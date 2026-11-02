@@ -1,6 +1,6 @@
+import { apiRequest } from '../auth.js';
 import { publishChatUnreadCount, syncApplicationBadge } from '../notifications/app-badge.js';
 import { refreshServiceUnseen } from '../notifications/service-unseen.js';
-import { getProfessionalMessengerConversations } from './messenger-api.js';
 
 const CHAT_UNREAD_KEY = '__VA_TOOLS_CHAT_UNREAD__';
 let refreshBusy = false;
@@ -61,7 +61,9 @@ function publish(total) {
 }
 
 async function loadTotal() {
-  const conversations = await getProfessionalMessengerConversations();
+  const response = await apiRequest('/communications/messenger/conversations');
+  const conversations = await response.json().catch(() => []);
+  if (!response.ok) throw new Error('Не удалось загрузить Messenger');
   return professionalUnread(conversations);
 }
 
