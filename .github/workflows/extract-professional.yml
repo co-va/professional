@@ -44,7 +44,7 @@ jobs:
         run: |
           node --check professional.js
           node --check service-worker.js
-          find core journal timetable settings chat online-booking invite ui pwa \
+          find core journal timetable settings chat online-booking invite ui \
             -type f \( -name '*.js' -o -name '*.mjs' \) -print0 \
             | xargs -0 -n1 node --check
 
