@@ -37,4 +37,47 @@ const result = spawnSync(process.execPath, [runtimeFile], {
 
 await fs.rm(runtimeFile, { force: true });
 if (result.error) throw result.error;
-process.exit(result.status ?? 1);
+if ((result.status ?? 1) !== 0) process.exit(result.status ?? 1);
+
+async function preserveProfessionalPreviewRuntime() {
+  const environmentFile = path.resolve('core/environment.js');
+  let environment = await fs.readFile(environmentFile, 'utf8');
+
+  if (!environment.includes("export const AMVERA_PREVIEW_API_BASE = '/api';")) {
+    environment = environment.replace(
+      "export const CODESPACES_STAGING_API_BASE = '/api';",
+      "export const CODESPACES_STAGING_API_BASE = '/api';\nexport const AMVERA_PREVIEW_API_BASE = '/api';",
+    );
+  }
+
+  environment = environment.replace(
+    "if (host.endsWith(AMVERA_SUFFIX)) return PRODUCTION_API_BASE;",
+    "if (host.endsWith(AMVERA_SUFFIX)) return AMVERA_PREVIEW_API_BASE;",
+  );
+
+  const simpleRuntime = `export function resolveRuntimeEnvironment({ hostname = '', override = '' } = {}) {\n  const base = resolveApiBase({ hostname, override });\n  return base === PRODUCTION_API_BASE ? 'production' : 'staging';\n}`;
+  const previewRuntime = `export function resolveRuntimeEnvironment({ hostname = '', override = '' } = {}) {\n  const explicit = normalizedBase(override);\n  const host = String(hostname || '').trim().toLowerCase();\n  if (!explicit && host.endsWith(AMVERA_SUFFIX)) return 'production';\n\n  const base = resolveApiBase({ hostname, override });\n  return base === PRODUCTION_API_BASE ? 'production' : 'staging';\n}`;
+  environment = environment.replace(simpleRuntime, previewRuntime);
+
+  if (!environment.includes("if (host.endsWith(AMVERA_SUFFIX)) return AMVERA_PREVIEW_API_BASE;")) {
+    throw new Error('Professional Amvera API mapping was not preserved');
+  }
+  await fs.writeFile(environmentFile, environment, 'utf8');
+
+  const nginx = `server {\n  listen 3000;\n  server_name _;\n  root /usr/share/nginx/html;\n  index index.html;\n\n  location ^~ /api/ {\n    proxy_pass https://api.va-tools.ru/;\n    proxy_set_header Host api.va-tools.ru;\n    proxy_ssl_server_name on;\n    proxy_ssl_name api.va-tools.ru;\n    proxy_set_header X-Real-IP $remote_addr;\n    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n    proxy_set_header X-Forwarded-Proto https;\n  }\n\n  location = /booking { try_files /booking.html =404; add_header Cache-Control \"no-cache\"; }\n  location ^~ /booking/ { try_files /booking.html =404; add_header Cache-Control \"no-cache\"; }\n  location ~* \\.(?:js|mjs|css|json|webmanifest|svg|png|jpg|jpeg|webp|woff2?)$ { try_files $uri =404; add_header Cache-Control \"no-cache\"; }\n  location = /service-worker.js { add_header Cache-Control \"no-cache\"; try_files $uri =404; }\n  location / { try_files $uri $uri/ /index.html; }\n}\n`;
+  await fs.writeFile(path.resolve('nginx.conf'), nginx, 'utf8');
+
+  const authFile = path.resolve('ui/auth/auth.css');
+  let auth = await fs.readFile(authFile, 'utf8');
+  auth = auth.replace(
+    '.shared-login-screen{width:min(100%,var(--app-max-width));min-height:100dvh;background:',
+    '.shared-login-screen{width:min(100%,var(--app-max-width));min-height:100dvh;margin:0 auto;background:',
+  );
+  if (!auth.includes('.shared-login-screen{width:min(100%,var(--app-max-width));min-height:100dvh;margin:0 auto;')) {
+    throw new Error('Professional login centering was not preserved');
+  }
+  await fs.writeFile(authFile, auth, 'utf8');
+}
+
+await preserveProfessionalPreviewRuntime();
+process.exit(0);
