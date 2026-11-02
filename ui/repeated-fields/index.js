@@ -11,23 +11,52 @@ function normalizeItems(values) {
       : { value: String(value), source: '' });
 }
 
-export function repeatedField({ label = '', name = '', values = [], type = 'text', placeholder = 'Добавить значение', className = '', showEmptyRow = true } = {}) {
+export function repeatedField({
+  label = '',
+  name = '',
+  values = [],
+  type = 'text',
+  placeholder = 'Добавить значение',
+  className = '',
+  showEmptyRow = true,
+  addInHeader = false,
+} = {}) {
   const items = normalizeItems(values);
   const rows = items.length ? items : (showEmptyRow ? [{ value: '', source: '' }] : []);
-  return `<div class="array-group ${escapeHtml(className)}" data-repeated-field data-repeated-name="${escapeHtml(name)}" data-repeated-label="${escapeHtml(label)}" data-repeated-type="${escapeHtml(type)}" data-repeated-placeholder="${escapeHtml(placeholder)}"><span class="array-label">${escapeHtml(label)}</span><div data-repeated-list>${rows.map((item,index) => repeatedRow({ name, type, value: item.value, source: item.source, placeholder, label, primary:index===0 })).join('')}</div></div>`;
+  const addLabel = label ? `Добавить ${label}` : 'Добавить значение';
+  const addControl = button('+', {
+    className:'array-row__add',
+    data:`data-repeated-add="${escapeHtml(name)}"`,
+    aria:addLabel,
+  });
+  const header = addInHeader
+    ? `<div class="array-group__header"><span class="array-label">${escapeHtml(label)}</span>${addControl}</div>`
+    : `<span class="array-label">${escapeHtml(label)}</span>`;
+  const rowMarkup = rows.map((item,index) => repeatedRow({
+    name,
+    type,
+    value:item.value,
+    source:item.source,
+    placeholder,
+    label,
+    action:addInHeader ? (index === 0 ? 'none' : 'remove') : (index === 0 ? 'add' : 'remove'),
+  })).join('');
+  return `<div class="array-group ${escapeHtml(className)}" data-repeated-field data-repeated-name="${escapeHtml(name)}" data-repeated-label="${escapeHtml(label)}" data-repeated-type="${escapeHtml(type)}" data-repeated-placeholder="${escapeHtml(placeholder)}" data-repeated-add-placement="${addInHeader ? 'header' : 'row'}">${header}<div data-repeated-list>${rowMarkup}</div></div>`;
 }
 
-function repeatedRow({ name, type, value = '', source = '', placeholder, label = '', primary = false }) {
+function repeatedRow({ name, type, value = '', source = '', placeholder, label = '', action = 'remove' }) {
   const sourceMarkup = source ? ` data-repeated-source="${escapeHtml(source)}"` : '';
   const removeLabel = label ? `Удалить ${label}` : 'Удалить значение';
   const addLabel = label ? `Добавить ${label}` : 'Добавить значение';
   const inputMarkup = type === 'tel'
     ? phoneInput({ name, value, aria: label || 'Телефон' })
     : `<input type="${escapeHtml(type)}" name="${escapeHtml(name)}" value="${escapeHtml(value)}" placeholder="${escapeHtml(placeholder)}">`;
-  const action = primary
+  const control = action === 'add'
     ? button('+', { className:'array-row__add', data:`data-repeated-add="${escapeHtml(name)}"`, aria:addLabel })
-    : `<button type="button" class="remove-button" data-repeated-remove aria-label="${escapeHtml(removeLabel)}">×</button>`;
-  return `<div class="array-row" data-repeated-row${sourceMarkup}>${inputMarkup}${action}</div>`;
+    : action === 'remove'
+      ? `<button type="button" class="remove-button" data-repeated-remove aria-label="${escapeHtml(removeLabel)}">×</button>`
+      : '';
+  return `<div class="array-row${action === 'none' ? ' array-row--solo' : ''}" data-repeated-row${sourceMarkup}>${inputMarkup}${control}</div>`;
 }
 
 export function initRepeatedFields(root) {
@@ -49,7 +78,7 @@ export function initRepeatedFields(root) {
       const label = group.dataset.repeatedLabel || '';
       const type = group.dataset.repeatedType || 'text';
       const placeholder = group.dataset.repeatedPlaceholder || 'Добавить значение';
-      list.insertAdjacentHTML('beforeend', repeatedRow({ name, type, placeholder, label, primary:false }));
+      list.insertAdjacentHTML('beforeend', repeatedRow({ name, type, placeholder, label, action:'remove' }));
       group.dispatchEvent(new Event('change', { bubbles: true }));
     });
   });
