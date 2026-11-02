@@ -1,0 +1,50 @@
+name: Extract Professional
+
+on:
+  push:
+    branches:
+      - staging
+    paths:
+      - .github/workflows/extract-professional.yml
+      - scripts/extract-professional.mjs
+
+permissions:
+  contents: write
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Professional
+        uses: actions/checkout@v4
+        with:
+          ref: staging
+          fetch-depth: 0
+
+      - name: Checkout core source
+        uses: actions/checkout@v4
+        with:
+          repository: co-va/core
+          ref: main
+          path: source
+          persist-credentials: false
+
+      - name: Extract clean Professional
+        shell: bash
+        run: |
+          SOURCE_SHA="$(git -C source rev-parse HEAD)"
+          echo "SOURCE_SHA=$SOURCE_SHA" >> "$GITHUB_ENV"
+          SOURCE_SHA="$SOURCE_SHA" node scripts/extract-professional.mjs
+
+      - name: Commit extracted application
+        shell: bash
+        run: |
+          git config user.name "co-tools"
+          git config user.email "a.volokovykh@yandex.ru"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No extraction changes"
+            exit 0
+          fi
+          git commit -m "Extract Professional from core main ${SOURCE_SHA}"
+          git push origin HEAD:staging
