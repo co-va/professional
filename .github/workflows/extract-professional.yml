@@ -8,6 +8,7 @@ on:
     paths:
       - .github/workflows/extract-professional.yml
       - scripts/extract-professional.mjs
+      - scripts/run-extraction.mjs
 
 permissions:
   contents: write
@@ -35,7 +36,7 @@ jobs:
         run: |
           SOURCE_SHA="$(git -C source rev-parse HEAD)"
           echo "SOURCE_SHA=$SOURCE_SHA" >> "$GITHUB_ENV"
-          SOURCE_SHA="$SOURCE_SHA" node scripts/extract-professional.mjs
+          SOURCE_SHA="$SOURCE_SHA" node scripts/run-extraction.mjs
 
       - name: Remove source checkout
         shell: bash
