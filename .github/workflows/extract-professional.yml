@@ -9,6 +9,7 @@ on:
       - .github/workflows/extract-professional.yml
       - scripts/extract-professional.mjs
       - scripts/run-extraction.mjs
+      - scripts/audit-professional-clean.mjs
       - scripts/overrides/**
 
 permissions:
@@ -74,6 +75,10 @@ jobs:
           find core journal timetable settings chat online-booking invite ui \
             -type f \( -name '*.js' -o -name '*.mjs' \) -print0 \
             | xargs -0 -n1 node --check
+
+      - name: Audit Professional cleanliness
+        shell: bash
+        run: node scripts/audit-professional-clean.mjs
 
       - name: Remove source checkout
         shell: bash
