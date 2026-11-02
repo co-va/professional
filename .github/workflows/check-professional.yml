@@ -20,6 +20,26 @@ jobs:
       - name: Checkout Professional
         uses: actions/checkout@v4
 
+      - name: Assert standalone repository
+        shell: bash
+        run: |
+          forbidden=(
+            "EXTRACTION_REPORT.md"
+            "EXTRACTION_SCOPE.md"
+            ".github/workflows/extract-professional.yml"
+            "scripts/extract-professional.mjs"
+            "scripts/run-extraction.mjs"
+            "scripts/overrides"
+            "scripts/extract-from-core.mjs"
+            ".github/workflows/probe-preview.yml"
+          )
+          for path in "${forbidden[@]}"; do
+            if [ -e "$path" ]; then
+              echo "Forbidden migration artifact: $path"
+              exit 1
+            fi
+          done
+
       - name: Validate JavaScript
         shell: bash
         run: |
