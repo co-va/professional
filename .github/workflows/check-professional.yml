@@ -40,6 +40,24 @@ jobs:
             fi
           done
 
+      - name: Assert Profile Q surface invariant
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const source = fs.readFileSync('core/profile/profile.js', 'utf8');
+          const start = source.indexOf('function openProfileData(');
+          const end = source.indexOf('export function openProfileAppearanceQ', start);
+          if (start < 0 || end < 0) throw new Error('Profile data surface not found');
+          const block = source.slice(start, end);
+          if (!block.includes('mountModal(') || !block.includes("variant:'q'")) {
+            throw new Error('Profile data must open through canonical Q');
+          }
+          if (block.includes('mountV2ZLayer(')) {
+            throw new Error('Profile data must not open as nested Z');
+          }
+          NODE
+
       - name: Validate JavaScript
         shell: bash
         run: |
