@@ -39,6 +39,22 @@ jobs:
           echo "SOURCE_SHA=$SOURCE_SHA" >> "$GITHUB_ENV"
           SOURCE_SHA="$SOURCE_SHA" node scripts/run-extraction.mjs
 
+      - name: Apply Professional UI invariants
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('ui/auth/auth.css')
+          text = path.read_text()
+          old = '.shared-login-screen{width:min(100%,var(--app-max-width));min-height:100dvh;background:var(--surface-dark)}'
+          new = '.shared-login-screen{width:min(100%,var(--app-max-width));min-height:100dvh;margin:0 auto;background:var(--surface-dark)}'
+          if old in text:
+              text = text.replace(old, new)
+          elif new not in text:
+              raise SystemExit('Professional login centering invariant not found')
+          path.write_text(text)
+          PY
+
       - name: Validate extracted JavaScript
         shell: bash
         run: |
