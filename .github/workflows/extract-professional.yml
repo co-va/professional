@@ -9,6 +9,7 @@ on:
       - .github/workflows/extract-professional.yml
       - scripts/extract-professional.mjs
       - scripts/run-extraction.mjs
+      - scripts/overrides/**
 
 permissions:
   contents: write
@@ -38,9 +39,22 @@ jobs:
           echo "SOURCE_SHA=$SOURCE_SHA" >> "$GITHUB_ENV"
           SOURCE_SHA="$SOURCE_SHA" node scripts/run-extraction.mjs
 
+      - name: Validate extracted JavaScript
+        shell: bash
+        run: |
+          node --check professional.js
+          node --check service-worker.js
+          find core journal timetable settings chat online-booking invite ui pwa \
+            -type f \( -name '*.js' -o -name '*.mjs' \) -print0 \
+            | xargs -0 -n1 node --check
+
       - name: Remove source checkout
         shell: bash
         run: rm -rf source
+
+      - name: Validate Docker build
+        shell: bash
+        run: docker build --tag co-va-professional-check .
 
       - name: Commit extracted application
         shell: bash
