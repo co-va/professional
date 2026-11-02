@@ -11,6 +11,10 @@ const patches = [
     "return content.slice(0,a)+replacement+content.slice(b);",
     "return content.slice(0,a)+replacement+content.slice(b+end.length);",
   ],
+  [
+    "await copyJs(await resolveModule(key, spec));",
+    "const dependency = await resolveModule(key, spec);\n    try { await copyJs(dependency); } catch (error) { throw new Error(`${key} -> ${dependency}: ${error.message}`); }",
+  ],
 ];
 
 for (const [before, after] of patches) {
