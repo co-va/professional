@@ -392,6 +392,7 @@ async function renderActiveWorkspaceSurface(surface) {
 function renderWorkspace() {
   setThemeColor('#2F3338');
   app.classList.remove('app-shell--booking');
+  app.classList.remove('app-shell--auth');
   workspaceReady = true;
   disposeView();
   disposeView = () => {};
@@ -606,6 +607,7 @@ async function renderAuthenticated(account = authenticatedAccount) {
 function renderPasswordResetRequest() {
   setThemeColor('#F5F5F3');
   app.classList.remove('app-shell--booking');
+  app.classList.add('app-shell--auth');
   workspaceReady = false;
   disposeView();
   disposeView = () => {};
@@ -653,6 +655,7 @@ function renderPasswordResetRequest() {
 function renderLogin(message = '') {
   setThemeColor('#F5F5F3');
   app.classList.remove('app-shell--booking');
+  app.classList.add('app-shell--auth');
   workspaceReady = false;
   disposeView();
   disposeView = () => {};

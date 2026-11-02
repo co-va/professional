@@ -1,6 +1,6 @@
 # Professional extraction report
 
-Source: co-va/core:main @ da6670d7b299d74337c9f9e93f60828d8948789e
+Source: co-va/core:main @ 201e467112616524dc549c4ddc5db2a10f2adeae
 Files copied/generated: 293
 
 Excluded: User Journal runtime/markers; User/Account runtime; Admin; Landing; unreachable legacy modules.
