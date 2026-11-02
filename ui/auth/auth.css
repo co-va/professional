@@ -6,3 +6,6 @@ body:has(.shared-login-screen){background:var(--surface-dark)}
 .shared-login-form .field input,.shared-login-form .password-field__control input{border-radius:0!important}
 .shared-login-form .v2-sticker-link{border-radius:0}
 .shared-login-screen .ui-button:active,[data-shared-profile-action="logout"]:active{transform:translateY(1px);filter:brightness(.9)}
+body:has(.v2-sticker-screen--auth){background:var(--surface-dark)}
+.app-shell:has(> .v2-sticker-screen--auth){width:100%;max-width:none;min-height:100dvh;margin:0;padding-top:0;background:var(--surface-dark);box-shadow:none}
+.app-shell:has(> .v2-sticker-screen--auth)>.v2-sticker-screen--auth{width:min(100%,var(--app-max-width));margin-left:auto;margin-right:auto}
