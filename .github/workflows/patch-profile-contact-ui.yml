@@ -1,0 +1,50 @@
+name: Patch Profile Contact UI
+
+on:
+  push:
+    branches:
+      - staging
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: staging
+      - name: Apply Profile contact UI alignment
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          profile = Path('core/profile/profile.js')
+          text = profile.read_text()
+          old = "${v2Section('Контактные данные',repeatedField({label:'Телефон',name:'profilePhones',values:p.phones?.length?p.phones:[p.phone||''],type:'tel'})+repeatedField({label:'Telegram',name:'profileTelegrams',values:p.telegrams||[]})+repeatedField({label:'Email',name:'profileEmails',values:emails,type:'email'}))}"
+          new = "${v2Section('Контактные данные',repeatedField({label:'Телефон',name:'profilePhones',values:p.phones?.length?p.phones:[p.phone||''],type:'tel',addInHeader:true})+repeatedField({label:'Telegram',name:'profileTelegrams',values:p.telegrams||[],addInHeader:true})+repeatedField({label:'Email',name:'profileEmails',values:emails,type:'email',addInHeader:true}))}"
+          if old not in text:
+              raise SystemExit('Profile contact block not found; refusing broad edit')
+          profile.write_text(text.replace(old, new, 1))
+
+          css = Path('ui/inputs/inputs.css')
+          css_text = css.read_text()
+          marker = '/* Repeated contacts: compact header add control, matching the shared User profile pattern. */'
+          if marker not in css_text:
+              css_text += '''\n\n/* Repeated contacts: compact header add control, matching the shared User profile pattern. */\n.array-group[data-repeated-add-placement="header"] .array-group__header{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:28px}\n.array-group[data-repeated-add-placement="header"] .array-group__header .array-row__add{width:28px;min-width:28px;max-width:28px;height:28px;min-height:28px;max-height:28px;border:0;border-radius:0;padding:0;display:grid;place-items:center;background:transparent;color:#111;font-size:26px;font-weight:400;line-height:1;box-shadow:none}\n.array-group[data-repeated-add-placement="header"] .array-group__header .array-row__add:active{transform:none;opacity:.55}\n.array-group[data-repeated-add-placement="header"] [data-repeated-list]{display:grid;gap:7px;min-width:0}\n.array-group[data-repeated-add-placement="header"] .array-row--solo{grid-template-columns:minmax(0,1fr)}\n'''
+          css.write_text(css_text)
+          PY
+          node --check core/profile/profile.js
+          node --check ui/repeated-fields/index.js
+      - name: Commit patch
+        shell: bash
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add core/profile/profile.js ui/inputs/inputs.css
+          git diff --cached --check
+          git commit -m 'Align Profile contact controls [skip ci]'
+          git push origin HEAD:staging
