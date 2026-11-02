@@ -27,3 +27,10 @@
 .field input:disabled{background:var(--surface-soft);color:var(--text);opacity:1;cursor:default}
 
 .form-grid--relaxed{gap:14px}.input-action-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:7px;align-items:center}.field-inline-label{display:flex;align-items:center;justify-content:space-between;gap:8px;color:var(--text-secondary);font-size:13px}
+
+/* Repeated contacts: compact header add control, matching the shared User profile pattern. */
+.array-group[data-repeated-add-placement="header"] .array-group__header{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:28px}
+.array-group[data-repeated-add-placement="header"] .array-group__header .array-row__add{width:28px;min-width:28px;max-width:28px;height:28px;min-height:28px;max-height:28px;border:0;border-radius:0;padding:0;display:grid;place-items:center;background:transparent;color:#111;font-size:26px;font-weight:400;line-height:1;box-shadow:none}
+.array-group[data-repeated-add-placement="header"] .array-group__header .array-row__add:active{transform:none;opacity:.55}
+.array-group[data-repeated-add-placement="header"] [data-repeated-list]{display:grid;gap:7px;min-width:0}
+.array-group[data-repeated-add-placement="header"] .array-row--solo{grid-template-columns:minmax(0,1fr)}

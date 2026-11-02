@@ -78,7 +78,7 @@ function profileDataFields(p,emails,includePhoto=false){
   }):'';
   return `<div class="v2-profile-data-grid">
     ${v2Section('Личные данные',`<div class="form-grid">${photo}${field({label:'Имя',name:'profileName',value:p.name,placeholder:'Ваше имя',required:true})}${field({label:'Фамилия',name:'profileSurname',value:p.surname,placeholder:'Ваша фамилия'})}${textareaField({label:'О себе',name:'profileAbout',value:p.about||'',placeholder:'Коротко о себе'})}</div>`)}
-    ${v2Section('Контактные данные',repeatedField({label:'Телефон',name:'profilePhones',values:p.phones?.length?p.phones:[p.phone||''],type:'tel'})+repeatedField({label:'Telegram',name:'profileTelegrams',values:p.telegrams||[]})+repeatedField({label:'Email',name:'profileEmails',values:emails,type:'email'}))}
+    ${v2Section('Контактные данные',repeatedField({label:'Телефон',name:'profilePhones',values:p.phones?.length?p.phones:[p.phone||''],type:'tel',addInHeader:true})+repeatedField({label:'Telegram',name:'profileTelegrams',values:p.telegrams||[],addInHeader:true})+repeatedField({label:'Email',name:'profileEmails',values:emails,type:'email',addInHeader:true}))}
     ${v2Section('Профессиональные данные',`<div class="form-grid">${searchableSelect({label:'Профессия',name:'profession',value:p.profession||'',options:professionOptions(p.profession),placeholder:'Введите профессию',required:true})}${select({label:'Опыт работы',name:'experience',value:p.experience||'',options:[{value:'',label:'Не указан'},...EXPERIENCES.map(v=>({value:v,label:v}))]})}${textareaField({label:'О профессии',name:'professionAbout',value:p.professionAbout||'',placeholder:'Расскажите о своей профессии'})}</div>`)}
   </div>`;
 }
