@@ -1,0 +1,70 @@
+name: Fix Profile Data Q
+
+on:
+  push:
+    branches:
+      - staging
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: staging
+      - name: Replace Profile data Z2 with canonical Q
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('core/profile/profile.js')
+          text = path.read_text()
+          old = """function openProfileData(root,navigateBack,options={}){
+            const p=getProfile();
+            const layer=mountV2ZLayer(root,v2ZLayer(page([
+              profileContext(p,'Данные профиля'),
+              profileDataForm(p,options)
+            ]),{className:'v2-profile-data-layer'}));
+            if(!layer)return;
+            layer.querySelector('[data-profile-settings]')?.addEventListener('click',()=>openProfileSettings(root,navigateBack,options));
+            bindProfileData(layer,p,options,()=>{
+              layer.v2Close?.();
+              renderProfile(root,navigateBack,options);
+            });
+          }
+          """
+          new = """function openProfileData(root,navigateBack,options={}){
+            const p=getProfile();
+            const layer=mountModal(root,modal(`${profileContext(p,'Данные профиля')}${profileDataForm(p,options)}`,{
+              title:'Данные профиля',
+              variant:'q',
+              surface:'app',
+              className:'v2-profile-data-layer',
+            }));
+            if(!layer)return;
+            layer.querySelector('[data-v2-q-header-content]')?.replaceChildren();
+            layer.querySelector('[data-profile-settings]')?.addEventListener('click',()=>openProfileSettings(root,navigateBack,options));
+            bindProfileData(layer,p,options,()=>{
+              layer.v2Close?.();
+              renderProfile(root,navigateBack,options);
+            });
+          }
+          """
+          if old not in text:
+              raise SystemExit('Expected Profile data Z2 block not found; refusing broad edit')
+          path.write_text(text.replace(old, new, 1))
+          PY
+          node --check core/profile/profile.js
+      - name: Commit patch
+        shell: bash
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add core/profile/profile.js
+          git diff --cached --check
+          git commit -m 'Use canonical Q for Profile data [skip ci]'
+          git push origin HEAD:staging
