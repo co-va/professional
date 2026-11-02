@@ -179,11 +179,14 @@ function bindProfileData(layer,p,options,onSaved){
 
 function openProfileData(root,navigateBack,options={}){
   const p=getProfile();
-  const layer=mountV2ZLayer(root,v2ZLayer(page([
-    profileContext(p,'Данные профиля'),
-    profileDataForm(p,options)
-  ]),{className:'v2-profile-data-layer'}));
+  const layer=mountModal(root,modal(`${profileContext(p,'Данные профиля')}${profileDataForm(p,options)}`,{
+    title:'Данные профиля',
+    variant:'q',
+    surface:'app',
+    className:'v2-profile-data-layer',
+  }));
   if(!layer)return;
+  layer.querySelector('[data-v2-q-header-content]')?.replaceChildren();
   layer.querySelector('[data-profile-settings]')?.addEventListener('click',()=>openProfileSettings(root,navigateBack,options));
   bindProfileData(layer,p,options,()=>{
     layer.v2Close?.();
