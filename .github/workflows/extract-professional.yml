@@ -1,6 +1,7 @@
 name: Extract Professional
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - staging
@@ -35,6 +36,10 @@ jobs:
           SOURCE_SHA="$(git -C source rev-parse HEAD)"
           echo "SOURCE_SHA=$SOURCE_SHA" >> "$GITHUB_ENV"
           SOURCE_SHA="$SOURCE_SHA" node scripts/extract-professional.mjs
+
+      - name: Remove source checkout
+        shell: bash
+        run: rm -rf source
 
       - name: Commit extracted application
         shell: bash
