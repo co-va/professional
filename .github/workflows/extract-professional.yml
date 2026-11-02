@@ -39,20 +39,65 @@ jobs:
           echo "SOURCE_SHA=$SOURCE_SHA" >> "$GITHUB_ENV"
           SOURCE_SHA="$SOURCE_SHA" node scripts/run-extraction.mjs
 
-      - name: Apply Professional UI invariants
+      - name: Apply Professional runtime invariants
         shell: bash
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          path = Path('ui/auth/auth.css')
-          text = path.read_text()
-          old = '.shared-login-screen{width:min(100%,var(--app-max-width));min-height:100dvh;background:var(--surface-dark)}'
-          new = '.shared-login-screen{width:min(100%,var(--app-max-width));min-height:100dvh;margin:0 auto;background:var(--surface-dark)}'
-          if old in text:
-              text = text.replace(old, new)
-          elif new not in text:
-              raise SystemExit('Professional login centering invariant not found')
-          path.write_text(text)
+
+          # Professional auth surfaces must use the full viewport as their host,
+          # with the sticker centered independently inside it.
+          auth_path = Path('ui/auth/auth.css')
+          auth = auth_path.read_text()
+          auth_rules = '''
+.app-shell.app-shell--auth{width:100%;max-width:none;min-height:100dvh;margin:0;padding-top:0;background:var(--surface-dark);box-shadow:none}
+.app-shell.app-shell--auth>.v2-sticker-screen{width:min(100%,var(--app-max-width));margin-left:auto;margin-right:auto}
+'''
+          if '.app-shell.app-shell--auth{' not in auth:
+              auth += auth_rules
+          auth_path.write_text(auth)
+
+          entry_path = Path('professional.js')
+          entry = entry_path.read_text()
+
+          login_marker = "function renderLogin(message = '') {\n  setThemeColor('#F5F5F3');\n  app.classList.remove('app-shell--booking');"
+          login_replacement = login_marker + "\n  app.classList.add('app-shell--auth');"
+          if login_replacement not in entry:
+              if login_marker not in entry:
+                  raise SystemExit('Professional login auth-class marker not found')
+              entry = entry.replace(login_marker, login_replacement, 1)
+
+          reset_marker = "function renderPasswordResetRequest() {\n  setThemeColor('#F5F5F3');\n  app.classList.remove('app-shell--booking');"
+          reset_replacement = reset_marker + "\n  app.classList.add('app-shell--auth');"
+          if reset_replacement not in entry:
+              if reset_marker not in entry:
+                  raise SystemExit('Professional reset auth-class marker not found')
+              entry = entry.replace(reset_marker, reset_replacement, 1)
+
+          workspace_marker = "function renderWorkspace() {\n  setThemeColor('#2F3338');\n  app.classList.remove('app-shell--booking');"
+          workspace_replacement = workspace_marker + "\n  app.classList.remove('app-shell--auth');"
+          if workspace_replacement not in entry:
+              if workspace_marker not in entry:
+                  raise SystemExit('Professional workspace auth-class marker not found')
+              entry = entry.replace(workspace_marker, workspace_replacement, 1)
+
+          entry_path.write_text(entry)
+
+          # nginx defaults to HTTP/1.0 for proxy_pass. The production API edge
+          # answers that with HTTP 426 Upgrade Required, so preview proxy must use 1.1.
+          nginx_path = Path('nginx.conf')
+          nginx = nginx_path.read_text()
+          proxy_marker = '    proxy_set_header Host api.va-tools.ru;\n'
+          proxy_replacement = (
+              proxy_marker
+              + '    proxy_http_version 1.1;\n'
+              + '    proxy_set_header Connection "";\n'
+          )
+          if 'proxy_http_version 1.1;' not in nginx:
+              if proxy_marker not in nginx:
+                  raise SystemExit('Professional API proxy marker not found')
+              nginx = nginx.replace(proxy_marker, proxy_replacement, 1)
+          nginx_path.write_text(nginx)
           PY
 
       - name: Validate extracted JavaScript
@@ -63,6 +108,13 @@ jobs:
           find core journal timetable settings chat online-booking invite ui \
             -type f \( -name '*.js' -o -name '*.mjs' \) -print0 \
             | xargs -0 -n1 node --check
+
+      - name: Validate Professional runtime invariants
+        shell: bash
+        run: |
+          grep -F 'proxy_http_version 1.1;' nginx.conf
+          grep -F 'app-shell--auth' professional.js
+          grep -F '.app-shell.app-shell--auth' ui/auth/auth.css
 
       - name: Remove source checkout
         shell: bash
