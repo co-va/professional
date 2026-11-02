@@ -15,6 +15,10 @@ const patches = [
     "await copyJs(await resolveModule(key, spec));",
     "const dependency = await resolveModule(key, spec);\n    try { await copyJs(dependency); } catch (error) { throw new Error(`${key} -> ${dependency}: ${error.message}`); }",
   ],
+  [
+    "overrides.set('ui/ui.js',transformUiBarrel(await read('ui/ui.js')));",
+    "overrides.set('core/chat/unread-runtime.js', (await read('core/chat/unread-runtime.js'))\n  .replace(\"import { getGlobalAccountUnreadSummary } from '../account/index.js';\\n\", '')\n  .replace(\"import { USER_ORIGIN } from '../environment.js';\\n\", '')\n  .replace(\"const USER_HOST = new URL(USER_ORIGIN).hostname;\\n\", '')\n  .replace(/function isEndUserRuntime\\(\\) \\{[\\s\\S]*?\\n\\}\\n\\n/, '')\n  .replace(/async function loadTotal\\(\\) \\{[\\s\\S]*?\\n\\}/, \"async function loadTotal() {\\n  const conversations = await getProfessionalMessengerConversations();\\n  return professionalUnread(conversations);\\n}\"));\noverrides.set('ui/ui.js',transformUiBarrel(await read('ui/ui.js')));",
+  ],
 ];
 
 for (const [before, after] of patches) {
