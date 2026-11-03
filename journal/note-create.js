@@ -20,10 +20,10 @@ import {
   parseNoteTargetValue,
 } from './note-target.js';
 
-function normalizeTargetForDate(state, targetSource = null) {
+function normalizeTargetForDate(state) {
   const current = noteTargetValue(state);
   if (!current) return;
-  const allowed = new Set(noteTargetOptions(state.date, { source: targetSource }).map((option) => String(option.value || '')));
+  const allowed = new Set(noteTargetOptions(state.date).map((option) => String(option.value || '')));
   if (allowed.has(current)) return;
   state.targetType = '';
   state.targetId = '';
@@ -32,12 +32,9 @@ function normalizeTargetForDate(state, targetSource = null) {
 export function createJournalNoteFlow({
   owner,
   date,
-  noteActions = null,
-  targetSource = null,
   onCreated = () => {},
 } = {}) {
   if (!owner) return null;
-  const customActions = noteActions && typeof noteActions.create === 'function' ? noteActions : null;
 
   const state = {
     date: String(date || '').slice(0, 10),
@@ -66,7 +63,7 @@ export function createJournalNoteFlow({
   };
 
   const render = () => {
-    normalizeTargetForDate(state, targetSource);
+    normalizeTargetForDate(state);
     const view = owner.render({
       step: 'note',
       title: false,
@@ -80,7 +77,7 @@ export function createJournalNoteFlow({
           label: 'Прикрепить к',
           name: 'target',
           value: noteTargetValue(state),
-          options: noteTargetOptions(state.date, { source: targetSource }),
+          options: noteTargetOptions(state.date),
           aria: 'Прикрепить заметку',
         })}
         ${field({ label: 'Наименование', name: 'title', value: state.title })}
@@ -101,7 +98,7 @@ export function createJournalNoteFlow({
       const previousDate = state.date;
       capture(view.body);
       if (event.target?.name === 'date' && state.date !== previousDate) {
-        normalizeTargetForDate(state, targetSource);
+        normalizeTargetForDate(state);
         render();
       }
     });
@@ -121,10 +118,9 @@ export function createJournalNoteFlow({
       submit.disabled = true;
       const input = {
         context: noteContextWithTarget(
-          { scope: customActions ? 'account' : 'professional' },
+          { scope: 'professional' },
           state.targetType,
           state.targetId,
-          { source: targetSource },
         ),
         date: state.date,
         from: state.from,
@@ -136,21 +132,6 @@ export function createJournalNoteFlow({
         color: state.color,
       };
 
-      if (customActions) {
-        try {
-          const created = await customActions.create(input);
-          if (!created) throw new Error('Не удалось создать заметку.');
-          owner.commit?.();
-          onCreated?.(created);
-        } catch (error) {
-          openNotice({
-            title: 'Не удалось создать заметку',
-            message: String(error?.message || 'Сервер не подтвердил сохранение.'),
-          });
-          if (submit.isConnected) submit.disabled = false;
-        }
-        return;
-      }
 
       const ownerId = String(getProfile()?.id || '');
       if (!ownerId) {

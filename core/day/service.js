@@ -3,7 +3,7 @@
 import { replaceDayRows } from './data.js';
 import { getDay, getDays } from './read.js';
 import { createDayValue, dayDate, dayIdentity } from './rules.js';
-import { createTimeRange, getWorkingTimeUsageConflicts, isValidRange, releaseWorkingTimeSoftUsages } from '../time/index.js';
+import { createTimeRange, getWorkingTimeUsageConflicts, isValidRange } from '../time/index.js';
 
 export function getDayRemovalConflicts(workplaceId, date) {
   const key = dayDate(date);
@@ -27,14 +27,7 @@ export function saveDays(days) {
   }
 
   if (Array.isArray(days) && blocked.length) days.splice(0, days.length, ...next.map((day) => ({ ...day })));
-  const nextIds = new Set(next.map(dayIdentity));
-  const removed = current.filter((day) => !nextIds.has(dayIdentity(day)));
   replaceDayRows(next);
-  removed.forEach((day) => releaseWorkingTimeSoftUsages({
-    operation: 'remove',
-    date: dayDate(day?.date),
-    workplaceId: String(day?.workplaceId || ''),
-  }));
 
   return blocked.length
     ? { ok: false, reason: 'usage-conflict', blocked }

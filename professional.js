@@ -16,9 +16,9 @@ import { loadOperationalState } from './core/runtime/operational-state.js';
 import { ensureRknGuide, loadTenantDocumentArchive, refreshTenantDocumentArchive } from './core/runtime/tenant-document-archive.js';
 import { loadAuxiliaryState, loadFinanceState } from './core/runtime/auxiliary-state.js';
 import { startProfessionalServerSync } from './core/runtime/server-sync.js';
-import { getJournalTimeUsages, releaseJournalSoftTimeUsages } from './journal/time-usage-source.js';
+import { getJournalTimeUsages } from './journal/time-usage-source.js';
 import { configureWorkplaceSource } from './core/workplace-time.js';
-import { configureTimeUsageSource, configureSoftTimeUsageReleaseSource } from './core/time/index.js';
+import { configureTimeUsageSource } from './core/time/index.js';
 import { getCurrentAccount, login, requestPasswordReset } from './core/auth.js';
 import { activateDemo, canUseCapability, getAccess, loadAccess } from './core/access.js';
 import { field, passwordField, initPasswordFields, mountV2ZLayer, openNotice, initV2WorkspaceInteraction, setV2DeckOpen, v2CardDeck, v2Header, v2Shell, v2Sticker, v2ZLayer } from './ui/ui.js';
@@ -26,7 +26,6 @@ import { startPlatformNotices } from './core/platform-notices.js';
 
 configureWorkplaceSource(getWorkplaceEntities);
 configureTimeUsageSource(getJournalTimeUsages);
-configureSoftTimeUsageReleaseSource(releaseJournalSoftTimeUsages);
 
 const ROOT_SECTIONS = [
   { id: 'people', label: 'Клиенты', capability: 'people.access' },

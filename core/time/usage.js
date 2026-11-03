@@ -1,16 +1,11 @@
-// Neutral occupancy contract between business owners and Core time mechanisms.
-// This module does not own WorkPlan, Record, Event, Availability, or UI state.
+// Neutral occupancy contract between business owners and Professional time mechanisms.
+// Every Record/Event is strict occupied time. There is no soft usage and no silent release.
 import { containsRange, isValidRange, timeToMinutes } from './math.js';
 
 let timeUsageSource = () => [];
-let softTimeUsageReleaseSource = () => 0;
 
 export function configureTimeUsageSource(source) {
   timeUsageSource = typeof source === 'function' ? source : () => [];
-}
-
-export function configureSoftTimeUsageReleaseSource(source) {
-  softTimeUsageReleaseSource = typeof source === 'function' ? source : () => 0;
 }
 
 export function normalizeTimeUsage(usage = {}) {
@@ -22,7 +17,6 @@ export function normalizeTimeUsage(usage = {}) {
   return {
     ...usage,
     type: String(usage?.type || 'usage'),
-    rigidity: usage?.rigidity === 'hard' ? 'hard' : 'soft',
     sourceId: String(usage?.sourceId ?? usage?.id ?? ''),
     from,
     to,
@@ -34,18 +28,11 @@ export function getTimeUsagesForScope(options = {}) {
   return (Array.isArray(values) ? values : []).map(normalizeTimeUsage).filter(Boolean);
 }
 
-// WorkPlan asks whether existing usages still fit inside a changed working interval.
-// This is not appointment availability: that belongs to availability.js.
 export function getWorkingTimeUsageConflicts({ operation = 'resize', from, to, ...scope } = {}) {
   const usages = getTimeUsagesForScope(scope);
-  if (operation === 'remove') return usages.filter((usage) => usage.rigidity === 'hard');
+  if (operation === 'remove') return usages;
   if (!isValidRange(from, to)) return [];
   return usages.filter((usage) => !containsRange(from, to, usage.from, usage.to));
-}
-
-export function releaseWorkingTimeSoftUsages(options = {}) {
-  const released = Number(softTimeUsageReleaseSource(options));
-  return Number.isFinite(released) && released > 0 ? released : 0;
 }
 
 export function notifyTimeUsageChanged(detail = {}) {

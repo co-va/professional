@@ -44,9 +44,8 @@ function colorSwatch(color) {
   return `<div class="color-picker__swatch" style="background:${String(color || '#777A7D')}" aria-label="Цвет события"></div>`;
 }
 
-export function createJournalEventFlow({ owner, date, workplaceId, timeHint = '', eventActions = null, onCreated = () => {} } = {}) {
+export function createJournalEventFlow({ owner, date, workplaceId, timeHint = '', onCreated = () => {} } = {}) {
   if (!owner) return null;
-  const customActions = eventActions && typeof eventActions.create === 'function' ? eventActions : null;
   const initialFrom = String(timeHint || '09:00');
   const state = {
     date: String(date || '').slice(0, 10),
@@ -71,25 +70,15 @@ export function createJournalEventFlow({ owner, date, workplaceId, timeHint = ''
       openNotice({ title: 'Событие', message: 'Проверьте время события.' });
       return false;
     }
-    if (!customActions) {
-      const availability = checkTimeAvailability({
-        date: state.date,
-        workplaceId: state.workplaceId,
-        from,
-        to,
-      });
-      if (!availability.ok) {
-        openNotice({ title: 'Событие', message: availabilityMessage(availability.reason) });
-        return false;
-      }
-      return true;
-    }
-    if (typeof customActions.validate === 'function') {
-      const availability = await customActions.validate({ ...state, from, to });
-      if (availability && availability.ok === false) {
-        openNotice({ title: 'Событие', message: availabilityMessage(availability.reason) });
-        return false;
-      }
+    const availability = checkTimeAvailability({
+      date: state.date,
+      workplaceId: state.workplaceId,
+      from,
+      to,
+    });
+    if (!availability.ok) {
+      openNotice({ title: 'Событие', message: availabilityMessage(availability.reason) });
+      return false;
     }
     return true;
   };
@@ -146,24 +135,6 @@ export function createJournalEventFlow({ owner, date, workplaceId, timeHint = ''
 
       const submit = domEvent.currentTarget;
       submit.disabled = true;
-      if (customActions) {
-        try {
-          const created = await customActions.create({
-            date: state.date,
-            from: state.from,
-            to: state.to,
-            title: state.title,
-            description: state.description,
-            color: state.color,
-          });
-          owner.commit?.();
-          onCreated?.(created);
-        } catch (error) {
-          openNotice({ title: 'Не удалось создать событие', message: String(error?.message || 'Сервер не подтвердил сохранение.') });
-          if (submit.isConnected) submit.disabled = false;
-        }
-        return;
-      }
 
       const created = createEvent({
         ownerType: 'tenant',

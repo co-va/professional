@@ -1,17 +1,14 @@
-// Neutral minute-resolution time grid.
-// Owns no business entities and stores no application state.
+// Neutral minute-resolution Professional time grid.
+// Every usage is strict occupied time.
 import { isValidRange, timeToMinutes, minutesToTime } from './math.js';
 
-const RIGIDITY_WEIGHT = Object.freeze({ soft: 1, hard: 2 });
 const DAY_MINUTES = 24 * 60;
-
 function normalizeDate(value) { return String(value || '').slice(0, 10); }
 function dateOrdinal(value) {
   const match = normalizeDate(value).match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!match) return null;
   return Math.floor(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])) / 86400000);
 }
-
 function normalizeUsage(usage = {}, gridDate = '') {
   const from = String(usage?.from || '');
   const to = String(usage?.to || '');
@@ -26,39 +23,30 @@ function normalizeUsage(usage = {}, gridDate = '') {
   const gridStart = Math.max(0, absoluteStart);
   const gridEnd = Math.min(DAY_MINUTES, absoluteEnd);
   if (gridEnd <= gridStart) return null;
-  const rigidity = usage?.rigidity === 'hard' ? 'hard' : 'soft';
-  return { ...usage, sourceId: String(usage?.sourceId ?? usage?.id ?? ''), type: String(usage?.type || 'usage'), rigidity, from, to, gridStart, gridEnd };
+  return { ...usage, sourceId: String(usage?.sourceId ?? usage?.id ?? ''), type: String(usage?.type || 'usage'), from, to, gridStart, gridEnd };
 }
-
 function normalizePlan(plan = null) { if (!plan || !isValidRange(plan?.from, plan?.to)) return null; return { from: String(plan.from), to: String(plan.to) }; }
 
 export function createTimeGrid({ date = '', workplaceId = '', plan = null, usages = [] } = {}) {
   const day = normalizeDate(date);
   return Object.freeze({ date: day, workplaceId: String(workplaceId || ''), plan: normalizePlan(plan), usages: Object.freeze((Array.isArray(usages) ? usages : []).map((usage) => normalizeUsage(usage, day)).filter(Boolean)) });
 }
-
 export function getTimeGridMinuteState(grid, time, { excludeId = '' } = {}) {
-  const minute = timeToMinutes(time);
-  const planStart = timeToMinutes(grid?.plan?.from);
-  const planEnd = timeToMinutes(grid?.plan?.to);
-  if (minute == null || planStart == null || planEnd == null || minute < planStart || minute >= planEnd) return { state: 'outside-plan', rigidity: '', usage: null };
+  const minute = timeToMinutes(time), planStart = timeToMinutes(grid?.plan?.from), planEnd = timeToMinutes(grid?.plan?.to);
+  if (minute == null || planStart == null || planEnd == null || minute < planStart || minute >= planEnd) return { state: 'outside-plan', usage: null };
   const excluded = String(excludeId || '');
-  const occupied = (Array.isArray(grid?.usages) ? grid.usages : []).filter((usage) => (!excluded || String(usage?.sourceId || '') !== excluded) && usage.gridStart <= minute && minute < usage.gridEnd).sort((left, right) => (RIGIDITY_WEIGHT[right?.rigidity] || 0) - (RIGIDITY_WEIGHT[left?.rigidity] || 0));
-  const usage = occupied[0] || null;
-  if (!usage) return { state: 'free', rigidity: '', usage: null };
-  return { state: 'occupied', rigidity: usage.rigidity, usage };
+  const usage = (Array.isArray(grid?.usages) ? grid.usages : []).find((item) => (!excluded || String(item?.sourceId || '') !== excluded) && item.gridStart <= minute && minute < item.gridEnd) || null;
+  return usage ? { state: 'occupied', usage } : { state: 'free', usage: null };
 }
-
 export function getTimeGridRangeState(grid, { from, to, excludeId = '' } = {}) {
   if (!isValidRange(from, to)) return { ok: false, reason: 'invalid-time', conflicts: [] };
   const planStart = timeToMinutes(grid?.plan?.from), planEnd = timeToMinutes(grid?.plan?.to), start = timeToMinutes(from), end = timeToMinutes(to);
   if (planStart == null || planEnd == null) return { ok: false, reason: 'day-not-working', conflicts: [] };
   if (start == null || end == null || start < planStart || end > planEnd) return { ok: false, reason: 'outside-working-time', conflicts: [] };
   const excluded = String(excludeId || '');
-  const conflicts = (Array.isArray(grid?.usages) ? grid.usages : []).filter((usage) => (!excluded || String(usage?.sourceId || '') !== excluded) && start < usage.gridEnd && usage.gridStart < end).sort((left, right) => (RIGIDITY_WEIGHT[right?.rigidity] || 0) - (RIGIDITY_WEIGHT[left?.rigidity] || 0));
+  const conflicts = (Array.isArray(grid?.usages) ? grid.usages : []).filter((usage) => (!excluded || String(usage?.sourceId || '') !== excluded) && start < usage.gridEnd && usage.gridStart < end);
   return conflicts.length ? { ok: false, reason: 'occupied', conflicts } : { ok: true, reason: '', conflicts: [] };
 }
-
 export function listTimeGridAvailableStarts(grid, { duration = 0, step = 5, from = '', to = '', excludeId = '' } = {}) {
   const minutes = Math.max(1, Number(duration) || 0), increment = Math.max(1, Number(step) || 1);
   const planStart = timeToMinutes(grid?.plan?.from), planEnd = timeToMinutes(grid?.plan?.to), windowStart = timeToMinutes(from), windowEnd = timeToMinutes(to);
@@ -67,7 +55,6 @@ export function listTimeGridAvailableStarts(grid, { duration = 0, step = 5, from
   for (let minute = Math.ceil(start / increment) * increment; minute + minutes <= end; minute += increment) { const candidateFrom = minutesToTime(minute), candidateTo = minutesToTime(minute + minutes); if (!candidateFrom || !candidateTo) continue; if (getTimeGridRangeState(grid, { from: candidateFrom, to: candidateTo, excludeId }).ok) values.push(candidateFrom); }
   return values;
 }
-
 export function listTimeGridAvailableEnds(grid, { from, step = 5, to = '', excludeId = '' } = {}) {
   const start = timeToMinutes(from), planEnd = timeToMinutes(grid?.plan?.to), windowEnd = timeToMinutes(to), increment = Math.max(1, Number(step) || 1);
   if (start == null || planEnd == null) return [];

@@ -57,10 +57,9 @@ function descriptionHtml(value = '') {
   return esc(value).replace(/\n/g, '<br>');
 }
 
-export function openEventView(eventOrId, { onClose = () => {}, eventActions = null } = {}) {
+export function openEventView(eventOrId, { onClose = () => {}, } = {}) {
   const eventId = String(typeof eventOrId === 'object' ? eventOrId?.id : eventOrId || '');
-  const customActions = eventActions && typeof eventActions.read === 'function' ? eventActions : null;
-  const readCurrent = () => customActions ? customActions.read(eventId) : readEvent(eventId);
+  const readCurrent = () => readEvent(eventId);
   let current = readCurrent();
   if (!current) return null;
 
@@ -72,7 +71,6 @@ export function openEventView(eventOrId, { onClose = () => {}, eventActions = nu
   if (!layer) return null;
 
   const openNotes = (source) => {
-    if (customActions?.supportsNotes === false) return;
     const notes = getNotesForTarget('event', source.id);
     if (!notes.length) return;
     const noteDate = String(notes[0]?.date || source.date || '').slice(0, 10);
@@ -93,9 +91,7 @@ export function openEventView(eventOrId, { onClose = () => {}, eventActions = nu
     current = readCurrent();
     const root = host(layer);
     if (!root || !current) return;
-    const notesAvailable = customActions?.supportsNotes === false
-      ? false
-      : hasNotesForTarget('event', current.id);
+    const notesAvailable = hasNotesForTarget('event', current.id);
 
     setV2ZHeaderRows(layer, [
       `<div class="record-creation-step-title">${esc(current.title || 'Событие')}</div>`,
@@ -125,20 +121,6 @@ export function openEventView(eventOrId, { onClose = () => {}, eventActions = nu
       confirm?.querySelector('[data-event-delete-confirm]')?.addEventListener('click', async (domEvent) => {
         const submit = domEvent.currentTarget;
         submit.disabled = true;
-        if (customActions) {
-          try {
-            await customActions.remove?.(eventId);
-            confirm.v2Close?.();
-            layer.v2Close?.();
-          } catch (error) {
-            openNotice({
-              title: 'Не удалось удалить событие',
-              message: String(error?.message || 'Сервер не подтвердил удаление.'),
-            });
-            if (submit.isConnected) submit.disabled = false;
-          }
-          return;
-        }
 
         const snapshot = { ...current };
         removeEvent(eventId);
@@ -164,16 +146,6 @@ export function openEventView(eventOrId, { onClose = () => {}, eventActions = nu
       return false;
     }
 
-    if (customActions) {
-      if (typeof customActions.validate === 'function') {
-        const availability = await customActions.validate({ ...state, from, to, excludeId: eventId });
-        if (availability && availability.ok === false) {
-          openNotice({ title: 'Событие', message: unavailable(availability.reason) });
-          return false;
-        }
-      }
-      return true;
-    }
 
     const availability = checkTimeAvailability({
       date: state.date,
@@ -263,26 +235,6 @@ export function openEventView(eventOrId, { onClose = () => {}, eventActions = nu
 
       const submit = form.querySelector('[type="submit"]');
       if (submit) submit.disabled = true;
-      if (customActions) {
-        try {
-          await customActions.update?.(eventId, {
-            title: state.title,
-            description: state.description,
-            color: state.color,
-            from: state.from,
-            to: state.to,
-          });
-          editLayer.v2Close?.();
-          renderRead();
-        } catch (error) {
-          openNotice({
-            title: 'Не удалось сохранить событие',
-            message: String(error?.message || 'Сервер не подтвердил изменения.'),
-          });
-          if (submit?.isConnected) submit.disabled = false;
-        }
-        return;
-      }
 
       updateEvent(eventId, {
         title: state.title,

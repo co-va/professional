@@ -238,7 +238,7 @@ for (const required of ALLOWED_ONLINE_BOOKING_FILES) {
 
 for (const file of (await walk('journal')).filter((item) => /\.(?:js|mjs)$/i.test(item))) {
   const text = await fs.readFile(abs(file), 'utf8');
-  if (/data-account|cova:account|accountMode|context:\s*['"]account['"]|core\/(?:note|event)\/account-owner|calendar-sync\/account/.test(text)) {
+  if (/data-account|cova:account|accountMode|context:\s*['"]account['"]|scope:\s*['"]account['"]|eventActions|noteActions|targetSource|core\/(?:note|event)\/account-owner|calendar-sync\/account/.test(text)) {
     problems.push(`End-user Journal marker remains: ${file}`);
   }
 }

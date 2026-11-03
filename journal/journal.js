@@ -4,7 +4,7 @@ import { getWorkplaceContext, setWorkplaceContext } from '../core/workplace-cont
 import { readOnlyReceipt } from '../ui/receipt/index.js';
 import { canUseCapability } from '../core/access.js';
 import { getAllWorkplacesMonthStats, getWorkplaceMonthStats, getWorkingDays, getWorkplaces } from '../core/workplace-time.js';
-import { getActiveDayWorkplaces } from '../core/day/index.js';
+import { getActiveDayWorkplaces, getDayRemovalConflicts } from '../core/day/index.js';
 import { getRecordPaymentState, recordAmountDue } from '../core/finance/index.js';
 import { makeTimetableDayOff, openTimetableDayTimeEditor } from '../timetable/day-editor.js';
 import { getActiveRecordCountForDay, getRecords, getRecordsForDay } from '../core/record/index.js';
@@ -228,7 +228,7 @@ export function renderJournal(root, options = {}) {
   const makeSelectedDayOff = () => {
     if (selectedWorkplaceId === ALL_WORKPLACES_ID) return;
     const day = dateKey(selectedDate);
-    if (getActiveRecordCountForDay(day, selectedWorkplaceId) > 0) return;
+    if (getDayRemovalConflicts(selectedWorkplaceId, day).length > 0) return;
     makeTimetableDayOff({
       date: selectedDate,
       workplaceId: selectedWorkplaceId,
@@ -241,7 +241,7 @@ export function renderJournal(root, options = {}) {
     const allMode = selectedWorkplaceId === ALL_WORKPLACES_ID;
     const canMakeDayOff = activeView === 'day'
       && !allMode
-      && getActiveRecordCountForDay(day, selectedWorkplaceId) === 0;
+      && getDayRemovalConflicts(selectedWorkplaceId, day).length === 0;
     openSharedProfileSettingsMenu({
       title: 'Настройки журнала',
       actions: [

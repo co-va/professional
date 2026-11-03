@@ -70,34 +70,32 @@ function storedTargetSnapshot(note = {}) {
   return { ...snapshot, type, id };
 }
 
-function recordsForDay(date, source = null) {
-  if (typeof source?.recordsForDay === 'function') return source.recordsForDay(date) || [];
+function recordsForDay(date) {
   return getRecordsForDay(date, '');
 }
 
-function eventsForDay(date, source = null) {
-  if (typeof source?.eventsForDay === 'function') return source.eventsForDay(date) || [];
+function eventsForDay(date) {
   return getEventsForDay(date, '');
 }
 
-function liveTarget(type = '', id = '', source = null) {
+function liveTarget(type = '', id = '') {
   if (!id) return null;
   if (type === 'record') {
-    const record = typeof source?.readRecord === 'function' ? source.readRecord(id) : getRecord(id);
+    const record = getRecord(id);
     return record ? { type: 'record', entity: record, historical: false, deleted: false } : null;
   }
   if (type === 'event') {
-    const event = typeof source?.readEvent === 'function' ? source.readEvent(id) : readEvent(id);
+    const event = readEvent(id);
     return event ? { type: 'event', entity: event, historical: false, deleted: false } : null;
   }
   return null;
 }
 
-export function noteTargetSnapshot(targetType = '', targetId = '', { source = null } = {}) {
-  return targetSnapshot(liveTarget(targetType, targetId, source));
+export function noteTargetSnapshot(targetType = '', targetId = '') {
+  return targetSnapshot(liveTarget(targetType, targetId));
 }
 
-export function noteContextWithTarget(context = {}, targetType = '', targetId = '', { source = null } = {}) {
+export function noteContextWithTarget(context = {}, targetType = '', targetId = '') {
   const next = context && typeof context === 'object' && !Array.isArray(context) ? { ...context } : {};
   const type = targetType === 'record' || targetType === 'event' ? String(targetType) : '';
   const id = type ? String(targetId || '') : '';
@@ -106,7 +104,7 @@ export function noteContextWithTarget(context = {}, targetType = '', targetId = 
     return next;
   }
 
-  const snapshot = noteTargetSnapshot(type, id, { source });
+  const snapshot = noteTargetSnapshot(type, id);
   if (snapshot) {
     next.targetSnapshot = snapshot;
     return next;
@@ -119,16 +117,16 @@ export function noteContextWithTarget(context = {}, targetType = '', targetId = 
   return next;
 }
 
-export function noteTargetOptions(date, { includeNote = null, source = null } = {}) {
+export function noteTargetOptions(date, { includeNote = null } = {}) {
   const options = [
     { value: '', label: 'Не прикреплено' },
-    ...recordsForDay(date, source).filter((record) => record?.status !== 'cancelled').map((record) => recordOption(record)),
-    ...eventsForDay(date, source).map((event) => eventOption(event)),
+    ...recordsForDay(date).filter((record) => record?.status !== 'cancelled').map((record) => recordOption(record)),
+    ...eventsForDay(date).map((event) => eventOption(event)),
   ];
 
   const currentValue = noteTargetValue(includeNote || {});
   if (!currentValue || options.some((option) => String(option.value || '') === currentValue)) return options;
-  const target = resolveNoteTarget(includeNote || {}, { source });
+  const target = resolveNoteTarget(includeNote || {});
   if (!target) return options;
   if (target.type === 'record') {
     const label = target.deleted
@@ -158,14 +156,14 @@ export function noteTargetValue(note = {}) {
   return type && id ? `${type}:${id}` : '';
 }
 
-export function resolveNoteTarget(note = {}, { source = null } = {}) {
+export function resolveNoteTarget(note = {}) {
   const type = note?.targetType === 'record' || note?.targetType === 'event'
     ? String(note.targetType)
     : '';
   const id = String(note?.targetId || '');
   if (!type || !id) return null;
 
-  const live = liveTarget(type, id, source);
+  const live = liveTarget(type, id);
   if (live) return live;
 
   const snapshot = storedTargetSnapshot(note);
@@ -174,8 +172,8 @@ export function resolveNoteTarget(note = {}, { source = null } = {}) {
     : null;
 }
 
-export function noteTargetLabel(note = {}, { source = null } = {}) {
-  const target = resolveNoteTarget(note, { source });
+export function noteTargetLabel(note = {}) {
+  const target = resolveNoteTarget(note);
   if (!target) return '';
   if (target.type === 'record') {
     const status = target.deleted

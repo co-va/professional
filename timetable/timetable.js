@@ -15,7 +15,7 @@ function formatDuration(totalMinutes) {
   if (!hours) return `${minutes} м`;
   return `${hours} ч ${minutes} м`;
 }
-function occupiedLabel(item) { return item?.type === 'break' ? 'Перерыв' : 'Запись'; }
+function occupiedLabel(item) { return item?.type === 'event' ? 'Событие' : 'Запись'; }
 function formatMonthStats(stats = {}) {
   const days = Math.max(0, Number(stats?.days) || 0);
   const hours = Math.max(0, Number(stats?.hours) || 0);

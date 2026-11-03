@@ -20,7 +20,7 @@ function formatModalDate(value) {
 }
 
 function usageLabel(usage) {
-  return usage?.type === 'break' ? 'Перерыв' : 'Запись';
+  return usage?.type === 'event' ? 'Событие' : 'Запись';
 }
 
 function dayEntries(date, workingDays, workplaces) {
