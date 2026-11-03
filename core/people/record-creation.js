@@ -1,7 +1,9 @@
 import { openRecords } from '../records/records.js';
+import { openNotice } from '../../ui/ui.js';
 import { openRecordConfirmationNotice } from '../../ui/record/confirmation-notice.js';
 import { calculateSettlement, recordSettlementPricePercent } from '../finance/index.js';
 import { getProfile } from '../profile/data.js';
+import { loadRecordCreationOperationalState } from '../runtime/operational-state.js';
 import { procedurePricingForWorkplace } from '../service/procedures/selection.js';
 
 function actionContext() {
@@ -16,8 +18,18 @@ function actionContext() {
   };
 }
 
-export function openPersonRecordCreation({ person, onCreated = () => {} } = {}) {
+export async function openPersonRecordCreation({ person, onCreated = () => {} } = {}) {
   if (!person?.key) return null;
+
+  try {
+    await loadRecordCreationOperationalState();
+  } catch (error) {
+    openNotice({
+      title: 'Запись недоступна',
+      message: String(error?.message || 'Не удалось загрузить рабочие данные.'),
+    });
+    return null;
+  }
 
   return openRecords({
     context: 'person',
