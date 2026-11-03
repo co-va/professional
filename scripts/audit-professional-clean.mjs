@@ -28,6 +28,7 @@ const FORBIDDEN_EXACT = new Set([
   'online-booking/personal-account-data.js',
   'online-booking/password-settings.js',
   'online-booking/consent-settings.js',
+  'online-booking/server-sync.js',
   'core/account-transition-runtime.js',
   'core/chat/messenger-mode.js',
   'ui/header/mode-switch.js',
@@ -50,7 +51,13 @@ const ALLOWED_ONLINE_BOOKING_FILES = new Set([
   'online-booking/access.js',
   'online-booking/booking-entry.js',
   'online-booking/model.js',
-  'online-booking/server-sync.js',
+]);
+
+const RETIRED_RUNTIME_MARKERS = new Map([
+  ['book.auth.token', 'Legacy auth token key returned'],
+  ['book:v2-context-changed', 'Legacy Shared V2 context event returned'],
+  ["from './online-booking/server-sync.js'", 'Professional entry imports guest-contour server sync'],
+  ["from '../online-booking/server-sync.js'", 'Professional runtime imports guest-contour server sync'],
 ]);
 
 const reachable = new Set();
@@ -211,6 +218,13 @@ for (const file of allFiles) {
   if (FORBIDDEN_EXACT.has(file)) problems.push(`Forbidden file present: ${file}`);
   if (FORBIDDEN_PREFIXES.some((prefix) => file.startsWith(prefix))) problems.push(`Forbidden contour present: ${file}`);
   if (/(^|\/)(?:legacy|compat|bridge)(?:[._\/-]|$)/i.test(file)) problems.push(`Legacy/compat/bridge path present: ${file}`);
+
+  if (/\.(?:js|mjs|css|html|json|webmanifest)$/i.test(file)) {
+    const source = await fs.readFile(abs(file), 'utf8');
+    for (const [marker, message] of RETIRED_RUNTIME_MARKERS) {
+      if (source.includes(marker)) problems.push(`${message}: ${file}`);
+    }
+  }
 }
 
 for (const exact of FORBIDDEN_EXACT) if (await exists(exact)) problems.push(`Forbidden file present: ${exact}`);
@@ -235,6 +249,9 @@ if (await exists('professional.js')) {
   const entry = await fs.readFile(abs('professional.js'), 'utf8');
   if (/renderGlobalClient|renderOnlineBooking|isEndUserAppHost|END_USER_APP_HOSTS|account-runtime|user-entry/.test(entry)) {
     problems.push('Professional entry still contains User runtime markers');
+  }
+  if (!entry.includes("from './core/runtime/server-sync.js'")) {
+    problems.push('Professional entry must own server sync outside Public Booking');
   }
 }
 
@@ -266,4 +283,4 @@ if (uniqueProblems.length) {
   process.exit(1);
 }
 
-console.log('Professional clean audit PASS: no User contour, forbidden legacy paths, dead runtime code, unexpected Online Booking runtime, or exact runtime duplicates.');
+console.log('Professional clean audit PASS: standalone boundaries, guest Booking isolation, retired markers, reachability and duplicate checks are clean.');
