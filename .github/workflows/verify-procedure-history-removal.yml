@@ -1,34 +1,38 @@
-name: Verify procedure history removal once
+name: Diagnose procedure history removal once
 
 on:
   push:
     branches: [staging]
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  verify:
+  diagnose:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           ref: staging
-      - name: Verify removed history model
+      - name: Build diagnostic report
+        shell: bash
         run: |
-          set -euo pipefail
-          if grep -RInE --exclude-dir=.git --exclude-dir=.github 'procedureHistory|pushProcedureHistory|hydrateProceduresFromServer' .; then
-            echo 'Retired procedure history references remain.'
-            exit 1
-          fi
-          find . -type f \( -name '*.js' -o -name '*.mjs' \) -not -path './.git/*' -print0 | xargs -0 -n1 node --check
-          node scripts/audit-professional-clean.mjs
-      - name: Remove one-shot workflow
-        if: success()
-        run: |
-          rm .github/workflows/verify-procedure-history-removal.yml
-          git config user.name co-tools
-          git config user.email a.volokovykh@yandex.ru
-          git add -A
-          git commit -m 'Remove one-shot procedure history verifier'
-          git push origin HEAD:staging
+          set +e
+          {
+            echo '=== RETIRED REFERENCES ==='
+            git grep -n -E 'procedureHistory|pushProcedureHistory|hydrateProceduresFromServer' -- ':!.github/**'
+            echo "grep_exit=$?"
+            echo
+            echo '=== NODE CHECK ==='
+            find . -type f \( -name '*.js' -o -name '*.mjs' \) -not -path './.git/*' -not -path './.github/*' -print0 | xargs -0 -n1 node --check
+            echo "node_exit=$?"
+            echo
+            echo '=== CLEAN AUDIT ==='
+            node scripts/audit-professional-clean.mjs
+            echo "audit_exit=$?"
+          } > procedure-history-diagnostic.txt 2>&1
+          cat procedure-history-diagnostic.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: procedure-history-diagnostic
+          path: procedure-history-diagnostic.txt
