@@ -1,0 +1,56 @@
+name: Verify Professional Journal Z lifecycle once
+
+on:
+  push:
+    branches: [staging]
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: staging
+          fetch-depth: 0
+      - name: Verify Journal lifecycle, module links and Docker
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('node:fs');
+          const assert = require('node:assert/strict');
+          const journal = fs.readFileSync('journal/journal.js', 'utf8');
+          const day = fs.readFileSync('journal/день.js', 'utf8');
+          const editor = fs.readFileSync('journal/note-editor.js', 'utf8');
+          const create = fs.readFileSync('journal/note-create.js', 'utf8');
+          const owner = fs.readFileSync('ui/record/creation-flow.js', 'utf8');
+          assert.match(journal, /root\.querySelector\('\[data-record-creation-flow\]'\)/);
+          assert.match(journal, /onCreationFinished: renderView/);
+          assert.match(day, /onCreated: onCreationFinished \|\| rerender/);
+          assert.match(day, /onCancel: onCreationFinished \|\| rerender/);
+          assert.match(owner, /inlineHeaderHost\.replaceChildren\(savedHeader\)/);
+          assert.match(editor, /name: 'date', value: note\.date \|\| '', required: false, allowClear: true/);
+          assert.match(create, /journalDate/);
+          assert.match(create, /date: state\.date \|\| journalDate/);
+          assert.doesNotMatch(create, /Укажите дату заметки/);
+          console.log('Journal Z lifecycle and optional Note date contracts OK');
+          NODE
+          node -e "import('./ui/ui.js').then(() => console.log('shared UI module linked'))"
+          node -e "import('./journal/creation-flow.js').then(() => console.log('creation flow linked'))"
+          node -e "import('./journal/день.js').then(() => console.log('Journal day linked'))"
+          node -e "import('./journal/note-create.js').then(() => console.log('Note creation linked'))"
+          node -e "import('./journal/note-view.js').then(() => console.log('Note view linked'))"
+          find . -type f \( -name '*.js' -o -name '*.mjs' \) -not -path './.git/*' -print0 | xargs -0 -n1 node --check
+          node scripts/audit-professional-clean.mjs
+          docker build -t professional-journal-z-lifecycle .
+      - name: Remove temporary verifier
+        if: success()
+        run: |
+          set -euo pipefail
+          git config user.name co-tools
+          git config user.email a.volokovykh@yandex.ru
+          git rm .github/workflows/_verify-journal-z-lifecycle.yml
+          git commit -m 'Remove temporary Journal Z verifier'
+          git push origin HEAD:staging
