@@ -23,7 +23,7 @@ function formatMonthStats(stats = {}) {
   return { days, duration: `${hours} ч ${minutes} м` };
 }
 function notifyContext() {
-  window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
+  window.dispatchEvent(new CustomEvent('va-tools:v2-context-changed'));
 }
 
 export function renderTimetable(root) {
