@@ -58,7 +58,7 @@ const money = (value) => new Intl.NumberFormat('ru-RU').format(Number(value || 0
 const initials = (person) => [person?.name, person?.surname].filter(Boolean).slice(0, 2).map((part) => String(part).slice(0, 1).toUpperCase()).join('') || '?';
 
 function notifyContext() {
-  window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
+  window.dispatchEvent(new CustomEvent('va-tools:v2-context-changed'));
 }
 
 function sortItems(items, mode) {

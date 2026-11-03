@@ -14,7 +14,7 @@ async function download(rows,template=false){
 }
 export function render(root){
   const state={step:'upload',input:null,inspected:null,result:null,busy:false,history:[],cancelId:'',sortKey:'reason',descending:false,onlyErrors:true};
-  const notify=()=>window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
+  const notify=()=>window.dispatchEvent(new CustomEvent('va-tools:v2-context-changed'));
   function draw(){
     const next=state.step==='mapping'?'Проверить':state.step==='checked'?'Перенести':'Загрузить файл';
     root.innerHTML=page([

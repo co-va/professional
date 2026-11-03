@@ -185,7 +185,7 @@ function syncWorkplaceAvatar(root,photo){
   if(source){
     source.dataset.workspaceAImage=String(photo||'');
     source.dataset.workspaceAImagePosition='50% 50%';
-    window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
+    window.dispatchEvent(new CustomEvent('va-tools:v2-context-changed'));
   }
 }
 

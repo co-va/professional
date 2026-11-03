@@ -311,7 +311,7 @@ async function renderIntegrations(root) {
     : { error: telegramResult.reason instanceof Error ? telegramResult.reason.message : String(telegramResult.reason || 'Не удалось проверить состояние подключения') };
   const emailState = emailResult.status === 'fulfilled' ? emailResult.value : { error: 'Не удалось проверить состояние подключения' };
   renderIntegrationCards(root, telegramState, emailState);
-  window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
+  window.dispatchEvent(new CustomEvent('va-tools:v2-context-changed'));
 }
 
 export function render(root) { void renderIntegrations(root); }

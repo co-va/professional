@@ -67,7 +67,7 @@ const money = (value) => `${new Intl.NumberFormat('ru-RU', { maximumFractionDigi
 const uid = () => globalThis.crypto?.randomUUID?.() || `deposit-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
 function notifyContext() {
-  window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
+  window.dispatchEvent(new CustomEvent('va-tools:v2-context-changed'));
 }
 
 function crop(value) {

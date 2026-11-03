@@ -205,7 +205,7 @@ function openEditor(root, routing, event) {
       }, { viewer: 'profile' });
     }
     if (primary) primary.dataset.v2PrimaryVisible = editorSignature(form) !== initial ? 'true' : 'false';
-    window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
+    window.dispatchEvent(new CustomEvent('va-tools:v2-context-changed'));
   };
 
   form?.addEventListener('input', redraw);
@@ -226,7 +226,7 @@ function openEditor(root, routing, event) {
     } catch (error) {
       if (primary) primary.disabled = false;
       if (status) status.textContent = error instanceof Error ? error.message : 'Не удалось сохранить сообщение';
-      window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
+      window.dispatchEvent(new CustomEvent('va-tools:v2-context-changed'));
     }
   });
   redraw();

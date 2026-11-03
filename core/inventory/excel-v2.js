@@ -31,7 +31,7 @@ function numberText(value, maximum = 3) {
 }
 
 function notifyContext() {
-  window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
+  window.dispatchEvent(new CustomEvent('va-tools:v2-context-changed'));
 }
 
 function errorMessage(error, fallback = 'Ошибка Excel') {

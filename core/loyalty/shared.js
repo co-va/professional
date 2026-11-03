@@ -35,7 +35,7 @@ export const text = (value) => String(value ?? '').trim();
 export const uid = (prefix = 'loyalty') => globalThis.crypto?.randomUUID?.() || `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
 export function notifyLoyaltyContext() {
-  window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
+  window.dispatchEvent(new CustomEvent('va-tools:v2-context-changed'));
 }
 
 function crop(value) {

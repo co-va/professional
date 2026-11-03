@@ -352,11 +352,11 @@ export function mountRecordQ({
     disposeCalendarHeaderHost();
     originalClose?.();
     queueMicrotask(() => {
-      window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
+      window.dispatchEvent(new CustomEvent('va-tools:v2-context-changed'));
       onClose?.();
     });
   };
-  window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
+  window.dispatchEvent(new CustomEvent('va-tools:v2-context-changed'));
   return layer;
 }
 

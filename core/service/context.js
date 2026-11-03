@@ -32,5 +32,5 @@ export function serviceHeaderContext({
 }
 
 export function notifyServiceContext() {
-  window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
+  window.dispatchEvent(new CustomEvent('va-tools:v2-context-changed'));
 }

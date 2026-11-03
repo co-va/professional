@@ -387,7 +387,7 @@ function openDocumentDetail(root, item) {
 
   layer.querySelector('[data-document-content-open]')?.addEventListener('click', () => openDocument(item));
   layer.querySelector('[data-document-detail-settings]')?.addEventListener('click', () => openDocumentDetailSettings(root, layer, item));
-  window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
+  window.dispatchEvent(new CustomEvent('va-tools:v2-context-changed'));
   return layer;
 }
 
@@ -438,7 +438,7 @@ function renderTemplatesLayer(layer, root) {
       if (item) renderTemplateEditor(layer, root, item);
     });
   });
-  window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
+  window.dispatchEvent(new CustomEvent('va-tools:v2-context-changed'));
 }
 
 function openTemplatesLayer(root) {
@@ -710,7 +710,7 @@ function renderMain(root) {
     `<section class="documents-content" data-documents-content>${contentMarkup()}</section>`,
   ]);
   bindMain(root);
-  window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
+  window.dispatchEvent(new CustomEvent('va-tools:v2-context-changed'));
 }
 
 export function render(root) {
