@@ -1,4 +1,3 @@
-import { loadBookingDraft, saveBookingDraft, clearBookingDraft } from '../core/booking-draft.js';
 import { API_BASE } from '../core/environment.js';
 import { renderAccess } from './access.js';
 
@@ -64,27 +63,6 @@ async function resolveRoute() {
   };
 }
 
-function draftId(route) {
-  return `${String(route?.tenantId || '').trim()}:${String(route?.workplaceKey || '').trim() || 'profile'}`;
-}
-
-function restoreStoredDraft(route) {
-  const id = draftId(route);
-  if (!String(route?.tenantId || '').trim()) return id;
-  const stored = loadBookingDraft(id);
-  if (stored) {
-    history.replaceState({ ...(history.state || {}), covaBookingDraft: stored }, '', location.href);
-  }
-  return id;
-}
-
-function persistStoredDraft(id) {
-  if (!id) return;
-  const draft = history.state?.covaBookingDraft;
-  if (draft) saveBookingDraft(id, draft);
-  else clearBookingDraft(id);
-}
-
 window.addEventListener('resize', syncViewport, { passive: true });
 window.visualViewport?.addEventListener('resize', syncViewport, { passive: true });
 window.visualViewport?.addEventListener('scroll', syncViewport, { passive: true });
@@ -96,11 +74,5 @@ try {
 } catch {
   route = { tenantId: '', workplaceKey: '', procedureIds: [] };
 }
-
-const storedDraftId = restoreStoredDraft(route);
-window.addEventListener('pagehide', () => persistStoredDraft(storedDraftId));
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'hidden') persistStoredDraft(storedDraftId);
-});
 
 await renderAccess(root, route);
