@@ -1,4 +1,4 @@
-import { getProcedures, pushProcedureHistory, saveProcedure } from './data.js';
+import { getProcedures, saveProcedure } from './data.js';
 
 const normalizeId = (value) => String(value || '').trim();
 
@@ -22,10 +22,6 @@ export function assignProceduresToWorkplace({
     const procedureId = normalizeId(procedure?.id);
     if (!ids.has(procedureId) || hasWorkplace(procedure, targetWorkplaceId)) return;
 
-    const previous = {
-      ...procedure,
-      workplaces: Array.isArray(procedure?.workplaces) ? procedure.workplaces.map((item) => ({ ...item })) : [],
-    };
     const next = {
       ...procedure,
       workplaces: [
@@ -34,7 +30,6 @@ export function assignProceduresToWorkplace({
       ],
       updatedAt: new Date().toISOString(),
     };
-    pushProcedureHistory(previous, 'updated');
     saveProcedure(next);
     updated.push(next);
   });
