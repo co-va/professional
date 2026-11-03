@@ -1,19 +1,22 @@
-import { mountV2ZLayer, setV2ZHeaderRows, v2ZLayer } from '../ui/v2/index.js';
 import { actionBlock } from '../ui/page/page.js';
 import {
   button,
+  colorPicker,
   field,
+  initColorPickers,
+  initTimePickers,
   modal,
   mountModal,
-  openColorPickerAction,
   openNotice,
-  openTimeRangeAction,
   textareaField,
+  timePicker,
 } from '../ui/ui.js';
 import { checkTimeAvailability, timeToMinutes } from '../core/time/index.js';
 import { createEvent, readEvent, removeEvent, updateEvent } from '../core/event/index.js';
-import { getNotesForTarget, hasNotesForTarget } from '../core/note/index.js';
+import { getNotesForTarget } from '../core/note/index.js';
 import { flushBusinessPersistence } from '../core/business-persistence.js';
+import { noteAttachmentStickers } from '../ui/note/index.js';
+import { openNoteView } from './note-view.js';
 
 function esc(value = '') {
   return String(value).replace(/[&<>"']/g, (char) => ({
@@ -25,21 +28,14 @@ function esc(value = '') {
   }[char]));
 }
 
-function surface() {
-  return document.querySelector('[data-v2-workspace-surface]')
-    || document.querySelector('[data-v2-app]')
-    || document.body;
-}
-
-function host(layer) {
-  return layer?.querySelector('[data-event-view-host]') || null;
+function dateLabel(value = '') {
+  const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return match ? `${match[3]}.${match[2]}.${match[1].slice(-2)}` : String(value || '');
 }
 
 function unavailable(reason = '') {
   if (reason === 'occupied') return 'Это время уже занято.';
-  if (reason === 'day-not-working' || reason === 'outside-working-time') {
-    return 'Время находится вне рабочего графика.';
-  }
+  if (reason === 'day-not-working' || reason === 'outside-working-time') return 'Время находится вне рабочего графика.';
   return 'Проверьте время события.';
 }
 
@@ -49,216 +45,137 @@ function timeRangeValid(from, to) {
   return start != null && end != null && end > start;
 }
 
-function timeLabel(from, to) {
-  return `Время · С ${String(from || '—')} — До ${String(to || '—')}`;
-}
-
-function descriptionHtml(value = '') {
-  return esc(value).replace(/\n/g, '<br>');
-}
-
-export function openEventView(eventOrId, { onClose = () => {}, } = {}) {
+export function openEventView(eventOrId, { onClose = () => {} } = {}) {
   const eventId = String(typeof eventOrId === 'object' ? eventOrId?.id : eventOrId || '');
   const readCurrent = () => readEvent(eventId);
   let current = readCurrent();
   if (!current) return null;
 
-  const layer = mountV2ZLayer(
-    surface(),
-    v2ZLayer('<div data-event-view-host></div>', { className: 'event-view-z' }),
-    { stack: true, onClose },
-  );
+  const layer = mountModal(document.body, modal('<div data-event-view-host></div>', {
+    variant: 'q',
+    surface: 'app',
+    className: 'user-event-detail-q',
+  }));
   if (!layer) return null;
+  layer.setAttribute('aria-label', 'Событие');
 
-  const openNotes = (source) => {
-    const notes = getNotesForTarget('event', source.id);
-    if (!notes.length) return;
-    const noteDate = String(notes[0]?.date || source.date || '').slice(0, 10);
-    layer.v2Close?.();
-    queueMicrotask(() => {
-      window.dispatchEvent(new CustomEvent('professional:journal-note-focus-request', {
-        detail: {
-          targetType: 'event',
-          targetId: String(source.id || ''),
-          date: noteDate,
-          workplaceId: String(source.workplaceId || ''),
-        },
-      }));
-    });
-  };
+  const headerHost = layer.querySelector('[data-v2-q-header-content]');
+  if (headerHost) {
+    headerHost.innerHTML = '<div class="user-event-shell-title" style="position:absolute;top:0;left:52px;height:24px;display:flex;align-items:center;margin:0;font-size:20px;line-height:24px;font-weight:500">Событие</div>';
+  }
+
+  const originalClose = layer.v2Close?.bind(layer);
+  if (originalClose) {
+    layer.v2Close = () => {
+      if (!layer.isConnected) return;
+      originalClose();
+      onClose?.();
+    };
+  }
+  const host = () => layer.querySelector('[data-event-view-host]');
 
   const renderRead = () => {
     current = readCurrent();
-    const root = host(layer);
+    const root = host();
     if (!root || !current) return;
-    const notesAvailable = hasNotesForTarget('event', current.id);
-
-    setV2ZHeaderRows(layer, [
-      `<div class="record-creation-step-title">${esc(current.title || 'Событие')}</div>`,
-    ]);
-
+    const attachedNotes = getNotesForTarget('event', eventId);
+    const metaStyle = 'color:var(--text-secondary);font-size:13px;line-height:1.35;font-weight:650';
     root.innerHTML = `<section class="form-grid event-view">
-      <div><strong>${esc(current.date)}</strong></div>
-      <div><strong>С ${esc(current.from)} — До ${esc(current.to)}</strong></div>
-      <div class="color-picker__swatch" style="background:${esc(current.color || '#777A7D')}" aria-label="Цвет события"></div>
-      ${current.description ? `<div class="event-view__description">${descriptionHtml(current.description)}</div>` : ''}
-      ${actionBlock([
-        notesAvailable
-          ? button('Заметки', { variant: 'secondary', data: 'data-event-notes' })
-          : '',
-        button('Изменить', { data: 'data-event-edit' }),
-        button('Удалить событие', { data: 'data-event-delete', variant: 'danger' }),
-      ].filter(Boolean).join(''))}
+      <h2 style="margin:0;font-size:23px;line-height:1.15">${esc(current.title || 'Событие')}</h2>
+      ${current.description ? `<div class="event-view__description" style="white-space:pre-wrap;overflow-wrap:anywhere;font-size:18px;line-height:1.5">${esc(current.description)}</div>` : ''}
+      <div style="${metaStyle}">${esc(dateLabel(current.date || ''))}</div>
+      <div style="${metaStyle}">${esc(current.from || '')}–${esc(current.to || '')}</div>
+      ${noteAttachmentStickers(attachedNotes)}
+      ${actionBlock(`${button('Изменить', { data: 'data-event-edit' })}${button('Удалить', { variant: 'danger', data: 'data-event-delete' })}`)}
     </section>`;
 
-    root.querySelector('[data-event-notes]')?.addEventListener('click', () => openNotes(current));
-    root.querySelector('[data-event-edit]')?.addEventListener('click', openEdit);
-    root.querySelector('[data-event-delete]')?.addEventListener('click', () => {
-      const confirm = mountModal(document.body, modal(
-        button('Удалить событие', { data: 'data-event-delete-confirm', variant: 'danger' }),
-        { variant: 'x', title: 'Удалить событие' },
-      ));
-      confirm?.querySelector('[data-event-delete-confirm]')?.addEventListener('click', async (domEvent) => {
-        const submit = domEvent.currentTarget;
-        submit.disabled = true;
-
-        const snapshot = { ...current };
-        removeEvent(eventId);
-        try {
-          await flushBusinessPersistence();
-          confirm.v2Close?.();
-          layer.v2Close?.();
-        } catch (error) {
-          createEvent(snapshot);
-          openNotice({
-            title: 'Не удалось удалить событие',
-            message: String(error?.message || 'Сервер не подтвердил удаление.'),
-          });
-          if (submit.isConnected) submit.disabled = false;
-        }
-      });
-    });
-  };
-
-  const validateEditSelection = async (state, { from = state.from, to = state.to } = {}) => {
-    if (!timeRangeValid(from, to)) {
-      openNotice({ title: 'Событие', message: 'Проверьте время события.' });
-      return false;
-    }
-
-
-    const availability = checkTimeAvailability({
-      date: state.date,
-      workplaceId: state.workplaceId,
-      from,
-      to,
-      excludeId: eventId,
-    });
-    if (!availability.ok) {
-      openNotice({ title: 'Событие', message: unavailable(availability.reason) });
-      return false;
-    }
-    return true;
-  };
-
-  function openEdit() {
-    current = readCurrent();
-    if (!current) return null;
-    const before = { ...current };
-    const state = { ...current };
-
-    const editLayer = mountModal(document.body, modal(
-      `<form class="form-grid" data-event-edit-form>
-        ${field({ label: 'Наименование', name: 'title', value: state.title, required: true })}
-        ${textareaField({ label: 'Описание', name: 'description', value: state.description, rows: 8 })}
-        ${button(timeLabel(state.from, state.to), { variant: 'secondary', data: 'data-event-edit-time' })}
-        <div class="color-picker__swatch" data-event-edit-color style="background:${esc(state.color || '#777A7D')}" aria-label="Цвет события"></div>
-        ${actionBlock(`${button('Отмена', { data: 'data-event-edit-cancel', variant: 'secondary' })}${button('Сохранить', { type: 'submit' })}`)}
-      </form>`,
-      {
-        variant: 'q',
-        surface: 'app',
-        title: current.title || 'Событие',
-        className: 'event-edit-q',
-      },
-    ));
-    if (!editLayer) return null;
-
-    const form = editLayer.querySelector('[data-event-edit-form]');
-    const timeButton = editLayer.querySelector('[data-event-edit-time]');
-    const colorMark = editLayer.querySelector('[data-event-edit-color]');
-
-    const capture = () => {
-      if (!form) return;
-      const data = new FormData(form);
-      state.title = String(data.get('title') || '').trim();
-      state.description = String(data.get('description') || '').trim();
-    };
-
-    form?.addEventListener('input', capture);
-    form?.addEventListener('change', capture);
-
-    timeButton?.addEventListener('click', () => {
-      capture();
-      openTimeRangeAction({
-        from: state.from,
-        to: state.to,
-        title: 'Время события',
-        validate: (range) => validateEditSelection(state, range),
-        onSave: ({ from, to }) => {
-          openColorPickerAction({
-            value: state.color,
-            title: 'Цвет события',
-            confirm: true,
-            onSelect: (color) => {
-              state.from = from;
-              state.to = to;
-              state.color = color;
-              if (timeButton) timeButton.textContent = timeLabel(state.from, state.to);
-              if (colorMark) colorMark.style.background = state.color;
-            },
-          });
-        },
-      });
-    });
-
-    editLayer.querySelector('[data-event-edit-cancel]')?.addEventListener('click', () => editLayer.v2Close?.());
-
-    form?.addEventListener('submit', async (domEvent) => {
-      domEvent.preventDefault();
-      capture();
-      if (!state.title) {
-        openNotice({ title: 'Событие', message: 'Укажите название события.' });
+    root.querySelector('[data-event-edit]')?.addEventListener('click', renderEdit);
+    root.querySelectorAll('[data-note-attachment]').forEach((node) => node.addEventListener('click', () => {
+      const noteId = String(node.dataset.noteAttachment || '');
+      const note = attachedNotes.find((item) => String(item?.id || '') === noteId);
+      if (!note) return;
+      openNoteView(note, { onSaved: renderRead, onDeleted: renderRead });
+    }));
+    root.querySelector('[data-event-delete]')?.addEventListener('click', async (event) => {
+      const submit = event.currentTarget;
+      submit.disabled = true;
+      const snapshot = { ...current };
+      if (!removeEvent(eventId)) {
+        submit.disabled = false;
         return;
       }
-      if (!(await validateEditSelection(state))) return;
-
-      const submit = form.querySelector('[type="submit"]');
-      if (submit) submit.disabled = true;
-
-      updateEvent(eventId, {
-        title: state.title,
-        description: state.description,
-        color: state.color,
-        from: state.from,
-        to: state.to,
-      });
       try {
         await flushBusinessPersistence();
-        editLayer.v2Close?.();
+        layer.v2Close?.();
+      } catch (error) {
+        createEvent(snapshot);
+        openNotice({ title: 'Не удалось удалить событие', message: String(error?.message || 'Сервер не подтвердил удаление.') });
+        if (submit.isConnected) submit.disabled = false;
+      }
+    });
+  };
+
+  const renderEdit = () => {
+    current = readCurrent();
+    const root = host();
+    if (!root || !current) return;
+    root.innerHTML = `<form class="form-grid" data-event-edit-form>
+      <div class="user-event-color-picker">${colorPicker({ name: 'color', value: current.color || '#777A7D' })}</div>
+      <div class="time-range-fields">
+        ${timePicker({ label: 'С', name: 'from', value: current.from, minuteStep: 1 })}
+        ${timePicker({ label: 'До', name: 'to', value: current.to, minuteStep: 1 })}
+      </div>
+      ${field({ label: 'Наименование', name: 'title', value: current.title, required: true })}
+      ${textareaField({ label: 'Описание', name: 'description', value: current.description, rows: 6 })}
+      ${actionBlock(`${button('Сохранить', { type: 'submit' })}${button('Отмена', { variant: 'secondary', data: 'data-event-cancel' })}`)}
+    </form>`;
+    initTimePickers(root);
+    initColorPickers(root);
+    root.querySelector('[data-event-cancel]')?.addEventListener('click', renderRead);
+    root.querySelector('[data-event-edit-form]')?.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const data = new FormData(form);
+      const title = String(data.get('title') || '').trim();
+      const from = String(data.get('from') || '').slice(0, 5);
+      const to = String(data.get('to') || '').slice(0, 5);
+      if (!title) return openNotice({ title: 'Событие', message: 'Укажите наименование события.' });
+      if (!timeRangeValid(from, to)) return openNotice({ title: 'Событие', message: 'Проверьте время события.' });
+
+      const availability = checkTimeAvailability({
+        date: current.date,
+        workplaceId: current.workplaceId,
+        from,
+        to,
+        excludeId: eventId,
+      });
+      if (!availability.ok) return openNotice({ title: 'Событие', message: unavailable(availability.reason) });
+
+      const before = { ...current };
+      const patch = {
+        title,
+        description: String(data.get('description') || '').trim(),
+        from,
+        to,
+        color: String(data.get('color') || '#777A7D'),
+      };
+      const submit = form.querySelector('[type="submit"]');
+      if (submit) submit.disabled = true;
+      const updated = updateEvent(eventId, patch);
+      if (!updated) {
+        if (submit) submit.disabled = false;
+        return openNotice({ title: 'Событие', message: 'Не удалось сохранить событие.' });
+      }
+      try {
+        await flushBusinessPersistence();
         renderRead();
       } catch (error) {
         updateEvent(eventId, before);
-        openNotice({
-          title: 'Не удалось сохранить событие',
-          message: String(error?.message || 'Сервер не подтвердил изменения.'),
-        });
+        openNotice({ title: 'Не удалось сохранить событие', message: String(error?.message || 'Сервер не подтвердил изменения.') });
         if (submit?.isConnected) submit.disabled = false;
       }
     });
-
-    return editLayer;
-  }
+  };
 
   renderRead();
   return layer;
