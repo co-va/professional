@@ -1,5 +1,5 @@
 import { collectCost, costField, durationPicker, field, initCostFields, initDurationPickers, setSharedProfilePrimary, textareaField, v2ListEntries, v2ListEntry } from '../../../ui/ui.js';
-import { pushProcedureHistory, saveProcedure as saveProcedureData } from './data.js';
+import { saveProcedure as saveProcedureData } from './data.js';
 
 export function initialProcedure(existing = null, defaultWorkplace = null) {
   if (existing) return {
@@ -119,7 +119,6 @@ export function bindProcedureEditor(root, {
       createdAt: existing?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
-    if (existing) pushProcedureHistory(existing, 'updated');
     saveProcedureData(item);
     if (error) error.textContent = '';
     onSaved(item);
