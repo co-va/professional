@@ -111,7 +111,9 @@ export function v2ZFrame(content = '', { header = '', dismiss = true } = {}) {
 }
 
 export function v2QFrame(content = '', { header = '' } = {}) {
-  return `${v2QHeader(header)}${surfaceBody(content, { kind: 'q', topGap: Boolean(String(header || '').trim()) })}`;
+  // One Q body offset, independent of whether the screen displays a title.
+  // Content owners may omit text; they cannot collapse the Shared geometry.
+  return `${v2QHeader(header)}${surfaceBody(content, { kind: 'q', topGap: true })}`;
 }
 
 function resolveZSurface(root) {
