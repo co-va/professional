@@ -1,5 +1,5 @@
 import { escapeHtml } from '../utils/escape-html.js';
-import { mountV2Layer, v2Layer } from '../v2/index.js';
+import { bindV2HorizontalAffordances, mountV2Layer, v2Layer } from '../v2/index.js';
 import { v2QFrame } from '../v2/z-layout.js';
 
 let modalLevel = 0;
@@ -24,11 +24,12 @@ function assertInformationalS(content = '') {
 export function modal(content, { title = '', className = '', variant = 'q', surface = '', xRole = '' } = {}) {
   const resolvedVariant = MODAL_VARIANTS.has(variant) ? variant : 'q';
   if (resolvedVariant === 's') assertInformationalS(content);
+  const resolvedTitle = title;
   const kind = v2Kind(resolvedVariant);
   const variantClass = `modal--${kind}`;
   const surfaceClass = MODAL_SURFACES.has(surface) ? `modal--surface-${surface}` : '';
   const classes = ['modal-sheet', className, variantClass, surfaceClass].filter(Boolean).join(' ');
-  if (resolvedVariant === 'q') content = v2QFrame(content, { header: title ? `<h2 class="v2-q-title">${escapeHtml(title)}</h2>` : '' });
+  if (resolvedVariant === 'q') content = v2QFrame(content, { header: resolvedTitle ? `<h2 class="v2-q-title">${escapeHtml(resolvedTitle)}</h2>` : '' });
   let html = v2Layer(content, {
     kind,
     title: '',
@@ -39,7 +40,7 @@ export function modal(content, { title = '', className = '', variant = 'q', surf
     const resolvedRole = X_ROLES.has(xRole) ? xRole : 'editor';
     html = html.replace('data-v2-layer ', `data-v2-layer data-v2-x-role="${resolvedRole}" `);
   }
-  if (title) html = html.replace('aria-label=""', `aria-label="${escapeHtml(title)}"`);
+  if (resolvedTitle) html = html.replace('aria-label=""', `aria-label="${escapeHtml(resolvedTitle)}"`);
   html = html
     .replace('class="v2-layer-backdrop"', 'class="v2-layer-backdrop modal-backdrop" data-modal')
     .replace('class="v2-layer__close"', 'class="v2-layer__close modal-close" data-modal-close');
@@ -52,6 +53,7 @@ export function modal(content, { title = '', className = '', variant = 'q', surf
 export function mountModal(root, html) {
   const m = mountV2Layer(html, { root });
   if (!m) return null;
+  const disposeHorizontalAffordances = bindV2HorizontalAffordances(m);
   modalLevel += 1;
   m.dataset.modalLevel = String(modalLevel);
   const layerZ = String(1200 + modalLevel);
@@ -63,6 +65,7 @@ export function mountModal(root, html) {
   const originalClose = close;
   m.v2Close = () => {
     if (!m.isConnected) return;
+    disposeHorizontalAffordances?.();
     originalClose();
     if (!document.querySelector('[data-modal]')) modalLevel = 0;
   };
