@@ -89,7 +89,9 @@ export async function openJournalCreation({
   // This legacy API still owns current procedures; a scoped server endpoint is a CORE HANDOFF.
   if (typeof requestAnimationFrame === 'function') {
     requestAnimationFrame(() => {
-      if (owner.isOpen?.()) void loadRecordCreationOperationalState().catch(() => {});
+      window.setTimeout(() => {
+        if (owner.isOpen?.()) void loadRecordCreationOperationalState().catch(() => {});
+      }, 0);
     });
   } else {
     void loadRecordCreationOperationalState().catch(() => {});
