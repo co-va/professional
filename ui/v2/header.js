@@ -1,5 +1,8 @@
 import { text, dataAttributes } from './html.js';
 
+const STACKED_TITLE_LABEL_STYLE = 'display:block;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
+const STACKED_TITLE_SUBTITLE_STYLE = 'display:block;min-width:0;margin-top:1px;color:#fff;font-size:13px;line-height:1.1;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.82';
+
 function defaultChatBadge() {
   if (typeof globalThis === 'undefined') return 0;
   const value = Number(globalThis.__VA_TOOLS_ACCOUNT_UNREAD__?.total || 0);
@@ -15,6 +18,17 @@ function avatarControl(slot = {}) {
     ? `<span class="v2-header__avatar" style="--v2-avatar:url('${text(image)}');--v2-avatar-position:${text(slot.imagePosition || '50% 50%')}" aria-hidden="true"></span>`
     : `<span class="v2-header__avatar v2-header__avatar--initials" aria-hidden="true">${initials || label.slice(0, 1)}</span>`;
   return `<div class="v2-header__slot v2-header__slot--a"><div class="v2-header__control v2-header__control--avatar" aria-hidden="true">${body}</div></div>`;
+}
+
+function titleControl(slot = '') {
+  if (!slot || typeof slot !== 'object') return `<h1 class="v2-header__title">${text(slot)}</h1>`;
+  const label = text(slot.label || '');
+  const subtitle = text(slot.subtitle || '');
+  const content = `<span class="v2-header__title-label"${subtitle ? ` style="${STACKED_TITLE_LABEL_STYLE}"` : ''}>${label}</span>${subtitle ? `<span class="v2-header__title-subtitle" style="${STACKED_TITLE_SUBTITLE_STYLE}">${subtitle}</span>` : ''}`;
+  if (slot.data) {
+    return `<button type="button" class="v2-header__title v2-header__title-control"${dataAttributes(slot.data)} aria-label="${text(slot.aria || label)}">${content}</button>`;
+  }
+  return `<div class="v2-header__title" aria-label="${text(slot.aria || label)}">${content}</div>`;
 }
 
 function actionControl(slot = {}, role = '') {
@@ -44,9 +58,7 @@ function actionControl(slot = {}, role = '') {
 }
 
 export function v2Header({ a = null, b = '', c = null, d = null } = {}) {
-  const title = b && typeof b === 'object'
-    ? `<button type="button" class="v2-header__title v2-header__title-control"${dataAttributes(b.data)} aria-label="${text(b.aria || b.label || '')}">${text(b.label || '')}</button>`
-    : `<h1 class="v2-header__title">${text(b)}</h1>`;
+  const title = titleControl(b);
   const headerClasses = ['v2-header', c && !c.hidden ? 'has-c' : '', d && !d.hidden ? 'has-d' : ''].filter(Boolean).join(' ');
   return `<header class="${headerClasses}" data-v2-header>
     ${avatarControl(a)}
