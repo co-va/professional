@@ -179,7 +179,7 @@ function bindProfileData(layer,p,options,onSaved){
 function openProfileData(root,navigateBack,options={}){
   const p=getProfile();
   const layer=mountModal(root,modal(`${profileContext(p,'Данные профиля')}${profileDataForm(p,options)}`,{
-    title:'Данные профиля',
+    title:'',
     variant:'q',
     surface:'app',
     className:'v2-profile-data-layer',
