@@ -55,7 +55,7 @@ function flowMarkup() {
   return `<div class="record-creation-flow" data-record-creation-flow>
     <div class="modal-title record-creation-flow__title">
       <div data-record-creation-step-header></div>
-      <h2 data-record-creation-title>Запись</h2>
+      <h2 data-record-creation-title></h2>
     </div>
     <div class="record-creation-flow__body" data-record-creation-body></div>
     <div class="record-creation-flow__action" data-record-creation-action></div>
@@ -90,11 +90,12 @@ export function openRecordCreationOwner({
     layer = mountModal(document.body, modal(flowMarkup(), {
       variant: 'q',
       surface: 'app',
-      title: shellTitle,
+      title: '',
       className: 'record-creation-q',
     }));
   }
   if (!layer) return null;
+  if (!inline) layer.querySelector(':scope > .v2-layer')?.setAttribute('aria-label', shellTitle || 'Действие в Журнале');
 
   let committed = false;
   let closed = false;
@@ -158,9 +159,10 @@ export function openRecordCreationOwner({
   const actionHost = layer.querySelector('[data-record-creation-action]');
   const inlineStepHeaderHost = inline ? layer.querySelector('[data-record-creation-step-header]') : null;
   if (headerHost) {
-    headerHost.innerHTML = '<div data-record-creation-shell-header></div><div data-record-creation-step-header></div>';
+    headerHost.innerHTML = '<div data-record-creation-shell-header hidden></div><h2 class="v2-q-title" data-record-creation-header-title hidden></h2><div data-record-creation-step-header hidden></div>';
   }
   const shellHeaderHost = headerHost?.querySelector('[data-record-creation-shell-header]') || null;
+  const headerTitleHost = headerHost?.querySelector('[data-record-creation-header-title]') || null;
   const stepHeaderHost = inlineStepHeaderHost || headerHost?.querySelector('[data-record-creation-step-header]') || headerHost;
 
   const render = ({
@@ -173,10 +175,20 @@ export function openRecordCreationOwner({
   } = {}) => {
     if (!bodyHost || !actionHost || !titleHost) return null;
     layer.dataset.recordCreationStep = String(step || '');
-    if (stepHeaderHost) stepHeaderHost.innerHTML = String(header || '');
+    if (stepHeaderHost) {
+      stepHeaderHost.innerHTML = String(header || '');
+      if (stepHeaderHost !== headerHost) stepHeaderHost.hidden = !String(header || '').trim();
+    }
     const resolvedTitle = title === false ? '' : resolveRecordCreationTitle(step, title);
-    titleHost.textContent = resolvedTitle;
-    if (titleWrap) titleWrap.hidden = !resolvedTitle && !String(header || '').trim();
+    if (headerTitleHost) {
+      headerTitleHost.textContent = resolvedTitle;
+      headerTitleHost.hidden = !resolvedTitle;
+      titleHost.textContent = '';
+      if (titleWrap) titleWrap.hidden = true;
+    } else {
+      titleHost.textContent = resolvedTitle;
+      if (titleWrap) titleWrap.hidden = !resolvedTitle && !String(header || '').trim();
+    }
     bodyHost.innerHTML = body;
     const secondary = (Array.isArray(secondaryActions) ? secondaryActions : [])
       .filter((item) => item?.label)
@@ -214,6 +226,7 @@ export function openRecordCreationOwner({
       }
       if (!shellHeaderHost) return null;
       shellHeaderHost.innerHTML = String(content || '');
+      shellHeaderHost.hidden = !String(content || '').trim();
       return shellHeaderHost;
     },
     setBackHandler(handler = null) {
