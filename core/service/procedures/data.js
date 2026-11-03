@@ -1,7 +1,6 @@
 import { queueOperationalDataset } from '../../../core/business-persistence.js';
 
 let proceduresState = [];
-let historyState = [];
 
 function clone(value) {
   return value == null ? value : JSON.parse(JSON.stringify(value));
@@ -11,29 +10,14 @@ function readRawProcedures() {
   return clone(proceduresState);
 }
 
-function readHistory() {
-  return clone(historyState);
-}
-
 function writeProcedures(value) {
   proceduresState = Array.isArray(value) ? clone(value) : [];
   void queueOperationalDataset('procedures', proceduresState);
 }
 
-function writeHistory(value) {
-  historyState = Array.isArray(value) ? clone(value) : [];
-  void queueOperationalDataset('procedureHistory', historyState);
-}
-
 export function hydrateCurrentProceduresFromServer(procedures = []) {
   proceduresState = Array.isArray(procedures) ? clone(procedures) : [];
   return clone(proceduresState);
-}
-
-export function hydrateProceduresFromServer({ procedures = [], procedureHistory = [] } = {}) {
-  hydrateCurrentProceduresFromServer(procedures);
-  historyState = Array.isArray(procedureHistory) ? clone(procedureHistory) : [];
-  return { procedures: clone(proceduresState), procedureHistory: clone(historyState) };
 }
 
 export function getProcedures() {
@@ -47,21 +31,13 @@ export function saveProcedure(item) {
   return item;
 }
 
-export function pushProcedureHistory(record, action) {
-  const history = readHistory();
-  history.push({ ...record, historyAction: action, historyAt: new Date().toISOString() });
-  writeHistory(history);
-}
-
 export function deleteProcedure(id) {
   const values = readRawProcedures();
   const found = values.find((item) => item.id === id && !item.deletedAt);
   if (!found) return false;
-  pushProcedureHistory(found, 'deleted');
   writeProcedures(values.map((item) => item.id === id ? { ...item, deletedAt: new Date().toISOString() } : item));
   return true;
 }
-
 
 export function reorderProcedures(ids = []) {
   const order = (Array.isArray(ids) ? ids : []).map((value) => String(value || '')).filter(Boolean);
