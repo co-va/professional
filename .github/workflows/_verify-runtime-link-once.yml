@@ -1,0 +1,41 @@
+name: Verify Professional runtime module link once
+
+on:
+  push:
+    branches: [staging]
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: staging
+          fetch-depth: 0
+      - name: Verify module linkage and build
+        run: |
+          set -euo pipefail
+          if grep -R --include='*.js' -n 'noteIsActiveAt' .; then
+            echo 'Retired noteIsActiveAt reference remains'
+            exit 1
+          fi
+          node -e "import('./ui/ui.js').then(() => console.log('ui module link ok'))"
+          node -e "import('./journal/event-create.js').then(() => console.log('event create link ok'))"
+          node -e "import('./journal/event-view.js').then(() => console.log('event view link ok'))"
+          node -e "import('./journal/note-create.js').then(() => console.log('note create link ok'))"
+          node -e "import('./journal/note-view.js').then(() => console.log('note view link ok'))"
+          find . -type f \( -name '*.js' -o -name '*.mjs' \) -not -path './.git/*' -print0 | xargs -0 -n1 node --check
+          node scripts/audit-professional-clean.mjs
+          docker build -t professional-runtime-link .
+      - name: Remove temporary verifier
+        if: success()
+        run: |
+          set -euo pipefail
+          git config user.name co-tools
+          git config user.email a.volokovykh@yandex.ru
+          git rm .github/workflows/_verify-runtime-link-once.yml
+          git commit -m 'Remove runtime module-link verifier'
+          git push origin HEAD:staging
