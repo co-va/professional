@@ -1,16 +1,12 @@
 import {
   ALL_WORKPLACES_ID,
-  button,
   clearV2Y,
   focusNoteReels,
   initDateNavigator,
   initJournalDayTimeline,
   initNoteReels,
   journalDayTimeline,
-  modal,
-  mountModal,
   noteReels,
-  openRecordCreationOwner,
   setV2Y,
 } from '../ui/ui.js';
 import { getWorkplaces } from '../core/workplace-time.js';
@@ -18,9 +14,7 @@ import { getDays, getDay, getDayTime, getDaysForDate, getScheduleConflicts } fro
 import { getTimeUsagesForScope, getTimeAvailabilityAt } from '../core/time/index.js';
 import { getRecordPaymentState, recordAmountDue } from '../core/finance/index.js';
 import { getNotesForDay } from '../core/note/index.js';
-import { createJournalEventFlow } from './event-create.js';
-import { createJournalNoteFlow } from './note-create.js';
-import { noteTargetLabel, noteVisibleForWorkplace, resolveNoteTarget } from './note-target.js';
+import { noteTargetLabel, noteVisibleForWorkplace } from './note-target.js';
 
 // Warm the existing Journal creation module after the Day view has painted.
 let creationModuleRequest = null;
@@ -36,17 +30,6 @@ function loadJournalCreationModule() {
 
 function dateKey(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-}
-
-function currentTimeForDay(day) {
-  const now = new Date();
-  if (dateKey(now) !== String(day || '').slice(0, 10)) return '';
-  return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-}
-
-function nextMinuteDelay() {
-  const now = new Date();
-  return Math.max(25, 60000 - ((now.getSeconds() * 1000) + now.getMilliseconds()) + 25);
 }
 
 function withFinancialState(usages = []) {
@@ -93,8 +76,6 @@ export function renderJournalDay(root, {
   const contentRoot = root.querySelector('[data-journal-day-content]');
   const timelineRoot = contentRoot?.querySelector('[data-journal-timeline-host]');
   const dayDate = dateKey(date);
-  let activeTime = currentTimeForDay(dayDate);
-  let clockTimer = null;
   let creationWarmTimer = null;
   let creationWarmIdle = null;
   // Avoid making the first click perform a cold import of Record + editor dependencies.
@@ -113,8 +94,6 @@ export function renderJournalDay(root, {
   const dispose = () => {
     if (creationWarmTimer !== null) window.clearTimeout(creationWarmTimer);
     if (creationWarmIdle !== null) window.cancelIdleCallback?.(creationWarmIdle);
-    if (clockTimer) clearTimeout(clockTimer);
-    clockTimer = null;
     clearV2Y(root);
   };
 
@@ -141,15 +120,8 @@ export function renderJournalDay(root, {
       .map((note) => note.id)
     : [];
 
-  if (relatedIds.length) {
-    const relatedNote = visibleNotes.find((note) => relatedIds.includes(note.id));
-    const target = relatedNote ? resolveNoteTarget(relatedNote) : null;
-    if (target?.entity?.from) activeTime = String(target.entity.from);
-  }
-
   const renderY = () => {
     const yRoot = setV2Y(root, noteReels(visibleNotes, {
-      activeTime,
       relatedIds,
       targetLabel: noteTargetLabel,
     }));
@@ -170,22 +142,7 @@ export function renderJournalDay(root, {
     }
   };
 
-  const scheduleLiveTimeRefresh = () => {
-    if (!currentTimeForDay(dayDate)) return;
-    if (clockTimer) clearTimeout(clockTimer);
-    clockTimer = window.setTimeout(() => {
-      clockTimer = null;
-      if (!root.isConnected) return;
-      const nextActiveTime = currentTimeForDay(dayDate);
-      if (!nextActiveTime) return;
-      activeTime = nextActiveTime;
-      renderY();
-      scheduleLiveTimeRefresh();
-    }, nextMinuteDelay());
-  };
-
   renderY();
-  scheduleLiveTimeRefresh();
 
   if (allMode) {
     const days = getDaysForDate(getDays(), dayDate);
@@ -255,16 +212,9 @@ export function renderJournalDay(root, {
     onWorkFieldClick: () => onWorkplaceFieldClick(workplaceId),
     onUsageClick: ({ usageId }) => {
       const usage = usageById.get(String(usageId || ''));
-      if (usage?.from) {
-        activeTime = String(usage.from);
-        renderY();
-      }
       void openUsage(usage, rerender);
     },
     onSlotClick: async ({ from }) => {
-      activeTime = String(from || '');
-      renderY();
-
       const minuteState = getTimeAvailabilityAt({ date: dayDate, workplaceId, time: from });
       if (minuteState.state === 'occupied' && minuteState.usage) {
         const usage = usageById.get(String(minuteState.usage.sourceId || '')) || minuteState.usage;
