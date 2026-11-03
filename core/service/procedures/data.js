@@ -25,8 +25,13 @@ function writeHistory(value) {
   void queueOperationalDataset('procedureHistory', historyState);
 }
 
-export function hydrateProceduresFromServer({ procedures = [], procedureHistory = [] } = {}) {
+export function hydrateCurrentProceduresFromServer(procedures = []) {
   proceduresState = Array.isArray(procedures) ? clone(procedures) : [];
+  return clone(proceduresState);
+}
+
+export function hydrateProceduresFromServer({ procedures = [], procedureHistory = [] } = {}) {
+  hydrateCurrentProceduresFromServer(procedures);
   historyState = Array.isArray(procedureHistory) ? clone(procedureHistory) : [];
   return { procedures: clone(proceduresState), procedureHistory: clone(historyState) };
 }
