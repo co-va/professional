@@ -1,6 +1,6 @@
 import { initViewNavigation, openRecordCreationOwner, viewNavigation } from '../ui/ui.js';
 import { openRecords } from '../core/records/records.js';
-import { loadOperationalState } from '../core/runtime/operational-state.js';
+import { loadRecordCreationOperationalState } from '../core/runtime/operational-state.js';
 import { createJournalEventFlow } from './event-create.js';
 import { createJournalNoteFlow } from './note-create.js';
 
@@ -21,7 +21,7 @@ export async function openJournalCreation({
 } = {}) {
   const owner = openRecordCreationOwner({ onCancel, surfaceRoot, bodyRoot });
   if (!owner) return null;
-  const operationalReady = loadOperationalState({ full: true });
+  const operationalReady = loadRecordCreationOperationalState();
 
   const context = { date, workplaceId, timeHint };
   let activeMode = 'record';
