@@ -1,29 +1,18 @@
 import { API_BASE } from './environment.js';
 
-const TOKEN_KEY = 'book.auth.token';
+const TOKEN_KEY = 'va-tools.auth.token';
 const SESSION_CHECK_TIMEOUT_MS = 12000;
 const JOURNAL_BOOTSTRAP_TIMEOUT_MS = 12000;
 const DEFAULT_READ_TIMEOUT_MS = 12000;
 const OPTIONAL_STARTUP_READ_TIMEOUT_MS = 8000;
 const LOGIN_TIMEOUT_MS = 12000;
 
-function migrateSessionToken() {
-  const persistent = localStorage.getItem(TOKEN_KEY) || '';
-  if (persistent) return persistent;
-  const sessionValue = sessionStorage.getItem(TOKEN_KEY) || '';
-  if (!sessionValue) return '';
-  localStorage.setItem(TOKEN_KEY, sessionValue);
-  sessionStorage.removeItem(TOKEN_KEY);
-  return sessionValue;
-}
-
 export function getAuthToken() {
-  return localStorage.getItem(TOKEN_KEY) || migrateSessionToken();
+  return localStorage.getItem(TOKEN_KEY) || '';
 }
 
 export function setAuthToken(token) {
   const value = String(token || '').trim();
-  sessionStorage.removeItem(TOKEN_KEY);
   if (!value) {
     localStorage.removeItem(TOKEN_KEY);
     return;
@@ -33,7 +22,6 @@ export function setAuthToken(token) {
 
 export function clearAuthToken() {
   localStorage.removeItem(TOKEN_KEY);
-  sessionStorage.removeItem(TOKEN_KEY);
 }
 
 function timeoutValue(value, fallback) {
