@@ -22,6 +22,18 @@ import { createJournalEventFlow } from './event-create.js';
 import { createJournalNoteFlow } from './note-create.js';
 import { noteTargetLabel, noteVisibleForWorkplace, resolveNoteTarget } from './note-target.js';
 
+// Warm the existing Journal creation module after the Day view has painted.
+let creationModuleRequest = null;
+function loadJournalCreationModule() {
+  if (!creationModuleRequest) {
+    creationModuleRequest = import('./creation-flow.js').catch((error) => {
+      creationModuleRequest = null;
+      throw error;
+    });
+  }
+  return creationModuleRequest;
+}
+
 function dateKey(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
@@ -83,8 +95,24 @@ export function renderJournalDay(root, {
   const dayDate = dateKey(date);
   let activeTime = currentTimeForDay(dayDate);
   let clockTimer = null;
+  let creationWarmTimer = null;
+  let creationWarmIdle = null;
+  // Avoid making the first click perform a cold import of Record + editor dependencies.
+  if (typeof window.requestIdleCallback === 'function') {
+    creationWarmIdle = window.requestIdleCallback(() => {
+      creationWarmIdle = null;
+      void loadJournalCreationModule().catch(() => {});
+    }, { timeout: 1200 });
+  } else {
+    creationWarmTimer = window.setTimeout(() => {
+      creationWarmTimer = null;
+      void loadJournalCreationModule().catch(() => {});
+    }, 0);
+  }
 
   const dispose = () => {
+    if (creationWarmTimer !== null) window.clearTimeout(creationWarmTimer);
+    if (creationWarmIdle !== null) window.cancelIdleCallback?.(creationWarmIdle);
     if (clockTimer) clearTimeout(clockTimer);
     clockTimer = null;
     clearV2Y(root);
@@ -245,7 +273,8 @@ export function renderJournalDay(root, {
       }
       if (minuteState.state !== 'free') return;
 
-      const { openJournalCreation } = await import('./creation-flow.js');
+      const { openJournalCreation } = await loadJournalCreationModule();
+      if (!root.isConnected) return;
       openJournalCreation({
         date: dayDate,
         workplaceId,
