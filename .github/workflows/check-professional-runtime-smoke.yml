@@ -1,0 +1,48 @@
+name: Professional / Runtime Smoke
+
+on:
+  push:
+    branches:
+      - staging
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  runtime-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Professional
+        uses: actions/checkout@v4
+
+      - name: Build Professional container
+        run: docker build --tag co-va-professional-smoke .
+
+      - name: Start Professional container
+        run: docker run --detach --rm --name co-va-professional-smoke -p 18080:3000 co-va-professional-smoke
+
+      - name: Verify standalone entry surfaces
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in {1..20}; do
+            if curl --fail --silent http://127.0.0.1:18080/ >/tmp/professional-root.html; then break; fi
+            sleep 1
+          done
+          grep -q 'src="professional.js"' /tmp/professional-root.html
+          curl --fail --silent http://127.0.0.1:18080/booking >/tmp/professional-booking.html
+          grep -q 'online-booking/booking-entry.js' /tmp/professional-booking.html
+          curl --fail --silent http://127.0.0.1:18080/invite/ >/tmp/professional-invite.html
+          grep -q './invite.js' /tmp/professional-invite.html
+          curl --fail --silent http://127.0.0.1:18080/reset-password.html | grep -q 'core/password-reset-page.js'
+          curl --fail --silent http://127.0.0.1:18080/verify-email.html | grep -q 'core/email-verification-page.js'
+          curl --fail --silent http://127.0.0.1:18080/service-worker.js >/dev/null
+
+      - name: Stop Professional container
+        if: always()
+        run: docker stop co-va-professional-smoke || true
