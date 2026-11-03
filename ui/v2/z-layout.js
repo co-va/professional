@@ -13,7 +13,7 @@ const Z_HEADER_STYLE = [
   'display:flex',
   'flex:0 0 auto',
   'flex-direction:row',
-  'align-items:flex-start',
+  'align-items:center',
   'background:var(--v2-white,#fff)',
 ].join(';');
 
