@@ -1,50 +1,13 @@
-import {
-  actionBlock,
-  button,
-  colorPicker,
-  datePicker,
-  field,
-  initColorPickers,
-  initDatePickers,
-  initTimePickers,
-  modal,
-  mountModal,
-  openNotice,
-  select,
-  textareaField,
-  timePicker,
-} from '../ui/ui.js';
-import {
-  NOTE_DEFAULT_COLOR,
-  createNote,
-  readNote,
-  removeNote,
-  updateNote,
-} from '../core/note/index.js';
+import { actionBlock, button, modal, mountModal, openNotice } from '../ui/ui.js';
+import { createNote, readNote, removeNote, updateNote } from '../core/note/index.js';
 import { flushBusinessPersistence } from '../core/business-persistence.js';
 import { noteDetail } from '../ui/note/index.js';
+import { noteTargetLabel } from './note-target.js';
 import {
-  noteContextWithTarget,
-  noteTargetLabel,
-  noteTargetOptions,
-  noteTargetValue,
-  parseNoteTargetValue,
-  resolveNoteTarget,
-} from './note-target.js';
-
-function normalizeTargetForDate(state) {
-  const current = noteTargetValue(state);
-  if (!current) return;
-
-  const target = resolveNoteTarget(state);
-  const targetDate = String(target?.entity?.date || '').slice(0, 10);
-  if (targetDate && targetDate === String(state.date || '').slice(0, 10)) return;
-
-  const allowed = new Set(noteTargetOptions(state.date).map((option) => String(option.value || '')));
-  if (allowed.has(current)) return;
-  state.targetType = '';
-  state.targetId = '';
-}
+  initProfessionalNoteEditor,
+  professionalNoteEditorMarkup,
+  readProfessionalNoteEditor,
+} from './note-editor.js';
 
 export function openNoteView(noteOrId, {
   onClose = () => {},
@@ -59,10 +22,10 @@ export function openNoteView(noteOrId, {
   const layer = mountModal(document.body, modal('<div data-note-view-host></div>', {
     variant: 'q',
     surface: 'app',
-    title: 'Заметка',
-    className: 'note-view-q',
+    className: 'user-note-detail-q',
   }));
   if (!layer) return null;
+  layer.setAttribute('aria-label', 'Заметка');
 
   const originalClose = layer.v2Close?.bind(layer);
   if (originalClose) {
@@ -74,164 +37,81 @@ export function openNoteView(noteOrId, {
   }
 
   const host = () => layer.querySelector('[data-note-view-host]');
+  const headerHost = layer.querySelector('[data-v2-q-header-content]');
+  const setEditorHeader = (visible) => {
+    if (!headerHost) return;
+    headerHost.innerHTML = visible
+      ? '<div class="user-note-shell-title" style="position:absolute;top:0;left:52px;height:24px;display:flex;align-items:center;margin:0;font-size:20px;line-height:24px;font-weight:500">Заметка</div>'
+      : '';
+  };
+
+  const removeCurrent = async (control) => {
+    control.disabled = true;
+    const snapshot = readCurrent();
+    if (!snapshot || !removeNote(noteId)) {
+      control.disabled = false;
+      return;
+    }
+    try {
+      await flushBusinessPersistence();
+      onDeleted?.(snapshot);
+      layer.v2Close?.();
+    } catch (error) {
+      createNote(snapshot);
+      openNotice({ title: 'Не удалось удалить заметку', message: String(error?.message || 'Сервер не подтвердил удаление.') });
+      if (control.isConnected) control.disabled = false;
+    }
+  };
 
   const renderRead = () => {
     current = readCurrent();
     const root = host();
     if (!root || !current) return;
-    root.innerHTML = `${noteDetail(current, { targetLabel: noteTargetLabel(current) })}
-      ${actionBlock(button('Изменить', { data: 'data-note-view-edit' }))}`;
+    setEditorHeader(false);
+    root.innerHTML = `${noteDetail(current, { targetLabel: noteTargetLabel(current) })}${actionBlock(`${button('Изменить', { data: 'data-note-view-edit' })}${button('Удалить', { variant: 'danger', data: 'data-note-view-delete' })}`)}`;
     root.querySelector('[data-note-view-edit]')?.addEventListener('click', renderEdit);
+    root.querySelector('[data-note-view-delete]')?.addEventListener('click', (event) => removeCurrent(event.currentTarget));
   };
 
   const renderEdit = () => {
     current = readCurrent();
     const root = host();
     if (!root || !current) return;
-
-    const state = {
-      ...current,
-      context: current.context && typeof current.context === 'object' && !Array.isArray(current.context)
-        ? { ...current.context }
-        : {},
-    };
-    normalizeTargetForDate(state);
-    const before = { ...current };
-
-    const renderForm = () => {
-      normalizeTargetForDate(state);
-      root.innerHTML = `<form class="form-grid" data-note-edit-form>
-        ${datePicker({ label: 'Дата', name: 'date', value: state.date, required: true, allowClear: false })}
-        <div class="time-range-fields">
-          ${timePicker({ label: 'С', name: 'from', value: state.from, allowEmpty: true })}
-          ${timePicker({ label: 'До', name: 'to', value: state.to, allowEmpty: true })}
-        </div>
-        ${select({
-          label: 'Прикрепить к',
-          name: 'target',
-          value: noteTargetValue(state),
-          options: noteTargetOptions(state.date, { includeNote: state }),
-          aria: 'Прикрепить заметку',
-        })}
-        ${field({ label: 'Наименование', name: 'title', value: state.title })}
-        ${textareaField({ label: 'Текст', name: 'text', value: state.text, rows: 8, placeholder: 'Текст заметки' })}
-        ${colorPicker({ name: 'color', value: state.color || NOTE_DEFAULT_COLOR })}
-        ${actionBlock([
-          button('Сохранить', { type: 'submit' }),
-          button('Удалить', { variant: 'critical', data: 'data-note-edit-delete' }),
-        ].join(''))}
-      </form>`;
-
-      initDatePickers(root);
-      initTimePickers(root);
-      initColorPickers(root);
-
-      const form = root.querySelector('[data-note-edit-form]');
-      const capture = () => {
-        if (!form) return;
-        const data = new FormData(form);
-        state.date = String(data.get('date') || state.date || '').slice(0, 10);
-        state.from = String(data.get('from') || '').slice(0, 5);
-        state.to = String(data.get('to') || '').slice(0, 5);
-        const nextTarget = parseNoteTargetValue(data.get('target'));
-        state.targetType = nextTarget.targetType;
-        state.targetId = nextTarget.targetId;
-        state.title = String(data.get('title') || '').trim();
-        state.text = String(data.get('text') || '').trim();
-        state.color = String(data.get('color') || NOTE_DEFAULT_COLOR);
-      };
-
-      form?.addEventListener('input', capture);
-      form?.addEventListener('change', (event) => {
-        const previousDate = state.date;
-        capture();
-        if (event.target?.name === 'date' && state.date !== previousDate) {
-          normalizeTargetForDate(state);
-          renderForm();
-        }
+    setEditorHeader(true);
+    root.innerHTML = `${professionalNoteEditorMarkup(current, {
+      includeNote: current,
+      formData: 'data-professional-note-edit-form',
+    })}${actionBlock(`${button('Сохранить', { data: 'data-professional-note-save' })}${button('Отмена', { variant: 'secondary', data: 'data-professional-note-cancel' })}`)}`;
+    initProfessionalNoteEditor(root);
+    root.querySelector('[data-professional-note-cancel]')?.addEventListener('click', renderRead);
+    root.querySelector('[data-professional-note-save]')?.addEventListener('click', async (event) => {
+      const form = root.querySelector('[data-professional-note-edit-form]');
+      const patch = readProfessionalNoteEditor(form, {
+        currentContext: current.context || { scope: 'professional' },
+        fallbackDate: current.date,
       });
+      if (!patch.date) return openNotice({ title: 'Заметка', message: 'Укажите дату заметки.' });
+      if (!patch.title && !patch.text) return openNotice({ title: 'Заметка', message: 'Укажите наименование или текст заметки.' });
 
-      form?.addEventListener('submit', async (event) => {
-        event.preventDefault();
-        capture();
-        normalizeTargetForDate(state);
-        if (!state.date) {
-          openNotice({ title: 'Заметка', message: 'Укажите дату заметки.' });
-          return;
-        }
-        if (!state.title && !state.text) {
-          openNotice({ title: 'Заметка', message: 'Укажите наименование или текст заметки.' });
-          return;
-        }
-
-        const submit = form.querySelector('[type="submit"]');
-        if (submit) submit.disabled = true;
-        const patch = {
-          context: noteContextWithTarget(state.context, state.targetType, state.targetId),
-          date: state.date,
-          from: state.from,
-          to: state.to,
-          targetType: state.targetType,
-          targetId: state.targetId,
-          title: state.title,
-          text: state.text,
-          color: state.color,
-        };
-
-
-        const updated = updateNote(noteId, patch);
-        if (!updated) {
-          if (submit) submit.disabled = false;
-          openNotice({ title: 'Заметка', message: 'Не удалось сохранить заметку.' });
-          return;
-        }
-
-        try {
-          await flushBusinessPersistence();
-          current = updated;
-          onSaved?.(updated);
-          renderRead();
-        } catch (error) {
-          updateNote(noteId, before);
-          openNotice({
-            title: 'Не удалось сохранить заметку',
-            message: String(error?.message || 'Сервер не подтвердил изменения.'),
-          });
-          if (submit?.isConnected) submit.disabled = false;
-        }
-      });
-
-      root.querySelector('[data-note-edit-delete]')?.addEventListener('click', async (event) => {
-        const submit = event.currentTarget;
-        submit.disabled = true;
-        const snapshot = readCurrent();
-        if (!snapshot) {
-          submit.disabled = false;
-          return;
-        }
-
-
-        if (!removeNote(noteId)) {
-          submit.disabled = false;
-          return;
-        }
-
-        try {
-          await flushBusinessPersistence();
-          onDeleted?.(snapshot);
-          layer.v2Close?.();
-        } catch (error) {
-          createNote(snapshot);
-          openNotice({
-            title: 'Не удалось удалить заметку',
-            message: String(error?.message || 'Сервер не подтвердил удаление.'),
-          });
-          if (submit.isConnected) submit.disabled = false;
-        }
-      });
-    };
-
-    renderForm();
+      const before = { ...current, context: current.context && typeof current.context === 'object' ? { ...current.context } : current.context };
+      const submit = event.currentTarget;
+      submit.disabled = true;
+      const updated = updateNote(noteId, patch);
+      if (!updated) {
+        submit.disabled = false;
+        return openNotice({ title: 'Заметка', message: 'Не удалось сохранить заметку.' });
+      }
+      try {
+        await flushBusinessPersistence();
+        current = updated;
+        onSaved?.(updated);
+        renderRead();
+      } catch (error) {
+        updateNote(noteId, before);
+        openNotice({ title: 'Не удалось сохранить заметку', message: String(error?.message || 'Сервер не подтвердил изменения.') });
+        if (submit.isConnected) submit.disabled = false;
+      }
+    });
   };
 
   renderRead();
