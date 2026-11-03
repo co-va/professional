@@ -12,7 +12,7 @@ import { hydrateDocumentsFromServer } from '../../settings/documents/data.js';
 import { hydrateDocumentHistoryFromServer } from '../../settings/documents/history.js';
 import { hydrateProfileFromServer } from '../profile/data.js';
 import { hydrateWorkplacesFromServer } from '../profile/workplaces/data.js';
-import { hydrateProceduresFromServer } from '../service/procedures/data.js';
+import { hydrateCurrentProceduresFromServer } from '../service/procedures/data.js';
 import { hydrateProductsFromServer } from '../service/products/data.js';
 import { hydrateTagsFromServer } from '../../settings/tags/data.js';
 
@@ -113,16 +113,10 @@ async function pull(scopes = ALL_SCOPES) {
     if (responses.has('operational')) {
       const operational = await responseJson(responses.get('operational'), 'Не удалось обновить График, процедуры и онлайн-запись');
       const daysChanged = hasChanged('operational.days', operational.days || []);
-      const proceduresChanged = hasChanged('operational.procedures', {
-        procedures: operational.procedures || [],
-        procedureHistory: operational.procedureHistory || [],
-      });
+      const proceduresChanged = hasChanged('operational.procedures', operational.procedures || []);
       const bookingSettingsChanged = hasChanged('operational.bookingSettings', operational.bookingSettings || null);
       if (daysChanged) hydrateDaysFromServer(operational.days || []);
-      if (proceduresChanged) hydrateProceduresFromServer({
-        procedures: operational.procedures || [],
-        procedureHistory: operational.procedureHistory || [],
-      });
+      if (proceduresChanged) hydrateCurrentProceduresFromServer(operational.procedures || []);
       if (bookingSettingsChanged) hydrateBookingSettingsFromServer(operational.bookingSettings || null);
       if (daysChanged) {
         notify('professional:days-changed', { action: 'server-refresh' });
