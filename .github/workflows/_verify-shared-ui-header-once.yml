@@ -1,0 +1,69 @@
+name: Temporary Shared UI header geometry check
+
+on:
+  push:
+    branches: [staging]
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: staging
+          fetch-depth: 0
+      - name: Verify Shared Z Q geometry and module integrity
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import fs from 'node:fs';
+          import {v2QFrame,v2ZHeader,v2QHeader} from './ui/v2/z-layout.js';
+          import {modal} from './ui/modals/index.js';
+          const qNoTitle=v2QFrame('<div>Content</div>');
+          const qTitle=v2QFrame('<div>Content</div>',{header:'<h2>Title</h2>'});
+          const gap=html=>html.match(/data-v2-q-body style="([^"]+)"/)?.[1]?.match(/padding-top:18px/)?.[0];
+          assert.equal(gap(qNoTitle),gap(qTitle));
+          assert.ok(gap(qNoTitle));
+          assert.match(v2ZHeader('Title'),/align-items:center/);
+          assert.match(v2QHeader('Title'),/align-items:center/);
+          const arrow=fs.readFileSync('ui/v2/z-affordance.js','utf8');
+          assert.match(arrow,/margin:0 0 0 18px/);
+          const creation=fs.readFileSync('ui/record/creation-flow.js','utf8');
+          assert.doesNotMatch(creation,/record-creation-flow__title/);
+          assert.match(creation,/headerTitleHost.textContent = resolvedTitle/);
+          assert.match(creation,/data-record-creation-header-title/);
+          assert.doesNotMatch(creation,/setV2ZHeaderRows/);
+          const record=fs.readFileSync('ui/record/record.css','utf8');
+          assert.doesNotMatch(record,/record-creation-flow__title/);
+          const profile=fs.readFileSync('core/profile/profile.js','utf8');
+          assert.match(profile,/title:'',\s*variant:'q',\s*surface:'app',\s*className:'v2-profile-data-layer'/);
+          assert.doesNotMatch(profile,/data-close-workplace-limit/);
+          const event=fs.readFileSync('journal/event-view.js','utf8');
+          const note=fs.readFileSync('journal/note-view.js','utf8');
+          assert.doesNotMatch(event,/user-event-shell-title|left:52px/);
+          assert.doesNotMatch(note,/user-note-shell-title|left:52px/);
+          assert.match(modal('<div>Content</div>',{variant:'q',title:''}),/data-v2-q-header/);
+          console.log('Shared Header and Q Body invariants PASS');
+          NODE
+          node -e "import('./ui/ui.js').then(()=>console.log('UI linking PASS'))"
+          node -e "import('./journal/creation-flow.js').then(()=>console.log('Journal chooser linking PASS'))"
+          node -e "import('./core/records/records.js').then(()=>console.log('Record linking PASS'))"
+          node -e "import('./journal/event-create.js').then(()=>console.log('Event linking PASS'))"
+          node -e "import('./journal/note-create.js').then(()=>console.log('Note linking PASS'))"
+          node -e "import('./core/profile/profile.js').then(()=>console.log('Profile linking PASS'))"
+          find . -type f \( -name '*.js' -o -name '*.mjs' \) -not -path './.git/*' -print0 | xargs -0 -n1 node --check
+          node scripts/audit-professional-clean.mjs
+          docker build -t professional-shared-ui-header .
+      - name: Remove temporary verifier
+        if: always()
+        run: |
+          set -euo pipefail
+          git config user.name co-tools
+          git config user.email a.volokovykh@yandex.ru
+          git rm .github/workflows/_verify-shared-ui-header-once.yml
+          git commit -m 'Remove temporary Shared UI header verifier'
+          git push origin HEAD:staging
