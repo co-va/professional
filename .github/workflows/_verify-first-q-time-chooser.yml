@@ -1,0 +1,71 @@
+name: Verify first Q time chooser once
+
+on:
+  push:
+    branches: [staging]
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: staging
+          fetch-depth: 0
+      - name: Verify first Q and Record Event Note isolation
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs=require('node:fs'), assert=require('node:assert/strict');
+          const day=fs.readFileSync('journal/день.js','utf8');
+          const flow=fs.readFileSync('journal/creation-flow.js','utf8');
+          const record=fs.readFileSync('core/records/records.js','utf8');
+          assert.match(day, /createTimeGrid\(\{ date: dayDate, workplaceId, plan: time, usages \}\)/);
+          assert.match(day, /getTimeGridMinuteState\(timeGrid, from\)/);
+          assert.match(day, /timeGrid,\s*onCreated:/);
+          assert.doesNotMatch(day, /surfaceRoot: root\.closest/);
+          assert.doesNotMatch(day, /bodyRoot: root,/);
+          assert.match(flow, /timeGrid = null/);
+          assert.match(flow, /getTimeGridMinuteState\(timeGrid, value\)/);
+          assert.match(flow, /const timeChoices = \[hour, hour \+ 30\]/);
+          assert.match(flow, /owner\.setShellHeader\(''\)/);
+          assert.match(flow, /journalTimeConfirmed: true/);
+          assert.match(flow, /timeHint: selectedTime/);
+          assert.match(flow, /onBackFromStart: returnToChoices/);
+          assert.match(flow, /if \(activeMode === 'note'\)/);
+          assert.match(flow, /if \(activeMode === 'event'\)/);
+          assert.match(flow, /import\('\.\/note-create\.js'\)/);
+          assert.match(flow, /import\('\.\/event-create\.js'\)/);
+          assert.match(flow, /import\('\.\.\/core\/records\/records\.js'\)/);
+          assert.doesNotMatch(flow, /from '\.\.\/ui\/ui\.js'/);
+          assert.match(record, /if \(journalTimeConfirmed\) \{\s*state\.from = state\.timeHint;\s*renderProcedures\(\)/);
+          assert.match(record, /onBackFromStart\(stateSnapshot\(\)\)/);
+          console.log('Journal Q and entity boundary verified');
+          NODE
+          node -e "import('./journal/creation-flow.js').then(() => console.log('first Q module linked'))"
+          node -e "import('./journal/день.js').then(() => console.log('Day module linked'))"
+          node -e "import('./core/records/records.js').then(() => console.log('Record module linked'))"
+          node -e "import('./journal/event-create.js').then(() => console.log('Event module linked'))"
+          node -e "import('./journal/note-create.js').then(() => console.log('Note module linked'))"
+          node --input-type=module <<'NODE'
+          import { createTimeGrid,getTimeGridMinuteState } from './core/time/grid.js';
+          const grid=createTimeGrid({date:'2026-11-03',workplaceId:'w',plan:{from:'09:00',to:'19:00'},usages:[{date:'2026-11-03',sourceId:'r',type:'record',from:'16:00',to:'16:30'}]});
+          if(getTimeGridMinuteState(grid,'16:00').state!=='occupied'||getTimeGridMinuteState(grid,'16:30').state!=='free')throw Error('Time occupancy regression');
+          console.log('Existing Time Core grid flags verified');
+          NODE
+          find . -type f \( -name '*.js' -o -name '*.mjs' \) -not -path './.git/*' -print0 | xargs -0 -n1 node --check
+          node scripts/audit-professional-clean.mjs
+          git diff --check
+          docker build -t professional-first-q .
+      - name: Remove temporary verifier
+        if: success()
+        run: |
+          set -euo pipefail
+          git config user.name co-tools
+          git config user.email a.volokovykh@yandex.ru
+          git rm .github/workflows/_verify-first-q-time-chooser.yml
+          git commit -m 'Remove temporary first Q verifier'
+          git push origin HEAD:staging
