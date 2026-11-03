@@ -41,7 +41,7 @@ export function openNoteView(noteOrId, {
   const setEditorHeader = (visible) => {
     if (!headerHost) return;
     headerHost.innerHTML = visible
-      ? '<div class="user-note-shell-title" style="position:absolute;top:0;left:52px;height:24px;display:flex;align-items:center;margin:0;font-size:20px;line-height:24px;font-weight:500">Заметка</div>'
+      ? '<h2 class="v2-q-title">Заметка</h2>'
       : '';
   };
 
