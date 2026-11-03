@@ -8,7 +8,9 @@ export function setV2DeckOpen(root, open) {
     : root?.closest?.('[data-v2-app]') || root?.querySelector?.('[data-v2-app]');
   if (!app) return false;
   const next = Boolean(open);
-  if (next) app.classList.remove('is-z-entering');
+  if (next) {
+    app.classList.remove('is-z-entering', 'is-y-entering');
+  }
   app.classList.toggle('is-deck-open', next);
   app.classList.remove('is-revealing-deck');
   if (!next) app.classList.remove('is-e-open');
@@ -284,11 +286,25 @@ export function initV2WorkspaceInteraction(root, {
     return open;
   };
 
+  let yEnterTimer = 0;
   const clearZEntry = (event) => {
-    if (event.animationName === 'v2-z-enter-from-right') app.classList.remove('is-z-entering');
+    if (event.target !== front || event.animationName !== 'v2-z-enter-from-right') return;
+    if (!deckIsOpen() && app.classList.contains('has-v2-y')) {
+      app.classList.add('is-y-entering');
+      if (yEnterTimer) window.clearTimeout(yEnterTimer);
+      yEnterTimer = window.setTimeout(() => {
+        app.classList.remove('is-y-entering');
+        yEnterTimer = 0;
+      }, 560);
+    }
+    app.classList.remove('is-z-entering');
   };
   front.addEventListener('animationend', clearZEntry);
-  disposers.push(() => front.removeEventListener('animationend', clearZEntry));
+  disposers.push(() => {
+    front.removeEventListener('animationend', clearZEntry);
+    if (yEnterTimer) window.clearTimeout(yEnterTimer);
+    app.classList.remove('is-y-entering');
+  });
 
   bindNativeDeck(
     fDeck,
