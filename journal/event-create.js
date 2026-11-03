@@ -1,4 +1,12 @@
-import { button, field, openColorPickerAction, openNotice, openTimeRangeAction, textareaField } from '../ui/ui.js';
+import {
+  colorPicker,
+  field,
+  initColorPickers,
+  initTimePickers,
+  openNotice,
+  textareaField,
+  timePicker,
+} from '../ui/ui.js';
 import { checkTimeAvailability, minutesToTime, timeToMinutes } from '../core/time/index.js';
 import { createEvent, removeEvent } from '../core/event/index.js';
 import { flushBusinessPersistence } from '../core/business-persistence.js';
@@ -6,8 +14,8 @@ import { flushBusinessPersistence } from '../core/business-persistence.js';
 function initialTo(from) {
   const minute = timeToMinutes(from);
   if (minute == null) return '09:30';
-  const next = minute + 30;
-  return minutesToTime(next < 24 * 60 ? next : next - 24 * 60) || '09:30';
+  const next = Math.min(23 * 60 + 59, minute + 30);
+  return minutesToTime(next) || '09:30';
 }
 
 function availabilityMessage(reason = '') {
@@ -22,31 +30,9 @@ function timeRangeValid(from, to) {
   return start != null && end != null && end > start;
 }
 
-function growDescription(form) {
-  const textarea = form?.elements?.namedItem?.('description');
-  if (!(textarea instanceof HTMLTextAreaElement)) return;
-  textarea.style.overflowY = 'hidden';
-  textarea.style.resize = 'none';
-  textarea.style.minHeight = '220px';
-  const resize = () => {
-    textarea.style.height = 'auto';
-    textarea.style.height = `${Math.max(220, textarea.scrollHeight)}px`;
-  };
-  textarea.addEventListener('input', resize);
-  resize();
-}
-
-function timeLabel(from, to) {
-  return `Время · С ${String(from || '—')} — До ${String(to || '—')}`;
-}
-
-function colorSwatch(color) {
-  return `<div class="color-picker__swatch" style="background:${String(color || '#777A7D')}" aria-label="Цвет события"></div>`;
-}
-
 export function createJournalEventFlow({ owner, date, workplaceId, timeHint = '', onCreated = () => {} } = {}) {
   if (!owner) return null;
-  const initialFrom = String(timeHint || '09:00');
+  const initialFrom = String(timeHint || '09:00').slice(0, 5);
   const state = {
     date: String(date || '').slice(0, 10),
     workplaceId: String(workplaceId || ''),
@@ -57,17 +43,9 @@ export function createJournalEventFlow({ owner, date, workplaceId, timeHint = ''
     color: '#777A7D',
   };
 
-  const capture = (root) => {
-    const form = root?.querySelector('[data-event-create-form]');
-    if (!form) return;
-    const data = new FormData(form);
-    state.title = String(data.get('title') || '').trim();
-    state.description = String(data.get('description') || '').trim();
-  };
-
-  const validateSelection = async ({ from = state.from, to = state.to } = {}) => {
+  const validateSelection = ({ from = state.from, to = state.to } = {}) => {
     if (!timeRangeValid(from, to)) {
-      openNotice({ title: 'Событие', message: 'Проверьте время события.' });
+      openNotice({ title: 'Событие', message: 'Время окончания должно быть позже времени начала.' });
       return false;
     }
     const availability = checkTimeAvailability({
@@ -88,54 +66,34 @@ export function createJournalEventFlow({ owner, date, workplaceId, timeHint = ''
       step: 'event',
       title: false,
       body: `<form class="form-grid" data-event-create-form>
-        ${field({ label: 'Наименование', name: 'title', value: state.title, required: true, placeholder: 'Перерыв, встреча, дорога…' })}
-        ${textareaField({ label: 'Описание', name: 'description', value: state.description, rows: 12, placeholder: 'Подробности события' })}
-        ${button(timeLabel(state.from, state.to), { variant: 'secondary', data: 'data-event-create-time' })}
-        ${colorSwatch(state.color)}
+        <div class="user-event-color-picker">${colorPicker({ name: 'color', value: state.color })}</div>
+        <div class="time-range-fields">
+          ${timePicker({ label: 'С', name: 'from', value: state.from, minuteStep: 1 })}
+          ${timePicker({ label: 'До', name: 'to', value: state.to, minuteStep: 1 })}
+        </div>
+        ${field({ label: 'Наименование', name: 'title', value: state.title, required: true })}
+        ${textareaField({ label: 'Описание', name: 'description', value: state.description, rows: 6 })}
       </form>`,
       action: { label: 'Создать', data: 'data-event-create' },
     });
     if (!view) return;
+    initTimePickers(view.body);
+    initColorPickers(view.body);
 
-    const form = view.body.querySelector('[data-event-create-form]');
-    growDescription(form);
-    form?.addEventListener('input', () => capture(view.body));
-    form?.addEventListener('change', () => capture(view.body));
+    view.action?.addEventListener('click', async (event) => {
+      const form = view.body.querySelector('[data-event-create-form]');
+      const data = form ? new FormData(form) : new FormData();
+      state.from = String(data.get('from') || state.from).slice(0, 5);
+      state.to = String(data.get('to') || state.to).slice(0, 5);
+      state.title = String(data.get('title') || '').trim();
+      state.description = String(data.get('description') || '').trim();
+      state.color = String(data.get('color') || state.color || '#777A7D');
 
-    view.body.querySelector('[data-event-create-time]')?.addEventListener('click', () => {
-      capture(view.body);
-      openTimeRangeAction({
-        from: state.from,
-        to: state.to,
-        title: 'Время события',
-        validate: validateSelection,
-        onSave: ({ from, to }) => {
-          openColorPickerAction({
-            value: state.color,
-            title: 'Цвет события',
-            confirm: true,
-            onSelect: (color) => {
-              state.from = from;
-              state.to = to;
-              state.color = color;
-              render();
-            },
-          });
-        },
-      });
-    });
+      if (!state.title) return openNotice({ title: 'Событие', message: 'Укажите наименование события.' });
+      if (!validateSelection()) return;
 
-    view.action?.addEventListener('click', async (domEvent) => {
-      capture(view.body);
-      if (!state.title) {
-        openNotice({ title: 'Событие', message: 'Укажите название события.' });
-        return;
-      }
-      if (!(await validateSelection())) return;
-
-      const submit = domEvent.currentTarget;
+      const submit = event.currentTarget;
       submit.disabled = true;
-
       const created = createEvent({
         ownerType: 'tenant',
         context: { scope: 'professional' },
