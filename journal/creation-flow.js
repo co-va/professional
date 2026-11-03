@@ -95,7 +95,7 @@ export function openJournalCreation({
     if (!owner.isOpen?.() || version !== requestVersion) return;
     if (activeMode === 'note') {
       // A Note is independent of Time. The mode selector belongs to the chooser only.
-      owner.setShellHeader('');
+      owner.setShellHeader('<div class="record-creation-step-title">Заметка</div>');
       const { createJournalNoteFlow } = await import('./note-create.js');
       if (!owner.isOpen?.() || version !== requestVersion || activeMode !== 'note') return;
       owner.setBackHandler?.(returnToChoices);
@@ -107,7 +107,7 @@ export function openJournalCreation({
       return;
     }
     if (activeMode === 'event') {
-      owner.setShellHeader('');
+      owner.setShellHeader('<div class="record-creation-step-title">Событие</div>');
       const { createJournalEventFlow } = await import('./event-create.js');
       if (!owner.isOpen?.() || version !== requestVersion || activeMode !== 'event') return;
       owner.setBackHandler?.(returnToChoices);
