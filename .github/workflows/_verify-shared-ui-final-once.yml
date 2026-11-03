@@ -1,0 +1,77 @@
+name: Temporary Shared UI final verification
+
+on:
+  push:
+    branches: [staging]
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: staging
+          fetch-depth: 0
+      - name: Verify shared owners, find bypasses and build
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import path from 'node:path';
+          import assert from 'node:assert/strict';
+          const read=p=>fs.readFileSync(p,'utf8');
+          const creation=read('ui/record/creation-flow.js');
+          const event=read('journal/event-view.js');
+          const note=read('journal/note-view.js');
+          const profile=read('core/profile/profile.js');
+          const css=read('ui/record/record.css');
+          const modal=read('ui/modals/index.js');
+          assert.match(creation,/data-record-creation-header-title hidden/);
+          assert.match(creation,/headerTitleHost\.textContent = resolvedTitle/);
+          assert.match(creation,/title: '',\s*className: 'record-creation-q'/);
+          assert.match(creation,/if \(titleWrap\) titleWrap\.hidden = true/);
+          assert.match(creation,/shellHeaderHost\.hidden = !String\(content/);
+          assert.match(css,/grid-template-rows:minmax\(0,1fr\) auto/);
+          assert.match(css,/:has\(> \.record-creation-flow__title:not\(\[hidden\]\)\)/);
+          assert.doesNotMatch(event,/user-event-shell-title|left:52px/);
+          assert.match(event,/title: 'Событие'/);
+          assert.doesNotMatch(note,/user-note-shell-title|left:52px/);
+          assert.match(note,/class="v2-q-title">Заметка/);
+          assert.doesNotMatch(profile,/data-close-workplace-limit/);
+          assert.doesNotMatch(profile,/\[data-v2-q-header-content\]'\)\?\.replaceChildren\(/);
+          assert.match(modal,/resolvedVariant === 's'\) assertInformationalS\(content\)/);
+          console.log('PASS: One Shared Q header per Record/Event/Note/Profile');
+          function sources(dir){
+            return fs.readdirSync(dir,{withFileTypes:true}).flatMap(e=>{
+              const p=path.join(dir,e.name);
+              return e.isDirectory()?sources(p):/\.(?:js|css)$/.test(p)?[p]:[];
+            });
+          }
+          const all=[...sources('journal'),...sources('ui'),...sources('core')];
+          const headerConsumers=all.filter(p=> !p.startsWith('ui/v2/') && /data-v2-(?:q|z)-header-content/.test(read(p)));
+          console.log('OTHER HEADER CONTENT CONSUMERS: '+JSON.stringify(headerConsumers));
+          const absolute=all.flatMap(p=>read(p).split('\n').flatMap((line,i)=>/position:absolute.{0,120}(?:top|left):\s*\d+px/.test(line)?[p+':'+(i+1)+' '+line.slice(0,140)]:[]));
+          console.log('HARDCODED ABSOLUTE GEOMETRY candidates:');
+          absolute.slice(0,35).forEach(item=>console.log(item));
+          NODE
+          node -e "import('./ui/ui.js').then(()=>console.log('Shared UI module linked'))"
+          node -e "import('./ui/record/creation-flow.js').then(()=>console.log('Record owner module linked'))"
+          node -e "import('./journal/creation-flow.js').then(()=>console.log('Journal first Q linked'))"
+          node -e "import('./journal/event-view.js').then(()=>console.log('Event view linked'))"
+          node -e "import('./journal/note-view.js').then(()=>console.log('Note view linked'))"
+          node -e "import('./core/profile/profile.js').then(()=>console.log('Profile linked'))"
+          find . -type f \( -name '*.js' -o -name '*.mjs' \) -not -path './.git/*' -print0 | xargs -0 -n1 node --check
+          node scripts/audit-professional-clean.mjs
+          docker build -t professional-shared-ui-verify .
+      - name: Remove temporary verifier
+        if: always()
+        run: |
+          set -euo pipefail
+          git config user.name co-tools
+          git config user.email a.volokovykh@yandex.ru
+          git rm .github/workflows/_verify-shared-ui-final-once.yml
+          git commit -m 'Remove temporary Shared UI verification'
+          git push origin HEAD:staging
