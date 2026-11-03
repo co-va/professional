@@ -1,12 +1,10 @@
 import { apiRequest } from '../auth.js';
 import { hydrateDaysFromServer } from '../day/index.js';
-import { hydrateCurrentProceduresFromServer, hydrateProceduresFromServer } from '../../core/service/procedures/data.js';
-import { hydrateBookingSettingsFromServer } from '../booking-settings/index.js';
+import { hydrateCurrentProceduresFromServer } from '../../core/service/procedures/data.js';
 import { consumeJournalBootstrap } from './journal-bootstrap.js';
 
 let operationalStateRequest = null;
 let recordCreationHydrated = false;
-let fullOperationalHydrated = false;
 
 function clone(value){return value==null?value:JSON.parse(JSON.stringify(value));}
 async function payload(response,fallback){const value=await response.json().catch(()=>({}));if(!response.ok)throw new Error(value?.message||fallback);return value;}
@@ -15,20 +13,11 @@ function hydrateRecordCreation(remote={}){
   hydrateDays(remote);
   hydrateCurrentProceduresFromServer(Array.isArray(remote.procedures)?clone(remote.procedures):[]);
 }
-function hydrateFull(remote={}){
-  hydrateDays(remote);
-  hydrateProceduresFromServer({
-    procedures:Array.isArray(remote.procedures)?clone(remote.procedures):[],
-    procedureHistory:Array.isArray(remote.procedureHistory)?clone(remote.procedureHistory):[],
-  });
-  hydrateBookingSettingsFromServer(remote.bookingSettings&&typeof remote.bookingSettings==='object'&&!Array.isArray(remote.bookingSettings)?clone(remote.bookingSettings):null);
-}
 function resetOperationalLoad(){
   operationalStateRequest=null;
   recordCreationHydrated=false;
-  fullOperationalHydrated=false;
 }
-function requestOperationalState(){
+export function requestOperationalState(){
   if(!operationalStateRequest){
     operationalStateRequest=apiRequest('/business-state/operational')
       .then((response)=>payload(response,'Не удалось загрузить рабочие данные'))
@@ -43,7 +32,7 @@ if(typeof window!=='undefined'&&typeof window.addEventListener==='function'){
 
 export async function loadRecordCreationOperationalState(){
   const remote=await requestOperationalState();
-  if(!recordCreationHydrated&&!fullOperationalHydrated){
+  if(!recordCreationHydrated){
     hydrateRecordCreation(remote);
     recordCreationHydrated=true;
   }
@@ -51,18 +40,16 @@ export async function loadRecordCreationOperationalState(){
 }
 
 export async function loadOperationalState({full=false}={}){
-  if(!full){
-    const bootstrap=await consumeJournalBootstrap('operationalContext');
-    if(bootstrap){
-      hydrateDays(bootstrap);
-      return bootstrap;
-    }
+  if(full){
+    const {loadFullOperationalState}=await import('./operational-full-state.js');
+    return loadFullOperationalState();
+  }
+  const bootstrap=await consumeJournalBootstrap('operationalContext');
+  if(bootstrap){
+    hydrateDays(bootstrap);
+    return bootstrap;
   }
   const remote=await requestOperationalState();
-  if(!fullOperationalHydrated){
-    hydrateFull(remote);
-    fullOperationalHydrated=true;
-    recordCreationHydrated=true;
-  }
+  hydrateDays(remote);
   return remote;
 }
