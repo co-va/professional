@@ -68,6 +68,7 @@ export function renderJournalDay(root, {
   onWorkplaceFieldClick = () => {},
   navigationRoot = null,
   focusTarget = null,
+  onCreationFinished = null,
 } = {}) {
   root.dataset.journalDayContext = 'professional';
   root.innerHTML = navigationRoot
@@ -98,6 +99,7 @@ export function renderJournalDay(root, {
       onWorkplaceFieldClick,
       navigationRoot,
       focusTarget,
+      onCreationFinished,
     });
   };
 
@@ -250,7 +252,8 @@ export function renderJournalDay(root, {
         timeHint: from,
         surfaceRoot: root.closest('[data-v2-z],[data-v2-z-layer]'),
         bodyRoot: root,
-        onCreated: rerender,
+        onCreated: onCreationFinished || rerender,
+        onCancel: onCreationFinished || rerender,
       });
     },
   });
