@@ -2,7 +2,7 @@ import { openEntityCardAppearanceQ } from '../../ui/ui.js';
 import { getCardAppearanceTemplate, saveCardAppearanceTemplate } from '../../core/card-appearance-templates.js';
 import { getSettlementItemTotals } from '../../core/finance/index.js';
 import { getRecords } from '../../core/record/index.js';
-import { getProcedures, pushProcedureHistory, saveProcedure } from './procedures/data.js';
+import { getProcedures, saveProcedure } from './procedures/data.js';
 import { getProducts, pushProductHistory, saveProduct } from './products/data.js';
 import {
   procedureCardAppearance,
@@ -106,7 +106,6 @@ async function saveServiceAppearance({ type, target, appearance, photo, editor }
     pushProductHistory(current, 'updated');
     saveProduct({ ...current, photo, cardAppearance: appearance, updatedAt: new Date().toISOString() });
   } else {
-    pushProcedureHistory(current, 'updated');
     saveProcedure({ ...current, photo, cardAppearance: appearance, updatedAt: new Date().toISOString() });
   }
 }
