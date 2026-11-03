@@ -231,8 +231,6 @@ export function renderJournalDay(root, {
         workplaceId,
         timeHint: from,
         timeGrid,
-        surfaceRoot: root.closest('[data-v2-z],[data-v2-z-layer]'),
-        bodyRoot: root,
         onCreated: onCreationFinished || rerender,
         onCancel: onCreationFinished || rerender,
       });
