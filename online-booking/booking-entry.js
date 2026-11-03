@@ -1,7 +1,19 @@
-import { API_BASE } from '../core/environment.js';
-import { renderAccess } from './access.js';
+import { API_BASE, USER_ORIGIN } from '../core/environment.js';
 
 const root = document.querySelector('#app-content');
+const RUNTIME_STYLES = [
+  'ui/page/page.css',
+  'ui/inputs/inputs.css',
+  'ui/selectors/selectors.css',
+  'ui/calendar/calendar.css',
+  'ui/lists/list-entry.css',
+  'ui/time/time.css',
+  'ui/record/record.css',
+  'ui/states/state-view.css',
+  'ui/modals/modal.css',
+  'ui/documents/document.css',
+  'ui/v2/v2.css',
+];
 
 function syncViewport() {
   const vv = window.visualViewport;
@@ -63,16 +75,65 @@ async function resolveRoute() {
   };
 }
 
+function renderEntry(message = '') {
+  root.innerHTML = `<section class="booking-entry" aria-labelledby="booking-entry-title">
+    <div class="booking-entry__card">
+      <h1 id="booking-entry-title">Запись</h1>
+      ${message ? `<p class="booking-entry__error" role="alert">${message}</p>` : ''}
+      <div class="booking-entry__actions">
+        <button type="button" class="ui-button" data-booking-start>Записаться</button>
+        <button type="button" class="ui-button ui-button--secondary" data-booking-open-app>Открыть приложение</button>
+      </div>
+    </div>
+  </section>`;
+
+  root.querySelector('[data-booking-open-app]')?.addEventListener('click', () => {
+    location.assign(USER_ORIGIN);
+  });
+  root.querySelector('[data-booking-start]')?.addEventListener('click', (event) => {
+    void startBooking(event.currentTarget);
+  });
+}
+
+function ensureRuntimeStyles() {
+  const pending = RUNTIME_STYLES.map((href) => {
+    if (document.querySelector(`link[href="${href}"]`)) return Promise.resolve();
+    return new Promise((resolve) => {
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = href;
+      link.dataset.bookingRuntimeStyle = '';
+      link.addEventListener('load', resolve, { once: true });
+      link.addEventListener('error', resolve, { once: true });
+      document.head.appendChild(link);
+    });
+  });
+  return Promise.all(pending);
+}
+
+async function startBooking(action) {
+  if (!action || action.dataset.bookingBusy === 'true') return;
+  action.dataset.bookingBusy = 'true';
+  action.disabled = true;
+  action.textContent = 'Открываем…';
+
+  try {
+    const route = await resolveRoute();
+    if (!route.tenantId) {
+      renderEntry('Ссылка записи недействительна.');
+      return;
+    }
+    await ensureRuntimeStyles();
+    const { renderAccess } = await import('./access.js');
+    root.innerHTML = '';
+    await renderAccess(root, route);
+  } catch {
+    renderEntry('Не удалось открыть запись. Попробуйте ещё раз.');
+  }
+}
+
 window.addEventListener('resize', syncViewport, { passive: true });
 window.visualViewport?.addEventListener('resize', syncViewport, { passive: true });
 window.visualViewport?.addEventListener('scroll', syncViewport, { passive: true });
 syncViewport();
-
-let route = { tenantId: '', workplaceKey: '', procedureIds: [] };
-try {
-  route = await resolveRoute();
-} catch {
-  route = { tenantId: '', workplaceKey: '', procedureIds: [] };
-}
-
-await renderAccess(root, route);
+renderEntry();

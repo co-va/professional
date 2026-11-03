@@ -107,6 +107,14 @@
 - Confirm создаёт запись через серверный guest endpoint; второго клиентского Record owner нет.
 - App-wide sync удалён из guest contour.
 
+### Public Booking lightweight replacement
+
+- Публичная ссылка сначала показывает только два действия: `Записаться` / `Открыть приложение`; route API, Booking runtime и тяжёлые UI-модули до `Записаться` не загружаются.
+- Booking начинается с `Кого записать?`, затем собирает данные оформляющего; только после имени/телефона выполняется проверка PDN-маркера и загрузка операционного контекста.
+- Клиент больше не разбирает список consent/documentId как состояние человека: используется только boolean `legalState.pdnActive` существующего server endpoint; при `true` шага согласий нет.
+- Переход в User после выхода/успеха — только обычная навигация на `USER_ORIGIN`; User runtime внутрь Booking не загружается.
+- CORE HANDOFF: заменить guest `booking-state` на status-only контракт (`personExists`, `pdnActive`, `bookingAllowed`) и разделить текущий тяжёлый `/context`: операционные данные отдельно, актуальные PDN/marketing документы только по требованию при `pdnActive=false`, занятость — по нужному диапазону/дате. До этого handoff серверный `/context` после ввода данных всё ещё возвращает documents и широкую occupancy; клиентского fallback/второго consent-owner не добавлять.
+
 ### Этап 8 — dead code / duplicate / retired cleanup — DONE
 
 - Dead runtime, exact runtime duplicates, User/Admin/Landing contours и legacy/compat/bridge paths отсутствуют по фактической карте.

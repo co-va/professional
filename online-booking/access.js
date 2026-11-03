@@ -19,13 +19,12 @@ import {
   getBookingSlots,
   getBookingTimeRows,
   getBookingWorkingDates,
-  requiredBookingDocuments,
 } from './model.js';
 
 const MODE_SELF = 'self';
 const MODE_OTHER = 'other';
 const MODE_JOINT = 'joint';
-const DRAFT_VERSION = 1;
+const DRAFT_VERSION = 2;
 const DRAFT_TTL = 24 * 60 * 60 * 1000;
 
 function text(value) {
@@ -258,64 +257,65 @@ function totalPrice(state) {
   }, { minimum: 0, variable: false });
 }
 
-function legalPhoneKey(value) {
+function statusPhoneKey(value) {
   return text(value).replace(/\D/g, '');
 }
 
-function startLegalLookup(state, { force = false } = {}) {
+async function loadPersonStatus(state, { force = false } = {}) {
   const phone = text(state.booker.phone);
-  const phoneKey = legalPhoneKey(phone);
-  if (!phoneKey) return Promise.resolve({});
+  const phoneKey = statusPhoneKey(phone);
+  if (!phoneKey) throw new Error('Введите телефон полностью');
 
-  if (state.legalPhone !== phoneKey) {
-    const hadPhone = Boolean(state.legalPhone);
-    state.legalPhone = phoneKey;
-    state.legalState = {};
-    state.legalResolved = false;
-    state.legalLookup = null;
-    state.legalError = '';
-    if (hadPhone) state.consents = {};
-  } else if (!force && state.legalResolved) {
-    return Promise.resolve(state.legalState);
-  } else if (!force && state.legalLookup) {
-    return state.legalLookup;
+  if (!force && state.statusResolved && state.statusPhone === phoneKey) return state.personStatus;
+  if (state.statusPhone && state.statusPhone !== phoneKey) state.consents = {};
+  state.statusPhone = phoneKey;
+  state.statusResolved = false;
+  state.statusError = '';
+
+  try {
+    const result = await jsonRequest(
+      `/online-booking/${encodeURIComponent(state.tenantId)}/booking-state`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ name: state.booker.name, phone, email: state.booker.email }),
+      },
+      'Не удалось проверить доступность записи',
+    );
+    state.personStatus = {
+      pdnActive: result?.legalState?.pdnActive === true,
+    };
+    state.statusResolved = true;
+    return state.personStatus;
+  } catch (error) {
+    state.personStatus = { pdnActive: false };
+    state.statusError = text(error?.message) || 'Не удалось проверить доступность записи.';
+    throw error;
   }
-
-  const token = ++state.legalLookupToken;
-  state.legalResolved = false;
-  state.legalError = '';
-  const lookup = jsonRequest(
-    `/online-booking/${encodeURIComponent(state.tenantId)}/booking-state`,
-    {
-      method: 'POST',
-      body: JSON.stringify({ name: state.booker.name, phone, email: state.booker.email }),
-    },
-    'Не удалось проверить действующие согласия',
-  );
-  state.legalLookup = lookup;
-  return lookup.then((result) => {
-    if (token !== state.legalLookupToken) return result;
-    state.legalLookup = null;
-    state.legalResolved = true;
-    state.legalError = '';
-    state.legalState = result && typeof result === 'object' ? result : {};
-    if (state.current.kind === 'consents') renderCurrent(state);
-    return result;
-  }).catch((error) => {
-    if (token === state.legalLookupToken) {
-      state.legalLookup = null;
-      state.legalResolved = false;
-      state.legalState = {};
-      state.legalError = text(error?.message) || 'Не удалось проверить действующие согласия.';
-      if (state.current.kind === 'consents') renderCurrent(state);
-    }
-    return {};
-  });
 }
 
-function activeConsentIds(state) {
-  const rows = Array.isArray(state.legalState?.consents) ? state.legalState.consents : [];
-  return new Set(rows.filter((row) => row?.active).map((row) => text(row?.documentId)).filter(Boolean));
+function stepNeedsContext(step = {}) {
+  return ['workplace', 'services', 'date', 'time', 'consents', 'preview'].includes(text(step?.kind));
+}
+
+function nextStepAfterData(state) {
+  const workplaces = Array.isArray(state.context?.workplaces) ? state.context.workplaces : [];
+  if (!workplaces.length) throw new Error('Рабочие пространства не настроены.');
+  if (state.lockedWorkplaceKey) {
+    state.workplaceKey = state.lockedWorkplaceKey;
+    return { kind: 'services', index: 0 };
+  }
+  if (workplaces.length === 1) {
+    state.workplaceKey = text(workplaces[0]?.key);
+    return { kind: 'services', index: 0 };
+  }
+  state.workplaceKey = '';
+  return { kind: 'workplace', index: 0 };
+}
+
+async function prepareBooking(state, { forceStatus = false } = {}) {
+  await loadPersonStatus(state, { force: forceStatus });
+  await refreshContext(state);
+  return nextStepAfterData(state);
 }
 
 function flowHost(state) {
@@ -395,7 +395,7 @@ function renderWorkplace(state) {
     state.workplaceKey = text(node.dataset.bookingWorkplace);
     resetAfterServices(state);
     persistDraft(state);
-    go(state, { kind: 'mode' });
+    go(state, { kind: 'services', index: 0 });
   }));
 }
 
@@ -519,17 +519,28 @@ function renderData(state, errorMessage = '') {
     persistDraft(state);
     renderData(state);
   }));
-  host?.querySelector('[data-booking-data-next]')?.addEventListener('click', () => {
+  const nextAction = host?.querySelector('[data-booking-data-next]');
+  nextAction?.addEventListener('click', async () => {
+    if (nextAction.dataset.bookingBusy === 'true') return;
     const validationError = syncDataForm(state, form, { validate: true });
     const missingParticipantName = state.mode !== MODE_SELF && state.participants.some((participant) => !participant.name);
     if (validationError || missingParticipantName) {
       renderData(state, validationError || 'Укажите имя каждого участника.');
       return;
     }
-    startLegalLookup(state);
+
+    nextAction.dataset.bookingBusy = 'true';
+    nextAction.disabled = true;
+    nextAction.setAttribute('aria-busy', 'true');
+    nextAction.textContent = 'Продолжаем…';
     resetAfterServices(state);
     persistDraft(state);
-    go(state, { kind: 'services', index: 0 });
+    try {
+      const next = await prepareBooking(state);
+      go(state, next);
+    } catch (error) {
+      renderData(state, text(error?.message) || state.statusError || 'Не удалось продолжить запись.');
+    }
   });
 }
 
@@ -663,13 +674,15 @@ function renderTime(state) {
     renderTime(state);
   }));
   host?.querySelector('[data-booking-time-next]')?.addEventListener('click', () => {
-    if (state.from) go(state, { kind: 'consents' });
+    if (!state.from) return;
+    go(state, { kind: state.personStatus.pdnActive ? 'preview' : 'consents' });
   });
 }
 
 function consentDocuments(state) {
-  const active = activeConsentIds(state);
-  return requiredBookingDocuments(state.context).filter((document) => !active.has(text(document?.id)));
+  if (state.personStatus.pdnActive) return [];
+  return (Array.isArray(state.context?.documents) ? state.context.documents : [])
+    .filter((document) => Boolean(document?.personConsent));
 }
 
 function openConsentDocument(document = {}) {
@@ -681,21 +694,8 @@ function openConsentDocument(document = {}) {
 }
 
 function renderConsents(state) {
-  if (!state.legalResolved) {
-    if (!state.legalLookup && !state.legalError) startLegalLookup(state);
-    const hasError = Boolean(state.legalError);
-    const host = renderFrame(state, {
-      title: 'Согласия',
-      body: hasError
-        ? `<p class="form-error" role="alert">${escapeHtml(state.legalError)}</p>`
-        : '<p class="booking-flow__legal-check">Проверяем действующие согласия…</p>',
-      action: hasError ? actionBlock(button('Повторить', { data: 'data-booking-consents-retry' })) : '',
-      back: state.history.length > 0,
-    });
-    host?.querySelector('[data-booking-consents-retry]')?.addEventListener('click', () => {
-      startLegalLookup(state, { force: true });
-      renderConsents(state);
-    });
+  if (state.personStatus.pdnActive) {
+    go(state, { kind: 'preview' }, { push: false });
     return;
   }
 
@@ -768,8 +768,8 @@ function previewMarkup(state) {
 }
 
 function consentFacts(state) {
-  const documents = requiredBookingDocuments(state.context);
-  return documents.map((document) => ({
+  if (state.personStatus.pdnActive) return [];
+  return consentDocuments(state).map((document) => ({
     documentId: text(document?.id),
     documentVersion: Math.max(1, Number(document?.version || 1)),
     accepted: Boolean(state.consents[text(document?.id)]),
@@ -814,7 +814,11 @@ async function confirmBooking(state, action) {
   } catch (error) {
     const message = text(error?.message);
     if (Number(error?.status) === 409 && /соглас/i.test(message)) {
-      await startLegalLookup(state, { force: true });
+      const status = await loadPersonStatus(state, { force: true }).catch(() => ({ pdnActive: false }));
+      if (status?.pdnActive) {
+        openNotice({ title: 'Не удалось подтвердить запись', message: message || 'Состояние согласия изменилось. Попробуйте ещё раз.' });
+        return;
+      }
       state.current = { kind: 'consents', index: 0 };
       state.history = state.history.filter((step) => step.kind !== 'preview');
       state.exited = false;
@@ -856,11 +860,7 @@ function renderPreview(state) {
   });
 }
 
-function openApplication(state) {
-  if (typeof state.onExitToAccount === 'function') {
-    state.onExitToAccount({ tab: 'journal' });
-    return;
-  }
+function openApplication() {
   location.assign(USER_ORIGIN);
 }
 
@@ -872,12 +872,12 @@ function renderExit(state) {
     back: false,
   });
   host?.querySelector('[data-booking-resume]')?.addEventListener('click', () => {
-    state.current = cloneStep(state.resumeStep || { kind: 'workplace' });
+    state.current = cloneStep(state.resumeStep || { kind: 'mode' });
     state.exited = false;
     persistDraft(state, false);
     renderCurrent(state);
   });
-  host?.querySelector('[data-booking-open-app]')?.addEventListener('click', () => openApplication(state));
+  host?.querySelector('[data-booking-open-app]')?.addEventListener('click', () => openApplication());
 }
 
 function renderSuccess(state) {
@@ -887,7 +887,7 @@ function renderSuccess(state) {
     action: actionBlock(button('Открыть приложение', { variant: 'secondary', data: 'data-booking-open-app' })),
     back: false,
   });
-  host?.querySelector('[data-booking-open-app]')?.addEventListener('click', () => openApplication(state));
+  host?.querySelector('[data-booking-open-app]')?.addEventListener('click', () => openApplication());
 }
 
 function renderCurrent(state) {
@@ -904,24 +904,14 @@ function renderCurrent(state) {
   else if (state.current.kind === 'success') renderSuccess(state);
 }
 
-function initialStep(state) {
-  const workplaces = Array.isArray(state.context?.workplaces) ? state.context.workplaces : [];
-  if (state.lockedWorkplaceKey) {
-    state.workplaceKey = state.lockedWorkplaceKey;
-    return { kind: 'mode', index: 0 };
-  }
-  if (workplaces.length === 1) {
-    state.workplaceKey = text(workplaces[0]?.key);
-    return { kind: 'mode', index: 0 };
-  }
-  return { kind: 'workplace', index: 0 };
+function initialStep() {
+  return { kind: 'mode', index: 0 };
 }
 
 export async function renderAccess(root, {
   tenantId = '',
   workplaceKey = '',
   procedureIds = [],
-  onExitToAccount = null,
 } = {}) {
   const state = {
     tenantId: text(tenantId),
@@ -938,20 +928,17 @@ export async function renderAccess(root, {
     from: '',
     to: '',
     consents: {},
-    legalState: {},
-    legalResolved: false,
-    legalLookup: null,
-    legalLookupToken: 0,
-    legalPhone: '',
-    legalError: '',
-    current: { kind: 'workplace', index: 0 },
-    resumeStep: { kind: 'workplace', index: 0 },
+    personStatus: { pdnActive: false },
+    statusResolved: false,
+    statusPhone: '',
+    statusError: '',
+    current: { kind: 'mode', index: 0 },
+    resumeStep: { kind: 'mode', index: 0 },
     history: [],
     exited: false,
     result: null,
     layer: null,
     hardClose: null,
-    onExitToAccount: typeof onExitToAccount === 'function' ? onExitToAccount : null,
   };
 
   if (!state.tenantId) {
@@ -960,27 +947,22 @@ export async function renderAccess(root, {
   }
 
   root.innerHTML = '';
-  try {
-    await refreshContext(state);
-  } catch (error) {
-    root.innerHTML = emptyState('Запись недоступна', text(error?.message) || 'Не удалось открыть онлайн-запись.');
-    return () => {};
-  }
-
-  const workplaces = Array.isArray(state.context?.workplaces) ? state.context.workplaces : [];
-  if (!workplaces.length) {
-    root.innerHTML = emptyState('Запись недоступна', 'Рабочие пространства не настроены.');
-    return () => {};
-  }
-
   const restored = restoreDraft(state);
   if (!restored) {
-    state.current = initialStep(state);
+    state.current = initialStep();
     state.resumeStep = cloneStep(state.current);
     setMode(state, MODE_SELF);
     state.mode = '';
-  } else if (state.booker.phone) {
-    startLegalLookup(state);
+  } else {
+    const resumeTarget = state.exited ? state.resumeStep : state.current;
+    if (state.booker.phone && stepNeedsContext(resumeTarget)) {
+      try {
+        await prepareBooking(state);
+      } catch (error) {
+        root.innerHTML = emptyState('Запись недоступна', text(error?.message) || 'Не удалось продолжить запись.');
+        return () => {};
+      }
+    }
   }
 
   const layer = mountModal(document.body, modal('<div data-booking-flow></div>', {
