@@ -90,7 +90,7 @@
 .v2-y-host[hidden]{display:none}
 /* Y belongs to the visible Z content, never to the F/E deck. */
 .v2-app:is(.is-deck-open,.is-z-entering) > .v2-y-host{
-  max-height:0;opacity:0;pointer-events:none;
+  max-height:0;opacity:0;pointer-events:none;padding-bottom:0!important;
 }
 /* During an edge swipe, Y follows Z horizontally without changing its height. */
 .v2-app.is-revealing-deck > .v2-y-host{
