@@ -1,6 +1,7 @@
 import { v2ZDismissAffordance } from './z-affordance.js';
 
 const Z_VIEWPORT_OVERSCAN = '24px';
+const Q_HEADER_BODY_GAP = '18px';
 
 const Z_HEADER_STYLE = [
   'position:relative',
@@ -11,13 +12,15 @@ const Z_HEADER_STYLE = [
   'padding:0 18px 0 0',
   'display:flex',
   'flex:0 0 auto',
-  'flex-direction:column',
+  'flex-direction:row',
+  'align-items:flex-start',
   'background:var(--v2-white,#fff)',
 ].join(';');
 
 const Z_HEADER_CONTENT_STYLE = [
   'box-sizing:border-box',
   'min-width:0',
+  'flex:1 1 auto',
   'padding-left:18px',
   'display:flex',
   'flex-direction:column',
@@ -61,9 +64,10 @@ function surfaceHeader(content = '', { kind = 'z', dismiss = true } = {}) {
   return `<div ${data} style="${Z_HEADER_STYLE}">${dismiss ? v2ZDismissAffordance() : ''}<div ${contentData} style="${contentStyle}">${content}</div></div>`;
 }
 
-function surfaceBody(content = '', { kind = 'z' } = {}) {
+function surfaceBody(content = '', { kind = 'z', topGap = false } = {}) {
   const data = kind === 'q' ? 'data-v2-q-body' : 'data-v2-z-body';
-  const bodyStyle = visibleWorkAreaStyle(Z_BODY_STYLE, kind);
+  const gapStyle = topGap ? `;padding-top:${Q_HEADER_BODY_GAP}` : '';
+  const bodyStyle = `${visibleWorkAreaStyle(Z_BODY_STYLE, kind)}${gapStyle}`;
   return `<div ${data} style="${bodyStyle}">${content}</div>`;
 }
 
@@ -107,7 +111,7 @@ export function v2ZFrame(content = '', { header = '', dismiss = true } = {}) {
 }
 
 export function v2QFrame(content = '', { header = '' } = {}) {
-  return `${v2QHeader(header)}${v2QBody(content)}`;
+  return `${v2QHeader(header)}${surfaceBody(content, { kind: 'q', topGap: Boolean(String(header || '').trim()) })}`;
 }
 
 function resolveZSurface(root) {
