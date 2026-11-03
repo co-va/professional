@@ -2,7 +2,6 @@ import { button } from '../buttons/index.js';
 import { modal, mountModal } from '../modals/index.js';
 import { actionBlock } from '../page/page.js';
 import { timeSlots } from '../time/index.js';
-import { setV2ZHeaderRows } from '../v2/z-layout.js';
 
 const STEP_TITLES = {
   workplace: 'Выбор пространства',
@@ -53,10 +52,6 @@ export function recordCreationTimeRows(items = [], {
 
 function flowMarkup() {
   return `<div class="record-creation-flow" data-record-creation-flow>
-    <div class="modal-title record-creation-flow__title">
-      <div data-record-creation-step-header></div>
-      <h2 data-record-creation-title></h2>
-    </div>
     <div class="record-creation-flow__body" data-record-creation-body></div>
     <div class="record-creation-flow__action" data-record-creation-action></div>
   </div>`;
@@ -152,18 +147,17 @@ export function openRecordCreationOwner({
     };
   }
 
-  const headerHost = inline ? null : layer.querySelector('[data-v2-q-header-content]');
-  const titleHost = layer.querySelector('[data-record-creation-title]');
-  const titleWrap = titleHost?.closest('.record-creation-flow__title') || null;
+  const headerHost = inline
+    ? inlineHeaderHost
+    : layer.querySelector('[data-v2-q-header-content]');
   const bodyHost = layer.querySelector('[data-record-creation-body]');
   const actionHost = layer.querySelector('[data-record-creation-action]');
-  const inlineStepHeaderHost = inline ? layer.querySelector('[data-record-creation-step-header]') : null;
   if (headerHost) {
     headerHost.innerHTML = '<div data-record-creation-shell-header hidden></div><h2 class="v2-q-title" data-record-creation-header-title hidden></h2><div data-record-creation-step-header hidden></div>';
   }
   const shellHeaderHost = headerHost?.querySelector('[data-record-creation-shell-header]') || null;
   const headerTitleHost = headerHost?.querySelector('[data-record-creation-header-title]') || null;
-  const stepHeaderHost = inlineStepHeaderHost || headerHost?.querySelector('[data-record-creation-step-header]') || headerHost;
+  const stepHeaderHost = headerHost?.querySelector('[data-record-creation-step-header]') || null;
 
   const render = ({
     step = '',
@@ -173,22 +167,15 @@ export function openRecordCreationOwner({
     secondaryActions = [],
     action = null,
   } = {}) => {
-    if (!bodyHost || !actionHost || !titleHost) return null;
+    if (!bodyHost || !actionHost || !headerTitleHost) return null;
     layer.dataset.recordCreationStep = String(step || '');
     if (stepHeaderHost) {
       stepHeaderHost.innerHTML = String(header || '');
       if (stepHeaderHost !== headerHost) stepHeaderHost.hidden = !String(header || '').trim();
     }
     const resolvedTitle = title === false ? '' : resolveRecordCreationTitle(step, title);
-    if (headerTitleHost) {
-      headerTitleHost.textContent = resolvedTitle;
-      headerTitleHost.hidden = !resolvedTitle;
-      titleHost.textContent = '';
-      if (titleWrap) titleWrap.hidden = true;
-    } else {
-      titleHost.textContent = resolvedTitle;
-      if (titleWrap) titleWrap.hidden = !resolvedTitle && !String(header || '').trim();
-    }
+    headerTitleHost.textContent = resolvedTitle;
+    headerTitleHost.hidden = !resolvedTitle;
     bodyHost.innerHTML = body;
     const secondary = (Array.isArray(secondaryActions) ? secondaryActions : [])
       .filter((item) => item?.label)
@@ -220,10 +207,6 @@ export function openRecordCreationOwner({
     layer,
     render,
     setShellHeader(content = '') {
-      if (inline) {
-        const rows = setV2ZHeaderRows(surfaceRoot, [String(content || '')]);
-        return rows[0] || null;
-      }
       if (!shellHeaderHost) return null;
       shellHeaderHost.innerHTML = String(content || '');
       shellHeaderHost.hidden = !String(content || '').trim();
