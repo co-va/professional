@@ -13,7 +13,8 @@
 - Утверждённый Shared UI в `co-va/user` является эталоном общего UI-контракта. Professional не создаёт второй UI-мир.
 - Shared внутренние события в Professional не получают `User`/`Book`-маркер; для общего UI используется нейтральный namespace.
 - Public Booking остаётся отдельной guest surface и не смешивается с Professional App Runtime.
-- Инфраструктурное подключение Amvera/доменов выполняется только после архитектурной и runtime-очистки Professional.
+- Постоянный CI не должен управлять незавершённой очисткой. Сначала архитектура и runtime доводятся до правильного состояния, затем подтверждается работа, и только после этого ставятся финальные guards/CI.
+- Инфраструктурное подключение Amvera/доменов выполняется только после архитектурной очистки Professional.
 
 ## Цель
 
@@ -42,9 +43,11 @@
 
 Старый `Check Professional` удалён из `staging` по указанию владельца: он содержал прежние/неверные архитектурные предположения.
 
-- новый постоянный CI до окончания архитектурной очистки не ставить;
-- новый Repository/Shared UI/runtime gate собрать на этапе 9;
-- отсутствие CI не является доказательством runtime.
+Во время очистки:
+- постоянных workflow/CI в `.github/workflows` быть не должно;
+- CI не используется как источник архитектурной истины;
+- временные технические исполнители допустимы только для атомарной операции и обязаны удалить себя после выполнения;
+- финальный CI ставится только после реального runtime proof.
 
 ### Этап 3 — Shared UI convergence — DONE
 
@@ -104,24 +107,51 @@
 - Confirm создаёт запись через серверный guest endpoint; второго клиентского Record owner нет.
 - App-wide sync удалён из guest contour.
 
-### Этап 8 — dead code / duplicate / retired cleanup — ACTIVE
+### Этап 8 — dead code / duplicate / retired cleanup — DONE
 
-- До начала текущей очистки аудит не находил dead runtime, exact runtime duplicates, User/Admin/Landing contours или legacy/compat/bridge paths.
-- После baseline удалялись или переносились старые реализации; параллельные реализации не добавлялись.
-- Осталось убрать доказанные retired внутренние маркеры/имена без aliases: старые `Book*` client names и старые `book:*` internal events там, где это именно внутренний Professional contract.
-- Серверные поля/маршруты, которые всё ещё приходят из Core API под legacy-именами, не переписываются в Core на этом этапе и фиксируются в `CORE HANDOFF`.
+- Dead runtime, exact runtime duplicates, User/Admin/Landing contours и legacy/compat/bridge paths отсутствуют по фактической карте.
+- Старый внутренний namespace `book:*` полностью удалён из Professional runtime.
+- Professional-only runtime events используют `professional:*`.
+- Shared V2 events используют нейтральный `va-tools:*`.
+- Технические browser keys `book.*` заменены на `professional.*` без migration/alias.
+- Client access API очищен: `activateDemo`, `loadAccess`, `getAccess`, `getCapability`, `canUseCapability`, `getLimit` — без старых `*Book*` aliases.
+- Старый internal handler marker `__bookTimeUsageChangeHandler` удалён.
+- Изменения сделаны атомарно по producer/listener pairs; syntax всех изменённых JS файлов проверен.
+- Постоянный CI после очистки снова отсутствует.
 
-### Этап 9 — новый contour CI — TODO
+Не считаются внутренним Professional legacy и не меняются здесь серверные/персистентные контракты Core, в том числе:
+- `isOwnerBook` в access payload;
+- `X-Book-Document-Id` в HTTP response header;
+- persisted document schema с `sourceMode: 'BOOK'` и `availableBookText`, пока Core хранит/возвращает эти значения.
 
-После завершения этапа 8:
-- `Repository` + `Shared UI` + runtime smoke;
-- только реально нужные feature checks;
-- feature check защищает только свой contour;
-- единый Professional Gate для `staging`.
+### Этап 9 — проверка очищенного Professional без постоянного CI — ACTIVE
 
-### Этап 10 — runtime proof на staging — TODO
+До подключения финальных guards проверить само приложение, не подгоняя код под CI:
+- entry/bootstrap;
+- auth/session boundary;
+- Professional workspace;
+- Journal / Profile / People / Time / Service / Finance / Inventory / Loyalty / Settings;
+- F/E/Z и Q/X/S;
+- Record create/view/edit;
+- Notifications/Chat;
+- Public Booking guest surface;
+- manifest/service worker/PWA root;
+- отсутствие зависимости от frontend/runtime Core.
 
-Проверить фактическую работу:
+Постоянные workflow на этом этапе не ставить.
+
+### Этап 10 — Amvera и домен Professional — TODO
+
+После проверки очищенной структуры:
+- подключить Amvera напрямую к `co-va/professional/staging`;
+- `main` не использовать;
+- проверить staging deployment;
+- назначить/перенести Professional-домен;
+- проверить API origin, manifest/service worker и deep links.
+
+### Этап 11 — реальный runtime proof на развернутом Professional — TODO
+
+На фактически развернутом приложении проверить:
 - login/session;
 - Professional workspace;
 - Journal;
@@ -131,18 +161,18 @@
 - Settings;
 - Notifications/Chat;
 - отдельный Public Booking guest flow;
-- service worker/PWA root.
+- service worker/PWA root;
+- отсутствие обращения к старому Professional frontend/runtime в Core.
 
-### Этап 11 — Amvera и домен Professional — TODO
+Только после этого этапа разрешено ставить финальный CI.
 
-Только после зелёной архитектуры и runtime proof:
-- подключить Amvera к `co-va/professional/staging`;
-- проверить staging deployment;
-- назначить Professional-домен;
-- проверить API origin, PWA manifest/service worker и deep links;
-- `main` не использовать.
+### Этап 12 — финальные guards/CI и самостоятельность Professional — TODO
 
-### Этап 12 — финальная самостоятельность Professional — TODO
+После доказанного рабочего runtime поставить только актуальные проверки:
+- Repository guard;
+- Shared UI guard;
+- runtime smoke;
+- дополнительные feature checks только если они защищают реальный сегодняшний контракт.
 
 Professional отделён только если одновременно доказано:
 - приложение работает из `co-va/professional/staging`;
@@ -151,8 +181,8 @@ Professional отделён только если одновременно до�
 - User/Admin/Landing runtime отсутствуют;
 - Shared UI не имеет второго Professional-варианта;
 - Public Booking изолирован;
-- новые Repository/Shared UI/runtime gates зелёные;
-- staging deployment и домен работают из Professional repository.
+- staging deployment и домен работают из Professional repository;
+- финальные guards защищают уже проверенную архитектуру, а не формируют её.
 
 ## CORE HANDOFF — выполнять только после завершения Professional
 
@@ -161,6 +191,6 @@ Professional отделён только если одновременно до�
 1. После этапа 12 составить в `co-va/core` карту оставшегося Professional frontend/runtime и удалить его, сохранив API/server/Prisma/PostgreSQL.
 2. Поставить в Core guard, запрещающий возврат Professional frontend/runtime.
 3. Проверить, что `co-va/professional` продолжает работать через Core API.
-4. Отдельно нормализовать legacy server/API naming, если Core всё ещё отдаёт поля вроде `isOwnerBook`; Professional до этого не создаёт compatibility alias и не меняет Core.
+4. Отдельно нормализовать legacy server/API naming и persisted schema, если Core всё ещё отдаёт/хранит `isOwnerBook`, `X-Book-Document-Id`, `sourceMode: 'BOOK'`, `availableBookText` или аналогичные legacy server names. Professional до этого не создаёт compatibility alias и не меняет Core.
 
 До отдельного явного перехода к этому handoff `co-va/core` не изменять.
