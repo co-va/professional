@@ -1,14 +1,20 @@
 import { apiRequest } from '../auth.js';
 import { hydrateDaysFromServer } from '../day/index.js';
-import { hydrateProceduresFromServer } from '../../core/service/procedures/data.js';
+import { hydrateCurrentProceduresFromServer, hydrateProceduresFromServer } from '../../core/service/procedures/data.js';
 import { hydrateBookingSettingsFromServer } from '../booking-settings/index.js';
 import { consumeJournalBootstrap } from './journal-bootstrap.js';
 
-let fullOperationalStateLoad = null;
+let operationalStateRequest = null;
+let recordCreationHydrated = false;
+let fullOperationalHydrated = false;
 
 function clone(value){return value==null?value:JSON.parse(JSON.stringify(value));}
 async function payload(response,fallback){const value=await response.json().catch(()=>({}));if(!response.ok)throw new Error(value?.message||fallback);return value;}
 function hydrateDays(remote={}){hydrateDaysFromServer(Array.isArray(remote.days)?clone(remote.days):[]);}
+function hydrateRecordCreation(remote={}){
+  hydrateDays(remote);
+  hydrateCurrentProceduresFromServer(Array.isArray(remote.procedures)?clone(remote.procedures):[]);
+}
 function hydrateFull(remote={}){
   hydrateDays(remote);
   hydrateProceduresFromServer({
@@ -17,9 +23,31 @@ function hydrateFull(remote={}){
   });
   hydrateBookingSettingsFromServer(remote.bookingSettings&&typeof remote.bookingSettings==='object'&&!Array.isArray(remote.bookingSettings)?clone(remote.bookingSettings):null);
 }
+function resetOperationalLoad(){
+  operationalStateRequest=null;
+  recordCreationHydrated=false;
+  fullOperationalHydrated=false;
+}
+function requestOperationalState(){
+  if(!operationalStateRequest){
+    operationalStateRequest=apiRequest('/business-state/operational')
+      .then((response)=>payload(response,'Не удалось загрузить рабочие данные'))
+      .catch((error)=>{resetOperationalLoad();throw error;});
+  }
+  return operationalStateRequest;
+}
 
 if(typeof window!=='undefined'&&typeof window.addEventListener==='function'){
-  window.addEventListener('professional:auth-logout',()=>{fullOperationalStateLoad=null;});
+  window.addEventListener('professional:auth-logout',resetOperationalLoad);
+}
+
+export async function loadRecordCreationOperationalState(){
+  const remote=await requestOperationalState();
+  if(!recordCreationHydrated&&!fullOperationalHydrated){
+    hydrateRecordCreation(remote);
+    recordCreationHydrated=true;
+  }
+  return remote;
 }
 
 export async function loadOperationalState({full=false}={}){
@@ -30,11 +58,11 @@ export async function loadOperationalState({full=false}={}){
       return bootstrap;
     }
   }
-  if(!fullOperationalStateLoad){
-    fullOperationalStateLoad=apiRequest('/business-state/operational')
-      .then((response)=>payload(response,'Не удалось загрузить График, процедуры и настройки онлайн-записи'))
-      .then((remote)=>{hydrateFull(remote);return remote;})
-      .catch((error)=>{fullOperationalStateLoad=null;throw error;});
+  const remote=await requestOperationalState();
+  if(!fullOperationalHydrated){
+    hydrateFull(remote);
+    fullOperationalHydrated=true;
+    recordCreationHydrated=true;
   }
-  return fullOperationalStateLoad;
+  return remote;
 }
