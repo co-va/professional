@@ -1,0 +1,42 @@
+name: Verify Journal visual port once
+
+on:
+  push:
+    branches: [staging]
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: staging
+          fetch-depth: 0
+      - name: Verify visual port
+        run: |
+          set -euo pipefail
+          test -z "$(git grep -n -E 'note-reel-card|is-time-active|noteIsActiveAt|orderNoteReels' -- journal ui/note || true)"
+          git grep -n 'checkTimeAvailability' -- journal/event-create.js journal/event-view.js
+          if git grep -n -E 'getTimeUsagesForScope|checkTimeAvailability|rigidity|occupied' -- journal/note-create.js journal/note-view.js journal/note-editor.js; then
+            echo 'Note editor/view must stay neutral to occupancy.'
+            exit 1
+          fi
+          node --check journal/event-create.js
+          node --check journal/event-view.js
+          node --check journal/note-create.js
+          node --check journal/note-view.js
+          node --check journal/note-editor.js
+          node --check ui/note/index.js
+          node scripts/audit-professional-clean.mjs
+          docker build -t professional-journal-visual .
+      - name: Remove temporary verifier
+        if: success()
+        run: |
+          git config user.name co-tools
+          git config user.email a.volokovykh@yandex.ru
+          git rm .github/workflows/_verify-journal-visual-port.yml
+          git commit -m "Remove Journal visual verifier"
+          git push origin HEAD:staging
