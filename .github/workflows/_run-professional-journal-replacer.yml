@@ -1,0 +1,39 @@
+name: Run Professional Journal replacer once
+
+on:
+  push:
+    branches: [staging]
+
+permissions:
+  contents: write
+
+jobs:
+  replace:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: staging
+          fetch-depth: 0
+      - name: Replace and verify
+        run: |
+          set -euo pipefail
+          python scripts/_replace_professional_journal_semantics.py
+          if grep -RInE --exclude-dir=.git --exclude-dir=.github "rigidity|softTime|SoftTime|releaseWorkingTimeSoftUsages|configureSoftTimeUsageReleaseSource|releaseJournalSoftTimeUsages|scope:[[:space:]]*['\"]account['\"]|eventActions|noteActions|targetSource|customActions" journal core/time core/day timetable professional.js; then
+            echo 'Retired mixed Journal semantics remain.'
+            exit 1
+          fi
+          find . -type f \( -name '*.js' -o -name '*.mjs' \) -not -path './.git/*' -print0 | xargs -0 -n1 node --check
+          node scripts/audit-professional-clean.mjs
+          docker build -t professional-journal-clean .
+      - name: Commit replacement and remove temporary executor
+        run: |
+          set -euo pipefail
+          rm scripts/_replace_professional_journal_semantics.py
+          rm .github/workflows/_run-professional-journal-replacer.yml
+          git config user.name co-tools
+          git config user.email a.volokovykh@yandex.ru
+          git add -A
+          git diff --cached --check
+          git commit -m 'Make Professional Journal time rules strict'
+          git push origin HEAD:staging
