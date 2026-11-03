@@ -11,7 +11,7 @@ import {
 } from '../ui/ui.js';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { getDays, getDay, getDayTime, getDaysForDate, getScheduleConflicts } from '../core/day/index.js';
-import { getTimeUsagesForScope, getTimeAvailabilityAt } from '../core/time/index.js';
+import { createTimeGrid, getTimeGridMinuteState, getTimeUsagesForScope } from '../core/time/index.js';
 import { getRecordPaymentState, recordAmountDue } from '../core/finance/index.js';
 import { getNotesForDay } from '../core/note/index.js';
 import { noteTargetLabel, noteVisibleForWorkplace } from './note-target.js';
@@ -199,6 +199,7 @@ export function renderJournalDay(root, {
 
   const usages = withFinancialState(getTimeUsagesForScope({ date: dayDate, workplaceId }));
   const usageById = new Map(usages.map((usage) => [String(usage?.sourceId || usage?.id || ''), usage]));
+  const timeGrid = createTimeGrid({ date: dayDate, workplaceId, plan: time, usages });
 
   timelineRoot.innerHTML = journalDayTimeline({
     from: time.from,
@@ -215,7 +216,7 @@ export function renderJournalDay(root, {
       void openUsage(usage, rerender);
     },
     onSlotClick: async ({ from }) => {
-      const minuteState = getTimeAvailabilityAt({ date: dayDate, workplaceId, time: from });
+      const minuteState = getTimeGridMinuteState(timeGrid, from);
       if (minuteState.state === 'occupied' && minuteState.usage) {
         const usage = usageById.get(String(minuteState.usage.sourceId || '')) || minuteState.usage;
         await openUsage(usage, rerender);
@@ -229,6 +230,7 @@ export function renderJournalDay(root, {
         date: dayDate,
         workplaceId,
         timeHint: from,
+        timeGrid,
         surfaceRoot: root.closest('[data-v2-z],[data-v2-z-layer]'),
         bodyRoot: root,
         onCreated: onCreationFinished || rerender,
