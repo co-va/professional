@@ -271,7 +271,8 @@ export function renderJournal(root, options = {}) {
   };
 
   const renderView = () => {
-    if (!root.isConnected) return;
+    // An inline Record/Event/Note editor owns the visible Z body until commit/cancel.
+    if (!root.isConnected || root.querySelector('[data-record-creation-flow]')) return;
     disposeActiveView();
     disposeActiveView = () => {};
 
@@ -296,6 +297,7 @@ export function renderJournal(root, options = {}) {
         workplaceId: selectedWorkplaceId,
         navigationRoot: periodNavigationRoot,
         focusTarget: noteFocusTarget,
+        onCreationFinished: renderView,
         onWorkplaceFieldClick: openDayTime,
         onChange: (nextDate) => {
           selectedDate = nextDate;
