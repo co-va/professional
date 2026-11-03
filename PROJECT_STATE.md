@@ -8,7 +8,7 @@
 - Core остаётся владельцем backend/API/server logic/Prisma/PostgreSQL и общих серверных контрактов.
 - Любая необходимость изменить Core фиксируется только как `CORE HANDOFF` и выполняется позднее отдельным единым этапом вне этой карты.
 - Professional работает с сервером только через утверждённый API-контракт. Прямого доступа браузера к БД/Prisma/серверным внутренностям быть не должно.
-- Локальная папка `core/**` внутри `co-va/professional` допустима как клиентский доменный слой, как и в `co-va/user`; она не означает зависимость от репозитория `co-va/core`.
+- Локальная папка `core/**` внутри `co-va/professional` — клиентский доменный слой; она не означает зависимость от репозитория `co-va/core`.
 - Замена выполняется вместо старой реализации, а не поверх неё. Legacy/compat/bridge/fallback/duplicate UI после замены удаляются.
 - Утверждённый Shared UI в `co-va/user` является эталоном общего UI-контракта. Professional не создаёт второй UI-мир.
 - Shared внутренние события в Professional не получают `User`/`Book`-маркер; для общего UI используется нейтральный namespace.
@@ -18,64 +18,64 @@
 ## Цель
 
 Сделать `co-va/professional` полностью самостоятельным Professional-приложением по тому же принципу чистоты, что и `co-va/user`:
-
 - Professional frontend/runtime/UI живут только здесь;
 - User/Admin/Landing и чужие runtime-контуры отсутствуют;
 - общий UI не дублируется;
 - Professional не зависит от frontend/runtime `co-va/core`;
 - Core остаётся API/DB/server владельцем;
-- после доказанной самостоятельности отдельным будущим этапом из Core можно удалить оставшийся Professional frontend/runtime без риска для Professional.
+- после доказанной самостоятельности отдельным будущим этапом из Core удаляется оставшийся Professional frontend/runtime.
 
 ## Порядок работы
 
-Следующий исполнитель не создаёт новый план. Он читает этот файл и продолжает с первого незавершённого этапа. Этапы выполняются последовательно; соседний контур не исправляется «заодно».
+Следующий исполнитель продолжает с первого незавершённого этапа. Этапы выполняются последовательно; соседний contour не исправляется «заодно».
 
 ### Этап 1 — baseline и карта фактического runtime — DONE
 
-Установлено:
-- реальные entry points: `index.html` → `professional.js`, `booking.html` → guest Booking, `invite/index.html`, `reset-password.html`, `verify-email.html`, `service-worker.js`;
-- Professional Docker/runtime собирается только из этого репозитория;
-- `/api/` проксируется во внешний Core API `https://api.va-tools.ru`;
-- User/Admin/Landing/server runtime в Professional отсутствует;
-- старый аудит до отключения CI видел 281 runtime code files / 288 reachable runtime/assets и один оборванный импорт старого Booking Draft;
-- старый внешний Booking Draft storage удалён: текущий Public Booking хранит свой draft в собственном `history.state`-контракте;
-- подтверждена классификация: Professional domains = KEEP, общий UI = SHARED, legacy/duplicate/dead = DELETE, серверные изменения = CORE HANDOFF.
+- Entry points: `index.html` → `professional.js`, `booking.html` → guest Booking, `invite/index.html`, `reset-password.html`, `verify-email.html`, `service-worker.js`.
+- Docker/runtime собирается только из Professional repository.
+- `/api/` проксируется во внешний Core API `https://api.va-tools.ru`.
+- User/Admin/Landing/server runtime отсутствует.
+- Исходный аудит видел 281 runtime code files / 288 reachable runtime/assets и один оборванный Booking Draft import.
+- Старый внешний Booking Draft storage удалён; guest draft принадлежит текущему `history.state` flow.
 
 ### Этап 2 — CI reset перед очисткой — DONE
 
-По прямому указанию владельца старый `Check Professional` полностью удалён из `staging`, потому что содержал прежние/неверные архитектурные предположения и мешал очистке.
+Старый `Check Professional` удалён из `staging` по указанию владельца: он содержал прежние/неверные архитектурные предположения.
 
-- до окончания архитектурной очистки новый постоянный CI не ставить;
-- Repository/Shared UI/runtime guards собрать заново на этапе 9 по фактическому очищенному состоянию;
-- отсутствие CI на промежуточных этапах не считается доказательством работоспособности.
+- новый постоянный CI до окончания архитектурной очистки не ставить;
+- новый Repository/Shared UI/runtime gate собрать на этапе 9;
+- отсутствие CI не является доказательством runtime.
 
-### Этап 3 — Shared UI convergence — ACTIVE
+### Этап 3 — Shared UI convergence — DONE
 
-- Сверить Professional `ui/**` с утверждённым Shared UI User.
-- Оставить один общий контракт H/A/B/C/D/F/E/Z, Q/X/S, CardDeck, cards, lists, Calendar/Time и modal geometry.
-- Удалить Professional-local копии, локальный CSS и альтернативные владельцы уже существующего Shared UI.
-- Уже выровнены: Shared Header, horizontal rail behavior/cue, Z/Q layout; удалён Z `padding-top:0` override.
-- V2 context event заменён без bridge на нейтральный `va-tools:v2-context-changed` у producer/consumers.
-- Совпадающие с User Shared owners не переписывать без причины.
+- Shared Header выровнен с User contract.
+- Horizontal rail использует фактический overflow и единый Shared cue.
+- Z/Q layout выровнен; локальный `padding-top:0` override удалён.
+- Shared V2 context producer/consumers переведены без bridge на `va-tools:v2-context-changed`.
+- MiniCard, Calendar, modal lifecycle и общий V2 List Entry выровнены с User.
+- Professional-specific Journal/Time extensions сохранены только как feature extensions, а не второй Shared owner.
+- Portal-aware Q/V fix Professional сохранён, потому что он исправляет реальную portal geometry и не создаёт альтернативный owner.
 
-### Этап 4 — entry/bootstrap Professional — TODO
+### Этап 4 — entry/bootstrap Professional — DONE
 
-- Professional entry загружает только Professional App Runtime.
-- Первой рабочей поверхностью является утверждённый Professional workspace, без User/App-mode/legacy bootstrap.
-- Удалить старые host/mode переключатели и скрытые fallback-входы, если они существуют.
-- Public Booking не загружает Professional workspace и остаётся отдельной guest surface.
+- `professional.js` загружает только Professional App Runtime.
+- Первый workspace не зависит от User/Admin/Landing/App-mode runtime.
+- Profile/Journal/Operational/minimal Finance получают slices одного `journal-bootstrap`; full Profile/Finance остаются lazy.
+- Shared V2 listener в entry переведён на нейтральный namespace.
+- Public Booking не загружает `professional.js`.
 
-### Этап 5 — auth/account/network boundary — TODO
+### Этап 5 — auth/account/network boundary — DONE
 
-- Один владелец Professional auth/session/API transport.
-- Убрать параллельные network bridges и дублирующие fetch-owners.
-- Production/staging origin и API boundary задаются единообразно.
-- Browser storage не владеет бизнес-данными.
-- Core API остаётся внешним серверным контрактом; серверный код в Professional не копируется.
+- Auth/API transport имеет одного владельца: `core/auth.js` + `apiRequest`.
+- Legacy runtime migration `book.auth.token` удалён; используется один технический ключ `va-tools.auth.token`.
+- Business mutations идут через единую in-memory queue `core/business-persistence.js` → Core API.
+- App-wide server sync вынесен из `online-booking/` в `core/runtime/server-sync.js`; старый файл удалён без wrapper/alias.
+- Browser storage не является владельцем бизнес-данных.
+- Guest Public Booking использует свой unauthenticated HTTP boundary и не импортирует Professional auth/session.
 
-### Этап 6 — Professional-owned domains — TODO
+### Этап 6 — Professional-owned domains — DONE
 
-По фактической достижимости пройти только Professional-контуры:
+Проверены по фактическим owners/persistence:
 - Profile / Workplace;
 - People;
 - Journal / Record / Event / Note;
@@ -89,41 +89,47 @@
 - Chat;
 - Online Booking settings/link management.
 
-Для каждого: один owner, один публичный клиентский контракт, отсутствие дублей/bridge, сохранение через Core API и отсутствие зависимости от Core frontend/runtime.
+Результат:
+- данные живут как in-memory projections/caches и сохраняются через Core API;
+- Record имеет один public contract `core/record/index.js`;
+- Time имеет один public contract `core/time/index.js`;
+- Finance browser state — read cache, сервер остаётся владельцем Settlement/Operation/Ledger;
+- второго persistence owner или Core frontend/runtime dependency не найдено.
 
-### Этап 7 — Public Booking isolation — TODO
+### Этап 7 — Public Booking isolation — DONE
 
-- Guest Booking остаётся Booking, а не входом в Professional App.
-- Удалить legacy Online Booking runtime и оставить только фактически используемый guest flow.
-- Record создаётся через канонический серверный API/owner; не создавать второй Record-мир.
-- Professional workspace не должен быть обязательной зависимостью Public Booking.
+- `online-booking/` содержит только `booking-entry.js`, `access.js`, `model.js`.
+- Guest Booking не импортирует Professional workspace/auth.
+- Guest HTTP owner обращается только к `/online-booking/...` API.
+- Confirm создаёт запись через серверный guest endpoint; второго клиентского Record owner нет.
+- App-wide sync удалён из guest contour.
 
-### Этап 8 — dead code / duplicate / retired cleanup — TODO
+### Этап 8 — dead code / duplicate / retired cleanup — ACTIVE
 
-- Удалить недостижимый runtime.
-- Удалить exact/semantic duplicates после проверки потребителей.
-- Удалить retired Book/User/Account-mode/legacy/compat/bridge маркеры, которые больше не являются текущим контрактом.
-- Не оставлять aliases/wrappers ради старых имён.
+- До начала текущей очистки аудит не находил dead runtime, exact runtime duplicates, User/Admin/Landing contours или legacy/compat/bridge paths.
+- После baseline удалялись или переносились старые реализации; параллельные реализации не добавлялись.
+- Осталось убрать доказанные retired внутренние маркеры/имена без aliases: старые `Book*` client names и старые `book:*` internal events там, где это именно внутренний Professional contract.
+- Серверные поля/маршруты, которые всё ещё приходят из Core API под legacy-именами, не переписываются в Core на этом этапе и фиксируются в `CORE HANDOFF`.
 
 ### Этап 9 — новый contour CI — TODO
 
-После очистки, а не раньше:
-- собрать `Repository` + `Shared UI` + runtime smoke;
-- добавить только реально нужные feature-checks по владельцам;
-- feature-check защищает только свой контур и не переопределяет соседние продуктовые правила;
-- собрать единый Professional Gate для текущего `staging`.
+После завершения этапа 8:
+- `Repository` + `Shared UI` + runtime smoke;
+- только реально нужные feature checks;
+- feature check защищает только свой contour;
+- единый Professional Gate для `staging`.
 
 ### Этап 10 — runtime proof на staging — TODO
 
-Проверить фактическую работу, а не только наличие файлов/tests:
+Проверить фактическую работу:
 - login/session;
-- загрузка Professional workspace;
+- Professional workspace;
 - Journal;
-- основные переходы F/E/Z и Q/X/S;
+- F/E/Z и Q/X/S;
 - Profile/Workplace;
 - Record create/view/edit;
 - Settings;
-- Notifications/Chat по доступному текущему контракту;
+- Notifications/Chat;
 - отдельный Public Booking guest flow;
 - service worker/PWA root.
 
@@ -132,30 +138,29 @@
 Только после зелёной архитектуры и runtime proof:
 - подключить Amvera к `co-va/professional/staging`;
 - проверить staging deployment;
-- перенести/назначить Professional-домен;
-- проверить API origin, PWA manifest/service worker и прямые deep links;
-- не использовать `main` для этой операции.
+- назначить Professional-домен;
+- проверить API origin, PWA manifest/service worker и deep links;
+- `main` не использовать.
 
 ### Этап 12 — финальная самостоятельность Professional — TODO
 
-Professional считается отделённым только если одновременно доказано:
+Professional отделён только если одновременно доказано:
 - приложение работает из `co-va/professional/staging`;
-- Core frontend/runtime не требуется для запуска;
+- Core frontend/runtime не требуется;
 - данные/операции идут через Core API;
 - User/Admin/Landing runtime отсутствуют;
 - Shared UI не имеет второго Professional-варианта;
-- Public Booking изолирован от App Runtime;
-- Repository/Shared UI/runtime gates зелёные;
-- staging deployment и домен работают на Professional repository.
+- Public Booking изолирован;
+- новые Repository/Shared UI/runtime gates зелёные;
+- staging deployment и домен работают из Professional repository.
 
 ## CORE HANDOFF — выполнять только после завершения Professional
 
-Сюда добавляются только доказанные серверные/репозиторные хвосты, которые невозможно исправить внутри Professional.
+Доказанные хвосты, которые не исправляются внутри Professional:
 
-После завершения этапа 12 отдельной задачей в `co-va/core`:
-1. составить фактическую карту оставшегося Professional frontend/runtime в Core;
-2. удалить его из Core без удаления API/server/Prisma/PostgreSQL, нужных Professional;
-3. поставить guard, запрещающий возврат Professional frontend/runtime в Core;
-4. проверить, что `co-va/professional` продолжает работать через Core API.
+1. После этапа 12 составить в `co-va/core` карту оставшегося Professional frontend/runtime и удалить его, сохранив API/server/Prisma/PostgreSQL.
+2. Поставить в Core guard, запрещающий возврат Professional frontend/runtime.
+3. Проверить, что `co-va/professional` продолжает работать через Core API.
+4. Отдельно нормализовать legacy server/API naming, если Core всё ещё отдаёт поля вроде `isOwnerBook`; Professional до этого не создаёт compatibility alias и не меняет Core.
 
 До отдельного явного перехода к этому handoff `co-va/core` не изменять.
