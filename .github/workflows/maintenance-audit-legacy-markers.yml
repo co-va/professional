@@ -1,0 +1,26 @@
+name: Maintenance / Audit Legacy Markers
+
+on:
+  push:
+    branches: [staging]
+    paths:
+      - '.github/workflows/maintenance-audit-legacy-markers.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Scan runtime legacy markers
+        shell: bash
+        run: |
+          set -o pipefail
+          echo '=== legacy marker scan ==='
+          grep -RInE --include='*.js' --include='*.mjs' --include='*.html' --include='*.css' \
+            --exclude-dir='.git' --exclude-dir='.github' \
+            '(book:|Book[A-Z]|\bBook\b|book\.)' \
+            core journal timetable settings chat online-booking invite ui professional.js service-worker.js 2>/dev/null || true
+          echo '=== end scan ==='
