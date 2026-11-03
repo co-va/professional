@@ -26,7 +26,7 @@ import { serviceHeaderContext, notifyServiceContext } from '../context.js';
 import { openServiceWorkplaceSelection } from '../workplace-selection.js';
 import { procedureCardAppearance, procedureCardFields, procedureCardPhoto } from '../card-presentation.js';
 import { bindProcedureEditor, initialProcedure, procedureEditorForm } from './form.js';
-import { deleteProcedure as deleteProcedureData, getProcedures, pushProcedureHistory, reorderProcedures, saveProcedure as saveProcedureData } from './data.js';
+import { deleteProcedure as deleteProcedureData, getProcedures, reorderProcedures, saveProcedure as saveProcedureData } from './data.js';
 
 const money = (value) => `${new Intl.NumberFormat('ru-RU').format(Number(value || 0))} ₽`;
 
@@ -56,7 +56,6 @@ function spentText(minutes) {
 
 function updateProcedure(current, patch) {
   const next = { ...current, ...patch, updatedAt: new Date().toISOString() };
-  pushProcedureHistory(current, 'updated');
   saveProcedureData(next);
   return next;
 }
