@@ -1,0 +1,87 @@
+import fs from 'node:fs';
+import path from 'node:path';
+
+const ROOT = process.cwd();
+const read = (file) => fs.readFileSync(path.join(ROOT, file), 'utf8');
+const assert = (condition, message) => {
+  if (!condition) {
+    console.error(`Shared UI FAILED: ${message}`);
+    process.exitCode = 1;
+  }
+};
+const count = (source, marker) => source.split(marker).length - 1;
+
+function rootSelectorCount(source, selector) {
+  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return (source.match(new RegExp(`(^|\\n)${escaped}\\{`, 'g')) || []).length;
+}
+
+function walk(dir) {
+  const base = path.join(ROOT, dir);
+  if (!fs.existsSync(base)) return [];
+  const out = [];
+  const stack = [base];
+  while (stack.length) {
+    const current = stack.pop();
+    for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
+      const full = path.join(current, entry.name);
+      if (entry.isDirectory()) stack.push(full);
+      else out.push(path.relative(ROOT, full).replaceAll('\\', '/'));
+    }
+  }
+  return out.sort();
+}
+
+const v2 = read('ui/v2/v2.css');
+const geometry = read('ui/v2/geometry.js');
+const header = read('ui/v2/header.js');
+const zStack = read('ui/v2/z-stack.js');
+const modalPortal = read('ui/v2/modal-portal.js');
+const vHost = read('ui/v2/v-host.js');
+const entity = read('ui/cards/entity-card-constructor.css');
+const mini = read('ui/cards/mini-card.css');
+const list = read('ui/lists/list-entry.css');
+
+// Canonical shell geometry has one Shared owner.
+assert(v2.includes('--v2-z-radius:34px'), 'Shared Z radius changed');
+assert(v2.includes('--v2-z-layer-offset:12px'), 'Shared Z layer offset changed');
+assert(v2.includes('--v2-edge:16px'), 'Shared Z edge changed');
+assert(v2.includes('height:72px;') && v2.includes('flex:0 0 72px'), 'Shared H height changed');
+assert(v2.includes('padding:22px 18px calc(24px + env(safe-area-inset-bottom))'), 'Shared Z padding changed');
+assert(rootSelectorCount(v2, '.v2-header') === 1, 'Shared H geometry must have one owner');
+assert(rootSelectorCount(v2, '.v2-z') === 1, 'Shared Z geometry must have one owner');
+assert(!zStack.includes('padding-top:0'), 'Nested Z must not override Shared top padding');
+
+// Q geometry and modal lifecycle remain centralized.
+assert(geometry.includes('export function v2QModalPortalGeometry'), 'Shared Q geometry missing');
+assert(count(geometry, 'export function v2QModalPortalGeometry') === 1, 'Q geometry must have one owner');
+assert(modalPortal.includes("new CustomEvent('va-tools:v2-context-changed')"), 'Modal portal must publish neutral Shared context event');
+assert(vHost.includes("addEventListener('va-tools:v2-context-changed'"), 'V host must consume neutral Shared context event');
+
+// Canonical Shared components keep one geometry owner.
+assert(entity.includes('width:min(338px,100%)'), 'EntityCard width changed');
+assert(entity.includes('aspect-ratio:338/213'), 'EntityCard aspect ratio changed');
+assert(entity.includes('grid-template-rows:repeat(9,minmax(0,1fr))'), 'EntityCard row geometry changed');
+assert(rootSelectorCount(entity, '.entity-visual-card') === 1, 'EntityCard geometry must have one owner');
+
+assert(mini.includes('--mini-card-width:238px'), 'MiniCard width changed');
+assert(rootSelectorCount(mini, '.mini-card') === 1, 'MiniCard geometry must have one owner');
+
+assert(list.includes('min-height:78px'), 'V2 list entry geometry changed');
+assert(count(list, '.list-entry{') === 1, 'V2 list entry geometry must have one owner');
+
+assert(header.includes("kind === 'chat'"), 'Shared D chat control missing');
+assert(v2.includes('.v2-header__slot--d .v2-header__control--chat'), 'Shared D chat geometry missing');
+
+// Feature contours do not own CSS. Isolated invite entry and fundamental css/style.css are explicit exceptions.
+const allowedCss = new Set(['css/style.css', 'invite/invite.css']);
+const cssFiles = [
+  ...walk('core'), ...walk('journal'), ...walk('timetable'), ...walk('settings'),
+  ...walk('chat'), ...walk('online-booking'), ...walk('invite'), ...walk('css'),
+].filter((file) => file.endsWith('.css'));
+for (const file of cssFiles) {
+  assert(file.startsWith('ui/') || allowedCss.has(file), `Feature CSS owner is forbidden: ${file}`);
+}
+
+if (process.exitCode) process.exit(process.exitCode);
+console.log('Shared UI PASS: canonical geometry/components have one owner and feature contours do not create a second CSS world.');
