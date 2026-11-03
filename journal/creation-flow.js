@@ -10,8 +10,8 @@ const JOURNAL_CREATE_MODES = [
   { id: 'note', label: 'Заметка' },
 ];
 
-// The Journal supplies an already built Time grid. No Record, Event, Note or
-// operational-data loader participates in the first time-choice screen.
+// The first Q belongs to Journal, not Record/Event/Note.
+// It reads only the precomputed Time grid; the chosen entity owns all later steps.
 export function openJournalCreation({
   date = '',
   workplaceId = '',
@@ -23,13 +23,16 @@ export function openJournalCreation({
   onCancel = () => {},
 } = {}) {
   if (!timeGrid) return null;
-  const owner = openRecordCreationOwner({ onCancel, surfaceRoot, bodyRoot });
+  const owner = openRecordCreationOwner({
+    onCancel,
+    surfaceRoot,
+    bodyRoot,
+    shellTitle: '',
+  });
   if (!owner) return null;
 
-  let activeMode = 'record';
   let selectedTime = '';
   let requestVersion = 0;
-  let recordFlow = null;
 
   const hour = Math.floor((timeToMinutes(timeHint) ?? 0) / 60) * 60;
   const timeChoices = [hour, hour + 30]
@@ -46,18 +49,41 @@ export function openJournalCreation({
       };
     });
 
+  const returnToChoices = () => {
+    // Discard the previous entity and invalidate any unfinished lazy import.
+    ++requestVersion;
+    selectedTime = '';
+    showTimeChoices();
+    return true;
+  };
+
   const showTimeChoices = () => {
-    renderModeSwitch();
     owner.setBackHandler?.(() => {
       owner.close?.();
       return true;
     });
+    const host = owner.setShellHeader(viewNavigation({
+      views: JOURNAL_CREATE_MODES,
+      activeView: 'record',
+      ariaLabel: 'Действие в Журнале',
+    }));
+    if (host) {
+      initViewNavigation(host, {
+        views: JOURNAL_CREATE_MODES,
+        activeView: 'record',
+        onChange: (mode) => {
+          if (mode !== 'event' && mode !== 'note') return;
+          const version = ++requestVersion;
+          void beginAuxiliary(mode, version);
+        },
+      });
+    }
     const view = owner.render({
       step: 'time',
       body: `<div class="record-screen record-screen--time">${timeSlots({
         values: timeChoices,
         data: 'data-journal-start-time',
-        selected: selectedTime,
+        selected: '',
         ariaLabel: 'Уточните время',
       })}</div>`,
     });
@@ -67,65 +93,61 @@ export function openJournalCreation({
         if (getTimeGridMinuteState(timeGrid, from).state !== 'free') return;
         selectedTime = from;
         const version = ++requestVersion;
-        void showSelectedMode(version);
+        void beginRecord(version);
       });
     });
   };
 
-  const returnToChoices = () => {
-    ++requestVersion;
-    selectedTime = '';
-    recordFlow = null;
-    showTimeChoices();
-    return true;
+  const showEntityLoading = (mode) => {
+    owner.setShellHeader(`<div class="record-creation-step-title">${mode === 'event' ? 'Событие' : 'Заметка'}</div>`);
+    owner.setBackHandler?.(returnToChoices);
+    owner.render({ step: mode, title: false, body: '' });
   };
 
-  const showLoading = () => {
+  async function beginAuxiliary(mode, version) {
+    if (!owner.isOpen?.() || version !== requestVersion) return;
+    showEntityLoading(mode);
+    try {
+      if (mode === 'event') {
+        const { createJournalEventFlow } = await import('./event-create.js');
+        if (!owner.isOpen?.() || version !== requestVersion) return;
+        // Event starts from the originally tapped free time, without a second time chooser.
+        createJournalEventFlow({ owner, date, workplaceId, timeHint, onCreated });
+      } else {
+        const { createJournalNoteFlow } = await import('./note-create.js');
+        if (!owner.isOpen?.() || version !== requestVersion) return;
+        // Note is neutral: no time selection or occupancy check.
+        createJournalNoteFlow({ owner, date, onCreated });
+      }
+    } catch (error) {
+      if (!owner.isOpen?.() || version !== requestVersion) return;
+      returnToChoices();
+      const { openNotice } = await import('../ui/modals/index.js');
+      openNotice({
+        title: 'Не удалось открыть действие',
+        message: String(error?.message || 'Попробуйте ещё раз.'),
+      });
+    }
+  }
+
+  async function beginRecord(version) {
+    if (!owner.isOpen?.() || version !== requestVersion || !selectedTime) return;
+    owner.setShellHeader('');
     owner.setBackHandler?.(returnToChoices);
     owner.render({
       step: 'procedures',
       title: 'Выбор процедур',
       body: '<div class="muted">Загружаем текущие процедуры…</div>',
     });
-  };
-
-  async function showSelectedMode(version) {
-    if (!owner.isOpen?.() || version !== requestVersion) return;
-    if (activeMode === 'note') {
-      // A Note is independent of Time. The mode selector belongs to the chooser only.
-      owner.setShellHeader('<div class="record-creation-step-title">Заметка</div>');
-      const { createJournalNoteFlow } = await import('./note-create.js');
-      if (!owner.isOpen?.() || version !== requestVersion || activeMode !== 'note') return;
-      owner.setBackHandler?.(returnToChoices);
-      createJournalNoteFlow({ owner, date, onCreated });
-      return;
-    }
-    if (!selectedTime) {
-      showTimeChoices();
-      return;
-    }
-    if (activeMode === 'event') {
-      owner.setShellHeader('<div class="record-creation-step-title">Событие</div>');
-      const { createJournalEventFlow } = await import('./event-create.js');
-      if (!owner.isOpen?.() || version !== requestVersion || activeMode !== 'event') return;
-      owner.setBackHandler?.(returnToChoices);
-      createJournalEventFlow({
-        owner, date, workplaceId, timeHint: selectedTime, onCreated,
-      });
-      return;
-    }
-
-    owner.setShellHeader('');
-    showLoading();
     try {
       const [{ openRecords }, { loadRecordCreationOperationalState }] = await Promise.all([
         import('../core/records/records.js'),
         import('../core/runtime/operational-state.js'),
       ]);
-      if (!owner.isOpen?.() || version !== requestVersion || activeMode !== 'record') return;
+      if (!owner.isOpen?.() || version !== requestVersion) return;
       await loadRecordCreationOperationalState();
-      if (!owner.isOpen?.() || version !== requestVersion || activeMode !== 'record') return;
-      recordFlow = openRecords({
+      if (!owner.isOpen?.() || version !== requestVersion) return;
+      openRecords({
         context: 'journal',
         date,
         workplaceId,
@@ -147,26 +169,6 @@ export function openJournalCreation({
       });
     }
   }
-
-  const renderModeSwitch = () => {
-    const host = owner.setShellHeader(viewNavigation({
-      views: JOURNAL_CREATE_MODES,
-      activeView: activeMode,
-      ariaLabel: 'Режим Journal',
-    }));
-    if (!host) return;
-    initViewNavigation(host, {
-      views: JOURNAL_CREATE_MODES,
-      activeView: activeMode,
-      onChange: (mode) => {
-        if (mode === activeMode) return;
-        activeMode = mode;
-        const version = ++requestVersion;
-        if (mode === 'note') void showSelectedMode(version);
-        else showTimeChoices();
-      },
-    });
-  };
 
   showTimeChoices();
   return owner;
