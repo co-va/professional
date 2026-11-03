@@ -12,7 +12,7 @@ import {
 function normalizeTargetForDate(state) {
   const current = noteTargetValue(state);
   if (!current) return;
-  const allowed = new Set(noteTargetOptions(state.date).map((option) => String(option.value || '')));
+  const allowed = new Set(noteTargetOptions(state.date || state.journalDate).map((option) => String(option.value || '')));
   if (allowed.has(current)) return;
   state.targetType = '';
   state.targetId = '';
@@ -20,8 +20,12 @@ function normalizeTargetForDate(state) {
 
 export function createJournalNoteFlow({ owner, date, onCreated = () => {} } = {}) {
   if (!owner) return null;
+  const now = new Date();
+  const journalDate = String(date || '').slice(0, 10)
+    || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   const state = {
-    date: String(date || '').slice(0, 10),
+    journalDate,
+    date: '',
     from: '',
     to: '',
     targetType: '',
@@ -36,7 +40,7 @@ export function createJournalNoteFlow({ owner, date, onCreated = () => {} } = {}
     if (!form) return;
     Object.assign(state, readProfessionalNoteEditor(form, {
       currentContext: { scope: 'professional' },
-      fallbackDate: state.date,
+      fallbackDate: '',
     }));
   };
 
@@ -64,7 +68,6 @@ export function createJournalNoteFlow({ owner, date, onCreated = () => {} } = {}
 
     view.action?.addEventListener('click', async (event) => {
       capture(view.body);
-      if (!state.date) return openNotice({ title: 'Заметка', message: 'Укажите дату заметки.' });
       if (!state.title && !state.text) return openNotice({ title: 'Заметка', message: 'Укажите наименование или текст заметки.' });
 
       const ownerId = String(getProfile()?.id || '');
@@ -76,7 +79,7 @@ export function createJournalNoteFlow({ owner, date, onCreated = () => {} } = {}
         ownerType: 'profile',
         ownerId,
         context: state.context,
-        date: state.date,
+        date: state.date || journalDate,
         from: state.from,
         to: state.to,
         targetType: state.targetType,
