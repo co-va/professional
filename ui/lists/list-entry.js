@@ -80,7 +80,7 @@ export function v2ListEntry({
     return `<${tag} class="${classes}"${attrs}${style}>
       <span class="list-entry__background" aria-hidden="true"></span>
       <span class="list-entry__content">
-        ${reorderAction}<span class="list-entry__columns">${columnValues.map((column, index) => `<span class="list-entry__column list-entry__column--${index + 1}">${columnLines(column)}</span>`).join('')}</span>
+        ${reorderAction}${swatch}<span class="list-entry__columns">${columnValues.map((column, index) => `<span class="list-entry__column list-entry__column--${index + 1}">${columnLines(column)}</span>`).join('')}</span>
         ${action}${deleteAction}${selectionAction}
       </span>
     </${tag}>`;
