@@ -186,7 +186,6 @@ function openProfileData(root,navigateBack,options={}){
     className:'v2-profile-data-layer',
   }));
   if(!layer)return;
-  layer.querySelector('[data-v2-q-header-content]')?.replaceChildren();
   layer.querySelector('[data-profile-settings]')?.addEventListener('click',()=>openProfileSettings(root,navigateBack,options));
   bindProfileData(layer,p,options,()=>{
     layer.v2Close?.();
