@@ -21,8 +21,6 @@ export async function openJournalCreation({
 } = {}) {
   const owner = openRecordCreationOwner({ onCancel, surfaceRoot, bodyRoot });
   if (!owner) return null;
-  const operationalReady = loadRecordCreationOperationalState();
-
   const context = { date, workplaceId, timeHint };
   let activeMode = 'record';
   let recordFlow = null;
@@ -87,6 +85,14 @@ export async function openJournalCreation({
     stepBack: true,
     onCreated: onRecordCreated,
   });
-  void operationalReady.catch(() => {});
+  // Paint the first Time step before fetching the full server operational bundle.
+  // This legacy API still owns current procedures; a scoped server endpoint is a CORE HANDOFF.
+  if (typeof requestAnimationFrame === 'function') {
+    requestAnimationFrame(() => {
+      if (owner.isOpen?.()) void loadRecordCreationOperationalState().catch(() => {});
+    });
+  } else {
+    void loadRecordCreationOperationalState().catch(() => {});
+  }
   return owner;
 }
