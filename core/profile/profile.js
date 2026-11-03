@@ -103,8 +103,7 @@ function showProfileError(message){
 
 function openWorkplaceLimitModal(root,limit){
   const current=Number.isFinite(limit)?String(limit):'текущий лимит';
-  const m=mountModal(root,modal(`<div class="modal-title"><h2>Работаете в нескольких местах?</h2><p>Сейчас доступно рабочих пространств: ${escapeHtml(current)}.</p></div>${actionBlock(button('Понятно',{data:'data-close-workplace-limit'}))}`,{variant:'s',title:'Рабочие пространства'}));
-  m?.querySelector('[data-close-workplace-limit]')?.addEventListener('click',()=>m.v2Close?.());
+  mountModal(root,modal(`<div class="modal-title"><h2>Работаете в нескольких местах?</h2><p>Сейчас доступно рабочих пространств: ${escapeHtml(current)}.</p></div>`,{variant:'s',title:'Рабочие пространства'}));
 }
 
 function collectProfileData(root){
