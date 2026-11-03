@@ -66,6 +66,7 @@ export function openRecordCreationOwner({
   onCancel = () => {},
   surfaceRoot = null,
   bodyRoot = null,
+  shellTitle = 'Запись',
 } = {}) {
   const inline = Boolean(surfaceRoot && bodyRoot);
   let layer = null;
@@ -89,7 +90,7 @@ export function openRecordCreationOwner({
     layer = mountModal(document.body, modal(flowMarkup(), {
       variant: 'q',
       surface: 'app',
-      title: 'Запись',
+      title: shellTitle,
       className: 'record-creation-q',
     }));
   }
