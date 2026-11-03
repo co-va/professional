@@ -32,7 +32,7 @@ import {
   buildNaturalBookingTimeRows,
   checkTimeAvailability,
   getAvailabilityGrid,
-  getTimeAvailabilityAt,
+  getTimeGridMinuteState,
   minutesToTime,
   timeToMinutes,
 } from '../time/index.js';
@@ -152,11 +152,12 @@ function defaultJournalTimeRows({ date, workplaceId, hint }) {
   const anchor = timeToMinutes(hint);
   if (anchor == null) return [];
   const hour = Math.floor(anchor / 60) * 60;
+  const grid = getAvailabilityGrid({ date, workplaceId });
   return [hour, hour + 30]
     .map((minute) => minutesToTime(minute))
     .filter(Boolean)
     .map((value) => {
-      const availability = getTimeAvailabilityAt({ date, workplaceId, time: value });
+      const availability = getTimeGridMinuteState(grid, value);
       return {
         value,
         label: value,
