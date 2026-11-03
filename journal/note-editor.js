@@ -23,7 +23,7 @@ export function professionalNoteEditorMarkup(note = {}, {
 } = {}) {
   return `<form class="form-grid" ${formData}>
     <div class="user-note-color-picker">${colorPicker({ name: 'color', value: note.color || NOTE_DEFAULT_COLOR })}</div>
-    ${datePicker({ label: 'Дата', name: 'date', value: note.date || '', required: true, allowClear: false })}
+    ${datePicker({ label: 'Дата', name: 'date', value: note.date || '', required: false, allowClear: true })}
     <div class="time-range-fields">
       ${timePicker({ label: 'С', name: 'from', value: note.from || '', allowEmpty: true, minuteStep: 1 })}
       ${timePicker({ label: 'До', name: 'to', value: note.to || '', allowEmpty: true, minuteStep: 1 })}
@@ -32,7 +32,7 @@ export function professionalNoteEditorMarkup(note = {}, {
       label: 'Прикрепить к',
       name: 'target',
       value: noteTargetValue(note),
-      options: noteTargetOptions(note.date, { includeNote }),
+      options: noteTargetOptions(note.date || note.journalDate, { includeNote }),
       aria: 'Прикрепить заметку',
     })}
     ${field({ label: 'Наименование', name: 'title', value: note.title || '' })}
