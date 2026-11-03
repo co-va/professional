@@ -59,7 +59,7 @@ function openRenewalFlowIfNeeded(access) {
   });
 }
 
-export async function activateBookDemo() {
+export async function activateDemo() {
   const response = await apiRequest('/saas-access/demo/activate', {
     method: 'POST',
     body: JSON.stringify({}),
@@ -75,7 +75,7 @@ export async function requestLiveMode({ manage = false } = {}) {
   return payload;
 }
 
-export async function loadBookAccess() {
+export async function loadAccess() {
   const bootstrap = await consumeJournalBootstrap('access', { start:false });
   if (bootstrap) {
     const access = applyAccess(bootstrap);
@@ -92,25 +92,25 @@ export async function loadBookAccess() {
   return access;
 }
 
-export function getBookAccess() {
+export function getAccess() {
   return currentAccess;
 }
 
-export function getBookCapability(key) {
+export function getCapability(key) {
   return capabilityMap.get(String(key || '').trim()) || null;
 }
 
-export function canUseBookCapability(key) {
+export function canUseCapability(key) {
   if (currentAccess.status === 'SUSPENDED') return false;
-  const capability = getBookCapability(key);
+  const capability = getCapability(key);
   if (!capability) return currentAccess.isOwnerBook === true;
   if (capability.valueType !== 'BOOLEAN') return true;
   return capability.enabled === true;
 }
 
-export function getBookLimit(key) {
+export function getLimit(key) {
   if (currentAccess.status === 'SUSPENDED') return 0;
-  const capability = getBookCapability(key);
+  const capability = getCapability(key);
   if (!capability) return null;
   return capability.valueType === 'LIMIT' ? capability.limit : null;
 }

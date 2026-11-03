@@ -221,9 +221,9 @@ export function initJournalDayTimeline(root, {
   onUsageClick = () => {},
   onWorkFieldClick = () => {},
 } = {}) {
-  if (root.__bookTimeUsageChangeHandler) window.removeEventListener('book:time-usage-changed', root.__bookTimeUsageChangeHandler);
-  root.__bookTimeUsageChangeHandler = () => {};
-  window.addEventListener('book:time-usage-changed', root.__bookTimeUsageChangeHandler);
+  if (root.__professionalTimeUsageChangeHandler) window.removeEventListener('professional:time-usage-changed', root.__professionalTimeUsageChangeHandler);
+  root.__professionalTimeUsageChangeHandler = () => {};
+  window.addEventListener('professional:time-usage-changed', root.__professionalTimeUsageChangeHandler);
 
   root.querySelectorAll('[data-journal-work-field]').forEach((field) => {
     const open = () => {

@@ -42,7 +42,7 @@ function valid(note) {
 
 function notify(detail = {}) {
   if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('book:notes-changed', { detail }));
+    window.dispatchEvent(new CustomEvent('professional:notes-changed', { detail }));
   }
 }
 

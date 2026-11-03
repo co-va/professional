@@ -136,5 +136,5 @@ export async function changePassword(currentPassword, newPassword) {
 
 export function logout() {
   clearAuthToken();
-  window.dispatchEvent(new CustomEvent('book:auth-logout'));
+  window.dispatchEvent(new CustomEvent('professional:auth-logout'));
 }

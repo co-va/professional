@@ -2,7 +2,7 @@ import { viewNavigation, initViewNavigation, ALL_WORKPLACES_ID, modal, mountModa
 import { setV2ZHeaderRows, clearV2ZHeaderRows } from '../ui/v2/z-layout.js';
 import { getWorkplaceContext, setWorkplaceContext } from '../core/workplace-context.js';
 import { readOnlyReceipt } from '../ui/receipt/index.js';
-import { canUseBookCapability } from '../core/access.js';
+import { canUseCapability } from '../core/access.js';
 import { getAllWorkplacesMonthStats, getWorkplaceMonthStats, getWorkingDays, getWorkplaces } from '../core/workplace-time.js';
 import { getActiveDayWorkplaces } from '../core/day/index.js';
 import { getRecordPaymentState, recordAmountDue } from '../core/finance/index.js';
@@ -71,7 +71,7 @@ function recordHasEnded(record = null, now = new Date()) {
 }
 
 export function renderJournal(root, options = {}) {
-  const availableViews = views.filter((view) => canUseBookCapability(view.capability));
+  const availableViews = views.filter((view) => canUseCapability(view.capability));
   let activeView = availableViews.some((view) => view.id === options.initialView)
     ? options.initialView
     : (availableViews[0]?.id || 'day');
@@ -367,7 +367,7 @@ export function renderJournal(root, options = {}) {
     renderView();
   };
 
-  window.addEventListener('book:journal-note-focus-request', focusJournalNotes);
+  window.addEventListener('professional:journal-note-focus-request', focusJournalNotes);
 
   let refreshQueued = false;
   const scheduleRefresh = () => {
@@ -379,13 +379,13 @@ export function renderJournal(root, options = {}) {
     });
   };
   const refreshEvents = [
-    'book:records-changed',
-    'book:dds-changed',
-    'book:time-usage-changed',
-    'book:people-changed',
-    'book:procedures-changed',
-    'book:products-changed',
-    'book:workplaces-changed',
+    'professional:records-changed',
+    'professional:dds-changed',
+    'professional:time-usage-changed',
+    'professional:people-changed',
+    'professional:procedures-changed',
+    'professional:products-changed',
+    'professional:workplaces-changed',
   ];
   refreshEvents.forEach((eventName) => window.addEventListener(eventName, scheduleRefresh));
   renderView();
@@ -393,7 +393,7 @@ export function renderJournal(root, options = {}) {
   return () => {
     disposeActiveView();
     refreshEvents.forEach((eventName) => window.removeEventListener(eventName, scheduleRefresh));
-    window.removeEventListener('book:journal-note-focus-request', focusJournalNotes);
+    window.removeEventListener('professional:journal-note-focus-request', focusJournalNotes);
     clearV2ZHeaderRows(root);
   };
 }

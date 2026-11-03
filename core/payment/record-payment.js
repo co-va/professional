@@ -165,7 +165,7 @@ function blankPaymentContext(record, title = 'Оплата') {
 
 function bindPaymentChat(layer, record) {
   layer.querySelector('[data-record-payment-chat]')?.addEventListener('click', () => {
-    window.dispatchEvent(new CustomEvent('book:record-chat-request', {
+    window.dispatchEvent(new CustomEvent('professional:record-chat-request', {
       detail: { personKey: String(record?.person?.key || ''), personKeys: recordChatKeys(record) },
     }));
   });

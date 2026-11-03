@@ -93,10 +93,10 @@ async function pull(scopes = ALL_SCOPES) {
         hydrateUEIFromServer(business.uei || {});
         hydrateRecordStateFromServer({ records: business.records || [], recordEvents: business.recordEvents || [] });
       }
-      if (peopleChanged || ueiChanged) notify('book:people-changed', { action: 'server-refresh' });
+      if (peopleChanged || ueiChanged) notify('professional:people-changed', { action: 'server-refresh' });
       if (recordsChanged) {
-        notify('book:records-changed', { action: 'server-refresh' });
-        notify('book:time-usage-changed', { action: 'server-refresh' });
+        notify('professional:records-changed', { action: 'server-refresh' });
+        notify('professional:time-usage-changed', { action: 'server-refresh' });
       }
     }
 
@@ -105,8 +105,8 @@ async function pull(scopes = ALL_SCOPES) {
       const rows = Array.isArray(events) ? events : [];
       if (hasChanged('business.events', rows)) {
         hydrateEventsFromServer(rows);
-        notify('book:events-changed', { action: 'server-refresh' });
-        notify('book:time-usage-changed', { action: 'server-refresh' });
+        notify('professional:events-changed', { action: 'server-refresh' });
+        notify('professional:time-usage-changed', { action: 'server-refresh' });
       }
     }
 
@@ -125,11 +125,11 @@ async function pull(scopes = ALL_SCOPES) {
       });
       if (bookingSettingsChanged) hydrateBookingSettingsFromServer(operational.bookingSettings || null);
       if (daysChanged) {
-        notify('book:days-changed', { action: 'server-refresh' });
-        notify('book:time-usage-changed', { action: 'server-refresh' });
+        notify('professional:days-changed', { action: 'server-refresh' });
+        notify('professional:time-usage-changed', { action: 'server-refresh' });
       }
-      if (proceduresChanged) notify('book:procedures-changed', { action: 'server-refresh' });
-      if (bookingSettingsChanged) notify('book:booking-settings-changed', { action: 'server-refresh' });
+      if (proceduresChanged) notify('professional:procedures-changed', { action: 'server-refresh' });
+      if (bookingSettingsChanged) notify('professional:booking-settings-changed', { action: 'server-refresh' });
     }
 
     if (responses.has('documents')) {
@@ -139,7 +139,7 @@ async function pull(scopes = ALL_SCOPES) {
         hydrateDocumentsFromServer(documentData.documents || []);
         hydrateConsentsFromServer(documentData.consents || []);
         hydrateDocumentHistoryFromServer(documentData.history || []);
-        notify('book:documents-changed', { action: 'server-refresh' });
+        notify('professional:documents-changed', { action: 'server-refresh' });
       }
     }
 
@@ -152,10 +152,10 @@ async function pull(scopes = ALL_SCOPES) {
       const workplacesChanged = hasChanged('profile.workplaces', profile.workplaces || []);
       if (profileChanged) hydrateProfileFromServer(profile.profile || {}, profile.customProfessions || []);
       if (workplacesChanged) hydrateWorkplacesFromServer(profile.workplaces || []);
-      if (profileChanged) notify('book:profile-changed', { action: 'server-refresh' });
+      if (profileChanged) notify('professional:profile-changed', { action: 'server-refresh' });
       if (workplacesChanged) {
-        notify('book:workplaces-changed', { action: 'server-refresh' });
-        notify('book:time-usage-changed', { action: 'server-refresh' });
+        notify('professional:workplaces-changed', { action: 'server-refresh' });
+        notify('professional:time-usage-changed', { action: 'server-refresh' });
       }
     }
 
@@ -173,16 +173,16 @@ async function pull(scopes = ALL_SCOPES) {
         products: auxiliary.products || [],
         productHistory: auxiliary.productHistory || [],
       });
-      if (walletsChanged) notify('book:wallets-changed', { action: 'server-refresh' });
-      if (tagsChanged) notify('book:tags-changed', { action: 'server-refresh' });
-      if (productsChanged) notify('book:products-changed', { action: 'server-refresh' });
+      if (walletsChanged) notify('professional:wallets-changed', { action: 'server-refresh' });
+      if (tagsChanged) notify('professional:tags-changed', { action: 'server-refresh' });
+      if (productsChanged) notify('professional:products-changed', { action: 'server-refresh' });
     }
 
     if (responses.has('finance')) {
       const finance = await responseJson(responses.get('finance'), 'Не удалось обновить Финансы');
       if (hasChanged('finance', finance)) {
         hydrateFinanceFromServer(finance);
-        notify('book:dds-changed', { action: 'server-refresh' });
+        notify('professional:dds-changed', { action: 'server-refresh' });
       }
     }
   } catch {
@@ -210,11 +210,11 @@ export function startProfessionalServerSync() {
   };
   document.addEventListener('visibilitychange', refreshAll);
   window.addEventListener('focus', refreshAll);
-  window.addEventListener('book:server-mutation-completed', refreshMutation);
+  window.addEventListener('professional:server-mutation-completed', refreshMutation);
   stopListeners = () => {
     document.removeEventListener('visibilitychange', refreshAll);
     window.removeEventListener('focus', refreshAll);
-    window.removeEventListener('book:server-mutation-completed', refreshMutation);
+    window.removeEventListener('professional:server-mutation-completed', refreshMutation);
   };
   return () => stopProfessionalServerSync();
 }

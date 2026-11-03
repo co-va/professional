@@ -165,7 +165,7 @@ export function mountChatThread(root, {
     if (document.querySelector('[data-v2-app].is-deck-open')) {
       event.preventDefault();
       event.stopPropagation();
-      window.dispatchEvent(new CustomEvent('book:v2-navigation-request', { detail: { open: false } }));
+      window.dispatchEvent(new CustomEvent('va-tools:v2-navigation-request', { detail: { open: false } }));
       return;
     }
     form?.querySelector('[data-message-attachment]')?.click();

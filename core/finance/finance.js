@@ -1,4 +1,4 @@
-import { canUseBookCapability } from '../access.js';
+import { canUseCapability } from '../access.js';
 
 const FINANCE_NAVIGATION = [
   { id: 'cash', label: 'Касса', capability: 'finance.cash.access' },
@@ -7,17 +7,17 @@ const FINANCE_NAVIGATION = [
 ];
 
 function investmentAccessAllowed() {
-  return canUseBookCapability('finance.investment.self.access')
-    || canUseBookCapability('finance.investment.raise.access')
-    || canUseBookCapability('finance.investment.external.access');
+  return canUseCapability('finance.investment.self.access')
+    || canUseCapability('finance.investment.raise.access')
+    || canUseCapability('finance.investment.external.access');
 }
 
 export function financeNavigationItems() {
-  const cashAccess = canUseBookCapability('finance.cash.access');
+  const cashAccess = canUseCapability('finance.cash.access');
   return FINANCE_NAVIGATION
     .filter((item) => item.id === 'cash'
       ? (cashAccess || investmentAccessAllowed())
-      : canUseBookCapability(item.capability))
+      : canUseCapability(item.capability))
     .map(({ id, label }) => ({
       id,
       label: id === 'cash' && !cashAccess && investmentAccessAllowed() ? 'Инвестиции' : label,

@@ -29,7 +29,7 @@ import {
   workspaceHeaderContext,
 } from '../../../ui/ui.js';
 import { readOnlyReceipt } from '../../../ui/receipt/index.js';
-import { canUseBookCapability } from '../../access.js';
+import { canUseCapability } from '../../access.js';
 import { findPersonByAccountId, getPeople } from '../../people/data.js';
 import {
   canPermanentlyDeleteFinanceData,
@@ -148,8 +148,8 @@ function renderOperationRow(operation) {
 
 function cashContext() {
   const investmentOnly = allowedInvestmentRoles().length > 0
-    && !canUseBookCapability('finance.cash.access')
-    && !canUseBookCapability('finance.special.access');
+    && !canUseCapability('finance.cash.access')
+    && !canUseCapability('finance.special.access');
   const hasSettings = cashAppearanceTypeOptions().length > 0
     || financeOperationGroups({ groups: ['income-expense', 'transfer'] }).length > 0;
   return workspaceHeaderContext({
@@ -234,9 +234,9 @@ function horizontalCards(cards = []) {
 
 function allowedInvestmentRoles() {
   return [
-    canUseBookCapability('finance.investment.self.access') ? { value: 'self', label: 'В своё дело' } : null,
-    canUseBookCapability('finance.investment.raise.access') ? { value: 'raise', label: 'Привлекаю инвестора' } : null,
-    canUseBookCapability('finance.investment.external.access') ? { value: 'external', label: 'Я инвестор' } : null,
+    canUseCapability('finance.investment.self.access') ? { value: 'self', label: 'В своё дело' } : null,
+    canUseCapability('finance.investment.raise.access') ? { value: 'raise', label: 'Привлекаю инвестора' } : null,
+    canUseCapability('finance.investment.external.access') ? { value: 'external', label: 'Я инвестор' } : null,
   ].filter(Boolean);
 }
 
@@ -249,20 +249,20 @@ function canCreateInvestment() {
 }
 
 function canCreateCashEntity() {
-  return canUseBookCapability('finance.cash.access')
-    || canUseBookCapability('finance.special.access')
+  return canUseCapability('finance.cash.access')
+    || canUseCapability('finance.special.access')
     || canCreateInvestment();
 }
 
 function openCashCreateMenu(root) {
   const actions = [
-    canUseBookCapability('finance.cash.access')
+    canUseCapability('finance.cash.access')
       ? button('+ Добавить кошелек', { variant: 'secondary', data: 'data-cash-create-wallet' })
       : '',
     canCreateInvestment()
       ? button('+ Добавить инвестицию', { variant: 'secondary', data: 'data-cash-create-investment' })
       : '',
-    canUseBookCapability('finance.special.access')
+    canUseCapability('finance.special.access')
       ? button('+ Добавить займ', { variant: 'secondary', data: 'data-cash-create-loan' })
       : '',
   ].filter(Boolean);
@@ -292,8 +292,8 @@ function openCashCreateMenu(root) {
 
 function cashAppearanceTypeOptions() {
   return [
-    canUseBookCapability('finance.cash.access') ? { value: 'wallet', label: 'Кошелёк' } : null,
-    canUseBookCapability('finance.special.access') ? { value: 'loan', label: 'Займ' } : null,
+    canUseCapability('finance.cash.access') ? { value: 'wallet', label: 'Кошелёк' } : null,
+    canUseCapability('finance.special.access') ? { value: 'loan', label: 'Займ' } : null,
     allowedInvestmentRoles().length > 0 ? { value: 'investment', label: 'Инвестиция' } : null,
   ].filter(Boolean);
 }
@@ -440,9 +440,9 @@ function renderList(root) {
   const wallets = getWallets();
   const investments = getInvestmentEntities();
   const loans = getLoanEntities();
-  const canUseWallets = canUseBookCapability('finance.cash.access');
+  const canUseWallets = canUseCapability('finance.cash.access');
   const canUseInvestments = allowedInvestmentRoles().length > 0;
-  const canUseLoans = canUseBookCapability('finance.special.access');
+  const canUseLoans = canUseCapability('finance.special.access');
   root.innerHTML = page([
     cashContext(),
     canUseWallets ? v2Section('Кошельки', horizontalCards(wallets.map(renderWalletCard))) : '',
@@ -705,7 +705,7 @@ function investmentRoleAllowed(role = '') {
     : role === 'external'
       ? 'finance.investment.external.access'
       : 'finance.investment.raise.access';
-  return canUseBookCapability(key);
+  return canUseCapability(key);
 }
 
 function investmentTypeOptions() {

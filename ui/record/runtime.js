@@ -84,7 +84,7 @@ function recordHeaderContext({
 
 function bindRecordChat(layer, { chatPersonKey = '', groupPersonKeys = [] } = {}) {
   layer?.querySelector('[data-record-owner-chat]')?.addEventListener('click', () => {
-    window.dispatchEvent(new CustomEvent('book:record-chat-request', {
+    window.dispatchEvent(new CustomEvent('professional:record-chat-request', {
       detail: {
         personKey: String(chatPersonKey || ''),
         personKeys: normalizedChatKeys(groupPersonKeys),

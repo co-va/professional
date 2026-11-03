@@ -6,7 +6,7 @@ import { getDDSExpenses, getDDSIncome } from './read.js';
 
 function notifyFinanceChanged(detail = {}) {
   if (typeof window === 'undefined') return;
-  window.dispatchEvent(new CustomEvent('book:dds-changed', { detail }));
+  window.dispatchEvent(new CustomEvent('professional:dds-changed', { detail }));
 }
 
 async function responseJson(response, fallback) {

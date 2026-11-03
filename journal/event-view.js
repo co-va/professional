@@ -78,7 +78,7 @@ export function openEventView(eventOrId, { onClose = () => {}, eventActions = nu
     const noteDate = String(notes[0]?.date || source.date || '').slice(0, 10);
     layer.v2Close?.();
     queueMicrotask(() => {
-      window.dispatchEvent(new CustomEvent('book:journal-note-focus-request', {
+      window.dispatchEvent(new CustomEvent('professional:journal-note-focus-request', {
         detail: {
           targetType: 'event',
           targetId: String(source.id || ''),

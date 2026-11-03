@@ -7,7 +7,7 @@ import {
   v2Section,
   v2ZLayer,
 } from '../../../ui/ui.js';
-import { canUseBookCapability } from '../../access.js';
+import { canUseCapability } from '../../access.js';
 import { renderIncomeExpenseOperation } from '../dds/income-expense.js';
 import {
   SPECIAL_FINANCE_ACTIONS,
@@ -18,7 +18,7 @@ import {
 export function financeOperationGroups({ groups = null } = {}) {
   const allowed = Array.isArray(groups) ? new Set(groups) : null;
   const groupsOut = [];
-  if (canUseBookCapability('finance.income_expense.access')) {
+  if (canUseCapability('finance.income_expense.access')) {
     groupsOut.push({
       key: 'income-expense',
       title: 'Доход / Расход',
@@ -28,7 +28,7 @@ export function financeOperationGroups({ groups = null } = {}) {
       ],
     });
   }
-  if (canUseBookCapability('finance.special.access')) {
+  if (canUseCapability('finance.special.access')) {
     groupsOut.push({
       key: 'loan',
       title: 'Займы',

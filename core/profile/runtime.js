@@ -13,7 +13,7 @@ function hydrate(remote={}){
 }
 
 if(typeof window!=='undefined'){
-  window.addEventListener('book:auth-logout',()=>{
+  window.addEventListener('professional:auth-logout',()=>{
     fullProfileStateLoad=null;
     setProfileServerReady(false);
     setWorkplacesServerReady(false);

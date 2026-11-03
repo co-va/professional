@@ -1,4 +1,4 @@
-import { canUseBookCapability } from '../core/access.js';
+import { canUseCapability } from '../core/access.js';
 import { folderList, pageHeader } from '../ui/ui.js';
 
 const folders = [
@@ -11,7 +11,7 @@ const folders = [
 ];
 
 function availableFolders() {
-  return folders.filter((folder) => !folder[4] || canUseBookCapability(folder[4]));
+  return folders.filter((folder) => !folder[4] || canUseCapability(folder[4]));
 }
 
 function workspaceFolders() {

@@ -37,7 +37,7 @@ export function saveBookingSettings(value = {}) {
   bookingSettingsState = settings;
   void queueOperationalDataset('bookingSettings', settings);
   if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('book:booking-settings-changed', { detail: { settings } }));
+    window.dispatchEvent(new CustomEvent('professional:booking-settings-changed', { detail: { settings } }));
   }
   return settings;
 }

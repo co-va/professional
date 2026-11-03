@@ -14,7 +14,7 @@ export function applyInventorySnapshot(value = {}) {
     lots: asArray(value?.lots),
     movements: asArray(value?.movements),
   };
-  window.dispatchEvent(new CustomEvent('book:inventory-changed'));
+  window.dispatchEvent(new CustomEvent('professional:inventory-changed'));
   return snapshot;
 }
 

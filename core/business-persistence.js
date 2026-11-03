@@ -26,7 +26,7 @@ function reportError(error) {
   const previousMessage = lastError?.message || '';
   lastError = error instanceof Error ? error : new Error(String(error || 'Ошибка серверного сохранения'));
   if (typeof window !== 'undefined' && lastError.message !== previousMessage) {
-    window.dispatchEvent(new CustomEvent('book:business-persistence-error', { detail: { message: lastError.message } }));
+    window.dispatchEvent(new CustomEvent('professional:business-persistence-error', { detail: { message: lastError.message } }));
   }
 }
 
@@ -50,7 +50,7 @@ function reportCompletedMutationBatch() {
   if (typeof window === 'undefined' || !completedMutationScopes.size) return;
   const scopes = [...completedMutationScopes];
   completedMutationScopes.clear();
-  window.dispatchEvent(new CustomEvent('book:server-mutation-completed', {
+  window.dispatchEvent(new CustomEvent('professional:server-mutation-completed', {
     detail: { scopes },
   }));
 }

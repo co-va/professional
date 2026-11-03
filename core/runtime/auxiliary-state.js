@@ -40,7 +40,7 @@ function inferredAuxiliaryScope(){
 }
 
 if(typeof window!=='undefined'&&typeof window.addEventListener==='function'){
-  window.addEventListener('book:auth-logout',()=>{
+  window.addEventListener('professional:auth-logout',()=>{
     financeStateLoad=null;
     auxiliaryStateLoads.clear();
   });

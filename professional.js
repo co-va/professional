@@ -20,7 +20,7 @@ import { getJournalTimeUsages, releaseJournalSoftTimeUsages } from './journal/ti
 import { configureWorkplaceSource } from './core/workplace-time.js';
 import { configureTimeUsageSource, configureSoftTimeUsageReleaseSource } from './core/time/index.js';
 import { getCurrentAccount, login, requestPasswordReset } from './core/auth.js';
-import { activateBookDemo, canUseBookCapability, getBookAccess, loadBookAccess } from './core/access.js';
+import { activateDemo, canUseCapability, getAccess, loadAccess } from './core/access.js';
 import { field, passwordField, initPasswordFields, mountV2ZLayer, openNotice, initV2WorkspaceInteraction, setV2DeckOpen, v2CardDeck, v2Header, v2Shell, v2Sticker, v2ZLayer } from './ui/ui.js';
 import { startPlatformNotices } from './core/platform-notices.js';
 
@@ -83,18 +83,18 @@ function scheduleRknGuideSync() {
   }, 700);
 }
 
-window.addEventListener('book:profile-changed', scheduleRknGuideSync);
-window.addEventListener('book:server-mutation-completed', (event) => {
+window.addEventListener('professional:profile-changed', scheduleRknGuideSync);
+window.addEventListener('professional:server-mutation-completed', (event) => {
   const scopes = Array.isArray(event?.detail?.scopes) ? event.detail.scopes : [];
   if (scopes.includes('operational')) scheduleRknGuideSync();
 });
 
-window.addEventListener('book:business-persistence-error', (event) => {
+window.addEventListener('professional:business-persistence-error', (event) => {
   const message = String(event?.detail?.message || 'Не удалось сохранить изменения на сервере.');
   openNotice({ title: 'Не удалось сохранить', message, surface: 'app' });
 });
 
-window.addEventListener('book:record-chat-request', (event) => {
+window.addEventListener('professional:record-chat-request', (event) => {
   if (!workspaceReady) return;
   const layer = mountV2ZLayer(app, v2ZLayer('', { className: 'record-chat-z' }), { stack: true });
   if (!layer) return;
@@ -127,12 +127,12 @@ function rootDefinition(section) {
 }
 
 function sectionAllowed(section) {
-  if (section === 'chat') return canUseBookCapability('chat.access');
+  if (section === 'chat') return canUseCapability('chat.access');
   if (section === 'finance' || section === 'inventory' || section === 'loyalty' || section === 'settings') {
     return secondaryItems(section).length > 0;
   }
   const item = rootDefinition(section);
-  return Boolean(item && (!item.capability || canUseBookCapability(item.capability)));
+  return Boolean(item && (!item.capability || canUseCapability(item.capability)));
 }
 
 function allowedSections() {
@@ -564,8 +564,8 @@ function startRegularPlatformNotices() {
   disposePlatformNotices();
   disposePlatformNotices = startPlatformNotices({
     onAccessChanged: async () => {
-      await loadBookAccess();
-      if (getBookAccess().status === 'SUSPENDED') {
+      await loadAccess();
+      if (getAccess().status === 'SUSPENDED') {
         renderSuspended();
         return;
       }
@@ -582,9 +582,9 @@ async function renderAuthenticated(account = authenticatedAccount) {
     loadBusinessState(),
     loadOperationalState(),
     loadFinanceState(),
-    loadBookAccess(),
+    loadAccess(),
   ]);
-  if (getBookAccess().status === 'SUSPENDED') {
+  if (getAccess().status === 'SUSPENDED') {
     renderSuspended();
     return;
   }
@@ -593,11 +593,11 @@ async function renderAuthenticated(account = authenticatedAccount) {
   disposePlatformNotices();
   disposePlatformNotices = () => {};
 
-  const freshDemo = getBookAccess().commercialMode === 'DEMO' && !getBookAccess().demoActivatedAt;
+  const freshDemo = getAccess().commercialMode === 'DEMO' && !getAccess().demoActivatedAt;
   state.activeSection = freshDemo && sectionAllowed('profile')
     ? 'profile'
     : sectionAllowed('journal') ? 'journal' : defaultSection();
-  if (freshDemo && state.activeSection === 'profile') await activateBookDemo();
+  if (freshDemo && state.activeSection === 'profile') await activateDemo();
   if (state.activeSection !== 'chat') state.lastRootSection = state.activeSection;
   history.replaceState({}, '', `#${state.activeSection}`);
   renderWorkspace();
@@ -709,7 +709,7 @@ function renderLogin(message = '') {
   syncViewport();
 }
 
-window.addEventListener('book:auth-logout', () => {
+window.addEventListener('professional:auth-logout', () => {
   authenticatedAccount = null;
   disposePlatformNotices();
   disposePlatformNotices = () => {};
@@ -726,7 +726,7 @@ window.addEventListener('hashchange', () => {
     history.replaceState({}, '', `#${state.activeSection}`);
   }
 });
-window.addEventListener('book:v2-navigation-request', (event) => {
+window.addEventListener('va-tools:v2-navigation-request', (event) => {
   if (!workspaceReady) return;
   setNavigationOpen(event?.detail?.open !== false);
 });

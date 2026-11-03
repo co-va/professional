@@ -21,7 +21,7 @@ import {
   workspaceHeaderContext,
 } from '../../../ui/ui.js';
 import { readOnlyReceipt } from '../../../ui/receipt/index.js';
-import { canUseBookCapability } from '../../access.js';
+import { canUseCapability } from '../../access.js';
 import { getFinanceOperation } from '../data.js';
 import { getWallets } from '../cash/data.js';
 import { financeLocalDateValue, financeOccurredAtForDate } from '../date.js';
@@ -696,7 +696,7 @@ function openArticles(root) {
 
 function availableDDSSettings() {
   const items = [{ id: 'excel', label: 'Эксель' }];
-  if (canUseBookCapability('finance.articles.access')) items.push({ id: 'articles', label: 'Статьи' });
+  if (canUseCapability('finance.articles.access')) items.push({ id: 'articles', label: 'Статьи' });
   return items;
 }
 

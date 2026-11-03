@@ -73,8 +73,8 @@ function requireServerReady() {
 
 function notifyWorkplacesChanged(detail = {}) {
   if (typeof window === 'undefined') return;
-  window.dispatchEvent(new CustomEvent('book:workplaces-changed', { detail }));
-  window.dispatchEvent(new CustomEvent('book:time-usage-changed', { detail }));
+  window.dispatchEvent(new CustomEvent('professional:workplaces-changed', { detail }));
+  window.dispatchEvent(new CustomEvent('professional:time-usage-changed', { detail }));
 }
 
 async function responseJson(response, fallbackMessage) {

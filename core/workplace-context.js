@@ -1,4 +1,4 @@
-const CONTEXT_PREFIX = 'book:workplace-context';
+const CONTEXT_PREFIX = 'professional:workplace-context';
 
 function contextKey(scope = '') {
   const value = String(scope || '').trim();

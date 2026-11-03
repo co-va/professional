@@ -19,7 +19,7 @@ function hydrateFull(remote={}){
 }
 
 if(typeof window!=='undefined'&&typeof window.addEventListener==='function'){
-  window.addEventListener('book:auth-logout',()=>{fullOperationalStateLoad=null;});
+  window.addEventListener('professional:auth-logout',()=>{fullOperationalStateLoad=null;});
 }
 
 export async function loadOperationalState({full=false}={}){

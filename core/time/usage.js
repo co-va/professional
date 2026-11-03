@@ -49,5 +49,5 @@ export function releaseWorkingTimeSoftUsages(options = {}) {
 }
 
 export function notifyTimeUsageChanged(detail = {}) {
-  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('book:time-usage-changed', { detail }));
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('professional:time-usage-changed', { detail }));
 }

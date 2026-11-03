@@ -657,12 +657,12 @@ export function renderTimetable(root) {
       renderHeader(month);
     });
   };
-  window.addEventListener('book:time-usage-changed', syncCanonicalState);
-  window.addEventListener('book:workplaces-changed', syncCanonicalState);
+  window.addEventListener('professional:time-usage-changed', syncCanonicalState);
+  window.addEventListener('professional:workplaces-changed', syncCanonicalState);
 
   return () => {
-    window.removeEventListener('book:time-usage-changed', syncCanonicalState);
-    window.removeEventListener('book:workplaces-changed', syncCanonicalState);
+    window.removeEventListener('professional:time-usage-changed', syncCanonicalState);
+    window.removeEventListener('professional:workplaces-changed', syncCanonicalState);
     selection?.destroy?.();
   };
 }

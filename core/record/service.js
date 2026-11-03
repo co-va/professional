@@ -18,8 +18,8 @@ export async function refreshRecordsFromServer() {
     records: payload.records || [],
     recordEvents: payload.recordEvents || [],
   });
-  notify('book:records-changed', { action: 'server-refresh' });
-  notify('book:time-usage-changed', { action: 'server-refresh' });
+  notify('professional:records-changed', { action: 'server-refresh' });
+  notify('professional:time-usage-changed', { action: 'server-refresh' });
   return payload.records || [];
 }
 
@@ -199,8 +199,8 @@ export function createRecord({
     payload: { appointment: scheduleSnapshot(stored) },
   });
   const record = getRecord(stored.id);
-  notify('book:records-changed', { action: 'create', recordId: stored.id });
-  notify('book:time-usage-changed', {
+  notify('professional:records-changed', { action: 'create', recordId: stored.id });
+  notify('professional:time-usage-changed', {
     action: 'occupy',
     usageId: stored.id,
     sourceId: stored.id,
@@ -252,9 +252,9 @@ export function updateRecord(id, patch = {}, { actionContext = null } = {}) {
   }
   appendLifecyclePatch(current, updatedData, patch, actionContext);
   const updated = getRecord(id);
-  notify('book:records-changed', { action: 'update', recordId: id });
+  notify('professional:records-changed', { action: 'update', recordId: id });
   if (scheduleChanged(current, updated)) {
-    notify('book:time-usage-changed', {
+    notify('professional:time-usage-changed', {
       action: 'change', usageId: id, sourceId: id,
       date: updated?.date, workplaceId: updated?.workplaceId,
       from: updated?.from, to: updated?.to,
@@ -281,7 +281,7 @@ export function completeRecord(id, { actionContext = null } = {}) {
     payload: { appointment: scheduleSnapshot(current) },
   });
   const completed = getRecord(id);
-  notify('book:records-changed', { action: 'complete', recordId: id });
+  notify('professional:records-changed', { action: 'complete', recordId: id });
   return completed;
 }
 
@@ -293,8 +293,8 @@ export function cancelRecord(id, { actionContext = null } = {}) {
     payload: { appointment: scheduleSnapshot(current) },
   });
   const cancelled = getRecord(id);
-  notify('book:records-changed', { action: 'cancel', recordId: id });
-  notify('book:time-usage-changed', {
+  notify('professional:records-changed', { action: 'cancel', recordId: id });
+  notify('professional:time-usage-changed', {
     action: 'release', usageId: id, sourceId: id,
     date: current.date, workplaceId: current.workplaceId,
     from: current.from, to: current.to,
@@ -308,9 +308,9 @@ export function deleteRecord(id) {
   preserveNotesForTarget('record', current);
   if (!deleteRecordRow(id)) return false;
   deleteRecordEvents(id);
-  notify('book:records-changed', { action: 'delete', recordId: id });
+  notify('professional:records-changed', { action: 'delete', recordId: id });
   if (current.status !== 'cancelled') {
-    notify('book:time-usage-changed', {
+    notify('professional:time-usage-changed', {
       action: 'release', usageId: id, sourceId: id,
       date: current.date, workplaceId: current.workplaceId,
       from: current.from, to: current.to,

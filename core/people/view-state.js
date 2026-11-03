@@ -1,5 +1,5 @@
-const SORT_KEY = 'book.people.sort';
-const FILTER_KEY = 'book.people.filters';
+const SORT_KEY = 'professional.people.sort';
+const FILTER_KEY = 'professional.people.filters';
 const DEFAULT_SORT = 'nameAsc';
 const SORT_MODES = new Set(['nameAsc', 'nameDesc', 'ueiAsc', 'ueiDesc', 'lastAsc', 'lastDesc']);
 const DEFAULT_FILTERS = Object.freeze({

@@ -1,5 +1,5 @@
 import { actionBlock, button, collectRepeatedField, entityVisualCard, escapeHtml, field, initPhotoField, initRepeatedFields, modal, mountModal, mountV2ZLayer, openEntityCardAppearanceQ, openSharedProfileSettingsMenu, openSharedPasswordAction, page, photoField, repeatedField, searchableSelect, select, textareaField, v2HorizontalRail, v2Section, workspaceHeaderContext, v2ZLayer, workplaceAddButton } from '../../ui/ui.js';
-import { canUseBookCapability, getBookAccess, getBookLimit, loadBookAccess, requestLiveMode } from '../../core/access.js';
+import { canUseCapability, getAccess, getLimit, loadAccess, requestLiveMode } from '../../core/access.js';
 import { changePassword, logout } from '../../core/auth.js';
 import { getProfessionCatalog, getProfile, saveProfile as saveProfileData } from './data.js';
 import { getWorkplaces, saveWorkplaces, upsertWorkplace } from './workplaces/data.js';
@@ -38,7 +38,7 @@ function profileContext(p,title=fullName(p)){
 }
 
 function profileCard(p){
-  const workplaces=canUseBookCapability('workplaces.access')?getWorkplaces():[];
+  const workplaces=canUseCapability('workplaces.access')?getWorkplaces():[];
   return entityVisualCard({
     appearance:profileCardAppearance(p),
     fields:profileCardFields(p,workplaces),
@@ -258,7 +258,7 @@ export function openProfileAppearanceQ(root,{onSaved=null,navigateBack=()=>{},op
 
 function openProfileSettings(root,navigateBack,options={}){
   const p=getProfile();
-  const access=getBookAccess();
+  const access=getAccess();
   const commercialActions=access?.commercialMode==='DEMO'?[
     {id:'demo-status',label:demoRemainingText(access),disabled:true},
     {
@@ -268,7 +268,7 @@ function openProfileSettings(root,navigateBack,options={}){
       onSelect:async()=>{
         try{
           await requestLiveMode();
-          await loadBookAccess();
+          await loadAccess();
         }catch(error){
           showProfileError(error instanceof Error?error.message:'Не удалось отправить запрос LIVE');
         }
@@ -281,7 +281,7 @@ function openProfileSettings(root,navigateBack,options={}){
       onSelect:async()=>{
         try{
           await requestLiveMode({manage:true});
-          await loadBookAccess();
+          await loadAccess();
         }catch(error){
           showProfileError(error instanceof Error?error.message:'Не удалось открыть инструменты LIVE');
         }
@@ -328,7 +328,7 @@ function openWorkplaceZ2(root,existing,navigateBack,options={}){
 }
 
 function openWorkplace(root,existing,navigateBack,options={}){
-  const workplaceLimit=getBookLimit('workplaces.max');
+  const workplaceLimit=getLimit('workplaces.max');
   if(!existing&&workplaceLimit!==null&&getWorkplaces().length>=workplaceLimit){
     openWorkplaceLimitModal(root,workplaceLimit);
     return;
@@ -347,7 +347,7 @@ function rootAddSource(){
 
 function renderProfile(root,navigateBack,options={}){
   const p=getProfile();
-  const workplacesAllowed=canUseBookCapability('workplaces.access');
+  const workplacesAllowed=canUseCapability('workplaces.access');
   root.innerHTML=page([
     profileContext(p),
     profileCard(p),

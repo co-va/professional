@@ -24,7 +24,7 @@ async function requestBootstrap() {
 }
 
 if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
-  window.addEventListener('book:auth-logout', reset);
+  window.addEventListener('professional:auth-logout', reset);
 }
 
 export async function consumeJournalBootstrap(slice, { start = true } = {}) {

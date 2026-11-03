@@ -523,7 +523,7 @@ function openRecordGroupChat(personKeys = []) {
 }
 
 if (typeof window !== 'undefined') {
-  window.addEventListener('book:record-chat-request', (event) => {
+  window.addEventListener('professional:record-chat-request', (event) => {
     const keys = normalizedPersonKeys(event?.detail?.personKeys);
     if (keys.length < 2) return;
     event.stopImmediatePropagation();

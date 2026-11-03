@@ -71,7 +71,7 @@ function requireServerReady() {
 
 function notifyProfileChanged(detail = {}) {
   if (typeof window === 'undefined') return;
-  window.dispatchEvent(new CustomEvent('book:profile-changed', { detail }));
+  window.dispatchEvent(new CustomEvent('professional:profile-changed', { detail }));
 }
 
 export function hydrateProfileFromServer(profile = {}, customProfessions = [], professionCatalog = []) {
