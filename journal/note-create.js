@@ -1,6 +1,5 @@
 import { openNotice } from '../ui/ui.js';
 import { createNote, removeNote } from '../core/note/index.js';
-import { getProfile } from '../core/profile/data.js';
 import { flushBusinessPersistence } from '../core/business-persistence.js';
 import { noteTargetOptions, noteTargetValue } from './note-target.js';
 import {
@@ -70,14 +69,11 @@ export function createJournalNoteFlow({ owner, date, onCreated = () => {} } = {}
       capture(view.body);
       if (!state.title && !state.text) return openNotice({ title: 'Заметка', message: 'Укажите наименование или текст заметки.' });
 
-      const ownerId = String(getProfile()?.id || '');
-      if (!ownerId) return openNotice({ title: 'Заметка', message: 'Профиль ещё не загружен.' });
-
       const submit = event.currentTarget;
       submit.disabled = true;
       const created = createNote({
+        // The authenticated Note API resolves the profile owner ID on the server.
         ownerType: 'profile',
-        ownerId,
         context: state.context,
         date: state.date || journalDate,
         from: state.from,
