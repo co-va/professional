@@ -1,0 +1,57 @@
+name: Verify Professional Note owner once
+
+on:
+  push:
+    branches: [staging]
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: staging
+          fetch-depth: 0
+      - name: Verify Note owner server contract and Professional
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs=require('node:fs'),assert=require('node:assert/strict');
+          const create=fs.readFileSync('journal/note-create.js','utf8');
+          const note=fs.readFileSync('core/note/service.js','utf8');
+          const ui=fs.readFileSync('ui/modals/index.js','utf8');
+          assert.doesNotMatch(create,/getProfile|ownerId|Профиль ещё не загружен/);
+          assert.match(create,/ownerType: 'profile'/);
+          assert.match(create,/date: state\.date \|\| journalDate/);
+          assert.match(note,/ownerId: String\(input\?\.ownerId \|\| ''\)/);
+          assert.match(ui,/variant: 's'/);
+          console.log('No client ownerId dependency; errors use existing S notice');
+          NODE
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {createNote} from './core/note/service.js';
+          const note=createNote({ownerType:'profile',context:{scope:'professional'},date:'2026-11-03',title:'Note without profile id'});
+          assert.ok(note?.id);
+          assert.equal(note?.ownerId,'');
+          assert.equal(note?.ownerType,'profile');
+          assert.equal(note?.date,'2026-11-03');
+          console.log('Local Note creation without profile id passes');
+          NODE
+          node -e "import('./journal/note-create.js').then(() => console.log('Note create module linked'))"
+          node -e "import('./journal/creation-flow.js').then(() => console.log('Journal first Q module linked'))"
+          find . -type f \( -name '*.js' -o -name '*.mjs' \) -not -path './.git/*' -print0 | xargs -0 -n1 node --check
+          node scripts/audit-professional-clean.mjs
+          git diff --check
+          docker build -t professional-note-owner .
+      - name: Remove temporary verifier
+        if: success()
+        run: |
+          set -euo pipefail
+          git config user.name co-tools
+          git config user.email a.volokovykh@yandex.ru
+          git rm .github/workflows/_verify-professional-note-owner.yml
+          git commit -m 'Remove temporary Note owner verifier'
+          git push origin HEAD:staging
