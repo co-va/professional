@@ -1,0 +1,69 @@
+name: Maintenance / Neutralize V2 Context
+
+on:
+  push:
+    branches:
+      - staging
+    paths:
+      - .github/workflows/maintenance-neutralize-v2-context.yml
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout staging
+        uses: actions/checkout@v4
+        with:
+          ref: staging
+          fetch-depth: 0
+
+      - name: Replace retired Shared event exactly
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          files = [
+              'core/inventory/excel-v2.js',
+              'core/inventory/inventory.js',
+              'core/loyalty/deposit/index.js',
+              'core/loyalty/shared.js',
+              'core/people/people.js',
+              'core/profile/workplaces/workplaces.js',
+              'core/service/context.js',
+              'settings/data-transfer/data-transfer.js',
+              'settings/documents/documents.js',
+              'settings/integrations/integrations.js',
+              'settings/notifications/notifications.js',
+              'settings/tags/tags.js',
+              'ui/profile/index.js',
+              'ui/record/runtime.js',
+          ]
+          old = 'book:v2-context-changed'
+          new = 'va-tools:v2-context-changed'
+          for name in files:
+              path = Path(name)
+              text = path.read_text()
+              count = text.count(old)
+              if count < 1:
+                  raise SystemExit(f'Expected retired event not found in {name}')
+              path.write_text(text.replace(old, new))
+              print(f'{name}: {count}')
+          PY
+
+      - name: Remove one-time maintenance workflow
+        run: rm .github/workflows/maintenance-neutralize-v2-context.yml
+
+      - name: Commit exact cleanup to staging
+        shell: bash
+        run: |
+          git config user.name "co-tools-maintenance"
+          git config user.email "co-tools-maintenance@users.noreply.github.com"
+          git add core settings ui .github/workflows/maintenance-neutralize-v2-context.yml
+          git diff --cached --check
+          git commit -m "Neutralize remaining Shared V2 context events"
+          git push origin HEAD:staging
