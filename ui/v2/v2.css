@@ -80,8 +80,30 @@
 .v2-header__badge{position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;padding:0 5px;border-radius:999px;display:grid;place-items:center;background:var(--v2-danger);color:#fff;font-size:10px;font-weight:850}
 
 /* Y is a Shared H-zone between Header and Z. Its content owns no shell geometry. */
-.v2-y-host{box-sizing:border-box;flex:0 0 auto;min-width:0;min-height:0;background:var(--v2-base);overflow:hidden}
+.v2-y-host{
+  box-sizing:border-box;flex:0 0 auto;min-width:0;min-height:0;
+  background:var(--v2-base);overflow:hidden;
+  max-height:var(--v2-y-expanded-height,0px);
+  opacity:1;
+  transition:max-height .22s cubic-bezier(.16,1,.3,1),opacity .16s ease;
+}
 .v2-y-host[hidden]{display:none}
+/* Y belongs to the visible Z content, never to the F/E deck. */
+.v2-app:is(.is-deck-open,.is-revealing-deck,.is-z-entering) > .v2-y-host{
+  max-height:0;opacity:0;pointer-events:none;
+}
+/* Z finishes entering, descends as Y expands, then the stickers enter from right. */
+.v2-app.is-y-entering > .v2-y-host > *{
+  animation:v2-y-enter-from-right .23s cubic-bezier(.16,1,.3,1) .22s both;
+}
+@keyframes v2-y-enter-from-right{
+  from{transform:translateX(100%);opacity:0}
+  to{transform:translateX(0);opacity:1}
+}
+@media(prefers-reduced-motion:reduce){
+  .v2-y-host{transition:none}
+  .v2-app.is-y-entering > .v2-y-host > *{animation:none}
+}
 
 .v2-app__stage{position:relative;flex:1 1 auto;min-height:0;height:auto;background:var(--v2-base);overflow:hidden}
 .v2-front{
