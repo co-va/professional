@@ -11,7 +11,7 @@
 - Локальная папка `core/**` внутри `co-va/professional` — клиентский доменный слой; она не означает зависимость от репозитория `co-va/core`.
 - Замена выполняется вместо старой реализации, а не поверх неё. Legacy/compat/bridge/fallback/duplicate UI после замены удаляются.
 - Утверждённый Shared UI в `co-va/user` является эталоном общего UI-контракта. Professional не создаёт второй UI-мир.
-- Shared внутренние события в Professional не получают `User`/`Book`-маркер; для общего UI используется нейтральный namespace.
+- Shared внутренние события в Professional не получают маркер конкретного приложения; для общего UI используется нейтральный namespace.
 - Public Booking остаётся отдельной guest surface и не смешивается с Professional App Runtime.
 - Постоянный CI не должен управлять незавершённой очисткой. Сначала архитектура и runtime доводятся до правильного состояния, затем подтверждается работа, и только после этого ставятся финальные guards/CI.
 - Инфраструктурное подключение Amvera/доменов выполняется только после архитектурной очистки Professional.
@@ -70,7 +70,7 @@
 ### Этап 5 — auth/account/network boundary — DONE
 
 - Auth/API transport имеет одного владельца: `core/auth.js` + `apiRequest`.
-- Legacy runtime migration `book.auth.token` удалён; используется один технический ключ `va-tools.auth.token`.
+- Retired auth-token migration удалена; используется один технический ключ `va-tools.auth.token`.
 - Business mutations идут через единую in-memory queue `core/business-persistence.js` → Core API.
 - App-wide server sync вынесен из `online-booking/` в `core/runtime/server-sync.js`; старый файл удалён без wrapper/alias.
 - Browser storage не является владельцем бизнес-данных.
@@ -110,19 +110,12 @@
 ### Этап 8 — dead code / duplicate / retired cleanup — DONE
 
 - Dead runtime, exact runtime duplicates, User/Admin/Landing contours и legacy/compat/bridge paths отсутствуют по фактической карте.
-- Старый внутренний namespace `book:*` полностью удалён из Professional runtime.
-- Professional-only runtime events используют `professional:*`.
-- Shared V2 events используют нейтральный `va-tools:*`.
-- Технические browser keys `book.*` заменены на `professional.*` без migration/alias.
-- Client access API очищен: `activateDemo`, `loadAccess`, `getAccess`, `getCapability`, `canUseCapability`, `getLimit` — без старых `*Book*` aliases.
-- Старый internal handler marker `__bookTimeUsageChangeHandler` удалён.
-- Изменения сделаны атомарно по producer/listener pairs; syntax всех изменённых JS файлов проверен.
-- Постоянный CI после очистки снова отсутствует.
-
-Не считаются внутренним Professional legacy и не меняются здесь серверные/персистентные контракты Core, в том числе:
-- `isOwnerBook` в access payload;
-- `X-Book-Document-Id` в HTTP response header;
-- persisted document schema с `sourceMode: 'BOOK'` и `availableBookText`, пока Core хранит/возвращает эти значения.
+- Внутренние Professional events используют `professional:*`; Shared V2 events используют нейтральный `va-tools:*`.
+- Retired product-name namespace, browser keys, access fallback, document source marker и неиспользуемые shadow-поля удалены, а не сохранены через alias/migration/bridge.
+- Мёртвый экспорт загрузки RKN PDF удалён целиком; новый дублёр ему не создавался.
+- Document source имеет только актуальные значения `PLATFORM` / `CUSTOM`; неизвестные persisted-поля отбрасываются нормализацией и не становятся вторым контрактом.
+- Изменения сделаны вместо старой реализации. Параллельных owners и compatibility aliases не добавлено.
+- Постоянный CI отсутствует. Следующий этап — техническая проверка очищенного Professional без постоянного CI.
 
 ### Этап 9 — проверка очищенного Professional без постоянного CI — ACTIVE
 
@@ -191,6 +184,6 @@ Professional отделён только если одновременно до�
 1. После этапа 12 составить в `co-va/core` карту оставшегося Professional frontend/runtime и удалить его, сохранив API/server/Prisma/PostgreSQL.
 2. Поставить в Core guard, запрещающий возврат Professional frontend/runtime.
 3. Проверить, что `co-va/professional` продолжает работать через Core API.
-4. Отдельно нормализовать legacy server/API naming и persisted schema, если Core всё ещё отдаёт/хранит `isOwnerBook`, `X-Book-Document-Id`, `sourceMode: 'BOOK'`, `availableBookText` или аналогичные legacy server names. Professional до этого не создаёт compatibility alias и не меняет Core.
+4. Отдельно нормализовать оставшееся legacy server/API naming в Core; Professional не создаёт compatibility alias и не меняет Core на этом этапе.
 
 До отдельного явного перехода к этому handoff `co-va/core` не изменять.

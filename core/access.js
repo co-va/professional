@@ -5,7 +5,6 @@ import { consumeJournalBootstrap } from './runtime/journal-bootstrap.js';
 let currentAccess = {
   tenantId: '',
   status: 'ACTIVE',
-  isOwnerBook: false,
   commercialMode: '',
   demoActivatedAt: '',
   demoExpiresAt: '',
@@ -103,7 +102,7 @@ export function getCapability(key) {
 export function canUseCapability(key) {
   if (currentAccess.status === 'SUSPENDED') return false;
   const capability = getCapability(key);
-  if (!capability) return currentAccess.isOwnerBook === true;
+  if (!capability) return false;
   if (capability.valueType !== 'BOOLEAN') return true;
   return capability.enabled === true;
 }

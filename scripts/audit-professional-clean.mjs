@@ -54,8 +54,6 @@ const ALLOWED_ONLINE_BOOKING_FILES = new Set([
 ]);
 
 const RETIRED_RUNTIME_MARKERS = new Map([
-  ['book.auth.token', 'Legacy auth token key returned'],
-  ['book:v2-context-changed', 'Legacy Shared V2 context event returned'],
   ["from './online-booking/server-sync.js'", 'Professional entry imports guest-contour server sync'],
   ["from '../online-booking/server-sync.js'", 'Professional runtime imports guest-contour server sync'],
 ]);

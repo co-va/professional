@@ -48,11 +48,9 @@ function normalize(item = {}) {
     required: Boolean(item.required),
     version: policy.versioned ? Math.max(1, Number(item.version || 1)) : 1,
     text: String(item.text || ''),
-    sourceMode: sourceMode === 'BOOK' ? 'BOOK' : sourceMode === 'CUSTOM' ? 'CUSTOM' : '',
+    sourceMode: sourceMode === 'PLATFORM' ? 'PLATFORM' : sourceMode === 'CUSTOM' ? 'CUSTOM' : '',
     baseKey: String(item.baseKey || ''),
     baseVersion: Math.max(0, Number(item.baseVersion || 0)),
-    availableBaseVersion: Math.max(0, Number(item.availableBaseVersion || 0)),
-    availableBookText: String(item.availableBookText || ''),
     createdAt: String(item.createdAt || ''),
     updatedAt: String(item.updatedAt || ''),
     attachment: item.attachment && typeof item.attachment === 'object' && !Array.isArray(item.attachment)
@@ -105,7 +103,7 @@ function makeDocumentFromPlatformBase(base, version = 1) {
     signable: base.personConsent,
     version,
     text: renderPlatformBaseText(base),
-    sourceMode: 'BOOK',
+    sourceMode: 'PLATFORM',
     baseKey: base.key,
     baseVersion: base.version,
   });
@@ -159,7 +157,8 @@ export function reconcileTenantDocumentsWithPlatformBases(items = [], history = 
   let changed = sourceHistory.length !== nextHistory.length
     || sourceItems.some((item, index) => (
       String(item?.documentClass || '') !== String(current[index]?.documentClass || '')
-      || Object.prototype.hasOwnProperty.call(item || {}, 'recordType')
+      || String(item?.sourceMode || '') !== String(current[index]?.sourceMode || '')
+      || Object.keys(item || {}).some((key) => !Object.prototype.hasOwnProperty.call(current[index] || {}, key))
     ));
 
   if (!platformBasesState.length || !contextReady()) {
@@ -192,17 +191,15 @@ export function reconcileTenantDocumentsWithPlatformBases(items = [], history = 
       current[index] = normalize({
         ...active,
         documentClass: DOCUMENT_CLASS.CORE_LEGAL,
-        sourceMode: exactRegistryDocument ? 'BOOK' : 'CUSTOM',
+        sourceMode: exactRegistryDocument ? 'PLATFORM' : 'CUSTOM',
         baseKey: base.key,
         baseVersion: exactRegistryDocument ? base.version : 0,
-        availableBaseVersion: exactRegistryDocument ? 0 : base.version,
-        availableBookText: exactRegistryDocument ? '' : rendered,
       });
       changed = true;
       continue;
     }
 
-    if (active.sourceMode === 'BOOK') {
+    if (active.sourceMode === 'PLATFORM') {
       if (active.text !== rendered || active.title !== base.title || active.baseVersion !== base.version) {
         const previous = clone(active);
         const refreshed = normalize({
@@ -212,8 +209,6 @@ export function reconcileTenantDocumentsWithPlatformBases(items = [], history = 
           version: Number(active.version || 1) + 1,
           baseKey: base.key,
           baseVersion: base.version,
-          availableBaseVersion: 0,
-          availableBookText: '',
         });
         current[index] = refreshed;
         nextHistory.push(historyEntry(previous, 'superseded', 'platform-registry'));
@@ -223,17 +218,8 @@ export function reconcileTenantDocumentsWithPlatformBases(items = [], history = 
       continue;
     }
 
-    const nextAvailable = active.text === rendered && active.title === base.title ? 0 : base.version;
-    const nextText = nextAvailable ? rendered : '';
-    if (active.baseKey !== base.key
-      || active.availableBaseVersion !== nextAvailable
-      || active.availableBookText !== nextText) {
-      current[index] = normalize({
-        ...active,
-        baseKey: base.key,
-        availableBaseVersion: nextAvailable,
-        availableBookText: nextText,
-      });
+    if (active.baseKey !== base.key) {
+      current[index] = normalize({ ...active, baseKey: base.key });
       changed = true;
     }
   }
@@ -286,7 +272,7 @@ export function saveDocument(document) {
         documentTitle: previous.title,
         documentVersion: previous.version,
         action: 'superseded',
-        source: previous.sourceMode === 'BOOK' ? 'platform-registry' : 'custom',
+        source: previous.sourceMode === 'PLATFORM' ? 'platform-registry' : 'custom',
         snapshot: previous,
       });
     }
@@ -313,7 +299,7 @@ export function saveDocument(document) {
       documentTitle: next.title,
       documentVersion: next.version,
       action: 'created',
-      source: next.sourceMode === 'BOOK' ? 'platform-registry' : 'custom',
+      source: next.sourceMode === 'PLATFORM' ? 'platform-registry' : 'custom',
       snapshot: next,
     });
   } else if (versioned && previous && changedContent) {

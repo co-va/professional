@@ -147,7 +147,7 @@ function templates() {
         signable: Boolean(base.personConsent),
         version: Number(current?.version || base.version || 1),
         text: current ? String(current.text || '') : renderPlatformBaseText(base),
-        sourceMode: current?.sourceMode === 'CUSTOM' ? 'CUSTOM' : 'BOOK',
+        sourceMode: current?.sourceMode === 'CUSTOM' ? 'CUSTOM' : 'PLATFORM',
         baseKey: String(base.key || ''),
         baseVersion: Number(base.version || 1),
       };
