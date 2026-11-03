@@ -328,6 +328,7 @@ export function openRecords({
   workplaceId = '',
   date = '',
   timeHint = '',
+  journalTimeConfirmed = false,
   procedures = [],
   professionalActions = context !== 'online',
   actionContext = null,
@@ -972,7 +973,10 @@ export function openRecords({
         owner.close();
         return;
       }
-      renderTimes();
+      if (journalTimeConfirmed) {
+        state.from = state.timeHint;
+        renderProcedures();
+      } else renderTimes();
       return;
     }
 
