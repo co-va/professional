@@ -99,7 +99,7 @@
   pointer-events:none;
 }
 /* Z finishes entering, descends as Y expands, then the stickers enter from right. */
-.v2-app.is-y-entering > .v2-y-host > *{
+.v2-app.is-y-entering > .v2-y-host .note-reels__rail{
   animation:v2-y-enter-from-right .23s cubic-bezier(.16,1,.3,1) .22s both;
 }
 @keyframes v2-y-enter-from-right{
@@ -108,7 +108,7 @@
 }
 @media(prefers-reduced-motion:reduce){
   .v2-y-host{transition:none}
-  .v2-app.is-y-entering > .v2-y-host > *{animation:none}
+  .v2-app.is-y-entering > .v2-y-host .note-reels__rail{animation:none}
 }
 
 .v2-app__stage{position:relative;flex:1 1 auto;min-height:0;height:auto;background:var(--v2-base);overflow:hidden}
