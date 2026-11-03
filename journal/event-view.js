@@ -54,15 +54,11 @@ export function openEventView(eventOrId, { onClose = () => {} } = {}) {
   const layer = mountModal(document.body, modal('<div data-event-view-host></div>', {
     variant: 'q',
     surface: 'app',
+    title: 'Событие',
     className: 'user-event-detail-q',
   }));
   if (!layer) return null;
   layer.setAttribute('aria-label', 'Событие');
-
-  const headerHost = layer.querySelector('[data-v2-q-header-content]');
-  if (headerHost) {
-    headerHost.innerHTML = '<div class="user-event-shell-title" style="position:absolute;top:0;left:52px;height:24px;display:flex;align-items:center;margin:0;font-size:20px;line-height:24px;font-weight:500">Событие</div>';
-  }
 
   const originalClose = layer.v2Close?.bind(layer);
   if (originalClose) {
