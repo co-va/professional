@@ -2,9 +2,10 @@ name: One-shot Public Booking replacement
 
 on:
   push:
-    branches: [staging]
+    branches:
+      - staging
     paths:
-      - '.github/workflows/_public-booking-rewrite.yml'
+      - .github/workflows/_public-booking-rewrite.yml
 
 permissions:
   contents: write
@@ -18,8 +19,18 @@ jobs:
           ref: staging
           fetch-depth: 0
 
-      - name: Fix executor replacement escaping
-        run: sed -i "s/re.subn(pattern, replacement, text, count=1, flags=re.S)/re.subn(pattern, lambda _match: replacement, text, count=1, flags=re.S)/" scripts/_rewrite_public_booking.py
+      - name: Repair executor replacement escaping
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('scripts/_rewrite_public_booking.py')
+          text = path.read_text()
+          old = "re.subn(pattern, replacement, text, count=1, flags=re.S)"
+          new = "re.subn(pattern, lambda _match: replacement, text, count=1, flags=re.S)"
+          if old not in text:
+              raise SystemExit('executor escape target missing')
+          path.write_text(text.replace(old, new, 1))
+          PY
 
       - name: Replace old public Booking flow
         run: python3 scripts/_rewrite_public_booking.py
