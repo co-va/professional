@@ -203,7 +203,7 @@ export function mountV2Layer(html, { root = null } = {}) {
   node.v2Portal = portalOwner?.portal || null;
   if (qLayer) {
     app?.classList.add('has-v2-q-modal');
-    window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
+    window.dispatchEvent(new CustomEvent('va-tools:v2-context-changed'));
   }
 
   let disposeGesture = () => {};
@@ -259,7 +259,7 @@ export function mountV2Layer(html, { root = null } = {}) {
     const anotherQ = qLayer && applicationLayers().some((layer) => layer.dataset.v2Q === 'true');
     releaseHeaderLock();
     if (qLayer && !anotherQ) app?.classList.remove('has-v2-q-modal');
-    if (qLayer) window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
+    if (qLayer) window.dispatchEvent(new CustomEvent('va-tools:v2-context-changed'));
   };
 
   const dismissThroughVeil = () => {
@@ -284,8 +284,6 @@ export function mountV2Layer(html, { root = null } = {}) {
     veilPointerX = event.clientX;
     veilPointerY = event.clientY;
     veilPointerMoved = false;
-    // The veil owns the complete pointer sequence. The modal remains mounted and
-    // the underlying stage remains inert until pointerup/click have been consumed.
     event.stopImmediatePropagation();
   };
 
