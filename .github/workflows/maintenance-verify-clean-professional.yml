@@ -1,0 +1,54 @@
+name: Maintenance Verify Clean Professional
+on:
+  push:
+    branches: [staging]
+permissions:
+  contents: write
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: staging
+          fetch-depth: 1
+      - name: Verify source tree
+        run: |
+          git diff --check
+          find . -type f \( -name '*.js' -o -name '*.mjs' \) -not -path './.git/*' -print0 | xargs -0 -n1 node --check
+          node scripts/audit-professional-clean.mjs
+      - name: Build and start Professional container
+        run: |
+          docker build -t professional-stage9 .
+          docker run -d --name professional-stage9 -p 18080:3000 professional-stage9
+          for i in $(seq 1 20); do
+            if curl -fsS http://127.0.0.1:18080/ >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          docker logs professional-stage9
+          exit 1
+      - name: Verify runtime surfaces
+        run: |
+          curl -fsS http://127.0.0.1:18080/ | grep -q 'professional.js'
+          curl -fsS http://127.0.0.1:18080/booking.html | grep -q 'booking-entry.js'
+          curl -fsS http://127.0.0.1:18080/invite/ >/dev/null
+          curl -fsS http://127.0.0.1:18080/reset-password.html >/dev/null
+          curl -fsS http://127.0.0.1:18080/verify-email.html >/dev/null
+          curl -fsS http://127.0.0.1:18080/service-worker.js >/dev/null
+          docker inspect professional-stage9 --format '{{.State.Running}}' | grep -qx true
+      - name: Mark technical verification complete and remove executor
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('PROJECT_STATE.md')
+          s = p.read_text()
+          s = s.replace('### Этап 9 — проверка очищенного Professional без постоянного CI — ACTIVE', '### Этап 9 — проверка очищенного Professional без постоянного CI — DONE')
+          s = s.replace('### Этап 10 — Amvera и домен Professional — TODO', '### Этап 10 — Amvera и домен Professional — ACTIVE')
+          p.write_text(s)
+          PY
+          git config user.name 'co-tools-maintenance'
+          git config user.email 'co-tools-maintenance@users.noreply.github.com'
+          git rm .github/workflows/maintenance-verify-clean-professional.yml
+          git add PROJECT_STATE.md
+          git commit -m 'Confirm clean Professional technical runtime surface'
+          git push origin HEAD:staging
