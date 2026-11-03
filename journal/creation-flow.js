@@ -1,10 +1,8 @@
-import {
-  initViewNavigation,
-  openRecordCreationOwner,
-  timeSlots,
-  viewNavigation,
-} from '../ui/ui.js';
-import { getTimeGridMinuteState, minutesToTime, timeToMinutes } from '../core/time/index.js';
+import { initViewNavigation, viewNavigation } from '../ui/view-navigation/view-navigation.js';
+import { openRecordCreationOwner } from '../ui/record/creation-flow.js';
+import { timeSlots } from '../ui/time/index.js';
+import { getTimeGridMinuteState } from '../core/time/grid.js';
+import { minutesToTime, timeToMinutes } from '../core/time/math.js';
 
 const JOURNAL_CREATE_MODES = [
   { id: 'record', label: 'Запись' },
