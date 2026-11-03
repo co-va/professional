@@ -1,0 +1,36 @@
+name: Professional / Repository
+
+on:
+  push:
+    branches:
+      - staging
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  repository:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Professional
+        uses: actions/checkout@v4
+
+      - name: Validate JavaScript
+        shell: bash
+        run: |
+          node --check professional.js
+          node --check service-worker.js
+          find core journal timetable settings chat online-booking invite ui scripts \
+            -type f \( -name '*.js' -o -name '*.mjs' \) -print0 \
+            | xargs -0 -n1 node --check
+
+      - name: Audit standalone repository
+        run: node scripts/audit-professional-clean.mjs
+
+      - name: Validate Docker build
+        run: docker build --tag co-va-professional-repository-check .
