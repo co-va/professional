@@ -18,6 +18,9 @@ jobs:
           ref: staging
           fetch-depth: 0
 
+      - name: Fix executor replacement escaping
+        run: sed -i "s/re.subn(pattern, replacement, text, count=1, flags=re.S)/re.subn(pattern, lambda _match: replacement, text, count=1, flags=re.S)/" scripts/_rewrite_public_booking.py
+
       - name: Replace old public Booking flow
         run: python3 scripts/_rewrite_public_booking.py
 
