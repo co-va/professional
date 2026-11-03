@@ -18,7 +18,7 @@ function syncV2ZStackInteraction(app, host) {
 }
 
 export function v2ZLayer(content = '', { className = '', dismissible = true } = {}) {
-  return `<main class="v2-z v2-z--layer ${text(className)}" data-v2-z-layer data-v2-dismissible="${dismissible ? 'true' : 'false'}" style="padding-top:0">${v2ZFrame(content)}</main>`;
+  return `<main class="v2-z v2-z--layer ${text(className)}" data-v2-z-layer data-v2-dismissible="${dismissible ? 'true' : 'false'}">${v2ZFrame(content)}</main>`;
 }
 
 export function bindV2StableZFrame(node) {
@@ -72,7 +72,7 @@ export function mountV2ZLayer(root, html, { onClose = null, stack = false, dismi
   host.appendChild(node);
   app?.classList.add('has-z-layer');
   syncV2ZStackInteraction(app, host);
-  const notify = () => window.dispatchEvent(new CustomEvent('book:v2-context-changed'));
+  const notify = () => window.dispatchEvent(new CustomEvent('va-tools:v2-context-changed'));
   const contextObserver = new MutationObserver((mutations) => {
     if (mutations.some((mutation) => mutation.type === 'childList'
       || (mutation.type === 'attributes' && [
