@@ -11,6 +11,7 @@
 - Локальная папка `core/**` внутри `co-va/professional` допустима как клиентский доменный слой, как и в `co-va/user`; она не означает зависимость от репозитория `co-va/core`.
 - Замена выполняется вместо старой реализации, а не поверх неё. Legacy/compat/bridge/fallback/duplicate UI после замены удаляются.
 - Утверждённый Shared UI в `co-va/user` является эталоном общего UI-контракта. Professional не создаёт второй UI-мир.
+- Shared внутренние события в Professional не получают `User`/`Book`-маркер; для общего UI используется нейтральный namespace.
 - Public Booking остаётся отдельной guest surface и не смешивается с Professional App Runtime.
 - Инфраструктурное подключение Amvera/доменов выполняется только после архитектурной и runtime-очистки Professional.
 
@@ -29,28 +30,33 @@
 
 Следующий исполнитель не создаёт новый план. Он читает этот файл и продолжает с первого незавершённого этапа. Этапы выполняются последовательно; соседний контур не исправляется «заодно».
 
-### Этап 1 — baseline и карта фактического runtime — ACTIVE
+### Этап 1 — baseline и карта фактического runtime — DONE
 
-- Зафиксировать фактические entry points Professional и Public Booking.
-- Построить reachability-карту `index.html` / Professional entry / service worker / guest booking entry.
-- Для корневых каталогов и крупных модулей классифицировать: `KEEP`, `SHARED`, `DELETE`, `CORE HANDOFF`.
-- Найти прямые или косвенные зависимости на User/Admin/Landing/Core frontend runtime.
-- Найти dead runtime, exact duplicates, legacy/compat/bridge/fallback и бизнес-данные в browser storage.
-- Код на этом этапе не переписывать; результат — доказанная карта очистки.
+Установлено:
+- реальные entry points: `index.html` → `professional.js`, `booking.html` → guest Booking, `invite/index.html`, `reset-password.html`, `verify-email.html`, `service-worker.js`;
+- Professional Docker/runtime собирается только из этого репозитория;
+- `/api/` проксируется во внешний Core API `https://api.va-tools.ru`;
+- User/Admin/Landing/server runtime в Professional отсутствует;
+- старый аудит до отключения CI видел 281 runtime code files / 288 reachable runtime/assets и один оборванный импорт старого Booking Draft;
+- старый внешний Booking Draft storage удалён: текущий Public Booking хранит свой draft в собственном `history.state`-контракте;
+- подтверждена классификация: Professional domains = KEEP, общий UI = SHARED, legacy/duplicate/dead = DELETE, серверные изменения = CORE HANDOFF.
 
-### Этап 2 — Professional Repository Gate — TODO
+### Этап 2 — CI reset перед очисткой — DONE
 
-- Привести репозиторную защиту к принципу User `Repository`.
-- Guard должен запрещать возврат User/Admin/Landing runtime, retired markers, migration/extraction tooling, dead runtime и запрещённые bridge/compat слои.
-- Зафиксировать единственный Professional application owner и отдельный Public Booking guest entry.
-- Проверка одного контура не должна переопределять правила другого.
+По прямому указанию владельца старый `Check Professional` полностью удалён из `staging`, потому что содержал прежние/неверные архитектурные предположения и мешал очистке.
 
-### Этап 3 — Shared UI convergence — TODO
+- до окончания архитектурной очистки новый постоянный CI не ставить;
+- Repository/Shared UI/runtime guards собрать заново на этапе 9 по фактическому очищенному состоянию;
+- отсутствие CI на промежуточных этапах не считается доказательством работоспособности.
+
+### Этап 3 — Shared UI convergence — ACTIVE
 
 - Сверить Professional `ui/**` с утверждённым Shared UI User.
 - Оставить один общий контракт H/A/B/C/D/F/E/Z, Q/X/S, CardDeck, cards, lists, Calendar/Time и modal geometry.
 - Удалить Professional-local копии, локальный CSS и альтернативные владельцы уже существующего Shared UI.
-- Добавить Shared UI guard, не допускающий появления второго UI-мира.
+- Уже выровнены: Shared Header, horizontal rail behavior/cue, Z/Q layout; удалён Z `padding-top:0` override.
+- V2 context event заменён без bridge на нейтральный `va-tools:v2-context-changed` у producer/consumers.
+- Совпадающие с User Shared owners не переписывать без причины.
 
 ### Этап 4 — entry/bootstrap Professional — TODO
 
@@ -70,7 +76,6 @@
 ### Этап 6 — Professional-owned domains — TODO
 
 По фактической достижимости пройти только Professional-контуры:
-
 - Profile / Workplace;
 - People;
 - Journal / Record / Event / Note;
@@ -98,19 +103,19 @@
 - Удалить недостижимый runtime.
 - Удалить exact/semantic duplicates после проверки потребителей.
 - Удалить retired Book/User/Account-mode/legacy/compat/bridge маркеры, которые больше не являются текущим контрактом.
-- Зафиксировать удалённые маркеры guard-правилами, чтобы они не возвращались.
+- Не оставлять aliases/wrappers ради старых имён.
 
-### Этап 9 — contour CI — TODO
+### Этап 9 — новый contour CI — TODO
 
-- Разделить один общий `Check Professional` на понятные проверки по владельцам, где это оправдано.
-- Обязательные базовые проверки: `Repository` + `Shared UI` + runtime smoke.
-- Feature-check защищает только свой контур и не блокирует соседний из-за чужих продуктовых правил.
-- Собрать единый Professional Gate для текущего `staging`.
+После очистки, а не раньше:
+- собрать `Repository` + `Shared UI` + runtime smoke;
+- добавить только реально нужные feature-checks по владельцам;
+- feature-check защищает только свой контур и не переопределяет соседние продуктовые правила;
+- собрать единый Professional Gate для текущего `staging`.
 
 ### Этап 10 — runtime proof на staging — TODO
 
 Проверить фактическую работу, а не только наличие файлов/tests:
-
 - login/session;
 - загрузка Professional workspace;
 - Journal;
@@ -125,7 +130,6 @@
 ### Этап 11 — Amvera и домен Professional — TODO
 
 Только после зелёной архитектуры и runtime proof:
-
 - подключить Amvera к `co-va/professional/staging`;
 - проверить staging deployment;
 - перенести/назначить Professional-домен;
@@ -135,7 +139,6 @@
 ### Этап 12 — финальная самостоятельность Professional — TODO
 
 Professional считается отделённым только если одновременно доказано:
-
 - приложение работает из `co-va/professional/staging`;
 - Core frontend/runtime не требуется для запуска;
 - данные/операции идут через Core API;
@@ -150,7 +153,6 @@ Professional считается отделённым только если од�
 Сюда добавляются только доказанные серверные/репозиторные хвосты, которые невозможно исправить внутри Professional.
 
 После завершения этапа 12 отдельной задачей в `co-va/core`:
-
 1. составить фактическую карту оставшегося Professional frontend/runtime в Core;
 2. удалить его из Core без удаления API/server/Prisma/PostgreSQL, нужных Professional;
 3. поставить guard, запрещающий возврат Professional frontend/runtime в Core;
