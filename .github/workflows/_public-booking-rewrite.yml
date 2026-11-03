@@ -19,7 +19,7 @@ jobs:
           ref: staging
           fetch-depth: 0
 
-      - name: Repair executor replacement escaping
+      - name: Repair executor guards
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -29,7 +29,12 @@ jobs:
           new = "re.subn(pattern, lambda _match: replacement, text, count=1, flags=re.S)"
           if old not in text:
               raise SystemExit('executor escape target missing')
-          path.write_text(text.replace(old, new, 1))
+          text = text.replace(old, new, 1)
+          old_guard = "['startLegalLookup', 'activeConsentIds', 'legalState', 'legalResolved', 'legalLookup', 'legalLookupToken', 'legalPhone', 'legalError', 'onExitToAccount', 'requiredBookingDocuments']"
+          new_guard = "['startLegalLookup', 'activeConsentIds', 'legalResolved', 'legalLookup', 'legalLookupToken', 'legalPhone', 'legalError', 'onExitToAccount', 'requiredBookingDocuments']"
+          if old_guard not in text:
+              raise SystemExit('executor retired guard target missing')
+          path.write_text(text.replace(old_guard, new_guard, 1))
           PY
 
       - name: Replace old public Booking flow
