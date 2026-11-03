@@ -89,8 +89,14 @@
 }
 .v2-y-host[hidden]{display:none}
 /* Y belongs to the visible Z content, never to the F/E deck. */
-.v2-app:is(.is-deck-open,.is-revealing-deck,.is-z-entering) > .v2-y-host{
+.v2-app:is(.is-deck-open,.is-z-entering) > .v2-y-host{
   max-height:0;opacity:0;pointer-events:none;
+}
+/* During an edge swipe, Y follows Z horizontally without changing its height. */
+.v2-app.is-revealing-deck > .v2-y-host{
+  transform:translateX(var(--v2-front-drag-x,0px));
+  transition:none;
+  pointer-events:none;
 }
 /* Z finishes entering, descends as Y expands, then the stickers enter from right. */
 .v2-app.is-y-entering > .v2-y-host > *{
