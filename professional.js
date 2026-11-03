@@ -15,12 +15,12 @@ import { loadBusinessState } from './core/runtime/business-state.js';
 import { loadOperationalState } from './core/runtime/operational-state.js';
 import { ensureRknGuide, loadTenantDocumentArchive, refreshTenantDocumentArchive } from './core/runtime/tenant-document-archive.js';
 import { loadAuxiliaryState, loadFinanceState } from './core/runtime/auxiliary-state.js';
+import { startProfessionalServerSync } from './core/runtime/server-sync.js';
 import { getJournalTimeUsages, releaseJournalSoftTimeUsages } from './journal/time-usage-source.js';
 import { configureWorkplaceSource } from './core/workplace-time.js';
 import { configureTimeUsageSource, configureSoftTimeUsageReleaseSource } from './core/time/index.js';
 import { getCurrentAccount, login, requestPasswordReset } from './core/auth.js';
 import { activateBookDemo, canUseBookCapability, getBookAccess, loadBookAccess } from './core/access.js';
-import { startServerBookingSync } from './online-booking/server-sync.js';
 import { field, passwordField, initPasswordFields, mountV2ZLayer, openNotice, initV2WorkspaceInteraction, setV2DeckOpen, v2CardDeck, v2Header, v2Shell, v2Sticker, v2ZLayer } from './ui/ui.js';
 import { startPlatformNotices } from './core/platform-notices.js';
 
@@ -59,7 +59,7 @@ const app = document.querySelector('#app');
 let disposeView = () => {};
 let workspaceReady = false;
 let authenticatedAccount = null;
-let serverBookingSyncStarted = false;
+let serverSyncStarted = false;
 let disposePlatformNotices = () => {};
 let rknGuideSyncTimer = null;
 let workspaceRenderVersion = 0;
@@ -116,10 +116,10 @@ function setThemeColor(value) {
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', value);
 }
 
-function ensureServerBookingSync() {
-  if (serverBookingSyncStarted) return;
-  serverBookingSyncStarted = true;
-  startServerBookingSync();
+function ensureServerSync() {
+  if (serverSyncStarted) return;
+  serverSyncStarted = true;
+  startProfessionalServerSync();
 }
 
 function rootDefinition(section) {
@@ -500,8 +500,8 @@ function renderWorkspace() {
   }));
 
   const onV2ContextChanged = () => syncWorkspaceHeader(surface);
-  window.addEventListener('book:v2-context-changed', onV2ContextChanged);
-  disposers.push(() => window.removeEventListener('book:v2-context-changed', onV2ContextChanged));
+  window.addEventListener('va-tools:v2-context-changed', onV2ContextChanged);
+  disposers.push(() => window.removeEventListener('va-tools:v2-context-changed', onV2ContextChanged));
 
   let headerSyncQueued = false;
   const observer = new MutationObserver(() => {
@@ -588,7 +588,7 @@ async function renderAuthenticated(account = authenticatedAccount) {
     renderSuspended();
     return;
   }
-  ensureServerBookingSync();
+  ensureServerSync();
 
   disposePlatformNotices();
   disposePlatformNotices = () => {};
