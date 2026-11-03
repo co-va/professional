@@ -32,8 +32,6 @@ export function openJournalCreation({
   let selectedTime = '';
   let requestVersion = 0;
   let recordFlow = null;
-  let eventFlow = null;
-  let noteFlow = null;
 
   const hour = Math.floor((timeToMinutes(timeHint) ?? 0) / 60) * 60;
   const timeChoices = [hour, hour + 30]
@@ -51,6 +49,7 @@ export function openJournalCreation({
     });
 
   const showTimeChoices = () => {
+    renderModeSwitch();
     owner.setBackHandler?.(() => {
       owner.close?.();
       return true;
@@ -75,13 +74,16 @@ export function openJournalCreation({
     });
   };
 
+  const returnToChoices = () => {
+    ++requestVersion;
+    selectedTime = '';
+    recordFlow = null;
+    showTimeChoices();
+    return true;
+  };
+
   const showLoading = () => {
-    owner.setBackHandler?.(() => {
-      ++requestVersion;
-      selectedTime = '';
-      showTimeChoices();
-      return true;
-    });
+    owner.setBackHandler?.(returnToChoices);
     owner.render({
       step: 'procedures',
       title: 'Выбор процедур',
@@ -92,11 +94,12 @@ export function openJournalCreation({
   async function showSelectedMode(version) {
     if (!owner.isOpen?.() || version !== requestVersion) return;
     if (activeMode === 'note') {
+      // A Note is independent of Time. The mode selector belongs to the chooser only.
+      owner.setShellHeader('');
       const { createJournalNoteFlow } = await import('./note-create.js');
       if (!owner.isOpen?.() || version !== requestVersion || activeMode !== 'note') return;
-      owner.setBackHandler?.(() => { owner.close?.(); return true; });
-      if (!noteFlow) noteFlow = createJournalNoteFlow({ owner, date, onCreated });
-      else noteFlow.resume();
+      owner.setBackHandler?.(returnToChoices);
+      createJournalNoteFlow({ owner, date, onCreated });
       return;
     }
     if (!selectedTime) {
@@ -104,21 +107,17 @@ export function openJournalCreation({
       return;
     }
     if (activeMode === 'event') {
+      owner.setShellHeader('');
       const { createJournalEventFlow } = await import('./event-create.js');
       if (!owner.isOpen?.() || version !== requestVersion || activeMode !== 'event') return;
-      owner.setBackHandler?.(() => { selectedTime = ''; showTimeChoices(); return true; });
-      if (!eventFlow) eventFlow = createJournalEventFlow({
+      owner.setBackHandler?.(returnToChoices);
+      createJournalEventFlow({
         owner, date, workplaceId, timeHint: selectedTime, onCreated,
       });
-      else eventFlow.resume();
       return;
     }
 
-    if (recordFlow) {
-      recordFlow.resumeRecord?.();
-      return;
-    }
-
+    owner.setShellHeader('');
     showLoading();
     try {
       const [{ openRecords }, { loadRecordCreationOperationalState }] = await Promise.all([
@@ -132,23 +131,17 @@ export function openJournalCreation({
         context: 'journal',
         date,
         workplaceId,
-        selectedTime,
+        timeHint: selectedTime,
+        journalTimeConfirmed: true,
         professionalActions: true,
         creationOwner: owner,
         stepBack: true,
-        onBackFromStart: () => {
-          ++requestVersion;
-          selectedTime = '';
-          recordFlow = null;
-          showTimeChoices();
-          return true;
-        },
+        onBackFromStart: returnToChoices,
         onCreated: (...args) => window.setTimeout(() => onCreated(...args), 0),
       });
     } catch (error) {
       if (!owner.isOpen?.() || version !== requestVersion) return;
-      selectedTime = '';
-      showTimeChoices();
+      returnToChoices();
       const { openNotice } = await import('../ui/modals/index.js');
       openNotice({
         title: 'Не удалось подготовить запись',
@@ -171,13 +164,12 @@ export function openJournalCreation({
         if (mode === activeMode) return;
         activeMode = mode;
         const version = ++requestVersion;
-        renderModeSwitch();
-        void showSelectedMode(version);
+        if (mode === 'note') void showSelectedMode(version);
+        else showTimeChoices();
       },
     });
   };
 
-  renderModeSwitch();
   showTimeChoices();
   return owner;
 }
