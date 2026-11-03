@@ -1,0 +1,83 @@
+name: Temporary Shared UI convergence audit
+
+on:
+  push:
+    branches: [staging]
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: staging
+          fetch-depth: 0
+      - name: Inspect all header consumers and validate current Shared UI
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import path from 'node:path';
+          import assert from 'node:assert/strict';
+          function sources(dir){
+            return fs.readdirSync(dir,{withFileTypes:true}).flatMap(e=>{
+              const p=path.join(dir,e.name);
+              return e.isDirectory()?sources(p):/\.(?:js|css)$/.test(p)?[p]:[];
+            });
+          }
+          const all=[...sources('journal'),...sources('ui'),...sources('core')];
+          const read=p=>fs.readFileSync(p,'utf8');
+          const creation=read('ui/record/creation-flow.js');
+          const event=read('journal/event-view.js');
+          const note=read('journal/note-view.js');
+          const profile=read('core/profile/profile.js');
+          const recordCSS=read('ui/record/record.css');
+          const shared=read('ui/v2/z-layout.js');
+          const modal=read('ui/modals/index.js');
+          assert.match(creation,/data-record-creation-header-title hidden/);
+          assert.match(creation,/class="v2-q-title" data-record-creation-header-title/);
+          assert.match(creation,/headerTitleHost\.textContent = resolvedTitle/);
+          assert.match(creation,/if \(titleWrap\) titleWrap\.hidden = true/);
+          assert.match(creation,/shellHeaderHost\.hidden = !String\(content/);
+          assert.match(creation,/title: '',\s*className: 'record-creation-q'/);
+          assert.match(recordCSS,/grid-template-rows:minmax\(0,1fr\) auto/);
+          assert.match(recordCSS,/:has\(> \.record-creation-flow__title:not\(\[hidden\]\)\)/);
+          assert.doesNotMatch(event,/user-event-shell-title|left:52px/);
+          assert.match(event,/title: 'Событие'/);
+          assert.doesNotMatch(note,/user-note-shell-title|left:52px/);
+          assert.match(note,/<h2 class="v2-q-title">Заметка<\/h2>/);
+          assert.doesNotMatch(profile,/\[data-v2-q-header-content\]'\)\?\.replaceChildren\(/);
+          assert.doesNotMatch(profile,/data-close-workplace-limit/);
+          assert.match(modal,/variant === 's'\) assertInformationalS\(content\)/);
+          assert.match(shared,/function surfaceHeader\(/);
+          console.log('PASS: Shared Q header ownership, S contract and no local Event/Note coordinates');
+          const touchingHeader=all.filter(p=> !p.startsWith('ui/v2/') && /data-v2-(?:q|z)-header-content/.test(read(p)));
+          console.log('Remaining explicit header consumers (content only; inspect):');
+          touchingHeader.forEach(p=>console.log('  '+p));
+          const absolute=all.flatMap(p=>read(p).split('\n').flatMap((s,i)=>/position:absolute.{0,110}(?:top|left):\s*\d+px/.test(s)?[p+':'+(i+1)+' '+s.slice(0,170)]:[]));
+          console.log('Potential hard-coded absolute header-like geometry:');
+          absolute.slice(0,75).forEach(s=>console.log('  '+s));
+          const modalCallSites=all.filter(p=>/modal\(/.test(read(p)) && !p.startsWith('ui/v2/'));
+          console.log('Modal call site files:',modalCallSites.length);
+          NODE
+          node -e "import('./ui/ui.js').then(()=>console.log('Shared UI module links PASS'))"
+          node -e "import('./ui/record/creation-flow.js').then(()=>console.log('Record owner module links PASS'))"
+          node -e "import('./journal/creation-flow.js').then(()=>console.log('Journal chooser module links PASS'))"
+          node -e "import('./journal/event-view.js').then(()=>console.log('Event view module links PASS'))"
+          node -e "import('./journal/note-view.js').then(()=>console.log('Note view module links PASS'))"
+          node -e "import('./core/profile/profile.js').then(()=>console.log('Profile module links PASS'))"
+          find . -type f \( -name '*.js' -o -name '*.mjs' \) -not -path './.git/*' -print0 | xargs -0 -n1 node --check
+          node scripts/audit-professional-clean.mjs
+          docker build -t professional-shared-ui-convergence .
+      - name: Remove temporary Shared UI workflow
+        if: always()
+        run: |
+          set -euo pipefail
+          git config user.name co-tools
+          git config user.email a.volokovykh@yandex.ru
+          git rm .github/workflows/_verify-shared-ui-convergence-once.yml
+          git commit -m 'Remove temporary Shared UI convergence verifier'
+          git push origin HEAD:staging
