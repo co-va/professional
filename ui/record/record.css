@@ -37,8 +37,8 @@
 
 .record-status-controls{display:grid;gap:8px}.record-status-controls .segment-control{margin-bottom:0}
 
-.record-creation-flow{height:100%;min-height:0;display:grid;grid-template-rows:minmax(0,1fr) auto;gap:12px}.record-creation-flow:has(> .record-creation-flow__title:not([hidden])){grid-template-rows:auto minmax(0,1fr) auto}
-.record-creation-flow__title{margin:0}.record-creation-flow__title h2{margin:0;font-size:20px;line-height:1.2;font-weight:650;letter-spacing:0}.record-creation-flow__body{min-height:0;overflow:auto;overscroll-behavior:contain}.record-creation-flow__action:empty{display:none}
+.record-creation-flow{height:100%;min-height:0;display:grid;grid-template-rows:minmax(0,1fr) auto;gap:12px}
+.record-creation-flow__body{min-height:0;overflow:auto;overscroll-behavior:contain}.record-creation-flow__action:empty{display:none}
 .record-creation-time-rows{display:grid;gap:14px}.record-creation-time-row{display:grid;gap:8px}
 [data-record-creation-step="date"] .record-creation-flow__body{overflow:hidden}
 [data-record-creation-step="person"] .record-screen--people{height:100%;min-height:0;padding:0}[data-record-creation-step="person"] .record-person-list{min-height:0;overflow:auto}
