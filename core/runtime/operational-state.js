@@ -7,7 +7,17 @@ let operationalStateRequest = null;
 let recordCreationHydrated = false;
 
 function clone(value){return value==null?value:JSON.parse(JSON.stringify(value));}
-async function payload(response,fallback){const value=await response.json().catch(()=>({}));if(!response.ok)throw new Error(value?.message||fallback);return value;}
+async function payload(response,fallback){
+  const value=await response.json().catch(()=>null);
+  if(!response.ok){
+    const message=typeof value?.message==='string' ? value.message.trim() : '';
+    throw new Error(message || `${fallback} (HTTP ${response.status})`);
+  }
+  if(!value || typeof value!=='object' || !Array.isArray(value.procedures)){
+    throw new Error('Сервер вернул неполные рабочие данные');
+  }
+  return value;
+}
 function hydrateDays(remote={}){hydrateDaysFromServer(Array.isArray(remote.days)?clone(remote.days):[]);}
 function hydrateRecordCreation(remote={}){
   hydrateDays(remote);
