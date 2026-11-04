@@ -140,12 +140,15 @@ export function openJournalCreation({
       body: '<div class="muted">Загружаем текущие процедуры…</div>',
     });
     try {
-      const [{ openRecords }, { loadRecordCreationOperationalState }] = await Promise.all([
+      const [{ openRecords }, { loadRecordCreationOperationalState }, { hasCurrentProceduresSnapshot }] = await Promise.all([
         import('../core/records/records.js'),
         import('../core/runtime/operational-state.js'),
+        import('../core/service/procedures/data.js'),
       ]);
       if (!owner.isOpen?.() || version !== requestVersion) return;
-      await loadRecordCreationOperationalState();
+      // The Journal and server sync may already have hydrated the procedures owner.
+      // A failed duplicate request must never block an existing usable catalog.
+      if (!hasCurrentProceduresSnapshot()) await loadRecordCreationOperationalState();
       if (!owner.isOpen?.() || version !== requestVersion) return;
       openRecords({
         context: 'journal',
@@ -161,11 +164,18 @@ export function openJournalCreation({
       });
     } catch (error) {
       if (!owner.isOpen?.() || version !== requestVersion) return;
-      returnToChoices();
-      const { openNotice } = await import('../ui/modals/index.js');
-      openNotice({
-        title: 'Не удалось подготовить запись',
-        message: String(error?.message || 'Попробуйте ещё раз.'),
+      // Keep the selected time and the same Q. No extra S-modal or duplicate chooser.
+      const { escapeHtml } = await import('../ui/utils/escape-html.js');
+      if (!owner.isOpen?.() || version !== requestVersion) return;
+      const view = owner.render({
+        step: 'procedures',
+        title: 'Выбор процедур',
+        body: `<p role="alert">${escapeHtml(String(error?.message || 'Не удалось загрузить рабочие данные'))}</p>`,
+        action: { label: 'Повторить', data: 'data-record-retry-load' },
+      });
+      view?.action?.addEventListener('click', () => {
+        const nextVersion = ++requestVersion;
+        void beginRecord(nextVersion);
       });
     }
   }
