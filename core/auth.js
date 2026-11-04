@@ -71,15 +71,28 @@ export async function login(identifier, password) {
       signal: controller.signal,
     });
   } catch (error) {
-    if (error?.name === 'AbortError') throw new Error('Сервер не ответил вовремя');
-    throw error;
+    if (error?.name === 'AbortError') throw new Error('Сервер входа не ответил за 12 секунд');
+    throw new Error('Не удалось связаться с сервером входа');
   } finally {
     globalThis.clearTimeout(timer);
   }
 
-  const payload = await response.json().catch(() => ({}));
+  const payload = await response.json().catch(() => null);
   if (!response.ok) {
-    throw new Error(payload?.message || 'Не удалось войти');
+    // Non-JSON HTTP errors (e.g. a reverse proxy's 502 page) are not bad passwords.
+    if (response.status >= 500) {
+      throw new Error(`Сервер входа временно недоступен (HTTP ${response.status})`);
+    }
+    const serverMessage = Array.isArray(payload?.message)
+      ? payload.message.filter((item) => typeof item === 'string').join('; ')
+      : typeof payload?.message === 'string' ? payload.message.trim() : '';
+    if (serverMessage) throw new Error(serverMessage);
+    if (response.status === 401) throw new Error('Вход не подтверждён. Проверьте телефон, email и пароль');
+    if (response.status === 429) throw new Error('Слишком много запросов на вход. Повторите позже');
+    throw new Error(`Сервер отклонил вход (HTTP ${response.status})`);
+  }
+  if (!payload || typeof payload.accessToken !== 'string' || !payload.accessToken) {
+    throw new Error('Сервер входа вернул неполный ответ');
   }
 
   setAuthToken(payload.accessToken);
