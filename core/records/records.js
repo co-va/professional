@@ -183,6 +183,19 @@ function totalDuration(items = []) {
   return items.reduce((sum, item) => sum + Math.max(0, Number(item?.duration) || 0), 0);
 }
 
+function timeConflictMessage(result, from, to) {
+  const interval = [from, to].filter(Boolean).join('–');
+  if (result?.reason === 'occupied') {
+    const conflict = Array.isArray(result.conflicts) ? result.conflicts[0] : null;
+    const type = conflict?.type === 'event' ? 'событием' : 'записью';
+    const period = [conflict?.from, conflict?.to].filter(Boolean).join('–');
+    return period ? `Интервал ${interval} пересекается с ${type} ${period}.` : `Интервал ${interval} уже занят.`;
+  }
+  if (result?.reason === 'outside-working-time') return `Интервал ${interval} выходит за рабочее время.`;
+  if (result?.reason === 'day-not-working') return 'На выбранную дату рабочий график не установлен.';
+  return `Интервал ${interval} недоступен.`;
+}
+
 export function openProcedureAdjustment(record, procedureId, { onSaved = () => {} } = {}) {
   const source = getRecord(record?.id) || record;
   if (!source?.id || getRecordPaymentState(source).hasPayments) return null;
@@ -417,16 +430,33 @@ export function openRecords({
     if (state.from) {
       const start = timeToMinutes(state.from);
       const end = start == null ? '' : minutesToTime(start + totalDuration(state.procedures));
-      if (end && checkTimeAvailability({
+      const availability = end ? checkTimeAvailability({
         date: state.date,
         workplaceId: state.workplaceId,
         from: state.from,
         to: end,
         excludeId: state.recordId,
-      }).ok) {
+      }) : { ok: false, reason: 'invalid-time', conflicts: [] };
+      if (availability.ok) {
         state.to = end;
         if (!state.person && source.kind === 'professional') renderPerson();
         else renderConfirmation();
+        return;
+      }
+      if (context === 'journal' && journalTimeConfirmed) {
+        // Journal's first Q is the sole time-selection step.
+        // Never discard its selected time or open a second time selector.
+        state.to = '';
+        renderProcedures();
+        const host = owner.layer?.querySelector('[data-record-creation-body]');
+        if (host) {
+          const message = document.createElement('p');
+          message.className = 'auth-error';
+          message.setAttribute('role', 'alert');
+          message.dataset.recordTimeConflict = '';
+          message.textContent = timeConflictMessage(availability, state.from, end);
+          host.prepend(message);
+        }
         return;
       }
       state.from = '';
@@ -561,6 +591,7 @@ export function openRecords({
           selected.clear();
           next.forEach((value, key) => selected.set(key, value));
           state.procedures = [...selected.values()];
+          view?.body?.querySelector('[data-record-time-conflict]')?.remove();
           const nextButton = view?.layer?.querySelector('[data-records-procedures-next]');
           if (nextButton) nextButton.disabled = selected.size === 0;
         },
@@ -701,15 +732,17 @@ export function openRecords({
       });
     };
 
+    const personRows = (rows) => recordPersonList(rows.map((item) => {
+      const display = personDisplay(item);
+      return { key: item.key, name: display.name, uei: display.uei, phone: display.phone, aria: `Выбрать ${display.name}` };
+    }), { data: 'data-records-person', selected: [...selected.keys()], empty: 'Люди не найдены.' });
+
     const render = () => {
       const body = `<div class="record-screen record-screen--people">
         ${groupMode ? `<div class="muted">Участники: ${selected.size} / ${capacity}</div>` : ''}
         <div class="ui-search-field">${field({ name: 'recordsPersonSearch', type: 'search', placeholder: 'Поиск по имени или UEI', autocomplete: 'off', data: 'data-records-person-search' })}</div>
         <div class="ui-search-divider" aria-hidden="true"></div>
-        <div class="record-person-list">${recordPersonList(filtered.map((item) => {
-          const display = personDisplay(item);
-          return { key: item.key, name: display.name, uei: display.uei, phone: display.phone, aria: `Выбрать ${display.name}` };
-        }), { data: 'data-records-person', selected: [...selected.keys()], empty: 'Люди не найдены.' })}</div>
+        <div class="record-person-list">${personRows(filtered)}</div>
       </div>`;
       const view = owner.render({
         step: 'person',
@@ -719,15 +752,21 @@ export function openRecords({
       });
       view?.body?.querySelector('[data-records-person-search]')?.addEventListener('input', (event) => {
         const query = event.target.value.trim().toLocaleLowerCase('ru');
+        const digits = query.replace(/\D/g, '');
         filtered = all.filter((item) => {
           const display = personDisplay(item);
           return display.name.toLocaleLowerCase('ru').includes(query)
-            || display.phone.includes(query)
+            || display.phone.toLocaleLowerCase('ru').includes(query)
+            || (digits && display.phone.replace(/\D/g, '').includes(digits))
             || display.uei.toLocaleLowerCase('ru').includes(query);
         });
-        render();
+        // Update only the list. Rebuilding Q destroys the focused search input.
+        const rows = view?.body?.querySelector('.record-person-list');
+        if (rows) rows.innerHTML = personRows(filtered);
       });
-      view?.body?.querySelectorAll('[data-records-person]').forEach((node) => node.addEventListener('click', () => {
+      view?.body?.addEventListener('click', (event) => {
+        const node = event.target.closest('[data-records-person]');
+        if (!node || !view.body.contains(node)) return;
         const item = all.find((entry) => String(entry.key) === String(node.dataset.recordsPerson));
         if (!item) return;
         if (!groupMode) {
@@ -745,7 +784,7 @@ export function openRecords({
         }
         state.people = [...selected.values()];
         render();
-      }));
+      });
       renderFooter(view, {
         '[data-records-add-person]': openAddPerson,
         '[data-records-person-next]': () => {
@@ -868,14 +907,23 @@ export function openRecords({
       '[data-records-confirm]': async (event) => {
         const submit = event.currentTarget;
         if (!submit || submit.dataset.recordsBusy === 'true') return;
-        if (source.kind === 'professional' && !checkTimeAvailability({
+        const availability = source.kind === 'professional' ? checkTimeAvailability({
           date: state.date,
           workplaceId: state.workplaceId,
           from: state.from,
           to: state.to,
           excludeId: state.recordId,
-        }).ok) {
-          openNotice({ title: 'Запись недоступна', message: 'Выбранное время уже занято или недоступно.' });
+        }) : { ok: true };
+        if (!availability.ok) {
+          let message = view?.body?.querySelector('[data-record-confirmation-error]');
+          if (!message) {
+            message = document.createElement('p');
+            message.className = 'auth-error';
+            message.setAttribute('role', 'alert');
+            message.dataset.recordConfirmationError = '';
+            view?.body?.append(message);
+          }
+          if (message) message.textContent = timeConflictMessage(availability, state.from, state.to);
           return;
         }
         submit.dataset.recordsBusy = 'true';
