@@ -221,6 +221,10 @@ export function initJournalDayTimeline(root, {
   onUsageClick = () => {},
   onWorkFieldClick = () => {},
 } = {}) {
+  if (root.__professionalTimeUsageChangeHandler) window.removeEventListener('professional:time-usage-changed', root.__professionalTimeUsageChangeHandler);
+  root.__professionalTimeUsageChangeHandler = () => {};
+  window.addEventListener('professional:time-usage-changed', root.__professionalTimeUsageChangeHandler);
+
   root.querySelectorAll('[data-journal-work-field]').forEach((field) => {
     const open = () => {
       const workplaceId = String(field.dataset.journalWorkField || '');
