@@ -1,0 +1,65 @@
+name: Temporary Journal Record end-to-end checks
+
+on:
+  push:
+    branches: [staging]
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: staging
+          fetch-depth: 0
+      - name: Verify single time step, live search, half-open occupancy
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import assert from 'node:assert/strict';
+          import {createTimeGrid,getTimeGridRangeState} from './core/time/grid.js';
+          const sample={date:'2026-11-04',workplaceId:'w',plan:{from:'09:00',to:'20:00'}};
+          const at15=createTimeGrid({...sample,usages:[{sourceId:'next',type:'record',date:sample.date,from:'15:00',to:'16:00'}]});
+          assert.equal(getTimeGridRangeState(at15,{from:'12:00',to:'15:00'}).ok,true,'adjacent 15:00 must not block 12:00-15:00');
+          const at14=createTimeGrid({...sample,usages:[{sourceId:'earlier',type:'record',date:sample.date,from:'14:00',to:'15:00'}]});
+          const conflict=getTimeGridRangeState(at14,{from:'12:00',to:'15:00'});
+          assert.equal(conflict.ok,false,'14:00 start conflicts with 12:00-15:00');
+          assert.equal(conflict.reason,'occupied');
+          assert.equal(conflict.conflicts[0].from,'14:00');
+          const s=fs.readFileSync('core/records/records.js','utf8');
+          assert.match(s,/if \(context === 'journal' && journalTimeConfirmed\)/);
+          assert.match(s,/procedure(s)?;?\s*\/\/ The first Journal Q|Journal's first Q is the sole time-selection step/);
+          const skipTime=s.slice(s.indexOf('const nextAfterProcedures'),s.indexOf('const renderWorkplaces'));
+          assert.match(skipTime,/renderProcedures\(\)/);
+          assert.match(skipTime,/timeConflictMessage\(availability, state.from, end\)/);
+          assert.match(skipTime,/if \(context === 'journal' && journalTimeConfirmed\)[\s\S]*?return;/);
+          assert.match(s,/if \(journalTimeConfirmed\) \{\s*state.from = state.timeHint;\s*renderProcedures\(\)/);
+          const person=s.slice(s.indexOf('const renderPerson ='),s.indexOf('const confirmationPerson ='));
+          const inputBlock=person.slice(person.indexOf("querySelector('[data-records-person-search]')"),person.indexOf("addEventListener('click', (event) =>"));
+          assert.match(inputBlock,/rows.innerHTML = personRows\(filtered\)/);
+          assert.doesNotMatch(inputBlock,/\brender\(\)/);
+          assert.match(person,/const node = event.target.closest\('\[data-records-person\]'\)/);
+          assert.match(person,/display.uei.toLocaleLowerCase\('ru'\).includes\(query\)/);
+          assert.match(s,/message.textContent = timeConflictMessage\(availability, state.from, state.to\)/);
+          assert.doesNotMatch(s,/Выбранное время уже занято или недоступно/);
+          console.log('PASS: 12:00-15:00 / 15:00-16:00 allowed; 14:00 collision blocked; one time Q; stable search input; precise conflict');
+          NODE
+          node -e "import('./core/records/records.js').then(()=>console.log('Record module links'))"
+          node -e "import('./journal/creation-flow.js').then(()=>console.log('Journal Q module links'))"
+          node -e "import('./journal/день.js').then(()=>console.log('Journal Day module links'))"
+          find . -type f \( -name '*.js' -o -name '*.mjs' \) -not -path './.git/*' -print0 | xargs -0 -n1 node --check
+          node scripts/audit-professional-clean.mjs
+          docker build -t professional-journal-record-flow .
+      - name: Remove temporary verification workflow
+        if: always()
+        run: |
+          set -euo pipefail
+          git config user.name co-tools
+          git config user.email a.volokovykh@yandex.ru
+          git rm .github/workflows/_verify-journal-record-one-pass.yml
+          git commit -m 'Remove temporary Journal Record verifier'
+          git push origin HEAD:staging
