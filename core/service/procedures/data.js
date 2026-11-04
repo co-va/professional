@@ -1,6 +1,19 @@
 import { queueOperationalDataset } from '../../../core/business-persistence.js';
 
 let proceduresState = [];
+let proceduresSnapshotReady = false;
+
+// Readiness belongs to the existing procedures data owner, not to Record or Journal.
+if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+  window.addEventListener('professional:auth-logout', () => {
+    proceduresState = [];
+    proceduresSnapshotReady = false;
+  });
+}
+
+export function hasCurrentProceduresSnapshot() {
+  return proceduresSnapshotReady;
+}
 
 function clone(value) {
   return value == null ? value : JSON.parse(JSON.stringify(value));
@@ -12,11 +25,13 @@ function readRawProcedures() {
 
 function writeProcedures(value) {
   proceduresState = Array.isArray(value) ? clone(value) : [];
+  proceduresSnapshotReady = true;
   void queueOperationalDataset('procedures', proceduresState);
 }
 
 export function hydrateCurrentProceduresFromServer(procedures = []) {
   proceduresState = Array.isArray(procedures) ? clone(procedures) : [];
+  proceduresSnapshotReady = true;
   return clone(proceduresState);
 }
 
