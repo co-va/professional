@@ -59,16 +59,23 @@ function suggestedEntry({ workplaceId, date, workingDays, workplaces }) {
 export function makeTimetableDayOff({
   date,
   workplaceId,
+  workplaceIds = [],
   onSave = () => {},
 } = {}) {
   const day = dateKey(date);
-  const id = String(workplaceId || '');
-  if (!day || !id) return false;
+  const ids = [...new Set((workplaceIds.length ? workplaceIds : [workplaceId])
+    .map((value) => String(value || '')).filter(Boolean))];
+  if (!day || !ids.length) return false;
   const workingDays = getDays();
-  if (!removeDay(workingDays, id, day)) return false;
+  if (ids.some((id) => !getDay(workingDays, id, day) || getWorkingTimeUsageConflicts({
+    operation: 'remove', date: day, workplaceId: id,
+  }).length > 0)) return false;
+  for (const id of ids) {
+    if (!removeDay(workingDays, id, day)) return false;
+  }
   const result = saveDays(workingDays);
   if (!result?.ok) return false;
-  onSave({ date: day, workplaceId: id });
+  onSave({ date: day, workplaceIds: ids });
   return true;
 }
 
