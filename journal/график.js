@@ -156,20 +156,22 @@ export function renderJournalGraphMode({
       .sort((left, right) => String(left.date).localeCompare(String(right.date)));
     if (!protectedDates.length && applied.length) return;
 
-    const title = protectedDates.length
-      ? 'Не все дни можно сделать выходными'
-      : 'Дни не изменены';
-    const summary = applied.length
-      ? `Выходными стали ${applied.length} свободных дней. Даты с записями или событиями остались рабочими.`
-      : protectedDates.length
-        ? 'Занятые дни остались рабочими. Ничего не удалено.'
-        : 'Для выбранных дат нет рабочих дней, которые можно сделать выходными.';
     const countLabel = (count, singular, plural2, plural5) => {
       const last2 = count % 100;
       if (last2 >= 11 && last2 <= 14) return `${count} ${plural5}`;
       const last = count % 10;
       return `${count} ${last === 1 ? singular : last >= 2 && last <= 4 ? plural2 : plural5}`;
     };
+    const title = protectedDates.length
+      ? applied.length ? 'Не все дни можно сделать выходными'
+        : protectedDates.length === 1 ? 'День нельзя сделать выходным'
+          : 'Выбранные дни нельзя сделать выходными'
+      : 'Дни не изменены';
+    const summary = applied.length
+      ? `Свободные даты переведены в выходные (${countLabel(applied.length, 'день', 'дня', 'дней')}). Занятые даты остались рабочими.`
+      : protectedDates.length
+        ? 'Занятые дни остались рабочими. Ничего не удалено.'
+        : 'Для выбранных дат нет рабочих дней, которые можно сделать выходными.';
     const rows = protectedDates.map(({ date, conflicts }) => {
       const records = new Set(conflicts
         .filter((usage) => usage?.type === 'record')
