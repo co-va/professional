@@ -191,9 +191,12 @@ async function pull(scopes = ALL_SCOPES) {
   }
 }
 
-export function startProfessionalServerSync() {
+export function startProfessionalServerSync({ initialRefresh = true } = {}) {
   if (timer) return () => stopProfessionalServerSync();
-  void pull(ALL_SCOPES);
+  // Authenticated startup already hydrated Journal, WorkPlan, Profile and
+  // Finance. Avoid refetching all scopes immediately and triggering repeated
+  // Journal renders while the first screen is becoming interactive.
+  if (initialRefresh) void pull(ALL_SCOPES);
   timer = window.setInterval(() => void pull(POLL_SCOPES), POLL_MS);
   const refreshAll = () => void pull(ALL_SCOPES);
   const refreshMutation = (event) => {
