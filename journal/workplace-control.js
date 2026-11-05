@@ -6,6 +6,17 @@ function recordCountText(count = 0) {
   return `${Math.max(0, Number(count) || 0)} записей`;
 }
 
+function monthStatsText(stats = null) {
+  const days = Math.max(0, Number(stats?.days) || 0);
+  const totalMinutes = Math.max(0, Number(stats?.totalMinutes) || 0);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = String(totalMinutes % 60).padStart(2, '0');
+  const ending = days % 100 >= 11 && days % 100 <= 14
+    ? 'дней'
+    : days % 10 === 1 ? 'день' : days % 10 >= 2 && days % 10 <= 4 ? 'дня' : 'дней';
+  return `${days} ${ending} · ${hours} ч ${minutes} м`;
+}
+
 function workplaceMeta(workplace = {}, count = 0) {
   const range = workplace?.from && workplace?.to ? `${workplace.from} - ${workplace.to}` : '';
   return [range, recordCountText(count)].filter(Boolean).join(' · ');
@@ -21,14 +32,17 @@ export function openJournalWorkplaceControl({
   workplaceId = '',
   recordCounts = {},
   aggregateCount = 0,
+  month = false,
+  aggregateStats = null,
+  workplaceStats = {},
   availableWorkplaces = [],
   onSelect = () => {},
   onAdd = () => {},
 } = {}) {
   const options = [{
     value: ALL_WORKPLACES_ID,
-    label: 'График дня',
-    meta: recordCountText(aggregateCount),
+    label: month ? 'Общий график' : 'График дня',
+    meta: month ? monthStatsText(aggregateStats) : recordCountText(aggregateCount),
     indicatorColor: '',
   }];
 
@@ -38,18 +52,18 @@ export function openJournalWorkplaceControl({
     options.push({
       value: key,
       label: workplace?.name || 'Без названия',
-      meta: workplaceMeta(workplace, recordCounts?.[key]),
+      meta: month ? monthStatsText(workplaceStats?.[key]) : workplaceMeta(workplace, recordCounts?.[key]),
       indicatorColor: workplace?.indicatorColor || workplace?.color || WORKPLACE_FALLBACK_COLOR,
     });
   }
 
   const main = mountModal(document.body, modal(
     `<div class="compact-form">${select({
-      label: 'Режим',
+      label: month ? 'Рабочее пространство' : 'Режим',
       name: 'journalWorkplaceMode',
       value: workplaceId || ALL_WORKPLACES_ID,
       options,
-      aria: 'Режим рабочего поля журнала',
+      aria: month ? 'Выбор графика месяца' : 'Режим рабочего поля журнала',
       data: 'data-journal-workplace-select',
     })}${availableWorkplaces.length ? button('+ Рабочее пространство', { data: 'data-journal-workplace-add' }) : ''}</div>`,
     { variant: 'x', surface: 'app', title: 'Рабочее пространство', className: 'modal--form-sheet' },
