@@ -1,6 +1,6 @@
 export const PRODUCTION_API_BASE = 'https://api.va-tools.ru';
 export const ADMIN_APP_ORIGIN = 'https://admin.va-tools.ru';
-export const APP_ORIGIN = 'https://app.va-tools.ru';
+export const APP_ORIGIN = 'https://prof.va-tools.ru';
 export const USER_ORIGIN = 'https://user.va-tools.ru';
 export const LOCAL_STAGING_API_BASE = 'http://localhost:3000';
 export const CODESPACES_STAGING_API_BASE = '/api';
