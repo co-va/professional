@@ -145,8 +145,11 @@ export function bindV2VContext(root) {
     if (control) {
       syncControlState(control, source);
       control.addEventListener('click', () => {
-        if (!source?.isConnected || source.disabled) return;
-        source.click();
+        // The active Z/Q can be re-rendered before the MutationObserver runs.
+        // Never dispatch to the stale source captured by the previous sync.
+        const current = activeWorkspaceSurface(app)?.querySelector?.('[data-workspace-v-action]') || null;
+        if (!current?.isConnected || current.hidden || current.disabled) return;
+        current.click();
       });
     }
   };
