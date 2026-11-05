@@ -238,19 +238,12 @@ export function renderJournal(root, options = {}) {
 
   const openListWorkplaces = () => {
     const catalog = getWorkplaces();
-    const records = getJournalListRecords();
-    const recordCounts = Object.fromEntries(catalog.map((workplace) => {
-      const id = String(workplace?.key || '');
-      return [id, records.filter((record) => String(record?.workplaceId || '') === id).length];
-    }).filter(([id]) => id));
-
     const main = mountModal(document.body, modal(
       `<div class="compact-form">${journalWorkplaceSelect({
         workplaces: catalog,
         workplaceId: selectedWorkplaceId,
         list: true,
-        recordCounts,
-        aggregateCount: records.length,
+        metaPending: true,
       })}</div>`,
       { variant: 'x', surface: 'app', title: 'Настройки журнала', className: 'modal--form-sheet' },
     ));
@@ -260,6 +253,15 @@ export function renderJournal(root, options = {}) {
       if (!nextId || (nextId !== ALL_WORKPLACES_ID && !catalog.some((item) => String(item?.key || '') === nextId))) return;
       main.v2Close?.();
       if (nextId !== selectedWorkplaceId) selectWorkplace(nextId);
+    });
+    if (main) afterJournalSettingsPaint(main, () => {
+      const records = getJournalListRecords();
+      const recordCounts = {};
+      for (const record of records) {
+        const id = String(record?.workplaceId || '');
+        if (id) recordCounts[id] = (recordCounts[id] || 0) + 1;
+      }
+      return { workplaces: catalog, recordCounts, aggregateCount: records.length };
     });
   };
 
@@ -271,24 +273,30 @@ export function renderJournal(root, options = {}) {
     selectWorkplace(nextId);
   };
 
-  const monthWorkplaceChoices = () => {
+  const monthWorkplaceChoices = ({ withStats = false } = {}) => {
     const days = getWorkingDays();
     const catalog = getWorkplaces();
-    const stats = getWorkplaceMonthStatsMap(days, catalog, selectedDate);
+    const prefix = monthPrefix(selectedDate);
+    const monthIds = new Set(days
+      .filter((day) => String(day?.date || '').startsWith(prefix))
+      .map((day) => String(day?.workplaceId || '')));
     const extra = monthDraftIds();
     const active = catalog.filter((workplace) => {
       const id = String(workplace?.key || '');
-      return id && (Number(stats[id]?.days || 0) > 0 || extra.has(id));
+      return id && (monthIds.has(id) || extra.has(id));
     });
     const activeIds = new Set(active.map((workplace) => String(workplace.key)));
     const available = catalog.filter((workplace) => {
       const id = String(workplace?.key || '');
       return id && !activeIds.has(id);
     });
-    return {
-      active, activeIds, available, extra, stats,
-      aggregateStats: getAllWorkplacesMonthStats(days, catalog, selectedDate),
-    };
+    const choice = { active, activeIds, available, extra, days, catalog };
+    // The secondary picker may want stats immediately; V never does.
+    if (withStats) {
+      choice.stats = getWorkplaceMonthStatsMap(days, catalog, selectedDate);
+      choice.aggregateStats = getAllWorkplacesMonthStats(days, catalog, selectedDate);
+    }
+    return choice;
   };
 
   const addMonthWorkplace = ({ available, extra }, afterSelection = null) =>
@@ -305,7 +313,7 @@ export function renderJournal(root, options = {}) {
 
   // Only needed when Graph's Working Time action starts in aggregate mode.
   const openMonthWorkplaces = (afterSelection = null) => {
-    const choice = monthWorkplaceChoices();
+    const choice = monthWorkplaceChoices({ withStats: true });
     openJournalWorkplaceControl({
       workplaces: choice.active,
       workplaceId: choice.activeIds.has(selectedWorkplaceId) ? selectedWorkplaceId : ALL_WORKPLACES_ID,
