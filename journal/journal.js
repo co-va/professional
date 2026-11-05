@@ -549,9 +549,7 @@ export function renderJournal(root, options = {}) {
   const renderView = () => {
     // An inline Record/Event/Note editor owns the visible Z body until commit/cancel.
     if (!root.isConnected || root.querySelector('[data-record-creation-flow]')) return;
-    cancelDaySettingsWarmup();
-    daySettingsCache = null;
-    daySettingsRevision += 1;
+    dayViewState = null;
     disposeActiveView();
     disposeActiveView = () => {};
     graphControls = null;
@@ -583,6 +581,12 @@ export function renderJournal(root, options = {}) {
         focusTarget: noteFocusTarget,
         onCreationFinished: renderView,
         onWorkplaceFieldClick: openDayTime,
+        onUsageSummary: ({ usages = [] } = {}) => {
+          dayViewState = {
+            choices: dayWorkplaceChoices(),
+            busyWorkplaces: new Set(usages.map((usage) => String(usage?.workplaceId || ''))),
+          };
+        },
         onChange: (nextDate) => {
           selectedDate = nextDate;
           persistProfessionalContext();
@@ -650,7 +654,6 @@ export function renderJournal(root, options = {}) {
         renderView();
       } });
     }
-    if (activeView === 'day') scheduleDaySettingsWarmup();
   };
 
   const focusJournalNotes = (event) => {
@@ -698,9 +701,7 @@ export function renderJournal(root, options = {}) {
   renderView();
 
   return () => {
-    cancelDaySettingsWarmup();
-    daySettingsRevision += 1;
-    daySettingsCache = null;
+    dayViewState = null;
     disposeActiveView();
     refreshEvents.forEach((eventName) => window.removeEventListener(eventName, scheduleRefresh));
     window.removeEventListener('professional:journal-note-focus-request', focusJournalNotes);
