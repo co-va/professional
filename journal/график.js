@@ -1,4 +1,4 @@
-import { actionBlock, button, initCalendar, initMultiSelect, modal, mountModal, openDayWorkplaceControl, select, timePicker, initTimePickers, escapeHtml, ALL_WORKPLACES_ID } from '../ui/ui.js';
+import { actionBlock, button, initCalendar, initMultiSelect, modal, mountModal, openDayWorkplaceControl, timePicker, initTimePickers, escapeHtml, ALL_WORKPLACES_ID } from '../ui/ui.js';
 import { getWorkplaces, resolveWorkplaceTime, getWorkingDayIndicators, getWorkingDayTotalMinutes } from '../core/workplace-time.js';
 import { getDays, getDay, getDayTime } from '../core/day/index.js';
 import { applyTimetableWorkingDays, applyTimetableDaysOff, applyTimetableTimeCorrection } from '../timetable/day-editor.js';
@@ -200,31 +200,17 @@ export function renderJournalGraphMode({
       startSelectionSession(month);
     });
   }
-  function openGraphWorkplaceChooser() {
-    const viewMonth = calendar?.getDisplayedMonth() || initialMonth;
-    const choices = [
-      { value: ALL_WORKPLACES_ID, label: 'Общий график' },
-      ...workplaces.map((item) => ({ value: String(item.key || ''), label: item.name || 'Без названия' })),
-    ];
-    const m = mountModal(document.body, modal(`<div class="compact-form">${select({
-      label: 'Рабочее пространство',
-      name: 'journalGraphWorkplace',
-      value: selectedWorkplaceId,
-      options: choices,
-    })}</div>`, { title: 'Рабочее пространство', variant: 'x' }));
-    m?.querySelector('input[name="journalGraphWorkplace"]')?.addEventListener('change', (event) => {
-      const next = String(event.target.value || '');
-      if (!next) return;
-      selectedWorkplaceId = next;
-      onWorkplaceChange(next);
-      m.v2Close?.();
-      startSelectionSession(viewMonth);
-    });
+  function selectGraphWorkplace(nextId) {
+    const id = String(nextId || '');
+    if (id !== ALL_WORKPLACES_ID && !workplaces.some((item) => String(item?.key || '') === id)) return;
+    selectedWorkplaceId = id;
+    onWorkplaceChange(id);
+    startSelectionSession(calendar?.getDisplayedMonth() || initialMonth);
   }
 
   if (workplaces.length) startSelectionSession(initialMonth); else calendar = initCalendar(calendarRoot, { month: initialMonth, workingDates: [] });
   onControls({
-    openWorkplaces: openGraphWorkplaceChooser,
+    selectWorkplace: selectGraphWorkplace,
     openTime: () => openSelectedWorkingTimeCorrection(),
     canEditTime: () => !isAllMode() && (selection?.getSelectedDates?.() || [])
       .some((date) => Boolean(getDay(workingDays, selectedWorkplaceId, date))),
