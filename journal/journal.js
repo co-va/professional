@@ -103,7 +103,6 @@ export function renderJournal(root, options = {}) {
   let daySettingsCache = null;
   let daySettingsRevision = 0;
   let daySettingsWarmup = null;
-  let daySettingsWarmupKind = '';
 
   root.dataset.journalContext = 'professional';
 
@@ -216,17 +215,14 @@ export function renderJournal(root, options = {}) {
 
   const cancelDaySettingsWarmup = () => {
     if (daySettingsWarmup === null) return;
-    if (daySettingsWarmupKind === 'idle') window.cancelIdleCallback?.(daySettingsWarmup);
-    else window.clearTimeout(daySettingsWarmup);
+    window.clearTimeout(daySettingsWarmup);
     daySettingsWarmup = null;
-    daySettingsWarmupKind = '';
   };
 
   const scheduleDaySettingsWarmup = () => {
     const revision = daySettingsRevision;
     const warmup = () => {
       daySettingsWarmup = null;
-      daySettingsWarmupKind = '';
       if (revision !== daySettingsRevision || activeView !== 'day' || !root.isConnected || daySettingsCache) return;
       try {
         daySettingsCache = dayWorkplaceChoices();
@@ -234,13 +230,9 @@ export function renderJournal(root, options = {}) {
         console.error('Journal Day settings preparation failed', error);
       }
     };
-    if (typeof window.requestIdleCallback === 'function') {
-      daySettingsWarmupKind = 'idle';
-      daySettingsWarmup = window.requestIdleCallback(warmup, { timeout: 500 });
-    } else {
-      daySettingsWarmupKind = 'timeout';
-      daySettingsWarmup = window.setTimeout(warmup, 0);
-    }
+    // Predictable next task rather than waiting up to 500ms for browser idle.
+    // This runs after Journal Day has rendered, before the next user gesture.
+    daySettingsWarmup = window.setTimeout(warmup, 0);
   };
 
   // Keep one Shared Select presentation, embedded directly into Journal settings.
