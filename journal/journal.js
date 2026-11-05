@@ -6,7 +6,7 @@ import { canUseCapability } from '../core/access.js';
 import { getAllWorkplacesMonthStats, getWorkplaceMonthStats, getWorkingDays, getWorkplaces } from '../core/workplace-time.js';
 import { getActiveDayWorkplaces, getAvailableDayWorkplaces, getDayRemovalConflicts } from '../core/day/index.js';
 import { getRecordPaymentState, recordAmountDue } from '../core/finance/index.js';
-import { makeTimetableDayOff, openTimetableDayTimeEditor } from '../timetable/day-editor.js';
+import { applyTimetableWorkingDays, makeTimetableDayOff, openTimetableDayTimeEditor } from '../timetable/day-editor.js';
 import { getActiveRecordCountForDay, getRecords, getRecordsForDay } from '../core/record/index.js';
 import { openJournalWorkplaceControl } from './workplace-control.js';
 import { renderJournalDay } from './день.js';
@@ -140,8 +140,8 @@ export function renderJournal(root, options = {}) {
           available: getAvailableDayWorkplaces(selectedDate, workplaces),
           catalogTitle: 'Рабочее пространство',
           onAdd: (workplaceId) => {
-            openTimetableDayTimeEditor({
-              date: selectedDate,
+            applyTimetableWorkingDays({
+              dates: [day],
               workplaceId,
               onSave: () => selectWorkplace(workplaceId),
             });
