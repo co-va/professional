@@ -16,7 +16,7 @@ import { getRecordPaymentState, recordAmountDue } from '../core/finance/index.js
 import { getNotesForDay } from '../core/note/index.js';
 import { noteTargetLabel, noteVisibleForWorkplace } from './note-target.js';
 
-// Warm the existing Journal creation module after the Day view has painted.
+// Load Record creation only when a person starts a new Record.
 let creationModuleRequest = null;
 function loadJournalCreationModule() {
   if (!creationModuleRequest) {
@@ -77,24 +77,9 @@ export function renderJournalDay(root, {
   const contentRoot = root.querySelector('[data-journal-day-content]');
   const timelineRoot = contentRoot?.querySelector('[data-journal-timeline-host]');
   const dayDate = dateKey(date);
-  let creationWarmTimer = null;
-  let creationWarmIdle = null;
-  // Avoid making the first click perform a cold import of Record + editor dependencies.
-  if (typeof window.requestIdleCallback === 'function') {
-    creationWarmIdle = window.requestIdleCallback(() => {
-      creationWarmIdle = null;
-      void loadJournalCreationModule().catch(() => {});
-    }, { timeout: 1200 });
-  } else {
-    creationWarmTimer = window.setTimeout(() => {
-      creationWarmTimer = null;
-      void loadJournalCreationModule().catch(() => {});
-    }, 0);
-  }
-
+  // No automatic import of the Record creation flow while the first Journal
+  // Day frame is becoming interactive. The slot click imports it on demand.
   const dispose = () => {
-    if (creationWarmTimer !== null) window.clearTimeout(creationWarmTimer);
-    if (creationWarmIdle !== null) window.cancelIdleCallback?.(creationWarmIdle);
     clearV2Y(root);
   };
 
