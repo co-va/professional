@@ -357,6 +357,7 @@ export function renderJournal(root, options = {}) {
       actions: (isDayOff ? [{
         id: 'add-workplace',
         label: '+ Рабочее пространство',
+        variant: 'primary',
         onSelect: addDayWorkplace,
       }] : [
         {
