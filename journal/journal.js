@@ -11,7 +11,7 @@ import { getActiveRecordCountForDay, getRecords, getRecordsForDay } from '../cor
 import { openJournalWorkplaceControl } from './workplace-control.js';
 import { renderJournalDay } from './день.js';
 import { renderJournalMonth } from './месяц.js';
-import { renderJournalList } from './список.js';
+import { getJournalListRecords, renderJournalList } from './список.js';
 
 const JOURNAL_CONTEXT_SCOPE = 'journal';
 
@@ -184,6 +184,24 @@ export function renderJournal(root, options = {}) {
     });
   };
 
+  const openListWorkplaces = () => {
+    const catalog = getWorkplaces();
+    const records = getJournalListRecords();
+    const recordCounts = Object.fromEntries(catalog.map((workplace) => {
+      const id = String(workplace?.key || '');
+      return [id, records.filter((record) => String(record?.workplaceId || '') === id).length];
+    }).filter(([id]) => id));
+
+    openJournalWorkplaceControl({
+      workplaces: catalog,
+      workplaceId: selectedWorkplaceId,
+      list: true,
+      recordCounts,
+      aggregateCount: records.length,
+      onSelect: selectWorkplace,
+    });
+  };
+
   const selectMonthWorkplace = (nextId) => {
     if (monthMode === 'graph' && graphControls?.selectWorkplace) {
       graphControls.selectWorkplace(nextId);
@@ -239,9 +257,10 @@ export function renderJournal(root, options = {}) {
   const journalHeader = () => {
     const aggregate = selectedWorkplaceId === ALL_WORKPLACES_ID;
     const graph = activeView === 'month' && monthMode === 'graph';
+    const list = activeView === 'list';
     return {
-      title: aggregate ? (graph ? 'График' : 'Журнал') : journalTitle(),
-      subtitle: aggregate ? 'Общий режим' : (graph ? 'График' : 'Журнал'),
+      title: aggregate ? (graph ? 'График' : list ? 'Список' : 'Журнал') : journalTitle(),
+      subtitle: aggregate ? 'Общий режим' : (graph ? 'График' : list ? 'Список' : 'Журнал'),
     };
   };
 
@@ -323,6 +342,17 @@ export function renderJournal(root, options = {}) {
   };
 
   const openJournalSettings = () => {
+    if (activeView === 'list') {
+      openSharedProfileSettingsMenu({
+        title: 'Настройки журнала',
+        actions: [{
+          id: 'workplace',
+          label: 'Рабочее пространство',
+          onSelect: openListWorkplaces,
+        }],
+      });
+      return;
+    }
     if (activeView === 'month') {
       const inGraph = monthMode === 'graph';
       openSharedProfileSettingsMenu({
