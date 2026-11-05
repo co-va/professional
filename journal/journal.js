@@ -1,4 +1,4 @@
-import { viewNavigation, initViewNavigation, ALL_WORKPLACES_ID, modal, mountModal, openDayWorkplaceControl, openSharedProfileSettingsMenu, workspaceHeaderContext, button } from '../ui/ui.js';
+import { viewNavigation, initViewNavigation, ALL_WORKPLACES_ID, modal, mountModal, openDayWorkplaceControl, openSharedProfileSettingsMenu, workspaceHeaderContext } from '../ui/ui.js';
 import { setV2ZHeaderRows, clearV2ZHeaderRows } from '../ui/v2/z-layout.js';
 import { getWorkplaceContext, setWorkplaceContext } from '../core/workplace-context.js';
 import { readOnlyReceipt } from '../ui/receipt/index.js';
