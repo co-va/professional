@@ -1,10 +1,10 @@
-import { viewNavigation, initViewNavigation, ALL_WORKPLACES_ID, modal, mountModal, openSharedProfileSettingsMenu, workspaceHeaderContext } from '../ui/ui.js';
+import { viewNavigation, initViewNavigation, ALL_WORKPLACES_ID, modal, mountModal, openDayWorkplaceControl, openSharedProfileSettingsMenu, workspaceHeaderContext } from '../ui/ui.js';
 import { setV2ZHeaderRows, clearV2ZHeaderRows } from '../ui/v2/z-layout.js';
 import { getWorkplaceContext, setWorkplaceContext } from '../core/workplace-context.js';
 import { readOnlyReceipt } from '../ui/receipt/index.js';
 import { canUseCapability } from '../core/access.js';
 import { getAllWorkplacesMonthStats, getWorkplaceMonthStats, getWorkingDays, getWorkplaces } from '../core/workplace-time.js';
-import { getActiveDayWorkplaces, getDayRemovalConflicts } from '../core/day/index.js';
+import { getActiveDayWorkplaces, getAvailableDayWorkplaces, getDayRemovalConflicts } from '../core/day/index.js';
 import { getRecordPaymentState, recordAmountDue } from '../core/finance/index.js';
 import { makeTimetableDayOff, openTimetableDayTimeEditor } from '../timetable/day-editor.js';
 import { getActiveRecordCountForDay, getRecords, getRecordsForDay } from '../core/record/index.js';
@@ -133,7 +133,21 @@ export function renderJournal(root, options = {}) {
       workplaceId: selectedWorkplaceId,
       recordCounts,
       aggregateCount: getActiveRecordCountForDay(day),
+      availableWorkplaces: getAvailableDayWorkplaces(selectedDate, workplaces),
       onSelect: selectWorkplace,
+      onAdd: () => {
+        openDayWorkplaceControl({
+          available: getAvailableDayWorkplaces(selectedDate, workplaces),
+          catalogTitle: 'Рабочее пространство',
+          onAdd: (workplaceId) => {
+            openTimetableDayTimeEditor({
+              date: selectedDate,
+              workplaceId,
+              onSave: () => selectWorkplace(workplaceId),
+            });
+          },
+        });
+      },
     });
   };
 
