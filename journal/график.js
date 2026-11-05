@@ -1,6 +1,7 @@
 import { actionBlock, button, initCalendar, initMultiSelect, modal, mountModal, openDayWorkplaceControl, timePicker, initTimePickers, escapeHtml, ALL_WORKPLACES_ID } from '../ui/ui.js';
 import { getWorkplaces, resolveWorkplaceTime, getWorkingDayIndicators, getWorkingDayTotalMinutes } from '../core/workplace-time.js';
 import { getDays, getDay, getDayTime } from '../core/day/index.js';
+import { isValidRange } from '../core/time/index.js';
 import { applyTimetableWorkingDays, applyTimetableDaysOff, applyTimetableTimeCorrection } from '../timetable/day-editor.js';
 
 function datesForWorkplace(days, workplaceId) { return days.filter((item) => item?.workplaceId === workplaceId).map((item) => item.date).filter(Boolean); }
@@ -39,6 +40,12 @@ export function renderJournalGraphMode({
   const applyButton = actionsRoot.querySelector('[data-timetable-apply]');
   const applyActions = applyButton?.closest('.modal-actions');
   let calendar; let selection; let selectionMode = null;
+  const timePlans = new Map();
+  const timePlanKey = () => {
+    const shown = calendar?.getDisplayedMonth?.() || initialMonth;
+    return `${selectedWorkplaceId}:${shown.getFullYear()}-${shown.getMonth() + 1}`;
+  };
+  const selectedTimePlan = () => timePlans.get(timePlanKey()) || null;
   const isAllMode = () => selectedWorkplaceId === ALL_WORKPLACES_ID;
   const isWorkingDate = (date) => !isAllMode() && datesForWorkplace(workingDays, selectedWorkplaceId).includes(date);
   const syncApplyButton = (dates) => {
@@ -61,17 +68,24 @@ export function renderJournalGraphMode({
       applyButton.setAttribute('aria-label', 'Применить');
     } else {
       onDateFocus(selectedDate);
-      selectionMode = isWorkingDate(dates[0]) ? 'make-off' : 'make-working';
-      const makeOff = selectionMode === 'make-off';
-      applyButton.textContent = makeOff ? 'Выходной' : 'Рабочий';
-      applyButton.classList.toggle('ui-button--danger', makeOff);
-      applyButton.setAttribute('aria-label', makeOff ? 'Сделать выходным' : 'Сделать рабочим');
+      if (selectedTimePlan()) {
+        selectionMode = 'set-time';
+        applyButton.textContent = 'Применить время';
+        applyButton.classList.remove('ui-button--danger');
+        applyButton.setAttribute('aria-label', 'Применить выбранное время к датам');
+      } else {
+        selectionMode = isWorkingDate(dates[0]) ? 'make-off' : 'make-working';
+        const makeOff = selectionMode === 'make-off';
+        applyButton.textContent = makeOff ? 'Выходной' : 'Рабочий';
+        applyButton.classList.toggle('ui-button--danger', makeOff);
+        applyButton.setAttribute('aria-label', makeOff ? 'Сделать выходным' : 'Сделать рабочим');
+      }
     }
     applyButton.disabled = false;
     if (applyActions) applyActions.hidden = false;
   };
   const guard = (event) => {
-    const calendarButton = event.target.closest('[data-calendar-date]'); if (!calendarButton || !selection || isAllMode()) return;
+    const calendarButton = event.target.closest('[data-calendar-date]'); if (!calendarButton || !selection || isAllMode() || selectedTimePlan()) return;
     const date = calendarButton.dataset.calendarDate || ''; if (!date || selection.isSelected(date)) return;
     const mode = isWorkingDate(date) ? 'make-off' : 'make-working';
     if (!selectionMode) selectionMode = mode; else if (mode !== selectionMode) { event.preventDefault(); event.stopImmediatePropagation(); }
@@ -158,47 +172,47 @@ export function renderJournalGraphMode({
     m.querySelector('[data-removal-blocked-close]')?.addEventListener('click', () => m.remove());
   }
 
-  function openSelectedWorkingTimeCorrection(dates = selection?.getSelectedDates?.() || []) {
-    const selected = (Array.isArray(dates) ? dates : []).filter((date) => getDay(workingDays, selectedWorkplaceId, date));
-    if (!selected.length || isAllMode()) return;
 
-    const first = getDayTime(getDay(workingDays, selectedWorkplaceId, selected[0]), workplaces)
-      || resolveWorkplaceTime(workplaces, selectedWorkplaceId)
-      || { from: '09:00', to: '18:00' };
+  function openGraphTimePlan() {
+    if (isAllMode()) return;
+    const month = calendar?.getDisplayedMonth?.() || initialMonth;
+    const current = selectedTimePlan();
+    const firstWorkingDay = workingDays.find((day) =>
+      String(day?.workplaceId || '') === String(selectedWorkplaceId)
+      && String(day?.date || '').startsWith(`${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, '0')}-`));
+    const base = current || resolveWorkplaceTime(workplaces, selectedWorkplaceId)
+      || getDayTime(firstWorkingDay, workplaces) || { from: '09:00', to: '18:00' };
 
     const content = `<div class="compact-form">
-      <div class="modal-title"><h2>Время работы</h2><p>Изменение применяется к выбранным рабочим датам.</p></div>
+      <div class="modal-title"><h2>Рабочее время</h2><p>Выберите время до назначения дат. Оно применится к отмеченным дням после подтверждения; настройки пространства не изменятся.</p></div>
       <div class="time-range-fields">
-        ${timePicker({ name: 'timetableCorrectionFrom', label: 'С', value: first.from, minuteStep: 1 })}
-        ${timePicker({ name: 'timetableCorrectionTo', label: 'До', value: first.to, minuteStep: 1 })}
+        ${timePicker({ name: 'graphPlanFrom', label: 'С', value: base.from, minuteStep: 1 })}
+        ${timePicker({ name: 'graphPlanTo', label: 'До', value: base.to, minuteStep: 1 })}
       </div>
-      <div class="form-error" data-timetable-correction-error aria-live="polite"></div>
-      ${button('Сохранить', { data: 'data-timetable-correction-save' })}
+      <div class="form-error" data-graph-plan-error aria-live="polite"></div>
+      ${button('Выбрать время', { data: 'data-graph-plan-save' })}
     </div>`;
-
-    const m = mountModal(document.body, modal(content, { title: 'Время работы', variant: 'x' }));
+    const m = mountModal(document.body, modal(content, { title: 'Рабочее время', variant: 'x' }));
     if (!m) return;
     initTimePickers(m);
-
-    m.querySelector('[data-timetable-correction-save]')?.addEventListener('click', () => {
-      const from = m.querySelector('[name="timetableCorrectionFrom"]')?.value || '';
-      const to = m.querySelector('[name="timetableCorrectionTo"]')?.value || '';
-      const result = applyTimetableTimeCorrection({
-        dates: selected,
-        workplaceId: selectedWorkplaceId,
-        from,
-        to,
-        workingDays,
-      });
-      if (!result.ok) {
-        const error = m.querySelector('[data-timetable-correction-error]');
-        if (error) error.textContent = result.message;
+    m.querySelector('[data-graph-plan-save]')?.addEventListener('click', () => {
+      const from = m.querySelector('[name="graphPlanFrom"]')?.value || '';
+      const to = m.querySelector('[name="graphPlanTo"]')?.value || '';
+      if (!isValidRange(from, to)) {
+        const error = m.querySelector('[data-graph-plan-error]');
+        if (error) error.textContent = 'Окончание должно быть позже начала.';
         return;
       }
-      const month = calendar?.getDisplayedMonth() || initialMonth;
+      timePlans.set(timePlanKey(), { from, to });
       m.v2Close?.();
-      startSelectionSession(month);
+      syncApplyButton(selection?.getSelectedDates?.() || []);
     });
+  }
+
+  function showTimePlanError(message) {
+    const content = `<div class="modal-title"><h2>Время не изменено</h2><p>${escapeHtml(message || 'Проверьте выбранные даты.')}</p></div>${button('Понятно', { data: 'data-graph-plan-error-close' })}`;
+    const m = mountModal(document.body, modal(content, { title: 'Рабочее время', variant: 'x' }));
+    m?.querySelector('[data-graph-plan-error-close]')?.addEventListener('click', () => m.v2Close?.());
   }
   function selectGraphWorkplace(nextId) {
     const id = String(nextId || '');
@@ -211,9 +225,8 @@ export function renderJournalGraphMode({
   if (workplaces.length) startSelectionSession(initialMonth); else calendar = initCalendar(calendarRoot, { month: initialMonth, workingDates: [] });
   onControls({
     selectWorkplace: selectGraphWorkplace,
-    openTime: () => openSelectedWorkingTimeCorrection(),
-    canEditTime: () => !isAllMode() && (selection?.getSelectedDates?.() || [])
-      .some((date) => Boolean(getDay(workingDays, selectedWorkplaceId, date))),
+    openTime: openGraphTimePlan,
+    canEditTime: () => !isAllMode(),
   });
 
   applyButton.addEventListener('click', () => {
@@ -221,6 +234,20 @@ export function renderJournalGraphMode({
     if (!dates.length || !selectionMode) return;
     if (isAllMode()) {
       openAggregateWorkplaceApply(dates);
+      return;
+    }
+    if (selectionMode === 'set-time') {
+      const plan = selectedTimePlan();
+      if (!plan) return;
+      const result = applyTimetableTimeCorrection({
+        dates, workplaceId: selectedWorkplaceId, from: plan.from, to: plan.to,
+        workingDays, createMissing: true,
+      });
+      if (!result.ok) {
+        showTimePlanError(result.message);
+        return;
+      }
+      startSelectionSession(calendar?.getDisplayedMonth() || initialMonth);
       return;
     }
     const makeWorking = selectionMode === 'make-working';
