@@ -314,10 +314,9 @@ export function renderJournal(root, options = {}) {
   const journalHeader = () => {
     const aggregate = selectedWorkplaceId === ALL_WORKPLACES_ID;
     const graph = activeView === 'month' && monthMode === 'graph';
-    const list = activeView === 'list';
     return {
       title: aggregate ? (graph ? 'График' : 'Журнал') : journalTitle(),
-      subtitle: aggregate ? 'Общий режим' : (list ? '' : graph ? 'График' : 'Журнал'),
+      subtitle: aggregate ? 'Общий режим' : (graph ? 'График' : 'Журнал'),
     };
   };
 
