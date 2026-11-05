@@ -550,11 +550,12 @@ export function applyTimetableTimeCorrection({
   to = '',
   workingDays = getDays(),
   onSave = () => {},
+  createMissing = false,
 } = {}) {
   const id = String(workplaceId || '');
   const selected = [...new Set((Array.isArray(dates) ? dates : []).map(dateKey))]
-    .filter((date) => id && date && getDay(workingDays, id, date));
-  if (!selected.length) return { ok: false, message: 'Нет выбранных рабочих дней.' };
+    .filter((date) => id && date && (createMissing || getDay(workingDays, id, date)));
+  if (!selected.length) return { ok: false, message: 'Нет выбранных дат.' };
   if (!isValidRange(from, to)) return { ok: false, message: 'Окончание должно быть позже начала.' };
 
   for (const date of selected) {
@@ -570,7 +571,13 @@ export function applyTimetableTimeCorrection({
       return { ok: false, message: `${formatModalDate(date)}: время пересекается с другим рабочим пространством.` };
     }
   }
-  selected.forEach((date) => updateDayTime(workingDays, id, date, from, to));
+  selected.forEach((date) => {
+    if (getDay(workingDays, id, date)) updateDayTime(workingDays, id, date, from, to);
+    else if (createMissing) {
+      const day = createDay({ date, workplaceId: id, from, to });
+      if (day) workingDays.push(day);
+    }
+  });
   const result = saveDays(workingDays);
   if (!result?.ok) return { ok: false, message: 'Не удалось сохранить рабочее время.' };
   onSave();
