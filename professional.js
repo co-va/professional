@@ -299,6 +299,7 @@ function syncWorkspaceHeader(surface) {
     contextRoot.querySelector('.page-header h1'),
     fallbackTitle,
   );
+  const subtitle = context?.dataset.workspaceSubtitle || '';
   const aContext = contextRoot.querySelector('[data-workspace-a-context]');
   const dSource = contextRoot.querySelector('[data-workspace-d-action]');
   const cSource = primarySource(contextRoot);
@@ -319,7 +320,7 @@ function syncWorkspaceHeader(surface) {
 
   header.outerHTML = v2Header({
     a: aSlot,
-    b: title,
+    b: subtitle ? { label: title, subtitle } : title,
     c: cVisible ? {
       kind: 'text',
       label: primaryLabel(cSource),
