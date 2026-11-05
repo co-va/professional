@@ -4,7 +4,7 @@ import { bindCalendarHeaderHost } from '../ui/calendar/index.js';
 import { getRecordPaymentState } from '../core/finance/index.js';
 import { minutesBetween } from '../core/time/index.js';
 import { getWorkplaces, getWorkingDays, getWorkingDayIndicators, getWorkingDay, getWorkingDayTotalMinutes, resolveWorkingDayTime } from '../core/workplace-time.js';
-import { getRecords, recordVisualState } from '../core/record/index.js';
+import { getRecordsInRange, recordVisualState } from '../core/record/index.js';
 
 const RECORD_COLOR = '#EFFFBB';
 const PAID_COLOR = '#DDE8D7';
@@ -122,7 +122,16 @@ export function renderJournalMonth(root, {
   const workingDays = getWorkingDays();
   const workplaces = getWorkplaces();
   const allMode = workplaceId === ALL_WORKPLACES_ID;
-  const recordIndex = recordsByDate(getRecords(), workplaceId, allMode);
+  // Calendar Month never needs the history outside the displayed month.
+  const monthFirst = new Date(month.getFullYear(), month.getMonth(), 1);
+  const monthLast = new Date(month.getFullYear(), month.getMonth() + 1, 0);
+  const rangeDate = (value) => `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
+  const records = getRecordsInRange({
+    from: rangeDate(monthFirst),
+    to: rangeDate(monthLast),
+    workplaceId: allMode ? '' : workplaceId,
+  });
+  const recordIndex = recordsByDate(records, workplaceId, allMode);
 
   initCalendar(calendarRoot, {
     month,
