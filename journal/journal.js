@@ -405,8 +405,21 @@ export function renderJournal(root, options = {}) {
     }
     if (activeView === 'month') {
       const inGraph = monthMode === 'graph';
+      const choice = monthWorkplaceChoices();
+      const field = inlineWorkplaceSettings({
+        choices: choice.active,
+        workplaceId: choice.activeIds.has(selectedWorkplaceId) ? selectedWorkplaceId : ALL_WORKPLACES_ID,
+        month: true,
+        aggregateStats: choice.aggregateStats,
+        workplaceStats: choice.stats,
+        available: choice.available,
+        onSelect: selectMonthWorkplace,
+        onAdd: () => addMonthWorkplace(choice),
+      });
       openSharedProfileSettingsMenu({
         title: 'Настройки журнала',
+        content: field.content,
+        onMount: field.onMount,
         actions: [
           canUseCapability('timetable.access') ? {
             id: 'calendar-mode',
@@ -417,15 +430,6 @@ export function renderJournal(root, options = {}) {
               renderView();
             },
           } : null,
-          inGraph ? {
-            id: 'graph-workplace',
-            label: 'Рабочее пространство',
-            onSelect: openMonthWorkplaces,
-          } : {
-            id: 'workplace',
-            label: 'Рабочее пространство',
-            onSelect: openMonthWorkplaces,
-          },
           inGraph ? {
             id: 'graph-time',
             label: 'Рабочее время',
@@ -446,7 +450,7 @@ export function renderJournal(root, options = {}) {
     const day = dateKey(selectedDate);
     const allMode = selectedWorkplaceId === ALL_WORKPLACES_ID;
     const active = activeView === 'day' ? activeDayWorkplaces() : [];
-    const isDayOff = activeView === 'day' && !active.length;
+    const isDayOff = !active.length;
     const hasUsage = active.some((item) => getDayRemovalConflicts(item.workplaceId, day).length > 0);
     const activeIds = active.map((item) => item.workplaceId);
     const selectedActive = !allMode && activeIds.includes(selectedWorkplaceId);
@@ -459,36 +463,38 @@ export function renderJournal(root, options = {}) {
       });
     };
 
+    const dayChoice = dayWorkplaceChoices();
+    const field = inlineWorkplaceSettings({
+      choices: dayChoice.active,
+      workplaceId: selectedWorkplaceId,
+      available: dayChoice.available,
+      recordCounts: dayChoice.recordCounts,
+      aggregateCount: dayChoice.aggregateCount,
+      onSelect: selectWorkplace,
+      onAdd: addDayWorkplace,
+    });
     openSharedProfileSettingsMenu({
       title: 'Настройки журнала',
-      actions: (isDayOff ? [{
-        id: 'add-workplace',
-        label: '+ Рабочее пространство',
-        variant: 'primary',
-        onSelect: addDayWorkplace,
-      }] : [
-        {
-          id: 'workplace',
-          label: 'Рабочее пространство',
-          onSelect: activeView === 'day' ? openDayWorkplaces : openWorkplace,
-        },
-        activeView === 'day' && selectedActive ? {
+      content: field.content,
+      onMount: field.onMount,
+      actions: isDayOff ? [] : [
+        selectedActive ? {
           id: 'working-time',
           label: 'Рабочее время',
           onSelect: () => openDayTime(selectedWorkplaceId),
         } : null,
-        activeView === 'day' && !hasUsage ? {
+        !hasUsage ? {
           id: 'day-off',
           label: 'Применить выходной',
           variant: 'danger',
           onSelect: applyDayOff,
         } : null,
-        (activeView === 'day' && hasUsage) || activeView === 'month' ? {
+        hasUsage ? {
           id: 'z-report',
           label: 'Z-Отчет',
           onSelect: openJournalZReport,
         } : null,
-      ]).filter(Boolean),
+      ].filter(Boolean),
     });
   };
 
