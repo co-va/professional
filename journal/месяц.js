@@ -2,24 +2,22 @@ import { initCalendar, ALL_WORKPLACES_ID } from '../ui/ui.js';
 import { renderJournalGraphMode } from './график.js';
 import { bindCalendarHeaderHost } from '../ui/calendar/index.js';
 import { getRecordPaymentState } from '../core/finance/index.js';
-import { minutesBetween } from '../core/time/index.js';
-import { getWorkplaces, getWorkingDays, getWorkingDayIndicators, getWorkingDay, getWorkingDayTotalMinutes, resolveWorkingDayTime } from '../core/workplace-time.js';
+import { timeToMinutes } from '../core/time/index.js';
+import { getWorkplaces, getWorkingDays, getWorkingDayIndicators, resolveWorkingDayTime } from '../core/workplace-time.js';
 import { getRecordsInRange, recordVisualState } from '../core/record/index.js';
+import { getEvents } from '../core/event/index.js';
 
 const RECORD_COLOR = '#EFFFBB';
 const PAID_COLOR = '#DDE8D7';
 const NO_SHOW_COLOR = '#F1DADA';
+const EVENT_COLOR = '#777A7D';
 
-function recordMinutes(record) {
-  return Math.max(0, minutesBetween(String(record?.from || ''), String(record?.to || '')) || 0);
-}
-
-function dayCapacityMinutes(workingDays, workplaces, workplaceId, dateKey, allMode) {
-  if (allMode) return Math.max(0, getWorkingDayTotalMinutes(workingDays, workplaces, dateKey));
-  const workingDay = getWorkingDay(workingDays, workplaceId, dateKey);
-  const time = resolveWorkingDayTime(workplaces, workingDay);
-  return time ? Math.max(0, minutesBetween(time.from, time.to)) : 0;
-}
+// Visual priorities only: an occupied minute is counted once, even if two
+// different sources unexpectedly overlap. This does not change owner statuses.
+const ACTIVE = 1;
+const PAID = 2;
+const EVENT = 3;
+const NO_SHOW = 4;
 
 function recordsByDate(records, workplaceId, allMode) {
   const index = new Map();
@@ -35,21 +33,71 @@ function recordsByDate(records, workplaceId, allMode) {
   return index;
 }
 
-function dayRecordData({ dateKey, workplaceId, allMode, workingDays, workplaces, recordIndex }) {
-  const records = recordIndex.get(dateKey) || [];
-  const capacity = dayCapacityMinutes(workingDays, workplaces, workplaceId, dateKey, allMode);
-  const minutes = { paid: 0, active: 0, noShow: 0 };
-
-  records.forEach((record) => {
-    const duration = recordMinutes(record);
-    const paid = Boolean(getRecordPaymentState(record).fullyPaid);
-    const state = recordVisualState(record, { paid });
-    if (state === 'paid') minutes.paid += duration;
-    else if (state === 'no-show') minutes.noShow += duration;
-    else minutes.active += duration;
+function eventsByDate(events, workplaceId, allMode, prefix) {
+  const index = new Map();
+  (Array.isArray(events) ? events : []).forEach((event) => {
+    const key = String(event?.date || '').slice(0, 10);
+    if (!key.startsWith(prefix)) return;
+    if (!allMode && String(event?.workplaceId || '') !== String(workplaceId || '')) return;
+    const bucket = index.get(key) || [];
+    bucket.push(event);
+    index.set(key, bucket);
   });
+  return index;
+}
 
-  return { count: records.length, capacity, minutes };
+function dayRecordData({ dateKey, workplaceId, allMode, workingDays, workplaces, recordIndex, eventIndex }) {
+  const records = recordIndex.get(dateKey) || [];
+  const events = eventIndex.get(dateKey) || [];
+  const minutes = { paid: 0, active: 0, noShow: 0, event: 0 };
+  let capacity = 0;
+
+  // Each workplace has its own non-overlapping work interval. The aggregate
+  // calendar sums their capacities, not the wall-clock width of the day.
+  for (const day of workingDays) {
+    if (String(day?.date || '') !== dateKey) continue;
+    const id = String(day?.workplaceId || '');
+    if (!id || (!allMode && id !== String(workplaceId || ''))) continue;
+    const range = resolveWorkingDayTime(workplaces, day);
+    const from = timeToMinutes(range?.from);
+    const to = timeToMinutes(range?.to);
+    if (from == null || to == null || to <= from) continue;
+
+    capacity += to - from;
+    const slots = new Uint8Array(to - from);
+    const mark = (item, rank) => {
+      const start = timeToMinutes(item?.from);
+      const end = timeToMinutes(item?.to);
+      if (start == null || end == null || end <= start) return;
+      const left = Math.max(from, start) - from;
+      const right = Math.min(to, end) - from;
+      for (let minute = left; minute < right; minute += 1) {
+        if (rank > slots[minute]) slots[minute] = rank;
+      }
+    };
+
+    for (const record of records) {
+      if (String(record?.workplaceId || '') !== id) continue;
+      // "No-show" remains occupied and pink even if a payment was recorded.
+      if (record?.attendance === 'no-show') {
+        mark(record, NO_SHOW);
+      } else {
+        const paid = Boolean(getRecordPaymentState(record).fullyPaid);
+        mark(record, recordVisualState(record, { paid }) === 'paid' ? PAID : ACTIVE);
+      }
+    }
+    for (const event of events) {
+      if (String(event?.workplaceId || '') === id) mark(event, EVENT);
+    }
+    for (const rank of slots) {
+      if (rank === PAID) minutes.paid += 1;
+      else if (rank === ACTIVE) minutes.active += 1;
+      else if (rank === NO_SHOW) minutes.noShow += 1;
+      else if (rank === EVENT) minutes.event += 1;
+    }
+  }
+  const busy = minutes.paid + minutes.active + minutes.noShow + minutes.event;
+  return { count: records.length, capacity, minutes, busy };
 }
 
 function usageGradient({ capacity, minutes }) {
@@ -58,6 +106,7 @@ function usageGradient({ capacity, minutes }) {
     { color: PAID_COLOR, minutes: minutes.paid },
     { color: RECORD_COLOR, minutes: minutes.active },
     { color: NO_SHOW_COLOR, minutes: minutes.noShow },
+    { color: EVENT_COLOR, minutes: minutes.event },
   ];
   let cursor = 0;
   const stops = [];
@@ -75,11 +124,20 @@ function usageGradient({ capacity, minutes }) {
   return `linear-gradient(90deg,${stops.join(',')})`;
 }
 
+function busyLabel(total) {
+  const hours = Math.floor(total / 60);
+  const minutes = total % 60;
+  return hours && minutes ? `${hours}ч${String(minutes).padStart(2, '0')}м`
+    : hours ? `${hours} ч` : `${minutes} м`;
+}
+
 function dateContent(data) {
   const gradient = usageGradient(data);
   const fill = gradient ? `<span class="calendar__date-fill" style="--calendar-date-fill:${gradient}" aria-hidden="true"></span>` : '';
-  const count = data.count ? `<span class="calendar__date-count">${data.count} зап.</span>` : '';
-  return `${fill}${count}`;
+  const count = data.count ? `<span>${data.count} зап.</span>` : '';
+  const busy = data.busy ? `<span>${busyLabel(data.busy)}</span>` : '';
+  const details = count || busy ? `<span class="calendar__date-count">${count}${busy}</span>` : '';
+  return `${fill}${details}`;
 }
 
 function workingDatesForJournal(workingDays, workplaceId, allMode) {
@@ -124,11 +182,12 @@ export function renderJournalMonth(root, {
   const allMode = workplaceId === ALL_WORKPLACES_ID;
   // The calendar can navigate months internally, without remounting Journal.
   // Read/project a month only when it becomes visible; reuse it for its 28-31 cells.
-  let recordIndexMonth = '';
+  let indexMonth = '';
   let recordIndex = new Map();
-  const recordsForDisplayedMonth = (dateKey) => {
+  let eventIndex = new Map();
+  const dataForDisplayedMonth = (dateKey) => {
     const prefix = String(dateKey || '').slice(0, 7);
-    if (prefix !== recordIndexMonth) {
+    if (prefix !== indexMonth) {
       const [year, number] = prefix.split('-').map(Number);
       const lastDay = new Date(year, number, 0).getDate();
       const records = getRecordsInRange({
@@ -137,9 +196,10 @@ export function renderJournalMonth(root, {
         workplaceId: allMode ? '' : workplaceId,
       });
       recordIndex = recordsByDate(records, workplaceId, allMode);
-      recordIndexMonth = prefix;
+      eventIndex = eventsByDate(getEvents(), workplaceId, allMode, prefix);
+      indexMonth = prefix;
     }
-    return recordIndex;
+    return { recordIndex, eventIndex };
   };
 
   initCalendar(calendarRoot, {
@@ -149,7 +209,7 @@ export function renderJournalMonth(root, {
       if (!isCurrentMonth) return '';
       return dateContent(dayRecordData({
         dateKey, workplaceId, allMode, workingDays, workplaces,
-        recordIndex: recordsForDisplayedMonth(dateKey),
+        ...dataForDisplayedMonth(dateKey),
       }));
     },
     resolveDateIndicators: ({ dateKey, isCurrentMonth }) => isCurrentMonth
