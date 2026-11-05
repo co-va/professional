@@ -13,6 +13,8 @@ export function openSharedProfileSettingsMenu({
   title = 'Настройки профиля',
   controls = [],
   actions = [],
+  content = '',
+  onMount = null,
   data = 'data-shared-profile-settings-menu',
 } = {}) {
   const controlItems = (Array.isArray(controls) ? controls : []).filter((item) => item?.id && item?.label);
@@ -29,7 +31,7 @@ export function openSharedProfileSettingsMenu({
         toggleDisabled: Boolean(item.disabled),
       })))
     : '';
-  const body = `<div ${data}>${controlsMarkup}${settingsPanel(items.map((item) => ({
+  const body = `<div ${data}>${controlsMarkup}${content}${settingsPanel(items.map((item) => ({
     label: item.label,
     variant: item.variant || 'outline',
     data: actionData(item.id),
@@ -69,6 +71,7 @@ export function openSharedProfileSettingsMenu({
       void item.onSelect?.();
     });
   });
+  if (typeof onMount === 'function') onMount(layer);
   return layer;
 }
 
