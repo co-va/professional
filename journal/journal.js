@@ -4,10 +4,11 @@ import { getWorkplaceContext, setWorkplaceContext } from '../core/workplace-cont
 import { readOnlyReceipt } from '../ui/receipt/index.js';
 import { canUseCapability } from '../core/access.js';
 import { getAllWorkplacesMonthStats, getWorkplaceMonthStats, getWorkplaceMonthStatsMap, getWorkingDays, getWorkplaces } from '../core/workplace-time.js';
-import { getActiveDayWorkplaces, getAvailableDayWorkplaces, getDayRemovalConflicts } from '../core/day/index.js';
+import { getActiveDayWorkplaces, getAvailableDayWorkplaces } from '../core/day/index.js';
+import { getWorkingTimeUsageConflicts } from '../core/time/index.js';
 import { getRecordPaymentState, recordAmountDue } from '../core/finance/index.js';
 import { applyTimetableWorkingDays, makeTimetableDayOff, openTimetableDayTimeEditor } from '../timetable/day-editor.js';
-import { getActiveRecordCountForDay, getRecords, getRecordsForDay } from '../core/record/index.js';
+import { getRecords, getRecordsForDay } from '../core/record/index.js';
 import { journalWorkplaceSelect, openJournalWorkplaceControl } from './workplace-control.js';
 import { renderJournalDay } from './день.js';
 import { renderJournalMonth } from './месяц.js';
@@ -178,15 +179,22 @@ export function renderJournal(root, options = {}) {
         to: item.to,
       };
     });
-    const recordCounts = Object.fromEntries(active.map((workplace) => {
-      const key = String(workplace?.key || '');
-      return [key, key ? getActiveRecordCountForDay(day, key) : 0];
-    }));
+    // One projected Record snapshot per open, instead of one expensive
+    // full Record+settlement projection per workplace and another for totals.
+    const recordCounts = {};
+    let aggregateCount = 0;
+    for (const record of getRecordsForDay(day)) {
+      if (record?.status === 'cancelled') continue;
+      aggregateCount += 1;
+      const key = String(record?.workplaceId || '');
+      if (key) recordCounts[key] = (recordCounts[key] || 0) + 1;
+    }
+    const activeIds = new Set(active.map((item) => String(item.key)));
     return {
       active,
-      available: getAvailableDayWorkplaces(selectedDate, workplaces),
+      available: workplaces.filter((item) => item?.key && !activeIds.has(String(item.key))),
       recordCounts,
-      aggregateCount: getActiveRecordCountForDay(day),
+      aggregateCount,
     };
   };
 
@@ -451,9 +459,16 @@ export function renderJournal(root, options = {}) {
     }
     const day = dateKey(selectedDate);
     const allMode = selectedWorkplaceId === ALL_WORKPLACES_ID;
-    const active = activeView === 'day' ? activeDayWorkplaces() : [];
+    const dayChoice = dayWorkplaceChoices();
+    const active = dayChoice.active;
     const isDayOff = !active.length;
-    const hasUsage = active.some((item) => getDayRemovalConflicts(item.workplaceId, day).length > 0);
+    // One Time-owned occupancy read for the day. It uses the same source
+    // as getDayRemovalConflicts, including events and overnight records.
+    const busyWorkplaces = isDayOff ? new Set() : new Set(
+      getWorkingTimeUsageConflicts({ operation: 'remove', date: day })
+        .map((usage) => String(usage?.workplaceId || '')),
+    );
+    const hasUsage = active.some((item) => busyWorkplaces.has(String(item.workplaceId || item.key || '')));
     const activeIds = active.map((item) => item.workplaceId);
     const selectedActive = !allMode && activeIds.includes(selectedWorkplaceId);
     const applyDayOff = () => {
@@ -465,7 +480,6 @@ export function renderJournal(root, options = {}) {
       });
     };
 
-    const dayChoice = dayWorkplaceChoices();
     const field = inlineWorkplaceSettings({
       choices: dayChoice.active,
       workplaceId: selectedWorkplaceId,
