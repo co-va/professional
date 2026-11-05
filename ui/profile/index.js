@@ -31,12 +31,13 @@ export function openSharedProfileSettingsMenu({
         toggleDisabled: Boolean(item.disabled),
       })))
     : '';
-  const body = `<div ${data}>${controlsMarkup}${content}${settingsPanel(items.map((item) => ({
+  const actionsMarkup = items.length ? settingsPanel(items.map((item) => ({
     label: item.label,
     variant: item.variant || 'outline',
     data: actionData(item.id),
     disabled: Boolean(item.disabled),
-  })))}</div>`;
+  }))) : '';
+  const body = `<div ${data}>${controlsMarkup}${content}${actionsMarkup}</div>`;
   const layer = mountModal(document.body, modal(body, {
     variant: 'x',
     title,
