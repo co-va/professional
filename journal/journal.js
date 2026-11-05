@@ -8,7 +8,7 @@ import { getActiveDayWorkplaces, getAvailableDayWorkplaces, getDayRemovalConflic
 import { getRecordPaymentState, recordAmountDue } from '../core/finance/index.js';
 import { applyTimetableWorkingDays, makeTimetableDayOff, openTimetableDayTimeEditor } from '../timetable/day-editor.js';
 import { getActiveRecordCountForDay, getRecords, getRecordsForDay } from '../core/record/index.js';
-import { openJournalWorkplaceControl } from './workplace-control.js';
+import { journalWorkplaceSelect, openJournalWorkplaceControl } from './workplace-control.js';
 import { renderJournalDay } from './день.js';
 import { renderJournalMonth } from './месяц.js';
 import { getJournalListRecords, renderJournalList } from './список.js';
@@ -192,13 +192,22 @@ export function renderJournal(root, options = {}) {
       return [id, records.filter((record) => String(record?.workplaceId || '') === id).length];
     }).filter(([id]) => id));
 
-    openJournalWorkplaceControl({
-      workplaces: catalog,
-      workplaceId: selectedWorkplaceId,
-      list: true,
-      recordCounts,
-      aggregateCount: records.length,
-      onSelect: selectWorkplace,
+    const main = mountModal(document.body, modal(
+      `<div class="compact-form">${journalWorkplaceSelect({
+        workplaces: catalog,
+        workplaceId: selectedWorkplaceId,
+        list: true,
+        recordCounts,
+        aggregateCount: records.length,
+      })}</div>`,
+      { variant: 'x', surface: 'app', title: 'Настройки журнала', className: 'modal--form-sheet' },
+    ));
+    const input = main?.querySelector('input[name="journalWorkplaceMode"]');
+    input?.addEventListener('change', () => {
+      const nextId = String(input.value || '');
+      if (!nextId || (nextId !== ALL_WORKPLACES_ID && !catalog.some((item) => String(item?.key || '') === nextId))) return;
+      main.v2Close?.();
+      if (nextId !== selectedWorkplaceId) selectWorkplace(nextId);
     });
   };
 
@@ -343,14 +352,7 @@ export function renderJournal(root, options = {}) {
 
   const openJournalSettings = () => {
     if (activeView === 'list') {
-      openSharedProfileSettingsMenu({
-        title: 'Настройки журнала',
-        actions: [{
-          id: 'workplace',
-          label: 'Рабочее пространство',
-          onSelect: openListWorkplaces,
-        }],
-      });
+      openListWorkplaces();
       return;
     }
     if (activeView === 'month') {
