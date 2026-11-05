@@ -121,13 +121,23 @@ function renderFlowMode(root, records, workplaces) {
   scrollToFocus(root, '[data-journal-list-anchor]');
 }
 
+// Journal List: previous 30 calendar days, today, and every future date.
+export function getJournalListRecords({ workplaceId = ALL_WORKPLACES_ID, now = new Date() } = {}) {
+  const cutoff = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  cutoff.setDate(cutoff.getDate() - 30);
+  const earliest = `${cutoff.getFullYear()}-${String(cutoff.getMonth() + 1).padStart(2, '0')}-${String(cutoff.getDate()).padStart(2, '0')}`;
+  return getRecords().filter((record) => {
+    const date = String(record?.date || '').slice(0, 10);
+    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date) || date < earliest) return false;
+    return workplaceId === ALL_WORKPLACES_ID
+      || String(record?.workplaceId || '') === String(workplaceId || '');
+  });
+}
+
 export function renderJournalList(root, { mode = 'flow', workplaceId = ALL_WORKPLACES_ID } = {}) {
   root.dataset.journalListContext = 'professional';
   const workplaces = getWorkplaces();
-  const allRecords = getRecords();
-  const visibleRecords = workplaceId === ALL_WORKPLACES_ID
-    ? allRecords
-    : allRecords.filter((record) => String(record?.workplaceId || '') === String(workplaceId || ''));
+  const visibleRecords = getJournalListRecords({ workplaceId });
   if (!visibleRecords.length) {
     root.innerHTML = emptyState('Список', 'Записей пока нет.');
     return;
