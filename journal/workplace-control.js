@@ -23,11 +23,10 @@ function workplaceMeta(workplace = {}, count = 0) {
 }
 
 /**
- * Journal-owned workplace selector.
- * The Journal owns aggregate semantics; Shared Select owns the visual control
- * and its bottom selector manifestation.
+ * Journal-owned selector markup; can be mounted directly into an existing X sheet.
+ * Shared Select owns the picker, while Journal owns workplace options and counters.
  */
-export function openJournalWorkplaceControl({
+export function journalWorkplaceSelect({
   workplaces = [],
   workplaceId = '',
   recordCounts = {},
@@ -36,9 +35,6 @@ export function openJournalWorkplaceControl({
   list = false,
   aggregateStats = null,
   workplaceStats = {},
-  availableWorkplaces = [],
-  onSelect = () => {},
-  onAdd = () => {},
 } = {}) {
   const options = [{
     value: ALL_WORKPLACES_ID,
@@ -58,15 +54,35 @@ export function openJournalWorkplaceControl({
     });
   }
 
+  return select({
+    label: month || list ? 'Рабочее пространство' : 'Режим',
+    name: 'journalWorkplaceMode',
+    value: workplaceId || ALL_WORKPLACES_ID,
+    options,
+    aria: list ? 'Выбор списка записей' : month ? 'Выбор графика месяца' : 'Режим рабочего поля журнала',
+    data: 'data-journal-workplace-select',
+  });
+}
+
+/** Opens a dedicated X sheet for the Journal Day / Month workplace chooser. */
+export function openJournalWorkplaceControl({
+  workplaces = [],
+  workplaceId = '',
+  recordCounts = {},
+  aggregateCount = 0,
+  month = false,
+  list = false,
+  aggregateStats = null,
+  workplaceStats = {},
+  availableWorkplaces = [],
+  onSelect = () => {},
+  onAdd = () => {},
+} = {}) {
+  const selectorMarkup = journalWorkplaceSelect({
+    workplaces, workplaceId, recordCounts, aggregateCount, month, list, aggregateStats, workplaceStats,
+  });
   const main = mountModal(document.body, modal(
-    `<div class="compact-form">${select({
-      label: month || list ? 'Рабочее пространство' : 'Режим',
-      name: 'journalWorkplaceMode',
-      value: workplaceId || ALL_WORKPLACES_ID,
-      options,
-      aria: list ? 'Выбор списка записей' : month ? 'Выбор графика месяца' : 'Режим рабочего поля журнала',
-      data: 'data-journal-workplace-select',
-    })}${availableWorkplaces.length ? button('+ Рабочее пространство', { data: 'data-journal-workplace-add' }) : ''}</div>`,
+    `<div class="compact-form">${selectorMarkup}${availableWorkplaces.length ? button('+ Рабочее пространство', { data: 'data-journal-workplace-add' }) : ''}</div>`,
     { variant: 'x', surface: 'app', title: 'Рабочее пространство', className: 'modal--form-sheet' },
   ));
   const input = main?.querySelector('input[name="journalWorkplaceMode"]');
