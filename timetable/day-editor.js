@@ -479,14 +479,14 @@ export function applyTimetableWorkingDays({
       const day = createDay({ date, workplaceId, from: base.from, to: base.to });
       if (day) workingDays.push(day);
     }
-    if (freeDates.length) saveDays(workingDays);
+    if (freeDates.length) {
+      saveDays(workingDays);
+      onSave();
+    }
     if (conflictEntries.length) {
-      if (freeDates.length) onSave();
       openWorkingDaysConflictModal(conflictEntries, base, workplaceId);
       return;
     }
-    saveDays(workingDays);
-    onSave();
   }
 
   function openWorkingTimePicker(dates, workplaceId = selectedWorkplaceId) {
