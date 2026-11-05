@@ -25,7 +25,7 @@ function isAddAction(action) {
  * A is photo metadata only. V is the independent floating section action.
  * C accepts add actions only; D remains the Messenger entry/action.
  */
-export function workspaceHeaderContext({ title = '', a = null, v = null, c = null, d = null } = {}) {
+export function workspaceHeaderContext({ title = '', subtitle = '', a = null, v = null, c = null, d = null } = {}) {
   const cData = c?.data ? ` ${String(c.data).trim()}` : '';
   const dData = d?.data ? ` ${String(d.data).trim()}` : '';
   const vData = v?.data ? ` ${String(v.data).trim()}` : '';
@@ -35,7 +35,7 @@ export function workspaceHeaderContext({ title = '', a = null, v = null, c = nul
   const vAction = v ? `<button type="button" class="workspace-header-context__v-action" data-workspace-v-action${vData} aria-label="${escapeHtml(v.aria || v.label || 'Действия раздела')}"${vDisabled}></button>` : '';
   const cAction = isAddAction(c) ? `<button type="button" class="workspace-header-context__c-action" data-v2-primary-action data-v2-primary-label="+" data-workspace-c-kind="add"${cData} aria-label="${escapeHtml(c?.aria || c?.label || 'Добавить')}"${cDisabled}></button>` : '';
   const dAction = d ? `<button type="button" class="workspace-header-context__d-action" data-workspace-d-action${dData} data-workspace-d-kind="${escapeHtml(d.kind || 'chat')}" aria-label="${escapeHtml(d.aria || 'Действие справа')}"></button>` : '';
-  return `<div class="workspace-header-context" data-workspace-header-context data-workspace-title="${escapeHtml(title)}">${aContext}${vAction}${cAction}${dAction}</div>`;
+  return `<div class="workspace-header-context" data-workspace-header-context data-workspace-title="${escapeHtml(title)}" data-workspace-subtitle="${escapeHtml(subtitle)}">${aContext}${vAction}${cAction}${dAction}</div>`;
 }
 
 /**
