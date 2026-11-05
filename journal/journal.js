@@ -202,9 +202,15 @@ export function renderJournal(root, options = {}) {
       workplaces: choices,
       workplaceId: ids.has(workplaceId) ? workplaceId : ALL_WORKPLACES_ID,
       recordCounts, aggregateCount, month, aggregateStats, workplaceStats,
-    })}${available.length ? button('+ Рабочее пространство', { data: 'data-journal-workplace-add' }) : ''}</div>`;
+    })}</div>`;
     return {
       content,
+      addAction: available.length ? {
+        id: 'add-workplace',
+        label: '+ Рабочее пространство',
+        variant: 'primary',
+        onSelect: onAdd,
+      } : null,
       onMount: (layer) => {
         const input = layer.querySelector('input[name="journalWorkplaceMode"]');
         input?.addEventListener('change', () => {
@@ -212,10 +218,6 @@ export function renderJournal(root, options = {}) {
           if (!ids.has(nextId)) return;
           layer.v2Close?.();
           if (nextId !== selectedWorkplaceId) onSelect(nextId);
-        });
-        layer.querySelector('[data-journal-workplace-add]')?.addEventListener('click', () => {
-          layer.v2Close?.();
-          onAdd();
         });
       },
     };
@@ -442,6 +444,7 @@ export function renderJournal(root, options = {}) {
             label: 'Z-Отчет',
             onSelect: openJournalZReport,
           } : null,
+          field.addAction,
         ].filter(Boolean),
       });
       return;
@@ -476,23 +479,26 @@ export function renderJournal(root, options = {}) {
       title: 'Настройки журнала',
       content: field.content,
       onMount: field.onMount,
-      actions: isDayOff ? [] : [
-        selectedActive ? {
-          id: 'working-time',
-          label: 'Рабочее время',
-          onSelect: () => openDayTime(selectedWorkplaceId),
-        } : null,
-        !hasUsage ? {
-          id: 'day-off',
-          label: 'Применить выходной',
-          variant: 'danger',
-          onSelect: applyDayOff,
-        } : null,
-        hasUsage ? {
-          id: 'z-report',
-          label: 'Z-Отчет',
-          onSelect: openJournalZReport,
-        } : null,
+      actions: [
+        ...(isDayOff ? [] : [
+          selectedActive ? {
+            id: 'working-time',
+            label: 'Рабочее время',
+            onSelect: () => openDayTime(selectedWorkplaceId),
+          } : null,
+          !hasUsage ? {
+            id: 'day-off',
+            label: 'Применить выходной',
+            variant: 'danger',
+            onSelect: applyDayOff,
+          } : null,
+          hasUsage ? {
+            id: 'z-report',
+            label: 'Z-Отчет',
+            onSelect: openJournalZReport,
+          } : null,
+        ]),
+        field.addAction,
       ].filter(Boolean),
     });
   };
