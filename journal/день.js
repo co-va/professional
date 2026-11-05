@@ -103,11 +103,7 @@ export function renderJournalDay(root, {
   // One Time-owned read for the visible day, shared by Journal timeline and V.
   // The V menu never needs to read or re-project all Record/Finance facts.
   const dayUsages = workingDayRows.length ? getTimeUsagesForScope({ date: dayDate }) : [];
-  onUsageSummary({
-    usages: dayUsages,
-    records: dayUsages.filter((usage) =>
-      usage?.type === 'record' && String(usage?.date || '').slice(0, 10) === dayDate),
-  });
+  onUsageSummary({ usages: dayUsages });
   const dayNotes = getNotesForDay(dayDate);
   const visibleNotes = dayNotes.filter((note) => noteVisibleForWorkplace(note, workplaceId, { allMode }));
   const relatedIds = focusTarget?.targetType && focusTarget?.targetId
