@@ -3,7 +3,7 @@ import { setV2ZHeaderRows, clearV2ZHeaderRows } from '../ui/v2/z-layout.js';
 import { getWorkplaceContext, setWorkplaceContext } from '../core/workplace-context.js';
 import { readOnlyReceipt } from '../ui/receipt/index.js';
 import { canUseCapability } from '../core/access.js';
-import { getAllWorkplacesMonthStats, getWorkplaceMonthStats, getWorkingDays, getWorkplaces } from '../core/workplace-time.js';
+import { getAllWorkplacesMonthStats, getWorkplaceMonthStats, getWorkplaceMonthStatsMap, getWorkingDays, getWorkplaces } from '../core/workplace-time.js';
 import { getActiveDayWorkplaces, getAvailableDayWorkplaces, getDayRemovalConflicts } from '../core/day/index.js';
 import { getRecordPaymentState, recordAmountDue } from '../core/finance/index.js';
 import { applyTimetableWorkingDays, makeTimetableDayOff, openTimetableDayTimeEditor } from '../timetable/day-editor.js';
@@ -78,6 +78,8 @@ export function renderJournal(root, options = {}) {
   let listMode = 'flow';
   let monthMode = 'view';
   let graphControls = null;
+  // Month-only unsaved selections: zero-day workplaces do not become server WorkPlan facts.
+  const monthDraftWorkplaces = new Map();
   const workplaces = getWorkplaces();
   const professionalContext = getWorkplaceContext(workplaces, { scope: JOURNAL_CONTEXT_SCOPE });
   let selectedWorkplaceId = professionalContext.workplaceId;
@@ -92,6 +94,18 @@ export function renderJournal(root, options = {}) {
   };
 
   const activeDayWorkplaces = () => getActiveDayWorkplaces(selectedDate, workplaces);
+  const monthDraftIds = (date = selectedDate) => {
+    const key = monthPrefix(date);
+    if (!monthDraftWorkplaces.has(key)) monthDraftWorkplaces.set(key, new Set());
+    return monthDraftWorkplaces.get(key);
+  };
+  const monthWorkplaceVisible = (id, date = selectedDate) => {
+    const key = String(id || '');
+    if (key === ALL_WORKPLACES_ID) return true;
+    if (!workplaces.some((item) => String(item?.key || '') === key)) return false;
+    return monthDraftIds(date).has(key)
+      || getWorkplaceMonthStats(getWorkingDays(), workplaces, key, date).days > 0;
+  };
 
   const openDayTime = (workplaceId = '') => {
     const id = String(workplaceId || selectedWorkplaceId || '');
@@ -166,6 +180,48 @@ export function renderJournal(root, options = {}) {
       recordCounts,
       aggregateCount: getActiveRecordCountForDay(day),
       onSelect: selectWorkplace,
+    });
+  };
+
+  const selectMonthWorkplace = (nextId) => {
+    if (monthMode === 'graph' && graphControls?.selectWorkplace) {
+      graphControls.selectWorkplace(nextId);
+      return;
+    }
+    selectWorkplace(nextId);
+  };
+
+  const openMonthWorkplaces = () => {
+    const days = getWorkingDays();
+    const stats = getWorkplaceMonthStatsMap(days, workplaces, selectedDate);
+    const extra = monthDraftIds();
+    const active = workplaces.filter((workplace) => {
+      const id = String(workplace?.key || '');
+      return id && (Number(stats[id]?.days || 0) > 0 || extra.has(id));
+    });
+    const activeIds = new Set(active.map((workplace) => String(workplace.key)));
+    const available = workplaces.filter((workplace) => {
+      const id = String(workplace?.key || '');
+      return id && !activeIds.has(id);
+    });
+
+    openJournalWorkplaceControl({
+      workplaces: active,
+      workplaceId: activeIds.has(selectedWorkplaceId) ? selectedWorkplaceId : ALL_WORKPLACES_ID,
+      month: true,
+      workplaceStats: stats,
+      aggregateStats: getAllWorkplacesMonthStats(days, workplaces, selectedDate),
+      availableWorkplaces: available,
+      onSelect: selectMonthWorkplace,
+      onAdd: () => openDayWorkplaceControl({
+        available,
+        catalogTitle: 'Добавить рабочее пространство',
+        onAdd: (id) => {
+          if (!available.some((item) => String(item?.key || '') === String(id))) return;
+          extra.add(String(id));
+          selectMonthWorkplace(String(id));
+        },
+      }),
     });
   };
 
@@ -258,11 +314,11 @@ export function renderJournal(root, options = {}) {
           inGraph ? {
             id: 'graph-workplace',
             label: 'Рабочее пространство',
-            onSelect: () => graphControls?.openWorkplaces?.(),
+            onSelect: openMonthWorkplaces,
           } : {
             id: 'workplace',
             label: 'Рабочее пространство',
-            onSelect: openWorkplace,
+            onSelect: openMonthWorkplaces,
           },
           inGraph && graphControls?.canEditTime?.() ? {
             id: 'graph-time',
@@ -332,6 +388,10 @@ export function renderJournal(root, options = {}) {
     disposeActiveView();
     disposeActiveView = () => {};
     graphControls = null;
+    if (activeView === 'month' && !monthWorkplaceVisible(selectedWorkplaceId)) {
+      selectedWorkplaceId = ALL_WORKPLACES_ID;
+      persistProfessionalContext();
+    }
 
     const primaryNavigation = viewNavigation({ views: availableViews, activeView });
     const secondaryNavigation = activeView === 'list'
@@ -384,7 +444,12 @@ export function renderJournal(root, options = {}) {
           const month = nextMonth.getMonth();
           const day = Math.min(selectedDate.getDate(), new Date(year, month + 1, 0).getDate());
           selectedDate = new Date(year, month, day);
-          setWorkplaceContext({ workplaceId: selectedWorkplaceId, date: selectedDate, scope: JOURNAL_CONTEXT_SCOPE });
+          if (!monthWorkplaceVisible(selectedWorkplaceId)) {
+            selectedWorkplaceId = ALL_WORKPLACES_ID;
+            if (monthMode === 'graph') graphControls?.selectWorkplace(ALL_WORKPLACES_ID);
+            else renderView();
+          }
+          persistProfessionalContext();
         },
         onDateSelect: (nextDate) => {
           selectedDate = nextDate;
