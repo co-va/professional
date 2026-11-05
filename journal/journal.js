@@ -192,7 +192,7 @@ export function renderJournal(root, options = {}) {
     selectWorkplace(nextId);
   };
 
-  const openMonthWorkplaces = () => {
+  const openMonthWorkplaces = (afterSelection = null) => {
     const days = getWorkingDays();
     const catalog = getWorkplaces();
     const stats = getWorkplaceMonthStatsMap(days, catalog, selectedDate);
@@ -214,7 +214,10 @@ export function renderJournal(root, options = {}) {
       workplaceStats: stats,
       aggregateStats: getAllWorkplacesMonthStats(days, catalog, selectedDate),
       availableWorkplaces: available,
-      onSelect: selectMonthWorkplace,
+      onSelect: (id) => {
+        selectMonthWorkplace(id);
+        if (typeof afterSelection === 'function' && id !== ALL_WORKPLACES_ID) afterSelection();
+      },
       onAdd: () => openDayWorkplaceControl({
         available,
         catalogTitle: 'Добавить рабочее пространство',
@@ -222,6 +225,7 @@ export function renderJournal(root, options = {}) {
           if (!available.some((item) => String(item?.key || '') === String(id))) return;
           extra.add(String(id));
           selectMonthWorkplace(String(id));
+          if (typeof afterSelection === 'function') afterSelection();
         },
       }),
     });
@@ -322,10 +326,13 @@ export function renderJournal(root, options = {}) {
             label: 'Рабочее пространство',
             onSelect: openMonthWorkplaces,
           },
-          inGraph && graphControls?.canEditTime?.() ? {
+          inGraph ? {
             id: 'graph-time',
             label: 'Рабочее время',
-            onSelect: () => graphControls?.openTime?.(),
+            onSelect: () => {
+              if (graphControls?.canEditTime?.()) graphControls.openTime();
+              else openMonthWorkplaces(() => graphControls?.openTime?.());
+            },
           } : null,
           !inGraph ? {
             id: 'z-report',
