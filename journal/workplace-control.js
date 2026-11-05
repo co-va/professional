@@ -35,11 +35,12 @@ export function journalWorkplaceSelect({
   list = false,
   aggregateStats = null,
   workplaceStats = {},
+  metaPending = false,
 } = {}) {
   const options = [{
     value: ALL_WORKPLACES_ID,
     label: list ? 'Общий список' : month ? 'Общий график' : 'График дня',
-    meta: month ? monthStatsText(aggregateStats) : recordCountText(aggregateCount),
+    meta: metaPending ? '' : month ? monthStatsText(aggregateStats) : recordCountText(aggregateCount),
     indicatorColor: '',
   }];
 
@@ -49,7 +50,7 @@ export function journalWorkplaceSelect({
     options.push({
       value: key,
       label: workplace?.name || 'Без названия',
-      meta: month ? monthStatsText(workplaceStats?.[key]) : workplaceMeta(workplace, recordCounts?.[key]),
+      meta: metaPending ? '' : month ? monthStatsText(workplaceStats?.[key]) : workplaceMeta(workplace, recordCounts?.[key]),
       indicatorColor: workplace?.indicatorColor || workplace?.color || WORKPLACE_FALLBACK_COLOR,
     });
   }
@@ -63,6 +64,46 @@ export function journalWorkplaceSelect({
     aria: list ? 'Выбор списка записей' : month ? 'Выбор графика месяца' : 'Режим рабочего поля журнала',
     data: 'data-journal-workplace-select',
   });
+}
+
+/**
+ * Update only option metadata on an already displayed Journal X.
+ * No selector replacement, no new handlers, and no action/button mutations.
+ */
+export function updateJournalWorkplaceMetas(layer, {
+  workplaces = [], recordCounts = {}, aggregateCount = 0,
+  month = false, aggregateStats = null, workplaceStats = {},
+} = {}) {
+  if (!layer?.isConnected) return false;
+  const input = layer.querySelector('input[name="journalWorkplaceMode"]');
+  const trigger = layer.querySelector('[data-ui-select-trigger][data-journal-workplace-select]');
+  if (!input || !trigger) return false;
+  let options;
+  try {
+    options = JSON.parse(trigger.dataset.options || '[]');
+  } catch {
+    return false;
+  }
+  if (!Array.isArray(options)) return false;
+  const byId = new Map((Array.isArray(workplaces) ? workplaces : [])
+    .map((workplace) => [String(workplace?.key || workplace?.workplaceId || ''), workplace]));
+  const updated = options.map((option) => {
+    const id = String(option?.value || '');
+    const meta = id === ALL_WORKPLACES_ID
+      ? (month ? monthStatsText(aggregateStats) : recordCountText(aggregateCount))
+      : (month
+        ? monthStatsText(workplaceStats?.[id])
+        : workplaceMeta(byId.get(id) || {}, recordCounts?.[id]));
+    return { ...option, meta };
+  });
+  trigger.dataset.options = JSON.stringify(updated);
+  const selected = updated.find((item) => item.value === input.value);
+  const meta = trigger.querySelector('.ui-select__meta');
+  if (meta && selected) {
+    meta.textContent = selected.meta;
+    meta.hidden = !selected.meta;
+  }
+  return true;
 }
 
 /** Opens a dedicated X sheet for the Journal Day / Month workplace chooser. */
