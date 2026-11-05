@@ -1,14 +1,13 @@
-import { viewNavigation, initViewNavigation, ALL_WORKPLACES_ID, modal, mountModal, openDayWorkplaceControl, openSharedProfileSettingsMenu, workspaceHeaderContext } from '../ui/ui.js';
+import { viewNavigation, initViewNavigation, ALL_WORKPLACES_ID, modal, mountModal, openDayWorkplaceControl, openSharedProfileSettingsMenu, workspaceHeaderContext, button } from '../ui/ui.js';
 import { setV2ZHeaderRows, clearV2ZHeaderRows } from '../ui/v2/z-layout.js';
 import { getWorkplaceContext, setWorkplaceContext } from '../core/workplace-context.js';
 import { readOnlyReceipt } from '../ui/receipt/index.js';
 import { canUseCapability } from '../core/access.js';
 import { getAllWorkplacesMonthStats, getWorkplaceMonthStats, getWorkplaceMonthStatsMap, getWorkingDays, getWorkplaces } from '../core/workplace-time.js';
-import { getActiveDayWorkplaces, getAvailableDayWorkplaces } from '../core/day/index.js';
-import { getWorkingTimeUsageConflicts } from '../core/time/index.js';
+import { getActiveDayWorkplaces, getAvailableDayWorkplaces, getDayRemovalConflicts } from '../core/day/index.js';
 import { getRecordPaymentState, recordAmountDue } from '../core/finance/index.js';
 import { applyTimetableWorkingDays, makeTimetableDayOff, openTimetableDayTimeEditor } from '../timetable/day-editor.js';
-import { getRecords, getRecordsForDay } from '../core/record/index.js';
+import { getActiveRecordCountForDay, getRecords, getRecordsForDay } from '../core/record/index.js';
 import { journalWorkplaceSelect, openJournalWorkplaceControl } from './workplace-control.js';
 import { renderJournalDay } from './день.js';
 import { renderJournalMonth } from './месяц.js';
@@ -179,22 +178,15 @@ export function renderJournal(root, options = {}) {
         to: item.to,
       };
     });
-    // One projected Record snapshot per open, instead of one expensive
-    // full Record+settlement projection per workplace and another for totals.
-    const recordCounts = {};
-    let aggregateCount = 0;
-    for (const record of getRecordsForDay(day)) {
-      if (record?.status === 'cancelled') continue;
-      aggregateCount += 1;
-      const key = String(record?.workplaceId || '');
-      if (key) recordCounts[key] = (recordCounts[key] || 0) + 1;
-    }
-    const activeIds = new Set(active.map((item) => String(item.key)));
+    const recordCounts = Object.fromEntries(active.map((workplace) => {
+      const key = String(workplace?.key || '');
+      return [key, key ? getActiveRecordCountForDay(day, key) : 0];
+    }));
     return {
       active,
-      available: workplaces.filter((item) => item?.key && !activeIds.has(String(item.key))),
+      available: getAvailableDayWorkplaces(selectedDate, workplaces),
       recordCounts,
-      aggregateCount,
+      aggregateCount: getActiveRecordCountForDay(day),
     };
   };
 
@@ -213,12 +205,7 @@ export function renderJournal(root, options = {}) {
     })}</div>`;
     return {
       content,
-      addAction: available.length ? {
-        id: 'add-workplace',
-        label: '+ Рабочее пространство',
-        variant: 'primary',
-        onSelect: onAdd,
-      } : null,
+      footer: available.length ? button('+ Рабочее пространство', { data: 'data-journal-workplace-add' }) : '',
       onMount: (layer) => {
         const input = layer.querySelector('input[name="journalWorkplaceMode"]');
         input?.addEventListener('change', () => {
@@ -226,6 +213,10 @@ export function renderJournal(root, options = {}) {
           if (!ids.has(nextId)) return;
           layer.v2Close?.();
           if (nextId !== selectedWorkplaceId) onSelect(nextId);
+        });
+        layer.querySelector('[data-journal-workplace-add]')?.addEventListener('click', () => {
+          layer.v2Close?.();
+          onAdd();
         });
       },
     };
@@ -428,6 +419,7 @@ export function renderJournal(root, options = {}) {
       openSharedProfileSettingsMenu({
         title: 'Настройки журнала',
         content: field.content,
+        footer: field.footer,
         onMount: field.onMount,
         actions: [
           canUseCapability('timetable.access') ? {
@@ -452,23 +444,15 @@ export function renderJournal(root, options = {}) {
             label: 'Z-Отчет',
             onSelect: openJournalZReport,
           } : null,
-          field.addAction,
         ].filter(Boolean),
       });
       return;
     }
     const day = dateKey(selectedDate);
     const allMode = selectedWorkplaceId === ALL_WORKPLACES_ID;
-    const dayChoice = dayWorkplaceChoices();
-    const active = dayChoice.active;
+    const active = activeView === 'day' ? activeDayWorkplaces() : [];
     const isDayOff = !active.length;
-    // One Time-owned occupancy read for the day. It uses the same source
-    // as getDayRemovalConflicts, including events and overnight records.
-    const busyWorkplaces = isDayOff ? new Set() : new Set(
-      getWorkingTimeUsageConflicts({ operation: 'remove', date: day })
-        .map((usage) => String(usage?.workplaceId || '')),
-    );
-    const hasUsage = active.some((item) => busyWorkplaces.has(String(item.workplaceId || item.key || '')));
+    const hasUsage = active.some((item) => getDayRemovalConflicts(item.workplaceId, day).length > 0);
     const activeIds = active.map((item) => item.workplaceId);
     const selectedActive = !allMode && activeIds.includes(selectedWorkplaceId);
     const applyDayOff = () => {
@@ -480,6 +464,7 @@ export function renderJournal(root, options = {}) {
       });
     };
 
+    const dayChoice = dayWorkplaceChoices();
     const field = inlineWorkplaceSettings({
       choices: dayChoice.active,
       workplaceId: selectedWorkplaceId,
@@ -492,27 +477,25 @@ export function renderJournal(root, options = {}) {
     openSharedProfileSettingsMenu({
       title: 'Настройки журнала',
       content: field.content,
+      footer: field.footer,
       onMount: field.onMount,
-      actions: [
-        ...(isDayOff ? [] : [
-          selectedActive ? {
-            id: 'working-time',
-            label: 'Рабочее время',
-            onSelect: () => openDayTime(selectedWorkplaceId),
-          } : null,
-          !hasUsage ? {
-            id: 'day-off',
-            label: 'Применить выходной',
-            variant: 'danger',
-            onSelect: applyDayOff,
-          } : null,
-          hasUsage ? {
-            id: 'z-report',
-            label: 'Z-Отчет',
-            onSelect: openJournalZReport,
-          } : null,
-        ]),
-        field.addAction,
+      actions: isDayOff ? [] : [
+        selectedActive ? {
+          id: 'working-time',
+          label: 'Рабочее время',
+          onSelect: () => openDayTime(selectedWorkplaceId),
+        } : null,
+        !hasUsage ? {
+          id: 'day-off',
+          label: 'Применить выходной',
+          variant: 'danger',
+          onSelect: applyDayOff,
+        } : null,
+        hasUsage ? {
+          id: 'z-report',
+          label: 'Z-Отчет',
+          onSelect: openJournalZReport,
+        } : null,
       ].filter(Boolean),
     });
   };
