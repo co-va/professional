@@ -110,6 +110,18 @@ export function renderJournal(root, options = {}) {
     renderView();
   };
 
+  const addDayWorkplace = () => {
+    openDayWorkplaceControl({
+      available: getAvailableDayWorkplaces(selectedDate, workplaces),
+      catalogTitle: 'Рабочее пространство',
+      onAdd: (workplaceId) => applyTimetableWorkingDays({
+        dates: [dateKey(selectedDate)],
+        workplaceId,
+        onSave: () => selectWorkplace(workplaceId),
+      }),
+    });
+  };
+
   const openDayWorkplaces = () => {
     const day = dateKey(selectedDate);
     const active = activeDayWorkplaces().map((item) => {
@@ -135,19 +147,7 @@ export function renderJournal(root, options = {}) {
       aggregateCount: getActiveRecordCountForDay(day),
       availableWorkplaces: getAvailableDayWorkplaces(selectedDate, workplaces),
       onSelect: selectWorkplace,
-      onAdd: () => {
-        openDayWorkplaceControl({
-          available: getAvailableDayWorkplaces(selectedDate, workplaces),
-          catalogTitle: 'Рабочее пространство',
-          onAdd: (workplaceId) => {
-            applyTimetableWorkingDays({
-              dates: [day],
-              workplaceId,
-              onSave: () => selectWorkplace(workplaceId),
-            });
-          },
-        });
-      },
+      onAdd: addDayWorkplace,
     });
   };
 
@@ -239,48 +239,52 @@ export function renderJournal(root, options = {}) {
     }), { variant: 's', surface: 'app', title: 'Z - Отчет' }));
   };
 
-  const makeSelectedDayOff = () => {
-    if (selectedWorkplaceId === ALL_WORKPLACES_ID) return;
-    const day = dateKey(selectedDate);
-    if (getDayRemovalConflicts(selectedWorkplaceId, day).length > 0) return;
-    makeTimetableDayOff({
-      date: selectedDate,
-      workplaceId: selectedWorkplaceId,
-      onSave: renderView,
-    });
-  };
-
   const openJournalSettings = () => {
     const day = dateKey(selectedDate);
     const allMode = selectedWorkplaceId === ALL_WORKPLACES_ID;
-    const canMakeDayOff = activeView === 'day'
-      && !allMode
-      && getDayRemovalConflicts(selectedWorkplaceId, day).length === 0;
+    const active = activeView === 'day' ? activeDayWorkplaces() : [];
+    const isDayOff = activeView === 'day' && !active.length;
+    const hasUsage = active.some((item) => getDayRemovalConflicts(item.workplaceId, day).length > 0);
+    const activeIds = active.map((item) => item.workplaceId);
+    const selectedActive = !allMode && activeIds.includes(selectedWorkplaceId);
+    const applyDayOff = () => {
+      const workplaceIds = selectedActive ? [selectedWorkplaceId] : activeIds;
+      makeTimetableDayOff({
+        date: selectedDate,
+        workplaceIds,
+        onSave: () => selectWorkplace(ALL_WORKPLACES_ID),
+      });
+    };
+
     openSharedProfileSettingsMenu({
       title: 'Настройки журнала',
-      actions: [
+      actions: (isDayOff ? [{
+        id: 'add-workplace',
+        label: '+ Рабочее пространство',
+        onSelect: addDayWorkplace,
+      }] : [
         {
           id: 'workplace',
           label: 'Рабочее пространство',
           onSelect: activeView === 'day' ? openDayWorkplaces : openWorkplace,
         },
-        activeView === 'day' && !allMode ? {
+        activeView === 'day' && selectedActive ? {
           id: 'working-time',
           label: 'Рабочее время',
           onSelect: () => openDayTime(selectedWorkplaceId),
         } : null,
-        activeView === 'day' || activeView === 'month' ? {
+        activeView === 'day' && !hasUsage ? {
+          id: 'day-off',
+          label: 'Применить выходной',
+          variant: 'danger',
+          onSelect: applyDayOff,
+        } : null,
+        (activeView === 'day' && hasUsage) || activeView === 'month' ? {
           id: 'z-report',
           label: 'Z-Отчет',
           onSelect: openJournalZReport,
         } : null,
-        canMakeDayOff ? {
-          id: 'day-off',
-          label: 'Сделать выходным',
-          variant: 'danger',
-          onSelect: makeSelectedDayOff,
-        } : null,
-      ].filter(Boolean),
+      ]).filter(Boolean),
     });
   };
 
