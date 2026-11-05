@@ -1,5 +1,5 @@
 import { hydrateRecordSettlement } from '../finance/index.js';
-import { getRecordRow, getRecordRows, getRecordRowsForDay } from './data.js';
+import { getRecordRow, getRecordRows, getRecordRowsForDay, getRecordRowsInRange } from './data.js';
 import { getRecordEvents } from './events.js';
 import { projectRecordLifecycle } from './state.js';
 
@@ -31,6 +31,11 @@ export function getRecordsForDay(date, workplaceId = '') {
   // Filter raw facts first, then project Finance/lifecycle only for this date.
   // The old getRecords() call projected the entire history on every Day read.
   return getRecordRowsForDay(day, workplace).map(readRecord).filter(Boolean);
+}
+
+/** Project only Record facts from an inclusive calendar date range. */
+export function getRecordsInRange({ from = '', to = '', workplaceId = '' } = {}) {
+  return getRecordRowsInRange({ from, to, workplaceId }).map(readRecord).filter(Boolean);
 }
 
 export function getActiveRecordCountForDay(date, workplaceId = '') {
