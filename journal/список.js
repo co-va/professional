@@ -1,7 +1,7 @@
 import { ALL_WORKPLACES_ID, emptyState, escapeHtml, v2ListEntries, v2ListEntry, shortDate } from '../ui/ui.js';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { getRecordPaymentState, recordAmountDue } from '../core/finance/index.js';
-import { getRecords } from '../core/record/index.js';
+import { getRecordsInRange } from '../core/record/index.js';
 import { isRecordCompletedSide, recordActivityTime, recordAppointmentTime, recordVisualState } from '../core/record/index.js';
 
 let recordViewModulePromise = null;
@@ -126,11 +126,11 @@ export function getJournalListRecords({ workplaceId = ALL_WORKPLACES_ID, now = n
   const cutoff = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   cutoff.setDate(cutoff.getDate() - 30);
   const earliest = `${cutoff.getFullYear()}-${String(cutoff.getMonth() + 1).padStart(2, '0')}-${String(cutoff.getDate()).padStart(2, '0')}`;
-  return getRecords().filter((record) => {
-    const date = String(record?.date || '').slice(0, 10);
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date < earliest) return false;
-    return workplaceId === ALL_WORKPLACES_ID
-      || String(record?.workplaceId || '') === String(workplaceId || '');
+  // Preserve the 30-day cutoff and unbounded future, but project only
+  // matching Record rows rather than rebuilding all historical settlements.
+  return getRecordsInRange({
+    from: earliest,
+    workplaceId: workplaceId === ALL_WORKPLACES_ID ? '' : workplaceId,
   });
 }
 
