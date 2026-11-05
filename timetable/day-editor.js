@@ -522,24 +522,35 @@ export function applyTimetableDaysOff({
   onSave = () => {},
 } = {}) {
   const id = String(workplaceId || '');
-  if (!id) return { changed: false, blocked: [] };
-  let changed = false;
+  if (!id) return { changed: false, applied: [], blocked: [] };
+  const candidates = [...new Set((Array.isArray(dates) ? dates : []).map(dateKey))].filter(Boolean);
   const blocked = [];
-  for (const input of [...new Set(Array.isArray(dates) ? dates : [])]) {
-    const date = dateKey(input);
-    if (!date || !getDay(workingDays, id, date)) continue;
+  const removed = [];
+  for (const date of candidates) {
+    if (!getDay(workingDays, id, date)) continue;
     const conflicts = getDayRemovalConflicts(id, date);
     if (conflicts.length) {
       blocked.push({ date, conflicts });
       continue;
     }
-    if (removeDay(workingDays, id, date)) changed = true;
+    if (removeDay(workingDays, id, date)) removed.push(date);
   }
-  if (changed) {
-    saveDays(workingDays);
-    onSave();
+  if (!removed.length) return { changed: false, applied: [], blocked };
+
+  // Day remains the final authority: if the save guard restored a newly
+  // occupied date, report it as blocked rather than falsely calling it saved.
+  const saved = saveDays(workingDays);
+  for (const entry of saved?.blocked || []) {
+    const date = dateKey(entry?.day?.date);
+    if (String(entry?.day?.workplaceId || '') !== id || !removed.includes(date)) continue;
+    if (!blocked.some((item) => item.date === date)) {
+      blocked.push({ date, conflicts: entry.conflicts || [] });
+    }
   }
-  return { changed, blocked };
+  const persisted = getDays();
+  const applied = removed.filter((date) => !getDay(persisted, id, date));
+  if (applied.length) onSave();
+  return { changed: applied.length > 0, applied, blocked };
 }
 
 /** Timetable-owned time correction: validate all selected days before writing. */
