@@ -102,9 +102,10 @@ export function renderJournal(root, options = {}) {
   const monthWorkplaceVisible = (id, date = selectedDate) => {
     const key = String(id || '');
     if (key === ALL_WORKPLACES_ID) return true;
-    if (!workplaces.some((item) => String(item?.key || '') === key)) return false;
+    const catalog = getWorkplaces();
+    if (!catalog.some((item) => String(item?.key || '') === key)) return false;
     return monthDraftIds(date).has(key)
-      || getWorkplaceMonthStats(getWorkingDays(), workplaces, key, date).days > 0;
+      || getWorkplaceMonthStats(getWorkingDays(), catalog, key, date).days > 0;
   };
 
   const openDayTime = (workplaceId = '') => {
@@ -193,14 +194,15 @@ export function renderJournal(root, options = {}) {
 
   const openMonthWorkplaces = () => {
     const days = getWorkingDays();
-    const stats = getWorkplaceMonthStatsMap(days, workplaces, selectedDate);
+    const catalog = getWorkplaces();
+    const stats = getWorkplaceMonthStatsMap(days, catalog, selectedDate);
     const extra = monthDraftIds();
-    const active = workplaces.filter((workplace) => {
+    const active = catalog.filter((workplace) => {
       const id = String(workplace?.key || '');
       return id && (Number(stats[id]?.days || 0) > 0 || extra.has(id));
     });
     const activeIds = new Set(active.map((workplace) => String(workplace.key)));
-    const available = workplaces.filter((workplace) => {
+    const available = catalog.filter((workplace) => {
       const id = String(workplace?.key || '');
       return id && !activeIds.has(id);
     });
@@ -210,7 +212,7 @@ export function renderJournal(root, options = {}) {
       workplaceId: activeIds.has(selectedWorkplaceId) ? selectedWorkplaceId : ALL_WORKPLACES_ID,
       month: true,
       workplaceStats: stats,
-      aggregateStats: getAllWorkplacesMonthStats(days, workplaces, selectedDate),
+      aggregateStats: getAllWorkplacesMonthStats(days, catalog, selectedDate),
       availableWorkplaces: available,
       onSelect: selectMonthWorkplace,
       onAdd: () => openDayWorkplaceControl({
