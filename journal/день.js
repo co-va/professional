@@ -64,6 +64,7 @@ export function renderJournalDay(root, {
   navigationRoot = null,
   focusTarget = null,
   onCreationFinished = null,
+  onUsageSummary = () => {},
 } = {}) {
   root.dataset.journalDayContext = 'professional';
   root.innerHTML = navigationRoot
@@ -107,11 +108,21 @@ export function renderJournalDay(root, {
       navigationRoot,
       focusTarget,
       onCreationFinished,
+      onUsageSummary,
     });
   };
 
   const workplaces = getWorkplaces();
   const allMode = workplaceId === ALL_WORKPLACES_ID;
+  const workingDayRows = getDaysForDate(getDays(), dayDate);
+  // One Time-owned read for the visible day, shared by Journal timeline and V.
+  // The V menu never needs to read or re-project all Record/Finance facts.
+  const dayUsages = workingDayRows.length ? getTimeUsagesForScope({ date: dayDate }) : [];
+  onUsageSummary({
+    usages: dayUsages,
+    records: dayUsages.filter((usage) =>
+      usage?.type === 'record' && String(usage?.date || '').slice(0, 10) === dayDate),
+  });
   const dayNotes = getNotesForDay(dayDate);
   const visibleNotes = dayNotes.filter((note) => noteVisibleForWorkplace(note, workplaceId, { allMode }));
   const relatedIds = focusTarget?.targetType && focusTarget?.targetId
@@ -145,7 +156,7 @@ export function renderJournalDay(root, {
   renderY();
 
   if (allMode) {
-    const days = getDaysForDate(getDays(), dayDate);
+    const days = workingDayRows;
     if (!days.length) {
       timelineRoot.innerHTML = '<div class="time-day-state" aria-disabled="true">Выходной день</div>';
       return dispose;
@@ -161,7 +172,7 @@ export function renderJournalDay(root, {
         name: workplace?.name || 'Рабочее место',
         from: time.from,
         to: time.to,
-        usages: withFinancialState(getTimeUsagesForScope({ date: dayDate, workplaceId: currentId })),
+        usages: withFinancialState(dayUsages.filter((usage) => String(usage?.workplaceId || '') === currentId)),
         conflict: getScheduleConflicts(days, {
           workplaceId: currentId,
           date: dayDate,
@@ -197,7 +208,8 @@ export function renderJournalDay(root, {
     return dispose;
   }
 
-  const usages = withFinancialState(getTimeUsagesForScope({ date: dayDate, workplaceId }));
+  const usages = withFinancialState(dayUsages.filter((usage) =>
+    String(usage?.workplaceId || '') === String(workplaceId)));
   const usageById = new Map(usages.map((usage) => [String(usage?.sourceId || usage?.id || ''), usage]));
   const timeGrid = createTimeGrid({ date: dayDate, workplaceId, plan: time, usages });
 
