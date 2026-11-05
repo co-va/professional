@@ -5,11 +5,10 @@ import { readOnlyReceipt } from '../ui/receipt/index.js';
 import { canUseCapability } from '../core/access.js';
 import { getAllWorkplacesMonthStats, getWorkplaceMonthStats, getWorkplaceMonthStatsMap, getWorkingDays, getWorkplaces } from '../core/workplace-time.js';
 import { getActiveDayWorkplaces, getAvailableDayWorkplaces } from '../core/day/index.js';
-import { getWorkingTimeUsageConflicts } from '../core/time/index.js';
 import { getRecordPaymentState, recordAmountDue } from '../core/finance/index.js';
 import { applyTimetableWorkingDays, makeTimetableDayOff, openTimetableDayTimeEditor } from '../timetable/day-editor.js';
 import { getRecords, getRecordsForDay } from '../core/record/index.js';
-import { journalWorkplaceSelect, openJournalWorkplaceControl } from './workplace-control.js';
+import { journalWorkplaceSelect, openJournalWorkplaceControl, updateJournalWorkplaceMetas } from './workplace-control.js';
 import { renderJournalDay } from './день.js';
 import { renderJournalMonth } from './месяц.js';
 import { getJournalListRecords, renderJournalList } from './список.js';
@@ -100,9 +99,7 @@ export function renderJournal(root, options = {}) {
   let selectedDate = professionalContext.date;
   let disposeActiveView = () => {};
   let noteFocusTarget = null;
-  let daySettingsCache = null;
-  let daySettingsRevision = 0;
-  let daySettingsWarmup = null;
+  let dayViewState = null;
 
   root.dataset.journalContext = 'professional';
 
@@ -169,84 +166,56 @@ export function renderJournal(root, options = {}) {
     });
   };
 
+  // Menu structure is only WorkPlan + catalog facts; never query Record,
+  // Finance, or Time while handling the V click.
   const dayWorkplaceChoices = () => {
-    const day = dateKey(selectedDate);
-    // Preserve the original WorkPlan objects: workplaceId is required to
-    // show "Рабочее время" and to target a specific Day-off operation.
     const rawActive = activeDayWorkplaces();
-    const active = rawActive.map((item) => {
-      const workplace = workplaces.find((entry) => String(entry?.key || '') === String(item.workplaceId || '')) || null;
+    const byId = new Map(workplaces.map((item) => [String(item?.key || ''), item]));
+    const active = rawActive.map((day) => {
+      const workplace = byId.get(String(day.workplaceId || '')) || null;
       return {
         ...(workplace || {}),
-        key: item.workplaceId,
-        workplaceId: item.workplaceId,
-        name: item.name,
-        indicatorColor: item.indicatorColor,
-        from: item.from,
-        to: item.to,
+        key: day.workplaceId,
+        workplaceId: day.workplaceId,
+        name: day.name,
+        indicatorColor: day.indicatorColor,
+        from: day.from,
+        to: day.to,
       };
     });
-    // One projection of the day's records instead of a full Record/Finance
-    // projection for each workplace and another for the aggregate.
-    const recordCounts = {};
-    let aggregateCount = 0;
-    for (const record of getRecordsForDay(day)) {
-      if (record?.status === 'cancelled') continue;
-      aggregateCount += 1;
-      const id = String(record?.workplaceId || '');
-      if (id) recordCounts[id] = (recordCounts[id] || 0) + 1;
-    }
-    // Same Time-owned occupancy contract as getDayRemovalConflicts,
-    // evaluated once for all Day workplaces rather than once per workplace.
-    const busy = rawActive.length
-      ? new Set(getWorkingTimeUsageConflicts({ operation: 'remove', date: day })
-        .map((usage) => String(usage?.workplaceId || '')))
-      : new Set();
-    const hasUsage = rawActive.some((item) => busy.has(String(item.workplaceId || '')));
+    const ids = new Set(rawActive.map((day) => String(day.workplaceId || '')));
     return {
       active,
       rawActive,
-      hasUsage,
-      available: getAvailableDayWorkplaces(selectedDate, workplaces),
-      recordCounts,
-      aggregateCount,
+      available: workplaces.filter((item) => item?.key && !ids.has(String(item.key))),
     };
   };
 
-  const cancelDaySettingsWarmup = () => {
-    if (daySettingsWarmup === null) return;
-    window.clearTimeout(daySettingsWarmup);
-    daySettingsWarmup = null;
-  };
-
-  const scheduleDaySettingsWarmup = () => {
-    const revision = daySettingsRevision;
-    const warmup = () => {
-      daySettingsWarmup = null;
-      if (revision !== daySettingsRevision || activeView !== 'day' || !root.isConnected || daySettingsCache) return;
+  const afterJournalSettingsPaint = (layer, compute) => {
+    // The X selector and all action buttons are mounted before any metadata work.
+    requestAnimationFrame(() => window.setTimeout(() => {
+      if (!layer?.isConnected) return;
       try {
-        daySettingsCache = dayWorkplaceChoices();
+        const metadata = compute();
+        if (layer.isConnected) updateJournalWorkplaceMetas(layer, metadata);
       } catch (error) {
-        console.error('Journal Day settings preparation failed', error);
+        console.error('Journal selector metadata failed', error);
       }
-    };
-    // Predictable next task rather than waiting up to 500ms for browser idle.
-    // This runs after Journal Day has rendered, before the next user gesture.
-    daySettingsWarmup = window.setTimeout(warmup, 0);
+    }, 0));
   };
 
   // Keep one Shared Select presentation, embedded directly into Journal settings.
   const inlineWorkplaceSettings = ({
     choices = [], workplaceId = selectedWorkplaceId, available = [],
     recordCounts = {}, aggregateCount = 0, month = false,
-    aggregateStats = null, workplaceStats = {},
+    aggregateStats = null, workplaceStats = {}, metaPending = false,
     onSelect = selectWorkplace, onAdd = () => {},
   } = {}) => {
     const ids = new Set([ALL_WORKPLACES_ID, ...choices.map((item) => String(item?.key || '')).filter(Boolean)]);
     const content = `<div class="compact-form">${journalWorkplaceSelect({
       workplaces: choices,
       workplaceId: ids.has(workplaceId) ? workplaceId : ALL_WORKPLACES_ID,
-      recordCounts, aggregateCount, month, aggregateStats, workplaceStats,
+      recordCounts, aggregateCount, month, aggregateStats, workplaceStats, metaPending,
     })}</div>`;
     return {
       content,
