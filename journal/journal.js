@@ -236,6 +236,27 @@ export function renderJournal(root, options = {}) {
     return workplaces.find((item) => String(item?.key || '') === String(selectedWorkplaceId || ''))?.name || 'Журнал';
   };
 
+  const journalHeader = () => {
+    const aggregate = selectedWorkplaceId === ALL_WORKPLACES_ID;
+    const graph = activeView === 'month' && monthMode === 'graph';
+    return {
+      title: aggregate ? 'Общий режим' : journalTitle(),
+      subtitle: graph
+        ? (aggregate ? 'Общий график' : 'График')
+        : (aggregate ? 'Журнал · Просмотр' : 'Журнал'),
+    };
+  };
+
+  const syncJournalHeader = () => {
+    const context = root.querySelector('[data-workspace-header-context]');
+    if (!context) return;
+    const { title, subtitle } = journalHeader();
+    if (context.dataset.workspaceTitle === title && context.dataset.workspaceSubtitle === subtitle) return;
+    context.dataset.workspaceTitle = title;
+    context.dataset.workspaceSubtitle = subtitle;
+    window.dispatchEvent(new CustomEvent('va-tools:v2-context-changed'));
+  };
+
   const openJournalZReport = () => {
     const allMode = selectedWorkplaceId === ALL_WORKPLACES_ID;
     const isMonth = activeView === 'month';
@@ -412,7 +433,7 @@ export function renderJournal(root, options = {}) {
     const secondaryNavigationRoot = headerRows[1] || null;
     const periodNavigationRoot = secondaryNavigationRoot?.querySelector('[data-journal-period-navigation]') || null;
     const viewClass = activeView === 'list' ? ' class="journal-list-viewport"' : '';
-    const headerOptions = { title: activeView === 'day' ? journalTitle() : 'Журнал' };
+    const headerOptions = journalHeader();
     headerOptions.v = { data: 'data-journal-settings', aria: 'Настройки журнала' };
 
     root.innerHTML = `${workspaceHeaderContext(headerOptions)}<div data-journal-view${viewClass}></div>`;
@@ -446,6 +467,7 @@ export function renderJournal(root, options = {}) {
         onWorkplaceChange: (nextId) => {
           selectedWorkplaceId = nextId;
           persistProfessionalContext();
+          syncJournalHeader();
         },
         workplaceId: selectedWorkplaceId,
         navigationRoot: periodNavigationRoot,
