@@ -122,23 +122,35 @@ export function renderJournalMonth(root, {
   const workingDays = getWorkingDays();
   const workplaces = getWorkplaces();
   const allMode = workplaceId === ALL_WORKPLACES_ID;
-  // Calendar Month never needs the history outside the displayed month.
-  const monthFirst = new Date(month.getFullYear(), month.getMonth(), 1);
-  const monthLast = new Date(month.getFullYear(), month.getMonth() + 1, 0);
-  const rangeDate = (value) => `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
-  const records = getRecordsInRange({
-    from: rangeDate(monthFirst),
-    to: rangeDate(monthLast),
-    workplaceId: allMode ? '' : workplaceId,
-  });
-  const recordIndex = recordsByDate(records, workplaceId, allMode);
+  // The calendar can navigate months internally, without remounting Journal.
+  // Read/project a month only when it becomes visible; reuse it for its 28-31 cells.
+  let recordIndexMonth = '';
+  let recordIndex = new Map();
+  const recordsForDisplayedMonth = (dateKey) => {
+    const prefix = String(dateKey || '').slice(0, 7);
+    if (prefix !== recordIndexMonth) {
+      const [year, number] = prefix.split('-').map(Number);
+      const lastDay = new Date(year, number, 0).getDate();
+      const records = getRecordsInRange({
+        from: `${prefix}-01`,
+        to: `${prefix}-${String(lastDay).padStart(2, '0')}`,
+        workplaceId: allMode ? '' : workplaceId,
+      });
+      recordIndex = recordsByDate(records, workplaceId, allMode);
+      recordIndexMonth = prefix;
+    }
+    return recordIndex;
+  };
 
   initCalendar(calendarRoot, {
     month,
     workingDates: workingDatesForJournal(workingDays, workplaceId, allMode),
     renderDateContent: ({ dateKey, isCurrentMonth }) => {
       if (!isCurrentMonth) return '';
-      return dateContent(dayRecordData({ dateKey, workplaceId, allMode, workingDays, workplaces, recordIndex }));
+      return dateContent(dayRecordData({
+        dateKey, workplaceId, allMode, workingDays, workplaces,
+        recordIndex: recordsForDisplayedMonth(dateKey),
+      }));
     },
     resolveDateIndicators: ({ dateKey, isCurrentMonth }) => isCurrentMonth
       ? getWorkingDayIndicators(workingDays, workplaces, dateKey, { excludeWorkplaceId: allMode ? '' : workplaceId })
