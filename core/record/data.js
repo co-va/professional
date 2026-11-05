@@ -29,6 +29,20 @@ export function getRecordRows() {
   return clone(recordRowsState);
 }
 
+/**
+ * Read only a specific day's raw Record facts before cloning them.
+ * Date/workplace filtering belongs to the storage gateway; Finance and
+ * lifecycle projections are applied by the existing Record read contract.
+ */
+export function getRecordRowsForDay(date, workplaceId = '') {
+  const day = String(date || '').slice(0, 10);
+  const workplace = normalizeId(workplaceId);
+  return recordRowsState
+    .filter((row) => row?.date === day
+      && (!workplace || normalizeId(row?.workplaceId) === workplace))
+    .map((row) => clone(row));
+}
+
 export function getRecordRow(id) {
   const recordId = normalizeId(id);
   const row = recordRowsState.find((item) => normalizeId(item?.id) === recordId) || null;
