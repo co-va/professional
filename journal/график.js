@@ -16,7 +16,6 @@ function formatDuration(totalMinutes) {
   if (!hours) return `${minutes} м`;
   return `${hours} ч ${minutes} м`;
 }
-function occupiedLabel(item) { return item?.type === 'event' ? 'Событие' : 'Запись'; }
 export function renderJournalGraphMode({
   root,
   calendarRoot,
@@ -149,29 +148,44 @@ export function renderJournalGraphMode({
     });
   }
 
-  function openRemovalBlockedModal(entries = []) {
-    const blocked = (Array.isArray(entries) ? entries : []).filter((entry) => Array.isArray(entry?.conflicts) && entry.conflicts.length);
-    if (!blocked.length) return;
-    const workplace = workplaces.find((item) => String(item?.key || '') === String(selectedWorkplaceId || '')) || null;
-    const workplaceName = workplace?.name || 'Рабочее пространство';
-    const multiple = blocked.length > 1;
-    const title = multiple ? 'Не все дни можно сделать выходными' : 'День нельзя сделать выходным';
-    const description = multiple
-      ? `${workplaceName}: на этих датах есть занятое время. Рабочие дни сохранены.`
-      : `${workplaceName}: на этой дате есть занятое время. Рабочий день сохранён.`;
-    const rows = blocked.map((entry) => {
-      const details = entry.conflicts
-        .filter((conflict) => conflict?.from && conflict?.to)
-        .map((conflict) => `${occupiedLabel(conflict)} ${conflict.from}–${conflict.to}`)
-        .join(', ');
-      return `<div><span>${escapeHtml(formatDateLabel(entry.date))}</span><strong>${escapeHtml(details || 'Есть занятое время')}</strong></div>`;
-    }).join('');
-    const content = `<div class="modal-title"><h2>${escapeHtml(title)}</h2><p>${escapeHtml(description)}</p></div><div class="entity-details">${rows}</div>${button('Понятно', { data: 'data-removal-blocked-close' })}`;
-    const m = mountModal(document.body, modal(content, { title, variant: 'x' }));
-    if (!m) return;
-    m.querySelector('[data-removal-blocked-close]')?.addEventListener('click', () => m.remove());
-  }
+  // SModal is informational: bulk Day-off is applied to free dates only.
+  // Blocked dates keep their WorkPlan. No confirmation button is needed.
+  function showDayOffResult({ blocked = [], applied = [] } = {}) {
+    const protectedDates = (Array.isArray(blocked) ? blocked : [])
+      .filter((entry) => Array.isArray(entry?.conflicts) && entry.conflicts.length)
+      .sort((left, right) => String(left.date).localeCompare(String(right.date)));
+    if (!protectedDates.length && applied.length) return;
 
+    const title = protectedDates.length
+      ? 'Не все дни можно сделать выходными'
+      : 'Дни не изменены';
+    const summary = applied.length
+      ? `Выходными стали ${applied.length} свободных дней. Даты с записями или событиями остались рабочими.`
+      : protectedDates.length
+        ? 'Занятые дни остались рабочими. Ничего не удалено.'
+        : 'Для выбранных дат нет рабочих дней, которые можно сделать выходными.';
+    const countLabel = (count, singular, plural2, plural5) => {
+      const last2 = count % 100;
+      if (last2 >= 11 && last2 <= 14) return `${count} ${plural5}`;
+      const last = count % 10;
+      return `${count} ${last === 1 ? singular : last >= 2 && last <= 4 ? plural2 : plural5}`;
+    };
+    const rows = protectedDates.map(({ date, conflicts }) => {
+      const records = new Set(conflicts
+        .filter((usage) => usage?.type === 'record')
+        .map((usage, i) => String(usage?.sourceId || usage?.id || `record-${i}`)));
+      const events = new Set(conflicts
+        .filter((usage) => usage?.type === 'event')
+        .map((usage, i) => String(usage?.sourceId || usage?.id || `event-${i}`)));
+      const details = [
+        records.size ? countLabel(records.size, 'запись', 'записи', 'записей') : '',
+        events.size ? countLabel(events.size, 'событие', 'события', 'событий') : '',
+      ].filter(Boolean).join(' · ') || 'Есть занятое время';
+      return `<div><span>${escapeHtml(formatDateLabel(date))}</span><strong>${escapeHtml(details)}</strong></div>`;
+    }).join('');
+    const content = `<div class="modal-title"><h2>${escapeHtml(title)}</h2><p>${escapeHtml(summary)}</p></div>${rows ? `<div class="entity-details">${rows}</div>` : ''}`;
+    return mountModal(document.body, modal(content, { title, variant: 's', surface: 'app' }));
+  }
 
   function openGraphTimePlan() {
     if (isAllMode()) return;
@@ -262,7 +276,7 @@ export function renderJournalGraphMode({
       workingDays,
     });
     if (result.changed) startSelectionSession(calendar.getDisplayedMonth());
-    if (result.blocked.length) openRemovalBlockedModal(result.blocked);
+    if (result.blocked.length || !result.changed) showDayOffResult(result);
   });
 
   let refreshQueued = false;
