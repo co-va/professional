@@ -14,6 +14,12 @@ import { renderJournalMonth } from './месяц.js';
 import { getJournalListRecords, renderJournalList } from './список.js';
 
 const JOURNAL_CONTEXT_SCOPE = 'journal';
+const WORKPLACE_CONTEXT_SCOPES = {
+  day: JOURNAL_CONTEXT_SCOPE,
+  month: 'journal:month',
+  graph: 'journal:graph',
+  list: 'journal:list',
+};
 
 const views = [
   { id: 'day', label: 'День', render: renderJournalDay, capability: 'journal.day.access' },
@@ -81,8 +87,15 @@ export function renderJournal(root, options = {}) {
   // Month-only unsaved selections: zero-day workplaces do not become server WorkPlan facts.
   const monthDraftWorkplaces = new Map();
   const workplaces = getWorkplaces();
-  const professionalContext = getWorkplaceContext(workplaces, { scope: JOURNAL_CONTEXT_SCOPE });
-  let selectedWorkplaceId = professionalContext.workplaceId;
+  // The aggregate choice is valid even though it is not a catalog workplace.
+  const contextWorkplaces = [...workplaces, { key: ALL_WORKPLACES_ID }];
+  const professionalContext = getWorkplaceContext(contextWorkplaces, { scope: JOURNAL_CONTEXT_SCOPE });
+  const workplaceContexts = Object.fromEntries(Object.entries(WORKPLACE_CONTEXT_SCOPES)
+    .map(([mode, scope]) => [mode, getWorkplaceContext(contextWorkplaces, { scope }).workplaceId]));
+  const currentWorkplaceMode = () => activeView === 'month'
+    ? (monthMode === 'graph' ? 'graph' : 'month')
+    : activeView;
+  let selectedWorkplaceId = workplaceContexts[currentWorkplaceMode()];
   let selectedDate = professionalContext.date;
   let disposeActiveView = () => {};
   let noteFocusTarget = null;
@@ -90,7 +103,19 @@ export function renderJournal(root, options = {}) {
   root.dataset.journalContext = 'professional';
 
   const persistProfessionalContext = () => {
-    setWorkplaceContext({ workplaceId: selectedWorkplaceId, date: selectedDate, scope: JOURNAL_CONTEXT_SCOPE });
+    const mode = currentWorkplaceMode();
+    workplaceContexts[mode] = selectedWorkplaceId;
+    setWorkplaceContext({ workplaceId: selectedWorkplaceId, date: selectedDate, scope: WORKPLACE_CONTEXT_SCOPES[mode] });
+    // The Journal date is shared; its Day workplace selection is not.
+    if (mode !== 'day') setWorkplaceContext({ date: selectedDate, scope: JOURNAL_CONTEXT_SCOPE });
+  };
+
+  const restoreWorkplaceContext = () => {
+    const candidate = workplaceContexts[currentWorkplaceMode()];
+    const valid = candidate === ALL_WORKPLACES_ID
+      || getWorkplaces().some((workplace) => String(workplace?.key || '') === String(candidate || ''));
+    selectedWorkplaceId = valid ? candidate : ALL_WORKPLACES_ID;
+    if (!valid) persistProfessionalContext();
   };
 
   const activeDayWorkplaces = () => getActiveDayWorkplaces(selectedDate, workplaces);
@@ -115,7 +140,8 @@ export function renderJournal(root, options = {}) {
       date: selectedDate,
       workplaceId: id,
       onSave: () => {
-        setWorkplaceContext({ workplaceId: id, date: selectedDate, scope: JOURNAL_CONTEXT_SCOPE });
+        selectedWorkplaceId = id;
+        persistProfessionalContext();
         renderView();
       },
     });
@@ -365,6 +391,7 @@ export function renderJournal(root, options = {}) {
             label: inGraph ? 'Месяц' : 'График',
             onSelect: () => {
               monthMode = inGraph ? 'view' : 'graph';
+              restoreWorkplaceContext();
               renderView();
             },
           } : null,
@@ -517,6 +544,7 @@ export function renderJournal(root, options = {}) {
           selectedDate = nextDate;
           persistProfessionalContext();
           activeView = 'day';
+          restoreWorkplaceContext();
           options.onViewChange?.(activeView);
           renderView();
         },
@@ -538,6 +566,7 @@ export function renderJournal(root, options = {}) {
       initViewNavigation(primaryNavigationRoot, { views: availableViews, activeView, onChange: (nextView) => {
         if (nextView !== 'month') monthMode = 'view';
         activeView = nextView;
+        restoreWorkplaceContext();
         options.onViewChange?.(activeView);
         renderView();
       } });
@@ -554,10 +583,11 @@ export function renderJournal(root, options = {}) {
     const nextDate = new Date(`${date}T12:00:00`);
     if (!Number.isNaN(nextDate.getTime())) selectedDate = nextDate;
     const targetWorkplaceId = String(detail.workplaceId || '');
+    activeView = 'day';
+    restoreWorkplaceContext();
     if (selectedWorkplaceId !== ALL_WORKPLACES_ID && targetWorkplaceId) {
       selectedWorkplaceId = targetWorkplaceId;
     }
-    activeView = 'day';
     noteFocusTarget = { targetType, targetId };
     persistProfessionalContext();
     options.onViewChange?.(activeView);
