@@ -5,6 +5,7 @@ export {
   getRecord,
   getRecords,
   getRecordsForDay,
+  getRecordsInRange,
   readRecord,
 } from './read.js';
 export {
