@@ -2,6 +2,8 @@ import { actionBlock, button, initCalendar, initMultiSelect, modal, mountModal, 
 import { getWorkplaces, resolveWorkplaceTime, getWorkingDayIndicators, getWorkingDayTotalMinutes } from '../core/workplace-time.js';
 import { getDays, getDay, getDayTime } from '../core/day/index.js';
 import { isValidRange } from '../core/time/index.js';
+import { getRecordsInRange } from '../core/record/index.js';
+import { getEvents } from '../core/event/index.js';
 import { applyTimetableWorkingDays, applyTimetableDaysOff, applyTimetableTimeCorrection } from '../timetable/day-editor.js';
 
 function datesForWorkplace(days, workplaceId) { return days.filter((item) => item?.workplaceId === workplaceId).map((item) => item.date).filter(Boolean); }
@@ -29,6 +31,7 @@ export function renderJournalGraphMode({
 } = {}) {
   const workplaces = getWorkplaces();
   const workingDays = getDays();
+  calendarRoot.dataset.journalGraphCalendar = '';
   let selectedWorkplaceId = workplaceId || ALL_WORKPLACES_ID;
   const initialMonth = new Date(month.getFullYear(), month.getMonth(), 1);
   actionsRoot.innerHTML = actionBlock(button('Применить', {
@@ -99,14 +102,48 @@ export function renderJournalGraphMode({
 
   const startSelectionSession = (month) => {
     const allMode = isAllMode();
+    // Read each visible month once, from the Record and Event owners.
+    // Recreate this cache on every canonical state refresh/workplace change.
+    const occupancyByMonth = new Map();
+    const occupancyForDate = (dateKey) => {
+      const prefix = dateKey.slice(0, 7);
+      if (!occupancyByMonth.has(prefix)) {
+        const [year, number] = prefix.split('-').map(Number);
+        const lastDay = new Date(year, number, 0).getDate();
+        const occupied = new Map();
+        const flag = (date, kind) => {
+          const current = occupied.get(date) || { record: false, event: false };
+          current[kind] = true;
+          occupied.set(date, current);
+        };
+        getRecordsInRange({
+          from: `${prefix}-01`,
+          to: `${prefix}-${String(lastDay).padStart(2, '0')}`,
+          workplaceId: allMode ? '' : selectedWorkplaceId,
+        }).forEach((record) => {
+          if (record?.status !== 'cancelled') flag(String(record?.date || '').slice(0, 10), 'record');
+        });
+        getEvents().forEach((event) => {
+          const date = String(event?.date || '').slice(0, 10);
+          if (date.startsWith(prefix) && (allMode || String(event?.workplaceId || '') === String(selectedWorkplaceId))) {
+            flag(date, 'event');
+          }
+        });
+        occupancyByMonth.set(prefix, occupied);
+      }
+      return occupancyByMonth.get(prefix)?.get(dateKey) || null;
+    };
     calendar = initCalendar(calendarRoot, {
       month,
       workingDates: allMode ? datesForAllWorkplaces(workingDays) : datesForWorkplace(workingDays, selectedWorkplaceId),
       renderDateContent: ({ dateKey, isCurrentMonth, isWorking }) => {
-        if (!isCurrentMonth || !isWorking) return '';
-        if (allMode) return `<span>${escapeHtml(formatDuration(getWorkingDayTotalMinutes(workingDays, workplaces, dateKey)))}</span>`;
+        if (!isCurrentMonth) return '';
+        const usage = occupancyForDate(dateKey);
+        const stripes = !usage ? '' : `<span class="calendar__graph-occupancy" role="img" aria-label="${usage.record && usage.event ? 'Есть запись и событие' : usage.record ? 'Есть запись' : 'Есть событие'}">${usage.record ? '<span class="calendar__graph-occupancy-bar calendar__graph-occupancy-bar--record"></span>' : ''}${usage.event ? '<span class="calendar__graph-occupancy-bar calendar__graph-occupancy-bar--event"></span>' : ''}</span>`;
+        if (!isWorking) return stripes;
+        if (allMode) return `${stripes}<span>${escapeHtml(formatDuration(getWorkingDayTotalMinutes(workingDays, workplaces, dateKey)))}</span>`;
         const time = getDayTime(workingDayForDate(workingDays, selectedWorkplaceId, dateKey), workplaces);
-        return time ? `<span>${time.from}</span><span>${time.to}</span>` : '';
+        return time ? `${stripes}<span>${time.from}</span><span>${time.to}</span>` : stripes;
       },
       resolveDateIndicators: ({ dateKey, isCurrentMonth }) => isCurrentMonth
         ? getWorkingDayIndicators(workingDays, workplaces, dateKey, { excludeWorkplaceId: allMode ? '' : selectedWorkplaceId })
