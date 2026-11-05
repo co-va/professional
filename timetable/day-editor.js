@@ -1,5 +1,5 @@
 import { button, escapeHtml, initTimePickers, modal, mountModal, openDayWorkplaceControl, openDayWorkplaceTime, timePicker, twoColumnLayout } from '../ui/ui.js';
-import { createDay, findSuggestedInterval, getDay, getDayDraftScheduleConflicts, getDayTime, getDays, getDaysForDate, getScheduleConflicts, removeDay, saveDays, updateDayTime } from '../core/day/index.js';
+import { createDay, findSuggestedInterval, getDay, getDayDraftScheduleConflicts, getDayRemovalConflicts, getDayTime, getDays, getDaysForDate, getScheduleConflicts, removeDay, saveDays, updateDayTime } from '../core/day/index.js';
 import { getWorkingTimeUsageConflicts } from '../core/time/index.js';
 import { isValidRange } from '../core/time/index.js';
 import { getWorkplaces, resolveWorkplaceTime } from '../core/workplace-time.js';
