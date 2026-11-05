@@ -1,4 +1,4 @@
-import { ALL_WORKPLACES_ID, modal, mountModal, select } from '../ui/ui.js';
+import { ALL_WORKPLACES_ID, button, modal, mountModal, select } from '../ui/ui.js';
 
 const WORKPLACE_FALLBACK_COLOR = '#212529';
 
@@ -21,7 +21,9 @@ export function openJournalWorkplaceControl({
   workplaceId = '',
   recordCounts = {},
   aggregateCount = 0,
+  availableWorkplaces = [],
   onSelect = () => {},
+  onAdd = () => {},
 } = {}) {
   const options = [{
     value: ALL_WORKPLACES_ID,
@@ -49,7 +51,7 @@ export function openJournalWorkplaceControl({
       options,
       aria: 'Режим рабочего поля журнала',
       data: 'data-journal-workplace-select',
-    })}</div>`,
+    })}${availableWorkplaces.length ? button('+ Рабочее пространство', { variant: 'secondary', data: 'data-journal-workplace-add' }) : ''}</div>`,
     { variant: 'x', surface: 'app', title: 'Рабочее пространство', className: 'modal--form-sheet' },
   ));
   const input = main?.querySelector('input[name="journalWorkplaceMode"]');
@@ -58,6 +60,10 @@ export function openJournalWorkplaceControl({
     if (!nextId) return;
     main.v2Close?.();
     onSelect(nextId);
+  });
+  main?.querySelector('[data-journal-workplace-add]')?.addEventListener('click', () => {
+    main.v2Close?.();
+    onAdd();
   });
   return main;
 }
