@@ -432,13 +432,13 @@ export function renderJournal(root, options = {}) {
         choices: choice.active,
         workplaceId: choice.activeIds.has(selectedWorkplaceId) ? selectedWorkplaceId : ALL_WORKPLACES_ID,
         month: true,
-        aggregateStats: choice.aggregateStats,
-        workplaceStats: choice.stats,
+        metaPending: true,
         available: choice.available,
         onSelect: selectMonthWorkplace,
         onAdd: () => addMonthWorkplace(choice),
       });
-      openSharedProfileSettingsMenu({
+      const monthAtOpen = new Date(selectedDate.getTime());
+      const layer = openSharedProfileSettingsMenu({
         title: 'Настройки журнала',
         content: field.content,
         footer: field.footer,
@@ -468,14 +468,22 @@ export function renderJournal(root, options = {}) {
           } : null,
         ].filter(Boolean),
       });
+      if (layer) afterJournalSettingsPaint(layer, () => ({
+        workplaces: choice.active,
+        month: true,
+        workplaceStats: getWorkplaceMonthStatsMap(choice.days, choice.catalog, monthAtOpen),
+        aggregateStats: getAllWorkplacesMonthStats(choice.days, choice.catalog, monthAtOpen),
+      }));
       return;
     }
     const allMode = selectedWorkplaceId === ALL_WORKPLACES_ID;
-    const dayChoice = daySettingsCache || dayWorkplaceChoices();
-    daySettingsCache = dayChoice;
+    const dayChoice = dayViewState?.choices || dayWorkplaceChoices();
     const active = dayChoice.rawActive;
     const isDayOff = !active.length;
-    const hasUsage = dayChoice.hasUsage;
+    // Occupancy is read from the already rendered Day timeline, never on V.
+    // Unknown occupancy conservatively offers Z, not a destructive Day-off.
+    const hasUsage = !dayViewState || active.some((item) =>
+      dayViewState.busyWorkplaces.has(String(item.workplaceId || '')));
     const activeIds = active.map((item) => item.workplaceId);
     const selectedActive = !allMode && activeIds.includes(selectedWorkplaceId);
     const applyDayOff = () => {
@@ -491,12 +499,12 @@ export function renderJournal(root, options = {}) {
       choices: dayChoice.active,
       workplaceId: selectedWorkplaceId,
       available: dayChoice.available,
-      recordCounts: dayChoice.recordCounts,
-      aggregateCount: dayChoice.aggregateCount,
+      metaPending: true,
       onSelect: selectWorkplace,
       onAdd: addDayWorkplace,
     });
-    openSharedProfileSettingsMenu({
+    const dayAtOpen = dateKey(selectedDate);
+    const layer = openSharedProfileSettingsMenu({
       title: 'Настройки журнала',
       content: field.content,
       footer: field.footer,
@@ -519,6 +527,22 @@ export function renderJournal(root, options = {}) {
           onSelect: openJournalZReport,
         } : null,
       ].filter(Boolean),
+    });
+    if (layer) afterJournalSettingsPaint(layer, () => {
+      const records = getRecordsForDay(dayAtOpen);
+      const recordCounts = {};
+      let aggregateCount = 0;
+      for (const record of records) {
+        if (record?.status === 'cancelled') continue;
+        aggregateCount += 1;
+        const id = String(record?.workplaceId || '');
+        if (id) recordCounts[id] = (recordCounts[id] || 0) + 1;
+      }
+      return {
+        workplaces: dayChoice.active,
+        recordCounts,
+        aggregateCount,
+      };
     });
   };
 
