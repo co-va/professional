@@ -128,7 +128,7 @@ export function getJournalListRecords({ workplaceId = ALL_WORKPLACES_ID, now = n
   const earliest = `${cutoff.getFullYear()}-${String(cutoff.getMonth() + 1).padStart(2, '0')}-${String(cutoff.getDate()).padStart(2, '0')}`;
   return getRecords().filter((record) => {
     const date = String(record?.date || '').slice(0, 10);
-    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date) || date < earliest) return false;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date < earliest) return false;
     return workplaceId === ALL_WORKPLACES_ID
       || String(record?.workplaceId || '') === String(workplaceId || '');
   });
