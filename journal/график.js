@@ -150,7 +150,7 @@ export function renderJournalGraphMode({
 
   // SModal is informational: bulk Day-off is applied to free dates only.
   // Blocked dates keep their WorkPlan. No confirmation button is needed.
-  function showDayOffResult({ blocked = [], applied = [] } = {}) {
+  function showDayOffResult({ blocked = [], applied = [], error = false } = {}) {
     const protectedDates = (Array.isArray(blocked) ? blocked : [])
       .filter((entry) => Array.isArray(entry?.conflicts) && entry.conflicts.length)
       .sort((left, right) => String(left.date).localeCompare(String(right.date)));
@@ -162,16 +162,19 @@ export function renderJournalGraphMode({
       const last = count % 10;
       return `${count} ${last === 1 ? singular : last >= 2 && last <= 4 ? plural2 : plural5}`;
     };
-    const title = protectedDates.length
-      ? applied.length ? 'Не все дни можно сделать выходными'
-        : protectedDates.length === 1 ? 'День нельзя сделать выходным'
-          : 'Выбранные дни нельзя сделать выходными'
-      : 'Дни не изменены';
-    const summary = applied.length
-      ? `Свободные даты переведены в выходные (${countLabel(applied.length, 'день', 'дня', 'дней')}). Занятые даты остались рабочими.`
+    const title = error ? 'Не удалось применить выходной'
       : protectedDates.length
-        ? 'Занятые дни остались рабочими. Ничего не удалено.'
-        : 'Для выбранных дат нет рабочих дней, которые можно сделать выходными.';
+        ? applied.length ? 'Не все дни можно сделать выходными'
+          : protectedDates.length === 1 ? 'День нельзя сделать выходным'
+            : 'Выбранные дни нельзя сделать выходными'
+        : 'Дни не изменены';
+    const summary = error
+      ? 'Данные графика не изменены. Проверьте актуальность выбранных дат.'
+      : applied.length
+        ? `Свободные даты переведены в выходные (${countLabel(applied.length, 'день', 'дня', 'дней')}). Занятые даты остались рабочими.`
+        : protectedDates.length
+          ? 'Занятые дни остались рабочими. Ничего не удалено.'
+          : 'Для выбранных дат нет рабочих дней, которые можно сделать выходными.';
     const rows = protectedDates.map(({ date, conflicts }) => {
       const records = new Set(conflicts
         .filter((usage) => usage?.type === 'record')
@@ -272,11 +275,23 @@ export function renderJournalGraphMode({
       return;
     }
 
-    const result = applyTimetableDaysOff({
-      dates,
-      workplaceId: selectedWorkplaceId,
-      workingDays,
-    });
+    // Always apply against the current Day owner's state. The Graph snapshot
+    // was taken when this view opened and can be stale after server updates.
+    let result;
+    try {
+      result = applyTimetableDaysOff({
+        dates,
+        workplaceId: selectedWorkplaceId,
+        workingDays: getDays(),
+      });
+    } catch (error) {
+      console.error('Graph Day-off failed', error);
+      showDayOffResult({ blocked: [], applied: [], error: true });
+      return;
+    }
+    // Reflect the actual canonical rows, not the old Graph-local snapshot.
+    const currentDays = getDays();
+    workingDays.splice(0, workingDays.length, ...currentDays);
     if (result.changed) startSelectionSession(calendar.getDisplayedMonth());
     if (result.blocked.length || !result.changed) showDayOffResult(result);
   });
