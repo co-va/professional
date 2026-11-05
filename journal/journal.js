@@ -76,6 +76,8 @@ export function renderJournal(root, options = {}) {
     ? options.initialView
     : (availableViews[0]?.id || 'day');
   let listMode = 'flow';
+  let monthMode = 'view';
+  let graphControls = null;
   const workplaces = getWorkplaces();
   const professionalContext = getWorkplaceContext(workplaces, { scope: JOURNAL_CONTEXT_SCOPE });
   let selectedWorkplaceId = professionalContext.workplaceId;
@@ -240,6 +242,42 @@ export function renderJournal(root, options = {}) {
   };
 
   const openJournalSettings = () => {
+    if (activeView === 'month') {
+      const inGraph = monthMode === 'graph';
+      openSharedProfileSettingsMenu({
+        title: 'Настройки журнала',
+        actions: [
+          canUseCapability('timetable.access') ? {
+            id: 'calendar-mode',
+            label: inGraph ? 'Месяц' : 'График',
+            onSelect: () => {
+              monthMode = inGraph ? 'view' : 'graph';
+              renderView();
+            },
+          } : null,
+          inGraph ? {
+            id: 'graph-workplace',
+            label: 'Рабочее пространство',
+            onSelect: () => graphControls?.openWorkplaces?.(),
+          } : {
+            id: 'workplace',
+            label: 'Рабочее пространство',
+            onSelect: openWorkplace,
+          },
+          inGraph && graphControls?.canEditTime?.() ? {
+            id: 'graph-time',
+            label: 'Рабочее время',
+            onSelect: () => graphControls?.openTime?.(),
+          } : null,
+          !inGraph ? {
+            id: 'z-report',
+            label: 'Z-Отчет',
+            onSelect: openJournalZReport,
+          } : null,
+        ].filter(Boolean),
+      });
+      return;
+    }
     const day = dateKey(selectedDate);
     const allMode = selectedWorkplaceId === ALL_WORKPLACES_ID;
     const active = activeView === 'day' ? activeDayWorkplaces() : [];
@@ -293,6 +331,7 @@ export function renderJournal(root, options = {}) {
     if (!root.isConnected || root.querySelector('[data-record-creation-flow]')) return;
     disposeActiveView();
     disposeActiveView = () => {};
+    graphControls = null;
 
     const primaryNavigation = viewNavigation({ views: availableViews, activeView });
     const secondaryNavigation = activeView === 'list'
@@ -328,6 +367,16 @@ export function renderJournal(root, options = {}) {
       disposeActiveView = renderJournalMonth(viewRoot, {
         context: 'professional',
         month: selectedDate,
+        mode: monthMode,
+        onGraphControls: (controls) => { graphControls = controls; },
+        onDateFocus: (nextDate) => {
+          selectedDate = nextDate;
+          persistProfessionalContext();
+        },
+        onWorkplaceChange: (nextId) => {
+          selectedWorkplaceId = nextId;
+          persistProfessionalContext();
+        },
         workplaceId: selectedWorkplaceId,
         navigationRoot: periodNavigationRoot,
         onMonthChange: (nextMonth) => {
@@ -360,6 +409,7 @@ export function renderJournal(root, options = {}) {
     }
     if (primaryNavigationRoot) {
       initViewNavigation(primaryNavigationRoot, { views: availableViews, activeView, onChange: (nextView) => {
+        if (nextView !== 'month') monthMode = 'view';
         activeView = nextView;
         options.onViewChange?.(activeView);
         renderView();

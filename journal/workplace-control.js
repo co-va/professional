@@ -51,7 +51,7 @@ export function openJournalWorkplaceControl({
       options,
       aria: 'Режим рабочего поля журнала',
       data: 'data-journal-workplace-select',
-    })}${availableWorkplaces.length ? button('+ Рабочее пространство', { variant: 'secondary', data: 'data-journal-workplace-add' }) : ''}</div>`,
+    })}${availableWorkplaces.length ? button('+ Рабочее пространство', { data: 'data-journal-workplace-add' }) : ''}</div>`,
     { variant: 'x', surface: 'app', title: 'Рабочее пространство', className: 'modal--form-sheet' },
   ));
   const input = main?.querySelector('input[name="journalWorkplaceMode"]');

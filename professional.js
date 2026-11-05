@@ -3,7 +3,6 @@ import { financeNavigationItems, renderFinanceSection } from './core/finance/ind
 import { inventoryNavigationItems, renderInventorySection } from './core/inventory/index.js';
 import { loyaltyNavigationItems, renderLoyaltySection } from './core/loyalty/index.js';
 import { renderJournal } from './journal/journal.js';
-import { renderTimetable } from './timetable/timetable.js';
 import { settingsNavigationItems, renderSettingsSection } from './settings/settings.js';
 import { render as renderProfile } from './core/profile/profile.js';
 import { getProfile } from './core/profile/data.js';
@@ -30,7 +29,6 @@ configureTimeUsageSource(getJournalTimeUsages);
 const ROOT_SECTIONS = [
   { id: 'people', label: 'Клиенты', capability: 'people.access' },
   { id: 'journal', label: 'Журнал', capability: '' },
-  { id: 'timetable', label: 'График', capability: 'timetable.access' },
   { id: 'profile', label: 'Профиль', capability: '' },
   { id: 'service', label: 'Сервис', capability: 'services.access' },
   { id: 'loyalty', label: 'Лояльность', capability: '' },
@@ -372,7 +370,6 @@ async function renderActiveWorkspaceSurface(surface) {
   });
   if (section === 'inventory') return renderInventorySection(surface, ensureSecondary('inventory'));
   if (section === 'loyalty') return renderLoyaltySection(surface, ensureSecondary('loyalty'));
-  if (section === 'timetable') return renderTimetable(surface);
   if (section === 'journal') {
     return renderJournal(surface, {
       initialView: state.journalView || 'day',

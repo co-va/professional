@@ -1,4 +1,5 @@
 import { initCalendar, ALL_WORKPLACES_ID } from '../ui/ui.js';
+import { renderJournalGraphMode } from './график.js';
 import { bindCalendarHeaderHost } from '../ui/calendar/index.js';
 import { getRecordPaymentState } from '../core/finance/index.js';
 import { minutesBetween } from '../core/time/index.js';
@@ -91,13 +92,32 @@ function workingDatesForJournal(workingDays, workplaceId, allMode) {
 export function renderJournalMonth(root, {
   month = new Date(),
   workplaceId = '',
+  mode = 'view',
   onDateSelect = () => {},
+  onDateFocus = () => {},
   onMonthChange = () => {},
+  onWorkplaceChange = () => {},
+  onGraphControls = () => {},
   navigationRoot = null,
 } = {}) {
   root.dataset.journalMonthContext = 'professional';
-  root.innerHTML = '<div data-journal-month-calendar></div>';
+  root.innerHTML = '<div data-journal-month-calendar data-calendar-workspace-host></div><div data-journal-month-actions></div>';
   const calendarRoot = root.querySelector('[data-journal-month-calendar]');
+  if (mode === 'graph') {
+    const disposeGraph = renderJournalGraphMode({
+      root,
+      calendarRoot,
+      actionsRoot: root.querySelector('[data-journal-month-actions]'),
+      month,
+      workplaceId,
+      onDateFocus,
+      onMonthChange,
+      onWorkplaceChange,
+      onControls: onGraphControls,
+    });
+    const disposeHeader = bindCalendarHeaderHost(calendarRoot, navigationRoot);
+    return () => { disposeHeader(); disposeGraph?.(); };
+  }
 
   const workingDays = getWorkingDays();
   const workplaces = getWorkplaces();
