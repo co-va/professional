@@ -14,6 +14,7 @@ export function openSharedProfileSettingsMenu({
   controls = [],
   actions = [],
   content = '',
+  footer = '',
   onMount = null,
   data = 'data-shared-profile-settings-menu',
 } = {}) {
@@ -37,7 +38,12 @@ export function openSharedProfileSettingsMenu({
     data: actionData(item.id),
     disabled: Boolean(item.disabled),
   }))) : '';
-  const body = `<div ${data}>${controlsMarkup}${content}${actionsMarkup}</div>`;
+  // Keep existing action rendering unchanged. Only callers supplying a footer
+  // receive a trailing, independent action with shared panel spacing.
+  const trailingActions = footer
+    ? `<div class="app-settings-panel">${actionsMarkup}${footer}</div>`
+    : actionsMarkup;
+  const body = `<div ${data}>${controlsMarkup}${content}${trailingActions}</div>`;
   const layer = mountModal(document.body, modal(body, {
     variant: 'x',
     title,
