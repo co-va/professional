@@ -43,6 +43,20 @@ export function getRecordRowsForDay(date, workplaceId = '') {
     .map((row) => clone(row));
 }
 
+/** Inclusive ISO day range; an empty bound is unbounded. Clone only matches. */
+export function getRecordRowsInRange({ from = '', to = '', workplaceId = '' } = {}) {
+  const start = String(from || '').slice(0, 10);
+  const end = String(to || '').slice(0, 10);
+  const workplace = normalizeId(workplaceId);
+  return recordRowsState.filter((row) => {
+    const date = String(row?.date || '').slice(0, 10);
+    return /^\\d{4}-\\d{2}-\\d{2}$/.test(date)
+      && (!start || date >= start)
+      && (!end || date <= end)
+      && (!workplace || normalizeId(row?.workplaceId) === workplace);
+  }).map((row) => clone(row));
+}
+
 export function getRecordRow(id) {
   const recordId = normalizeId(id);
   const row = recordRowsState.find((item) => normalizeId(item?.id) === recordId) || null;
