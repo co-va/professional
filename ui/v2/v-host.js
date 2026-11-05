@@ -129,18 +129,24 @@ export function bindV2VContext(root) {
     }
 
     if (!nextSource || nextSource.hidden) {
-      if (control?.isConnected) clearV2V(app);
+      // Do not destroy the physical V button while the Journal replaces Z content.
+      // Replacing a touched DOM button before pointerup cancels the native click.
+      if (control?.isConnected && hostControl() === control) {
+        control.disabled = true;
+        hostNode().hidden = true;
+      } else if (control?.isConnected) clearV2V(app);
       source = nextSource;
-      control = null;
-      return;
-    }
-
-    if (nextSource === source && control?.isConnected) {
-      syncControlState(control, source);
       return;
     }
 
     source = nextSource;
+    if (control?.isConnected && hostControl() === control) {
+      // Stable button identity across view and dataset refreshes.
+      hostNode().hidden = false;
+      syncControlState(control, source);
+      return;
+    }
+
     control = setV2V(app, { aria: source.getAttribute('aria-label') || 'Действия раздела' });
     if (control) {
       syncControlState(control, source);
