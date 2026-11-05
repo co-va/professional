@@ -3,6 +3,7 @@ FROM nginx:1.27-alpine
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 COPY app-icon.svg /usr/share/nginx/html/app-icon.svg
+COPY icon-192.png /usr/share/nginx/html/icon-192.png
 COPY booking.html /usr/share/nginx/html/booking.html
 COPY chat /usr/share/nginx/html/chat
 COPY core /usr/share/nginx/html/core
