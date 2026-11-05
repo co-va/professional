@@ -1,4 +1,4 @@
-import { viewNavigation, initViewNavigation, ALL_WORKPLACES_ID, modal, mountModal, openDayWorkplaceControl, openSharedProfileSettingsMenu, workspaceHeaderContext } from '../ui/ui.js';
+import { viewNavigation, initViewNavigation, ALL_WORKPLACES_ID, modal, mountModal, openDayWorkplaceControl, openSharedProfileSettingsMenu, workspaceHeaderContext, button } from '../ui/ui.js';
 import { setV2ZHeaderRows, clearV2ZHeaderRows } from '../ui/v2/z-layout.js';
 import { getWorkplaceContext, setWorkplaceContext } from '../core/workplace-context.js';
 import { readOnlyReceipt } from '../ui/receipt/index.js';
@@ -165,7 +165,7 @@ export function renderJournal(root, options = {}) {
     });
   };
 
-  const openDayWorkplaces = () => {
+  const dayWorkplaceChoices = () => {
     const day = dateKey(selectedDate);
     const active = activeDayWorkplaces().map((item) => {
       const workplace = workplaces.find((entry) => String(entry?.key || '') === String(item.workplaceId || '')) || null;
@@ -182,32 +182,43 @@ export function renderJournal(root, options = {}) {
       const key = String(workplace?.key || '');
       return [key, key ? getActiveRecordCountForDay(day, key) : 0];
     }));
-
-    openJournalWorkplaceControl({
-      workplaces: active,
-      workplaceId: selectedWorkplaceId,
+    return {
+      active,
+      available: getAvailableDayWorkplaces(selectedDate, workplaces),
       recordCounts,
       aggregateCount: getActiveRecordCountForDay(day),
-      availableWorkplaces: getAvailableDayWorkplaces(selectedDate, workplaces),
-      onSelect: selectWorkplace,
-      onAdd: addDayWorkplace,
-    });
+    };
   };
 
-  const openWorkplace = () => {
-    const day = dateKey(selectedDate);
-    const recordCounts = Object.fromEntries(workplaces.map((workplace) => {
-      const key = String(workplace?.key || '');
-      return [key, key ? getActiveRecordCountForDay(day, key) : 0];
-    }));
-
-    openJournalWorkplaceControl({
-      workplaces,
-      workplaceId: selectedWorkplaceId,
-      recordCounts,
-      aggregateCount: getActiveRecordCountForDay(day),
-      onSelect: selectWorkplace,
-    });
+  // Keep one Shared Select presentation, embedded directly into Journal settings.
+  const inlineWorkplaceSettings = ({
+    choices = [], workplaceId = selectedWorkplaceId, available = [],
+    recordCounts = {}, aggregateCount = 0, month = false,
+    aggregateStats = null, workplaceStats = {},
+    onSelect = selectWorkplace, onAdd = () => {},
+  } = {}) => {
+    const ids = new Set([ALL_WORKPLACES_ID, ...choices.map((item) => String(item?.key || '')).filter(Boolean)]);
+    const content = `<div class="compact-form">${journalWorkplaceSelect({
+      workplaces: choices,
+      workplaceId: ids.has(workplaceId) ? workplaceId : ALL_WORKPLACES_ID,
+      recordCounts, aggregateCount, month, aggregateStats, workplaceStats,
+    })}${available.length ? button('+ Рабочее пространство', { data: 'data-journal-workplace-add' }) : ''}</div>`;
+    return {
+      content,
+      onMount: (layer) => {
+        const input = layer.querySelector('input[name="journalWorkplaceMode"]');
+        input?.addEventListener('change', () => {
+          const nextId = String(input.value || '');
+          if (!ids.has(nextId)) return;
+          layer.v2Close?.();
+          if (nextId !== selectedWorkplaceId) onSelect(nextId);
+        });
+        layer.querySelector('[data-journal-workplace-add]')?.addEventListener('click', () => {
+          layer.v2Close?.();
+          onAdd();
+        });
+      },
+    };
   };
 
   const openListWorkplaces = () => {
@@ -245,7 +256,7 @@ export function renderJournal(root, options = {}) {
     selectWorkplace(nextId);
   };
 
-  const openMonthWorkplaces = (afterSelection = null) => {
+  const monthWorkplaceChoices = () => {
     const days = getWorkingDays();
     const catalog = getWorkplaces();
     const stats = getWorkplaceMonthStatsMap(days, catalog, selectedDate);
@@ -259,28 +270,39 @@ export function renderJournal(root, options = {}) {
       const id = String(workplace?.key || '');
       return id && !activeIds.has(id);
     });
-
-    openJournalWorkplaceControl({
-      workplaces: active,
-      workplaceId: activeIds.has(selectedWorkplaceId) ? selectedWorkplaceId : ALL_WORKPLACES_ID,
-      month: true,
-      workplaceStats: stats,
+    return {
+      active, activeIds, available, extra, stats,
       aggregateStats: getAllWorkplacesMonthStats(days, catalog, selectedDate),
-      availableWorkplaces: available,
+    };
+  };
+
+  const addMonthWorkplace = ({ available, extra }, afterSelection = null) =>
+    openDayWorkplaceControl({
+      available,
+      catalogTitle: 'Добавить рабочее пространство',
+      onAdd: (id) => {
+        if (!available.some((item) => String(item?.key || '') === String(id))) return;
+        extra.add(String(id));
+        selectMonthWorkplace(String(id));
+        if (typeof afterSelection === 'function') afterSelection();
+      },
+    });
+
+  // Only needed when Graph's Working Time action starts in aggregate mode.
+  const openMonthWorkplaces = (afterSelection = null) => {
+    const choice = monthWorkplaceChoices();
+    openJournalWorkplaceControl({
+      workplaces: choice.active,
+      workplaceId: choice.activeIds.has(selectedWorkplaceId) ? selectedWorkplaceId : ALL_WORKPLACES_ID,
+      month: true,
+      workplaceStats: choice.stats,
+      aggregateStats: choice.aggregateStats,
+      availableWorkplaces: choice.available,
       onSelect: (id) => {
         selectMonthWorkplace(id);
         if (typeof afterSelection === 'function' && id !== ALL_WORKPLACES_ID) afterSelection();
       },
-      onAdd: () => openDayWorkplaceControl({
-        available,
-        catalogTitle: 'Добавить рабочее пространство',
-        onAdd: (id) => {
-          if (!available.some((item) => String(item?.key || '') === String(id))) return;
-          extra.add(String(id));
-          selectMonthWorkplace(String(id));
-          if (typeof afterSelection === 'function') afterSelection();
-        },
-      }),
+      onAdd: () => addMonthWorkplace(choice, afterSelection),
     });
   };
 
