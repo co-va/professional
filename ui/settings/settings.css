@@ -1,4 +1,6 @@
 .app-settings-panel{display:grid;gap:8px}
+/* Match selector-to-action spacing to the same 8px rhythm as action-to-action spacing. */
+.modal--profile-settings-sheet [data-shared-profile-settings-menu]{display:grid;gap:8px}
 .app-settings-panel .ui-button.app-settings-panel__button{justify-content:center;text-align:center}
 .app-setting-toggle{width:100%;min-height:48px;border:1px solid var(--border);border-radius:13px;padding:8px 10px 8px 13px;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;background:var(--white);color:var(--text);font:inherit;font-size:14px;font-weight:650;text-align:left}
 .app-setting-toggle__switch{position:relative;width:42px;height:24px;border-radius:999px;background:var(--text-muted);transition:background .16s ease}
