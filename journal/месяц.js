@@ -50,46 +50,58 @@ function dayRecordData({ dateKey, workplaceId, allMode, workingDays, workplaces,
   const records = recordIndex.get(dateKey) || [];
   const events = eventIndex.get(dateKey) || [];
   const minutes = { paid: 0, active: 0, noShow: 0, event: 0 };
-  let capacity = 0;
 
-  // Each workplace has its own non-overlapping work interval. The aggregate
-  // calendar sums their capacities, not the wall-clock width of the day.
+  // Day owns planned work, Record/Event own actual occupancy. A later schedule
+  // correction must not hide an existing appointment from the Month.
+  const timelines = new Map();
+  const timeline = (id) => {
+    if (!timelines.has(id)) timelines.set(id, {
+      planned: new Uint8Array(1440),
+      occupied: new Uint8Array(1440),
+    });
+    return timelines.get(id);
+  };
+  const inScope = (id) => id && (allMode || id === String(workplaceId || ''));
+  const bounds = (value) => {
+    const from = timeToMinutes(value?.from);
+    const to = timeToMinutes(value?.to);
+    return from == null || to == null || to <= from ? null : { from, to };
+  };
+
   for (const day of workingDays) {
     if (String(day?.date || '') !== dateKey) continue;
     const id = String(day?.workplaceId || '');
-    if (!id || (!allMode && id !== String(workplaceId || ''))) continue;
-    const range = resolveWorkingDayTime(workplaces, day);
-    const from = timeToMinutes(range?.from);
-    const to = timeToMinutes(range?.to);
-    if (from == null || to == null || to <= from) continue;
+    if (!inScope(id)) continue;
+    const range = bounds(resolveWorkingDayTime(workplaces, day));
+    if (!range) continue;
+    timeline(id).planned.fill(1, range.from, range.to);
+  }
 
-    capacity += to - from;
-    const slots = new Uint8Array(to - from);
-    const mark = (item, rank) => {
-      const start = timeToMinutes(item?.from);
-      const end = timeToMinutes(item?.to);
-      if (start == null || end == null || end <= start) return;
-      const left = Math.max(from, start) - from;
-      const right = Math.min(to, end) - from;
-      for (let minute = left; minute < right; minute += 1) {
-        if (rank > slots[minute]) slots[minute] = rank;
-      }
-    };
+  const occupy = (item, rank) => {
+    const id = String(item?.workplaceId || '');
+    if (!inScope(id)) return;
+    const range = bounds(item);
+    if (!range) return;
+    const slots = timeline(id).occupied;
+    for (let minute = range.from; minute < range.to; minute += 1) {
+      if (rank > slots[minute]) slots[minute] = rank;
+    }
+  };
+  for (const record of records) {
+    // "No-show" remains occupied and pink, regardless of payment status.
+    if (record?.attendance === 'no-show') occupy(record, NO_SHOW);
+    else {
+      const paid = Boolean(getRecordPaymentState(record).fullyPaid);
+      occupy(record, recordVisualState(record, { paid }) === 'paid' ? PAID : ACTIVE);
+    }
+  }
+  for (const event of events) occupy(event, EVENT);
 
-    for (const record of records) {
-      if (String(record?.workplaceId || '') !== id) continue;
-      // "No-show" remains occupied and pink even if a payment was recorded.
-      if (record?.attendance === 'no-show') {
-        mark(record, NO_SHOW);
-      } else {
-        const paid = Boolean(getRecordPaymentState(record).fullyPaid);
-        mark(record, recordVisualState(record, { paid }) === 'paid' ? PAID : ACTIVE);
-      }
-    }
-    for (const event of events) {
-      if (String(event?.workplaceId || '') === id) mark(event, EVENT);
-    }
-    for (const rank of slots) {
+  let capacity = 0;
+  for (const { planned, occupied } of timelines.values()) {
+    for (let minute = 0; minute < planned.length; minute += 1) {
+      const rank = occupied[minute];
+      if (planned[minute] || rank) capacity += 1;
       if (rank === PAID) minutes.paid += 1;
       else if (rank === ACTIVE) minutes.active += 1;
       else if (rank === NO_SHOW) minutes.noShow += 1;
