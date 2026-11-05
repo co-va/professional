@@ -167,7 +167,6 @@ export function renderJournal(root, options = {}) {
   };
 
   const dayWorkplaceChoices = () => {
-    const day = dateKey(selectedDate);
     const active = activeDayWorkplaces().map((item) => {
       const workplace = workplaces.find((entry) => String(entry?.key || '') === String(item.workplaceId || '')) || null;
       return {
@@ -478,9 +477,13 @@ export function renderJournal(root, options = {}) {
         field.onMount(layer);
         const contextAction = layer.querySelector('[data-shared-profile-action="day-context"]');
         // Never let a slow Record/Time projection delay the first X paint.
-        if (contextAction) contextAction.hidden = true;
+        if (contextAction) {
+          contextAction.hidden = true;
+          contextAction.style.display = 'none';
+        }
         requestAnimationFrame(() => window.setTimeout(() => {
           if (!layer.isConnected) return;
+          try {
           const recordCounts = {};
           let aggregateCount = 0;
           for (const record of getRecordsForDay(day)) {
@@ -506,6 +509,19 @@ export function renderJournal(root, options = {}) {
             contextAction.classList.toggle('ui-button--danger', !hasUsage);
             contextAction.classList.toggle('ui-button--outline', hasUsage);
             contextAction.hidden = false;
+            contextAction.style.removeProperty('display');
+          }
+          } catch (error) {
+            console.error('Journal settings details failed', error);
+            // If occupancy cannot be read, never offer a destructive Day-off action.
+            if (contextAction?.isConnected) {
+              hasUsage = true;
+              contextAction.textContent = 'Z-Отчет';
+              contextAction.classList.remove('ui-button--danger');
+              contextAction.classList.add('ui-button--outline');
+              contextAction.hidden = false;
+              contextAction.style.removeProperty('display');
+            }
           }
         }, 0));
       },
