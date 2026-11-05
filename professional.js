@@ -116,7 +116,9 @@ function setThemeColor(value) {
 function ensureServerSync() {
   if (serverSyncStarted) return;
   serverSyncStarted = true;
-  startProfessionalServerSync();
+  // Authenticated loaders have already fetched this state.
+  // Normal polling, focus and mutation events keep it fresh thereafter.
+  startProfessionalServerSync({ initialRefresh: false });
 }
 
 function rootDefinition(section) {
