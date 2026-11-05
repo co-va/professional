@@ -546,6 +546,14 @@ export function renderJournal(root, options = {}) {
     });
   };
 
+  // Delegate once for this Journal instance: the Day source can survive server
+  // refreshes without collecting extra click handlers.
+  const handleSettingsClick = (event) => {
+    const action = event.target?.closest?.('[data-journal-settings]');
+    if (action && root.contains(action)) openJournalSettings();
+  };
+  root.addEventListener('click', handleSettingsClick);
+
   const renderView = () => {
     // An inline Record/Event/Note editor owns the visible Z body until commit/cancel.
     if (!root.isConnected || root.querySelector('[data-record-creation-flow]')) return;
@@ -570,7 +578,19 @@ export function renderJournal(root, options = {}) {
     const headerOptions = journalHeader();
     headerOptions.v = { data: 'data-journal-settings', aria: 'Настройки журнала' };
 
-    root.innerHTML = `${workspaceHeaderContext(headerOptions)}<div data-journal-view${viewClass}></div>`;
+    // A cold server sync can refresh Day several times immediately after login.
+    // Keep the actual V source node mounted, so a finger pressing V is not
+    // interrupted by root.innerHTML replacing that source mid-gesture.
+    const oldContext = root.querySelector(':scope > [data-workspace-header-context]');
+    const oldView = root.querySelector(':scope > [data-journal-view]');
+    const retainDayV = activeView === 'day'
+      && oldView?.dataset.journalDayContext === 'professional'
+      && oldContext?.querySelector('[data-journal-settings]');
+    if (!retainDayV) {
+      root.innerHTML = `${workspaceHeaderContext(headerOptions)}<div data-journal-view${viewClass}></div>`;
+    } else {
+      syncJournalHeader();
+    }
     const viewRoot = root.querySelector('[data-journal-view]');
     if (activeView === 'day') {
       disposeActiveView = renderJournalDay(viewRoot, {
@@ -634,7 +654,6 @@ export function renderJournal(root, options = {}) {
       }) || (() => {});
     } else renderJournalList(viewRoot, { mode: listMode, workplaceId: selectedWorkplaceId });
 
-    root.querySelector('[data-journal-settings]')?.addEventListener('click', openJournalSettings);
     if (activeView === 'list' && secondaryNavigationRoot) {
       initViewNavigation(secondaryNavigationRoot, {
         views: listModes,
@@ -703,6 +722,7 @@ export function renderJournal(root, options = {}) {
   return () => {
     dayViewState = null;
     disposeActiveView();
+    root.removeEventListener('click', handleSettingsClick);
     refreshEvents.forEach((eventName) => window.removeEventListener(eventName, scheduleRefresh));
     window.removeEventListener('professional:journal-note-focus-request', focusJournalNotes);
     clearV2ZHeaderRows(root);
