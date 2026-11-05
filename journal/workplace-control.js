@@ -33,6 +33,7 @@ export function openJournalWorkplaceControl({
   recordCounts = {},
   aggregateCount = 0,
   month = false,
+  list = false,
   aggregateStats = null,
   workplaceStats = {},
   availableWorkplaces = [],
@@ -41,7 +42,7 @@ export function openJournalWorkplaceControl({
 } = {}) {
   const options = [{
     value: ALL_WORKPLACES_ID,
-    label: month ? 'Общий график' : 'График дня',
+    label: list ? 'Общий список' : month ? 'Общий график' : 'График дня',
     meta: month ? monthStatsText(aggregateStats) : recordCountText(aggregateCount),
     indicatorColor: '',
   }];
@@ -59,11 +60,11 @@ export function openJournalWorkplaceControl({
 
   const main = mountModal(document.body, modal(
     `<div class="compact-form">${select({
-      label: month ? 'Рабочее пространство' : 'Режим',
+      label: month || list ? 'Рабочее пространство' : 'Режим',
       name: 'journalWorkplaceMode',
       value: workplaceId || ALL_WORKPLACES_ID,
       options,
-      aria: month ? 'Выбор графика месяца' : 'Режим рабочего поля журнала',
+      aria: list ? 'Выбор списка записей' : month ? 'Выбор графика месяца' : 'Режим рабочего поля журнала',
       data: 'data-journal-workplace-select',
     })}${availableWorkplaces.length ? button('+ Рабочее пространство', { data: 'data-journal-workplace-add' }) : ''}</div>`,
     { variant: 'x', surface: 'app', title: 'Рабочее пространство', className: 'modal--form-sheet' },
