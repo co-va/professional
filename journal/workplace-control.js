@@ -55,7 +55,8 @@ export function journalWorkplaceSelect({
   }
 
   return select({
-    label: month || list ? 'Рабочее пространство' : 'Режим',
+    // Journal X has no visual heading: the mode is clear from the selected value.
+    // Keep the explicit aria name below for assistive technology.
     name: 'journalWorkplaceMode',
     value: workplaceId || ALL_WORKPLACES_ID,
     options,
