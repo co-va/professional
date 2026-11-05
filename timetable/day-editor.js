@@ -513,3 +513,66 @@ export function applyTimetableWorkingDays({
   else applyWorkingDays(dates, schedule, selectedWorkplaceId);
   return true;
 }
+
+/** Timetable-owned bulk day-off action. Blocked dates remain unchanged. */
+export function applyTimetableDaysOff({
+  dates = [],
+  workplaceId = '',
+  workingDays = getDays(),
+  onSave = () => {},
+} = {}) {
+  const id = String(workplaceId || '');
+  if (!id) return { changed: false, blocked: [] };
+  let changed = false;
+  const blocked = [];
+  for (const input of [...new Set(Array.isArray(dates) ? dates : [])]) {
+    const date = dateKey(input);
+    if (!date || !getDay(workingDays, id, date)) continue;
+    const conflicts = getDayRemovalConflicts(id, date);
+    if (conflicts.length) {
+      blocked.push({ date, conflicts });
+      continue;
+    }
+    if (removeDay(workingDays, id, date)) changed = true;
+  }
+  if (changed) {
+    saveDays(workingDays);
+    onSave();
+  }
+  return { changed, blocked };
+}
+
+/** Timetable-owned time correction: validate all selected days before writing. */
+export function applyTimetableTimeCorrection({
+  dates = [],
+  workplaceId = '',
+  from = '',
+  to = '',
+  workingDays = getDays(),
+  onSave = () => {},
+} = {}) {
+  const id = String(workplaceId || '');
+  const selected = [...new Set((Array.isArray(dates) ? dates : []).map(dateKey))]
+    .filter((date) => id && date && getDay(workingDays, id, date));
+  if (!selected.length) return { ok: false, message: 'Нет выбранных рабочих дней.' };
+  if (!isValidRange(from, to)) return { ok: false, message: 'Окончание должно быть позже начала.' };
+
+  for (const date of selected) {
+    const usage = getWorkingTimeUsageConflicts({ date, workplaceId: id, from, to })
+      .filter((item) => item?.from && item?.to);
+    if (usage.length) {
+      return {
+        ok: false,
+        message: `${formatModalDate(date)}: ${usage.map((item) => `${usageLabel(item)} ${item.from}–${item.to}`).join(', ')} выходит за рабочее время.`,
+      };
+    }
+    if (getScheduleConflicts(workingDays, { workplaceId: id, date, from, to }).length) {
+      return { ok: false, message: `${formatModalDate(date)}: время пересекается с другим рабочим пространством.` };
+    }
+  }
+  selected.forEach((date) => updateDayTime(workingDays, id, date, from, to));
+  const result = saveDays(workingDays);
+  if (!result?.ok) return { ok: false, message: 'Не удалось сохранить рабочее время.' };
+  onSave();
+  return { ok: true };
+}

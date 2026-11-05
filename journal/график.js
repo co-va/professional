@@ -1,8 +1,7 @@
 import { actionBlock, button, initCalendar, initMultiSelect, modal, mountModal, openDayWorkplaceControl, select, timePicker, initTimePickers, escapeHtml, ALL_WORKPLACES_ID } from '../ui/ui.js';
 import { getWorkplaces, resolveWorkplaceTime, getWorkingDayIndicators, getWorkingDayTotalMinutes } from '../core/workplace-time.js';
-import { getDays, saveDays, getDay, getDayTime, removeDay, getDayRemovalConflicts, getScheduleConflicts } from '../core/day/index.js';
-import { applyTimetableWorkingDays } from '../timetable/day-editor.js';
-import { getWorkingTimeUsageConflicts, isValidRange } from '../core/time/index.js';
+import { getDays, getDay, getDayTime } from '../core/day/index.js';
+import { applyTimetableWorkingDays, applyTimetableDaysOff, applyTimetableTimeCorrection } from '../timetable/day-editor.js';
 
 function datesForWorkplace(days, workplaceId) { return days.filter((item) => item?.workplaceId === workplaceId).map((item) => item.date).filter(Boolean); }
 function datesForAllWorkplaces(days) { return [...new Set(days.map((item) => item?.date).filter(Boolean))]; }
@@ -184,38 +183,21 @@ export function renderJournalGraphMode({
     m.querySelector('[data-timetable-correction-save]')?.addEventListener('click', () => {
       const from = m.querySelector('[name="timetableCorrectionFrom"]')?.value || '';
       const to = m.querySelector('[name="timetableCorrectionTo"]')?.value || '';
-      const error = m.querySelector('[data-timetable-correction-error]');
-      if (!isValidRange(from, to)) {
-        if (error) error.textContent = 'Окончание должно быть позже начала.';
+      const result = applyTimetableTimeCorrection({
+        dates: selected,
+        workplaceId: selectedWorkplaceId,
+        from,
+        to,
+        workingDays,
+      });
+      if (!result.ok) {
+        const error = m.querySelector('[data-timetable-correction-error]');
+        if (error) error.textContent = result.message;
         return;
       }
-
-      for (const date of selected) {
-        const usage = getWorkingTimeUsageConflicts({ date, workplaceId: selectedWorkplaceId, from, to })
-          .filter((item) => item?.from && item?.to);
-        if (usage.length) {
-          if (error) error.textContent = `${formatDateLabel(date)}: ${usage.map((item) => `${occupiedLabel(item)} ${item.from}–${item.to}`).join(', ')} выходит за рабочее время.`;
-          return;
-        }
-
-        const schedule = getScheduleConflicts(workingDays, {
-          workplaceId: selectedWorkplaceId,
-          date,
-          from,
-          to,
-        });
-        if (schedule.length) {
-          if (error) error.textContent = `${formatDateLabel(date)}: время пересекается с другим рабочим пространством.`;
-          return;
-        }
-      }
-
-      selected.forEach((date) => updateDayTime(workingDays, selectedWorkplaceId, date, from, to));
-      saveDays(workingDays);
       const month = calendar?.getDisplayedMonth() || initialMonth;
       m.v2Close?.();
       startSelectionSession(month);
-      
     });
   }
   function openGraphWorkplaceChooser() {
@@ -261,14 +243,13 @@ export function renderJournalGraphMode({
       return;
     }
 
-    const blockedRemoval = [];
-    for (const date of dates) {
-      if (removeDay(workingDays, selectedWorkplaceId, date)) continue;
-      const conflicts = getDayRemovalConflicts(selectedWorkplaceId, date);
-      if (conflicts.length) blockedRemoval.push({ date, conflicts });
-    }
-    saveDays(workingDays); const month = calendar.getDisplayedMonth(); startSelectionSession(month); 
-    if (blockedRemoval.length) openRemovalBlockedModal(blockedRemoval);
+    const result = applyTimetableDaysOff({
+      dates,
+      workplaceId: selectedWorkplaceId,
+      workingDays,
+    });
+    if (result.changed) startSelectionSession(calendar.getDisplayedMonth());
+    if (result.blocked.length) openRemovalBlockedModal(result.blocked);
   });
 
   let refreshQueued = false;
