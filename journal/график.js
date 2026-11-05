@@ -40,7 +40,6 @@ export function renderJournalGraphMode({
   const applyButton = actionsRoot.querySelector('[data-timetable-apply]');
   const applyActions = applyButton?.closest('.modal-actions');
   let calendar; let selection; let selectionMode = null;
-  const renderHeader = () => {};
   const isAllMode = () => selectedWorkplaceId === ALL_WORKPLACES_ID;
   const isWorkingDate = (date) => !isAllMode() && datesForWorkplace(workingDays, selectedWorkplaceId).includes(date);
   const syncApplyButton = (dates) => {
@@ -108,7 +107,7 @@ export function renderJournalGraphMode({
       onMonthChange: (nextMonth) => {
         bindSelection();
         onMonthChange(nextMonth);
-        renderHeader(nextMonth);
+        
       },
     });
     bindSelection();
@@ -123,7 +122,7 @@ export function renderJournalGraphMode({
       onSave: () => {
         const month = calendar?.getDisplayedMonth() || initialMonth;
         startSelectionSession(month);
-        renderHeader(month);
+        
       },
     });
   };
@@ -216,7 +215,7 @@ export function renderJournalGraphMode({
       const month = calendar?.getDisplayedMonth() || initialMonth;
       m.v2Close?.();
       startSelectionSession(month);
-      renderHeader(month);
+      
     });
   }
   function openGraphWorkplaceChooser() {
@@ -268,7 +267,7 @@ export function renderJournalGraphMode({
       const conflicts = getDayRemovalConflicts(selectedWorkplaceId, date);
       if (conflicts.length) blockedRemoval.push({ date, conflicts });
     }
-    saveDays(workingDays); const month = calendar.getDisplayedMonth(); startSelectionSession(month); renderHeader(month);
+    saveDays(workingDays); const month = calendar.getDisplayedMonth(); startSelectionSession(month); 
     if (blockedRemoval.length) openRemovalBlockedModal(blockedRemoval);
   });
 
@@ -290,7 +289,7 @@ export function renderJournalGraphMode({
       const month = calendar?.getDisplayedMonth?.() || initialMonth;
       if (workplaces.length) startSelectionSession(month);
       else calendar = initCalendar(calendarRoot, { month, workingDates: [] });
-      renderHeader(month);
+      
     });
   };
   window.addEventListener('professional:time-usage-changed', syncCanonicalState);
