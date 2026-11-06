@@ -37,17 +37,35 @@ function mountV2ModalPortal(host, app = null) {
     let geometry = standardGeometry;
     if (qLayer && app) {
       const appRect = app.getBoundingClientRect();
-      geometry = { left: appRect.left, top: appRect.top, width: appRect.width, height: appRect.height, bottom: appRect.bottom };
+      const editable = document.activeElement?.matches?.('input:not([type="hidden"]):not([readonly]), textarea:not([readonly]), [contenteditable="true"]');
+      const stableHeight = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--app-stable-vh')) || window.innerHeight;
+      const keyboardVisible = Boolean(editable && stableHeight > viewport.height + 60);
+      portal.classList.toggle('is-keyboard-visible', keyboardVisible);
+
+      // iOS may shift/shrink the app while the software keyboard is open.
+      // Q still belongs to the app, but its visible bottom must follow
+      // VisualViewport, not the temporarily displaced app rectangle.
+      const surfaceRect = keyboardVisible ? {
+        ...appRect,
+        top: viewport.offsetTop,
+        bottom: viewport.offsetTop + viewport.height,
+        height: viewport.height,
+      } : appRect;
+      geometry = keyboardVisible
+        ? v2ModalPortalGeometry(surfaceRect, viewport)
+        : { left: appRect.left, top: appRect.top, width: appRect.width, height: appRect.height, bottom: appRect.bottom };
       const headerBottom = app.querySelector?.('[data-v2-header]')?.getBoundingClientRect?.().bottom;
-      const qGeometry = v2QModalPortalGeometry(appRect, {
+      const qViewport = keyboardVisible ? viewport : {
         offsetLeft: appRect.left,
         offsetTop: appRect.top,
         width: appRect.width,
         height: appRect.height,
-      }, { headerBottom });
+      };
+      const qGeometry = v2QModalPortalGeometry(surfaceRect, qViewport, { headerBottom });
       portal.style.setProperty('--v2-q-top', `${Math.max(0, qGeometry.top - geometry.top)}px`);
       portal.style.setProperty('--v2-q-left', `${Math.max(0, qGeometry.left - geometry.left)}px`);
     } else {
+      portal.classList.remove('is-keyboard-visible');
       portal.style.removeProperty('--v2-q-top');
       portal.style.removeProperty('--v2-q-left');
     }

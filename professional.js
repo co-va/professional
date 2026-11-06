@@ -159,12 +159,6 @@ window.addEventListener('professional:auth-logout', () => renderLogin());
 window.addEventListener('resize', syncViewport, { passive: true });
 window.visualViewport?.addEventListener('resize', syncViewport, { passive: true });
 window.visualViewport?.addEventListener('scroll', syncViewport, { passive: true });
-document.addEventListener('focusin', (event) => {
-  const target = event.target;
-  if (!(target instanceof HTMLElement) || !target.matches('input, select, textarea')) return;
-  if (target.closest('[data-v2-layer]')) return;
-  window.setTimeout(() => target.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'smooth' }), 120);
-}, { passive: true });
 
 syncViewport();
 try {

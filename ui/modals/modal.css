@@ -35,3 +35,10 @@
 .modal-sheet.modal--bottom.modal--form-sheet{height:auto;min-height:260px;max-height:54%;padding:max(20px,var(--v2-layer-gesture-size)) 18px calc(18px + env(safe-area-inset-bottom));background:var(--white);overflow:auto}
 
 .modal-sheet.modal--bottom.modal--time-picker-sheet{height:auto;min-height:360px;max-height:72%;padding:max(20px,var(--v2-layer-gesture-size)) 18px calc(18px + env(safe-area-inset-bottom));background:var(--white);overflow:auto}
+
+/* A profile editor must never cover an active input with its save action.
+   The action returns to the same Shared Q footer when the keyboard closes. */
+.v2-layer-portal.is-keyboard-visible :is(.modal--profile-editor,.v2-profile-data-layer) .modal-actions{
+  visibility:hidden;
+  pointer-events:none;
+}
