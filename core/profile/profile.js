@@ -29,11 +29,11 @@ export function render(root,navigateBack=()=>{},options={}){
   return loadProfileState().then(()=>renderProfile(root,navigateBack,options));
 }
 
-function profileContext(p,title=fullName(p)){
+function profileContext(p,title=fullName(p),{includeSettings=true}={}){
   return workspaceHeaderContext({
     title,
     a:{kind:'avatar',image:p.photo||'',imagePosition:avatarPosition(p),initials:initial(p)},
-    v:{data:'data-profile-settings',aria:'Настройки профиля'},
+    v:includeSettings?{data:'data-profile-settings',aria:'Настройки профиля'}:null,
   });
 }
 
@@ -108,15 +108,12 @@ function openProfileData(root,navigateBack,options={}){
   const emails=current.emails?.length?current.emails:(options.accountEmail?[options.accountEmail]:[]);
   return openSharedProfileDataEditor({
     root,
-    header:profileContext(current,'Данные профиля'),
+    header:profileContext(current,'Данные профиля',{includeSettings:false}),
     fields:profileDataFields(current,emails),
     read:collectProfileData,
     validate:(values)=>!values.name||!values.phones.length||!values.profession
       ?'Имя, телефон и профессия обязательны.':'',
     persist:saveProfileData,
-    onOpen:(layer)=>{
-      layer.querySelector('[data-profile-settings]')?.addEventListener('click',()=>openProfileSettings(root,navigateBack,options));
-    },
     onSaved:()=>renderProfile(root,navigateBack,options),
   });
 }
