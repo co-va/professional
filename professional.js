@@ -1,4 +1,4 @@
-import { getCurrentAccount, login, requestPasswordReset } from './core/auth.js';
+import { getCurrentAccount, login, logout, requestPasswordReset } from './core/auth.js';
 import { field, passwordField, initPasswordFields } from './ui/inputs/index.js';
 import { v2Sticker } from './ui/v2/sticker.js';
 import { syncViewport, setThemeColor } from './ui/viewport/index.js';
@@ -15,6 +15,38 @@ async function enterWorkspace(account) {
   }
   const { renderAuthenticated } = await workspaceModule;
   await renderAuthenticated(account);
+}
+
+function renderWorkspaceUnavailable(account, cause) {
+  setThemeColor('#F5F5F3');
+  app.classList.remove('app-shell--booking');
+  app.classList.add('app-shell--auth');
+  app.innerHTML = v2Sticker({
+    title: 'Кабинет временно недоступен',
+    body: '<p>Вход выполнен или сохранён. Не удалось открыть рабочий экран. Повторно вводить пароль не требуется.</p>'
+      + '<p class="auth-error" data-workspace-load-error role="alert"></p>'
+      + '<button type="button" class="v2-sticker-link" data-workspace-logout>Выйти из Кабинета</button>',
+    action: '<button type="button" class="ui-button" data-workspace-retry>Повторить</button>',
+    className: 'v2-sticker-screen--auth',
+  });
+  app.querySelector('[data-workspace-load-error]').textContent =
+    cause instanceof Error ? cause.message : 'Не удалось загрузить рабочий экран';
+  app.querySelector('[data-workspace-logout]')?.addEventListener('click', logout);
+  app.querySelector('[data-workspace-retry]')?.addEventListener('click', async (event) => {
+    const button = event.currentTarget;
+    button.disabled = true;
+    try {
+      const current = account || await getCurrentAccount();
+      if (!current) {
+        renderLogin();
+        return;
+      }
+      await enterWorkspace(current);
+    } catch (error) {
+      renderWorkspaceUnavailable(account, error);
+    }
+  });
+  syncViewport();
 }
 
 function renderPasswordResetRequest() {
@@ -71,13 +103,13 @@ function renderLogin(message = '') {
     <form class="auth-form" id="auth-form">
       ${field({ label: 'Телефон или email', name: 'identifier', type: 'text', required: true, autocomplete: 'username' })}
       ${passwordField({ label: 'Пароль', name: 'password', required: true, autocomplete: 'current-password' })}
-      <p class="auth-error" id="auth-error" role="alert">${message}</p>
+      <p class="auth-error" id="auth-error" role="alert"></p>
       <button type="button" class="v2-sticker-link" data-specialist-forgot>Забыли пароль?</button>
       <button type="button" class="v2-sticker-link" data-professional-register>Зарегистрироваться</button>
     </form>`;
 
   app.innerHTML = v2Sticker({
-    title: 'Вход',
+    title: 'Вход в Кабинет',
     body,
     action: '<button class="ui-button" type="submit" form="auth-form">Войти</button>',
     className: 'v2-sticker-screen--auth',
@@ -93,6 +125,7 @@ function renderLogin(message = '') {
 
   const form = app.querySelector('#auth-form');
   const error = app.querySelector('#auth-error');
+  error.textContent = message;
   const button = app.querySelector('button[type="submit"][form="auth-form"]');
 
   form.addEventListener('submit', async (event) => {
@@ -102,13 +135,19 @@ function renderLogin(message = '') {
     button.textContent = 'Входим…';
     const data = new FormData(form);
 
+    let account;
     try {
-      const account = await login(data.get('identifier'), data.get('password'));
-      await enterWorkspace(account);
+      account = await login(data.get('identifier'), data.get('password'));
     } catch (loginError) {
       error.textContent = loginError instanceof Error ? loginError.message : 'Не удалось войти';
       button.disabled = false;
       button.textContent = 'Войти';
+      return;
+    }
+    try {
+      await enterWorkspace(account);
+    } catch (workspaceError) {
+      renderWorkspaceUnavailable(account, workspaceError);
     }
   });
 
@@ -130,8 +169,13 @@ document.addEventListener('focusin', (event) => {
 syncViewport();
 try {
   const account = await getCurrentAccount();
-  if (account) await enterWorkspace(account);
-  else renderLogin();
-} catch {
-  renderLogin('Сервер временно недоступен');
+  if (account) {
+    try {
+      await enterWorkspace(account);
+    } catch (error) {
+      renderWorkspaceUnavailable(account, error);
+    }
+  } else renderLogin();
+} catch (error) {
+  renderWorkspaceUnavailable(null, error);
 }
