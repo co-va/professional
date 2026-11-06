@@ -41,7 +41,7 @@ function syncViewport() {
     stableWidth = width;
   }
   const shrinking = height < stableHeight - 60;
-  const keyboardOpen = shrinking && Boolean(activeEditable() || root.classList.contains('keyboard-open'));
+  const keyboardOpen = shrinking && Boolean(activeEditable() || root.classList.contains('keyboard-open') || performance.now() < trackThrough);
   if (!keyboardOpen && height >= stableHeight - 60) {
     stableHeight = height;
     stableWidth = width;
