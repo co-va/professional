@@ -1,9 +1,81 @@
 import { button } from '../buttons/index.js';
 import { formError, formView } from '../forms/index.js';
 import { formValidationMessage, initPasswordFields, passwordField, selectPhotoFile } from '../inputs/index.js';
+import { initRepeatedFields } from '../repeated-fields/index.js';
+import { actionBlock } from '../page/page.js';
 import { modal, mountModal, openNotice } from '../modals/index.js';
 import { settingsPanel } from '../settings/index.js';
 import { v2ListEntry, v2ListEntries } from '../lists/list-entry.js';
+
+
+/** One form lifecycle for Professional profile personal/contact/professional fields. */
+export function openSharedProfileDataEditor({
+  root = document.body,
+  header = '',
+  fields = '',
+  read,
+  validate = () => '',
+  persist,
+  onSaved = () => {},
+  onOpen = () => {},
+} = {}) {
+  const body = `<form class="v2-profile-data-form" data-profile-data-form>
+    ${fields}
+    <div class="form-error" data-profile-error role="alert"></div>
+    ${actionBlock(button('Сохранить', { type: 'submit', data: 'data-save-profile' }))}
+  </form>`;
+  const layer = mountModal(root, modal(`${header}${body}`, {
+    title: '',
+    variant: 'q',
+    surface: 'app',
+    className: 'v2-profile-data-layer',
+  }));
+  if (!layer) return null;
+  initRepeatedFields(layer);
+  const form = layer.querySelector('[data-profile-data-form]');
+  const saveButton = layer.querySelector('[data-save-profile]');
+  const saveActions = saveButton?.closest('.modal-actions');
+  const errorNode = layer.querySelector('[data-profile-error]');
+  const signature = () => JSON.stringify([...new FormData(form).entries()].map(
+    ([key, value]) => [key, typeof value === 'string' ? value : ''],
+  ));
+  const initial = signature();
+  const syncDirty = () => {
+    if (saveActions) saveActions.hidden = signature() === initial;
+  };
+  form?.addEventListener('input', syncDirty);
+  form?.addEventListener('change', syncDirty);
+  form?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (saveButton?.disabled) return;
+    const fieldError = formValidationMessage(form);
+    if (fieldError) {
+      if (errorNode) errorNode.textContent = fieldError;
+      return;
+    }
+    const values = read(layer);
+    const validationError = validate(values);
+    if (validationError) {
+      if (errorNode) errorNode.textContent = validationError;
+      return;
+    }
+    if (errorNode) errorNode.textContent = '';
+    if (saveButton) saveButton.disabled = true;
+    try {
+      await persist(values);
+      layer.v2Close?.();
+      onSaved();
+    } catch (error) {
+      if (saveButton) saveButton.disabled = false;
+      if (errorNode) errorNode.textContent = error instanceof Error
+        ? error.message
+        : 'Не удалось сохранить профиль';
+    }
+  });
+  onOpen(layer);
+  syncDirty();
+  return layer;
+}
 
 function actionData(id = '') {
   return `data-shared-profile-action="${String(id || '').trim()}"`;
