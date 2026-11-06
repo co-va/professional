@@ -4,4 +4,4 @@
 html:has([data-v2-app]),body:has([data-v2-app]){height:100%;overflow:hidden;overscroll-behavior:none;background:var(--surface-dark)}
 /* Exactly one fixed application root. Safari's visual viewport pan is
    compensated here, never on individual Z/Q surfaces or form controls. */
-.app-shell:has([data-v2-app]){position:fixed;top:var(--ui-visual-top,0px);left:0;right:0;height:var(--app-stable-vh,100dvh);min-height:0;padding-top:0;overflow:hidden;background:var(--surface-dark)}
+.app-shell:has([data-v2-app]){position:fixed;top:var(--ui-visual-top,0px);left:0;right:0;transform:translateX(var(--ui-visual-left,0px));height:var(--app-stable-vh,100dvh);min-height:0;padding-top:0;overflow:hidden;background:var(--surface-dark)}

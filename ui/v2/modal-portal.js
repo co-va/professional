@@ -254,8 +254,6 @@ export function mountV2Layer(html, { root = null } = {}) {
     document.removeEventListener('pointercancel', handleOutsidePointerCancel, true);
     document.removeEventListener('click', handleOutsideClick, true);
     disposeGesture();
-    // Blur the focused control before removing its modal from the document.
-    if (node.contains(document.activeElement)) document.activeElement.blur();
     if (node.isConnected) nativeRemove();
     portalOwner?.dispose();
     if (!technical && host.matches?.('[data-v2-z], [data-v2-z-layer]')) unlockV2ModalSurface(host);
