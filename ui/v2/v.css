@@ -1,17 +1,5 @@
 /* V — independent Shared floating utility control. It belongs to H and never participates in Header/Y/Z/Q geometry. */
-.v2-app{--v2-v-bottom:36px}
-
-/* Keep V above the shared bottom action stack instead of overlapping it. */
-.v2-app:has(:is([data-v2-z-body],[data-v2-q-body]) .modal-actions:not([hidden])>:nth-child(1 of :not([hidden]))){--v2-v-bottom:88px}
-.v2-app:has(:is([data-v2-z-body],[data-v2-q-body]) .modal-actions:not([hidden])>:nth-child(2 of :not([hidden]))){--v2-v-bottom:144px}
-.v2-app:has(:is([data-v2-z-body],[data-v2-q-body]) .modal-actions:not([hidden])>:nth-child(3 of :not([hidden]))){--v2-v-bottom:200px}
-.v2-app:has(:is([data-v2-z-body],[data-v2-q-body]) .modal-actions:not([hidden])>:nth-child(4 of :not([hidden]))){--v2-v-bottom:256px}
-
-/* Q lives in a viewport portal outside .v2-app. Mirror the same action-stack offset there. */
-body:has([data-v2-layer][data-v2-q="true"] [data-v2-q-body] .modal-actions:not([hidden])>:nth-child(1 of :not([hidden]))) .v2-app.has-v2-q-modal{--v2-v-bottom:88px}
-body:has([data-v2-layer][data-v2-q="true"] [data-v2-q-body] .modal-actions:not([hidden])>:nth-child(2 of :not([hidden]))) .v2-app.has-v2-q-modal{--v2-v-bottom:144px}
-body:has([data-v2-layer][data-v2-q="true"] [data-v2-q-body] .modal-actions:not([hidden])>:nth-child(3 of :not([hidden]))) .v2-app.has-v2-q-modal{--v2-v-bottom:200px}
-body:has([data-v2-layer][data-v2-q="true"] [data-v2-q-body] .modal-actions:not([hidden])>:nth-child(4 of :not([hidden]))) .v2-app.has-v2-q-modal{--v2-v-bottom:256px}
+.v2-app{--v2-v-bottom:calc(36px + var(--ui-active-action-height,0px))}
 
 .v2-v-host{
   position:absolute;
@@ -23,7 +11,7 @@ body:has([data-v2-layer][data-v2-q="true"] [data-v2-q-body] .modal-actions:not([
 .v2-v{
   position:absolute;
   left:36px;
-  bottom:calc(var(--v2-v-bottom) + env(safe-area-inset-bottom));
+  bottom:calc(var(--v2-v-bottom) + var(--ui-keyboard-inset,0px) + var(--ui-bottom-safe,env(safe-area-inset-bottom)));
   box-sizing:border-box;
   width:48px;
   height:48px;
@@ -54,10 +42,9 @@ body:has([data-v2-layer][data-v2-q="true"] [data-v2-q-body] .modal-actions:not([
 }
 .v2-v:focus-visible{outline:2px solid var(--v2-yellow);outline-offset:0;border-radius:14px}
 .v2-app.is-deck-open .v2-v,
-.v2-app.has-v2-modal:not(.has-v2-q-modal) .v2-v,
-html.keyboard-open .v2-v{visibility:hidden;pointer-events:none}
+.v2-app.has-v2-modal:not(.has-v2-q-modal) .v2-v{visibility:hidden;pointer-events:none}
 
 @media(max-width:360px){
-  .v2-app{--v2-v-bottom:32px}
+  .v2-app{--v2-v-bottom:calc(32px + var(--ui-active-action-height,0px))}
   .v2-v{left:32px}
 }

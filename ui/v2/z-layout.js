@@ -13,7 +13,7 @@ const Z_HEADER_STYLE = [
   'display:flex',
   'flex:0 0 auto',
   'flex-direction:row',
-  'align-items:center',
+  'align-items:flex-start',
   'background:var(--v2-white,#fff)',
 ].join(';');
 
@@ -111,9 +111,7 @@ export function v2ZFrame(content = '', { header = '', dismiss = true } = {}) {
 }
 
 export function v2QFrame(content = '', { header = '' } = {}) {
-  // One Q body offset, independent of whether the screen displays a title.
-  // Content owners may omit text; they cannot collapse the Shared geometry.
-  return `${v2QHeader(header)}${surfaceBody(content, { kind: 'q', topGap: true })}`;
+  return `${v2QHeader(header)}${surfaceBody(content, { kind: 'q', topGap: Boolean(String(header || '').trim()) })}`;
 }
 
 function resolveZSurface(root) {

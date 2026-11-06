@@ -21,7 +21,7 @@ import { configureTimeUsageSource } from '../core/time/index.js';
 import { activateDemo, canUseCapability, getAccess, loadAccess } from '../core/access.js';
 import { mountV2ZLayer, openNotice, initV2WorkspaceInteraction, setV2DeckOpen, v2CardDeck, v2Header, v2Shell, v2Sticker, v2ZLayer } from '../ui/ui.js';
 import { startPlatformNotices } from '../core/platform-notices.js';
-import { syncViewport, setThemeColor } from '../ui/viewport/index.js';
+import { setThemeColor } from '../ui/viewport/index.js';
 
 configureWorkplaceSource(getWorkplaceEntities);
 configureTimeUsageSource(getJournalTimeUsages);
@@ -537,8 +537,6 @@ function renderWorkspace() {
     disposers.forEach((dispose) => dispose?.());
     moduleDispose?.();
   };
-
-  syncViewport();
 }
 
 function renderSuspended() {
@@ -555,7 +553,6 @@ function renderSuspended() {
   app.querySelector('[data-suspended-u-close]')?.addEventListener('click', () => {
     if (window.history.length > 1) window.history.back();
   });
-  syncViewport();
 }
 
 function startRegularPlatformNotices() {

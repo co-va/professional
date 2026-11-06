@@ -24,6 +24,8 @@ export function v2QModalPortalGeometry(appRect = {}, viewport = {}, { edge = 16,
   const base = v2ModalPortalGeometry(appRect, viewport);
   const safeEdge = Math.max(0, Number(edge) || 0);
   const right = base.left + base.width;
+  // Q is not another Z level. It fully covers the current Z stack and therefore
+  // uses the same left edge as base Z1, without the nested Z layer offset.
   const left = Math.min(right, base.left + safeEdge);
   const explicitHeaderBottom = headerBottom == null ? NaN : Number(headerBottom);
   const fallbackTop = base.top + Math.max(0, Number(headerHeight) || 0);

@@ -1,7 +1,7 @@
 import { getCurrentAccount, login, logout, requestPasswordReset } from './core/auth.js';
 import { field, passwordField, initPasswordFields } from './ui/inputs/index.js';
 import { v2Sticker } from './ui/v2/sticker.js';
-import { syncViewport, setThemeColor } from './ui/viewport/index.js';
+import { setThemeColor } from './ui/viewport/index.js';
 
 const app = document.querySelector('#app');
 let workspaceModule = null;
@@ -46,7 +46,6 @@ function renderWorkspaceUnavailable(account, cause) {
       renderWorkspaceUnavailable(account, error);
     }
   });
-  syncViewport();
 }
 
 function renderPasswordResetRequest() {
@@ -91,7 +90,6 @@ function renderPasswordResetRequest() {
       button.textContent = 'Отправить ссылку';
     }
   });
-  syncViewport();
 }
 
 function renderLogin(message = '') {
@@ -150,17 +148,10 @@ function renderLogin(message = '') {
       renderWorkspaceUnavailable(account, workspaceError);
     }
   });
-
-  syncViewport();
 }
 
 
 window.addEventListener('professional:auth-logout', () => renderLogin());
-window.addEventListener('resize', syncViewport, { passive: true });
-window.visualViewport?.addEventListener('resize', syncViewport, { passive: true });
-window.visualViewport?.addEventListener('scroll', syncViewport, { passive: true });
-
-syncViewport();
 try {
   const account = await getCurrentAccount();
   if (account) {

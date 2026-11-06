@@ -4,13 +4,35 @@
 .modal-title--action{display:flex;align-items:center;justify-content:space-between;gap:12px}.modal-title--action .ui-info{flex:0 0 auto}
 .modal-actions{display:grid;gap:8px}.compact-form{display:grid;gap:12px}.compact-form .modal-title{margin-bottom:2px}
 
-/* Shared Z/Q action placement. Button geometry remains owned only by ui/buttons. */
-:is([data-v2-z-body],[data-v2-q-body]):has(.modal-actions>:first-child){padding-bottom:calc(80px + env(safe-area-inset-bottom))}
-:is([data-v2-z-body],[data-v2-q-body]):has(.modal-actions>:nth-child(2)){padding-bottom:calc(136px + env(safe-area-inset-bottom))}
-:is([data-v2-z-body],[data-v2-q-body]):has(.modal-actions>:nth-child(3)){padding-bottom:calc(192px + env(safe-area-inset-bottom))}
-:is([data-v2-z-body],[data-v2-q-body]):has(.modal-actions>:nth-child(4)){padding-bottom:calc(248px + env(safe-area-inset-bottom))}
-:is([data-v2-z-body],[data-v2-q-body]) .modal-actions{position:absolute;z-index:5;left:36px;right:36px;bottom:calc(24px + env(safe-area-inset-bottom));box-sizing:border-box;margin:0;padding:0}
-@media(max-width:360px){:is([data-v2-z-body],[data-v2-q-body]) .modal-actions{left:32px;right:32px}}
+/* One measured action stack for all Z/Q surfaces; no button-count rules. */
+.modal-actions[hidden]{display:none!important}
+:is([data-v2-z-body],[data-v2-q-body]):has(.modal-actions:not([hidden])){
+  padding-bottom:calc(var(--ui-action-height,0px) + 44px);
+  scroll-padding-bottom:calc(var(--ui-action-height,0px) + 44px);
+}
+:is([data-v2-z-body],[data-v2-q-body]) .modal-actions{
+  position:absolute;
+  z-index:5;
+  left:36px;
+  right:36px;
+  bottom:calc(24px + var(--ui-bottom-safe,env(safe-area-inset-bottom)) + var(--ui-keyboard-inset,0px));
+  box-sizing:border-box;
+  margin:0;
+  padding:0;
+}
+@media(max-width:360px){
+  :is([data-v2-z-body],[data-v2-q-body]) .modal-actions{left:32px;right:32px}
+}
+/* X has its own scroll surface, so its existing action stack sticks inside it. */
+.v2-layer--bottom .modal-actions{
+  position:sticky;
+  bottom:0;
+  z-index:5;
+  box-sizing:border-box;
+  margin-top:8px;
+  padding:8px 0;
+  background:var(--v2-white,#fff);
+}
 
 .modal-sheet input,.modal-sheet select,.modal-sheet textarea{font-size:16px;max-width:100%;min-width:0}.modal-sheet input:focus,.modal-sheet select:focus,.modal-sheet textarea:focus{font-size:16px}
 .modal-sheet.modal--surface-app{background:var(--app-bg)}
@@ -35,31 +57,3 @@
 .modal-sheet.modal--bottom.modal--form-sheet{height:auto;min-height:260px;max-height:54%;padding:max(20px,var(--v2-layer-gesture-size)) 18px calc(18px + env(safe-area-inset-bottom));background:var(--white);overflow:auto}
 
 .modal-sheet.modal--bottom.modal--time-picker-sheet{height:auto;min-height:360px;max-height:72%;padding:max(20px,var(--v2-layer-gesture-size)) 18px calc(18px + env(safe-area-inset-bottom));background:var(--white);overflow:auto}
-
-/* The keyboard reduces the visible portal, never the app's underlying Z.
-   One shared action footer stays above the iOS keyboard and its accessory bar.
-   Reserve scroll clearance so it cannot cover the currently edited field. */
-.modal-actions[hidden]{display:none!important}
-.v2-layer-portal.is-keyboard-visible [data-v2-q-body] .modal-actions:not([hidden]){
-  bottom:8px;
-}
-.v2-layer-portal.is-keyboard-visible [data-v2-q-body]:has(.modal-actions:not([hidden])>:first-child){
-  padding-bottom:104px;
-  scroll-padding-bottom:104px;
-}
-.v2-layer-portal.is-keyboard-visible .v2-layer--bottom:has(:is(input:not([type="hidden"]),textarea,select)){
-  max-height:calc(100% - 12px);
-  overflow-y:auto;
-  overscroll-behavior:contain;
-}
-/* X editors, including payment entry, keep their existing action in view.
-   This is the same action node, never a second floating button. */
-.v2-layer-portal.is-keyboard-visible .v2-layer--bottom .modal-actions:not([hidden]){
-  position:sticky;
-  bottom:0;
-  z-index:5;
-  box-sizing:border-box;
-  margin-top:8px;
-  padding:8px 0;
-  background:var(--v2-white,#fff);
-}

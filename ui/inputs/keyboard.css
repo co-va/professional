@@ -1,6 +1,15 @@
+/* Shared viewport, scrollable work area and keyboard inset for every screen. */
 :root{
-  --visual-vh:var(--app-stable-vh,100vh)!important;
+  --visual-vh:var(--app-stable-vh,100dvh)!important;
+  --ui-keyboard-inset:0px;
+  --ui-bottom-safe:env(safe-area-inset-bottom);
 }
-body,.app-shell{
-  min-height:var(--app-stable-vh,100vh);
+html.keyboard-open{--ui-bottom-safe:0px}
+body,.app-shell{min-height:var(--app-stable-vh,100dvh)}
+/* Resize only the editor's scrollable area, never its containing Z/Q screen. */
+:is([data-v2-z-body],[data-v2-q-body]){margin-bottom:var(--ui-keyboard-inset)}
+/* All X surfaces follow the same visible bottom edge as Z and Q actions. */
+.v2-layer--bottom{
+  bottom:var(--ui-keyboard-inset);
+  max-height:min(52%,calc(100% - var(--ui-keyboard-inset) - 12px));
 }

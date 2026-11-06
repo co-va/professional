@@ -32,44 +32,31 @@ function mountV2ModalPortal(host, app = null) {
 
   const sync = () => {
     if (!portal.isConnected || !host.isConnected) return;
-    const viewport = currentVisualViewport();
+    // Use the stable application viewport. A keyboard changes only the shared
+    // visible-work-area inset, never the position or height of the Q/X portal.
+    const visual = currentVisualViewport();
     const stableHeight = Number.parseFloat(
       getComputedStyle(document.documentElement).getPropertyValue('--app-stable-vh'),
     ) || window.innerHeight;
-    // Keyboard state comes from the actual visible area, not focus.
-    // Blurring a field while the keyboard closes must not move the modal early.
-    const keyboardVisible = stableHeight > viewport.height + 60;
-    portal.classList.toggle('is-keyboard-visible', keyboardVisible);
-    const viewportBottom = viewport.offsetTop + viewport.height;
+    const stableWidth = Number.parseFloat(
+      getComputedStyle(document.documentElement).getPropertyValue('--app-stable-vw'),
+    ) || window.innerWidth;
+    const layoutViewport = {
+      offsetLeft: 0,
+      offsetTop: 0,
+      width: Math.max(stableWidth, visual.width),
+      height: stableHeight,
+    };
     const hostRect = host.getBoundingClientRect();
-    let geometry = keyboardVisible
-      ? v2ModalPortalGeometry({
-          ...hostRect,
-          top: viewport.offsetTop,
-          bottom: viewportBottom,
-          height: viewport.height,
-        }, viewport)
-      : v2ModalPortalGeometry(hostRect, viewport);
+    let geometry = v2ModalPortalGeometry(hostRect, layoutViewport);
     if (qLayer && app) {
       const appRect = app.getBoundingClientRect();
-      const surfaceRect = keyboardVisible
-        ? { ...appRect, top: viewport.offsetTop, bottom: viewportBottom, height: viewport.height }
-        : appRect;
-      geometry = keyboardVisible
-        ? v2ModalPortalGeometry(surfaceRect, viewport)
-        : { left: appRect.left, top: appRect.top, width: appRect.width, height: appRect.height, bottom: appRect.bottom };
-      // Use the stable shared 72px H height while iOS moves the page for typing.
-      // Otherwise the Q header jumps to the status bar or under the keyboard.
-      const headerBottom = keyboardVisible
-        ? viewport.offsetTop + Math.min(72, Math.max(0, viewport.height - 240))
-        : app.querySelector?.('[data-v2-header]')?.getBoundingClientRect?.().bottom;
-      const qViewport = keyboardVisible ? viewport : {
-        offsetLeft: appRect.left,
-        offsetTop: appRect.top,
-        width: appRect.width,
-        height: appRect.height,
+      geometry = {
+        left: appRect.left, top: appRect.top,
+        width: appRect.width, height: appRect.height, bottom: appRect.bottom,
       };
-      const qGeometry = v2QModalPortalGeometry(surfaceRect, qViewport, { headerBottom });
+      const headerBottom = app.querySelector?.('[data-v2-header]')?.getBoundingClientRect?.().bottom;
+      const qGeometry = v2QModalPortalGeometry(appRect, layoutViewport, { headerBottom });
       portal.style.setProperty('--v2-q-top', `${Math.max(0, qGeometry.top - geometry.top)}px`);
       portal.style.setProperty('--v2-q-left', `${Math.max(0, qGeometry.left - geometry.left)}px`);
     } else {
@@ -82,21 +69,16 @@ function mountV2ModalPortal(host, app = null) {
     portal.style.height = `${geometry.height}px`;
   };
 
-  let settleTimers = [];
+  let settleFrame = 0;
   const settle = () => {
-    sync();
-    requestAnimationFrame(sync);
-    requestAnimationFrame(() => requestAnimationFrame(sync));
-    settleTimers.forEach((timer) => window.clearTimeout(timer));
-    settleTimers = [
-      window.setTimeout(sync, 80),
-      window.setTimeout(sync, 180),
-      window.setTimeout(sync, 360),
-    ];
+    if (settleFrame) return;
+    settleFrame = requestAnimationFrame(() => {
+      settleFrame = 0;
+      sync();
+    });
   };
 
-  settle();
-
+  sync();
   const resizeObserver = typeof ResizeObserver === 'function' ? new ResizeObserver(settle) : null;
   resizeObserver?.observe(host);
   window.addEventListener('resize', settle);
@@ -111,12 +93,13 @@ function mountV2ModalPortal(host, app = null) {
     setQLayer(value) {
       qLayer = Boolean(value);
       portal.classList.toggle('is-q', qLayer);
+      sync();
       settle();
     },
     dispose() {
       resizeObserver?.disconnect();
-      settleTimers.forEach((timer) => window.clearTimeout(timer));
-      settleTimers = [];
+      if (settleFrame) cancelAnimationFrame(settleFrame);
+      settleFrame = 0;
       window.removeEventListener('resize', settle);
       window.visualViewport?.removeEventListener('resize', settle);
       window.visualViewport?.removeEventListener('scroll', settle);
