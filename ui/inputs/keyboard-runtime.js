@@ -57,11 +57,10 @@ function syncViewport() {
     stableHeight = height;
     stableWidth = width;
     if (!focused) keyboardSession = false;
-  } else if (!keyboardSession) {
-    // An ordinary unfocused viewport resize is not a keyboard session.
-    stableHeight = height;
-    stableWidth = width;
   }
+  // Never adopt a smaller VisualViewport as the app's physical height.
+  // On iOS, tapping a bottom input can shrink the viewport BEFORE focusin.
+  // The shell must remain anchored even during that pre-focus resize.
   const keyboardOpen = keyboardSession && height < stableHeight - 60;
 
   setRootPixel('--app-stable-vh', stableHeight);
