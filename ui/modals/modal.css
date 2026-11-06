@@ -15,11 +15,6 @@
   padding-bottom:calc(var(--ui-action-height,0px) + 44px);
   scroll-padding-bottom:calc(var(--ui-action-height,0px) + 44px);
 }
-/* A suppressed footer must not add a fake blank area after the final field. */
-:is([data-v2-z-body],[data-v2-q-body]):has(.modal-actions[data-ui-action-hidden]){
-  padding-bottom:0;
-  scroll-padding-bottom:0;
-}
 :is([data-v2-z-body],[data-v2-q-body]) .modal-actions{
   position:absolute;
   z-index:5;

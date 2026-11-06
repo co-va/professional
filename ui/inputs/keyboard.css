@@ -23,14 +23,3 @@ html.keyboard-open .modal-sheet.v2-layer--bottom{
   min-height:0;
   max-height:min(52%,calc(100% - var(--ui-keyboard-inset) - 12px));
 }
-
-/* The X sheet still ends at the keyboard top, but its white face continues
-   below it. The extension is behind the sheet, never in its scroll range. */
-.v2-layer-backdrop[data-v2-layer-kind="bottom"]::before{
-  content:"";
-  position:absolute;
-  inset:auto 0 0;
-  height:calc(var(--ui-keyboard-inset) + 1px);
-  background:var(--v2-white,#fff);
-  pointer-events:none;
-}
