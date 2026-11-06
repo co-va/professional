@@ -42,7 +42,7 @@ function syncViewport() {
   }
   const shrinking = height < stableHeight - 60;
   const keyboardOpen = shrinking && Boolean(activeEditable() || root.classList.contains('keyboard-open'));
-  if (!keyboardOpen) {
+  if (!keyboardOpen && height >= stableHeight - 60) {
     stableHeight = height;
     stableWidth = width;
   }
