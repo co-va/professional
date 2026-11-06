@@ -122,7 +122,48 @@ try {
   near(moved.q.right - 19, after.q.right, 'Q anchored through horizontal Safari pan');
   near(moved.x.right - 19, after.x.right, 'X anchored through horizontal Safari pan');
 
-  console.log('PASS: fixed H/Z/Q right and bottom; X white background extends under keyboard');
+  // Exercise the real shared controller, not just the CSS. Native iOS
+  // animates VisualViewport resize gradually, often 10-30px per frame.
+  // Q must keep its physical bottom even when the last field is focused.
+  await page.addScriptTag({ content: await readFile('ui/inputs/keyboard-runtime.js', 'utf8') });
+  const animation = await page.evaluate(async () => {
+    const html = document.documentElement;
+    const vv = window.visualViewport;
+    const fullHeight = vv.height;
+    const firstStable = html.style.getPropertyValue('--app-stable-vh');
+    const sheet = document.querySelector('#q');
+    const firstBottom = sheet.getBoundingClientRect().bottom;
+    const field = document.createElement('input');
+    field.type = 'text';
+    document.querySelector('#q-body').append(field);
+    const frame = () => new Promise((resolve) => requestAnimationFrame(resolve));
+    const heights = [];
+    const bottoms = [];
+    field.focus({ preventScroll: true });
+    for (let delta = 20; delta <= 300; delta += 20) {
+      Object.defineProperty(vv, 'height', { configurable: true, value: fullHeight - delta });
+      vv.dispatchEvent(new Event('resize'));
+      await frame();
+      heights.push(html.style.getPropertyValue('--app-stable-vh'));
+      bottoms.push(sheet.getBoundingClientRect().bottom);
+    }
+    field.blur();
+    for (let delta = 280; delta >= 0; delta -= 20) {
+      Object.defineProperty(vv, 'height', { configurable: true, value: fullHeight - delta });
+      vv.dispatchEvent(new Event('resize'));
+      await frame();
+      heights.push(html.style.getPropertyValue('--app-stable-vh'));
+      bottoms.push(sheet.getBoundingClientRect().bottom);
+    }
+    delete vv.height;
+    return { firstStable, firstBottom, heights, bottoms };
+  });
+  assert.ok(animation.heights.every((value) => value === animation.firstStable),
+    'Animated keyboard may not gradually reduce shared shell height: ' + JSON.stringify(animation.heights));
+  assert.ok(animation.bottoms.every((value) => Math.abs(value - animation.firstBottom) <= 1),
+    'Q white surface must not move its bottom during keyboard animation: ' + JSON.stringify(animation.bottoms));
+
+  console.log('PASS: fixed H/Z/Q, X white to bottom, and gradual iOS keyboard animation');
   await page.close();
 } finally {
   await browser.close();
