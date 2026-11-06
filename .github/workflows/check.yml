@@ -22,6 +22,7 @@ jobs:
         run: |
           node --check professional.js
           node --check professional/workspace.js
+          node --check ui/viewport/index.js
           node --check core/access.js
           node --check core/runtime/server-sync.js
           node --check core/profile/runtime.js

@@ -5,6 +5,13 @@ const WORKPLACE_FALLBACK_COLOR = '#212529';
 let workplacesState = [];
 let referenceDataState = { cities: [], currencies: [], defaults: { currency: '', from: '', to: '', timeZone: '' } };
 let serverReady = false;
+if(typeof window!=='undefined'){
+  window.addEventListener('professional:auth-logout',()=>{
+    workplacesState=[];
+    referenceDataState={cities:[],currencies:[],defaults:{currency:'',from:'',to:'',timeZone:''}};
+    serverReady=false;
+  });
+}
 
 function normalizeLinks(values) {
   return (Array.isArray(values) ? values : [])

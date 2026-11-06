@@ -343,3 +343,5 @@ Professional отделён только если одновременно до�
 - Background server refresh is scoped to the active section and begins after the section has loaded, not on the login screen.
 - User and Professional personal identity are NOT unified by this frontend change. Current database tables `Account` and `PlatformAccount` and passwords remain separate. Do not claim universal SSO until an atomic verified backend migration and identity ownership proof have been completed.
 - The Professional Profile's public-card builder (appearance/profession/workplaces) remains distinct from basic User personal data.
+
+- 2026-11-06: The active login and workspace share one viewport utility; separate duplicate helpers deleted. Auth logout clears Profile, workplace, and synchronization caches; stale in-flight loads cannot hydrate a new session. Runtime check protects these boundaries.

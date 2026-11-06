@@ -5,6 +5,14 @@ let profileState = null;
 let customProfessionsState = [];
 let professionCatalogState = [];
 let serverReady = false;
+if(typeof window!=='undefined'){
+  window.addEventListener('professional:auth-logout',()=>{
+    profileState=null;
+    customProfessionsState=[];
+    professionCatalogState=[];
+    serverReady=false;
+  });
+}
 
 function normalizeList(values) {
   return (Array.isArray(values) ? values : [])

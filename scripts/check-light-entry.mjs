@@ -7,6 +7,9 @@ const access = read('core/access.js');
 const serverSync = read('core/runtime/server-sync.js');
 assert.match(entry, /import\('\.\/professional\/workspace\.js'\)/);
 assert.match(entry, /await getCurrentAccount\(\)/);
+assert.match(entry, /from '\.\/ui\/viewport\/index\.js'/);
+assert.match(workspace, /from '\.\.\/ui\/viewport\/index\.js'/);
+assert.doesNotMatch(entry + workspace, /function syncViewport\(/);
 assert.match(entry, /await login\(/);
 assert.doesNotMatch(entry, /loadBusinessState|loadFinanceState|loadOperationalState|loadProfileState|startProfessionalServerSync|from ['"]\.\/ui\/ui\.js/);
 assert.match(workspace, /export async function renderAuthenticated/);
@@ -16,6 +19,8 @@ assert.doesNotMatch(start.slice(0, start.indexOf('renderWorkspace();')), /loadBu
 assert.match(workspace, /async function ensureWorkspaceState/);
 assert.match(workspace, /await ensureWorkspaceState\(section\);\s*ensureServerSync\(\)/);
 assert.match(serverSync, /getActiveScopes/);
+assert.match(serverSync, /snapshots\.clear\(\)/);
+assert.doesNotMatch(read('core/profile/runtime.js'), /if\(!full&&/);
 assert.doesNotMatch(serverSync, /const refreshAll = \(\) => void pull\(ALL_SCOPES\)/);
 for(const path of ['core/access.js', 'core/runtime/business-state.js', 'core/runtime/operational-state.js', 'core/runtime/auxiliary-state.js', 'core/profile/runtime.js']) {
   assert.doesNotMatch(read(path), /consumeJournalBootstrap|journal-bootstrap/);

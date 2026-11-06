@@ -5,6 +5,7 @@ import { hydrateTagsFromServer } from '../../settings/tags/data.js';
 import { hydrateCardAppearanceTemplates } from '../card-appearance-templates.js';
 
 let financeStateLoad = null;
+let auxiliaryEpoch = 0;
 const auxiliaryStateLoads = new Map();
 
 function clone(value){return value==null?value:JSON.parse(JSON.stringify(value));}
@@ -40,19 +41,21 @@ function inferredAuxiliaryScope(){
 
 if(typeof window!=='undefined'&&typeof window.addEventListener==='function'){
   window.addEventListener('professional:auth-logout',()=>{
+    auxiliaryEpoch += 1;
     financeStateLoad=null;
     auxiliaryStateLoads.clear();
   });
 }
 
-export async function loadFinanceState({full=false}={}){
+export async function loadFinanceState(){
   if(!financeStateLoad){
+    const epoch=auxiliaryEpoch;
     financeStateLoad=apiRequest('/finance')
       .then((response)=>payload(response,'Не удалось загрузить Финансы'))
-      .then((finance)=>{hydrateFinanceFromServer(finance);return finance;})
+      .then((finance)=>{if(epoch!==auxiliaryEpoch)return null;hydrateFinanceFromServer(finance);return finance;})
       .catch((error)=>{
-        financeStateLoad=null;
-        if(!full&&error?.name==='AbortError') return null;
+        if(epoch===auxiliaryEpoch)financeStateLoad=null;
+
         throw error;
       });
   }
@@ -63,11 +66,12 @@ export async function loadAuxiliaryState(scope=''){
   await Promise.resolve();
   const key=String(scope||inferredAuxiliaryScope()||'all').trim()||'all';
   if(!auxiliaryStateLoads.has(key)){
+    const epoch=auxiliaryEpoch;
     const path=key==='all'?'/auxiliary-state':`/auxiliary-state/${encodeURIComponent(key)}`;
     const request=apiRequest(path)
       .then((response)=>payload(response,'Не удалось загрузить связанные данные'))
-      .then((remote)=>{hydrateAuxiliary(remote);return remote;})
-      .catch((error)=>{auxiliaryStateLoads.delete(key);throw error;});
+      .then((remote)=>{if(epoch!==auxiliaryEpoch)return null;hydrateAuxiliary(remote);return remote;})
+      .catch((error)=>{if(epoch===auxiliaryEpoch)auxiliaryStateLoads.delete(key);throw error;});
     auxiliaryStateLoads.set(key,request);
   }
   return auxiliaryStateLoads.get(key);

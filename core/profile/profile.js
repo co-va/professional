@@ -26,7 +26,7 @@ function demoRemainingText(access){
 }
 
 export function render(root,navigateBack=()=>{},options={}){
-  return loadProfileState({full:true}).then(()=>renderProfile(root,navigateBack,options));
+  return loadProfileState().then(()=>renderProfile(root,navigateBack,options));
 }
 
 function profileContext(p,title=fullName(p)){

@@ -53,7 +53,7 @@ export function loadBusinessState() {
         return remote;
       })
       .catch((error) => {
-        businessStateLoad = null;
+        if (epoch === businessEpoch) businessStateLoad = null;
         throw error;
       });
   }

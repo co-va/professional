@@ -1,23 +1,10 @@
 import { getCurrentAccount, login, requestPasswordReset } from './core/auth.js';
 import { field, passwordField, initPasswordFields } from './ui/inputs/index.js';
 import { v2Sticker } from './ui/v2/sticker.js';
+import { syncViewport, setThemeColor } from './ui/viewport/index.js';
 
 const app = document.querySelector('#app');
 let workspaceModule = null;
-
-function syncViewport() {
-  const vv = window.visualViewport;
-  const height = vv?.height || window.innerHeight;
-  const width = vv?.width || window.innerWidth;
-  document.documentElement.style.setProperty('--visual-vh', `${height}px`);
-  document.documentElement.style.setProperty('--visual-vw', `${width}px`);
-  document.documentElement.classList.toggle('keyboard-open', vv ? height < window.innerHeight * 0.78 : false);
-}
-
-function setThemeColor(value) {
-  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', value);
-}
-
 
 async function enterWorkspace(account) {
   if (!workspaceModule) {

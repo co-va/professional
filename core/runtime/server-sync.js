@@ -225,6 +225,7 @@ export function stopProfessionalServerSync() {
   if (timer) window.clearInterval(timer);
   timer = null;
   pendingScopes.clear();
+  snapshots.clear();
   stopListeners();
   stopListeners = () => {};
 }

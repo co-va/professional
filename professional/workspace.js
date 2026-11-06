@@ -21,6 +21,7 @@ import { configureTimeUsageSource } from '../core/time/index.js';
 import { activateDemo, canUseCapability, getAccess, loadAccess } from '../core/access.js';
 import { mountV2ZLayer, openNotice, initV2WorkspaceInteraction, setV2DeckOpen, v2CardDeck, v2Header, v2Shell, v2Sticker, v2ZLayer } from '../ui/ui.js';
 import { startPlatformNotices } from '../core/platform-notices.js';
+import { syncViewport, setThemeColor } from '../ui/viewport/index.js';
 
 configureWorkplaceSource(getWorkplaceEntities);
 configureTimeUsageSource(getJournalTimeUsages);
@@ -98,19 +99,6 @@ window.addEventListener('professional:record-chat-request', (event) => {
     personKey: String(event?.detail?.personKey || ''),
   });
 });
-
-function syncViewport() {
-  const vv = window.visualViewport;
-  const height = vv?.height || window.innerHeight;
-  const width = vv?.width || window.innerWidth;
-  document.documentElement.style.setProperty('--visual-vh', `${height}px`);
-  document.documentElement.style.setProperty('--visual-vw', `${width}px`);
-  document.documentElement.classList.toggle('keyboard-open', vv ? height < window.innerHeight * 0.78 : false);
-}
-
-function setThemeColor(value) {
-  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', value);
-}
 
 function ensureServerSync() {
   if (serverSyncStarted) return;
