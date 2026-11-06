@@ -6,7 +6,12 @@
 
 /* One measured action stack for all Z/Q surfaces; no button-count rules. */
 .modal-actions[hidden]{display:none!important}
-:is([data-v2-z-body],[data-v2-q-body]):has(.modal-actions:not([hidden])){
+/* Shared action visibility retains the occupied footer height and scroll bounds. */
+.modal-actions[data-ui-action-hidden]{
+  visibility:hidden;
+  pointer-events:none;
+}
+:is([data-v2-z-body],[data-v2-q-body]):has(.modal-actions){
   padding-bottom:calc(var(--ui-action-height,0px) + 44px);
   scroll-padding-bottom:calc(var(--ui-action-height,0px) + 44px);
 }
@@ -15,7 +20,7 @@
   z-index:5;
   left:36px;
   right:36px;
-  bottom:calc(24px + var(--ui-bottom-safe,env(safe-area-inset-bottom)) + var(--ui-keyboard-inset,0px));
+  bottom:calc(24px + var(--ui-bottom-safe,env(safe-area-inset-bottom)));
   box-sizing:border-box;
   margin:0;
   padding:0;
@@ -23,14 +28,13 @@
 @media(max-width:360px){
   :is([data-v2-z-body],[data-v2-q-body]) .modal-actions{left:32px;right:32px}
 }
-/* X has its own scroll surface, so its existing action stack sticks inside it. */
+/* X action is the final part of its natural content, not a floating
+   second footer. There is no scrollable blank area after the button. */
 .v2-layer--bottom .modal-actions{
-  position:sticky;
-  bottom:0;
-  z-index:5;
+  position:static;
   box-sizing:border-box;
   margin-top:8px;
-  padding:8px 0;
+  padding:0;
   background:var(--v2-white,#fff);
 }
 

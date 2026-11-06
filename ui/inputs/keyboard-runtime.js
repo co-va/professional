@@ -9,8 +9,14 @@ const root = document.documentElement;
 const viewport = () => window.visualViewport;
 let stableHeight = 0;
 let stableWidth = 0;
-let revealFrame = 0;
 let actionsFrame = 0;
+let trackingFrame = 0;
+let trackThrough = 0;
+
+function setRootPixel(name, value) {
+  const next = `${Math.round(value)}px`;
+  if (root.style.getPropertyValue(name) !== next) root.style.setProperty(name, next);
+}
 
 function activeEditable() {
   const node = document.activeElement;
@@ -22,12 +28,11 @@ function viewportSize() {
   return {
     height: Math.round(vv?.height || window.innerHeight || root.clientHeight || 0),
     width: Math.round(vv?.width || window.innerWidth || root.clientWidth || 0),
-    top: Number(vv?.offsetTop || 0),
   };
 }
 
 function syncViewport() {
-  const { height, width, top } = viewportSize();
+  const { height, width } = viewportSize();
   if (!height || !width) return;
 
   // Orientation changes can change the stable size; keyboard changes only height.
@@ -42,54 +47,19 @@ function syncViewport() {
     stableWidth = width;
   }
 
-  root.style.setProperty('--app-stable-vh', `${stableHeight}px`);
-  root.style.setProperty('--app-stable-vw', `${stableWidth}px`);
-  // VisualViewport.offsetTop accounts for Safari panning while the keyboard is shown.
-  const inset = keyboardOpen ? Math.max(0, stableHeight - (top + height)) : 0;
-  root.style.setProperty('--ui-keyboard-inset', `${Math.round(inset)}px`);
+  setRootPixel('--app-stable-vh', stableHeight);
+  setRootPixel('--app-stable-vw', stableWidth);
+  // In iOS WebKit the *visual* viewport can pan while document.scrollTop
+  // remains zero. Compensate only at the one fixed application root:
+  // its SCREEN position is (layout top - visualViewport.offsetTop).
+  // Q/X are app-owned portals and inherit the exact same offset.
+  const visualTop = keyboardOpen
+    ? Math.max(0, Math.round(Number(viewport()?.offsetTop || 0)))
+    : 0;
+  setRootPixel('--ui-visual-top', visualTop);
+  const inset = keyboardOpen ? Math.max(0, stableHeight - height) : 0;
+  setRootPixel('--ui-keyboard-inset', inset);
   root.classList.toggle('keyboard-open', keyboardOpen);
-}
-
-function scrollHostFor(node) {
-  for (let parent = node?.parentElement; parent && parent !== document.body && parent !== root; parent = parent.parentElement) {
-    const style = getComputedStyle(parent);
-    if (/(auto|scroll)/.test(style.overflowY) && parent.scrollHeight > parent.clientHeight + 1) return parent;
-  }
-  return null;
-}
-
-function revealEditable(node) {
-  if (!node?.isConnected || document.activeElement !== node || !node.matches(EDITABLE_SELECTOR)) return;
-  const host = scrollHostFor(node);
-  if (!host) return; // Never scroll the application shell or a background Z.
-  const rect = node.getBoundingClientRect();
-  const hostRect = host.getBoundingClientRect();
-  const vv = viewport();
-  const top = Number(vv?.offsetTop || 0);
-  const bottom = top + Number(vv?.height || window.innerHeight || stableHeight);
-  const surface = node.closest('[data-v2-layer], [data-v2-z-layer], [data-v2-z]');
-  const footer = surface?.querySelector('.modal-actions:not([hidden])');
-  const footerTop = footer?.getBoundingClientRect?.().top;
-  const visibleTop = Math.max(hostRect.top, top) + 12;
-  const visibleBottom = Math.min(hostRect.bottom, bottom, Number.isFinite(footerTop) ? footerTop : bottom) - 12;
-  if (visibleBottom <= visibleTop) return;
-
-  // Minimal immediate scroll, never smooth recentering or repeated timers.
-  const distance = rect.top < visibleTop
-    ? rect.top - visibleTop
-    : rect.height > visibleBottom - visibleTop
-      ? rect.top - visibleTop
-      : rect.bottom - visibleBottom;
-  if (Math.abs(distance) > 1) host.scrollBy({ top: distance, behavior: 'auto' });
-}
-
-function scheduleReveal() {
-  if (revealFrame) cancelAnimationFrame(revealFrame);
-  revealFrame = requestAnimationFrame(() => {
-    revealFrame = 0;
-    const focused = activeEditable();
-    if (focused) revealEditable(focused);
-  });
 }
 
 const observedActions = new Set();
@@ -97,9 +67,11 @@ const actionObserver = typeof ResizeObserver === 'function'
   ? new ResizeObserver(() => scheduleActionSync())
   : null;
 
-function visibleAction(surface) {
+function measurableAction(surface) {
   if (!surface) return null;
-  return [...surface.querySelectorAll('.modal-actions:not([hidden])')]
+  // A hidden Q/Z footer remains measurable so editing does not suddenly
+  // increase the inner scroll surface's height when Save first appears.
+  return [...surface.querySelectorAll('.modal-actions')]
     .reverse()
     .find((node) => node.getBoundingClientRect().height > 0 && getComputedStyle(node).display !== 'none') || null;
 }
@@ -109,7 +81,7 @@ function syncActionHeights() {
   const areas = document.querySelectorAll('[data-v2-z-body], [data-v2-q-body]');
   const nextActions = new Set();
   areas.forEach((area) => {
-    const action = visibleAction(area);
+    const action = measurableAction(area);
     if (action) nextActions.add(action);
     const height = action ? Math.ceil(action.getBoundingClientRect().height) : 0;
     const value = `${height}px`;
@@ -130,8 +102,8 @@ function syncActionHeights() {
   const z = [...app.querySelectorAll('[data-v2-z-layer]')].at(-1)
     || app.querySelector('[data-v2-front] > [data-v2-z]');
   const active = q || z;
-  const action = visibleAction(active);
-  const value = `${action ? Math.ceil(action.getBoundingClientRect().height) : 0}px`;
+  const action = measurableAction(active);
+  const value = `${action && !action.hidden && !action.hasAttribute('data-ui-action-hidden') ? Math.ceil(action.getBoundingClientRect().height) : 0}px`;
   if (app.style.getPropertyValue('--ui-active-action-height') !== value) {
     app.style.setProperty('--ui-active-action-height', value);
   }
@@ -142,16 +114,40 @@ function scheduleActionSync() {
   actionsFrame = requestAnimationFrame(syncActionHeights);
 }
 
+// Some WebKit versions dispatch visualViewport.scroll only AFTER a native pan.
+ // During a keyboard interaction, read its offset once per animation frame.
+ // This is the SAME root anchor, not a per-form scroll or animation.
+function followVisualViewport() {
+  trackingFrame = 0;
+  if (document.visibilityState === 'hidden') return;
+  syncViewport();
+  if ((activeEditable() && root.classList.contains('keyboard-open'))
+    || performance.now() < trackThrough) {
+    trackingFrame = requestAnimationFrame(followVisualViewport);
+  }
+}
+
+function ensureViewportTracking(milliseconds = 0) {
+  trackThrough = Math.max(trackThrough, performance.now() + milliseconds);
+  if (!trackingFrame && document.visibilityState !== 'hidden') {
+    trackingFrame = requestAnimationFrame(followVisualViewport);
+  }
+}
+
 function onViewportChange() {
   syncViewport();
-  scheduleReveal();
+  if (root.classList.contains('keyboard-open')) ensureViewportTracking();
 }
 
 document.addEventListener('focusin', (event) => {
   if (!event.target?.matches?.(EDITABLE_SELECTOR)) return;
   onViewportChange();
+  ensureViewportTracking(800);
 });
-document.addEventListener('focusout', onViewportChange);
+document.addEventListener('focusout', () => {
+  onViewportChange();
+  ensureViewportTracking(500);
+});
 window.addEventListener('resize', onViewportChange, { passive: true });
 viewport()?.addEventListener('resize', onViewportChange, { passive: true });
 viewport()?.addEventListener('scroll', onViewportChange, { passive: true });
@@ -161,7 +157,7 @@ new MutationObserver(scheduleActionSync).observe(document.body, {
   childList: true,
   subtree: true,
   attributes: true,
-  attributeFilter: ['hidden', 'class'],
+  attributeFilter: ['hidden', 'class', 'data-ui-action-hidden'],
 });
 window.addEventListener('va-tools:v2-context-changed', scheduleActionSync);
 
