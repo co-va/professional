@@ -2,7 +2,7 @@ import { button } from '../buttons/index.js';
 import { formError, formView } from '../forms/index.js';
 import { formValidationMessage, initPasswordFields, passwordField, selectPhotoFile } from '../inputs/index.js';
 import { initRepeatedFields } from '../repeated-fields/index.js';
-import { actionBlock } from '../page/page.js';
+import { actionBlock, setSharedActionVisible } from '../page/page.js';
 import { modal, mountModal, openNotice } from '../modals/index.js';
 import { settingsPanel } from '../settings/index.js';
 import { v2ListEntry, v2ListEntries } from '../lists/list-entry.js';
@@ -41,7 +41,7 @@ export function openSharedProfileDataEditor({
   ));
   const initial = signature();
   const syncDirty = () => {
-    if (saveActions) saveActions.hidden = signature() === initial;
+    setSharedActionVisible(saveActions, signature() !== initial);
   };
   form?.addEventListener('input', syncDirty);
   form?.addEventListener('change', syncDirty);

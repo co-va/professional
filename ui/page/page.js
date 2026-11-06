@@ -26,6 +26,15 @@ export function agreementBlock(items = []) {
   }).join('')}</section>`;
 }
 
+// Preserve measured action space while disabled, so keyboard focus does not change iOS scroll bounds.
+export function setSharedActionVisible(node, visible = true) {
+  if (!node) return;
+  node.removeAttribute('hidden');
+  node.toggleAttribute('data-ui-action-hidden', !visible);
+  node.inert = !visible;
+  node.setAttribute('aria-hidden', visible ? 'false' : 'true');
+}
+
 export function actionBlock(content = '', { className = '' } = {}) {
   return `<div class="profile-actions modal-actions${className ? ` ${escapeHtml(className)}` : ''}">${content}</div>`;
 }
