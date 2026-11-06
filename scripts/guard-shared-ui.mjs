@@ -63,6 +63,8 @@ assert(vHost.includes("addEventListener('va-tools:v2-context-changed'"), 'V host
 
 // Shared keyboard geometry is one owner; never add per-field scroll handlers.
 assert(keyboardRuntime.includes('let keyboardSession = false;'), 'Shared keyboard session owner missing');
+assert(!keyboardRuntime.includes('else if (!keyboardSession)'),
+  'Safari resize before bottom-field focus must never replace the stable app height');
 assert(!keyboardRuntime.includes('scrollTop') && !keyboardRuntime.includes('scrollIntoView'), 'Keyboard controller must never scroll fields on a frame or focus event');
 assert(keyboardRuntime.includes("setRootPixel('--ui-visual-left', visualLeft)"), 'Horizontal Safari viewport compensation missing');
 assert(shellStyle.includes('transform:translateX(var(--ui-visual-left,0px))'), 'Shared application root must compensate Safari horizontal pan');
