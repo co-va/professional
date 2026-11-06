@@ -163,7 +163,46 @@ try {
   assert.ok(animation.bottoms.every((value) => Math.abs(value - animation.firstBottom) <= 1),
     'Q white surface must not move its bottom during keyboard animation: ' + JSON.stringify(animation.bottoms));
 
-  console.log('PASS: fixed H/Z/Q, X white to bottom, and gradual iOS keyboard animation');
+  // iOS standalone can expose less VisualViewport/innerHeight than the
+  // physical screen even with the keyboard CLOSED. The white Q may not stop
+  // at that shorter height: its portal must share the full app shell.
+  const pwa = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  await pwa.setContent(`<!doctype html><html><head>
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+    <style>${css}</style></head><body><div class="app-shell">
+      <section class="v2-app" data-v2-app>
+        <header class="v2-header" data-v2-header>ABCD</header>
+        <div class="v2-app__stage"><div class="v2-front" data-v2-front>
+          <main class="v2-z" data-v2-z><div data-v2-z-body>Journal</div></main>
+        </div></div>
+        <div class="v2-layer-portal v2-layer-portal--workspace is-q"
+             style="inset:0;width:100%;height:100%;--v2-q-top:72px;--v2-q-left:16px">
+          <div class="v2-layer-backdrop v2-layer-backdrop--contained" data-v2-layer data-v2-q="true">
+            <section class="v2-layer v2-layer--standard" id="pwa-q"
+                     style="animation:none;top:72px;left:16px;right:0;bottom:0">
+              <div data-v2-q-body>Profile</div>
+            </section>
+          </div>
+        </div>
+      </section></div></body></html>`);
+  await pwa.evaluate(() => {
+    Object.defineProperty(navigator, 'standalone', { configurable: true, value: true });
+    Object.defineProperty(screen, 'width', { configurable: true, value: 390 });
+    Object.defineProperty(screen, 'height', { configurable: true, value: 900 });
+  });
+  await pwa.addScriptTag({ content: await readFile('ui/inputs/keyboard-runtime.js', 'utf8') });
+  const standalone = await pwa.evaluate(() => ({
+    appHeight: document.querySelector('[data-v2-app]').getBoundingClientRect().height,
+    whiteBottom: document.querySelector('#pwa-q').getBoundingClientRect().bottom,
+    visualHeight: window.visualViewport.height,
+    stableHeight: getComputedStyle(document.documentElement).getPropertyValue('--app-stable-vh').trim(),
+  }));
+  near(standalone.appHeight, 900, 'Standalone app must cover the physical screen rather than the shorter visual viewport');
+  near(standalone.whiteBottom, 900, 'Standalone Q white surface must reach the physical screen bottom');
+  assert.ok(standalone.visualHeight < standalone.appHeight, 'Fixture must simulate missing standalone bottom band');
+  await pwa.close();
+
+  console.log('PASS: anchored Z/Q/X, gradual keyboard animation, and standalone full-screen baseline');
   await page.close();
 } finally {
   await browser.close();
