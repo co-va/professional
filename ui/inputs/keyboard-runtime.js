@@ -62,6 +62,49 @@ function syncViewport() {
   root.classList.toggle('keyboard-open', keyboardOpen);
 }
 
+// Reveal a focused field only once after the native keyboard finishes opening.
+// Never scroll from a frame loop: it must not compete with manual gestures.
+let pendingRevealField = null;
+let revealTimer = 0;
+
+function cancelPendingFieldReveal() {
+  pendingRevealField = null;
+  if (revealTimer) window.clearTimeout(revealTimer);
+  revealTimer = 0;
+}
+
+function revealFocusedFieldOnce() {
+  revealTimer = 0;
+  const field = pendingRevealField;
+  pendingRevealField = null;
+  if (!field?.isConnected || field !== activeEditable()
+    || !root.classList.contains('keyboard-open')) return;
+  const body = field.closest('[data-v2-q-body], [data-v2-z-body]');
+  if (!body) return;
+  const area = body.getBoundingClientRect();
+  const rect = field.getBoundingClientRect();
+  const top = area.top + 12;
+  const bottom = area.bottom - 16;
+  if (bottom <= top) return;
+  let delta = 0;
+  if (rect.height > bottom - top) {
+    if (rect.top < top || rect.top > bottom) delta = rect.top - top;
+  } else if (rect.bottom > bottom) {
+    delta = rect.bottom - bottom;
+  } else if (rect.top < top) {
+    delta = rect.top - top;
+  }
+  if (Math.abs(delta) <= 2) return;
+  const limit = Math.max(0, body.scrollHeight - body.clientHeight);
+  body.scrollTop = Math.max(0, Math.min(limit, body.scrollTop + delta));
+}
+
+function scheduleFocusedFieldReveal() {
+  if (!pendingRevealField || !root.classList.contains('keyboard-open')) return;
+  if (revealTimer) window.clearTimeout(revealTimer);
+  revealTimer = window.setTimeout(revealFocusedFieldOnce, 120);
+}
+
 const observedActions = new Set();
 const actionObserver = typeof ResizeObserver === 'function'
   ? new ResizeObserver(() => scheduleActionSync())
@@ -141,15 +184,25 @@ function onViewportChange() {
 
 document.addEventListener('focusin', (event) => {
   if (!event.target?.matches?.(EDITABLE_SELECTOR)) return;
+  pendingRevealField = event.target;
   onViewportChange();
   ensureViewportTracking(800);
+  scheduleFocusedFieldReveal();
 });
 document.addEventListener('focusout', () => {
+  cancelPendingFieldReveal();
   onViewportChange();
   ensureViewportTracking(500);
 });
+// Native user scrolling always wins; never counter-scroll during a touch drag.
+document.addEventListener('touchmove', (event) => {
+  if (pendingRevealField && event.target?.closest?.('[data-v2-q-body], [data-v2-z-body]')) {
+    cancelPendingFieldReveal();
+  }
+}, { passive: true });
 window.addEventListener('resize', onViewportChange, { passive: true });
 viewport()?.addEventListener('resize', onViewportChange, { passive: true });
+viewport()?.addEventListener('resize', scheduleFocusedFieldReveal, { passive: true });
 viewport()?.addEventListener('scroll', onViewportChange, { passive: true });
 document.addEventListener('visibilitychange', onViewportChange);
 
