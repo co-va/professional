@@ -62,6 +62,27 @@ function syncViewport() {
   root.classList.toggle('keyboard-open', keyboardOpen);
 }
 
+// Reveal the focused field by scrolling its owner body only, never Z/Q/H.
+// Clamp to the real last item; iOS cannot extend the scroll beyond content.
+function syncFocusedFieldVisibility() {
+  if (!root.classList.contains('keyboard-open')) return;
+  const field = activeEditable();
+  const body = field?.closest?.('[data-v2-q-body], [data-v2-z-body]');
+  if (!body) return;
+  const area = body.getBoundingClientRect();
+  const rect = field.getBoundingClientRect();
+  const top = area.top + 12;
+  const bottom = area.bottom - 16;
+  if (bottom <= top) return;
+  let shift = 0;
+  if (rect.height > bottom - top) shift = rect.top - top;
+  else if (rect.bottom > bottom) shift = rect.bottom - bottom;
+  else if (rect.top < top) shift = rect.top - top;
+  if (Math.abs(shift) <= 2) return;
+  const limit = Math.max(0, body.scrollHeight - body.clientHeight);
+  body.scrollTop = Math.max(0, Math.min(limit, body.scrollTop + shift));
+}
+
 const observedActions = new Set();
 const actionObserver = typeof ResizeObserver === 'function'
   ? new ResizeObserver(() => scheduleActionSync())
@@ -121,6 +142,7 @@ function followVisualViewport() {
   trackingFrame = 0;
   if (document.visibilityState === 'hidden') return;
   syncViewport();
+  syncFocusedFieldVisibility();
   if ((activeEditable() && root.classList.contains('keyboard-open'))
     || performance.now() < trackThrough) {
     trackingFrame = requestAnimationFrame(followVisualViewport);
