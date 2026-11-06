@@ -348,7 +348,7 @@ async function ensureWorkspaceState(section) {
   if (section === 'journal' || section === 'profile' || section === 'people' || section === 'service' || section === 'settings') tasks.push(loadProfileState());
   if (section === 'journal' || section === 'people' || section === 'loyalty') tasks.push(loadBusinessState());
   if (section === 'journal' || section === 'service') tasks.push(loadOperationalState());
-  if (section === 'finance') tasks.push(loadFinanceState());
+  if (section === 'journal' || section === 'finance') tasks.push(loadFinanceState());
   const needsAuxiliary = section === 'people'
     || section === 'loyalty'
     || section === 'service'
