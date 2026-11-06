@@ -40,27 +40,24 @@ function syncViewport() {
   const { height, width } = viewportSize();
   if (!height || !width) return;
 
-  // Only a changed layout width (rotation) may replace the shell's
-  // baseline during keyboard interaction. A visual viewport shrink must
-  // never shorten Z/Q, including when Safari blurs one input before focusing
-  // the next or pans to the final field.
+  // Keep one layout-viewport anchor for the entire H/Z/Q/X shell.
+  // iOS animates VisualViewport.height in small increments; comparing one
+  // frame to the preceding frame and accepting decreases below a threshold
+  // makes the "stable" height follow the keyboard down. Never do that.
   const rotated = !stableHeight || !stableWidth || Math.abs(width - stableWidth) > 48;
   if (rotated) {
-    stableHeight = height;
+    stableHeight = Math.max(height, Math.round(window.innerHeight || root.clientHeight || 0));
     stableWidth = width;
     keyboardSession = false;
   }
   const focused = Boolean(activeEditable());
   if (focused) keyboardSession = true;
   const shrinking = height < stableHeight - 60;
-  if (!shrinking) {
-    stableHeight = height;
-    stableWidth = width;
-    if (!focused) keyboardSession = false;
-  }
-  // Never adopt a smaller VisualViewport as the app's physical height.
-  // On iOS, tapping a bottom input can shrink the viewport BEFORE focusin.
-  // The shell must remain anchored even during that pre-focus resize.
+  // Once established, the height may grow on a genuine recovered viewport,
+  // but a keyboard animation can never shorten it. A new orientation is the
+  // only event allowed to establish a shorter physical screen baseline.
+  if (!keyboardSession && !focused && height > stableHeight) stableHeight = height;
+  if (!focused && !shrinking) keyboardSession = false;
   const keyboardOpen = keyboardSession && height < stableHeight - 60;
 
   setRootPixel('--app-stable-vh', stableHeight);
