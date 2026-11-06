@@ -5,7 +5,6 @@ import { hydrateRecordStateFromServer } from '../record/index.js';
 import { hydrateEventsFromServer } from '../event/index.js';
 import { hydrateNotesFromServer } from '../note/index.js';
 import { hydratePeopleFromServer } from '../people/data.js';
-import { consumeJournalBootstrap } from './journal-bootstrap.js';
 
 function clone(value) {
   return value == null ? value : JSON.parse(JSON.stringify(value));
@@ -36,10 +35,27 @@ function hydrate(remote = {}) {
   hydrateNotesFromServer(Array.isArray(remote.notes) ? clone(remote.notes) : []);
 }
 
-export async function loadBusinessState() {
-  setBusinessServerReady(false);
-  const bootstrap = await consumeJournalBootstrap('journal');
-  const remote = bootstrap || await payload(await apiRequest('/business-state/journal'), 'Не удалось загрузить данные Журнала');
-  hydrate(remote);
-  setBusinessServerReady(true);
+let businessStateLoad = null;
+if (typeof window !== 'undefined') {
+  window.addEventListener('professional:auth-logout', () => {
+    businessStateLoad = null;
+    setBusinessServerReady(false);
+  });
+}
+export function loadBusinessState() {
+  if (!businessStateLoad) {
+    setBusinessServerReady(false);
+    businessStateLoad = apiRequest('/business-state/journal')
+      .then((response) => payload(response, 'Не удалось загрузить данные Журнала'))
+      .then((remote) => {
+        hydrate(remote);
+        setBusinessServerReady(true);
+        return remote;
+      })
+      .catch((error) => {
+        businessStateLoad = null;
+        throw error;
+      });
+  }
+  return businessStateLoad;
 }

@@ -14,6 +14,7 @@ COPY journal /usr/share/nginx/html/journal
 COPY manifest.webmanifest /usr/share/nginx/html/manifest.webmanifest
 COPY online-booking /usr/share/nginx/html/online-booking
 COPY professional.js /usr/share/nginx/html/professional.js
+COPY professional /usr/share/nginx/html/professional
 COPY reset-password.html /usr/share/nginx/html/reset-password.html
 COPY service-worker.js /usr/share/nginx/html/service-worker.js
 COPY settings /usr/share/nginx/html/settings

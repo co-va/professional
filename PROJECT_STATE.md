@@ -334,3 +334,12 @@ Professional отделён только если одновременно до�
 - Core staging API has added the new origin to production CORS without disabling existing users. Verified actual environment functions for `prof.va-tools.ru`, Amvera preview, localhost and old app domain; no real HTTP/auth/PWA check available in current environment.
 - **Required next gate:** deploy the current `professional/staging` and `core/staging` via Amvera; verify live `https://prof.va-tools.ru` login, Journal, Record, guest Booking, notifications and PWA. Only after successful check, in a separate Core-only cutover, redirect/disable `app.va-tools.ru` (and old temporary host), switch backend invitation and password-reset URLs to `prof.va-tools.ru`, then remove legacy Professional static UI while keeping API/DB/Admin/Landing. Old host must not remain a parallel usable Professional frontend.
 - Do not delete old Professional files before cutover verification. The old Core runtime and its host are intentionally left untouched in this preparatory commit, to protect live users. Other repos/main unchanged.
+
+## Lightweight entry boundary — 2026-11-06
+
+- The only browser login/registration request entry is `professional.js`, using direct auth UI primitives and `/auth/login` or `/auth/me`; it dynamically imports `professional/workspace.js` **after** successful authentication.
+- Workspace startup validates entitlements only. No Journal, People, Record, Finance, Profile or auxiliary business state is requested before entering an actual section.
+- The selected section fetches only its required domain slices. The obsolete aggregate `journal-bootstrap.js` client runtime is deleted, not retained as a fallback.
+- Background server refresh is scoped to the active section and begins after the section has loaded, not on the login screen.
+- User and Professional personal identity are NOT unified by this frontend change. Current database tables `Account` and `PlatformAccount` and passwords remain separate. Do not claim universal SSO until an atomic verified backend migration and identity ownership proof have been completed.
+- The Professional Profile's public-card builder (appearance/profession/workplaces) remains distinct from basic User personal data.

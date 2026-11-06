@@ -191,26 +191,31 @@ async function pull(scopes = ALL_SCOPES) {
   }
 }
 
-export function startProfessionalServerSync({ initialRefresh = true } = {}) {
+export function startProfessionalServerSync({ initialRefresh = false, getActiveScopes = () => POLL_SCOPES } = {}) {
   if (timer) return () => stopProfessionalServerSync();
-  // Authenticated startup already hydrated Journal, WorkPlan, Profile and
-  // Finance. Avoid refetching all scopes immediately and triggering repeated
-  // Journal renders while the first screen is becoming interactive.
-  if (initialRefresh) void pull(ALL_SCOPES);
-  timer = window.setInterval(() => void pull(POLL_SCOPES), POLL_MS);
-  const refreshAll = () => void pull(ALL_SCOPES);
+  const active = () => {
+    const selected = getActiveScopes();
+    return Array.isArray(selected) ? selected.filter((scope) => ALL_SCOPES.includes(scope)) : [];
+  };
+  const refreshActive = () => {
+    const selected = active();
+    if (selected.length) void pull(selected);
+  };
+  if (initialRefresh) refreshActive();
+  timer = window.setInterval(refreshActive, POLL_MS);
   const refreshMutation = (event) => {
     const scopes = Array.isArray(event?.detail?.scopes)
-      ? event.detail.scopes.map((scope) => String(scope || '')).filter(Boolean)
+      ? event.detail.scopes.filter((scope) => ALL_SCOPES.includes(String(scope || '')))
       : [];
-    void pull(scopes.length ? scopes : ALL_SCOPES);
+    if (scopes.length) void pull(scopes);
+    else refreshActive();
   };
-  document.addEventListener('visibilitychange', refreshAll);
-  window.addEventListener('focus', refreshAll);
+  document.addEventListener('visibilitychange', refreshActive);
+  window.addEventListener('focus', refreshActive);
   window.addEventListener('professional:server-mutation-completed', refreshMutation);
   stopListeners = () => {
-    document.removeEventListener('visibilitychange', refreshAll);
-    window.removeEventListener('focus', refreshAll);
+    document.removeEventListener('visibilitychange', refreshActive);
+    window.removeEventListener('focus', refreshActive);
     window.removeEventListener('professional:server-mutation-completed', refreshMutation);
   };
   return () => stopProfessionalServerSync();

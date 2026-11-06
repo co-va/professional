@@ -1,7 +1,6 @@
 import { apiRequest } from '../auth.js';
 import { hydrateDaysFromServer } from '../day/index.js';
 import { hydrateCurrentProceduresFromServer } from '../../core/service/procedures/data.js';
-import { consumeJournalBootstrap } from './journal-bootstrap.js';
 
 let operationalStateRequest = null;
 let recordCreationHydrated = false;
@@ -53,11 +52,6 @@ export async function loadOperationalState({full=false}={}){
   if(full){
     const {loadFullOperationalState}=await import('./operational-full-state.js');
     return loadFullOperationalState();
-  }
-  const bootstrap=await consumeJournalBootstrap('operationalContext');
-  if(bootstrap){
-    hydrateDays(bootstrap);
-    return bootstrap;
   }
   const remote=await requestOperationalState();
   hydrateDays(remote);

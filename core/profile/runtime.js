@@ -1,5 +1,4 @@
 import { apiRequest } from '../../core/auth.js';
-import { consumeJournalBootstrap } from '../runtime/journal-bootstrap.js';
 import { hydrateProfileFromServer, setProfileServerReady } from './data.js';
 import { hydrateWorkplacesFromServer, setWorkplacesServerReady } from './workplaces/data.js';
 
@@ -20,17 +19,7 @@ if(typeof window!=='undefined'){
   });
 }
 
-export async function loadProfileState({full=false}={}){
-  if(!full){
-    setProfileServerReady(false);
-    setWorkplacesServerReady(false);
-    const bootstrap=await consumeJournalBootstrap('profileContext');
-    if(bootstrap){
-      hydrate(bootstrap);
-      return bootstrap;
-    }
-  }
-
+export async function loadProfileState(){
   if(!fullProfileStateLoad){
     setProfileServerReady(false);
     setWorkplacesServerReady(false);

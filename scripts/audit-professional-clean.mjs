@@ -16,7 +16,7 @@ const ENTRY_ROOTS = [
 ];
 
 const RUNTIME_DIRS = [
-  'core', 'css', 'journal', 'timetable', 'settings', 'chat', 'ui', 'invite', 'online-booking', 'pwa',
+  'core', 'css', 'journal', 'timetable', 'settings', 'chat', 'ui', 'invite', 'online-booking', 'pwa', 'professional',
 ];
 
 const FORBIDDEN_EXACT = new Set([
@@ -209,7 +209,7 @@ for (const file of runtimeCode) {
 const allFiles = [
   ...await walk('core'), ...await walk('journal'), ...await walk('timetable'), ...await walk('settings'),
   ...await walk('chat'), ...await walk('ui'), ...await walk('invite'), ...await walk('online-booking'),
-  ...await walk('css'), ...await walk('pwa'),
+  ...await walk('css'), ...await walk('pwa'), ...await walk('professional'),
 ];
 
 for (const file of allFiles) {
@@ -248,8 +248,12 @@ if (await exists('professional.js')) {
   if (/renderGlobalClient|renderOnlineBooking|isEndUserAppHost|END_USER_APP_HOSTS|account-runtime|user-entry/.test(entry)) {
     problems.push('Professional entry still contains User runtime markers');
   }
-  if (!entry.includes("from './core/runtime/server-sync.js'")) {
-    problems.push('Professional entry must own server sync outside Public Booking');
+  if (!entry.includes("import('./professional/workspace.js')")) {
+    problems.push('Professional entry must load the workspace after authentication');
+  }
+  const workspace = await fs.readFile(abs('professional/workspace.js'), 'utf8');
+  if (!workspace.includes("from '../core/runtime/server-sync.js'")) {
+    problems.push('Professional workspace must own server synchronization');
   }
 }
 
