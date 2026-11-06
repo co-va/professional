@@ -50,3 +50,6 @@ assert.equal(sectionAllowed('journal'), false);
 assert.match(source, /if \(!allowedSections\(\)\.length\) \{/,
   'empty available toolset must show an empty state, not render a hidden tool');
 console.log('Professional root readiness navigation PASS');
+
+assert.match(source, /if \(!workspaceReady \|\| !sectionAllowed\('chat'\)\) return;/,
+  'Record-to-Chat action must not bypass a NOT_READY Chat instrument');

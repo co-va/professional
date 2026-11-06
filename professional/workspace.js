@@ -92,7 +92,8 @@ window.addEventListener('professional:business-persistence-error', (event) => {
 });
 
 window.addEventListener('professional:record-chat-request', (event) => {
-  if (!workspaceReady) return;
+  // Direct Record actions must obey the same Chat readiness as root navigation.
+  if (!workspaceReady || !sectionAllowed('chat')) return;
   const layer = mountV2ZLayer(app, v2ZLayer('', { className: 'record-chat-z' }), { stack: true });
   if (!layer) return;
   renderChat(layer, {
