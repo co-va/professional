@@ -52,3 +52,14 @@
   overflow-y:auto;
   overscroll-behavior:contain;
 }
+/* X editors, including payment entry, keep their existing action in view.
+   This is the same action node, never a second floating button. */
+.v2-layer-portal.is-keyboard-visible .v2-layer--bottom .modal-actions:not([hidden]){
+  position:sticky;
+  bottom:0;
+  z-index:5;
+  box-sizing:border-box;
+  margin-top:8px;
+  padding:8px 0;
+  background:var(--v2-white,#fff);
+}
