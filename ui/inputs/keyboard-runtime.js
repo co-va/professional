@@ -9,6 +9,7 @@ const root = document.documentElement;
 const viewport = () => window.visualViewport;
 let stableHeight = 0;
 let stableWidth = 0;
+let restingVisualHeight = 0;
 // Keep the outer shell's pre-keyboard dimensions through input changes and
 // WebKit's staggered focus/viewport events. Only its work area may shrink.
 let keyboardSession = false;
@@ -40,25 +41,36 @@ function syncViewport() {
   const { height, width } = viewportSize();
   if (!height || !width) return;
 
-  // Keep one layout-viewport anchor for the entire H/Z/Q/X shell.
-  // iOS animates VisualViewport.height in small increments; comparing one
-  // frame to the preceding frame and accepting decreases below a threshold
-  // makes the "stable" height follow the keyboard down. Never do that.
+  // The visual viewport is the VISIBLE area, not the physical app size.
+  // In iOS standalone mode WebKit may exclude the status-bar height from
+  // visualViewport AND innerHeight, leaving a dark band at the screen bottom.
+  // Keep the outer H/Z/Q/X coordinate space anchored to the full screen.
+  const standalone = navigator.standalone === true ||
+    window.matchMedia?.('(display-mode: standalone)')?.matches === true;
+  const physicalHeight = standalone &&
+    Math.abs(Number(window.screen.width || 0) - width) < 48
+      ? Math.round(Number(window.screen.height || 0)) : 0;
+  const layoutHeight = Math.round(window.innerHeight || root.clientHeight || 0);
   const rotated = !stableHeight || !stableWidth || Math.abs(width - stableWidth) > 48;
   if (rotated) {
-    stableHeight = Math.max(height, Math.round(window.innerHeight || root.clientHeight || 0));
+    stableHeight = Math.max(height, layoutHeight, physicalHeight);
     stableWidth = width;
+    restingVisualHeight = height;
     keyboardSession = false;
   }
   const focused = Boolean(activeEditable());
   if (focused) keyboardSession = true;
-  const shrinking = height < stableHeight - 60;
-  // Once established, the height may grow on a genuine recovered viewport,
-  // but a keyboard animation can never shorten it. A new orientation is the
-  // only event allowed to establish a shorter physical screen baseline.
-  if (!keyboardSession && !focused && height > stableHeight) stableHeight = height;
+  // Detect keyboard relative to the *resting visual viewport*, not screen
+  // height: the persistent iOS standalone status-bar delta is not a keyboard.
+  const shrinking = height < restingVisualHeight - 60;
+  if (!keyboardSession && !focused && height > restingVisualHeight) {
+    restingVisualHeight = height;
+  }
+  if (!keyboardSession && !focused) {
+    stableHeight = Math.max(stableHeight, layoutHeight, physicalHeight);
+  }
   if (!focused && !shrinking) keyboardSession = false;
-  const keyboardOpen = keyboardSession && height < stableHeight - 60;
+  const keyboardOpen = keyboardSession && shrinking;
 
   setRootPixel('--app-stable-vh', stableHeight);
   setRootPixel('--app-stable-vw', stableWidth);
