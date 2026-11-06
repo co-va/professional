@@ -62,24 +62,26 @@ function scrollHostFor(node) {
 
 function revealEditable(node) {
   if (!(node instanceof HTMLElement) || !node.matches(EDITABLE_SELECTOR)) return;
+  const host = scrollHostFor(node);
+  // The entire page is not a scroll surface. Calling scrollIntoView without
+  // a local scroll host makes iOS drag the whole app and its fixed controls.
+  if (!host) return;
 
   const vv = viewport();
   const viewportTop = vv?.offsetTop || 0;
   const viewportBottom = viewportTop + (vv?.height || window.innerHeight || stableHeight);
-  const rect = node.getBoundingClientRect();
-  const margin = 24;
-
-  if (rect.top >= viewportTop + margin && rect.bottom <= viewportBottom - margin) return;
-
-  const host = scrollHostFor(node);
-  if (!host) {
-    node.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'smooth' });
-    return;
-  }
-
   const hostRect = host.getBoundingClientRect();
+  const rect = node.getBoundingClientRect();
+  const margin = 16;
+
+  const action = node.closest('[data-v2-layer]')?.querySelector('.modal-actions:not([hidden])');
+  const actionRect = action?.getBoundingClientRect?.();
+  const actionTop = actionRect?.height > 0 ? actionRect.top - margin : viewportBottom;
   const visibleTop = Math.max(hostRect.top, viewportTop) + margin;
-  const visibleBottom = Math.min(hostRect.bottom, viewportBottom) - margin;
+  const visibleBottom = Math.min(hostRect.bottom, viewportBottom, actionTop) - margin;
+  if (rect.top >= visibleTop && rect.bottom <= visibleBottom) return;
+  if (visibleBottom <= visibleTop) return;
+
   const desiredCenter = (visibleTop + visibleBottom) / 2;
   const currentCenter = (rect.top + rect.bottom) / 2;
   host.scrollBy({ top: currentCenter - desiredCenter, behavior: 'smooth' });

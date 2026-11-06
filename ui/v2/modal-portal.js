@@ -33,28 +33,36 @@ function mountV2ModalPortal(host, app = null) {
   const sync = () => {
     if (!portal.isConnected || !host.isConnected) return;
     const viewport = currentVisualViewport();
-    const standardGeometry = v2ModalPortalGeometry(host.getBoundingClientRect(), viewport);
-    let geometry = standardGeometry;
+    const stableHeight = Number.parseFloat(
+      getComputedStyle(document.documentElement).getPropertyValue('--app-stable-vh'),
+    ) || window.innerHeight;
+    // Keyboard state comes from the actual visible area, not focus.
+    // Blurring a field while the keyboard closes must not move the modal early.
+    const keyboardVisible = stableHeight > viewport.height + 60;
+    portal.classList.toggle('is-keyboard-visible', keyboardVisible);
+    const viewportBottom = viewport.offsetTop + viewport.height;
+    const hostRect = host.getBoundingClientRect();
+    let geometry = keyboardVisible
+      ? v2ModalPortalGeometry({
+          ...hostRect,
+          top: viewport.offsetTop,
+          bottom: viewportBottom,
+          height: viewport.height,
+        }, viewport)
+      : v2ModalPortalGeometry(hostRect, viewport);
     if (qLayer && app) {
       const appRect = app.getBoundingClientRect();
-      const editable = document.activeElement?.matches?.('input:not([type="hidden"]):not([readonly]), textarea:not([readonly]), [contenteditable="true"]');
-      const stableHeight = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--app-stable-vh')) || window.innerHeight;
-      const keyboardVisible = Boolean(editable && stableHeight > viewport.height + 60);
-      portal.classList.toggle('is-keyboard-visible', keyboardVisible);
-
-      // iOS may shift/shrink the app while the software keyboard is open.
-      // Q still belongs to the app, but its visible bottom must follow
-      // VisualViewport, not the temporarily displaced app rectangle.
-      const surfaceRect = keyboardVisible ? {
-        ...appRect,
-        top: viewport.offsetTop,
-        bottom: viewport.offsetTop + viewport.height,
-        height: viewport.height,
-      } : appRect;
+      const surfaceRect = keyboardVisible
+        ? { ...appRect, top: viewport.offsetTop, bottom: viewportBottom, height: viewport.height }
+        : appRect;
       geometry = keyboardVisible
         ? v2ModalPortalGeometry(surfaceRect, viewport)
         : { left: appRect.left, top: appRect.top, width: appRect.width, height: appRect.height, bottom: appRect.bottom };
-      const headerBottom = app.querySelector?.('[data-v2-header]')?.getBoundingClientRect?.().bottom;
+      // Use the stable shared 72px H height while iOS moves the page for typing.
+      // Otherwise the Q header jumps to the status bar or under the keyboard.
+      const headerBottom = keyboardVisible
+        ? viewport.offsetTop + Math.min(72, Math.max(0, viewport.height - 240))
+        : app.querySelector?.('[data-v2-header]')?.getBoundingClientRect?.().bottom;
       const qViewport = keyboardVisible ? viewport : {
         offsetLeft: appRect.left,
         offsetTop: appRect.top,
@@ -65,7 +73,6 @@ function mountV2ModalPortal(host, app = null) {
       portal.style.setProperty('--v2-q-top', `${Math.max(0, qGeometry.top - geometry.top)}px`);
       portal.style.setProperty('--v2-q-left', `${Math.max(0, qGeometry.left - geometry.left)}px`);
     } else {
-      portal.classList.remove('is-keyboard-visible');
       portal.style.removeProperty('--v2-q-top');
       portal.style.removeProperty('--v2-q-left');
     }

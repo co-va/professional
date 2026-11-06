@@ -36,9 +36,19 @@
 
 .modal-sheet.modal--bottom.modal--time-picker-sheet{height:auto;min-height:360px;max-height:72%;padding:max(20px,var(--v2-layer-gesture-size)) 18px calc(18px + env(safe-area-inset-bottom));background:var(--white);overflow:auto}
 
-/* A profile editor must never cover an active input with its save action.
-   The action returns to the same Shared Q footer when the keyboard closes. */
-.v2-layer-portal.is-keyboard-visible :is(.modal--profile-editor,.v2-profile-data-layer) .modal-actions{
-  visibility:hidden;
-  pointer-events:none;
+/* The keyboard reduces the visible portal, never the app's underlying Z.
+   One shared action footer stays above the iOS keyboard and its accessory bar.
+   Reserve scroll clearance so it cannot cover the currently edited field. */
+.modal-actions[hidden]{display:none!important}
+.v2-layer-portal.is-keyboard-visible [data-v2-q-body] .modal-actions:not([hidden]){
+  bottom:8px;
+}
+.v2-layer-portal.is-keyboard-visible [data-v2-q-body]:has(.modal-actions:not([hidden])>:first-child){
+  padding-bottom:104px;
+  scroll-padding-bottom:104px;
+}
+.v2-layer-portal.is-keyboard-visible .v2-layer--bottom:has(:is(input:not([type="hidden"]),textarea,select)){
+  max-height:calc(100% - 12px);
+  overflow-y:auto;
+  overscroll-behavior:contain;
 }
