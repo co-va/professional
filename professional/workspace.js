@@ -121,6 +121,12 @@ function rootDefinition(section) {
 
 function sectionAllowed(section) {
   if (section === 'chat') return canUseCapability('chat.access');
+  // Root navigation must use the same server-resolved readiness as submodes.
+  if (section === 'journal') {
+    return ['journal.day.access', 'journal.month.access', 'journal.list.access']
+      .some((key) => canUseCapability(key));
+  }
+  if (section === 'profile') return canUseCapability('profile.access');
   if (section === 'finance' || section === 'inventory' || section === 'loyalty' || section === 'settings') {
     return secondaryItems(section).length > 0;
   }
@@ -154,7 +160,7 @@ function allowedRootItems() {
 
 function defaultSection() {
   if (sectionAllowed('journal')) return 'journal';
-  return allowedSections()[0] || 'settings';
+  return allowedSections()[0] || '';
 }
 
 function normalizeRequestedSection(section) {
@@ -394,6 +400,15 @@ function renderWorkspace() {
   workspaceReady = true;
   disposeView();
   disposeView = () => {};
+  // Do not invent a Settings fallback when every instrument is NOT_READY.
+  if (!allowedSections().length) {
+    app.innerHTML = v2Sticker({
+      title: 'Нет доступных инструментов',
+      body: '<p>Инструменты станут доступны после допуска к проверке или выпуску.</p>',
+      className: 'v2-sticker-screen--technical',
+    });
+    return;
+  }
   const requested = normalizeRequestedSection(state.activeSection);
   if (!sectionAllowed(requested)) state.activeSection = defaultSection();
   if (state.activeSection !== 'chat') state.lastRootSection = state.activeSection;
