@@ -37,6 +37,9 @@ const geometry = read('ui/v2/geometry.js');
 const header = read('ui/v2/header.js');
 const zStack = read('ui/v2/z-stack.js');
 const modalPortal = read('ui/v2/modal-portal.js');
+const keyboardRuntime = read('ui/inputs/keyboard-runtime.js');
+const keyboardStyle = read('ui/inputs/keyboard.css');
+const shellStyle = read('css/style.css');
 const vHost = read('ui/v2/v-host.js');
 const entity = read('ui/cards/entity-card-constructor.css');
 const mini = read('ui/cards/mini-card.css');
@@ -57,6 +60,15 @@ assert(geometry.includes('export function v2QModalPortalGeometry'), 'Shared Q ge
 assert(count(geometry, 'export function v2QModalPortalGeometry') === 1, 'Q geometry must have one owner');
 assert(modalPortal.includes("new CustomEvent('va-tools:v2-context-changed')"), 'Modal portal must publish neutral Shared context event');
 assert(vHost.includes("addEventListener('va-tools:v2-context-changed'"), 'V host must consume neutral Shared context event');
+
+// Shared keyboard geometry is one owner; never add per-field scroll handlers.
+assert(keyboardRuntime.includes('let keyboardSession = false;'), 'Shared keyboard session owner missing');
+assert(!keyboardRuntime.includes('scrollTop') && !keyboardRuntime.includes('scrollIntoView'), 'Keyboard controller must never scroll fields on a frame or focus event');
+assert(keyboardRuntime.includes("setRootPixel('--ui-visual-left', visualLeft)"), 'Horizontal Safari viewport compensation missing');
+assert(shellStyle.includes('transform:translateX(var(--ui-visual-left,0px))'), 'Shared application root must compensate Safari horizontal pan');
+assert(keyboardStyle.includes('.v2-layer--bottom{\\n  bottom:0;'.replace('\\n', '\n')), 'X white surface must stay attached to bottom under keyboard');
+assert(keyboardStyle.includes('padding-bottom:calc(20px + var(--ui-keyboard-inset))'), 'X contents must remain above keyboard');
+assert(!modalPortal.includes('node.contains(document.activeElement)'), 'Per-modal focus blur override is forbidden');
 
 // Canonical Shared components keep one geometry owner.
 assert(entity.includes('width:min(338px,100%)'), 'EntityCard width changed');

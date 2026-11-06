@@ -59,6 +59,15 @@
 - Professional-specific Journal/Time extensions сохранены только как feature extensions, а не второй Shared owner.
 - Portal-aware Q/V fix Professional сохранён, потому что он исправляет реальную portal geometry и не создаёт альтернативный owner.
 
+### Shared Z/Q/X keyboard — канонический baseline 2026-11-06
+
+- Эталон: `co-va/user/staging` commit `65d2ef7e525f029160e6a5c7ec360235912b1de9` (рабочий UI, проверенный владельцем в User).
+- В Professional заменены целиком `ui/inputs/keyboard-runtime.js`, `ui/inputs/keyboard.css`, `css/style.css`, `ui/v2/modal-portal.js` по этому эталону. Отличие JS — только нейтральное Shared событие `va-tools:v2-context-changed` вместо User namespace.
+- Убраны временные попытки фиксировать симптомы: принудительная покадровая/одноразовая прокрутка к полю, отдельный blur при закрытии Q, старое перемещение X к верху клавиатуры, отсутствие горизонтальной компенсации Safari. Не возвращать.
+- Контракт: H/ABCD, Z и Q имеют неподвижные внешние границы; клавиатура ограничивает только внутренний scroll; X сохраняет белый фон до физического низа и поднимает содержимое; прокрутка не перескакивает назад при ручном жесте.
+- Проверки: `scripts/ci/shared-keyboard-layout-smoke.mjs` (канонический Chromium тест из User), `scripts/guard-shared-ui.mjs` (запрет возврата временных обходов). Из-за незавершённых этапов Professional постоянный CI не включён; реальный iOS runtime ещё должен быть проверен отдельно. Исходники и симуляция focus/blur/viewport проверены.
+- `main`, `co-va/core`, `co-va/user` не изменялись в этом этапе.
+
 ### Этап 4 — entry/bootstrap Professional — DONE
 
 - `professional.js` загружает только Professional App Runtime.
