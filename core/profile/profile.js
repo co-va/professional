@@ -105,7 +105,13 @@ function collectProfileData(root){
 
 function openProfileData(root,navigateBack,options={}){
   const current=getProfile();
-  const emails=current.emails?.length?current.emails:(options.accountEmail?[options.accountEmail]:[]);
+  const accountEmail=String(options.accountEmail||'').trim();
+  // The account email is an auth identity. Other profile emails are contacts.
+  // Keep existing contacts intact, but never render the account address twice.
+  const emails=[...new Map([accountEmail,...(current.emails||[])]
+    .map(value=>String(value||'').trim())
+    .filter(Boolean)
+    .map(value=>[value.toLowerCase(),value])).values()];
   return openSharedProfileDataEditor({
     root,
     header:profileContext(current,'Данные профиля',{includeSettings:false}),
@@ -115,6 +121,26 @@ function openProfileData(root,navigateBack,options={}){
       ?'Имя, телефон и профессия обязательны.':'',
     persist:saveProfileData,
     onSaved:()=>renderProfile(root,navigateBack,options),
+    onOpen:(layer)=>{
+      if(!accountEmail)return;
+      const primary=layer.querySelector('[data-repeated-name="profileEmails"] [data-repeated-row] input[name="profileEmails"]');
+      if(!primary)return;
+      primary.readOnly=true;
+      primary.dataset.accountPrimaryEmail='true';
+      primary.title='Нажмите, чтобы изменить основной Email';
+      primary.setAttribute('aria-label','Основной Email. Нажмите, чтобы изменить и подтвердить новый адрес');
+      const editAccountEmail=()=>{
+        void import('./account-controls.js')
+          .then(({openAccountEmailSettingsModal})=>openAccountEmailSettingsModal())
+          .catch(()=>showProfileError('Не удалось открыть изменение Email'));
+      };
+      primary.addEventListener('click',editAccountEmail);
+      primary.addEventListener('keydown',(event)=>{
+        if(event.key!=='Enter'&&event.key!==' ')return;
+        event.preventDefault();
+        editAccountEmail();
+      });
+    },
   });
 }
 
