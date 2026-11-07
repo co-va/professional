@@ -354,3 +354,18 @@ Professional отделён только если одновременно до�
 - The Professional Profile's public-card builder (appearance/profession/workplaces) remains distinct from basic User personal data.
 
 - 2026-11-06: The active login and workspace share one viewport utility; separate duplicate helpers deleted. Auth logout clears Profile, workplace, and synchronization caches; stale in-flight loads cannot hydrate a new session. Runtime check protects these boundaries.
+
+## Professional account email and platform notifications — 2026-11-07
+
+- Область: только `co-va/professional/staging`; `main`, `co-va/user`, `co-va/core` не изменялись.
+- `Профиль → V → Документы / Уведомления` — единое по организации с User окно: Push, Email, документы платформы. Telegram удалён из этого окна как чужой канал. Ни настройки рассылок Professional↔User, ни подключение персональной почты/бота здесь не размещаются.
+- Email в этом окне — именно существующий `PlatformNotificationPreference.emailEnabled`. При `emailVerifiedAt = null` соответствующий переключатель виден как выключенный/недоступный, не обещая доставку. Push сохраняет свой текущий API и управление.
+- Из окна документов убраны редактирование адреса аккаунта и ручная отправка письма. Для исправления ошибочно введённого адреса и аварийной повторной отправки добавлено отдельное действие `Профиль → V → Email аккаунта`, использующее существующие `/auth/email-verification/status|request|change` API без нового владельца данных. Это не замена автоматической серверной верификации.
+- Документы пока строятся только из `GET /profile/account-controls`, который возвращает `type LIKE '%CONSENT%'`. Перечень договоров/политик платформы необходимо расширять в Core отдельным контрактом; не создавать фронтенд-дубликат.
+- Локальное изменение UI НЕ доказывает, что `emailEnabled` применяется при отправке, что адрес реально подтверждён или что Postbox работает. Реальный iPhone и доставка почты после изменений не проверены.
+
+**CORE HANDOFF (только отдельный серверный этап, не исправлять здесь):**
+1. При регистрации или первом входе с неподтверждённым Email инициировать отправку подтверждения на сервере по надёжному идемпотентному правилу с retry/cooldown; не привязывать старт к открытию настроек или кнопке в Profile.
+2. Исправить реальную ошибку отправителя SMTP `538 5.7.8 Authentication credentials invalid`; проверить конфигурацию Yandex Cloud Postbox в Amvera, без раскрытия секретов. Не считать ticket без успешной отправки доказательством доставки.
+3. Документировать и обеспечить, что `PlatformNotificationPreference.emailEnabled` регулирует только необязательные сервисные письма **платформа → PlatformAccount**, после подтверждения адреса. Критичные security/verification сообщения не блокировать этим флагом. Рассылки Professional↔User и маркетинг — другие контракты.
+4. Уточнить список платформенных документов для Professional: согласия, договоры/условия, политика конфиденциальности с актуальными версиями, без второго источника документов.
