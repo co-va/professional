@@ -15,6 +15,10 @@ async function enterWorkspace(account) {
   }
   const { renderAuthenticated } = await workspaceModule;
   await renderAuthenticated(account);
+  // Verification runs after the workspace has appeared. It must never delay login.
+  void import('./core/profile/account-controls.js')
+    .then(({ offerAccountEmailVerificationReminder }) => offerAccountEmailVerificationReminder(account))
+    .catch(() => undefined);
 }
 
 function renderWorkspaceUnavailable(account, cause) {
