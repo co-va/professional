@@ -123,7 +123,7 @@ function fieldControl(line,fields){
 function editorWorkspace(state,fields,allowPhoto=true){
   if(allowPhoto && state.tab==='photo'){
     return `<div class="entity-card-editor__photo">
-      ${button(state.photo?'Заменить фото':'Добавить фото',{data:'data-card-photo-select'})}
+      ${button(state.photo?'Заменить фото':'Добавить фото',{variant:'secondary',data:'data-card-photo-select'})}
       ${state.photo?button('Удалить фото',{variant:'outline',className:'ui-button--delete-outline',data:'data-card-photo-remove'}):''}
       <p>Фото заполняет карту. Если фото нет, используется градиентный фон.</p>
     </div>`;
