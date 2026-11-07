@@ -35,43 +35,35 @@ function consentCards(consents) {
   })), { layout:'rail' });
 }
 
-function serviceMarkup(state, pushState) {
-  const emailEnabled = state.serviceNotifications?.email !== false;
-  const telegramAvailable = state.serviceNotifications?.telegramAvailable === true;
-  const telegramEnabled = telegramAvailable && state.serviceNotifications?.telegram !== false;
+function serviceMarkup(state, pushState, emailState = {}) {
+  const verified = emailState.verified === true;
+  const emailEnabled = verified && state.serviceNotifications?.email !== false;
   const pushSupported = Boolean(pushState?.supported && pushState?.enabled);
   const pushEnabled = Boolean(pushState?.subscribed);
 
   return notificationSettings([
     {
-      label: 'Telegram',
-      description: telegramAvailable ? 'Канал подключён.' : 'Канал платформенного аккаунта не подключён.',
-      checked: telegramEnabled,
-      disabled: !telegramAvailable,
-      data: 'data-service-telegram',
-    },
-    {
-      label: 'Email',
-      description: 'Сервисные сообщения на email учётной записи.',
-      checked: emailEnabled,
-      data: 'data-service-email',
-    },
-    {
       label: 'Push',
-      description: pushSupported ? 'Push-уведомления на этом устройстве.' : 'Push на этом устройстве сейчас недоступен.',
+      description: pushSupported ? 'Push-уведомления платформы на этом устройстве.' : 'Push на этом устройстве сейчас недоступен.',
       checked: pushEnabled,
       disabled: !pushSupported,
       data: 'data-service-push',
     },
+    {
+      label: 'Email',
+      description: verified ? 'Сервисные уведомления платформы на подтверждённый email.' : 'Email не подтверждён. Канал станет доступен после подтверждения адреса.',
+      checked: emailEnabled,
+      disabled: !verified,
+      data: 'data-service-email',
+    },
   ]);
 }
-
 function emailMarkup(emailState = {}) {
   const status = emailState.verified ? 'Email подтверждён.' : 'Email не подтверждён.';
   return `<div class="form-grid">
     ${field({ label: 'Email', name: 'platformAccountEmail', value: emailState.email || '', type: 'email', required: true, autocomplete: 'email', data: 'data-platform-account-email' })}
     <div class="muted" data-platform-account-email-status>${escapeHtml(status)}</div>
-    ${button(emailState.verified ? 'Изменить email' : 'Подтвердить / изменить email', { type: 'button', variant: 'outline', data: 'data-platform-account-email-save' })}
+    ${button(emailState.verified ? 'Сохранить новый email' : 'Исправить email / отправить письмо повторно', { type: 'button', variant: 'outline', data: 'data-platform-account-email-save' })}
   </div>`;
 }
 
@@ -87,37 +79,9 @@ async function renderPanelState(root,state,pushState=null,emailState={}){
   const consents=Array.isArray(state.consents)?state.consents:[];
   const push=pushState || await getPlatformPushState().catch(()=>({supported:false,enabled:false,subscribed:false}));
   root.innerHTML=`
-    ${v2Section('Email',emailMarkup(emailState))}
-    ${v2Section('Уведомления',serviceMarkup(state,push))}
-    ${v2Section('Согласия',consentCards(consents))}
+    ${v2Section('Уведомления',serviceMarkup(state,push,emailState))}
+    ${v2Section('Документы',consentCards(consents))}
   `;
-
-  root.querySelector('[data-platform-account-email-save]')?.addEventListener('click',async(event)=>{
-    const control=event.currentTarget;
-    const input=root.querySelector('[data-platform-account-email]');
-    const status=root.querySelector('[data-platform-account-email-status]');
-    const nextEmail=String(input?.value||'').trim().toLowerCase();
-    if(!nextEmail){ if(status)status.textContent='Укажите email.'; return; }
-    control.disabled=true;
-    if(status)status.textContent='Отправляем письмо…';
-    try{
-      const current=String(emailState.email||'').trim().toLowerCase();
-      if(nextEmail===current){
-        if(emailState.verified){ if(status)status.textContent='Email уже подтверждён.'; return; }
-        await request('/auth/email-verification/request',{method:'POST'});
-      }else{
-        await request('/auth/email-verification/change',{
-          method:'POST',
-          body:JSON.stringify({email:nextEmail}),
-        });
-      }
-      if(status)status.textContent=`Письмо отправлено на ${nextEmail}. Email изменится только после подтверждения.`;
-    }catch(error){
-      if(status)status.textContent=error instanceof Error?error.message:'Не удалось отправить письмо';
-    }finally{
-      control.disabled=false;
-    }
-  });
 
   root.querySelectorAll('[data-account-consent-open]').forEach((control)=>{
     control.addEventListener('click',()=>{
@@ -182,6 +146,55 @@ async function renderPanelState(root,state,pushState=null,emailState={}){
       if(push?.supported&&push?.enabled)input.disabled=false;
     }
   });
+}
+
+async function renderAccountEmailPanel(root) {
+  root.innerHTML = emptyState('Загрузка', 'Проверяем email аккаунта.');
+  let emailState;
+  try {
+    emailState = await request('/auth/email-verification/status');
+  } catch (error) {
+    root.innerHTML = emptyState('Email недоступен', error instanceof Error ? error.message : 'Не удалось проверить email');
+    return;
+  }
+  root.innerHTML = emailMarkup(emailState);
+  root.querySelector('[data-platform-account-email-save]')?.addEventListener('click',async(event)=>{
+  const control=event.currentTarget;
+  const input=root.querySelector('[data-platform-account-email]');
+  const status=root.querySelector('[data-platform-account-email-status]');
+  const nextEmail=String(input?.value||'').trim().toLowerCase();
+  if(!nextEmail){ if(status)status.textContent='Укажите email.'; return; }
+  control.disabled=true;
+  if(status)status.textContent='Отправляем письмо…';
+  try{
+  const current=String(emailState.email||'').trim().toLowerCase();
+  if(nextEmail===current){
+  if(emailState.verified){ if(status)status.textContent='Email уже подтверждён.'; return; }
+  await request('/auth/email-verification/request',{method:'POST'});
+  }else{
+  await request('/auth/email-verification/change',{
+  method:'POST',
+  body:JSON.stringify({email:nextEmail}),
+  });
+  }
+  if(status)status.textContent=`Письмо отправлено на ${nextEmail}. Email изменится только после подтверждения.`;
+  }catch(error){
+  if(status)status.textContent=error instanceof Error?error.message:'Не удалось отправить письмо';
+  }finally{
+  control.disabled=false;
+  }
+  });
+}
+
+export function openAccountEmailSettingsModal() {
+  const layer = mountModal(document.body, modal('<div data-account-email-settings-panel></div>', {
+    variant: 'q',
+    title: 'Email аккаунта',
+    className: 'modal--account-email-settings',
+  }));
+  const root = layer?.querySelector('[data-account-email-settings-panel]');
+  if (root) void renderAccountEmailPanel(root);
+  return layer;
 }
 
 export async function renderAccountControlsPanel(root){
