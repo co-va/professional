@@ -387,7 +387,9 @@ async function renderActiveWorkspaceSurface(surface) {
       },
     });
   }
-  if (section === 'profile') return renderProfile(surface, openNavigation);
+  if (section === 'profile') return renderProfile(surface, openNavigation, {
+    accountEmail: authenticatedAccount?.account?.email || '',
+  });
   if (section === 'service') return renderService(surface, openNavigation);
   if (section === 'settings') return renderSettingsSection(surface, ensureSecondary('settings'), { onBack: openNavigation });
   if (section === 'chat') return renderChat(surface, { personKey: state.chatPersonKey });
