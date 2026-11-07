@@ -81,7 +81,11 @@ function syncViewport() {
   const visualLeft = Math.max(0, Math.round(Number(viewport()?.offsetLeft || 0)));
   setRootPixel('--ui-visual-top', visualTop);
   setRootPixel('--ui-visual-left', visualLeft);
-  const inset = keyboardOpen ? Math.max(0, stableHeight - height) : 0;
+  // The keyboard occupies only the reduction of the *resting visual*
+  // viewport. Physical standalone chrome/safe-area space is NOT keyboard.
+  // Subtracting height from stableHeight made the scroll area too short and
+  // provoked Safari's document-level scroll-to-focus on bottom inputs.
+  const inset = keyboardOpen ? Math.max(0, restingVisualHeight - height) : 0;
   setRootPixel('--ui-keyboard-inset', inset);
   root.classList.toggle('keyboard-open', keyboardOpen);
 }
