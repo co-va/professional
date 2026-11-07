@@ -225,3 +225,90 @@ export function openAccountControlsModal() {
   if (host) void renderAccountControlsPanel(host);
   return layer;
 }
+
+let remindedAccountId = '';
+let reminderInFlight = false;
+
+/**
+ * Check once after a successful Professional workspace entry. The server
+ * owns verification status and email delivery; this UI never marks it verified.
+ */
+export async function offerAccountEmailVerificationReminder(account = {}) {
+  const accountId = String(account?.account?.id || '').trim();
+  if (!accountId || remindedAccountId === accountId || reminderInFlight) return null;
+  reminderInFlight = true;
+  try {
+    const status = await request('/auth/email-verification/status');
+    if (status.verified === true) {
+      remindedAccountId = accountId;
+      return null;
+    }
+    if (!document.querySelector('[data-v2-app].v2-app--workspace')) return null;
+    if (document.querySelector('[data-account-email-verification-reminder]')) return null;
+
+    remindedAccountId = accountId;
+    const accountEmail = String(status.email || account?.account?.email || '').trim();
+    const content = `<div class="modal-title">
+      <h2>Подтвердите email</h2>
+      <p>Подтвердите адрес <strong>${escapeHtml(accountEmail || 'вашей учётной записи')}</strong>, чтобы получать сервисные письма платформы и восстанавливать пароль.</p>
+      <p>Откройте письмо с подтверждением. Если его нет, проверьте папку «Спам». Если адрес указан неверно, исправьте его.</p>
+    </div>
+    <p class="muted" data-email-verification-reminder-status role="status" aria-live="polite">Проверяем отправку письма…</p>
+    <div class="modal-actions">
+      ${button('Исправить email', { variant: 'outline', data: 'data-email-verification-change' })}
+      ${button('Отправить повторно', { variant: 'outline', data: 'data-email-verification-resend' })}
+      ${button('Понятно', { data: 'data-email-verification-later' })}
+    </div>`;
+    const layer = mountModal(document.body, modal(content, {
+      variant: 'technical',
+      title: 'Подтверждение email',
+      className: 'modal--email-verification-reminder',
+    }));
+    if (!layer) return null;
+    layer.dataset.accountEmailVerificationReminder = accountId;
+
+    const message = layer.querySelector('[data-email-verification-reminder-status]');
+    const resend = layer.querySelector('[data-email-verification-resend]');
+    const send = async () => {
+      if (!layer.isConnected || resend?.disabled) return;
+      if (resend) resend.disabled = true;
+      if (message) message.textContent = 'Запрашиваем письмо подтверждения…';
+      try {
+        const result = await request('/auth/email-verification/request', { method: 'POST' });
+        if (message) message.textContent = result?.alreadyVerified
+          ? 'Email уже подтверждён. При следующем входе это уведомление не появится.'
+          : result?.throttled
+            ? 'Повторная отправка временно ограничена. Проверьте «Входящие» и «Спам».'
+            : result?.sent
+              ? 'Письмо принято почтовым сервером. Проверьте «Входящие» и «Спам».'
+              : 'Отправка не подтверждена сервером. Попробуйте позднее.';
+      } catch {
+        if (message) message.textContent = 'Письмо сейчас не отправлено: почтовый сервис платформы недоступен. Повторите попытку позднее.';
+      } finally {
+        if (resend?.isConnected) resend.disabled = false;
+      }
+    };
+    layer.querySelector('[data-email-verification-change]')?.addEventListener('click', () => {
+      layer.v2Close?.();
+      openAccountEmailSettingsModal();
+    });
+    layer.querySelector('[data-email-verification-later]')?.addEventListener('click', () => {
+      layer.v2Close?.();
+    });
+    resend?.addEventListener('click', () => void send());
+    // The first verification attempt runs after entry, never before the workspace.
+    void send();
+    return layer;
+  } catch {
+    // Verification must not block login. Retry on a later entry.
+    return null;
+  } finally {
+    reminderInFlight = false;
+  }
+}
+
+window.addEventListener('professional:auth-logout', () => {
+  remindedAccountId = '';
+  reminderInFlight = false;
+  document.querySelector('[data-account-email-verification-reminder]')?.v2Close?.();
+});
