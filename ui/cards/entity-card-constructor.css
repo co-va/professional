@@ -33,9 +33,9 @@
 .entity-card-editor__photo p{grid-column:1/-1;margin:4px 0 0;color:var(--text-secondary);font-size:12px;line-height:1.35}
 .entity-card-editor__background{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
 .entity-card-editor__background [data-card-gradient-color]{min-width:0}
-.entity-card-editor__background .color-picker__trigger{width:100%;min-width:0;min-height:48px}
+.entity-card-editor__background .color-picker__trigger{width:100%;min-width:0;min-height:48px;padding:0;overflow:hidden}
 .entity-card-editor__background .color-picker__trigger>span:last-child{display:none}
-.entity-card-editor__background .color-picker__swatch{width:100%;height:28px;border:1px solid #111}
+.entity-card-editor__background .color-picker__swatch{display:block;width:100%;height:48px;min-width:0;flex:1 1 auto;border:0;border-radius:0}
 .entity-card-editor__direction{grid-column:1/-1}
 
 .entity-card-editor__line-picker{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:3px;margin-bottom:10px}
