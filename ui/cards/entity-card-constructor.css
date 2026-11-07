@@ -21,6 +21,9 @@
 .entity-visual-card__line.is-italic{font-style:italic}
 .entity-visual-card__line.is-underline{text-decoration:underline}
 
+.entity-card-appearance-q__selectors{display:grid;gap:8px;min-width:0;width:100%}
+.entity-card-appearance-q__selectors .ui-select{width:100%}
+
 .entity-card-editor{display:grid;gap:14px}
 .entity-card-editor__preview{display:flex;justify-content:center;min-width:0;margin-bottom:10px}
 .entity-card-editor__tabs{margin:0}
