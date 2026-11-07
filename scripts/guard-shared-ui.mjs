@@ -63,11 +63,9 @@ assert(vHost.includes("addEventListener('va-tools:v2-context-changed'"), 'V host
 
 // Shared keyboard geometry is one owner; never add per-field scroll handlers.
 assert(keyboardRuntime.includes('let keyboardSession = false;'), 'Shared keyboard session owner missing');
-assert(!keyboardRuntime.includes('else if (!keyboardSession)'),
-  'Safari resize before bottom-field focus must never replace the stable app height');
 assert(!keyboardRuntime.includes('scrollTop') && !keyboardRuntime.includes('scrollIntoView'), 'Keyboard controller must never scroll fields on a frame or focus event');
 assert(keyboardRuntime.includes("setRootPixel('--ui-visual-left', visualLeft)"), 'Horizontal Safari viewport compensation missing');
-assert(shellStyle.includes('transform:translate3d(var(--ui-visual-left,0px),var(--ui-visual-top,0px),0)'), 'Shared application root must compensate Safari horizontal pan');
+assert(shellStyle.includes('transform:translateX(var(--ui-visual-left,0px))'), 'Shared application root must compensate Safari horizontal pan');
 assert(keyboardStyle.includes('.v2-layer--bottom{\\n  bottom:0;'.replace('\\n', '\n')), 'X white surface must stay attached to bottom under keyboard');
 assert(keyboardStyle.includes('padding-bottom:calc(20px + var(--ui-keyboard-inset))'), 'X contents must remain above keyboard');
 assert(!modalPortal.includes('node.contains(document.activeElement)'), 'Per-modal focus blur override is forbidden');

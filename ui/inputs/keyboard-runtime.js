@@ -9,7 +9,6 @@ const root = document.documentElement;
 const viewport = () => window.visualViewport;
 let stableHeight = 0;
 let stableWidth = 0;
-let restingVisualHeight = 0;
 // Keep the outer shell's pre-keyboard dimensions through input changes and
 // WebKit's staggered focus/viewport events. Only its work area may shrink.
 let keyboardSession = false;
@@ -41,36 +40,29 @@ function syncViewport() {
   const { height, width } = viewportSize();
   if (!height || !width) return;
 
-  // The visual viewport is the VISIBLE area, not the physical app size.
-  // In iOS standalone mode WebKit may exclude the status-bar height from
-  // visualViewport AND innerHeight, leaving a dark band at the screen bottom.
-  // Keep the outer H/Z/Q/X coordinate space anchored to the full screen.
-  const standalone = navigator.standalone === true ||
-    window.matchMedia?.('(display-mode: standalone)')?.matches === true;
-  const physicalHeight = standalone &&
-    Math.abs(Number(window.screen.width || 0) - width) < 48
-      ? Math.round(Number(window.screen.height || 0)) : 0;
-  const layoutHeight = Math.round(window.innerHeight || root.clientHeight || 0);
+  // Only a changed layout width (rotation) may replace the shell's
+  // baseline during keyboard interaction. A visual viewport shrink must
+  // never shorten Z/Q, including when Safari blurs one input before focusing
+  // the next or pans to the final field.
   const rotated = !stableHeight || !stableWidth || Math.abs(width - stableWidth) > 48;
   if (rotated) {
-    stableHeight = Math.max(height, layoutHeight, physicalHeight);
+    stableHeight = height;
     stableWidth = width;
-    restingVisualHeight = height;
     keyboardSession = false;
   }
   const focused = Boolean(activeEditable());
   if (focused) keyboardSession = true;
-  // Detect keyboard relative to the *resting visual viewport*, not screen
-  // height: the persistent iOS standalone status-bar delta is not a keyboard.
-  const shrinking = height < restingVisualHeight - 60;
-  if (!keyboardSession && !focused && height > restingVisualHeight) {
-    restingVisualHeight = height;
+  const shrinking = height < stableHeight - 60;
+  if (!shrinking) {
+    stableHeight = height;
+    stableWidth = width;
+    if (!focused) keyboardSession = false;
+  } else if (!keyboardSession) {
+    // An ordinary unfocused viewport resize is not a keyboard session.
+    stableHeight = height;
+    stableWidth = width;
   }
-  if (!keyboardSession && !focused) {
-    stableHeight = Math.max(stableHeight, layoutHeight, physicalHeight);
-  }
-  if (!focused && !shrinking) keyboardSession = false;
-  const keyboardOpen = keyboardSession && shrinking;
+  const keyboardOpen = keyboardSession && height < stableHeight - 60;
 
   setRootPixel('--app-stable-vh', stableHeight);
   setRootPixel('--app-stable-vw', stableWidth);
@@ -81,11 +73,7 @@ function syncViewport() {
   const visualLeft = Math.max(0, Math.round(Number(viewport()?.offsetLeft || 0)));
   setRootPixel('--ui-visual-top', visualTop);
   setRootPixel('--ui-visual-left', visualLeft);
-  // The keyboard occupies only the reduction of the *resting visual*
-  // viewport. Physical standalone chrome/safe-area space is NOT keyboard.
-  // Subtracting height from stableHeight made the scroll area too short and
-  // provoked Safari's document-level scroll-to-focus on bottom inputs.
-  const inset = keyboardOpen ? Math.max(0, restingVisualHeight - height) : 0;
+  const inset = keyboardOpen ? Math.max(0, stableHeight - height) : 0;
   setRootPixel('--ui-keyboard-inset', inset);
   root.classList.toggle('keyboard-open', keyboardOpen);
 }
