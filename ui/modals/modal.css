@@ -61,3 +61,6 @@
 .modal-sheet.modal--bottom.modal--form-sheet{height:auto;min-height:260px;max-height:54%;padding:max(20px,var(--v2-layer-gesture-size)) 18px calc(18px + env(safe-area-inset-bottom));background:var(--white);overflow:auto}
 
 .modal-sheet.modal--bottom.modal--time-picker-sheet{height:auto;min-height:360px;max-height:72%;padding:max(20px,var(--v2-layer-gesture-size)) 18px calc(18px + env(safe-area-inset-bottom));background:var(--white);overflow:auto}
+
+/* Only this long Q title scales on narrow phones; other Q headings are unchanged. */
+.modal--account-controls .v2-q-title{font-size:clamp(13px,4.3vw,18px);letter-spacing:-.035em;white-space:nowrap;max-width:100%}
