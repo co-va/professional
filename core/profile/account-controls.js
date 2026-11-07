@@ -80,6 +80,7 @@ async function renderPanelState(root,state,pushState=null,emailState={}){
   const push=pushState || await getPlatformPushState().catch(()=>({supported:false,enabled:false,subscribed:false}));
   root.innerHTML=`
     ${v2Section('Уведомления',serviceMarkup(state,push,emailState))}
+    <p class="form-error" data-controls-status role="status" aria-live="polite"></p>
     ${v2Section('Документы',consentCards(consents))}
   `;
 
@@ -158,31 +159,34 @@ async function renderAccountEmailPanel(root) {
     return;
   }
   root.innerHTML = emailMarkup(emailState);
-  root.querySelector('[data-platform-account-email-save]')?.addEventListener('click',async(event)=>{
-  const control=event.currentTarget;
-  const input=root.querySelector('[data-platform-account-email]');
-  const status=root.querySelector('[data-platform-account-email-status]');
-  const nextEmail=String(input?.value||'').trim().toLowerCase();
-  if(!nextEmail){ if(status)status.textContent='Укажите email.'; return; }
-  control.disabled=true;
-  if(status)status.textContent='Отправляем письмо…';
-  try{
-  const current=String(emailState.email||'').trim().toLowerCase();
-  if(nextEmail===current){
-  if(emailState.verified){ if(status)status.textContent='Email уже подтверждён.'; return; }
-  await request('/auth/email-verification/request',{method:'POST'});
-  }else{
-  await request('/auth/email-verification/change',{
-  method:'POST',
-  body:JSON.stringify({email:nextEmail}),
-  });
-  }
-  if(status)status.textContent=`Письмо отправлено на ${nextEmail}. Email изменится только после подтверждения.`;
-  }catch(error){
-  if(status)status.textContent=error instanceof Error?error.message:'Не удалось отправить письмо';
-  }finally{
-  control.disabled=false;
-  }
+  root.querySelector('[data-platform-account-email-save]')?.addEventListener('click', async (event) => {
+    const control = event.currentTarget;
+    const input = root.querySelector('[data-platform-account-email]');
+    const status = root.querySelector('[data-platform-account-email-status]');
+    const nextEmail = String(input?.value || '').trim().toLowerCase();
+    if (!nextEmail) { if (status) status.textContent = 'Укажите email.'; return; }
+    control.disabled = true;
+    if (status) status.textContent = 'Запрашиваем письмо…';
+    try {
+      const current = String(emailState.email || '').trim().toLowerCase();
+      if (nextEmail === current && emailState.verified) {
+        if (status) status.textContent = 'Email уже подтверждён.';
+        return;
+      }
+      const response = nextEmail === current
+        ? await request('/auth/email-verification/request', { method: 'POST' })
+        : await request('/auth/email-verification/change', {
+            method: 'POST',
+            body: JSON.stringify({ email: nextEmail }),
+          });
+      if (status) status.textContent = response?.throttled
+        ? 'Повторная отправка пока ограничена. Проверьте почту и папку «Спам».'
+        : `Письмо запрошено для ${nextEmail}. Адрес изменится после подтверждения.`;
+    } catch (error) {
+      if (status) status.textContent = error instanceof Error ? error.message : 'Не удалось отправить письмо';
+    } finally {
+      control.disabled = false;
+    }
   });
 }
 
