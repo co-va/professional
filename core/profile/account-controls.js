@@ -228,6 +228,7 @@ export function openAccountControlsModal() {
 
 let remindedAccountId = '';
 let reminderInFlight = false;
+let reminderEpoch = 0;
 
 /**
  * Check once after a successful Professional workspace entry. The server
@@ -237,8 +238,10 @@ export async function offerAccountEmailVerificationReminder(account = {}) {
   const accountId = String(account?.account?.id || '').trim();
   if (!accountId || remindedAccountId === accountId || reminderInFlight) return null;
   reminderInFlight = true;
+  const epoch = reminderEpoch;
   try {
     const status = await request('/auth/email-verification/status');
+    if (epoch !== reminderEpoch) return null;
     if (status.verified === true) {
       remindedAccountId = accountId;
       return null;
@@ -275,6 +278,7 @@ export async function offerAccountEmailVerificationReminder(account = {}) {
       if (message) message.textContent = 'Запрашиваем письмо подтверждения…';
       try {
         const result = await request('/auth/email-verification/request', { method: 'POST' });
+        if (epoch !== reminderEpoch || !layer.isConnected) return;
         if (message) message.textContent = result?.alreadyVerified
           ? 'Email уже подтверждён. При следующем входе это уведомление не появится.'
           : result?.throttled
@@ -283,7 +287,7 @@ export async function offerAccountEmailVerificationReminder(account = {}) {
               ? 'Письмо принято почтовым сервером. Проверьте «Входящие» и «Спам».'
               : 'Отправка не подтверждена сервером. Попробуйте позднее.';
       } catch {
-        if (message) message.textContent = 'Письмо сейчас не отправлено: почтовый сервис платформы недоступен. Повторите попытку позднее.';
+        if (epoch === reminderEpoch && layer.isConnected && message) message.textContent = 'Письмо сейчас не отправлено: почтовый сервис платформы недоступен. Повторите попытку позднее.';
       } finally {
         if (resend?.isConnected) resend.disabled = false;
       }
@@ -303,11 +307,12 @@ export async function offerAccountEmailVerificationReminder(account = {}) {
     // Verification must not block login. Retry on a later entry.
     return null;
   } finally {
-    reminderInFlight = false;
+    if (epoch === reminderEpoch) reminderInFlight = false;
   }
 }
 
 window.addEventListener('professional:auth-logout', () => {
+  reminderEpoch += 1;
   remindedAccountId = '';
   reminderInFlight = false;
   document.querySelector('[data-account-email-verification-reminder]')?.v2Close?.();
