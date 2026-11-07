@@ -200,6 +200,33 @@ try {
   near(standalone.appHeight, 900, 'Standalone app must cover the physical screen rather than the shorter visual viewport');
   near(standalone.whiteBottom, 900, 'Standalone Q white surface must reach the physical screen bottom');
   assert.ok(standalone.visualHeight < standalone.appHeight, 'Fixture must simulate missing standalone bottom band');
+
+  // When the physical PWA screen is taller than the resting visual viewport,
+  // that pre-existing difference is not a part of the software keyboard.
+  const standaloneKeyboard = await pwa.evaluate(async () => {
+    const vv = window.visualViewport;
+    const input = document.createElement('input');
+    input.type = 'text';
+    document.querySelector('#pwa-q [data-v2-q-body]').append(input);
+    input.focus({ preventScroll: true });
+    const base = vv.height;
+    Object.defineProperty(vv, 'height', { configurable: true, value: base - 300 });
+    vv.dispatchEvent(new Event('resize'));
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    const result = {
+      inset: getComputedStyle(document.documentElement).getPropertyValue('--ui-keyboard-inset').trim(),
+      qBottom: document.querySelector('#pwa-q').getBoundingClientRect().bottom,
+      appHeight: document.querySelector('[data-v2-app]').getBoundingClientRect().height,
+    };
+    delete vv.height;
+    input.blur();
+    vv.dispatchEvent(new Event('resize'));
+    return result;
+  });
+  assert.equal(standaloneKeyboard.inset, '300px',
+    'The resting-viewport status gap must never inflate the keyboard work-area inset');
+  near(standaloneKeyboard.qBottom, 900, 'PWA Q must keep its physical bottom while typing');
+  near(standaloneKeyboard.appHeight, 900, 'PWA shell must not shrink on last-field focus');
   await pwa.close();
 
   console.log('PASS: anchored Z/Q/X, gradual keyboard animation, and standalone full-screen baseline');
