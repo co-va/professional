@@ -1,5 +1,6 @@
 import { actionBlock } from '../page/page.js';
 import { button } from '../buttons/index.js';
+import { escapeHtml } from '../utils/escape-html.js';
 import { workspaceHeaderContext } from '../header/index.js';
 import { modal, mountModal } from '../modals/index.js';
 import { select } from '../selectors/index.js';
@@ -35,8 +36,8 @@ export function openEntityCardAppearanceQ(root, {
     className: 'entity-card-appearance-q',
   }));
   const host = layer?.querySelector('[data-entity-card-appearance-q]');
-  const previewHost = layer?.querySelector('[data-v2-q-header-content]');
-  if (!host) return layer;
+  const headerHost = layer?.querySelector('[data-v2-q-header-content]');
+  if (!host || !headerHost) return layer;
 
   const render = () => {
     const targets = Array.isArray(targetOptions(type)) ? targetOptions(type).filter(Boolean) : [];
@@ -44,35 +45,39 @@ export function openEntityCardAppearanceQ(root, {
     const editor = resolve(type, target) || {};
     const typeSelector = types.length > 1 ? select({
       name: 'entityCardAppearanceType',
-      label: typeLabel,
+      label: '',
+      aria: typeLabel,
+      placeholder: typeLabel,
       value: type,
       options: types,
       data: 'data-entity-card-appearance-type',
-    }) : '';
+    }) : `<h2 class="v2-q-title">${escapeHtml(types[0]?.label || title)}</h2>`;
     const targetSelector = targets.length ? select({
       name: 'entityCardAppearanceTarget',
-      label: targetLabel,
+      label: '',
+      aria: targetLabel,
+      placeholder: targetLabel,
       value: target,
       options: targets,
       data: 'data-entity-card-appearance-target',
     }) : '';
-    const selectors = `${typeSelector}${targetSelector}`;
 
-    if (previewHost) previewHost.replaceChildren();
+    // The Q Header owns the card-type controls; the Q Body owns the sole preview.
+    // No duplicate preview is mounted into the Header.
+    headerHost.innerHTML = `<div class="entity-card-appearance-q__selectors">${typeSelector}${targetSelector}</div>`;
     host.innerHTML = `${workspaceHeaderContext({ title })}
-      ${selectors ? `<div class="form-grid entity-card-appearance-q__selectors">${selectors}</div>` : ''}
       <div data-entity-card-appearance-constructor></div>
       ${actionBlock(button('Сохранить', {
         data: 'data-card-q-save',
         aria: 'Сохранить вид карты',
       }))}`;
 
-    host.querySelector('[name="entityCardAppearanceType"]')?.addEventListener('change', (event) => {
+    headerHost.querySelector('[name="entityCardAppearanceType"]')?.addEventListener('change', (event) => {
       type = String(event.target.value || '');
       target = 'all';
       render();
     });
-    host.querySelector('[name="entityCardAppearanceTarget"]')?.addEventListener('change', (event) => {
+    headerHost.querySelector('[name="entityCardAppearanceTarget"]')?.addEventListener('change', (event) => {
       target = String(event.target.value || '');
       render();
     });
@@ -81,15 +86,7 @@ export function openEntityCardAppearanceQ(root, {
     const saveButton = host.querySelector('[data-card-q-save]');
     const saveActions = saveButton?.closest('.modal-actions');
     let controller = null;
-    const syncHeaderPreview = () => {
-      if (!previewHost || !constructor) return;
-      const preview = constructor.querySelector('[data-card-preview]');
-      if (!preview) return;
-      previewHost.innerHTML = preview.innerHTML;
-      preview.hidden = true;
-    };
     const syncSaveButton = ({ dirty = false, saving = false } = {}) => {
-      syncHeaderPreview();
       if (!saveButton) return;
       saveButton.disabled = Boolean(saving);
       if (saveActions) saveActions.hidden = !dirty;
@@ -107,7 +104,6 @@ export function openEntityCardAppearanceQ(root, {
       },
       onStateChange: syncSaveButton,
     });
-    syncHeaderPreview();
     saveButton?.addEventListener('click', () => {
       void controller?.save?.();
     });
