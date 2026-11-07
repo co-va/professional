@@ -217,7 +217,7 @@ function openProfileSettings(root,navigateBack,options={}){
       ...commercialActions,
       {id:'appearance',label:'Вид',onSelect:()=>openProfileAppearanceQ(root,{navigateBack,options})},
       {id:'password',label:'Изменить пароль',onSelect:()=>openSharedPasswordAction({onSubmit:({currentPassword,newPassword})=>changePassword(currentPassword,newPassword)})},
-      {id:'controls',label:'Согласия / Уведомления',onSelect:()=>import('./account-controls.js').then(({openAccountControlsModal})=>openAccountControlsModal())},
+      {id:'controls',label:'Документы / Уведомления',onSelect:()=>import('./account-controls.js').then(({openAccountControlsModal})=>openAccountControlsModal())},
       {id:'logout',label:'Выход',variant:'danger',onSelect:()=>logout()},
     ],
   });
