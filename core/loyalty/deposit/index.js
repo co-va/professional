@@ -1087,6 +1087,29 @@ export async function openDepositForPerson(root, person = null) {
   return layer;
 }
 
+
+/**
+ * Entry from the already-selected Person. Reuse the canonical funding and
+ * issued-deposit Q flows; never ask the operator to choose the person twice.
+ */
+export async function issueDepositForPerson(root, person, programId, onSaved = () => {}) {
+  if (!person?.key) throw new Error('Клиент не выбран');
+  await loadDepositPrograms();
+  const program = getDepositPrograms().find((item) => String(item?.id) === String(programId)
+    && !item.archivedAt && (!item.status || item.status === 'active'));
+  if (!program) throw new Error('Депозитная программа больше недоступна');
+  return openFundQ(root, program, { person, onSaved });
+}
+
+export async function openAssignedDepositForPerson(root, person, depositId, onChanged = () => {}) {
+  if (!person?.key) throw new Error('Клиент не выбран');
+  const deposits = await listPersonDeposits(person.key);
+  if (!deposits.some((item) => String(item?.depositId || item?.id) === String(depositId))) {
+    throw new Error('Депозит не принадлежит выбранному клиенту');
+  }
+  return openDepositQ(root, depositId, onChanged);
+}
+
 export async function renderDeposit(root) {
   await loadDepositPrograms();
   const programs = getDepositPrograms().filter((item) => !item?.archivedAt);
