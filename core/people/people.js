@@ -52,6 +52,7 @@ import { getPeopleFilters, getPeopleSortMode, setPeopleFilters, setPeopleSortMod
 import { buildPersonRelationshipSections } from './programs.js';
 import { openPersonRecordCreation } from './record-creation.js';
 import { canUseRealPersonalData } from '../access.js';
+import { isTelegramUserId, loadTelegramUsernames, telegramDisplay } from './telegram-usernames.js';
 
 const name = (person) => [person?.name, person?.surname].filter(Boolean).join(' ').trim() || 'Без имени';
 const money = (value) => new Intl.NumberFormat('ru-RU').format(Number(value || 0)) + ' ₽';
@@ -801,12 +802,13 @@ function businessEntries(person, all, fieldName) {
 }
 
 function contactAnchor(person) {
-  const telegram = (person.telegrams || []).map((value) => String(value || '').trim()).find(Boolean);
+  const telegram = (person.telegrams || []).map((value) => String(value || '').trim()).find((value) => value && !isTelegramUserId(value));
   if (telegram) return { value: person.key, label: telegram };
   const phone = (person.phones || []).map((value) => String(value || '').trim()).find(Boolean);
   if (phone) return { value: person.key, label: phone };
   const email = (person.emails || []).map((value) => String(value || '').trim()).find(Boolean);
   if (email) return { value: person.key, label: email };
+  if ((person.telegrams || []).some((value) => isTelegramUserId(value))) return { value: person.key, label: 'Telegram' };
   return null;
 }
 
@@ -832,6 +834,12 @@ function ueiData(person, all) {
   };
 }
 
+function telegramEntries(person, all) {
+  return businessEntries(person, all, 'telegrams').map((entry) => isTelegramUserId(entry.value)
+    ? { ...entry, display: telegramDisplay(entry.value) }
+    : entry);
+}
+
 function personDataFields(person, all) {
   return [
     `<section class="v2-section"><div class="form-grid people-uei-editor">${uei(ueiData(person, all))}</div></section>`,
@@ -848,7 +856,7 @@ function personDataFields(person, all) {
     </div>`),
     v2Section('Контактные данные',
       repeatedField({ label: 'Телефон', name: 'phones', values: businessEntries(person, all, 'phones'), type: 'tel', addInHeader: true })
-      + repeatedField({ label: 'Telegram', name: 'telegrams', values: businessEntries(person, all, 'telegrams'), addInHeader: true })
+      + repeatedField({ label: 'Telegram', name: 'telegrams', values: telegramEntries(person, all), addInHeader: true })
       + repeatedField({ label: 'Email', name: 'emails', values: businessEntries(person, all, 'emails'), type: 'email', addInHeader: true })
       + links({ links: person.links || [], name: 'person-links', label: 'Ссылки', compact: true, addInHeader: true })),
     v2Section('Ярлыки', tags({ tags: getTags(), selected: person.tags || [], name: 'person-tags' })),
@@ -973,6 +981,17 @@ function openPersonEdit(baseRoot, key, callbacks = {}) {
   initTags(layer);
   initRepeatedFields(layer);
   initUEI(layer);
+  // Resolve the visible alias asynchronously, without replacing the stable ID
+  // submitted by the Q form or treating the lookup as a user edit.
+  const telegramIds = telegramEntries(person, all).map((entry) => entry.value).filter(isTelegramUserId);
+  if (telegramIds.length) {
+    void loadTelegramUsernames(telegramIds).then(() => {
+      if (layer.isConnected === false) return;
+      layer.querySelectorAll('[data-repeated-identity-alias]').forEach((input) => {
+        input.value = telegramDisplay(input.dataset.repeatedIdentityAlias);
+      });
+    }).catch(() => {});
+  }
 
   const form = layer.querySelector('[data-person-edit-form]');
   const action = layer.querySelector('[data-person-q-save]');
