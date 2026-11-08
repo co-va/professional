@@ -7,7 +7,12 @@ export const BOOKING_SLOT_STEPS = Object.freeze([5, 10, 15, 30, 60]);
 export const DEFAULT_BOOKING_SETTINGS = Object.freeze({
   welcomeTitle: 'Рады видеть вас',
   welcomeText: 'Выберите удобное время для встречи — запись займёт всего пару минут.',
-  slotStep: 0
+  slotStep: 0,
+  // Saved preferences for the upcoming shared booking-rules workflow.
+  // Do not activate booking time-step or client actions until User/API enforce them.
+  preferredSlotStep: 15,
+  allowClientCancellation: false,
+  allowClientRescheduling: false
 });
 
 
@@ -17,9 +22,13 @@ export function normalizeBookingSettings(value = {}) {
   return {
     welcomeTitle: String(source.welcomeTitle || defaults.welcomeTitle).trim().slice(0, 90),
     welcomeText: String(source.welcomeText || defaults.welcomeText).trim().slice(0, 500),
-    // Step configuration is intentionally inactive for now. Public booking uses
-    // natural starts: exact hours plus real occupied-interval end boundaries.
-    slotStep: 0
+    // Active booking remains unchanged until the server and User honor the preferences.
+    // Public booking continues to use natural starts.
+    slotStep: 0,
+    preferredSlotStep: BOOKING_SLOT_STEPS.includes(Number(source.preferredSlotStep))
+      ? Number(source.preferredSlotStep) : defaults.preferredSlotStep,
+    allowClientCancellation: source.allowClientCancellation === true,
+    allowClientRescheduling: source.allowClientRescheduling === true
   };
 }
 
