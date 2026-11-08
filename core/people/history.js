@@ -272,6 +272,10 @@ export async function getPersonHistory(key = '') {
   const identityKeys = [...new Set(getIdentityMemberKeys(key).map(text).filter(Boolean))];
   if (!identityKeys.length && text(key)) identityKeys.push(text(key));
   if (!identityKeys.length) return [];
-  const facts = await loadHistoryFacts({ personKeys: identityKeys, limit: 2000 });
+  const facts = await loadHistoryFacts({
+    personKeys: identityKeys,
+    entityTypes: ['record', 'record-event', 'finance-operation', 'finance-settlement'],
+    limit: 2000,
+  });
   return mergePersonHistory(projectPersonHistoryFacts(facts), getCurrentPersonHistory(key));
 }
