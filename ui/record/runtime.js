@@ -1,6 +1,6 @@
 import { workspaceHeaderContext } from '../header/index.js';
 import { mountV2ZLayer, v2ZLayer } from '../v2/index.js';
-import { v2ZBodySections } from '../v2/z-layout.js';
+import { setV2ZHeaderRows, v2ZBodySections } from '../v2/z-layout.js';
 import { modal, mountModal } from '../modals/index.js';
 import { bindCalendarHeaderHost } from '../calendar/index.js';
 import { entityVisualCard } from '../cards/entity-card-constructor.js';
@@ -366,6 +366,18 @@ export function recordZHost(layerRoot) {
 
 export function recordQHeaderHost(layerRoot) {
   return layerRoot?.querySelector('[data-v2-q-header-content]') || null;
+}
+
+/** The Record content is shared; only the containing Q/Z header differs. */
+export function setRecordHeaderRows(layerRoot, rows = []) {
+  if (layerRoot?.dataset?.v2Q !== 'true') return setV2ZHeaderRows(layerRoot, rows);
+  const host = recordQHeaderHost(layerRoot);
+  if (!host) return [];
+  host.querySelectorAll(':scope > [data-record-q-header-row]').forEach((node) => node.remove());
+  const valid = (Array.isArray(rows) ? rows : [rows]).filter((row) => String(row || '').trim());
+  host.insertAdjacentHTML('beforeend', valid.map((row, index) =>
+    `<div data-record-q-header-row="${index}" style="min-width:0">${row}</div>`).join(''));
+  return [...host.querySelectorAll(':scope > [data-record-q-header-row]')];
 }
 
 export function renderRecordZ(layerRoot, content = '') {
