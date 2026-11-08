@@ -324,7 +324,7 @@ function renderDetail(layer, root, person, account) {
   const host = layer.querySelector('[data-personal-account-q-host]') || layer;
   host.innerHTML = page([
     loyaltyHeader(personLabel(person), { settings: true, settingsData: 'data-personal-account-actions' }),
-    accountInfo(person, account || {}),
+    `<section class="v2-section">${accountInfo(person, account || {})}</section>`,
     v2Section('Задолженности', debtList(account || {})),
     v2Section('История', historyRail(account || {})),
   ]);
