@@ -834,7 +834,7 @@ function ueiData(person, all) {
 
 function personDataFields(person, all) {
   return [
-    `<div class="form-grid people-uei-editor">${uei(ueiData(person, all))}</div>`,
+    `<section class="v2-section"><div class="form-grid people-uei-editor">${uei(ueiData(person, all))}</div></section>`,
     v2Section('Персональные данные', `<div class="form-grid">
       ${field({ label: 'Имя', name: 'name', value: person.name, required: true })}
       ${field({ label: 'Фамилия', name: 'surname', value: person.surname })}
@@ -850,7 +850,7 @@ function personDataFields(person, all) {
       repeatedField({ label: 'Телефон', name: 'phones', values: businessEntries(person, all, 'phones'), type: 'tel', addInHeader: true })
       + repeatedField({ label: 'Telegram', name: 'telegrams', values: businessEntries(person, all, 'telegrams'), addInHeader: true })
       + repeatedField({ label: 'Email', name: 'emails', values: businessEntries(person, all, 'emails'), type: 'email', addInHeader: true })),
-    v2Section('Ссылки', links({ links: person.links || [], name: 'person-links' })),
+    `<section class="v2-section">${links({ links: person.links || [], name: 'person-links', label: 'Ссылки', compact: true, addInHeader: true })}</section>`,
     v2Section('Ярлыки', tags({ tags: getTags(), selected: person.tags || [], name: 'person-tags' })),
   ].join('');
 }
