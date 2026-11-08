@@ -622,10 +622,24 @@ function openFilterSettings(root) {
       peopleWorkplaceFilter: 'workplace',
       peopleNoEmailFilter: 'noEmail',
       peopleNoVisitsFilter: 'noVisits',
+      peopleVisitMonths: 'visitMonths',
     };
     const key = keyByName[event.target?.name];
     if (!key) return;
-    draft[key] = String(event.target.value || '');
+    if (key === 'noVisits') {
+      draft.noVisits = String(event.target.value || '');
+      draft.visitMonths = draft.noVisits === 'recent' ? String(draft.visitMonths || '1') : '';
+      const months = layer.querySelector('[data-people-visit-months]');
+      if (months) months.hidden = draft.noVisits !== 'recent';
+      const monthInput = layer.querySelector('[name="peopleVisitMonths"]');
+      if (monthInput) monthInput.value = draft.visitMonths || '1';
+    } else if (key === 'visitMonths') {
+      const value = Math.max(1, Math.min(6, Math.floor(Number(event.target.value) || 1)));
+      draft.visitMonths = draft.noVisits === 'recent' ? String(value) : '';
+      event.target.value = String(value);
+    } else {
+      draft[key] = String(event.target.value || '');
+    }
     updateAction();
   });
 
