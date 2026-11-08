@@ -1110,6 +1110,28 @@ export async function openAssignedDepositForPerson(root, person, depositId, onCh
   return openDepositQ(root, depositId, onChanged);
 }
 
+
+/**
+ * Shared E → Person program contract. Choice values are concrete IDs from the
+ * same server-backed deposit catalog that renders Loyalty's Deposit E screen.
+ */
+export async function getPersonProgramChoices(person) {
+  if (!person?.key) return { options: [] };
+  const programs = await loadDepositPrograms();
+  return {
+    label: 'Депозитная программа',
+    placeholder: 'Выберите депозитную программу',
+    actionLabel: 'Оформить',
+    options: programs
+      .filter((item) => item?.id && !item.archivedAt && (!item.status || item.status === 'active'))
+      .map((item) => ({ value: String(item.id), label: String(item.name || 'Депозит') })),
+  };
+}
+
+export async function openPersonProgramChoice(root, person, programId, onChanged = () => {}) {
+  return issueDepositForPerson(root, person, programId, onChanged);
+}
+
 export async function renderDeposit(root) {
   await loadDepositPrograms();
   const programs = getDepositPrograms().filter((item) => !item?.archivedAt);
