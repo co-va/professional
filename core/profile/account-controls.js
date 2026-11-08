@@ -244,7 +244,7 @@ export async function offerAccountEmailVerificationReminder(account = {}) {
       <p>Подтвердите адрес <strong>${escapeHtml(accountEmail || 'вашей учётной записи')}</strong>, чтобы получать сервисные письма платформы и восстанавливать пароль.</p>
       <p>Если письмо уже приходило, проверьте почту и папку «Спам». Новое письмо отправляется только по нажатию «Отправить повторно». Неверный адрес можно исправить.</p>
     </div>
-    <p class="muted" data-email-verification-reminder-status role="status" aria-live="polite">Автоматическая отправка писем отключена.</p>
+    <p class="muted" data-email-verification-reminder-status role="status" aria-live="polite">Отправка письма — только по кнопке ниже.</p>
     <div class="modal-actions">
       ${button('Исправить email', { variant: 'outline', data: 'data-email-verification-change' })}
       ${button('Отправить повторно', { variant: 'outline', data: 'data-email-verification-resend' })}
