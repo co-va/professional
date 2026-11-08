@@ -510,7 +510,7 @@ function peopleFilterFields(filters = {}) {
       { value: '', label: 'Все месяцы' }, ...BIRTH_MONTH_OPTIONS,
       { value: 'has', label: 'Дата указана' }, { value: 'none', label: 'Дата не указана' },
     ] })}
-    ${select({ label: 'Ярлык', name: 'peopleTagFilter', value: filters.tag, options: tagFilterOptions(), searchable: true })}
+    ${select({ label: 'Ярлык', name: 'peopleTagFilter', value: filters.tag, options: tagFilterOptions() })}
     <div data-people-procedure-filter>${hasCurrentProceduresSnapshot()
       ? select({ label: 'Процедура', name: 'peopleProcedureFilter', value: filters.procedure, options: procedureFilterOptions(), searchable: true })
       : '<div class="field">Процедура: загрузка…</div>'}</div>
