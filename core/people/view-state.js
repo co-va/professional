@@ -31,7 +31,7 @@ export function getPeopleFilters() {
     // Migrate saved visit-filter settings without changing the user's active selection.
     if (!result.recordPeriod && stored.noVisits === 'recent') {
       const months = Math.max(1, Math.min(6, Math.floor(Number(stored.visitMonths) || 1)));
-      result.recordPeriod = String(months * 30);
+      result.recordPeriod = String(months);
     } else if (!result.recordPeriod && stored.noVisits === 'yes') {
       result.recordPeriod = 'none';
     }
