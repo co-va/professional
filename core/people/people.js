@@ -867,7 +867,10 @@ function personDataFields(person, all) {
 
 function formSnapshot(form) {
   if (!form) return '';
-  return JSON.stringify([...new FormData(form).entries()].map(([key, value]) => [key, typeof value === 'string' ? value : '']));
+  return JSON.stringify({
+    fields: [...new FormData(form).entries()].map(([key, value]) => [key, typeof value === 'string' ? value : '']),
+    tags: collectTags(form, 'person-tags'),
+  });
 }
 
 function saveBusinessEntries(all, ownerKey, fieldName, entries, memberKeys) {
