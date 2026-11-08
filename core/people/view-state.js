@@ -7,6 +7,7 @@ const DEFAULT_FILTERS = Object.freeze({
   birthday: '',
   tag: '',
   procedure: '',
+  workplace: '',
   noEmail: '',
   noVisits: '',
 });
