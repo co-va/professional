@@ -329,13 +329,11 @@ export async function buildPersonRelationshipSections(person = {}, { refresh = t
   const account = canSee('personal-account') ? getCachedPersonalAccount(key) : null;
   const accountError = '';
   const deposits = canSee('deposit') ? cachedPersonDeposits(key) : [];
-  const refreshTasks = [
+  const refreshTasks = refresh ? [
     ...(canSee('personal-account') ? [loadPersonalAccount(key)] : []),
     ...(canSee('deposit') ? [listPersonDeposits(key)] : []),
-  ];
-  const refreshPromise = refresh && refreshTasks.length
-    ? Promise.allSettled(refreshTasks)
-    : null;
+  ] : [];
+  const refreshPromise = refreshTasks.length ? Promise.allSettled(refreshTasks) : null;
   const certificates = canSee('certificate') ? getCertificateAssignmentsForPerson(key) : [];
   const subscriptions = canSee('subscription') ? getSubscriptionAssignmentsForPerson(key) : [];
   const referrals = canSee('referral') ? getReferralAssignmentsForPerson(key) : [];
