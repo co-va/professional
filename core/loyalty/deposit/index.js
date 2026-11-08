@@ -1094,6 +1094,10 @@ export async function openDepositForPerson(root, person = null) {
  */
 export async function issueDepositForPerson(root, person, programId, onSaved = () => {}) {
   if (!person?.key) throw new Error('Клиент не выбран');
+  // Person's auxiliary scope does not include wallets. Fetch the authoritative
+  // Loyalty scope before opening the original payment form.
+  const { loadAuxiliaryState } = await import('../../runtime/auxiliary-state.js');
+  await loadAuxiliaryState('loyalty');
   await loadDepositPrograms();
   const program = getDepositPrograms().find((item) => String(item?.id) === String(programId)
     && !item.archivedAt && (!item.status || item.status === 'active'));
