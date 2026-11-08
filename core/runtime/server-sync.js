@@ -155,7 +155,8 @@ async function pull(scopes = ALL_SCOPES) {
 
     if (responses.has('auxiliary')) {
       const auxiliary = await responseJson(responses.get('auxiliary'), 'Не удалось обновить связанные данные');
-      const walletsChanged = hasChanged('auxiliary.wallets', auxiliary.wallets || []);
+      const hasWalletSnapshot = Array.isArray(auxiliary?.wallets);
+      const walletsChanged = hasWalletSnapshot && hasChanged('auxiliary.wallets', auxiliary.wallets);
       const tagsChanged = hasChanged('auxiliary.tags', auxiliary.tags || []);
       const productsChanged = hasChanged('auxiliary.products', {
         products: auxiliary.products || [],
