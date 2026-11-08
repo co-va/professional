@@ -373,7 +373,7 @@ function currentPeopleFilters() {
 
 function recordPeriodStart(monthCount, today = new Date()) {
   const months = Number(monthCount);
-  if (!Number.isInteger(months) || months < 1 || months > 6) return '';
+  if (!Number.isInteger(months) || months < 1 || months > 12) return '';
   // Months are fixed 30-day windows, counted backwards from today, inclusive.
   const start = new Date(today.getFullYear(), today.getMonth(), today.getDate() - months * 30 + 1);
   return [start.getFullYear(), String(start.getMonth() + 1).padStart(2, '0'),
@@ -578,7 +578,7 @@ function peopleFilterFields(filters = {}) {
     ${select({ label: 'Email', name: 'peopleNoEmailFilter', value: filters.noEmail, options: [{ value: '', label: 'Без фильтра' }, { value: 'has', label: 'Указан' }, { value: 'yes', label: 'Не указан' }] })}
     ${select({ label: 'Посещения', name: 'peopleRecordPeriodFilter', value: filters.recordPeriod, options: [
       { value: '', label: 'Без фильтра' },
-      ...[1, 2, 3, 4, 5, 6].map((months) => ({ value: String(months), label: `За ${months} ${months === 1 ? 'месяц' : months < 5 ? 'месяца' : 'месяцев'}` })),
+      ...Array.from({ length: 12 }, (_, index) => index + 1).map((months) => ({ value: String(months), label: `За ${months} ${months === 1 ? 'месяц' : months < 5 ? 'месяца' : 'месяцев'}` })),
       { value: 'none', label: 'Без посещений' },
     ] })}
   </div>`;
