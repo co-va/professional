@@ -11,7 +11,7 @@ import { v2ListEntry, v2ListEntries } from '../lists/list-entry.js';
 /** One form lifecycle for Professional profile personal/contact/professional fields. */
 export function openSharedProfileDataEditor({
   root = document.body,
-  header = '',
+  title = 'Данные профиля',
   fields = '',
   read,
   validate = () => '',
@@ -24,8 +24,8 @@ export function openSharedProfileDataEditor({
     <div class="form-error" data-profile-error role="alert"></div>
     ${actionBlock(button('Сохранить', { type: 'submit', data: 'data-save-profile' }))}
   </form>`;
-  const layer = mountModal(root, modal(`${header}${body}`, {
-    title: '',
+  const layer = mountModal(root, modal(body, {
+    title,
     variant: 'q',
     surface: 'app',
     className: 'v2-profile-data-layer',
