@@ -224,12 +224,16 @@ export function openRecordView(record, {
   onClose = () => {},
   context = 'professional',
   professional = null,
+  readOnlyHistory = false,
 } = {}) {
   if (!record?.id) return null;
 
-  const capabilities = recordViewCapabilities(context);
+  // Historical Record snapshots render through the standard viewer without editing V.
+  const capabilities = readOnlyHistory
+    ? { ...RECORD_VIEW_CAPABILITIES.account, contactIdentity: true }
+    : recordViewCapabilities(context);
   const professionalDisplay = accountProfessionalDisplay(professional);
-  let currentRecord = getRecord(record.id) || record;
+  let currentRecord = readOnlyHistory ? record : (getRecord(record.id) || record);
   let startTimer = null;
   const layer = mountRecordZ({
     settings: capabilities.settings,
@@ -252,7 +256,7 @@ export function openRecordView(record, {
   const root = recordZHost(layer);
 
   const syncCurrent = () => {
-    currentRecord = getRecord(currentRecord.id) || currentRecord;
+    if (!readOnlyHistory) currentRecord = getRecord(currentRecord.id) || currentRecord;
     return currentRecord;
   };
 
@@ -436,8 +440,12 @@ export function openRecordView(record, {
     const person = personDisplay(source.person || {});
     const procedures = Array.isArray(source.procedures) ? source.procedures : [];
     const products = Array.isArray(source.products) ? source.products : [];
-    const payment = getRecordPaymentState(source);
-    const settlement = resolveRecordSettlement(source);
+    const payment = readOnlyHistory
+      ? { hasPayments: false, fullyPaid: false, partiallyPaid: false, remaining: 0 }
+      : getRecordPaymentState(source);
+    const settlement = readOnlyHistory
+      ? { items: [], serviceTotal: 0, planTotal: 0 }
+      : resolveRecordSettlement(source);
     const settlementByProcedure = new Map((Array.isArray(settlement?.items) ? settlement.items : [])
       .filter((item) => String(item?.sourceType || 'procedure') === 'procedure')
       .map((item) => [String(item?.sourceId || ''), item]));
@@ -458,7 +466,9 @@ export function openRecordView(record, {
       data: 'data-record-view-program',
       aria: 'Выбрать программу записи',
     }) : '';
-    const contactDiscountPercent = Math.max(0, Math.min(100, Number(contact?.discountPercent) || 0));
+    const contactDiscountPercent = readOnlyHistory
+      ? 0
+      : Math.max(0, Math.min(100, Number(contact?.discountPercent) || 0));
     const discountMoney = Math.max(0, (Number(settlement?.serviceTotal) || 0) - (Number(settlement?.planTotal) || 0));
     const grossTotal = Math.max(0, Number(settlement?.serviceTotal) || 0);
     const fromMinutes = timeMinutes(source.from);
@@ -482,7 +492,7 @@ export function openRecordView(record, {
       phone: capabilities.contactIdentity ? (person.phone || '') : professionalDisplay.phone,
       duration: durationText(appointmentMinutes),
       discountMoney: discountMoney > 0.009 ? formatMoney(discountMoney) : '',
-      total: formatMoney(grossTotal),
+      total: readOnlyHistory ? '—' : formatMoney(grossTotal),
       programControl,
       procedures: [
         ...procedures.map((item) => {
@@ -490,7 +500,9 @@ export function openRecordView(record, {
           return {
             name: item?.name || 'Процедура',
             durationText: durationText(Number(item?.duration) || 0),
-            right: formatMoney(financeItem?.planAmount ?? item?.cost ?? 0),
+            right: readOnlyHistory
+              ? (item?.cost !== '' && item?.cost != null ? formatMoney(item.cost) : '—')
+              : formatMoney(financeItem?.planAmount ?? item?.cost ?? 0),
             ...(capabilities.procedureSettings && !payment.hasPayments ? {
               action: {
                 data: 'data-record-view-procedure-settings',
@@ -527,7 +539,7 @@ export function openRecordView(record, {
       : `${recordHasEnded(source) ? 'Задолженность' : 'К оплате'}: ${formatMoney(payment.remaining)}`;
     root.innerHTML = `<div class="record-screen record-screen--state-view record-screen--record-view">
       ${card}
-      ${actionBlock([
+      ${readOnlyHistory ? '' : actionBlock([
         capabilities.sale && !payment.hasPayments ? button('Продажа', { variant: 'secondary', data: 'data-record-view-sale' }) : '',
         capabilities.notes && hasNotesForTarget('record', source.id)
           ? button('Заметки', { variant: 'secondary', data: 'data-record-view-notes' })
