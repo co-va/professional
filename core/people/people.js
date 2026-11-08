@@ -371,29 +371,58 @@ function currentPeopleFilters() {
   return setPeopleFilters({ ...filters, workplace: '' });
 }
 
-function recordFilterPersonKeys({ procedure = '', workplace = '' } = {}) {
+function visitPeriodStart(monthCount, today = new Date()) {
+  const months = Math.max(1, Math.min(6, Math.floor(Number(monthCount) || 1)));
+  const monthStart = new Date(today.getFullYear(), today.getMonth() - months, 1);
+  const lastDay = new Date(today.getFullYear(), today.getMonth() - months + 1, 0).getDate();
+  monthStart.setDate(Math.min(today.getDate(), lastDay));
+  return [monthStart.getFullYear(), String(monthStart.getMonth() + 1).padStart(2, '0'),
+    String(monthStart.getDate()).padStart(2, '0')].join('-');
+}
+
+function recordFilterPersonKeys({ procedure = '', workplace = '', noVisits = '' } = {}) {
   const procedureKeys = procedure ? new Set() : null;
   const workplaceKeys = workplace ? new Set() : null;
-  if (!procedureKeys && !workplaceKeys) return { procedureKeys, workplaceKeys };
+  const visitDates = noVisits ? new Map() : null;
+  if (!procedureKeys && !workplaceKeys && !visitDates) return { procedureKeys, workplaceKeys, visitDates };
+  const now = new Date();
+  const today = [now.getFullYear(), String(now.getMonth() + 1).padStart(2, '0'),
+    String(now.getDate()).padStart(2, '0')].join('-');
   for (const record of getRecords()) {
     if (record?.status === 'cancelled') continue;
     const procedureMatch = procedureKeys
       && (record?.procedures || []).some((item) => String(item?.id || '') === procedure);
     const workplaceMatch = workplaceKeys && String(record?.workplaceId || '') === workplace;
-    if (!procedureMatch && !workplaceMatch) continue;
+    // A booking is not a visit. Use arrived/completed or an imported historical visit.
+    const appointmentDate = String(record?.date || '').slice(0, 10);
+    const visitMatch = visitDates
+      && record?.attendance !== 'no-show'
+      && (record?.attendance === 'arrived' || record?.completed === true || Boolean(record?.historicalTransfer))
+      && /^\d{4}-\d{2}-\d{2}$/.test(appointmentDate)
+      && appointmentDate <= today;
+    if (!procedureMatch && !workplaceMatch && !visitMatch) continue;
     const keys = [record?.person?.key, ...(record?.group?.participants || []).map((participant) => participant?.key)]
       .map((key) => String(key || '')).filter(Boolean);
     for (const key of keys) {
       if (procedureMatch) procedureKeys.add(key);
       if (workplaceMatch) workplaceKeys.add(key);
+      if (visitMatch) {
+        const dates = visitDates.get(key) || [];
+        dates.push(appointmentDate);
+        visitDates.set(key, dates);
+      }
     }
   }
-  return { procedureKeys, workplaceKeys };
+  return { procedureKeys, workplaceKeys, visitDates };
 }
 
 function applyPeopleFilters(items = [], filters = currentPeopleFilters()) {
   const selectedMonth = Number(filters.birthday);
-  const { procedureKeys, workplaceKeys } = recordFilterPersonKeys(filters);
+  const { procedureKeys, workplaceKeys, visitDates } = recordFilterPersonKeys(filters);
+  const visitStart = filters.noVisits === 'recent' ? visitPeriodStart(filters.visitMonths) : '';
+  const today = new Date();
+  const todayDate = [today.getFullYear(), String(today.getMonth() + 1).padStart(2, '0'),
+    String(today.getDate()).padStart(2, '0')].join('-');
   return items.filter((person) => {
     if (filters.gender === 'none' && person.gender) return false;
     if (filters.gender && filters.gender !== 'none' && person.gender !== filters.gender) return false;
@@ -401,32 +430,38 @@ function applyPeopleFilters(items = [], filters = currentPeopleFilters()) {
     if (filters.birthday === 'has' && !person.birthDate) return false;
     if (selectedMonth >= 1 && selectedMonth <= 12 && birthMonth(person.birthDate) !== selectedMonth) return false;
     if (filters.tag && !(person.tags || []).includes(filters.tag)) return false;
-    if (procedureKeys || workplaceKeys) {
+    if (procedureKeys || workplaceKeys || visitDates) {
       const personKeys = getIdentityMemberKeys(person.key);
       if (procedureKeys && !personKeys.some((key) => procedureKeys.has(key))) return false;
       if (workplaceKeys && !personKeys.some((key) => workplaceKeys.has(key))) return false;
+      if (visitDates) {
+        const dates = personKeys.flatMap((key) => visitDates.get(key) || []);
+        if (filters.noVisits === 'yes' && dates.length) return false;
+        if (visitStart && !dates.some((date) => date >= visitStart && date <= todayDate)) return false;
+      }
     }
-    if (filters.noEmail === 'yes' && (person.emails || []).some((value) => String(value || '').trim())) return false;
-    if (filters.noVisits === 'yes' && getPersonMetadata(person.key).recordCount > 0) return false;
+    const emailSpecified = (person.emails || []).some((value) => String(value || '').trim());
+    if (filters.noEmail === 'yes' && emailSpecified) return false;
+    if (filters.noEmail === 'has' && !emailSpecified) return false;
     return true;
   });
 }
 
 function tagFilterOptions() {
-  return [{ value: '', label: 'Все ярлыки' }, ...getTags().map((item) => ({ value: String(item.id), label: item.name }))];
+  return [{ value: '', label: 'Без фильтра' }, ...getTags().map((item) => ({ value: String(item.id), label: item.name }))];
 }
 
 function procedureFilterOptions() {
   const items = getProcedures()
     .filter((item) => item?.id && item?.name)
     .sort((a, b) => String(a.name).localeCompare(String(b.name), 'ru'));
-  return [{ value: '', label: 'Все процедуры' }, ...items.map((item) => ({ value: String(item.id), label: String(item.name) }))];
+  return [{ value: '', label: 'Без фильтра' }, ...items.map((item) => ({ value: String(item.id), label: String(item.name) }))];
 }
 
 function workplaceFilterOptions() {
   const workplaces = getWorkplaces().filter((item) => item.key);
   if (workplaces.length <= 1) return [];
-  return [{ value: '', label: 'Все рабочие пространства' },
+  return [{ value: '', label: 'Без фильтра' },
     ...workplaces.map((item) => ({ value: String(item.key), label: String(item.name || 'Без названия') }))];
 }
 
@@ -529,10 +564,10 @@ function openSortSettings(root) {
 function peopleFilterFields(filters = {}) {
   return `<div class="form-grid">
     ${select({ label: 'Пол', name: 'peopleGenderFilter', value: filters.gender, options: [
-      { value: '', label: 'Любой' }, { value: 'female', label: 'Женский' }, { value: 'male', label: 'Мужской' }, { value: 'none', label: 'Не указан' },
+      { value: '', label: 'Без фильтра' }, { value: 'female', label: 'Женский' }, { value: 'male', label: 'Мужской' }, { value: 'none', label: 'Не указан' },
     ] })}
     ${select({ label: 'Месяц рождения', name: 'peopleBirthdayFilter', value: filters.birthday, options: [
-      { value: '', label: 'Все месяцы' }, ...BIRTH_MONTH_OPTIONS,
+      { value: '', label: 'Без фильтра' }, ...BIRTH_MONTH_OPTIONS,
       { value: 'has', label: 'Дата указана' }, { value: 'none', label: 'Дата не указана' },
     ] })}
     ${select({ label: 'Ярлык', name: 'peopleTagFilter', value: filters.tag, options: tagFilterOptions() })}
@@ -543,8 +578,15 @@ function peopleFilterFields(filters = {}) {
       label: 'Рабочее пространство', name: 'peopleWorkplaceFilter',
       value: filters.workplace, options: workplaceFilterOptions(),
     }) : ''}
-    ${select({ label: 'Почта', name: 'peopleNoEmailFilter', value: filters.noEmail, options: [{ value: '', label: 'Все' }, { value: 'yes', label: 'Без почты' }] })}
-    ${select({ label: 'Посещения', name: 'peopleNoVisitsFilter', value: filters.noVisits, options: [{ value: '', label: 'Все' }, { value: 'yes', label: 'Без посещений' }] })}
+    ${select({ label: 'Email', name: 'peopleNoEmailFilter', value: filters.noEmail, options: [{ value: '', label: 'Без фильтра' }, { value: 'has', label: 'Указан' }, { value: 'yes', label: 'Не указан' }] })}
+    ${select({ label: 'Посещения', name: 'peopleNoVisitsFilter', value: filters.noVisits, options: [
+      { value: '', label: 'Без фильтра' }, { value: 'recent', label: 'За последние месяцы' },
+      { value: 'yes', label: 'Без посещений' },
+    ] })}
+    <div data-people-visit-months${filters.noVisits === 'recent' ? '' : ' hidden'}>
+      ${field({ label: 'Количество месяцев (1–6)', name: 'peopleVisitMonths', type: 'number',
+        value: filters.visitMonths || '1', min: 1, max: 6, step: 1, inputmode: 'numeric' })}
+    </div>
   </div>`;
 }
 
