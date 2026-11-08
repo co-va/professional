@@ -366,7 +366,7 @@ export async function buildPersonRelationshipSections(person = {}, { refresh = t
   ];
 
   const detailByKey = new Map([
-    ...(account ? [['personal-account', { title: 'Личный счёт', body: personalAccountDetail(account, accountError) }]] : []),
+    ...(account ? [['personal-account', { title: 'Личный счёт', body: personalAccountDetail(account, accountError), settings: false }]] : []),
     ...deposits.map((item) => [`deposit:${item.depositId || item.id}`, { title: item.programName || 'Депозит', body: depositDetail(item) }]),
     ...certificates.map((item) => [`certificate:${item.instance?.id}`, { title: item.program?.name || 'Сертификат', body: certificateDetail(item) }]),
     ...subscriptions.map((item) => [`subscription:${item.instance?.id}`, { title: item.program?.name || 'Абонемент', body: subscriptionDetail(item) }]),
