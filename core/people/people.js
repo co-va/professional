@@ -47,7 +47,7 @@ import { getAllPeople, getPeople, savePeople } from './data.js';
 import { bindPersonCreateForm, personCreateForm } from './create.js';
 import { personDisplay } from './presentation.js';
 import { personCardAppearance, personCardFields } from './card-presentation.js';
-import { getPersonHistory } from './history.js';
+import { getCurrentPersonHistory, getPersonHistory } from './history.js';
 import { getPersonMetadata } from './metadata.js';
 import { getCardAppearanceTemplate, saveCardAppearanceTemplate } from '../card-appearance-templates.js';
 import { getPeopleFilters, getPeopleSortMode, setPeopleFilters, setPeopleSortMode } from './view-state.js';
@@ -369,7 +369,8 @@ export async function openPersonHistoryQ(root, person, options = {}) {
   }
   const host = layer.querySelector('[data-person-history-host]');
   const search = layer.querySelector('[data-person-history-search]');
-  let sourceItems = [];
+  // Show existing Journal records immediately; audit History enriches the list.
+  let sourceItems = getCurrentPersonHistory(person.key);
   const render = () => {
     const query = String(search?.value || '').trim();
     const items = historyItems(sourceItems, query);
@@ -383,12 +384,21 @@ export async function openPersonHistoryQ(root, person, options = {}) {
   };
   search?.addEventListener('input', render);
   bindPersonContext(layer, person, options);
-  if (host) host.innerHTML = emptyState('История', 'Загружаем данные…');
+  if (sourceItems.length) render();
+  else if (host) host.innerHTML = emptyState('История', 'Загружаем данные…');
   try {
     sourceItems = await getPersonHistory(person.key);
-    render();
+    if (layer.isConnected !== false) render();
   } catch (error) {
-    if (host) host.innerHTML = emptyState('История недоступна', error instanceof Error ? error.message : 'Не удалось загрузить историю.');
+    if (layer.isConnected !== false && host) {
+      const message = error instanceof Error ? error.message : 'Не удалось загрузить историю.';
+      if (sourceItems.length) {
+        render();
+        host.insertAdjacentHTML('afterbegin', `<p class="form-error" role="status">Полная история временно недоступна: ${escapeHtml(message)}. Показаны записи из Журнала.</p>`);
+      } else {
+        host.innerHTML = emptyState('История недоступна', message);
+      }
+    }
   }
   return layer;
 }
