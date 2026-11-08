@@ -391,12 +391,13 @@ export async function openPersonHistoryQ(root, person, options = {}) {
     if (layer.isConnected !== false) render();
   } catch (error) {
     if (layer.isConnected !== false && host) {
-      const message = error instanceof Error ? error.message : 'Не удалось загрузить историю.';
+      // The low-level fetch failure is not useful in a contact card.
+      // Audit history is optional for showing the already-hydrated Journal records.
       if (sourceItems.length) {
         render();
-        host.insertAdjacentHTML('afterbegin', `<p class="form-error" role="status">Полная история временно недоступна: ${escapeHtml(message)}. Показаны записи из Журнала.</p>`);
+        host.insertAdjacentHTML('afterbegin', '<p class="muted" role="status">Показаны записи из Журнала. Полная история сейчас недоступна.</p>');
       } else {
-        host.innerHTML = emptyState('История недоступна', message);
+        host.innerHTML = emptyState('История недоступна', 'Не удалось получить историю с сервера. Повторите попытку позже.');
       }
     }
   }
