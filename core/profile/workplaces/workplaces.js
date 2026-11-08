@@ -35,11 +35,12 @@ export function workplaceForm(existing=null,{sourceOnly=false,bodyActions=false}
       }))
     : '';
   const body=bodyActions ? actionBlock(button('Сохранить',{type:'submit'})) : '';
+  // Destructive action must stay at the end of the scrollable Q form, never in the floating .modal-actions footer.
   const deletion=existing
-    ? actionBlock(button('Удалить',{
+    ? button('Удалить',{
         variant:'critical',
         data:'data-delete-workplace-form',
-      }))
+      })
     : '';
   // The photo preserves its existing storage and editor flow.
   const photoFields=bodyActions
