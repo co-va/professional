@@ -1,4 +1,4 @@
-import { actionBlock, button, collectLinks, colorPicker, escapeHtml, field, initColorPickers, initLinks, initPhotoField, initTimePickers, links, mountModal, mountV2ZLayer, modal, openColorPickerAction, openSharedProfileSettingsMenu, openTimeRangeAction, page, phoneField, photoField, select, textareaField, timePicker, v2ZLayer, workspaceHeaderContext } from '../../../ui/ui.js';
+import { actionBlock, button, collectLinks, colorPicker, escapeHtml, field, initColorPickers, initLinks, initPhotoField, initTimePickers, links, mountModal, mountV2ZLayer, modal, openSharedProfileSettingsMenu, page, phoneField, photoField, select, textareaField, timePicker, v2ZLayer, workspaceHeaderContext } from '../../../ui/ui.js';
 import { getProfile } from '../data.js';
 import { deleteWorkplace as deleteWorkplaceData, getWorkplaceReferenceData, getWorkplaces, upsertWorkplace } from './data.js';
 
@@ -36,23 +36,29 @@ export function workplaceForm(existing=null,{sourceOnly=false,bodyActions=false}
   const body=bodyActions
     ? actionBlock(`${button('Сохранить',{type:'submit'})}${existing?button('Удалить',{variant:'danger',data:'data-delete-workplace-form'}):''}`)
     : '';
-  const settingsFields=bodyActions
-    ? `${photoField({
+  // All editable workplace values live in the Q form, not behind V.
+  // Photo remains in the dedicated appearance/editor flow for the primary Q.
+  const settingsFields=`${bodyActions
+    ? photoField({
         name:'workplacePhoto',
         value:w.photo||'',
         cropX:w.photoCropX,
         cropY:w.photoCropY,
         cropXName:'workplacePhotoCropX',
         cropYName:'workplacePhotoCropY',
-      })}
-      ${colorPicker({name:'workplaceColor',value:w.color||'',required:true})}
-      <div class="work-time-row"><span class="work-time-row__label">График работы</span><div class="work-time-row__fields">${timePicker({label:'С',name:'workplaceFrom',value:w.from||defaults.from||''})}${timePicker({label:'До',name:'workplaceTo',value:w.to||defaults.to||''})}</div></div>`
+      })
     : `<input type="hidden" name="workplacePhoto" value="${escapeHtml(w.photo||'')}">
-      <input type="hidden" name="workplacePhotoCropX" value="${Number(w.photoCropX||50)}">
-      <input type="hidden" name="workplacePhotoCropY" value="${Number(w.photoCropY||50)}">
-      <input type="hidden" name="workplaceColor" value="${escapeHtml(w.color||'')}">
-      <input type="hidden" name="workplaceFrom" value="${escapeHtml(w.from||defaults.from||'')}">
-      <input type="hidden" name="workplaceTo" value="${escapeHtml(w.to||defaults.to||'')}">`;
+       <input type="hidden" name="workplacePhotoCropX" value="${Number(w.photoCropX||50)}">
+       <input type="hidden" name="workplacePhotoCropY" value="${Number(w.photoCropY||50)}">`}
+    <div class="workplace-form__color"><span class="work-time-row__label">Цвет рабочего пространства *</span>
+      ${colorPicker({name:'workplaceColor',value:w.color||'',required:true})}
+    </div>
+    <div class="work-time-row"><span class="work-time-row__label">График работы</span>
+      <div class="work-time-row__fields">
+        ${timePicker({label:'С',name:'workplaceFrom',value:w.from||defaults.from||''})}
+        ${timePicker({label:'До',name:'workplaceTo',value:w.to||defaults.to||''})}
+      </div>
+    </div>`;
   return `<form class="compact-form workplace-form" data-workplace-form>
     <input type="hidden" name="workplaceCardAppearance" value="${escapeHtml(JSON.stringify(w.cardAppearance||{}))}">
     <input type="hidden" name="visibleInPublicBooking" value="${w.visibleInPublicBooking===false?'false':'true'}">
@@ -237,28 +243,8 @@ export function openWorkplaceSettingsMenu(root,existing=null,{onDeleted=()=>{}}=
       },
     },
   ];
-  const actions=[
-    {
-      id:'color',
-      label:'Выбор цвета',
-      onSelect:()=>openColorPickerAction({
-        value:String(data().get('workplaceColor')||''),
-        onSelect:(value)=>setWorkplaceDraft(root,'workplaceColor',value),
-      }),
-    },
-    {
-      id:'schedule',
-      label:'График работы',
-      onSelect:()=>openTimeRangeAction({
-        from:String(data().get('workplaceFrom')||workplaceDefaults().from||''),
-        to:String(data().get('workplaceTo')||workplaceDefaults().to||''),
-        onSave:({from,to})=>{
-          setWorkplaceDraft(root,'workplaceFrom',from);
-          setWorkplaceDraft(root,'workplaceTo',to);
-        },
-      }),
-    },
-  ];
+  // V holds only configuration actions, not editable workplace form fields.
+  const actions=[];
   if(existing){
     actions.push({
       id:'delete',
