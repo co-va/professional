@@ -371,61 +371,53 @@ function currentPeopleFilters() {
   return setPeopleFilters({ ...filters, workplace: '' });
 }
 
-function visitPeriodStart(monthCount, today = new Date()) {
-  const months = Math.max(1, Math.min(6, Math.floor(Number(monthCount) || 1)));
-  const monthStart = new Date(today.getFullYear(), today.getMonth() - months, 1);
-  const lastDay = new Date(today.getFullYear(), today.getMonth() - months + 1, 0).getDate();
-  monthStart.setDate(Math.min(today.getDate(), lastDay));
-  return [monthStart.getFullYear(), String(monthStart.getMonth() + 1).padStart(2, '0'),
-    String(monthStart.getDate()).padStart(2, '0')].join('-');
+function recordPeriodStart(monthCount, today = new Date()) {
+  const months = Number(monthCount);
+  if (!Number.isInteger(months) || months < 1 || months > 6) return '';
+  // Months are fixed 30-day windows, counted backwards from today, inclusive.
+  const start = new Date(today.getFullYear(), today.getMonth(), today.getDate() - months * 30 + 1);
+  return [start.getFullYear(), String(start.getMonth() + 1).padStart(2, '0'),
+    String(start.getDate()).padStart(2, '0')].join('-');
 }
 
-function recordFilterPersonKeys({ procedure = '', workplace = '', noVisits = '' } = {}) {
+function recordFilterPersonKeys({ procedure = '', workplace = '', recordPeriod = '' } = {}) {
   const procedureKeys = procedure ? new Set() : null;
   const workplaceKeys = workplace ? new Set() : null;
-  const visitDates = noVisits ? new Map() : null;
-  if (!procedureKeys && !workplaceKeys && !visitDates) return { procedureKeys, workplaceKeys, visitDates };
-  const now = new Date();
-  const today = [now.getFullYear(), String(now.getMonth() + 1).padStart(2, '0'),
-    String(now.getDate()).padStart(2, '0')].join('-');
+  const recordDates = recordPeriod ? new Map() : null;
+  if (!procedureKeys && !workplaceKeys && !recordDates) return { procedureKeys, workplaceKeys, recordDates };
+  const today = new Date();
+  const todayDate = [today.getFullYear(), String(today.getMonth() + 1).padStart(2, '0'),
+    String(today.getDate()).padStart(2, '0')].join('-');
   for (const record of getRecords()) {
     if (record?.status === 'cancelled') continue;
     const procedureMatch = procedureKeys
       && (record?.procedures || []).some((item) => String(item?.id || '') === procedure);
     const workplaceMatch = workplaceKeys && String(record?.workplaceId || '') === workplace;
-    // Past, non-cancelled records count as visits even when attendance was never
-    // manually marked. Exclude explicit no-shows and today's unfinished bookings.
+    // A dated record counts whether arrived, unattended or unclosed.
+    // Future appointments and cancelled records do not count in past-period filters.
     const appointmentDate = String(record?.date || '').slice(0, 10);
-    const nowTime = [String(now.getHours()).padStart(2, '0'),
-      String(now.getMinutes()).padStart(2, '0')].join(':');
-    const endTime = String(record?.to || '');
-    const finishedToday = /^\d{2}:\d{2}$/.test(endTime) && endTime <= nowTime;
-    const visitMatch = visitDates
-      && record?.attendance !== 'no-show'
-      && /^\d{4}-\d{2}-\d{2}$/.test(appointmentDate)
-      && (appointmentDate < today || (appointmentDate === today
-        && (record?.attendance === 'arrived' || record?.completed === true
-          || Boolean(record?.historicalTransfer) || finishedToday)));
-    if (!procedureMatch && !workplaceMatch && !visitMatch) continue;
+    const datedRecord = recordDates && /^\\d{4}-\\d{2}-\\d{2}$/.test(appointmentDate)
+      && appointmentDate <= todayDate;
+    if (!procedureMatch && !workplaceMatch && !datedRecord) continue;
     const keys = [record?.person?.key, ...(record?.group?.participants || []).map((participant) => participant?.key)]
       .map((key) => String(key || '')).filter(Boolean);
     for (const key of keys) {
       if (procedureMatch) procedureKeys.add(key);
       if (workplaceMatch) workplaceKeys.add(key);
-      if (visitMatch) {
-        const dates = visitDates.get(key) || [];
+      if (datedRecord) {
+        const dates = recordDates.get(key) || [];
         dates.push(appointmentDate);
-        visitDates.set(key, dates);
+        recordDates.set(key, dates);
       }
     }
   }
-  return { procedureKeys, workplaceKeys, visitDates };
+  return { procedureKeys, workplaceKeys, recordDates };
 }
 
 function applyPeopleFilters(items = [], filters = currentPeopleFilters()) {
   const selectedMonth = Number(filters.birthday);
-  const { procedureKeys, workplaceKeys, visitDates } = recordFilterPersonKeys(filters);
-  const visitStart = filters.noVisits === 'recent' ? visitPeriodStart(filters.visitMonths) : '';
+  const { procedureKeys, workplaceKeys, recordDates } = recordFilterPersonKeys(filters);
+  const periodStart = recordPeriodStart(filters.recordPeriod);
   const today = new Date();
   const todayDate = [today.getFullYear(), String(today.getMonth() + 1).padStart(2, '0'),
     String(today.getDate()).padStart(2, '0')].join('-');
@@ -436,14 +428,14 @@ function applyPeopleFilters(items = [], filters = currentPeopleFilters()) {
     if (filters.birthday === 'has' && !person.birthDate) return false;
     if (selectedMonth >= 1 && selectedMonth <= 12 && birthMonth(person.birthDate) !== selectedMonth) return false;
     if (filters.tag && !(person.tags || []).includes(filters.tag)) return false;
-    if (procedureKeys || workplaceKeys || visitDates) {
+    if (procedureKeys || workplaceKeys || recordDates) {
       const personKeys = getIdentityMemberKeys(person.key);
       if (procedureKeys && !personKeys.some((key) => procedureKeys.has(key))) return false;
       if (workplaceKeys && !personKeys.some((key) => workplaceKeys.has(key))) return false;
-      if (visitDates) {
-        const dates = personKeys.flatMap((key) => visitDates.get(key) || []);
-        if (filters.noVisits === 'yes' && dates.length) return false;
-        if (visitStart && !dates.some((date) => date >= visitStart && date <= todayDate)) return false;
+      if (recordDates) {
+        const dates = personKeys.flatMap((key) => recordDates.get(key) || []);
+        if (filters.recordPeriod === 'none' && dates.length) return false;
+        if (periodStart && !dates.some((date) => date >= periodStart && date <= todayDate)) return false;
       }
     }
     const emailSpecified = (person.emails || []).some((value) => String(value || '').trim());
@@ -452,7 +444,6 @@ function applyPeopleFilters(items = [], filters = currentPeopleFilters()) {
     return true;
   });
 }
-
 function tagFilterOptions() {
   return [{ value: '', label: 'Без фильтра' }, ...getTags().map((item) => ({ value: String(item.id), label: item.name }))];
 }
@@ -585,14 +576,11 @@ function peopleFilterFields(filters = {}) {
       value: filters.workplace, options: workplaceFilterOptions(),
     }) : ''}
     ${select({ label: 'Email', name: 'peopleNoEmailFilter', value: filters.noEmail, options: [{ value: '', label: 'Без фильтра' }, { value: 'has', label: 'Указан' }, { value: 'yes', label: 'Не указан' }] })}
-    ${select({ label: 'Посещения', name: 'peopleNoVisitsFilter', value: filters.noVisits, options: [
-      { value: '', label: 'Без фильтра' }, { value: 'recent', label: 'За последние месяцы' },
-      { value: 'yes', label: 'Без посещений' },
+    ${select({ label: 'Посещения', name: 'peopleRecordPeriodFilter', value: filters.recordPeriod, options: [
+      { value: '', label: 'Без фильтра' },
+      ...[1, 2, 3, 4, 5, 6].map((months) => ({ value: String(months), label: `За ${months} ${months === 1 ? 'месяц' : months < 5 ? 'месяца' : 'месяцев'}` })),
+      { value: 'none', label: 'Без посещений' },
     ] })}
-    <div data-people-visit-months${filters.noVisits === 'recent' ? '' : ' hidden'}>
-      ${field({ label: 'Количество месяцев (1–6)', name: 'peopleVisitMonths', type: 'number',
-        value: filters.visitMonths || '1', min: 1, max: 6, step: 1, inputmode: 'numeric' })}
-    </div>
   </div>`;
 }
 
@@ -627,25 +615,11 @@ function openFilterSettings(root) {
       peopleProcedureFilter: 'procedure',
       peopleWorkplaceFilter: 'workplace',
       peopleNoEmailFilter: 'noEmail',
-      peopleNoVisitsFilter: 'noVisits',
-      peopleVisitMonths: 'visitMonths',
+      peopleRecordPeriodFilter: 'recordPeriod',
     };
     const key = keyByName[event.target?.name];
     if (!key) return;
-    if (key === 'noVisits') {
-      draft.noVisits = String(event.target.value || '');
-      draft.visitMonths = draft.noVisits === 'recent' ? String(draft.visitMonths || '1') : '';
-      const months = layer.querySelector('[data-people-visit-months]');
-      if (months) months.hidden = draft.noVisits !== 'recent';
-      const monthInput = layer.querySelector('[name="peopleVisitMonths"]');
-      if (monthInput) monthInput.value = draft.visitMonths || '1';
-    } else if (key === 'visitMonths') {
-      const value = Math.max(1, Math.min(6, Math.floor(Number(event.target.value) || 1)));
-      draft.visitMonths = draft.noVisits === 'recent' ? String(value) : '';
-      event.target.value = String(value);
-    } else {
-      draft[key] = String(event.target.value || '');
-    }
+    draft[key] = String(event.target.value || '');
     updateAction();
   });
 
