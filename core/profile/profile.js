@@ -1,4 +1,4 @@
-import { button, collectRepeatedField, entityVisualCard, escapeHtml, field, modal, mountModal, mountV2ZLayer, openEntityCardAppearanceQ, openSharedProfileDataEditor, openSharedProfileSettingsMenu, openSharedPasswordAction, page, repeatedField, searchableSelect, select, textareaField, v2HorizontalRail, v2Section, workspaceHeaderContext, v2ZLayer, workplaceAddButton } from '../../ui/ui.js';
+import { button, collectRepeatedField, entityVisualCard, escapeHtml, field, modal, mountModal, openEntityCardAppearanceQ, openSharedProfileDataEditor, openSharedProfileSettingsMenu, openSharedPasswordAction, page, repeatedField, searchableSelect, select, textareaField, v2HorizontalRail, v2Section, workspaceHeaderContext, workplaceAddButton } from '../../ui/ui.js';
 import { canUseCapability, getAccess, getLimit, loadAccess, requestLiveMode } from '../../core/access.js';
 import { changePassword, logout } from '../../core/auth.js';
 import { getProfessionCatalog, getProfile, saveProfile as saveProfileData } from './data.js';
@@ -249,10 +249,11 @@ function openProfileSettings(root,navigateBack,options={}){
   });
 }
 
-function openWorkplaceZ2(root,existing,navigateBack,options={}){
+function openWorkplaceQ(root,existing,navigateBack,options={}){
   const current=existing||{name:'',photo:'',photoCropX:50,photoCropY:50};
   const title=existing?.name||'Новое рабочее пространство';
-  const layer=mountV2ZLayer(root,v2ZLayer(page([
+  // Profile and workplace data share a Q editing surface. The V menu holds actions only.
+  const layer=mountModal(root,modal(page([
     workspaceHeaderContext({
       title,
       a:{
@@ -263,8 +264,13 @@ function openWorkplaceZ2(root,existing,navigateBack,options={}){
       },
       v:{data:'data-workplace-settings',aria:'Настройки пространства'},
     }),
-    workplaceForm(existing,{sourceOnly:true})
-  ]),{className:'v2-workplace-data-layer'}));
+    workplaceForm(existing,{sourceOnly:true}),
+  ]),{
+    title:'',
+    variant:'q',
+    surface:'app',
+    className:'v2-workplace-data-layer',
+  }));
   if(!layer)return;
   const closeAndRender=()=>{
     layer.v2Close?.();
@@ -283,7 +289,7 @@ function openWorkplace(root,existing,navigateBack,options={}){
     openWorkplaceLimitModal(root,workplaceLimit);
     return;
   }
-  openWorkplaceZ2(root,existing,navigateBack,options);
+  openWorkplaceQ(root,existing,navigateBack,options);
 }
 
 function rootAddSource(){
