@@ -261,7 +261,7 @@ function personHistoryMarkup(items = [], query = '') {
   })));
 }
 
-function personQContext(person) {
+function personQContext(person, { settings = true } = {}) {
   return workspaceHeaderContext({
     title: name(person),
     a: {
@@ -269,7 +269,7 @@ function personQContext(person) {
       image: person.photo || '',
       initials: initials(person),
     },
-    v: { data: 'data-person-settings', aria: `Настройки ${name(person)}` },
+    v: settings ? { data: 'data-person-settings', aria: `Настройки ${name(person)}` } : null,
     d: {
       kind: 'chat',
       data: 'data-person-direct-chat',
@@ -756,7 +756,7 @@ async function renderPersonOverview(layer, baseRoot, key, options = {}) {
 }
 
 function openPersonRelationshipQ(root, person, detail, options = {}) {
-  const layer = mountModal(root, modal(`${personQContext(person)}${detail?.body || ''}`, {
+  const layer = mountModal(root, modal(`${personQContext(person, { settings: false })}${detail?.body || ''}`, {
     title: detail?.title || name(person),
     variant: 'q',
     surface: 'app',
