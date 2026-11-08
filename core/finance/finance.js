@@ -6,22 +6,20 @@ const FINANCE_NAVIGATION = [
   { id: 'z-report', label: 'Z-отчёт', capability: 'finance.z_report.access' },
 ];
 
-function investmentAccessAllowed() {
-  return canUseCapability('finance.investment.self.access')
+function cashCompositionAccessible() {
+  return canUseCapability('finance.cash.access')
+    || canUseCapability('finance.special.access')
+    || canUseCapability('finance.investment.self.access')
     || canUseCapability('finance.investment.raise.access')
     || canUseCapability('finance.investment.external.access');
 }
 
 export function financeNavigationItems() {
-  const cashAccess = canUseCapability('finance.cash.access');
   return FINANCE_NAVIGATION
     .filter((item) => item.id === 'cash'
-      ? (cashAccess || investmentAccessAllowed())
+      ? cashCompositionAccessible()
       : canUseCapability(item.capability))
-    .map(({ id, label }) => ({
-      id,
-      label: id === 'cash' && !cashAccess && investmentAccessAllowed() ? 'Инвестиции' : label,
-    }));
+    .map(({ id, label }) => ({ id, label }));
 }
 
 export function renderFinanceSection(root, section = 'cash', options = {}) {
