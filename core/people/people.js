@@ -396,7 +396,7 @@ function recordFilterPersonKeys({ procedure = '', workplace = '', recordPeriod =
     // A dated record counts whether arrived, unattended or unclosed.
     // Future appointments and cancelled records do not count in past-period filters.
     const appointmentDate = String(record?.date || '').slice(0, 10);
-    const datedRecord = recordDates && /^\\d{4}-\\d{2}-\\d{2}$/.test(appointmentDate)
+    const datedRecord = recordDates && /^\d{4}-\d{2}-\d{2}$/.test(appointmentDate)
       && appointmentDate <= todayDate;
     if (!procedureMatch && !workplaceMatch && !datedRecord) continue;
     const keys = [record?.person?.key, ...(record?.group?.participants || []).map((participant) => participant?.key)]
