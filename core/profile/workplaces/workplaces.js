@@ -1,4 +1,4 @@
-import { actionBlock, button, collectLinks, colorPicker, escapeHtml, field, initColorPickers, initLinks, initPhotoField, initTimePickers, links, mountModal, mountV2ZLayer, modal, page, phoneField, photoField, select, textareaField, timePicker, v2ZLayer, workspaceHeaderContext } from '../../../ui/ui.js';
+import { actionBlock, button, collectLinks, colorPicker, escapeHtml, field, initColorPickers, initLinks, initPhotoField, initTimePickers, links, mountModal, modal, phoneField, photoField, select, textareaField, timePicker } from '../../../ui/ui.js';
 import { notificationSettings } from '../../../ui/settings/index.js';
 import { getProfile } from '../data.js';
 import { deleteWorkplace as deleteWorkplaceData, getWorkplaceReferenceData, getWorkplaces, upsertWorkplace } from './data.js';
@@ -207,36 +207,6 @@ function setWorkplaceDraft(root,name,value,{notify=true}={}){
   if(!input)return;
   input.value=String(value??'');
   if(notify)input.dispatchEvent(new Event('change',{bubbles:true}));
-}
-
-function syncWorkplaceAvatar(root,photo){
-  const source=root.querySelector('[data-workspace-a-context]');
-  if(source){
-    source.dataset.workspaceAImage=String(photo||'');
-    source.dataset.workspaceAImagePosition='50% 50%';
-    window.dispatchEvent(new CustomEvent('va-tools:v2-context-changed'));
-  }
-}
-
-function workplaceDraftFromForm(root,existing=null){
-  const form=root.querySelector('[data-workplace-form]');
-  if(!form)return existing||emptyWorkplace();
-  const data=new FormData(form);
-  return {
-    ...(existing||emptyWorkplace()),
-    name:String(data.get('workplaceName')||'').trim(),
-    city:String(data.get('workplaceCity')||'').trim(),
-    address:String(data.get('workplaceAddress')||'').trim(),
-    phone:String(data.get('workplacePhone')||'').trim(),
-    currency:String(data.get('workplaceCurrency')||workplaceDefaults().currency||''),
-    from:String(data.get('workplaceFrom')||''),
-    to:String(data.get('workplaceTo')||''),
-    photo:String(data.get('workplacePhoto')||''),
-    photoCropX:Number(data.get('workplacePhotoCropX')||50),
-    photoCropY:Number(data.get('workplacePhotoCropY')||50),
-    cardAppearance:parseCardAppearance(data.get('workplaceCardAppearance')),
-    visibleInPublicBooking:String(data.get('visibleInPublicBooking')||'true')!=='false',
-  };
 }
 
 export function openWorkplaceModal(root, existing = null, onDone = () => {}) {
