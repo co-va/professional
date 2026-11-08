@@ -1,4 +1,4 @@
-import { actionBlock, button, collectLinks, colorPicker, escapeHtml, field, initColorPickers, initLinks, initPhotoField, initTimePickers, links, mountModal, modal, phoneField, photoField, select, textareaField, timePicker } from '../../../ui/ui.js';
+import { actionBlock, button, collectLinks, colorPicker, escapeHtml, field, initColorPickers, initLinks, initTimePickers, links, mountModal, modal, phoneField, select, textareaField, timePicker } from '../../../ui/ui.js';
 import { notificationSettings } from '../../../ui/settings/index.js';
 import { getProfile } from '../data.js';
 import { deleteWorkplace as deleteWorkplaceData, getWorkplaceReferenceData, getWorkplaces, upsertWorkplace } from './data.js';
@@ -19,7 +19,7 @@ function emptyWorkplace(){
   };
 }
 
-export function workplaceForm(existing=null,{sourceOnly=false,bodyActions=false}={}){
+export function workplaceForm(existing=null){
   const reference=getWorkplaceReferenceData();
   const defaults=reference.defaults||{};
   const w=existing||emptyWorkplace();
@@ -27,14 +27,11 @@ export function workplaceForm(existing=null,{sourceOnly=false,bodyActions=false}
   const currencies=(reference.currencies||[]).length
     ? reference.currencies
     : (w.currency?[{value:w.currency,label:w.currency}]:[]);
-  const primary=sourceOnly
-    ? actionBlock(button('Сохранить',{
-        type:'submit',
-        data:'data-workplace-primary',
-        aria:'Сохранить',
-      }))
-    : '';
-  const body=bodyActions ? actionBlock(button('Сохранить',{type:'submit'})) : '';
+  const primary=actionBlock(button('Сохранить',{
+    type:'submit',
+    data:'data-workplace-primary',
+    aria:'Сохранить',
+  }));
   // Destructive action must stay at the end of the scrollable Q form, never in the floating .modal-actions footer.
   const deletion=existing
     ? button('Удалить',{
@@ -42,19 +39,10 @@ export function workplaceForm(existing=null,{sourceOnly=false,bodyActions=false}
         data:'data-delete-workplace-form',
       })
     : '';
-  // The photo preserves its existing storage and editor flow.
-  const photoFields=bodyActions
-    ? photoField({
-        name:'workplacePhoto',
-        value:w.photo||'',
-        cropX:w.photoCropX,
-        cropY:w.photoCropY,
-        cropXName:'workplacePhotoCropX',
-        cropYName:'workplacePhotoCropY',
-      })
-    : `<input type="hidden" name="workplacePhoto" value="${escapeHtml(w.photo||'')}">
-       <input type="hidden" name="workplacePhotoCropX" value="${Number(w.photoCropX||50)}">
-       <input type="hidden" name="workplacePhotoCropY" value="${Number(w.photoCropY||50)}">`;
+  // Photo is edited by the single shared View editor; Q carries the stored values.
+  const photoFields=`<input type="hidden" name="workplacePhoto" value="${escapeHtml(w.photo||'')}">
+    <input type="hidden" name="workplacePhotoCropX" value="${Number(w.photoCropX||50)}">
+    <input type="hidden" name="workplacePhotoCropY" value="${Number(w.photoCropY||50)}">`;
   // Q data order: identity, address, phone, schedule, currency, color, links, about.
   const scheduleField=`<div class="work-time-row"><span class="work-time-row__label">График работы</span>
       <div class="work-time-row__fields">
@@ -88,7 +76,6 @@ export function workplaceForm(existing=null,{sourceOnly=false,bodyActions=false}
     ${textareaField({label:'О рабочем пространстве',name:'workplaceAbout',value:w.about||'',placeholder:'Коротко о рабочем пространстве'})}
     <div class="form-error" data-workplace-error></div>
     ${primary}
-    ${body}
     ${deletion}
   </form>`;
 }
@@ -155,7 +142,6 @@ async function saveWorkplace(root,existing,onDone){
 export function bindWorkplaceForm(root,existing=null,{onSaved=()=>{},onDeleted=()=>{}}={}){
   const form=root.querySelector('[data-workplace-form]');
   if(!form)return ()=>{};
-  if(root.querySelector('[data-photo-field]'))initPhotoField(root);
   if(root.querySelector('[data-color-picker]'))initColorPickers(root);
   if(root.querySelector('[data-time-picker]'))initTimePickers(root);
   initLinks(root);
@@ -207,17 +193,6 @@ function setWorkplaceDraft(root,name,value,{notify=true}={}){
   if(!input)return;
   input.value=String(value??'');
   if(notify)input.dispatchEvent(new Event('change',{bubbles:true}));
-}
-
-export function openWorkplaceModal(root, existing = null, onDone = () => {}) {
-  const html=workplaceForm(existing,{bodyActions:true});
-  const m=mountModal(root,modal(html,{variant:'q',title:existing?'Рабочее пространство':'Новое рабочее пространство'}));
-  if(!m)return null;
-  bindWorkplaceForm(m,existing,{
-    onSaved:()=>{m.v2Close?.();onDone();},
-    onDeleted:()=>{m.v2Close?.();onDone();},
-  });
-  return m;
 }
 
 export function confirmDeleteWorkplace(root,key,onDeleted=()=>{}){
