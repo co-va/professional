@@ -393,13 +393,19 @@ function recordFilterPersonKeys({ procedure = '', workplace = '', noVisits = '' 
     const procedureMatch = procedureKeys
       && (record?.procedures || []).some((item) => String(item?.id || '') === procedure);
     const workplaceMatch = workplaceKeys && String(record?.workplaceId || '') === workplace;
-    // A booking is not a visit. Use arrived/completed or an imported historical visit.
+    // Past, non-cancelled records count as visits even when attendance was never
+    // manually marked. Exclude explicit no-shows and today's unfinished bookings.
     const appointmentDate = String(record?.date || '').slice(0, 10);
+    const nowTime = [String(now.getHours()).padStart(2, '0'),
+      String(now.getMinutes()).padStart(2, '0')].join(':');
+    const endTime = String(record?.to || '');
+    const finishedToday = /^\d{2}:\d{2}$/.test(endTime) && endTime <= nowTime;
     const visitMatch = visitDates
       && record?.attendance !== 'no-show'
-      && (record?.attendance === 'arrived' || record?.completed === true || Boolean(record?.historicalTransfer))
       && /^\d{4}-\d{2}-\d{2}$/.test(appointmentDate)
-      && appointmentDate <= today;
+      && (appointmentDate < today || (appointmentDate === today
+        && (record?.attendance === 'arrived' || record?.completed === true
+          || Boolean(record?.historicalTransfer) || finishedToday)));
     if (!procedureMatch && !workplaceMatch && !visitMatch) continue;
     const keys = [record?.person?.key, ...(record?.group?.participants || []).map((participant) => participant?.key)]
       .map((key) => String(key || '')).filter(Boolean);
