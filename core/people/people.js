@@ -423,11 +423,16 @@ function listMarkup(items, query = '') {
   }));
 }
 
+function visiblePeople(root) {
+  const query = root.peopleSearchInput?.value || '';
+  return filterPeople(applyPeopleFilters(sortItems(getPeople(), getPeopleSortMode())), query);
+}
+
 function refreshPeopleList(root) {
   const host = root.querySelector('[data-people-list-host]');
   if (!host) return;
   const query = root.peopleSearchInput?.value || '';
-  const items = filterPeople(applyPeopleFilters(sortItems(getPeople(), getPeopleSortMode())), query);
+  const items = visiblePeople(root);
   host.innerHTML = listMarkup(items, query);
   host.querySelectorAll('[data-person]').forEach((node) => {
     node.addEventListener('click', () => openPersonOverview(root, node.dataset.person, root.peopleOptions || {}));
@@ -509,26 +514,21 @@ function openFilterSettings(root) {
   return layer;
 }
 
-function openExcelSettings(root) {
-  const layer = mountModal(root, modal(`<div class="modal-actions">
-    ${button('Выгрузить', { variant: 'secondary', data: 'data-export' })}
-  </div>`, { title: 'Excel', variant: 'x', surface: 'app' }));
-  layer?.querySelector('[data-export]')?.addEventListener('click', () => downloadCsv());
-  return layer;
-}
-
 function openListSettings(root, options = {}) {
   const layer = mountModal(root, modal(`<div class="modal-actions">
     ${button('Сортировка', { variant: 'secondary', data: 'data-people-sort' })}
     ${button('Фильтр', { variant: 'secondary', data: 'data-people-filter' })}
     ${button('Вид', { variant: 'secondary', data: 'data-people-appearance' })}
-    ${button('Excel', { variant: 'secondary', data: 'data-people-excel' })}
+    ${button('Выгрузить в Excel', { variant: 'secondary', data: 'data-people-export' })}
   </div>`, { title: 'Клиенты', variant: 'x', surface: 'app' }));
   if (!layer) return null;
   layer.querySelector('[data-people-sort]')?.addEventListener('click', () => { layer.v2Close?.(); openSortSettings(root); });
   layer.querySelector('[data-people-filter]')?.addEventListener('click', () => { layer.v2Close?.(); openFilterSettings(root); });
   layer.querySelector('[data-people-appearance]')?.addEventListener('click', () => { layer.v2Close?.(); openPeopleAppearanceQ(root, options); });
-  layer.querySelector('[data-people-excel]')?.addEventListener('click', () => { layer.v2Close?.(); openExcelSettings(root, options); });
+  layer.querySelector('[data-people-export]')?.addEventListener('click', () => {
+    layer.v2Close?.();
+    downloadCsv(root);
+  });
   return layer;
 }
 
@@ -558,16 +558,16 @@ function openPeopleAppearanceQ(root, options = {}) {
   });
 }
 
-function downloadCsv() {
+function downloadCsv(root) {
   const headers = ['Имя', 'Фамилия', 'Телефон', 'Email'];
-  const rows = getPeople().map((person) => [person.name, person.surname, person.phones?.[0], person.emails?.[0]]);
+  const rows = visiblePeople(root).map((person) => [person.name, person.surname, person.phones?.[0], person.emails?.[0]]);
   const text = '\uFEFF' + [headers, ...rows]
     .map((row) => row.map((value) => `"${String(value ?? '').replaceAll('"', '""')}"`).join(';'))
     .join('\r\n');
   const url = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8' }));
   const anchor = document.createElement('a');
   anchor.href = url;
-  anchor.download = 'люди.csv';
+  anchor.download = 'клиенты.csv';
   anchor.click();
   URL.revokeObjectURL(url);
 }
