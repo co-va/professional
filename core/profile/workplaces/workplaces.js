@@ -1,4 +1,5 @@
 import { actionBlock, button, collectLinks, colorPicker, escapeHtml, field, initColorPickers, initLinks, initPhotoField, initTimePickers, links, mountModal, mountV2ZLayer, modal, openSharedProfileSettingsMenu, page, phoneField, photoField, select, textareaField, timePicker, v2ZLayer, workspaceHeaderContext } from '../../../ui/ui.js';
+import { notificationSettings } from '../../../ui/settings/index.js';
 import { getProfile } from '../data.js';
 import { deleteWorkplace as deleteWorkplaceData, getWorkplaceReferenceData, getWorkplaces, upsertWorkplace } from './data.js';
 
@@ -221,45 +222,41 @@ function workplaceDraftFromForm(root,existing=null){
 export function openWorkplaceSettingsMenu(root,existing=null,{onDeleted=()=>{}}={}){
   const form=root.querySelector('[data-workplace-form]');
   if(!form)return null;
-  const data=()=>new FormData(form);
-  const currentVisibility=()=>String(data().get('visibleInPublicBooking')||'true')!=='false';
-  const controls=[
-    {
-      id:'public-booking-visibility',
-      label:'Показывать в общей онлайн-записи',
-      checked:currentVisibility(),
-      onToggle:async(checked)=>{
-        const previous=currentVisibility();
-        try{
-          if(existing)await upsertWorkplace({...existing,visibleInPublicBooking:checked});
-          setWorkplaceDraft(root,'visibleInPublicBooking',checked?'true':'false',{notify:!existing});
-          return checked;
-        }catch(error){
-          setWorkplaceDraft(root,'visibleInPublicBooking',previous?'true':'false',{notify:false});
-          throw error;
-        }
-      },
-      onError:(error)=>{
-        const target=root.querySelector('[data-workplace-error]');
-        if(target)target.textContent=error instanceof Error?error.message:'Не удалось сохранить настройку онлайн-записи';
-      },
-    },
-  ];
-  // V holds only configuration actions, not editable workplace form fields.
-  const actions=[];
-  if(existing){
-    actions.push({
-      id:'delete',
-      label:'Удалить пространство',
-      variant:'critical',
-      onSelect:()=>confirmDeleteWorkplace(root,existing.key,onDeleted),
-    });
-  }
+  const currentVisibility=()=>String(new FormData(form).get('visibleInPublicBooking')||'true')!=='false';
+  const actions=existing?[{
+    id:'delete',
+    label:'Удалить пространство',
+    variant:'critical',
+    onSelect:()=>confirmDeleteWorkplace(root,existing.key,onDeleted),
+  }]:[];
   return openSharedProfileSettingsMenu({
     title:'Настройки пространства',
-    controls,
+    content:notificationSettings([{
+      label:'Показывать в общей онлайн-записи',
+      labelLines:['Показывать в общей','онлайн-записи'],
+      checked:currentVisibility(),
+      data:'data-workplace-public-booking-visibility',
+    }]),
     actions,
     data:'data-workplace-settings-menu',
+    onMount:(layer)=>{
+      const input=layer.querySelector('[data-workplace-public-booking-visibility]');
+      input?.addEventListener('change',async()=>{
+        const previous=currentVisibility();
+        const next=input.checked;
+        input.disabled=true;
+        try{
+          if(existing)await upsertWorkplace({...existing,visibleInPublicBooking:next});
+          setWorkplaceDraft(root,'visibleInPublicBooking',next?'true':'false',{notify:!existing});
+        }catch(error){
+          input.checked=previous;
+          const target=root.querySelector('[data-workplace-error]');
+          if(target)target.textContent=error instanceof Error?error.message:'Не удалось сохранить настройку онлайн-записи';
+        }finally{
+          input.disabled=false;
+        }
+      });
+    },
   });
 }
 
