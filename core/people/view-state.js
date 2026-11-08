@@ -10,6 +10,8 @@ const DEFAULT_FILTERS = Object.freeze({
   workplace: '',
   noEmail: '',
   recordPeriod: '',
+  recordFrom: '',
+  recordTo: '',
 });
 
 export function getPeopleSortMode() {
@@ -36,6 +38,11 @@ export function getPeopleFilters() {
       result.recordPeriod = 'none';
     }
     if (result.birthday === 'month') result.birthday = String(new Date().getMonth() + 1);
+    if (!['', '1', '3', '6', 'range', 'none'].includes(result.recordPeriod)) result.recordPeriod = '';
+    if (result.recordPeriod !== 'range') {
+      result.recordFrom = '';
+      result.recordTo = '';
+    }
     return result;
   } catch {
     return { ...DEFAULT_FILTERS };
