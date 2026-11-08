@@ -8,6 +8,7 @@ let inFlight = null;
 
 async function readResponse(response) {
   const payload = await response.json().catch(() => null);
+  if (response.status === 404) return { unsupported: true };
   if (!response.ok) throw new Error(payload?.message || 'Не удалось восстановить кошельки');
   if (!payload || !Array.isArray(payload.wallets) || !Array.isArray(payload.recovered)) {
     throw new Error('Сервер вернул неполный результат восстановления');
@@ -18,6 +19,7 @@ async function readResponse(response) {
 async function recoverOnServer() {
   const result = await apiRequest('/auxiliary-state/wallets/recover', { method: 'POST' })
     .then(readResponse);
+  if (result.unsupported) return { status: 'unsupported', recovered: [] };
   hydrateWalletsFromServer(result.wallets);
   return {
     status: result.recovered.length ? 'restored' : 'unchanged',
