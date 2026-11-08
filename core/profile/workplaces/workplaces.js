@@ -36,9 +36,8 @@ export function workplaceForm(existing=null,{sourceOnly=false,bodyActions=false}
   const body=bodyActions
     ? actionBlock(`${button('Сохранить',{type:'submit'})}${existing?button('Удалить',{variant:'danger',data:'data-delete-workplace-form'}):''}`)
     : '';
-  // All editable workplace values live in the Q form, not behind V.
-  // Photo remains in the dedicated appearance/editor flow for the primary Q.
-  const settingsFields=`${bodyActions
+  // The photo preserves its existing storage and editor flow.
+  const photoFields=bodyActions
     ? photoField({
         name:'workplacePhoto',
         value:w.photo||'',
@@ -49,26 +48,28 @@ export function workplaceForm(existing=null,{sourceOnly=false,bodyActions=false}
       })
     : `<input type="hidden" name="workplacePhoto" value="${escapeHtml(w.photo||'')}">
        <input type="hidden" name="workplacePhotoCropX" value="${Number(w.photoCropX||50)}">
-       <input type="hidden" name="workplacePhotoCropY" value="${Number(w.photoCropY||50)}">`}
-    <div class="workplace-form__color"><span class="work-time-row__label">Цвет рабочего пространства *</span>
-      ${colorPicker({name:'workplaceColor',value:w.color||'',required:true})}
-    </div>
-    <div class="work-time-row"><span class="work-time-row__label">График работы</span>
+       <input type="hidden" name="workplacePhotoCropY" value="${Number(w.photoCropY||50)}">`;
+  // Workplace-specific time and required color follow Address inside Q.
+  const scheduleAndColor=`<div class="work-time-row"><span class="work-time-row__label">График работы</span>
       <div class="work-time-row__fields">
         ${timePicker({label:'С',name:'workplaceFrom',value:w.from||defaults.from||''})}
         ${timePicker({label:'До',name:'workplaceTo',value:w.to||defaults.to||''})}
       </div>
+    </div>
+    <div class="workplace-form__color"><span class="work-time-row__label">Цвет рабочего пространства *</span>
+      ${colorPicker({name:'workplaceColor',value:w.color||'',required:true})}
     </div>`;
   return `<form class="compact-form workplace-form" data-workplace-form>
     <input type="hidden" name="workplaceCardAppearance" value="${escapeHtml(JSON.stringify(w.cardAppearance||{}))}">
     <input type="hidden" name="visibleInPublicBooking" value="${w.visibleInPublicBooking===false?'false':'true'}">
-    ${settingsFields}
+    ${photoFields}
     ${field({label:'Название',name:'workplaceName',value:w.name,placeholder:'Название рабочего пространства',required:true})}
     ${select({label:'Город *',name:'workplaceCity',value:w.city||'',options:cities,placeholder:'Город',searchable:true,allowCustom:false})}
     ${field({label:'Адрес',name:'workplaceAddress',value:w.address,placeholder:'Адрес'})}
+    ${scheduleAndColor}
     ${phoneField({label:'Телефон',name:'workplacePhone',value:w.phone||''})}
     ${select({label:'Валюта',name:'workplaceCurrency',value:w.currency||defaults.currency||'',options:currencies})}
-    <div class="array-group"><span class="array-label">Ссылки</span>${links({links:w.links||[],name:'workplace-links'})}</div>
+    ${links({links:w.links||[],name:'workplace-links',label:'Ссылки',compact:true,addInHeader:true})}
     ${textareaField({label:'О рабочем пространстве',name:'workplaceAbout',value:w.about||'',placeholder:'Коротко о рабочем пространстве'})}
     <div class="form-error" data-workplace-error></div>
     ${primary}
