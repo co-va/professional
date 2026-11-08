@@ -51,6 +51,7 @@ import { getCurrentPersonHistory, getPersonHistory } from './history.js';
 import { getPersonMetadata } from './metadata.js';
 import { getRecord, getRecords } from '../record/index.js';
 import { getProcedures, hasCurrentProceduresSnapshot } from '../service/procedures/data.js';
+import { getWorkplaces, isWorkplacesServerReady } from '../profile/workplaces/data.js';
 import { loadRecordCreationOperationalState } from '../runtime/operational-state.js';
 import { getCardAppearanceTemplate, saveCardAppearanceTemplate } from '../card-appearance-templates.js';
 import { getPeopleFilters, getPeopleSortMode, setPeopleFilters, setPeopleSortMode } from './view-state.js';
@@ -361,25 +362,38 @@ function birthMonth(value = '') {
   return local ? Number(local[1]) : 0;
 }
 
-function procedurePersonKeys(procedureId) {
-  if (!procedureId) return null;
-  const keys = new Set();
-  for (const record of getRecords()) {
-    if (record?.status === 'cancelled') continue;
-    if (!(record?.procedures || []).some((item) => String(item?.id || '') === String(procedureId))) continue;
-    const key = String(record?.person?.key || '');
-    if (key) keys.add(key);
-    for (const participant of record?.group?.participants || []) {
-      const participantKey = String(participant?.key || '');
-      if (participantKey) keys.add(participantKey);
-    }
-  }
-  return keys;
+function currentPeopleFilters() {
+  const filters = getPeopleFilters();
+  if (!filters.workplace || !isWorkplacesServerReady()) return filters;
+  const workplaces = getWorkplaces();
+  if (workplaces.length > 1 && workplaces.some((item) => item.key === filters.workplace)) return filters;
+  // A deleted/sole workplace must not remain as an invisible, active filter.
+  return setPeopleFilters({ ...filters, workplace: '' });
 }
 
-function applyPeopleFilters(items = [], filters = getPeopleFilters()) {
+function recordFilterPersonKeys({ procedure = '', workplace = '' } = {}) {
+  const procedureKeys = procedure ? new Set() : null;
+  const workplaceKeys = workplace ? new Set() : null;
+  if (!procedureKeys && !workplaceKeys) return { procedureKeys, workplaceKeys };
+  for (const record of getRecords()) {
+    if (record?.status === 'cancelled') continue;
+    const procedureMatch = procedureKeys
+      && (record?.procedures || []).some((item) => String(item?.id || '') === procedure);
+    const workplaceMatch = workplaceKeys && String(record?.workplaceId || '') === workplace;
+    if (!procedureMatch && !workplaceMatch) continue;
+    const keys = [record?.person?.key, ...(record?.group?.participants || []).map((participant) => participant?.key)]
+      .map((key) => String(key || '')).filter(Boolean);
+    for (const key of keys) {
+      if (procedureMatch) procedureKeys.add(key);
+      if (workplaceMatch) workplaceKeys.add(key);
+    }
+  }
+  return { procedureKeys, workplaceKeys };
+}
+
+function applyPeopleFilters(items = [], filters = currentPeopleFilters()) {
   const selectedMonth = Number(filters.birthday);
-  const procedureKeys = procedurePersonKeys(filters.procedure);
+  const { procedureKeys, workplaceKeys } = recordFilterPersonKeys(filters);
   return items.filter((person) => {
     if (filters.gender === 'none' && person.gender) return false;
     if (filters.gender && filters.gender !== 'none' && person.gender !== filters.gender) return false;
@@ -387,7 +401,11 @@ function applyPeopleFilters(items = [], filters = getPeopleFilters()) {
     if (filters.birthday === 'has' && !person.birthDate) return false;
     if (selectedMonth >= 1 && selectedMonth <= 12 && birthMonth(person.birthDate) !== selectedMonth) return false;
     if (filters.tag && !(person.tags || []).includes(filters.tag)) return false;
-    if (procedureKeys && !getIdentityMemberKeys(person.key).some((key) => procedureKeys.has(key))) return false;
+    if (procedureKeys || workplaceKeys) {
+      const personKeys = getIdentityMemberKeys(person.key);
+      if (procedureKeys && !personKeys.some((key) => procedureKeys.has(key))) return false;
+      if (workplaceKeys && !personKeys.some((key) => workplaceKeys.has(key))) return false;
+    }
     if (filters.noEmail === 'yes' && (person.emails || []).some((value) => String(value || '').trim())) return false;
     if (filters.noVisits === 'yes' && getPersonMetadata(person.key).recordCount > 0) return false;
     return true;
@@ -403,6 +421,13 @@ function procedureFilterOptions() {
     .filter((item) => item?.id && item?.name)
     .sort((a, b) => String(a.name).localeCompare(String(b.name), 'ru'));
   return [{ value: '', label: 'Все процедуры' }, ...items.map((item) => ({ value: String(item.id), label: String(item.name) }))];
+}
+
+function workplaceFilterOptions() {
+  const workplaces = getWorkplaces().filter((item) => item.key);
+  if (workplaces.length <= 1) return [];
+  return [{ value: '', label: 'Все рабочие пространства' },
+    ...workplaces.map((item) => ({ value: String(item.key), label: String(item.name || 'Без названия') }))];
 }
 
 const BIRTH_MONTH_OPTIONS = [
@@ -512,15 +537,19 @@ function peopleFilterFields(filters = {}) {
     ] })}
     ${select({ label: 'Ярлык', name: 'peopleTagFilter', value: filters.tag, options: tagFilterOptions() })}
     <div data-people-procedure-filter>${hasCurrentProceduresSnapshot()
-      ? select({ label: 'Процедура', name: 'peopleProcedureFilter', value: filters.procedure, options: procedureFilterOptions(), searchable: true })
+      ? select({ label: 'Процедура', name: 'peopleProcedureFilter', value: filters.procedure, options: procedureFilterOptions() })
       : '<div class="field">Процедура: загрузка…</div>'}</div>
+    ${workplaceFilterOptions().length ? select({
+      label: 'Рабочее пространство', name: 'peopleWorkplaceFilter',
+      value: filters.workplace, options: workplaceFilterOptions(),
+    }) : ''}
     ${select({ label: 'Почта', name: 'peopleNoEmailFilter', value: filters.noEmail, options: [{ value: '', label: 'Все' }, { value: 'yes', label: 'Без почты' }] })}
     ${select({ label: 'Посещения', name: 'peopleNoVisitsFilter', value: filters.noVisits, options: [{ value: '', label: 'Все' }, { value: 'yes', label: 'Без посещений' }] })}
   </div>`;
 }
 
 function openFilterSettings(root) {
-  let applied = getPeopleFilters();
+  let applied = currentPeopleFilters();
   let draft = { ...applied };
   const hasFilters = (filters) => Object.values(filters).some(Boolean);
   const sameFilters = (left, right) => Object.keys(applied).every((key) => String(left[key] || '') === String(right[key] || ''));
@@ -548,6 +577,7 @@ function openFilterSettings(root) {
       peopleBirthdayFilter: 'birthday',
       peopleTagFilter: 'tag',
       peopleProcedureFilter: 'procedure',
+      peopleWorkplaceFilter: 'workplace',
       peopleNoEmailFilter: 'noEmail',
       peopleNoVisitsFilter: 'noVisits',
     };
@@ -583,7 +613,6 @@ function openFilterSettings(root) {
         name: 'peopleProcedureFilter',
         value: draft.procedure,
         options: procedureFilterOptions(),
-        searchable: true,
       });
     }).catch(() => {
       if (!layer.isConnected) return;
