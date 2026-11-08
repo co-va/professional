@@ -172,8 +172,9 @@ function personDocumentTile(person, documentItem) {
     title: documentItem.title || 'Документ',
     status: state.active ? 'Подписано' : 'Не подписано',
     statusState: state.active ? 'signed' : 'pending',
-    data: `data-person-document="${escapeHtml(documentItem.id)}"`,
-    aria: `Открыть информацию о документе ${documentItem.title || ''}`,
+    interactive: state.active,
+    data: state.active ? `data-person-document="${escapeHtml(documentItem.id)}"` : '',
+    aria: state.active ? `Открыть информацию о документе ${documentItem.title || ''}` : '',
   });
 }
 
@@ -181,6 +182,7 @@ function openPersonDocumentInfo(root, person, documentId) {
   const documentItem = personDocuments(person).find((item) => String(item.id) === String(documentId));
   if (!documentItem) return null;
   const state = personConsentState(person, documentItem);
+  if (!state.active) return null;
   const html = readOnlyReceipt({
     title: documentItem.title || 'Документ',
     groups: [[
