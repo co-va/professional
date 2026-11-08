@@ -184,13 +184,10 @@ function openPersonDocumentInfo(root, person, documentId) {
   const state = personConsentState(person, documentItem);
   if (!state.active) return null;
   const html = readOnlyReceipt({
-    title: documentItem.title || 'Документ',
-    groups: [[
-      { label: 'Статус', value: state.active ? 'Подписано' : 'Не подписано' },
-      ...(state.active ? [{ label: 'Дата и время подписания', value: consentSignedMoment(state.fact) }] : []),
-    ]],
+    status: 'Подписано',
+    date: consentSignedMoment(state.fact),
   });
-  return mountModal(root, modal(html, { title: documentItem.title || 'Документ', variant: 's', surface: 'app' }));
+  return mountModal(root, modal(html, { variant: 's', surface: 'app' }));
 }
 
 function openPersonDocuments(root, person) {
