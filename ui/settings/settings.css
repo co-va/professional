@@ -22,6 +22,7 @@
 .app-notification-row input:checked{background:var(--text)}
 .app-notification-row input:checked::after{content:"✓";color:#fff;font-size:15px;font-weight:800;line-height:1}
 .app-notification-row strong,.app-notification-row small{display:block}
+.app-notification-row__label-line{display:block}
 .app-notification-row small{margin-top:4px;color:var(--text-secondary);font-weight:400}
 .app-notification-row input:disabled{background:var(--surface-soft);border-color:var(--text-muted);opacity:.65}
 .app-notification-row.is-disabled{color:var(--text-secondary)}
