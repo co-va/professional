@@ -37,8 +37,7 @@ export function workplaceForm(existing=null,{sourceOnly=false,bodyActions=false}
   const body=bodyActions ? actionBlock(button('Сохранить',{type:'submit'})) : '';
   const deletion=existing
     ? actionBlock(button('Удалить рабочее пространство',{
-        variant:'outline',
-        className:'ui-button--delete-outline',
+        variant:'danger',
         data:'data-delete-workplace-form',
       }))
     : '';
