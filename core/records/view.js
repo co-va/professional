@@ -6,13 +6,14 @@ import {
   modal,
   mountModal,
   mountRecordZ,
+  mountRecordQ,
+  setRecordHeaderRows,
   openNotice,
   recordConfirmationMiniCard,
   recordZHost,
   select,
 } from '../../ui/ui.js';
 import { readOnlyReceipt } from '../../ui/receipt/index.js';
-import { setV2ZHeaderRows } from '../../ui/v2/z-layout.js';
 import { getWorkplaces } from '../workplace-time.js';
 import { getAllPeople } from '../people/data.js';
 import { openPersonHistoryQ } from '../people/people.js';
@@ -225,6 +226,7 @@ export function openRecordView(record, {
   context = 'professional',
   professional = null,
   readOnlyHistory = false,
+  presentation = 'z',
 } = {}) {
   if (!record?.id) return null;
 
@@ -235,12 +237,13 @@ export function openRecordView(record, {
   const professionalDisplay = accountProfessionalDisplay(professional);
   let currentRecord = readOnlyHistory ? record : (getRecord(record.id) || record);
   let startTimer = null;
-  const layer = mountRecordZ({
+  const useQ = presentation === 'q';
+  const layer = (useQ ? mountRecordQ : mountRecordZ)({
     settings: capabilities.settings,
-    title: capabilities.contactIdentity
+    title: useQ ? 'Запись' : capabilities.contactIdentity
       ? (personDisplay(currentRecord.person || {}).name || 'Запись')
       : (professionalDisplay.name || 'Запись'),
-    className: 'record-view-z journal-view-z',
+    className: useQ ? 'record-view-q journal-view-z' : 'record-view-z journal-view-z',
     ...(capabilities.contactIdentity ? {} : {
       aImage: professionalDisplay.photo,
       aInitials: professionalDisplay.initials,
@@ -529,7 +532,7 @@ export function openRecordView(record, {
       <button type="button" class="${effectiveAttendance === 'arrived' ? 'is-active' : ''}" aria-pressed="${effectiveAttendance === 'arrived'}" data-record-view-attendance="arrived"${!started ? ' disabled' : ''}>Пришел</button>
       <button type="button" class="${effectiveAttendance === 'no-show' ? 'is-active' : ''}" aria-pressed="${effectiveAttendance === 'no-show'}" data-record-view-attendance="no-show"${!started ? ' disabled' : ''}>Не пришел</button>
     </div>`;
-    setV2ZHeaderRows(layer, [
+    setRecordHeaderRows(layer, [
       capabilities.confirmation ? confirmedControl : '',
       capabilities.attendance ? attendanceControl : '',
     ].filter(Boolean));
