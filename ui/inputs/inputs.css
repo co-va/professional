@@ -34,6 +34,7 @@
 .array-group[data-repeated-add-placement="header"] .array-group__header .array-row__add:active{transform:none;opacity:.55}
 .array-group[data-repeated-add-placement="header"] [data-repeated-list]{display:grid;gap:7px;min-width:0}
 .array-group[data-repeated-add-placement="header"] .array-row--solo{grid-template-columns:minmax(0,1fr)}
+.array-group[data-repeated-add-placement="header"] .array-row:not(.array-row--solo){grid-template-columns:minmax(0,1fr) 24px}
 /* Workplace Q: link codes align with the 60px phone prefix; add/remove actions are plain glyphs. */
 .ui-links--compact{min-width:0}
 .ui-links--compact [data-links-list]{min-width:0}
@@ -44,7 +45,7 @@
 .ui-links--compact .link-row .ui-select__value{font-size:15px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:clip}
 .ui-links--compact .link-row .ui-select__meta{display:none}
 .ui-links--compact .link-row .ui-select__chevron{right:3px;font-size:13px}
-.ui-links--compact .link-row .remove-button{box-sizing:border-box;min-width:24px;width:24px;height:40px;min-height:40px;padding:0;border:0;border-radius:0;background:transparent;color:#ff1111;font-size:24px;font-weight:400;line-height:1}
+.ui-links--compact .link-row .remove-button,.array-group[data-repeated-add-placement="header"] .array-row .remove-button{box-sizing:border-box;min-width:24px;width:24px;height:40px;min-height:40px;padding:0;border:0;border-radius:0;background:transparent;color:#ff1111;font-size:24px;font-weight:400;line-height:1}
 .ui-links--compact .link-row .remove-button:active{opacity:.55}
 .ui-links--compact[data-repeated-add-placement="header"] .array-group__header{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:28px}
 .ui-links--compact[data-repeated-add-placement="header"] .array-group__header .array-row__add{width:28px;min-width:28px;max-width:28px;height:28px;min-height:28px;max-height:28px;border:0;border-radius:0;padding:0;display:grid;place-items:center;background:transparent;color:#111;font-size:26px;font-weight:400;line-height:1;box-shadow:none}
