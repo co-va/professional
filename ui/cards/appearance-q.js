@@ -1,6 +1,5 @@
 import { actionBlock } from '../page/page.js';
 import { button } from '../buttons/index.js';
-import { escapeHtml } from '../utils/escape-html.js';
 import { modal, mountModal } from '../modals/index.js';
 import { select } from '../selectors/index.js';
 import { mountEntityCardConstructor } from './entity-card-constructor.js';
@@ -30,10 +29,12 @@ export function openEntityCardAppearanceQ(root, {
   let type = optionValue(types, initialType);
   let target = String(initialTarget || 'all');
   const layer = mountModal(root, modal('<div data-entity-card-appearance-q></div>', {
-    title,
+    // The title is for accessibility only: the header is reserved for actual selectors.
+    title: '',
     variant: 'q',
     className: 'entity-card-appearance-q',
   }));
+  layer?.querySelector('.modal-sheet')?.setAttribute('aria-label', title);
   const host = layer?.querySelector('[data-entity-card-appearance-q]');
   const headerHost = layer?.querySelector('[data-v2-q-header-content]');
   if (!host || !headerHost) return layer;
@@ -50,8 +51,8 @@ export function openEntityCardAppearanceQ(root, {
       value: type,
       options: types,
       data: 'data-entity-card-appearance-type',
-    }) : `<h2 class="v2-q-title">${escapeHtml(types[0]?.label || title)}</h2>`;
-    const targetSelector = targets.length ? select({
+    }) : '';
+    const targetSelector = targets.length > 1 ? select({
       name: 'entityCardAppearanceTarget',
       label: '',
       aria: targetLabel,
@@ -63,7 +64,9 @@ export function openEntityCardAppearanceQ(root, {
 
     // The Q Header owns the card-type controls; the Q Body owns the sole preview.
     // No duplicate preview is mounted into the Header.
-    headerHost.innerHTML = `<h2 class="v2-q-title">${escapeHtml(title)}</h2><div class="entity-card-appearance-q__selectors">${typeSelector}${targetSelector}</div>`;
+    headerHost.innerHTML = typeSelector || targetSelector
+      ? `<div class="entity-card-appearance-q__selectors">${typeSelector}${targetSelector}</div>`
+      : '';
     host.innerHTML = `<div data-entity-card-appearance-constructor></div>
       ${actionBlock(button('Сохранить', {
         data: 'data-card-q-save',
