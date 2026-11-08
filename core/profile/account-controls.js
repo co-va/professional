@@ -10,18 +10,6 @@ async function request(path, options = {}) {
   return payload;
 }
 
-function moment(value) {
-  const date = new Date(value || 0);
-  if (!Number.isFinite(date.getTime())) return '—';
-  return new Intl.DateTimeFormat('ru-RU', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
-}
-
 function consentCards(consents) {
   if (!consents.length) return emptyState('Согласий пока нет', 'Здесь появятся актуальные согласия вашей учётной записи.');
   return documentTiles(consents.map((item) => documentTile({
