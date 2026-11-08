@@ -21,7 +21,9 @@ export function notificationSettings(items = []) {
   return `<div class="app-notification-list">${(Array.isArray(items) ? items : []).filter(Boolean).map((item) => `
     <label class="app-notification-row${item.disabled ? ' is-disabled' : ''}">
       <input type="checkbox" ${item.data || ''} ${item.checked ? 'checked' : ''} ${item.disabled ? 'disabled' : ''}>
-      <span><strong>${text(item.label || '')}</strong>${item.description ? `<small>${text(item.description)}</small>` : ''}</span>
+      <span><strong>${Array.isArray(item.labelLines) && item.labelLines.length
+        ? item.labelLines.map((line) => `<span class="app-notification-row__label-line">${text(line)}</span>`).join(' ')
+        : text(item.label || '')}</strong>${item.description ? `<small>${text(item.description)}</small>` : ''}</span>
     </label>`).join('')}
     <div class="muted" data-notification-status></div>
   </div>`;
