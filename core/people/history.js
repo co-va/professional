@@ -1,5 +1,6 @@
 import { loadHistoryFacts } from '../history/service.js';
 import { getIdentityMemberKeys } from './data.js';
+import { getRecords } from '../record/index.js';
 
 const text = (value) => String(value ?? '').trim();
 const objectValue = (value) => value && typeof value === 'object' && !Array.isArray(value) ? value : {};
@@ -222,10 +223,55 @@ export function projectPersonHistoryFacts(facts = []) {
     .sort((left, right) => text(right.occurredAt).localeCompare(text(left.occurredAt)));
 }
 
+// A read-only projection of Record facts already hydrated for the Journal.
+// It lets the contact history open immediately, without waiting for /history.
+// Historical deletions and financial audit details still come from /history.
+export function getCurrentPersonHistory(key = '') {
+  const identityKeys = new Set(getIdentityMemberKeys(key).map(text).filter(Boolean));
+  if (!identityKeys.size && text(key)) identityKeys.add(text(key));
+  if (!identityKeys.size) return [];
+  return getRecords()
+    .filter((record) => identityKeys.has(text(record?.person?.key)) && text(record.id))
+    .map((record) => {
+      const procedures = procedureNames(record);
+      const products = productNames(record);
+      return {
+        id: `record:${text(record.id)}`,
+        kind: 'record',
+        recordId: text(record.id),
+        occurredAt: appointmentMoment(record),
+        createdAt: text(record.createdAt),
+        appointmentDate: text(record.date),
+        from: text(record.from),
+        to: text(record.to),
+        durationMinutes: durationMinutes(record),
+        procedures,
+        products,
+        title: [...procedures, ...products].join(', ') || 'Запись',
+        subtitle: record.status === 'cancelled' ? 'Запись отменена'
+          : record.attendance === 'no-show' ? 'Не пришёл'
+          : record.completed ? 'Завершена'
+          : record.attendance === 'arrived' ? 'Пришёл'
+          : record.confirmed ? 'Подтверждена' : 'Запись',
+        amount: null,
+        status: text(record.status || 'active'),
+        attendance: text(record.attendance),
+        confirmed: record.confirmed === true,
+      };
+    })
+    .sort((a, b) => text(b.occurredAt).localeCompare(text(a.occurredAt)));
+}
+
+function mergePersonHistory(audit = [], current = []) {
+  const auditedRecords = new Set(audit.filter((item) => item.kind === 'record').map((item) => text(item.recordId)));
+  return [...audit, ...current.filter((item) => !auditedRecords.has(text(item.recordId)))]
+    .sort((a, b) => text(b.occurredAt).localeCompare(text(a.occurredAt)));
+}
+
 export async function getPersonHistory(key = '') {
   const identityKeys = [...new Set(getIdentityMemberKeys(key).map(text).filter(Boolean))];
   if (!identityKeys.length && text(key)) identityKeys.push(text(key));
   if (!identityKeys.length) return [];
   const facts = await loadHistoryFacts({ personKeys: identityKeys, limit: 2000 });
-  return projectPersonHistoryFacts(facts);
+  return mergePersonHistory(projectPersonHistoryFacts(facts), getCurrentPersonHistory(key));
 }
