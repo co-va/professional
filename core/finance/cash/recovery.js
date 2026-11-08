@@ -67,7 +67,16 @@ async function restoreWalletsFromFinanceHistory() {
     throw new Error('Сервер вернул неполные финансовые данные. Восстановление не выполнялось');
   }
   const candidates = missingWalletsFromFinanceHistory(auxiliary.wallets, finance);
-  if (!candidates.length) return { status: 'not-found', recovered: [] };
+  if (!candidates.length) {
+    const storedIDs = new Set(auxiliary.wallets.map((item) => text(item?.id)));
+    // A soft-deleted wallet is intentionally hidden from getWallets() but still
+    // exists on the server; do not flag it as lost or resurrect it.
+    const unknownID = finance.ledger.some((item) => {
+      const id = text(item?.walletId);
+      return id && id !== 'cash' && id !== 'cashless' && !storedIDs.has(id);
+    });
+    return { status: unknownID ? 'not-found' : 'unchanged', recovered: [] };
+  }
 
   // Recheck the original list before any PUT, so a concurrent wallet edit
   // causes a safe abort rather than overwriting another device's changes.
