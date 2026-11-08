@@ -1,7 +1,9 @@
 import { buildBookingLink } from '../../core/booking-link/index.js';
 import { apiRequest, getCurrentAccount } from '../../core/auth.js';
 import { loadOperationalState } from '../../core/runtime/operational-state.js';
+import { settingsPanel } from '../../ui/settings/index.js';
 import {
+  BOOKING_SLOT_STEPS,
   getBookingSettings,
   normalizeBookingSettings,
   saveBookingSettings,
@@ -20,6 +22,7 @@ import {
   select,
   setCopyButtonCopied,
   textareaField,
+  v2Section,
   workspaceHeaderContext,
 } from '../../ui/ui.js';
 
@@ -150,6 +153,50 @@ function mountScreen(root, body) {
   root.querySelector('[data-online-booking-settings]')?.addEventListener('click', () => openOnlineBookingSettings(root));
 }
 
+// These settings are intentionally saved as preferences, not active permissions.
+// The User flow and Core admission rules must be connected together in a later step.
+const BOOKING_RULES = Object.freeze([
+  { key: 'allowClientCancellation', label: 'Разрешить отмену записи' },
+  { key: 'allowClientRescheduling', label: 'Разрешить перенос записи' },
+]);
+
+function bookingRulesMarkup() {
+  const saved = getBookingSettings();
+  return v2Section('Правила онлайн-записи', `<div class="form-grid">
+    ${select({
+      label: 'Шаг времени записи',
+      name: 'preferredBookingSlotStep',
+      value: String(saved.preferredSlotStep),
+      options: BOOKING_SLOT_STEPS.map((step) => ({ value: String(step), label: `${step} минут` })),
+      aria: 'Выбрать шаг времени онлайн-записи',
+    })}
+    ${settingsPanel(BOOKING_RULES.map(({ key, label }) => ({
+      type: 'toggle',
+      label,
+      checked: saved[key] === true,
+      data: `data-booking-rule="${key}"`,
+    })))}
+    <p class="muted">Настройки сохраняются, но пока не применяются к записи: подключение правил в User и Core запланировано отдельно.</p>
+  </div>`);
+}
+
+function bindBookingRules(root) {
+  root.querySelector('[name="preferredBookingSlotStep"]')?.addEventListener('change', (event) => {
+    saveBookingSettings({ ...getBookingSettings(), preferredSlotStep: Number(event.target.value) });
+  });
+  BOOKING_RULES.forEach(({ key }) => {
+    const control = root.querySelector(`[data-booking-rule="${key}"]`);
+    control?.addEventListener('click', () => {
+      const saved = getBookingSettings();
+      const next = saveBookingSettings({ ...saved, [key]: !saved[key] });
+      const checked = next[key] === true;
+      control.setAttribute('aria-pressed', checked ? 'true' : 'false');
+      control.classList.toggle('is-on', checked);
+      control.querySelector('.app-setting-toggle__switch')?.classList.toggle('is-on', checked);
+    });
+  });
+}
+
 function renderReady(root) {
   const workplaces = publicRouteState.workplaces.filter((item) => item.key && item.slug);
   const options = [
@@ -167,9 +214,10 @@ function renderReady(root) {
       aria: 'Выбрать рабочее пространство для онлайн-записи',
     })}
     <div data-workplace-booking-link></div>
-  </div>`);
+  </div>${bookingRulesMarkup()}`);
 
   bindCopyButtons(root);
+  bindBookingRules(root);
   root.querySelector('input[name="bookingWorkplace"]')?.addEventListener('change', (event) => {
     const host = root.querySelector('[data-workplace-booking-link]');
     if (!host) return;
