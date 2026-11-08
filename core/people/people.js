@@ -730,11 +730,14 @@ async function renderPersonOverview(layer, baseRoot, key, options = {}) {
     return;
   }
   const relationships = await buildPersonRelationshipSections(person);
+  // Z2 Header stays empty (apart from its shared dismiss control).
+  // The contact card and its programs belong to the same scrollable Z2 Body.
   layer.innerHTML = page([
     personContext(person),
+    overviewCard(person),
     relationships.markup,
   ]);
-  setV2ZHeaderRows(layer, [overviewCard(person)]);
+  setV2ZHeaderRows(layer, []);
   bindPersonContext(layer, person, options);
   relationships.bind(layer, (detail) => openPersonRelationshipQ(baseRoot, person, detail, options));
   layer.querySelector('[data-person-card]')?.addEventListener('click', () => {
