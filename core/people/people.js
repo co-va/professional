@@ -756,7 +756,7 @@ async function renderPersonOverview(layer, baseRoot, key, options = {}) {
 }
 
 function openPersonRelationshipQ(root, person, detail, options = {}) {
-  const layer = mountModal(root, modal(`${personQContext(person, { settings: false })}${detail?.body || ''}`, {
+  const layer = mountModal(root, modal(`${personQContext(person, { settings: detail?.settings !== false })}${detail?.body || ''}`, {
     title: detail?.title || name(person),
     variant: 'q',
     surface: 'app',
