@@ -17,15 +17,6 @@ function telegramOf(value = {}) {
   return firstOf(value,'telegrams');
 }
 
-function unreadOf(profile = {}) {
-  const tenantId = String(profile?.tenantId || '').trim();
-  const globalUnread = typeof globalThis !== 'undefined'
-    ? globalThis.__VA_TOOLS_ACCOUNT_UNREAD__?.byTenant?.[tenantId]
-    : null;
-  const count = Math.max(0, Math.trunc(Number(globalUnread ?? profile?.unreadCount ?? 0) || 0));
-  return count > 0 ? `Новых: ${count > 99 ? '99+' : count}` : '';
-}
-
 function defaultLines(entries = []) {
   const lines=Array.from({length:9},()=>({field:'',zone:'full',align:'left',size:'m',color:'white',bold:false,italic:false,underline:false,uppercase:false}));
   entries.forEach(({row,field,zone='full',align='left',size='m',color='white',bold=false,italic=false,underline=false,uppercase=false})=>{
@@ -44,7 +35,6 @@ export function profileCardFields(profile = {}, workplaces = []) {
   const values=supplied.length?supplied:(Array.isArray(profile?.workplaces)?profile.workplaces:[]);
   const first=values[0]||{};
   return [
-    {value:'unread',label:'Непрочитанное',text:unreadOf(profile)},
     {value:'workTime',label:'График',text:first.from||first.to?`${first.from||'—'} - ${first.to||'—'}`:''},
     {value:'workplaceName',label:'Рабочее пространство',text:first.name||''},
     {value:'name',label:'Имя и фамилия',text:[profile.name,profile.surname].filter(Boolean).join(' ')},
@@ -87,7 +77,6 @@ export function profileCardAppearance(profile = {}) {
   if(hasConfiguredLines(profile.cardAppearance)) return normalizeEntityCardAppearance(profile.cardAppearance);
   return normalizeEntityCardAppearance({
     lines:defaultLines([
-      {row:1,field:'unread',zone:'left',align:'left',size:'m'},
       {row:1,field:'workTime',zone:'right',align:'right',size:'m'},
       {row:2,field:'workplaceName',zone:'right',align:'right',size:'m'},
       {row:7,field:'name',zone:'full',align:'left',size:'l',bold:true},
