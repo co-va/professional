@@ -847,9 +847,9 @@ function personDataFields(person, all) {
       ${field({ label: 'Скидка %', name: 'discountPercent', value: person.discountPercent || '', type: 'number', inputmode: 'decimal' })}
     </div>`),
     v2Section('Контактные данные',
-      repeatedField({ label: 'Телефон', name: 'phones', values: businessEntries(person, all, 'phones'), type: 'tel' })
-      + repeatedField({ label: 'Telegram', name: 'telegrams', values: businessEntries(person, all, 'telegrams') })
-      + repeatedField({ label: 'Email', name: 'emails', values: businessEntries(person, all, 'emails'), type: 'email' })),
+      repeatedField({ label: 'Телефон', name: 'phones', values: businessEntries(person, all, 'phones'), type: 'tel', addInHeader: true })
+      + repeatedField({ label: 'Telegram', name: 'telegrams', values: businessEntries(person, all, 'telegrams'), addInHeader: true })
+      + repeatedField({ label: 'Email', name: 'emails', values: businessEntries(person, all, 'emails'), type: 'email', addInHeader: true })),
     v2Section('Ссылки', links({ links: person.links || [], name: 'person-links' })),
     v2Section('Ярлыки', tags({ tags: getTags(), selected: person.tags || [], name: 'person-tags' })),
   ].join('');
@@ -939,7 +939,7 @@ function deletePersonByKey(key) {
 function confirmDelete(root, person, onDeleted) {
   const layer = mountModal(root, modal(`<div class="modal-title"><h2>Удалить?</h2><p>${escapeHtml(name(person))} будет удалён.</p></div>
     <div class="modal-actions">
-      ${button('Удалить', { variant: 'danger', data: 'data-confirm-delete' })}
+      ${button('Удалить', { variant: 'critical', data: 'data-confirm-delete' })}
       ${button('Отмена', { variant: 'secondary', data: 'data-cancel-delete' })}
     </div>`, { title: 'Удалить', variant: 'x', surface: 'app' }));
   if (!layer) return;
@@ -955,13 +955,13 @@ function openPersonEdit(parentLayer, baseRoot, key, options = {}, callbacks = {}
   const person = getAllPeople().find((item) => item.key === key);
   if (!person) return null;
   const all = getAllPeople();
-  const layer = mountModal(baseRoot, modal(`${personQContext(person)}<form data-person-edit-form>
+  const layer = mountModal(baseRoot, modal(`<form data-person-edit-form>
     ${personDataFields(person, all)}
-    ${button('Удалить клиента', { type: 'button', variant: 'danger', data: 'data-person-delete' })}
+    ${button('Удалить', { type: 'button', variant: 'critical', data: 'data-person-delete' })}
     <div class="form-error" data-person-edit-error></div>
     ${actionBlock(button('Сохранить', { type: 'button', data: 'data-person-q-save', aria: 'Сохранить изменения' }))}
   </form>`, {
-    title: name(person),
+    title: 'Данные клиента',
     variant: 'q',
     surface: 'app',
     className: 'people-edit-q',
