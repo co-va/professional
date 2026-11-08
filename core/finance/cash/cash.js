@@ -148,13 +148,12 @@ function renderOperationRow(operation) {
 }
 
 function cashContext() {
-  const investmentOnly = allowedInvestmentRoles().length > 0
-    && !canUseCapability('finance.cash.access')
-    && !canUseCapability('finance.special.access');
+  // Cash is one E-card whose three independently gated parts are wallets,
+  // loans and investments. Never rename the E based on which part is visible.
   const hasSettings = cashAppearanceTypeOptions().length > 0
     || financeOperationGroups({ groups: ['income-expense', 'transfer'] }).length > 0;
   return workspaceHeaderContext({
-    title: investmentOnly ? 'Инвестиции' : 'Касса',
+    title: 'Касса',
     v: hasSettings ? {
       kind: 'settings',
       data: 'data-cash-settings',
@@ -163,7 +162,7 @@ function cashContext() {
     c: canCreateCashEntity() ? {
       label: '+',
       data: 'data-cash-create',
-      aria: investmentOnly ? 'Добавить инвестицию' : 'Создать сущность кассы',
+      aria: 'Создать сущность кассы',
     } : null,
   });
 }
