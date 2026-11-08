@@ -9,6 +9,8 @@ import {
   entityVisualCard,
   documentTile,
   documentTiles,
+  datePicker,
+  initDatePickers,
   escapeHtml,
   field,
   initLinks,
@@ -587,8 +589,8 @@ function peopleFilterFields(filters = {}) {
     ] })}
     <div data-people-record-range${filters.recordPeriod === 'range' ? '' : ' hidden'}>
       <div class="form-grid form-grid--two">
-        ${field({ label: 'С', name: 'peopleRecordFromFilter', type: 'date', value: filters.recordFrom || '' })}
-        ${field({ label: 'По', name: 'peopleRecordToFilter', type: 'date', value: filters.recordTo || '' })}
+        ${datePicker({ name: 'peopleRecordFromFilter', value: filters.recordFrom || '', label: '', placeholder: 'С даты', allowClear: true, modalSurface: 'app' })}
+        ${datePicker({ name: 'peopleRecordToFilter', value: filters.recordTo || '', label: '', placeholder: 'По дату', allowClear: true, modalSurface: 'app' })}
       </div>
     </div>
   </div>`;
@@ -605,6 +607,7 @@ function openFilterSettings(root) {
       ${button('Применить', { data: 'data-people-filter-action' })}
     </div>`, { title: 'Фильтр', variant: 'x', surface: 'app' }));
   if (!layer) return null;
+  initDatePickers(layer);
   const action = layer.querySelector('[data-people-filter-action]');
   const actions = layer.querySelector('[data-people-filter-actions]');
 
@@ -660,7 +663,10 @@ function openFilterSettings(root) {
     applied = setPeopleFilters({});
     draft = { ...applied };
     const fields = layer.querySelector('[data-people-filter-fields]');
-    if (fields) fields.innerHTML = peopleFilterFields(draft);
+    if (fields) {
+      fields.innerHTML = peopleFilterFields(draft);
+      initDatePickers(fields);
+    }
     refreshPeopleList(root);
     updateAction();
   });
