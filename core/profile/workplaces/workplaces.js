@@ -248,10 +248,15 @@ export function openWorkplaceSettingsMenu(root,existing=null,{onDeleted=()=>{}}=
         try{
           if(existing)await upsertWorkplace({...existing,visibleInPublicBooking:next});
           setWorkplaceDraft(root,'visibleInPublicBooking',next?'true':'false',{notify:!existing});
+          const status=layer.querySelector('[data-notification-status]');
+          if(status)status.textContent='';
         }catch(error){
           input.checked=previous;
+          const message=error instanceof Error?error.message:'Не удалось сохранить настройку онлайн-записи';
+          const status=layer.querySelector('[data-notification-status]');
+          if(status)status.textContent=message;
           const target=root.querySelector('[data-workplace-error]');
-          if(target)target.textContent=error instanceof Error?error.message:'Не удалось сохранить настройку онлайн-записи';
+          if(target)target.textContent=message;
         }finally{
           input.disabled=false;
         }
