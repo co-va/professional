@@ -43,13 +43,14 @@ import { openTagEditor } from '../../settings/tags/tags.js';
 import { addTagToSelection } from '../../ui/tags/index.js';
 import { getDocuments } from '../../settings/documents/data.js';
 import { getConsents } from '../../settings/documents/consents.js';
-import { getAllPeople, getPeople, savePeople } from './data.js';
+import { getAllPeople, getIdentityMemberKeys, getPeople, savePeople } from './data.js';
 import { bindPersonCreateForm, personCreateForm } from './create.js';
 import { personDisplay } from './presentation.js';
 import { personCardAppearance, personCardFields } from './card-presentation.js';
 import { getCurrentPersonHistory, getPersonHistory } from './history.js';
 import { getPersonMetadata } from './metadata.js';
-import { getRecord } from '../record/index.js';
+import { getRecord, getRecords } from '../record/index.js';
+import { getProcedures } from '../service/procedures/data.js';
 import { getCardAppearanceTemplate, saveCardAppearanceTemplate } from '../card-appearance-templates.js';
 import { getPeopleFilters, getPeopleSortMode, setPeopleFilters, setPeopleSortMode } from './view-state.js';
 import { buildPersonRelationshipSections } from './programs.js';
@@ -352,21 +353,40 @@ function openPersonSettings(root, person, options = {}) {
 }
 
 function birthMonth(value = '') {
-  const match = String(value || '').match(/^(?:\d{4}-)?(\d{2})-(\d{2})$/);
-  return match ? Number(match[1]) : 0;
+  const source = String(value || '').trim();
+  const iso = source.match(/^(?:\d{4}-)?(\d{2})-\d{2}(?:$|T)/);
+  if (iso) return Number(iso[1]);
+  const local = source.match(/^\d{2}[./](\d{2})(?:[./]\d{4})?$/);
+  return local ? Number(local[1]) : 0;
+}
+
+function procedurePersonKeys(procedureId) {
+  if (!procedureId) return null;
+  const keys = new Set();
+  for (const record of getRecords()) {
+    if (record?.status === 'cancelled') continue;
+    if (!(record?.procedures || []).some((item) => String(item?.id || '') === String(procedureId))) continue;
+    const key = String(record?.person?.key || '');
+    if (key) keys.add(key);
+    for (const participant of record?.group?.participants || []) {
+      const participantKey = String(participant?.key || '');
+      if (participantKey) keys.add(participantKey);
+    }
+  }
+  return keys;
 }
 
 function applyPeopleFilters(items = [], filters = getPeopleFilters()) {
-  const tagsById = new Map(getTags().map((item) => [String(item.id), item]));
-  const currentMonth = new Date().getMonth() + 1;
+  const selectedMonth = Number(filters.birthday);
+  const procedureKeys = procedurePersonKeys(filters.procedure);
   return items.filter((person) => {
     if (filters.gender === 'none' && person.gender) return false;
     if (filters.gender && filters.gender !== 'none' && person.gender !== filters.gender) return false;
     if (filters.birthday === 'none' && person.birthDate) return false;
     if (filters.birthday === 'has' && !person.birthDate) return false;
-    if (filters.birthday === 'month' && birthMonth(person.birthDate) !== currentMonth) return false;
+    if (selectedMonth >= 1 && selectedMonth <= 12 && birthMonth(person.birthDate) !== selectedMonth) return false;
     if (filters.tag && !(person.tags || []).includes(filters.tag)) return false;
-    if (filters.tagColor && !(person.tags || []).some((id) => tagsById.get(String(id))?.color === filters.tagColor)) return false;
+    if (procedureKeys && !getIdentityMemberKeys(person.key).some((key) => procedureKeys.has(key))) return false;
     if (filters.noEmail === 'yes' && (person.emails || []).some((value) => String(value || '').trim())) return false;
     if (filters.noVisits === 'yes' && getPersonMetadata(person.key).recordCount > 0) return false;
     return true;
@@ -377,20 +397,17 @@ function tagFilterOptions() {
   return [{ value: '', label: 'Все ярлыки' }, ...getTags().map((item) => ({ value: String(item.id), label: item.name }))];
 }
 
-function tagColorOptions() {
-  const byColor = new Map();
-  for (const tag of getTags()) {
-    const color = String(tag.color || '').trim();
-    if (!color) continue;
-    const names = byColor.get(color) || [];
-    names.push(tag.name);
-    byColor.set(color, names);
-  }
-  return [{ value: '', label: 'Любая окраска' }, ...[...byColor.entries()].map(([value, names]) => ({
-    value,
-    label: names.join(' · '),
-  }))];
+function procedureFilterOptions() {
+  const items = getProcedures()
+    .filter((item) => item?.id && item?.name)
+    .sort((a, b) => String(a.name).localeCompare(String(b.name), 'ru'));
+  return [{ value: '', label: 'Все процедуры' }, ...items.map((item) => ({ value: String(item.id), label: String(item.name) }))];
 }
+
+const BIRTH_MONTH_OPTIONS = [
+  'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
+  'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь',
+].map((label, index) => ({ value: String(index + 1), label }));
 
 function filterPeople(items, query = '') {
   const needle = String(query || '').trim().toLocaleLowerCase('ru');
@@ -489,11 +506,11 @@ function openFilterSettings(root) {
     ${select({ label: 'Пол', name: 'peopleGenderFilter', value: filters.gender, options: [
       { value: '', label: 'Любой' }, { value: 'female', label: 'Женский' }, { value: 'male', label: 'Мужской' }, { value: 'none', label: 'Не указан' },
     ] })}
-    ${select({ label: 'День рождения', name: 'peopleBirthdayFilter', value: filters.birthday, options: [
-      { value: '', label: 'Любой' }, { value: 'month', label: 'В этом месяце' }, { value: 'has', label: 'Дата указана' }, { value: 'none', label: 'Дата не указана' },
+    ${select({ label: 'Месяц рождения', name: 'peopleBirthdayFilter', value: filters.birthday, options: [
+      { value: '', label: 'Все месяцы' }, ...BIRTH_MONTH_OPTIONS, { value: 'none', label: 'Дата не указана' },
     ] })}
     ${select({ label: 'Ярлык', name: 'peopleTagFilter', value: filters.tag, options: tagFilterOptions(), searchable: true })}
-    ${select({ label: 'Окраска ярлыка', name: 'peopleTagColorFilter', value: filters.tagColor, options: tagColorOptions() })}
+    ${select({ label: 'Процедура', name: 'peopleProcedureFilter', value: filters.procedure, options: procedureFilterOptions(), searchable: true })}
     ${select({ label: 'Почта', name: 'peopleNoEmailFilter', value: filters.noEmail, options: [{ value: '', label: 'Все' }, { value: 'yes', label: 'Без почты' }] })}
     ${select({ label: 'Посещения', name: 'peopleNoVisitsFilter', value: filters.noVisits, options: [{ value: '', label: 'Все' }, { value: 'yes', label: 'Без посещений' }] })}
   </div>`;
@@ -504,7 +521,7 @@ function openFilterSettings(root) {
       gender: layer.querySelector('[name="peopleGenderFilter"]')?.value || '',
       birthday: layer.querySelector('[name="peopleBirthdayFilter"]')?.value || '',
       tag: layer.querySelector('[name="peopleTagFilter"]')?.value || '',
-      tagColor: layer.querySelector('[name="peopleTagColorFilter"]')?.value || '',
+      procedure: layer.querySelector('[name="peopleProcedureFilter"]')?.value || '',
       noEmail: layer.querySelector('[name="peopleNoEmailFilter"]')?.value || '',
       noVisits: layer.querySelector('[name="peopleNoVisitsFilter"]')?.value || '',
     });
