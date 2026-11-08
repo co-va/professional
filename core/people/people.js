@@ -586,9 +586,9 @@ function peopleFilterFields(filters = {}) {
       { value: 'none', label: 'Без посещений' },
     ] })}
     <div data-people-record-range${filters.recordPeriod === 'range' ? '' : ' hidden'}>
-      <div class="form-grid">
-        ${field({ label: 'С даты', name: 'peopleRecordFromFilter', type: 'date', value: filters.recordFrom || '' })}
-        ${field({ label: 'По дату', name: 'peopleRecordToFilter', type: 'date', value: filters.recordTo || '' })}
+      <div class="form-grid form-grid--two">
+        ${field({ label: 'С', name: 'peopleRecordFromFilter', type: 'date', value: filters.recordFrom || '' })}
+        ${field({ label: 'По', name: 'peopleRecordToFilter', type: 'date', value: filters.recordTo || '' })}
       </div>
     </div>
   </div>`;
