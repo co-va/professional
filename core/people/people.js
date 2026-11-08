@@ -50,7 +50,8 @@ import { personCardAppearance, personCardFields } from './card-presentation.js';
 import { getCurrentPersonHistory, getPersonHistory } from './history.js';
 import { getPersonMetadata } from './metadata.js';
 import { getRecord, getRecords } from '../record/index.js';
-import { getProcedures } from '../service/procedures/data.js';
+import { getProcedures, hasCurrentProceduresSnapshot } from '../service/procedures/data.js';
+import { loadRecordCreationOperationalState } from '../runtime/operational-state.js';
 import { getCardAppearanceTemplate, saveCardAppearanceTemplate } from '../card-appearance-templates.js';
 import { getPeopleFilters, getPeopleSortMode, setPeopleFilters, setPeopleSortMode } from './view-state.js';
 import { buildPersonRelationshipSections } from './programs.js';
@@ -507,10 +508,13 @@ function openFilterSettings(root) {
       { value: '', label: 'Любой' }, { value: 'female', label: 'Женский' }, { value: 'male', label: 'Мужской' }, { value: 'none', label: 'Не указан' },
     ] })}
     ${select({ label: 'Месяц рождения', name: 'peopleBirthdayFilter', value: filters.birthday, options: [
-      { value: '', label: 'Все месяцы' }, ...BIRTH_MONTH_OPTIONS, { value: 'none', label: 'Дата не указана' },
+      { value: '', label: 'Все месяцы' }, ...BIRTH_MONTH_OPTIONS,
+      { value: 'has', label: 'Дата указана' }, { value: 'none', label: 'Дата не указана' },
     ] })}
     ${select({ label: 'Ярлык', name: 'peopleTagFilter', value: filters.tag, options: tagFilterOptions(), searchable: true })}
-    ${select({ label: 'Процедура', name: 'peopleProcedureFilter', value: filters.procedure, options: procedureFilterOptions(), searchable: true })}
+    <div data-people-procedure-filter>${hasCurrentProceduresSnapshot()
+      ? select({ label: 'Процедура', name: 'peopleProcedureFilter', value: filters.procedure, options: procedureFilterOptions(), searchable: true })
+      : '<div class="field">Процедура: загрузка…</div>'}</div>
     ${select({ label: 'Почта', name: 'peopleNoEmailFilter', value: filters.noEmail, options: [{ value: '', label: 'Все' }, { value: 'yes', label: 'Без почты' }] })}
     ${select({ label: 'Посещения', name: 'peopleNoVisitsFilter', value: filters.noVisits, options: [{ value: '', label: 'Все' }, { value: 'yes', label: 'Без посещений' }] })}
   </div>`;
@@ -527,7 +531,27 @@ function openFilterSettings(root) {
     });
     refreshPeopleList(root);
   };
-  layer.querySelectorAll('select, input').forEach((node) => node.addEventListener('change', sync));
+  layer.addEventListener('change', (event) => {
+    if (event.target?.matches?.('[name^="people"][name$="Filter"]')) sync();
+  });
+  if (!hasCurrentProceduresSnapshot()) {
+    void loadRecordCreationOperationalState().then(() => {
+      if (!layer.isConnected) return;
+      const host = layer.querySelector('[data-people-procedure-filter]');
+      if (!host) return;
+      host.innerHTML = select({
+        label: 'Процедура',
+        name: 'peopleProcedureFilter',
+        value: getPeopleFilters().procedure,
+        options: procedureFilterOptions(),
+        searchable: true,
+      });
+    }).catch(() => {
+      if (!layer.isConnected) return;
+      const host = layer.querySelector('[data-people-procedure-filter]');
+      if (host) host.textContent = 'Не удалось загрузить процедуры';
+    });
+  }
   return layer;
 }
 
