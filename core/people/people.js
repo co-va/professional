@@ -58,6 +58,7 @@ import { loadRecordCreationOperationalState } from '../runtime/operational-state
 import { getCardAppearanceTemplate, saveCardAppearanceTemplate } from '../card-appearance-templates.js';
 import { getPeopleFilters, getPeopleSortMode, setPeopleFilters, setPeopleSortMode } from './view-state.js';
 import { buildPersonRelationshipSections } from './programs.js';
+import { openPersonProgramActions } from '../loyalty/person-program-actions.js';
 import { openPersonRecordCreation } from './record-creation.js';
 import { canUseRealPersonalData } from '../access.js';
 import { isTelegramUserId, loadTelegramUsernames, telegramDisplay } from './telegram-usernames.js';
@@ -333,6 +334,7 @@ function openPersonSettings(root, person, options = {}) {
   const layer = mountModal(root, modal(`<div class="modal-actions">
     ${button('Документы', { variant: 'secondary', data: 'data-person-settings-documents' })}
     ${button('История', { variant: 'secondary', data: 'data-person-settings-history' })}
+    ${button('Программы', { variant: 'secondary', data: 'data-person-settings-programs' })}
     ${button('Записать', { data: 'data-person-settings-record' })}
     ${button('Удалить', { variant: 'critical', data: 'data-person-settings-delete' })}
   </div>`, {
@@ -349,6 +351,10 @@ function openPersonSettings(root, person, options = {}) {
   layer.querySelector('[data-person-settings-history]')?.addEventListener('click', () => {
     layer.v2Close?.();
     void openPersonHistoryQ(root, person, options);
+  });
+  layer.querySelector('[data-person-settings-programs]')?.addEventListener('click', () => {
+    layer.v2Close?.();
+    openPersonProgramActions(root, person, { onChanged: options.onProgramChanged });
   });
   layer.querySelector('[data-person-settings-record]')?.addEventListener('click', () => {
     layer.v2Close?.();
@@ -849,6 +855,7 @@ async function renderPersonOverview(layer, baseRoot, key, options = {}) {
   setV2ZHeaderRows(layer, []);
   bindPersonContext(layer, person, {
     ...options,
+    onProgramChanged: () => void renderPersonOverview(layer, baseRoot, person.key, options),
     onDeleted: () => {
       layer.v2Close?.();
       renderPeople(baseRoot, options);
