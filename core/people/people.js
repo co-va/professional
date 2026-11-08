@@ -26,6 +26,7 @@ import {
   repeatedField,
   select,
   setV2ZHeaderRows,
+  shortDate,
   shortDateTime,
   tags,
   uei,
@@ -42,7 +43,6 @@ import { openTagEditor } from '../../settings/tags/tags.js';
 import { addTagToSelection } from '../../ui/tags/index.js';
 import { getDocuments } from '../../settings/documents/data.js';
 import { getConsents } from '../../settings/documents/consents.js';
-import { readOnlyReceipt } from '../../ui/receipt/index.js';
 import { getAllPeople, getPeople, savePeople } from './data.js';
 import { bindPersonCreateForm, personCreateForm } from './create.js';
 import { personDisplay } from './presentation.js';
@@ -94,7 +94,7 @@ function sortOptions() {
 
 function consentSignedMoment(fact) {
   // Never display the timestamp of a revocation or a superseded signature.
-  return shortDateTime(fact?.acceptedAt || fact?.eventAt || '', '—');
+  return shortDate(fact?.acceptedAt || fact?.eventAt || '', '');
 }
 
 function consentEventTime(fact) {
@@ -170,24 +170,11 @@ function personDocumentTile(person, documentItem) {
   const state = personConsentState(person, documentItem);
   return documentTile({
     title: documentItem.title || 'Документ',
-    status: state.active ? 'Подписано' : 'Не подписано',
-    statusState: state.active ? 'signed' : 'pending',
-    interactive: state.active,
-    data: state.active ? `data-person-document="${escapeHtml(documentItem.id)}"` : '',
-    aria: state.active ? `Открыть информацию о документе ${documentItem.title || ''}` : '',
+    meta: state.active ? consentSignedMoment(state.fact) : '',
+    status: state.active ? 'Подписано' : '',
+    statusState: state.active ? 'signed' : '',
+    interactive: false,
   });
-}
-
-function openPersonDocumentInfo(root, person, documentId) {
-  const documentItem = personDocuments(person).find((item) => String(item.id) === String(documentId));
-  if (!documentItem) return null;
-  const state = personConsentState(person, documentItem);
-  if (!state.active) return null;
-  const html = readOnlyReceipt({
-    status: 'Подписано',
-    date: consentSignedMoment(state.fact),
-  });
-  return mountModal(root, modal(html, { variant: 's', surface: 'app' }));
 }
 
 function openPersonDocuments(root, person) {
@@ -195,11 +182,7 @@ function openPersonDocuments(root, person) {
   const body = documents.length
     ? documentTiles(documents.map((item) => personDocumentTile(person, item)), { layout: 'rail' })
     : emptyState('Документов пока нет', 'Документы и согласия этого человека появятся здесь.');
-  const layer = mountModal(root, modal(body, { title: 'Документы / согласия', variant: 'x', surface: 'app' }));
-  layer?.querySelectorAll('[data-person-document]').forEach((node) => {
-    node.addEventListener('click', () => openPersonDocumentInfo(root, person, node.dataset.personDocument));
-  });
-  return layer;
+  return mountModal(root, modal(body, { title: 'Документы / согласия', variant: 'x', surface: 'app' }));
 }
 
 function historyItems(items = [], query = '') {
