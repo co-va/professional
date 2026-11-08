@@ -6,7 +6,7 @@ const DEFAULT_FILTERS = Object.freeze({
   gender: '',
   birthday: '',
   tag: '',
-  tagColor: '',
+  procedure: '',
   noEmail: '',
   noVisits: '',
 });
@@ -25,7 +25,11 @@ export function setPeopleSortMode(value) {
 export function getPeopleFilters() {
   try {
     const value = JSON.parse(localStorage.getItem(FILTER_KEY) || '{}');
-    return { ...DEFAULT_FILTERS, ...(value && typeof value === 'object' ? value : {}) };
+    const stored = value && typeof value === 'object' ? value : {};
+    const result = Object.fromEntries(Object.keys(DEFAULT_FILTERS).map((key) => [key, String(stored[key] || '')]));
+    // Earlier versions used 'month' for the current month. Preserve that selection.
+    if (result.birthday === 'month') result.birthday = String(new Date().getMonth() + 1);
+    return result;
   } catch {
     return { ...DEFAULT_FILTERS };
   }
