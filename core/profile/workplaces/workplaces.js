@@ -1,4 +1,4 @@
-import { actionBlock, button, collectLinks, colorPicker, escapeHtml, field, initColorPickers, initLinks, initPhotoField, initTimePickers, links, mountModal, mountV2ZLayer, modal, openSharedProfileSettingsMenu, page, phoneField, photoField, select, textareaField, timePicker, v2ZLayer, workspaceHeaderContext } from '../../../ui/ui.js';
+import { actionBlock, button, collectLinks, colorPicker, escapeHtml, field, initColorPickers, initLinks, initPhotoField, initTimePickers, links, mountModal, mountV2ZLayer, modal, page, phoneField, photoField, select, textareaField, timePicker, v2ZLayer, workspaceHeaderContext } from '../../../ui/ui.js';
 import { notificationSettings } from '../../../ui/settings/index.js';
 import { getProfile } from '../data.js';
 import { deleteWorkplace as deleteWorkplaceData, getWorkplaceReferenceData, getWorkplaces, upsertWorkplace } from './data.js';
@@ -34,8 +34,13 @@ export function workplaceForm(existing=null,{sourceOnly=false,bodyActions=false}
         aria:'Сохранить',
       }))
     : '';
-  const body=bodyActions
-    ? actionBlock(`${button('Сохранить',{type:'submit'})}${existing?button('Удалить',{variant:'danger',data:'data-delete-workplace-form'}):''}`)
+  const body=bodyActions ? actionBlock(button('Сохранить',{type:'submit'})) : '';
+  const deletion=existing
+    ? actionBlock(button('Удалить рабочее пространство',{
+        variant:'outline',
+        className:'ui-button--delete-outline',
+        data:'data-delete-workplace-form',
+      }))
     : '';
   // The photo preserves its existing storage and editor flow.
   const photoFields=bodyActions
@@ -71,11 +76,18 @@ export function workplaceForm(existing=null,{sourceOnly=false,bodyActions=false}
     ${scheduleField}
     ${select({label:'Валюта',name:'workplaceCurrency',value:w.currency||defaults.currency||'',options:currencies})}
     ${colorField}
+    ${notificationSettings([{
+      label:'Показывать в общей онлайн-записи',
+      labelLines:['Показывать в общей','онлайн-записи'],
+      checked:w.visibleInPublicBooking!==false,
+      data:'data-workplace-public-booking-visibility',
+    }])}
     ${links({links:w.links||[],name:'workplace-links',label:'Ссылки',compact:true,addInHeader:true})}
     ${textareaField({label:'О рабочем пространстве',name:'workplaceAbout',value:w.about||'',placeholder:'Коротко о рабочем пространстве'})}
     <div class="form-error" data-workplace-error></div>
     ${primary}
     ${body}
+    ${deletion}
   </form>`;
 }
 function formSnapshot(form){
@@ -145,6 +157,12 @@ export function bindWorkplaceForm(root,existing=null,{onSaved=()=>{},onDeleted=(
   if(root.querySelector('[data-color-picker]'))initColorPickers(root);
   if(root.querySelector('[data-time-picker]'))initTimePickers(root);
   initLinks(root);
+
+  // The visible checkbox is part of the Q draft: one Save commits all workplace fields.
+  // Keep the existing hidden API field as the single form-data source.
+  form.querySelector('[data-workplace-public-booking-visibility]')?.addEventListener('change',(event)=>{
+    setWorkplaceDraft(root,'visibleInPublicBooking',event.currentTarget.checked?'true':'false');
+  });
 
   const primary=root.querySelector('[data-workplace-primary]');
   const primaryActions=primary?.closest('.modal-actions');
@@ -217,52 +235,6 @@ function workplaceDraftFromForm(root,existing=null){
     cardAppearance:parseCardAppearance(data.get('workplaceCardAppearance')),
     visibleInPublicBooking:String(data.get('visibleInPublicBooking')||'true')!=='false',
   };
-}
-
-export function openWorkplaceSettingsMenu(root,existing=null,{onDeleted=()=>{}}={}){
-  const form=root.querySelector('[data-workplace-form]');
-  if(!form)return null;
-  const currentVisibility=()=>String(new FormData(form).get('visibleInPublicBooking')||'true')!=='false';
-  const actions=existing?[{
-    id:'delete',
-    label:'Удалить пространство',
-    variant:'critical',
-    onSelect:()=>confirmDeleteWorkplace(root,existing.key,onDeleted),
-  }]:[];
-  return openSharedProfileSettingsMenu({
-    title:'Настройки пространства',
-    content:notificationSettings([{
-      label:'Показывать в общей онлайн-записи',
-      labelLines:['Показывать в общей','онлайн-записи'],
-      checked:currentVisibility(),
-      data:'data-workplace-public-booking-visibility',
-    }]),
-    actions,
-    data:'data-workplace-settings-menu',
-    onMount:(layer)=>{
-      const input=layer.querySelector('[data-workplace-public-booking-visibility]');
-      input?.addEventListener('change',async()=>{
-        const previous=currentVisibility();
-        const next=input.checked;
-        input.disabled=true;
-        try{
-          if(existing)await upsertWorkplace({...existing,visibleInPublicBooking:next});
-          setWorkplaceDraft(root,'visibleInPublicBooking',next?'true':'false',{notify:!existing});
-          const status=layer.querySelector('[data-notification-status]');
-          if(status)status.textContent='';
-        }catch(error){
-          input.checked=previous;
-          const message=error instanceof Error?error.message:'Не удалось сохранить настройку онлайн-записи';
-          const status=layer.querySelector('[data-notification-status]');
-          if(status)status.textContent=message;
-          const target=root.querySelector('[data-workplace-error]');
-          if(target)target.textContent=message;
-        }finally{
-          input.disabled=false;
-        }
-      });
-    },
-  });
 }
 
 export function openWorkplaceModal(root, existing = null, onDone = () => {}) {
