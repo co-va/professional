@@ -1,28 +1,21 @@
 import { button, emptyState, modal, mountModal, openNotice, select } from '../../ui/ui.js';
 import { loyaltyNavigationItems } from './index.js';
-import { getDepositPrograms, listPersonDeposits, loadDepositPrograms } from './deposit/data.js';
 
-// Exactly the same E-card collection as the existing Loyalty navigation.
-// No local list of program types and no second readiness gate.
+// The selector always mirrors the Loyalty E-cards. No second feature list.
 export function personProgramActionTypes() {
   return loyaltyNavigationItems();
 }
 
-async function depositChoices(personKey) {
-  const programs = await loadDepositPrograms();
-  const deposits = await listPersonDeposits(personKey);
-  const available = programs.filter((item) => item?.id && !item.archivedAt
-    && (!item.status || item.status === 'active'));
-  return [
-    ...available.map((item) => ({
-      value: `issue:${item.id}`,
-      label: `Оформить · ${item.name || 'Депозит'}`,
-    })),
-    ...deposits.filter((item) => item?.depositId || item?.id).map((item) => ({
-      value: `existing:${item.depositId || item.id}`,
-      label: `Открыть · ${item.programName || 'Депозит'}`,
-    })),
-  ];
+// Each Loyalty module provides these exports when its person-scoped workflow
+// is operational. A future E-card is automatically listed, and its own catalog
+// becomes selectable as soon as that module implements the shared contract.
+async function loadPersonProgramWorkflow(kind, person) {
+  const module = await import(`./${kind}/index.js`);
+  if (typeof module.getPersonProgramChoices !== 'function'
+    || typeof module.openPersonProgramChoice !== 'function') return null;
+  const settings = await module.getPersonProgramChoices(person);
+  if (!settings || typeof settings !== 'object') return null;
+  return { module, settings };
 }
 
 export function openPersonProgramActions(root, person, { onChanged = () => {} } = {}) {
@@ -50,14 +43,16 @@ export function openPersonProgramActions(root, person, { onChanged = () => {} } 
   let kind = '';
   let selectedChoice = '';
   let choices = new Set();
+  let workflow = null;
   let sequence = 0;
   let loading = false;
 
   const updateAction = () => {
-    const available = kind === 'personal-account' || (kind === 'deposit' && choices.has(selectedChoice));
-    actionHost.hidden = !available;
-    action.disabled = loading || !available;
-    action.textContent = kind === 'personal-account' || selectedChoice.startsWith('existing:') ? 'Открыть' : 'Оформить';
+    const ready = Boolean(workflow
+      && (workflow.settings.direct === true || choices.has(selectedChoice)));
+    actionHost.hidden = !ready;
+    action.disabled = loading || !ready;
+    action.textContent = workflow?.settings.actionLabel || 'Оформить';
   };
 
   layer.addEventListener('change', (event) => {
@@ -67,67 +62,70 @@ export function openPersonProgramActions(root, person, { onChanged = () => {} } 
       return;
     }
     if (event.target?.name !== 'personProgramKind') return;
-    const nextKind = String(event.target.value || '');
+    const requestedKind = String(event.target.value || '');
     const request = ++sequence;
-    kind = personProgramActionTypes().some((item) => item.id === nextKind) ? nextKind : '';
+    kind = personProgramActionTypes().some((item) => item.id === requestedKind) ? requestedKind : '';
     selectedChoice = '';
     choices = new Set();
+    workflow = null;
     errorHost.textContent = '';
     optionsHost.innerHTML = '';
     updateAction();
-    if (kind !== 'deposit') {
-      // A newly exposed E-card is listed immediately. Incomplete program
-      // modules never silently perform local/demo assignments from Person.
-      if (kind && kind !== 'personal-account') {
-        optionsHost.textContent = 'Действия с клиентом для этой программы пока недоступны.';
-      }
-      return;
-    }
+    if (!kind) return;
+
     optionsHost.textContent = 'Загружаем программы…';
     loading = true;
     updateAction();
-    void depositChoices(person.key).then((available) => {
+    void loadPersonProgramWorkflow(kind, person).then((result) => {
       if (!layer.isConnected || request !== sequence) return;
-      optionsHost.innerHTML = available.length
-        ? select({
-          label: 'Депозит', name: 'personProgramChoice', value: '',
-          options: [{ value: '', label: 'Выберите депозит' }, ...available],
-        })
-        : emptyState('Депозиты не найдены', 'Для этого клиента пока нет доступных депозитов.');
-      choices = new Set(available.map((item) => item.value));
       loading = false;
+      optionsHost.textContent = '';
+      if (!result) {
+        optionsHost.textContent = 'Действия с клиентом для этой программы пока недоступны.';
+        updateAction();
+        return;
+      }
+      workflow = result;
+      if (result.settings.direct === true) {
+        optionsHost.innerHTML = '';
+      } else {
+        const options = Array.isArray(result.settings.options) ? result.settings.options
+          .filter((item) => item?.value && item?.label) : [];
+        choices = new Set(options.map((item) => String(item.value)));
+        optionsHost.innerHTML = options.length
+          ? select({
+            label: result.settings.label || 'Вариант программы',
+            name: 'personProgramChoice', value: '',
+            options: [{
+              value: '', label: result.settings.placeholder || 'Выберите вариант',
+            }, ...options],
+          })
+          : emptyState(result.settings.emptyTitle || 'Нет доступных вариантов',
+            result.settings.emptyDescription || 'Создайте программу в разделе «Лояльность».');
+      }
       updateAction();
     }).catch((error) => {
       if (!layer.isConnected || request !== sequence) return;
       loading = false;
+      workflow = null;
       optionsHost.textContent = '';
-      errorHost.textContent = error instanceof Error ? error.message : 'Не удалось загрузить депозиты';
+      errorHost.textContent = error instanceof Error ? error.message : 'Не удалось загрузить программы';
       updateAction();
     });
   });
 
   action.addEventListener('click', async () => {
-    if (action.disabled || !personProgramActionTypes().some((item) => item.id === kind)) return;
-    const selectedKind = kind;
-    const choice = selectedChoice;
-    if (selectedKind === 'deposit' && !choices.has(choice)) return;
+    if (action.disabled || !workflow
+      || !personProgramActionTypes().some((item) => item.id === kind)) return;
+    if (workflow.settings.direct !== true && !choices.has(selectedChoice)) return;
     loading = true;
     updateAction();
     errorHost.textContent = '';
     try {
-      if (selectedKind === 'deposit') {
-        const { issueDepositForPerson, openAssignedDepositForPerson } = await import('./deposit/index.js');
-        if (!layer.isConnected) return;
-        if (choice.startsWith('issue:')) {
-          await issueDepositForPerson(root, person, choice.slice('issue:'.length), onChanged);
-        } else if (choice.startsWith('existing:')) {
-          await openAssignedDepositForPerson(root, person, choice.slice('existing:'.length), onChanged);
-        }
-      } else if (selectedKind === 'personal-account') {
-        const { openPersonalAccountForPerson } = await import('./personal-account/index.js');
-        if (!layer.isConnected) return;
-        await openPersonalAccountForPerson(root, person);
-      }
+      const opened = await workflow.module.openPersonProgramChoice(
+        root, person, workflow.settings.direct === true ? '' : selectedChoice, onChanged,
+      );
+      if (!opened) throw new Error('Не удалось открыть программу');
       layer.v2Close?.();
     } catch (error) {
       if (layer.isConnected) {
