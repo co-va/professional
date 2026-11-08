@@ -293,13 +293,18 @@ function workspaceProfileASlot() {
 function syncWorkspaceHeader(surface) {
   if (!surface?.isConnected) return;
   const contextRoot = activeWorkspaceSurface(surface);
-  const context = contextRoot.querySelector('[data-workspace-header-context]');
+  // Q never owns Header B. Read the title from the underlying F/Z surface,
+  // while keeping its own title within the canonical Q header.
+  const titleRoot = contextRoot.closest?.('[data-v2-q="true"]')
+    ? ([...app.querySelectorAll('[data-v2-z-layer]')].at(-1) || surface)
+    : contextRoot;
+  const context = titleRoot.querySelector('[data-workspace-header-context]');
   const root = activeRootSection();
   const fallbackTitle = state.activeSection === 'chat'
     ? 'Чат'
     : rootDefinition(root)?.label || '';
   const title = context?.dataset.workspaceTitle || sourceText(
-    contextRoot.querySelector('.page-header h1'),
+    titleRoot.querySelector('.page-header h1'),
     fallbackTitle,
   );
   const subtitle = context?.dataset.workspaceSubtitle || '';
