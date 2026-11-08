@@ -17,7 +17,7 @@ export function settingsPanel(items = []) {
 }
 
 
-export function notificationSettings(items = []) {
+export function notificationSettings(items = [], { showStatus = true } = {}) {
   return `<div class="app-notification-list">${(Array.isArray(items) ? items : []).filter(Boolean).map((item) => `
     <label class="app-notification-row${item.disabled ? ' is-disabled' : ''}">
       <input type="checkbox" ${item.data || ''} ${item.checked ? 'checked' : ''} ${item.disabled ? 'disabled' : ''}>
@@ -25,6 +25,6 @@ export function notificationSettings(items = []) {
         ? item.labelLines.map((line) => `<span class="app-notification-row__label-line">${text(line)}</span>`).join(' ')
         : text(item.label || '')}</strong>${item.description ? `<small>${text(item.description)}</small>` : ''}</span>
     </label>`).join('')}
-    <div class="muted" data-notification-status></div>
+    ${showStatus ? '<div class="muted" data-notification-status></div>' : ''}
   </div>`;
 }
