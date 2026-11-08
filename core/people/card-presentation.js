@@ -1,6 +1,7 @@
 import { normalizeEntityCardAppearance } from '../../ui/ui.js';
 import { getCardAppearanceTemplate } from '../card-appearance-templates.js';
 import { getPersonMetadata, formatPersonVisitDate } from './metadata.js';
+import { telegramDisplay } from './telegram-usernames.js';
 
 function first(values = []) {
   return String(Array.isArray(values) ? (values[0] || '') : '');
@@ -36,7 +37,7 @@ export function personCardFields(person = {}) {
     { value: 'surname', label: 'Фамилия', text: person.surname || '' },
     { value: 'phone', label: 'Телефон', text: first(person.phones) },
     { value: 'email', label: 'Email', text: first(person.emails) },
-    { value: 'telegram', label: 'Telegram', text: first(person.telegrams) },
+    { value: 'telegram', label: 'Telegram', text: telegramDisplay(first(person.telegrams)) },
     { value: 'birthDate', label: 'Дата рождения', text: person.birthDate || '' },
     { value: 'discount', label: 'Скидка', text: person.discountPercent ? `${Number(person.discountPercent)}%` : '' },
     { value: 'recordCount', label: 'Количество записей', text: String(meta.recordCount || 0) },
