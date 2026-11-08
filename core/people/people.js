@@ -26,7 +26,6 @@ import {
   repeatedField,
   select,
   setV2ZHeaderRows,
-  shortDate,
   shortDateTime,
   tags,
   uei,
@@ -49,6 +48,7 @@ import { personDisplay } from './presentation.js';
 import { personCardAppearance, personCardFields } from './card-presentation.js';
 import { getCurrentPersonHistory, getPersonHistory } from './history.js';
 import { getPersonMetadata } from './metadata.js';
+import { getRecord } from '../record/index.js';
 import { getCardAppearanceTemplate, saveCardAppearanceTemplate } from '../card-appearance-templates.js';
 import { getPeopleFilters, getPeopleSortMode, setPeopleFilters, setPeopleSortMode } from './view-state.js';
 import { buildPersonRelationshipSections } from './programs.js';
@@ -278,58 +278,6 @@ function personQContext(person, { settings = true } = {}) {
   });
 }
 
-function durationLabel(minutes = 0) {
-  const value = Math.max(0, Math.round(Number(minutes) || 0));
-  if (!value) return '—';
-  const hours = Math.floor(value / 60);
-  const rest = value % 60;
-  if (!hours) return `${rest} мин`;
-  if (!rest) return `${hours} ч`;
-  return `${hours} ч ${rest} мин`;
-}
-
-function paymentStateLabel(item = {}) {
-  if (item.paymentState === 'paid') return 'Оплачено';
-  if (item.paymentState === 'partial') return 'Частично оплачено';
-  if (item.paymentState === 'unpaid') return 'К оплате';
-  return '—';
-}
-
-function recordHistoryDetail(item = {}) {
-  const recordBlock = v2Section('Запись', details([
-    { label: 'Процедуры', value: item.procedures?.join(', ') || item.products?.join(', ') || item.title || '—' },
-    { label: 'Запись создана', value: shortDateTime(item.createdAt, '—') },
-    ...(item.provenance?.type === 'import' ? [{ label: 'Происхождение', value: 'Импорт' }, { label: 'Перенесено в CO-VA', value: shortDateTime(item.recordedAt, '—') }] : []),
-    { label: 'Дата посещения', value: shortDate(item.appointmentDate, '—') },
-    { label: 'Время', value: [item.from, item.to].filter(Boolean).join(' — ') || '—' },
-    { label: 'Продолжительность', value: durationLabel(item.durationMinutes) },
-    { label: 'Статус', value: item.subtitle || '—' },
-  ]));
-
-  const paymentRows = (Array.isArray(item.payments) ? item.payments : []).map((payment, index) => v2Section(
-    item.payments.length > 1 ? `Оплата ${index + 1}` : 'Оплата',
-    details([
-      { label: 'Дата оплаты', value: shortDateTime(payment.occurredAt, '—') },
-      { label: 'Сумма', value: money(payment.total) },
-    ]),
-  )).join('');
-  const refundRows = (Array.isArray(item.refunds) ? item.refunds : []).map((refund, index) => v2Section(
-    item.refunds.length > 1 ? `Возврат ${index + 1}` : 'Возврат',
-    details([
-      { label: 'Дата возврата', value: shortDateTime(refund.occurredAt, '—') },
-      { label: 'Сумма', value: money(refund.total) },
-    ]),
-  )).join('');
-  const paymentSummary = (item.payments?.length || item.refunds?.length || item.planTotal > 0)
-    ? v2Section('Итог оплаты', details([
-      { label: 'Статус', value: paymentStateLabel(item) },
-      { label: 'Оплачено', value: money(item.paidAmount) },
-      { label: 'К оплате', value: item.due == null ? 'Не указано' : money(item.due) },
-    ]))
-    : '';
-  return `${recordBlock}${paymentRows}${refundRows}${paymentSummary}`;
-}
-
 function financeHistoryDetail(item = {}) {
   return v2Section('Операция', details([
     { label: 'Операция', value: item.title || 'Финансовая операция' },
@@ -340,9 +288,27 @@ function financeHistoryDetail(item = {}) {
   ]));
 }
 
-function openPersonHistoryItemQ(root, person, item, options = {}) {
-  const body = item.kind === 'record' ? recordHistoryDetail(item) : financeHistoryDetail(item);
-  const layer = mountModal(root, modal(`${personQContext(person)}${body}`, {
+async function openPersonHistoryItemQ(root, person, item, options = {}) {
+  if (item.kind === 'record') {
+    const current = getRecord(item.recordId);
+    const snapshot = item.recordSnapshot || null;
+    const record = current || (snapshot?.id ? {
+      ...snapshot,
+      // Deleted/history-only records retain their original Record values.
+      person: snapshot.person?.key ? snapshot.person : person,
+    } : null);
+    if (!record?.id) return null;
+    const { openRecordView } = await import('../records/view.js');
+    if (root?.isConnected === false) return null;
+    // Do not stack the old contact Q preview on the shared Record view.
+    root?.v2Close?.();
+    return openRecordView(record, {
+      readOnlyHistory: !current,
+      onClose: () => { void openPersonHistoryQ(document.body, person, options); },
+    });
+  }
+  // Financial events have their own information, not a Record preview.
+  const layer = mountModal(root, modal(`${personQContext(person)}${financeHistoryDetail(item)}`, {
     title: name(person),
     variant: 'q',
     surface: 'app',
@@ -378,7 +344,7 @@ export async function openPersonHistoryQ(root, person, options = {}) {
     host?.querySelectorAll('[data-person-history-item]').forEach((node) => {
       node.addEventListener('click', () => {
         const item = items[Number(node.dataset.personHistoryItem)];
-        if (item) openPersonHistoryItemQ(layer, person, item, options);
+        if (item) void openPersonHistoryItemQ(layer, person, item, options);
       });
     });
   };
