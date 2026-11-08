@@ -1,7 +1,6 @@
 import { actionBlock } from '../page/page.js';
 import { button } from '../buttons/index.js';
 import { escapeHtml } from '../utils/escape-html.js';
-import { workspaceHeaderContext } from '../header/index.js';
 import { modal, mountModal } from '../modals/index.js';
 import { select } from '../selectors/index.js';
 import { mountEntityCardConstructor } from './entity-card-constructor.js';
@@ -64,9 +63,8 @@ export function openEntityCardAppearanceQ(root, {
 
     // The Q Header owns the card-type controls; the Q Body owns the sole preview.
     // No duplicate preview is mounted into the Header.
-    headerHost.innerHTML = `<div class="entity-card-appearance-q__selectors">${typeSelector}${targetSelector}</div>`;
-    host.innerHTML = `${workspaceHeaderContext({ title })}
-      <div data-entity-card-appearance-constructor></div>
+    headerHost.innerHTML = `<h2 class="v2-q-title">${escapeHtml(title)}</h2><div class="entity-card-appearance-q__selectors">${typeSelector}${targetSelector}</div>`;
+    host.innerHTML = `<div data-entity-card-appearance-constructor></div>
       ${actionBlock(button('Сохранить', {
         data: 'data-card-q-save',
         aria: 'Сохранить вид карты',
