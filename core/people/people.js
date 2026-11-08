@@ -385,9 +385,6 @@ function recordFilterPersonKeys({ procedure = '', workplace = '', recordPeriod =
   const workplaceKeys = workplace ? new Set() : null;
   const recordDates = recordPeriod ? new Map() : null;
   if (!procedureKeys && !workplaceKeys && !recordDates) return { procedureKeys, workplaceKeys, recordDates };
-  const today = new Date();
-  const todayDate = [today.getFullYear(), String(today.getMonth() + 1).padStart(2, '0'),
-    String(today.getDate()).padStart(2, '0')].join('-');
   for (const record of getRecords()) {
     if (record?.status === 'cancelled') continue;
     const procedureMatch = procedureKeys
