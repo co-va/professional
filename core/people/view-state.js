@@ -9,8 +9,7 @@ const DEFAULT_FILTERS = Object.freeze({
   procedure: '',
   workplace: '',
   noEmail: '',
-  noVisits: '',
-  visitMonths: '',
+  recordPeriod: '',
 });
 
 export function getPeopleSortMode() {
@@ -29,7 +28,13 @@ export function getPeopleFilters() {
     const value = JSON.parse(localStorage.getItem(FILTER_KEY) || '{}');
     const stored = value && typeof value === 'object' ? value : {};
     const result = Object.fromEntries(Object.keys(DEFAULT_FILTERS).map((key) => [key, String(stored[key] || '')]));
-    // Earlier versions used 'month' for the current month. Preserve that selection.
+    // Migrate saved visit-filter settings without changing the user's active selection.
+    if (!result.recordPeriod && stored.noVisits === 'recent') {
+      const months = Math.max(1, Math.min(6, Math.floor(Number(stored.visitMonths) || 1)));
+      result.recordPeriod = String(months * 30);
+    } else if (!result.recordPeriod && stored.noVisits === 'yes') {
+      result.recordPeriod = 'none';
+    }
     if (result.birthday === 'month') result.birthday = String(new Date().getMonth() + 1);
     return result;
   } catch {
