@@ -230,14 +230,16 @@ export function openRecordView(record, {
 } = {}) {
   if (!record?.id) return null;
 
-  // Historical Record snapshots render through the standard viewer without editing V.
-  const capabilities = readOnlyHistory
+  const useQ = presentation === 'q';
+  // Reuse the same preview while respecting the opening container:
+  // Q from contact History cannot open that same History Q again.
+  const baseCapabilities = readOnlyHistory
     ? { ...RECORD_VIEW_CAPABILITIES.account, contactIdentity: true }
     : recordViewCapabilities(context);
+  const capabilities = useQ ? { ...baseCapabilities, personHistory: false } : baseCapabilities;
   const professionalDisplay = accountProfessionalDisplay(professional);
   let currentRecord = readOnlyHistory ? record : (getRecord(record.id) || record);
   let startTimer = null;
-  const useQ = presentation === 'q';
   const layer = (useQ ? mountRecordQ : mountRecordZ)({
     settings: capabilities.settings,
     title: useQ ? 'Запись' : capabilities.contactIdentity
