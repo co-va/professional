@@ -54,4 +54,6 @@
 /* Reusable two-field row: keep both date controls on one line, including narrow iPhones. */
 .form-grid--two{grid-template-columns:repeat(2,minmax(0,1fr))}
 .form-grid--two>.field{min-width:0}
-.form-grid--two>.field input[type="date"]{box-sizing:border-box;min-width:0;padding-inline:6px}
+.form-grid--two>[data-date-picker]>span:empty{display:none}
+.form-grid--two>[data-date-picker] .ui-select__control{box-sizing:border-box;width:100%;min-width:0;padding-inline:9px 20px}
+.form-grid--two>[data-date-picker] .ui-select__value{white-space:nowrap;overflow:hidden;text-overflow:clip}
