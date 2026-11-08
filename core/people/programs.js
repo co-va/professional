@@ -49,6 +49,11 @@ function statusLabel(value = '') {
   return 'Активно';
 }
 
+// Keep all summary panels on the same shared vertical rhythm as titled sections.
+function detailsSection(rows) {
+  return `<section class="v2-section">${details(rows)}</section>`;
+}
+
 function historyList(items = [], emptyText = 'Истории пока нет') {
   if (!items.length) return emptyState(emptyText, 'Движения появятся после использования.');
   return v2ListEntries(items.map((item) => v2ListEntry({
@@ -75,7 +80,7 @@ function personalAccountDetail(account, loadError = '') {
     subtitle: shortDateTime(item.occurredAt, '—'),
     rightTop: money(item.outstandingAmount || item.originalAmount),
   }));
-  return `${details([
+  return `${detailsSection([
     { label: 'Денежный остаток', value: money(value.balance) },
     { label: 'Задолженность', value: money(value.debtTotal) },
     { label: 'Можно оплатить со счёта', value: `${Math.max(0, Math.min(100, Number(value.spendLimitPercent ?? 100) || 0))}%` },
@@ -118,7 +123,7 @@ function depositDetail(deposit = {}) {
     subtitle: shortDateTime(item.occurredAt, '—'),
     rightTop: `${String(item.direction || '').toUpperCase() === 'IN' ? '+' : '−'}${money(item.amount)}`,
   }));
-  return `${details(rows)}${v2Section('История', historyList(history, 'Истории депозита пока нет'))}`;
+  return `${detailsSection(rows)}${v2Section('История', historyList(history, 'Истории депозита пока нет'))}`;
 }
 
 function certificateCard({ instance, program }) {
@@ -141,7 +146,7 @@ function certificateDetail({ instance = {}, program = {} }) {
     subtitle: shortDateTime(item.occurredAt, '—'),
     rightTop: item.amount ? `−${money(item.amount)}` : '',
   }));
-  return `${details([
+  return `${detailsSection([
     { label: 'Сертификат', value: program.name || '—' },
     { label: 'Дата оформления', value: shortDateTime(instance.issuedAt, '—') },
     { label: 'Исходное право', value: program.type === 'amount' ? money(instance.initialValue) : (program.service || 'Право по программе') },
@@ -173,7 +178,7 @@ function subscriptionDetail({ instance = {}, program = {} }) {
     subtitle: shortDateTime(item.occurredAt, '—'),
     rightTop: item.procedure || '',
   }));
-  return `${details([
+  return `${detailsSection([
     { label: 'Абонемент', value: program.name || '—' },
     { label: 'Дата оформления', value: shortDateTime(instance.issuedAt, '—') },
     { label: 'Использовано', value: String(Math.max(0, Number(instance.used || 0))) },
@@ -294,7 +299,7 @@ function financeDetail(entity, kind) {
     subtitle: shortDateTime(item.occurredAt, '—'),
     rightTop: money(item.amount || item.total),
   }));
-  return `${details(rows)}${v2Section('История', historyList(history, 'Истории пока нет'))}`;
+  return `${detailsSection(rows)}${v2Section('История', historyList(history, 'Истории пока нет'))}`;
 }
 
 function personFinanceEntities(person = {}) {
