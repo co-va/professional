@@ -254,9 +254,9 @@ export async function offerAccountEmailVerificationReminder(account = {}) {
     const content = `<div class="modal-title">
       <h2>Подтвердите email</h2>
       <p>Подтвердите адрес <strong>${escapeHtml(accountEmail || 'вашей учётной записи')}</strong>, чтобы получать сервисные письма платформы и восстанавливать пароль.</p>
-      <p>Откройте письмо с подтверждением. Если его нет, проверьте папку «Спам». Если адрес указан неверно, исправьте его.</p>
+      <p>Если письмо уже приходило, проверьте почту и папку «Спам». Новое письмо отправляется только по нажатию «Отправить повторно». Неверный адрес можно исправить.</p>
     </div>
-    <p class="muted" data-email-verification-reminder-status role="status" aria-live="polite">Проверяем отправку письма…</p>
+    <p class="muted" data-email-verification-reminder-status role="status" aria-live="polite">Автоматическая отправка писем отключена.</p>
     <div class="modal-actions">
       ${button('Исправить email', { variant: 'outline', data: 'data-email-verification-change' })}
       ${button('Отправить повторно', { variant: 'outline', data: 'data-email-verification-resend' })}
@@ -300,8 +300,6 @@ export async function offerAccountEmailVerificationReminder(account = {}) {
       layer.v2Close?.();
     });
     resend?.addEventListener('click', () => void send());
-    // The first verification attempt runs after entry, never before the workspace.
-    void send();
     return layer;
   } catch {
     // Verification must not block login. Retry on a later entry.
