@@ -52,6 +52,7 @@ import {
   updateWallet,
 } from './data.js';
 import { cashEntityCardAppearance, cashEntityCardFields, cashEntityCardPhoto, walletCardAppearance, walletCardFields, walletCardPhoto } from './card-presentation.js';
+import { recoverMissingWalletsFromFinanceHistory } from './recovery.js';
 import { getCardAppearanceTemplate, saveCardAppearanceTemplate } from '../../card-appearance-templates.js';
 import {
   getInvestmentEntities,
@@ -1580,9 +1581,24 @@ function openOperationSettings(root, walletLayer, operationLayer, wallet, operat
   });
 }
 
-export function renderWallets(root, options = {}) {
+export async function renderWallets(root, options = {}) {
   cashRuntimeOptions = options && typeof options === 'object' ? options : {};
+  let recovered = [];
+  let error = '';
+  try {
+    const result = await recoverMissingWalletsFromFinanceHistory();
+    recovered = result?.recovered || [];
+    if (result?.status === 'changed') error = 'Список кошельков изменился во время проверки. Восстановление не выполнялось.';
+    if (result?.status === 'not-found') error = 'В финансовых операциях не удалось определить названия отсутствующих кошельков.';
+  } catch (caught) {
+    error = String(caught?.message || 'Не удалось проверить сохранность кошельков');
+  }
   renderList(root);
+  if (recovered.length) {
+    openNotice({ title: 'Кошельки', message: `Восстановлено: ${recovered.map((item) => item.name).join(', ')}` });
+  } else if (error) {
+    openNotice({ title: 'Кошельки', message: error });
+  }
 }
 
 export { renderWallets as render };
