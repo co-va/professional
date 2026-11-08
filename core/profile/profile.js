@@ -3,7 +3,7 @@ import { canUseCapability, getAccess, getLimit, loadAccess, requestLiveMode } fr
 import { changePassword, logout } from '../../core/auth.js';
 import { getProfessionCatalog, getProfile, saveProfile as saveProfileData } from './data.js';
 import { getWorkplaces, saveWorkplaces, upsertWorkplace } from './workplaces/data.js';
-import { bindWorkplaceForm, openWorkplaceSettingsMenu, workplaceForm } from './workplaces/workplaces.js';
+import { bindWorkplaceForm, workplaceForm } from './workplaces/workplaces.js';
 import { profileCardAppearance, profileCardFields, workplaceCardAppearance, workplaceCardFields, workplaceCardPhoto } from './card-presentation.js';
 import { getCardAppearanceTemplate, saveCardAppearanceTemplate } from '../../core/card-appearance-templates.js';
 import { loadProfileState } from './runtime.js';
@@ -252,7 +252,7 @@ function openProfileSettings(root,navigateBack,options={}){
 function openWorkplaceQ(root,existing,navigateBack,options={}){
   const current=existing||{name:'',photo:'',photoCropX:50,photoCropY:50};
   const title=existing?.name||'Новое рабочее пространство';
-  // Profile and workplace data share a Q editing surface. The V menu holds actions only.
+  // Profile and workplace data share Q; workplace visibility and deletion live in its form.
   const layer=mountModal(root,modal(page([
     workspaceHeaderContext({
       title,
@@ -262,7 +262,6 @@ function openWorkplaceQ(root,existing,navigateBack,options={}){
         imagePosition:`${crop(current.photoCropX)}% ${crop(current.photoCropY)}%`,
         initials:(current.name||'?').slice(0,1).toUpperCase(),
       },
-      v:{data:'data-workplace-settings',aria:'Настройки пространства'},
     }),
     workplaceForm(existing,{sourceOnly:true}),
   ]),{
@@ -276,7 +275,6 @@ function openWorkplaceQ(root,existing,navigateBack,options={}){
     layer.v2Close?.();
     renderProfile(root,navigateBack,options);
   };
-  layer.querySelector('[data-workplace-settings]')?.addEventListener('click',()=>openWorkplaceSettingsMenu(layer,existing,{onDeleted:closeAndRender}));
   bindWorkplaceForm(layer,existing,{
     onSaved:closeAndRender,
     onDeleted:closeAndRender,
