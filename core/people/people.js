@@ -741,7 +741,7 @@ async function renderPersonOverview(layer, baseRoot, key, options = {}) {
   bindPersonContext(layer, person, options);
   relationships.bind(layer, (detail) => openPersonRelationshipQ(baseRoot, person, detail, options));
   layer.querySelector('[data-person-card]')?.addEventListener('click', () => {
-    openPersonEdit(layer, baseRoot, person.key, options, {
+    openPersonEdit(baseRoot, person.key, {
       onSaved: (nextKey) => void renderPersonOverview(layer, baseRoot, nextKey || person.key, options),
       onDeleted: () => {
         layer.v2Close?.();
@@ -951,7 +951,7 @@ function confirmDelete(root, person, onDeleted) {
   });
 }
 
-function openPersonEdit(parentLayer, baseRoot, key, options = {}, callbacks = {}) {
+function openPersonEdit(baseRoot, key, callbacks = {}) {
   const person = getAllPeople().find((item) => item.key === key);
   if (!person) return null;
   const all = getAllPeople();
@@ -1009,7 +1009,6 @@ function openPersonEdit(parentLayer, baseRoot, key, options = {}, callbacks = {}
   form?.addEventListener('input', syncAction);
   form?.addEventListener('change', syncAction);
   form?.addEventListener('submit', (event) => { event.preventDefault(); save(); });
-  bindPersonContext(layer, person, options);
   syncAction();
   return layer;
 }
