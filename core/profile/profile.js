@@ -114,7 +114,7 @@ function openProfileData(root,navigateBack,options={}){
     .map(value=>[value.toLowerCase(),value])).values()];
   return openSharedProfileDataEditor({
     root,
-    header:profileContext(current,'Данные профиля',{includeSettings:false}),
+    title:'Данные профиля',
     fields:profileDataFields(current,emails),
     read:collectProfileData,
     validate:(values)=>!values.name||!values.phones.length||!values.profession
@@ -250,22 +250,9 @@ function openProfileSettings(root,navigateBack,options={}){
 }
 
 function openWorkplaceQ(root,existing,navigateBack,options={}){
-  const current=existing||{name:'',photo:'',photoCropX:50,photoCropY:50};
-  const title=existing?.name||'Новое рабочее пространство';
-  // Profile and workplace data share Q; workplace visibility and deletion live in its form.
-  const layer=mountModal(root,modal(page([
-    workspaceHeaderContext({
-      title,
-      a:{
-        kind:'avatar',
-        image:current.photo||'',
-        imagePosition:`${crop(current.photoCropX)}% ${crop(current.photoCropY)}%`,
-        initials:(current.name||'?').slice(0,1).toUpperCase(),
-      },
-    }),
-    workplaceForm(existing),
-  ]),{
-    title:'',
+  // The F profile owns Header B. Q owns only its canonical in-sheet title.
+  const layer=mountModal(root,modal(workplaceForm(existing),{
+    title:'Рабочее пространство',
     variant:'q',
     surface:'app',
     className:'v2-workplace-data-layer',
