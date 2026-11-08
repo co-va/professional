@@ -300,11 +300,11 @@ async function openPersonHistoryItemQ(root, person, item, options = {}) {
     if (!record?.id) return null;
     const { openRecordView } = await import('../records/view.js');
     if (root?.isConnected === false) return null;
-    // Do not stack the old contact Q preview on the shared Record view.
-    root?.v2Close?.();
+    // History stays Q1; the canonical Record preview opens as Q2 above it.
+    // Closing Q2 reveals the same history Q without another network request.
     return openRecordView(record, {
+      presentation: 'q',
       readOnlyHistory: !current,
-      onClose: () => { void openPersonHistoryQ(document.body, person, options); },
     });
   }
   // Financial events have their own information, not a Record preview.
