@@ -849,8 +849,8 @@ function personDataFields(person, all) {
     v2Section('Контактные данные',
       repeatedField({ label: 'Телефон', name: 'phones', values: businessEntries(person, all, 'phones'), type: 'tel', addInHeader: true })
       + repeatedField({ label: 'Telegram', name: 'telegrams', values: businessEntries(person, all, 'telegrams'), addInHeader: true })
-      + repeatedField({ label: 'Email', name: 'emails', values: businessEntries(person, all, 'emails'), type: 'email', addInHeader: true })),
-    `<section class="v2-section">${links({ links: person.links || [], name: 'person-links', label: 'Ссылки', compact: true, addInHeader: true })}</section>`,
+      + repeatedField({ label: 'Email', name: 'emails', values: businessEntries(person, all, 'emails'), type: 'email', addInHeader: true })
+      + links({ links: person.links || [], name: 'person-links', label: 'Ссылки', compact: true, addInHeader: true })),
     v2Section('Ярлыки', tags({ tags: getTags(), selected: person.tags || [], name: 'person-tags' })),
   ].join('');
 }
