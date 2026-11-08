@@ -220,7 +220,7 @@ function personHistoryMarkup(items = [], query = '') {
   })));
 }
 
-function personQContext(person, { settings = true } = {}) {
+function personQContext(person, { settings = false } = {}) {
   return workspaceHeaderContext({
     title: name(person),
     a: {
@@ -334,6 +334,7 @@ function openPersonSettings(root, person, options = {}) {
     ${button('Документы', { variant: 'secondary', data: 'data-person-settings-documents' })}
     ${button('История', { variant: 'secondary', data: 'data-person-settings-history' })}
     ${button('Записать', { data: 'data-person-settings-record' })}
+    ${button('Удалить', { variant: 'critical', data: 'data-person-settings-delete' })}
   </div>`, {
     title: 'Настройки',
     variant: 'x',
@@ -352,6 +353,10 @@ function openPersonSettings(root, person, options = {}) {
   layer.querySelector('[data-person-settings-record]')?.addEventListener('click', () => {
     layer.v2Close?.();
     openPersonRecordCreation({ person });
+  });
+  layer.querySelector('[data-person-settings-delete]')?.addEventListener('click', () => {
+    layer.v2Close?.();
+    confirmDelete(root, person, () => options.onDeleted?.());
   });
   return layer;
 }
@@ -801,7 +806,7 @@ function openCreateX(root, options = {}, preset = {}) {
 }
 
 function personContext(person) {
-  return personQContext(person);
+  return personQContext(person, { settings: true });
 }
 
 function bindPersonContext(root, person, options = {}) {
@@ -842,22 +847,24 @@ async function renderPersonOverview(layer, baseRoot, key, options = {}) {
     relationships.markup,
   ]);
   setV2ZHeaderRows(layer, []);
-  bindPersonContext(layer, person, options);
+  bindPersonContext(layer, person, {
+    ...options,
+    onDeleted: () => {
+      layer.v2Close?.();
+      renderPeople(baseRoot, options);
+    },
+  });
   relationships.bind(layer, (detail) => openPersonRelationshipQ(baseRoot, person, detail, options));
   layer.querySelector('[data-person-card]')?.addEventListener('click', () => {
     openPersonEdit(baseRoot, person.key, {
       onSaved: (nextKey) => void renderPersonOverview(layer, baseRoot, nextKey || person.key, options),
-      onDeleted: () => {
-        layer.v2Close?.();
-        renderPeople(baseRoot, options);
-      },
     });
   });
   notifyContext();
 }
 
 function openPersonRelationshipQ(root, person, detail, options = {}) {
-  const layer = mountModal(root, modal(`${personQContext(person, { settings: detail?.settings !== false })}${detail?.body || ''}`, {
+  const layer = mountModal(root, modal(`${personQContext(person)}${detail?.body || ''}`, {
     title: detail?.title || name(person),
     variant: 'q',
     surface: 'app',
@@ -1071,7 +1078,6 @@ function openPersonEdit(baseRoot, key, callbacks = {}) {
   const all = getAllPeople();
   const layer = mountModal(baseRoot, modal(`<form data-person-edit-form>
     ${personDataFields(person, all)}
-    ${button('Удалить', { type: 'button', variant: 'critical', data: 'data-person-delete' })}
     <div class="form-error" data-person-edit-error></div>
     ${actionBlock(button('Сохранить', { type: 'button', data: 'data-person-q-save', aria: 'Сохранить изменения' }))}
   </form>`, {
@@ -1130,12 +1136,6 @@ function openPersonEdit(baseRoot, key, callbacks = {}) {
   };
 
   action?.addEventListener('click', save);
-  layer.querySelector('[data-person-delete]')?.addEventListener('click', () => {
-    confirmDelete(layer, person, () => {
-      layer.v2Close?.();
-      callbacks.onDeleted?.();
-    });
-  });
   form?.addEventListener('input', syncAction);
   form?.addEventListener('change', syncAction);
   form?.addEventListener('submit', (event) => { event.preventDefault(); save(); });
