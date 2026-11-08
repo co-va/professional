@@ -6,6 +6,16 @@ const SYSTEM_WALLETS = [
   { id: 'cashless', name: 'Безналичные', photo: '', system: true },
 ];
 let walletsState = [];
+let walletsHydrated = false;
+
+// A cold/partial read must never create a persisted replacement for an
+// existing tenant wallet catalog. The server is the source of truth.
+if (typeof window !== 'undefined') {
+  window.addEventListener('professional:auth-logout', () => {
+    walletsState = [];
+    walletsHydrated = false;
+  });
+}
 
 function clone(value) {
   return value == null ? value : JSON.parse(JSON.stringify(value));
@@ -16,27 +26,29 @@ function readRaw() {
 }
 
 function write(value) {
-  walletsState = Array.isArray(value) ? clone(value) : [];
+  if (!walletsHydrated) throw new Error('Кошельки ещё не загружены с сервера');
+  if (!Array.isArray(value)) throw new Error('Некорректные данные кошельков');
+  walletsState = clone(value);
   void queueAuxiliaryDataset('wallets', walletsState);
 }
 
 export function hydrateWalletsFromServer(value = []) {
-  walletsState = Array.isArray(value) ? clone(value) : [];
+  if (!Array.isArray(value)) throw new Error('Сервер вернул некорректный список кошельков');
+  walletsState = clone(value);
+  walletsHydrated = true;
   return clone(walletsState);
 }
 
 export function getWallets() {
+  if (!walletsHydrated) return [];
   const stored = readRaw();
-  if (!stored.length) {
-    write(SYSTEM_WALLETS);
-    return SYSTEM_WALLETS.map((wallet) => ({ ...wallet }));
-  }
   const ids = new Set(stored.map((wallet) => String(wallet?.id || '')));
+  // System wallets are virtual defaults until the user explicitly saves a
+  // wallet change; merely viewing Finance, Loyalty or Person must never write.
   const withSystem = [
     ...SYSTEM_WALLETS.filter((wallet) => !ids.has(wallet.id)),
     ...stored,
   ];
-  if (withSystem.length !== stored.length) write(withSystem);
   return withSystem.filter((wallet) => !wallet.deletedAt).map((wallet) => ({ ...wallet }));
 }
 
