@@ -7,8 +7,8 @@ function normalizeItems(values) {
   return values
     .filter(value => value !== null && value !== undefined)
     .map(value => typeof value === 'object' && value !== null
-      ? { value: String(value.value ?? ''), source: String(value.source ?? '') }
-      : { value: String(value), source: '' });
+      ? { value: String(value.value ?? ''), source: String(value.source ?? ''), display: typeof value.display === 'string' ? value.display : null }
+      : { value: String(value), source: '', display: null });
 }
 
 export function repeatedField({
@@ -37,6 +37,7 @@ export function repeatedField({
     type,
     value:item.value,
     source:item.source,
+    display:item.display,
     placeholder,
     label,
     action:addInHeader ? (index === 0 ? 'none' : 'remove') : (index === 0 ? 'add' : 'remove'),
@@ -44,13 +45,15 @@ export function repeatedField({
   return `<div class="array-group ${escapeHtml(className)}" data-repeated-field data-repeated-name="${escapeHtml(name)}" data-repeated-label="${escapeHtml(label)}" data-repeated-type="${escapeHtml(type)}" data-repeated-placeholder="${escapeHtml(placeholder)}" data-repeated-add-placement="${addInHeader ? 'header' : 'row'}">${header}<div data-repeated-list>${rowMarkup}</div></div>`;
 }
 
-function repeatedRow({ name, type, value = '', source = '', placeholder, label = '', action = 'remove' }) {
+function repeatedRow({ name, type, value = '', source = '', display = null, placeholder, label = '', action = 'remove' }) {
   const sourceMarkup = source ? ` data-repeated-source="${escapeHtml(source)}"` : '';
   const removeLabel = label ? `Удалить ${label}` : 'Удалить значение';
   const addLabel = label ? `Добавить ${label}` : 'Добавить значение';
-  const inputMarkup = type === 'tel'
-    ? phoneInput({ name, value, aria: label || 'Телефон' })
-    : `<input type="${escapeHtml(type)}" name="${escapeHtml(name)}" value="${escapeHtml(value)}" placeholder="${escapeHtml(placeholder)}">`;
+  const inputMarkup = typeof display === 'string'
+    ? `<input type="hidden" name="${escapeHtml(name)}" value="${escapeHtml(value)}"><input type="text" value="${escapeHtml(display)}" data-repeated-identity-alias="${escapeHtml(value)}" aria-label="${escapeHtml(label)}" readonly>`
+    : type === 'tel'
+      ? phoneInput({ name, value, aria: label || 'Телефон' })
+      : `<input type="${escapeHtml(type)}" name="${escapeHtml(name)}" value="${escapeHtml(value)}" placeholder="${escapeHtml(placeholder)}">`;
   const control = action === 'add'
     ? button('+', { className:'array-row__add', data:`data-repeated-add="${escapeHtml(name)}"`, aria:addLabel })
     : action === 'remove'
