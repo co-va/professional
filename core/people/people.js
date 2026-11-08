@@ -501,9 +501,8 @@ function openSortSettings(root) {
   return layer;
 }
 
-function openFilterSettings(root) {
-  const filters = getPeopleFilters();
-  const content = `<div class="form-grid">
+function peopleFilterFields(filters = {}) {
+  return `<div class="form-grid">
     ${select({ label: 'Пол', name: 'peopleGenderFilter', value: filters.gender, options: [
       { value: '', label: 'Любой' }, { value: 'female', label: 'Женский' }, { value: 'male', label: 'Мужской' }, { value: 'none', label: 'Не указан' },
     ] })}
@@ -518,22 +517,62 @@ function openFilterSettings(root) {
     ${select({ label: 'Почта', name: 'peopleNoEmailFilter', value: filters.noEmail, options: [{ value: '', label: 'Все' }, { value: 'yes', label: 'Без почты' }] })}
     ${select({ label: 'Посещения', name: 'peopleNoVisitsFilter', value: filters.noVisits, options: [{ value: '', label: 'Все' }, { value: 'yes', label: 'Без посещений' }] })}
   </div>`;
-  const layer = mountModal(root, modal(content, { title: 'Фильтр', variant: 'x', surface: 'app' }));
+}
+
+function openFilterSettings(root) {
+  let applied = getPeopleFilters();
+  let draft = { ...applied };
+  const hasFilters = (filters) => Object.values(filters).some(Boolean);
+  const sameFilters = (left, right) => Object.keys(applied).every((key) => String(left[key] || '') === String(right[key] || ''));
+  const layer = mountModal(root, modal(`
+    <div data-people-filter-fields>${peopleFilterFields(draft)}</div>
+    <div class="modal-actions" data-people-filter-actions hidden>
+      ${button('Применить', { data: 'data-people-filter-action' })}
+    </div>`, { title: 'Фильтр', variant: 'x', surface: 'app' }));
   if (!layer) return null;
-  const sync = () => {
-    setPeopleFilters({
-      gender: layer.querySelector('[name="peopleGenderFilter"]')?.value || '',
-      birthday: layer.querySelector('[name="peopleBirthdayFilter"]')?.value || '',
-      tag: layer.querySelector('[name="peopleTagFilter"]')?.value || '',
-      procedure: layer.querySelector('[name="peopleProcedureFilter"]')?.value || '',
-      noEmail: layer.querySelector('[name="peopleNoEmailFilter"]')?.value || '',
-      noVisits: layer.querySelector('[name="peopleNoVisitsFilter"]')?.value || '',
-    });
-    refreshPeopleList(root);
+  const action = layer.querySelector('[data-people-filter-action]');
+  const actions = layer.querySelector('[data-people-filter-actions]');
+
+  const updateAction = () => {
+    const changed = !sameFilters(draft, applied);
+    const reset = !changed && hasFilters(applied);
+    actions.hidden = !changed && !reset;
+    action.textContent = changed ? 'Применить' : 'Сбросить';
+    action.classList.toggle('ui-button--secondary', reset);
   };
+
+  // Changes are drafts until the only action button is pressed.
   layer.addEventListener('change', (event) => {
-    if (event.target?.matches?.('[name^="people"][name$="Filter"]')) sync();
+    const keyByName = {
+      peopleGenderFilter: 'gender',
+      peopleBirthdayFilter: 'birthday',
+      peopleTagFilter: 'tag',
+      peopleProcedureFilter: 'procedure',
+      peopleNoEmailFilter: 'noEmail',
+      peopleNoVisitsFilter: 'noVisits',
+    };
+    const key = keyByName[event.target?.name];
+    if (!key) return;
+    draft[key] = String(event.target.value || '');
+    updateAction();
   });
+
+  action.addEventListener('click', () => {
+    if (!sameFilters(draft, applied)) {
+      applied = setPeopleFilters(draft);
+      refreshPeopleList(root);
+      layer.v2Close?.();
+      return;
+    }
+    if (!hasFilters(applied)) return;
+    applied = setPeopleFilters({});
+    draft = { ...applied };
+    const fields = layer.querySelector('[data-people-filter-fields]');
+    if (fields) fields.innerHTML = peopleFilterFields(draft);
+    refreshPeopleList(root);
+    updateAction();
+  });
+
   if (!hasCurrentProceduresSnapshot()) {
     void loadRecordCreationOperationalState().then(() => {
       if (!layer.isConnected) return;
@@ -542,7 +581,7 @@ function openFilterSettings(root) {
       host.innerHTML = select({
         label: 'Процедура',
         name: 'peopleProcedureFilter',
-        value: getPeopleFilters().procedure,
+        value: draft.procedure,
         options: procedureFilterOptions(),
         searchable: true,
       });
@@ -552,6 +591,7 @@ function openFilterSettings(root) {
       if (host) host.textContent = 'Не удалось загрузить процедуры';
     });
   }
+  updateAction();
   return layer;
 }
 
