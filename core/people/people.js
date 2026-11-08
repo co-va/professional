@@ -382,47 +382,45 @@ function recordPeriodStart(monthCount, today = new Date()) {
     String(start.getDate()).padStart(2, '0')].join('-');
 }
 
-function recordFilterPersonKeys({ procedure = '', workplace = '', recordPeriod = '' } = {}) {
-  const procedureKeys = procedure ? new Set() : null;
-  const workplaceKeys = workplace ? new Set() : null;
-  const recordDates = recordPeriod ? new Map() : null;
-  if (!procedureKeys && !workplaceKeys && !recordDates) return { procedureKeys, workplaceKeys, recordDates };
+function recordFilterPersonKeys({ procedure = '', workplace = '', recordPeriod = '', recordFrom = '', recordTo = '' } = {}) {
+  if (!procedure && !workplace && !recordPeriod) return null;
+  const matched = new Set();
+  const periodStart = recordPeriodStart(recordPeriod);
+  const now = new Date();
+  const today = [now.getFullYear(), String(now.getMonth() + 1).padStart(2, '0'),
+    String(now.getDate()).padStart(2, '0')].join('-');
+  const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+  const validRange = recordPeriod !== 'range'
+    || (datePattern.test(recordFrom) && datePattern.test(recordTo) && recordFrom <= recordTo);
+
   for (const record of getRecords()) {
     if (record?.status === 'cancelled') continue;
-    const procedureMatch = procedureKeys
-      && (record?.procedures || []).some((item) => String(item?.id || '') === procedure);
-    const workplaceMatch = workplaceKeys && String(record?.workplaceId || '') === workplace;
-    // A dated record counts whether arrived, unattended or unclosed.
-    // Future appointments and cancelled records do not count in past-period filters.
+    if (procedure && !(record?.procedures || []).some((item) => String(item?.id || '') === procedure)) continue;
+    if (workplace && String(record?.workplaceId || '') !== workplace) continue;
+
     const appointmentDate = String(record?.date || '').slice(0, 10);
-    const datedRecord = recordDates && /^\d{4}-\d{2}-\d{2}$/.test(appointmentDate);
-    if (!procedureMatch && !workplaceMatch && !datedRecord) continue;
-    const keys = [record?.person?.key, ...(record?.group?.participants || []).map((participant) => participant?.key)]
-      .map((key) => String(key || '')).filter(Boolean);
-    for (const key of keys) {
-      if (procedureMatch) procedureKeys.add(key);
-      if (workplaceMatch) workplaceKeys.add(key);
-      if (datedRecord) {
-        const dates = recordDates.get(key) || [];
-        dates.push(appointmentDate);
-        recordDates.set(key, dates);
+    if (recordPeriod) {
+      if (!datePattern.test(appointmentDate)) continue;
+      if (recordPeriod === 'none') {
+        if (appointmentDate > today) continue;
+      } else if (recordPeriod === 'range') {
+        if (!validRange || appointmentDate < recordFrom || appointmentDate > recordTo) continue;
+      } else if (!periodStart || appointmentDate < periodStart || appointmentDate > today) {
+        continue;
       }
     }
+
+    // All record-based conditions must describe the SAME record.
+    // Person fields (gender, labels, email, birthday) are checked separately.
+    const keys = [record?.person?.key, ...(record?.group?.participants || []).map((item) => item?.key)];
+    for (const key of keys) if (key) matched.add(String(key));
   }
-  return { procedureKeys, workplaceKeys, recordDates };
+  return matched;
 }
 
 function applyPeopleFilters(items = [], filters = currentPeopleFilters()) {
   const selectedMonth = Number(filters.birthday);
-  const { procedureKeys, workplaceKeys, recordDates } = recordFilterPersonKeys(filters);
-  const periodStart = recordPeriodStart(filters.recordPeriod);
-  const rangeSelected = filters.recordPeriod === 'range';
-  const rangeValid = rangeSelected && /^\d{4}-\d{2}-\d{2}$/.test(filters.recordFrom || '')
-    && /^\d{4}-\d{2}-\d{2}$/.test(filters.recordTo || '')
-    && filters.recordFrom <= filters.recordTo;
-  const today = new Date();
-  const todayDate = [today.getFullYear(), String(today.getMonth() + 1).padStart(2, '0'),
-    String(today.getDate()).padStart(2, '0')].join('-');
+  const recordKeys = recordFilterPersonKeys(filters);
   return items.filter((person) => {
     if (filters.gender === 'none' && person.gender) return false;
     if (filters.gender && filters.gender !== 'none' && person.gender !== filters.gender) return false;
@@ -430,16 +428,9 @@ function applyPeopleFilters(items = [], filters = currentPeopleFilters()) {
     if (filters.birthday === 'has' && !person.birthDate) return false;
     if (selectedMonth >= 1 && selectedMonth <= 12 && birthMonth(person.birthDate) !== selectedMonth) return false;
     if (filters.tag && !(person.tags || []).includes(filters.tag)) return false;
-    if (procedureKeys || workplaceKeys || recordDates) {
-      const personKeys = getIdentityMemberKeys(person.key);
-      if (procedureKeys && !personKeys.some((key) => procedureKeys.has(key))) return false;
-      if (workplaceKeys && !personKeys.some((key) => workplaceKeys.has(key))) return false;
-      if (recordDates) {
-        const dates = personKeys.flatMap((key) => recordDates.get(key) || []);
-        if (filters.recordPeriod === 'none' && dates.some((date) => date <= todayDate)) return false;
-        if (periodStart && !dates.some((date) => date >= periodStart && date <= todayDate)) return false;
-        if (rangeSelected && (!rangeValid || !dates.some((date) => date >= filters.recordFrom && date <= filters.recordTo))) return false;
-      }
+    if (recordKeys) {
+      const matched = getIdentityMemberKeys(person.key).some((key) => recordKeys.has(String(key)));
+      if (filters.recordPeriod === 'none' ? matched : !matched) return false;
     }
     const emailSpecified = (person.emails || []).some((value) => String(value || '').trim());
     if (filters.noEmail === 'yes' && emailSpecified) return false;
@@ -447,6 +438,7 @@ function applyPeopleFilters(items = [], filters = currentPeopleFilters()) {
     return true;
   });
 }
+
 function tagFilterOptions() {
   return [{ value: '', label: 'Без фильтра' }, ...getTags().map((item) => ({ value: String(item.id), label: item.name }))];
 }
