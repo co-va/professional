@@ -2,13 +2,10 @@ import { button, emptyState, modal, mountModal, openNotice, select } from '../..
 import { loyaltyNavigationItems } from './index.js';
 import { getDepositPrograms, listPersonDeposits, loadDepositPrograms } from './deposit/data.js';
 
-// An accessible program type appears here only when the platform permits it AND
-// there is a real person-scoped operation. Unfinished demo/local-only modules
-// must not be advertised as assignable programs.
-const IMPLEMENTED_PERSON_ACTIONS = new Set(['deposit', 'personal-account']);
-
+// Exactly the same E-card collection as the existing Loyalty navigation.
+// No local list of program types and no second readiness gate.
 export function personProgramActionTypes() {
-  return loyaltyNavigationItems().filter((item) => IMPLEMENTED_PERSON_ACTIONS.has(item.id));
+  return loyaltyNavigationItems();
 }
 
 async function depositChoices(personKey) {
@@ -78,7 +75,14 @@ export function openPersonProgramActions(root, person, { onChanged = () => {} } 
     errorHost.textContent = '';
     optionsHost.innerHTML = '';
     updateAction();
-    if (kind !== 'deposit') return;
+    if (kind !== 'deposit') {
+      // A newly exposed E-card is listed immediately. Incomplete program
+      // modules never silently perform local/demo assignments from Person.
+      if (kind && kind !== 'personal-account') {
+        optionsHost.textContent = 'Действия с клиентом для этой программы пока недоступны.';
+      }
+      return;
+    }
     optionsHost.textContent = 'Загружаем программы…';
     loading = true;
     updateAction();
