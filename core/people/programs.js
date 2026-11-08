@@ -10,6 +10,7 @@ import {
   v2Section,
 } from '../../ui/ui.js';
 import { getUEI } from '../uei.js';
+import { loyaltyNavigationItems } from '../loyalty/index.js';
 import { personalAccountVisualCard } from '../loyalty/personal-account/index.js';
 import { getCachedPersonalAccount, loadPersonalAccount } from '../loyalty/personal-account/data.js';
 import { getDepositInstances, listPersonDeposits } from '../loyalty/deposit/data.js';
@@ -320,19 +321,25 @@ function cachedPersonDeposits(personKey = '') {
 
 export async function buildPersonRelationshipSections(person = {}, { refresh = true } = {}) {
   const key = text(person.key || person.id);
-  const account = getCachedPersonalAccount(key);
+  // Use exactly the same resolved access/readiness as the Loyalty navigation.
+  // NOT_READY is denied to everyone; TESTING/READY are resolved by the server
+  // for the current account. Never infer readiness from program sample data.
+  const allowed = new Set(loyaltyNavigationItems().map(({ id }) => id));
+  const canSee = (kind) => allowed.has(kind);
+  const account = canSee('personal-account') ? getCachedPersonalAccount(key) : null;
   const accountError = '';
-  const deposits = cachedPersonDeposits(key);
-  const refreshPromise = refresh
-    ? Promise.allSettled([
-        loadPersonalAccount(key),
-        listPersonDeposits(key),
-      ])
+  const deposits = canSee('deposit') ? cachedPersonDeposits(key) : [];
+  const refreshTasks = [
+    ...(canSee('personal-account') ? [loadPersonalAccount(key)] : []),
+    ...(canSee('deposit') ? [listPersonDeposits(key)] : []),
+  ];
+  const refreshPromise = refresh && refreshTasks.length
+    ? Promise.allSettled(refreshTasks)
     : null;
-  const certificates = getCertificateAssignmentsForPerson(key);
-  const subscriptions = getSubscriptionAssignmentsForPerson(key);
-  const referrals = getReferralAssignmentsForPerson(key);
-  const bonuses = getBonusAssignmentsForPerson(key);
+  const certificates = canSee('certificate') ? getCertificateAssignmentsForPerson(key) : [];
+  const subscriptions = canSee('subscription') ? getSubscriptionAssignmentsForPerson(key) : [];
+  const referrals = canSee('referral') ? getReferralAssignmentsForPerson(key) : [];
+  const bonuses = canSee('bonus') ? getBonusAssignmentsForPerson(key) : [];
   const finance = personFinanceEntities(person);
 
   const programCards = [
