@@ -373,7 +373,7 @@ function currentPeopleFilters() {
 
 function recordPeriodStart(monthCount, today = new Date()) {
   const months = Number(monthCount);
-  if (!Number.isInteger(months) || months < 1 || months > 12) return '';
+  if (![1, 3, 6].includes(months)) return '';
   // Months are fixed 30-day windows, counted backwards from today, inclusive.
   const start = new Date(today.getFullYear(), today.getMonth(), today.getDate() - months * 30 + 1);
   return [start.getFullYear(), String(start.getMonth() + 1).padStart(2, '0'),
@@ -396,8 +396,7 @@ function recordFilterPersonKeys({ procedure = '', workplace = '', recordPeriod =
     // A dated record counts whether arrived, unattended or unclosed.
     // Future appointments and cancelled records do not count in past-period filters.
     const appointmentDate = String(record?.date || '').slice(0, 10);
-    const datedRecord = recordDates && /^\d{4}-\d{2}-\d{2}$/.test(appointmentDate)
-      && appointmentDate <= todayDate;
+    const datedRecord = recordDates && /^\d{4}-\d{2}-\d{2}$/.test(appointmentDate);
     if (!procedureMatch && !workplaceMatch && !datedRecord) continue;
     const keys = [record?.person?.key, ...(record?.group?.participants || []).map((participant) => participant?.key)]
       .map((key) => String(key || '')).filter(Boolean);
@@ -418,6 +417,10 @@ function applyPeopleFilters(items = [], filters = currentPeopleFilters()) {
   const selectedMonth = Number(filters.birthday);
   const { procedureKeys, workplaceKeys, recordDates } = recordFilterPersonKeys(filters);
   const periodStart = recordPeriodStart(filters.recordPeriod);
+  const rangeSelected = filters.recordPeriod === 'range';
+  const rangeValid = rangeSelected && /^\d{4}-\d{2}-\d{2}$/.test(filters.recordFrom || '')
+    && /^\d{4}-\d{2}-\d{2}$/.test(filters.recordTo || '')
+    && filters.recordFrom <= filters.recordTo;
   const today = new Date();
   const todayDate = [today.getFullYear(), String(today.getMonth() + 1).padStart(2, '0'),
     String(today.getDate()).padStart(2, '0')].join('-');
@@ -434,8 +437,9 @@ function applyPeopleFilters(items = [], filters = currentPeopleFilters()) {
       if (workplaceKeys && !personKeys.some((key) => workplaceKeys.has(key))) return false;
       if (recordDates) {
         const dates = personKeys.flatMap((key) => recordDates.get(key) || []);
-        if (filters.recordPeriod === 'none' && dates.length) return false;
+        if (filters.recordPeriod === 'none' && dates.some((date) => date <= todayDate)) return false;
         if (periodStart && !dates.some((date) => date >= periodStart && date <= todayDate)) return false;
+        if (rangeSelected && (!rangeValid || !dates.some((date) => date >= filters.recordFrom && date <= filters.recordTo))) return false;
       }
     }
     const emailSpecified = (person.emails || []).some((value) => String(value || '').trim());
@@ -578,9 +582,18 @@ function peopleFilterFields(filters = {}) {
     ${select({ label: 'Email', name: 'peopleNoEmailFilter', value: filters.noEmail, options: [{ value: '', label: 'Без фильтра' }, { value: 'has', label: 'Указан' }, { value: 'yes', label: 'Не указан' }] })}
     ${select({ label: 'Посещения', name: 'peopleRecordPeriodFilter', value: filters.recordPeriod, options: [
       { value: '', label: 'Без фильтра' },
-      ...Array.from({ length: 12 }, (_, index) => index + 1).map((months) => ({ value: String(months), label: `За ${months} ${months === 1 ? 'месяц' : months < 5 ? 'месяца' : 'месяцев'}` })),
+      { value: '1', label: 'За 1 месяц' },
+      { value: '3', label: 'За 3 месяца' },
+      { value: '6', label: 'За 6 месяцев' },
+      { value: 'range', label: 'За период' },
       { value: 'none', label: 'Без посещений' },
     ] })}
+    <div data-people-record-range${filters.recordPeriod === 'range' ? '' : ' hidden'}>
+      <div class="form-grid">
+        ${field({ label: 'С даты', name: 'peopleRecordFromFilter', type: 'date', value: filters.recordFrom || '' })}
+        ${field({ label: 'По дату', name: 'peopleRecordToFilter', type: 'date', value: filters.recordTo || '' })}
+      </div>
+    </div>
   </div>`;
 }
 
@@ -600,6 +613,11 @@ function openFilterSettings(root) {
 
   const updateAction = () => {
     const changed = !sameFilters(draft, applied);
+    const datesValid = draft.recordPeriod !== 'range' || (
+      /^\d{4}-\d{2}-\d{2}$/.test(draft.recordFrom)
+      && /^\d{4}-\d{2}-\d{2}$/.test(draft.recordTo)
+      && draft.recordFrom <= draft.recordTo);
+    action.disabled = changed && !datesValid;
     const reset = !changed && hasFilters(applied);
     actions.hidden = !changed && !reset;
     action.textContent = changed ? 'Применить' : 'Сбросить';
@@ -616,15 +634,26 @@ function openFilterSettings(root) {
       peopleWorkplaceFilter: 'workplace',
       peopleNoEmailFilter: 'noEmail',
       peopleRecordPeriodFilter: 'recordPeriod',
+      peopleRecordFromFilter: 'recordFrom',
+      peopleRecordToFilter: 'recordTo',
     };
     const key = keyByName[event.target?.name];
     if (!key) return;
     draft[key] = String(event.target.value || '');
+    if (key === 'recordPeriod') {
+      if (draft.recordPeriod !== 'range') {
+        draft.recordFrom = '';
+        draft.recordTo = '';
+      }
+      const rangeHost = layer.querySelector('[data-people-record-range]');
+      if (rangeHost) rangeHost.hidden = draft.recordPeriod !== 'range';
+    }
     updateAction();
   });
 
   action.addEventListener('click', () => {
     if (!sameFilters(draft, applied)) {
+      if (action.disabled) return;
       applied = setPeopleFilters(draft);
       refreshPeopleList(root);
       layer.v2Close?.();
