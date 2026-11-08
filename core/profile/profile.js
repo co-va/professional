@@ -263,7 +263,7 @@ function openWorkplaceQ(root,existing,navigateBack,options={}){
         initials:(current.name||'?').slice(0,1).toUpperCase(),
       },
     }),
-    workplaceForm(existing,{sourceOnly:true}),
+    workplaceForm(existing),
   ]),{
     title:'',
     variant:'q',
