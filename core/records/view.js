@@ -242,7 +242,7 @@ export function openRecordView(record, {
   let startTimer = null;
   const layer = (useQ ? mountRecordQ : mountRecordZ)({
     settings: capabilities.settings,
-    title: useQ ? 'Запись' : capabilities.contactIdentity
+    title: useQ ? '' : capabilities.contactIdentity
       ? (personDisplay(currentRecord.person || {}).name || 'Запись')
       : (professionalDisplay.name || 'Запись'),
     className: useQ ? 'record-view-q journal-view-z' : 'record-view-z journal-view-z',
