@@ -10,6 +10,7 @@ const DEFAULT_FILTERS = Object.freeze({
   workplace: '',
   noEmail: '',
   noVisits: '',
+  visitMonths: '',
 });
 
 export function getPeopleSortMode() {
