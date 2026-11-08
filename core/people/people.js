@@ -42,6 +42,7 @@ import { openTagEditor } from '../../settings/tags/tags.js';
 import { addTagToSelection } from '../../ui/tags/index.js';
 import { getDocuments } from '../../settings/documents/data.js';
 import { getConsents } from '../../settings/documents/consents.js';
+import { readOnlyReceipt } from '../../ui/receipt/index.js';
 import { getAllPeople, getPeople, savePeople } from './data.js';
 import { bindPersonCreateForm, personCreateForm } from './create.js';
 import { personDisplay } from './presentation.js';
@@ -91,23 +92,9 @@ function sortOptions() {
   ].map(([value, label]) => ({ value, label }));
 }
 
-function consentStatus(fact) {
-  if (!fact) return 'Не подписано';
-  if (fact.status === 'revoked') return 'Отозвано';
-  if (fact.status === 'declined') return 'Не подписано';
-  return 'Подписано';
-}
-
-function consentMoment(fact) {
-  const value = fact?.eventAt || fact?.revokedAt || fact?.acceptedAt || fact?.createdAt || '';
-  return shortDateTime(value,'—');
-}
-
-function consentSource(source) {
-  if (source === 'online-booking') return 'Онлайн-запись';
-  if (source === 'online-booking-registration') return 'Регистрация в системе';
-  if (source === 'manual') return 'Вручную';
-  return source || '—';
+function consentSignedMoment(fact) {
+  // Never display the timestamp of a revocation or a superseded signature.
+  return shortDateTime(fact?.acceptedAt || fact?.eventAt || '', '—');
 }
 
 function consentEventTime(fact) {
@@ -154,18 +141,17 @@ function currentConsentFacts(person, documentId) {
   return [...latestBySubject.values()];
 }
 
-function personConsentState(person, documentId) {
-  const facts = currentConsentFacts(person, documentId);
-  const active = facts.filter((fact) => fact.status === 'accepted').sort((a, b) => consentEventTime(b) - consentEventTime(a));
-  const inactive = facts.filter((fact) => fact.status !== 'accepted').sort((a, b) => consentEventTime(b) - consentEventTime(a));
-  return { active: active.length > 0, fact: active[0] || inactive[0] || null, count: facts.length };
+function personConsentState(person, documentItem) {
+  // An earlier document version remains in the audit, but is NOT an active signature.
+  const version = Math.max(1, Number(documentItem?.version || 1));
+  const facts = currentConsentFacts(person, documentItem?.id);
+  const current = facts
+    .filter((fact) => Number(fact.documentVersion) === version)
+    .sort((a, b) => consentEventTime(b) - consentEventTime(a));
+  const accepted = current.find((fact) => fact.status === 'accepted') || null;
+  return { active: Boolean(accepted), fact: accepted };
 }
 
-function consentStatusState(state, fact) {
-  if (state?.active) return 'signed';
-  if (fact?.status === 'revoked') return 'revoked';
-  return 'pending';
-}
 
 function personDocuments(person) {
   const documents = getDocuments().filter((item) => !item.hidden);
@@ -181,13 +167,11 @@ function personDocuments(person) {
 }
 
 function personDocumentTile(person, documentItem) {
-  const state = personConsentState(person, documentItem.id);
-  const fact = state.fact;
+  const state = personConsentState(person, documentItem);
   return documentTile({
     title: documentItem.title || 'Документ',
-    version: fact?.documentVersion || documentItem.version || 1,
-    status: state.active ? 'Подписано' : consentStatus(fact),
-    statusState: consentStatusState(state, fact),
+    status: state.active ? 'Подписано' : 'Не подписано',
+    statusState: state.active ? 'signed' : 'pending',
     data: `data-person-document="${escapeHtml(documentItem.id)}"`,
     aria: `Открыть информацию о документе ${documentItem.title || ''}`,
   });
@@ -196,26 +180,14 @@ function personDocumentTile(person, documentItem) {
 function openPersonDocumentInfo(root, person, documentId) {
   const documentItem = personDocuments(person).find((item) => String(item.id) === String(documentId));
   if (!documentItem) return null;
-  const state = personConsentState(person, documentItem.id);
-  const fact = state.fact;
-  const status = state.active ? 'Подписано' : consentStatus(fact);
-  const version = fact?.documentVersion || documentItem.version || 1;
-  const scope = state.count > 1 ? `<div><span>Фактов</span><strong>${escapeHtml(state.count)}</strong></div>` : '';
-  const html = `${documentTiles([documentTile({
-      title: documentItem.title || 'Документ',
-      version,
-      status,
-      statusState: consentStatusState(state, fact),
-      interactive: false,
-    })], { layout: 'rail' })}
-    <div class="entity-details">
-      <div><span>Статус</span><strong>${escapeHtml(status)}</strong></div>
-      <div><span>Версия</span><strong>${escapeHtml(version)}</strong></div>
-      <div><span>Дата</span><strong>${escapeHtml(consentMoment(fact))}</strong></div>
-      <div><span>Источник</span><strong>${escapeHtml(consentSource(fact?.source))}</strong></div>
-      ${scope}
-    </div>
-    ${fact ? '' : '<p class="muted">Подтверждение отсутствует.</p>'}`;
+  const state = personConsentState(person, documentItem);
+  const html = readOnlyReceipt({
+    title: documentItem.title || 'Документ',
+    groups: [[
+      { label: 'Статус', value: state.active ? 'Подписано' : 'Не подписано' },
+      ...(state.active ? [{ label: 'Дата и время подписания', value: consentSignedMoment(state.fact) }] : []),
+    ]],
+  });
   return mountModal(root, modal(html, { title: documentItem.title || 'Документ', variant: 's', surface: 'app' }));
 }
 
