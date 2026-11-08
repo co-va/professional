@@ -11,6 +11,7 @@ export async function loadHistoryFacts({
   inventoryItemId = '',
   financeOperationId = '',
   entityType = '',
+  entityTypes = [],
   entityId = '',
   from = '',
   to = '',
@@ -26,6 +27,8 @@ export async function loadHistoryFacts({
   if (text(inventoryItemId)) params.set('inventoryItemId', text(inventoryItemId));
   if (text(financeOperationId)) params.set('financeOperationId', text(financeOperationId));
   if (text(entityType)) params.set('entityType', text(entityType));
+  const types = [...new Set((Array.isArray(entityTypes) ? entityTypes : []).map(text).filter(Boolean))];
+  if (types.length) params.set('entityTypes', types.join(','));
   if (text(entityId)) params.set('entityId', text(entityId));
   if (text(from)) params.set('from', text(from));
   if (text(to)) params.set('to', text(to));
