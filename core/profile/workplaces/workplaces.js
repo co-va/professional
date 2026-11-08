@@ -75,12 +75,14 @@ export function workplaceForm(existing=null,{sourceOnly=false,bodyActions=false}
     ${scheduleField}
     ${select({label:'Валюта',name:'workplaceCurrency',value:w.currency||defaults.currency||'',options:currencies})}
     ${colorField}
-    ${notificationSettings([{
-      label:'Показывать в общей онлайн-записи',
-      labelLines:['Показывать в общей','онлайн-записи'],
-      checked:w.visibleInPublicBooking!==false,
-      data:'data-workplace-public-booking-visibility',
-    }])}
+    <div class="workplace-form__visibility">
+      ${notificationSettings([{
+        label:'Показывать в общей онлайн-записи',
+        labelLines:['Показывать в общей','онлайн-записи'],
+        checked:w.visibleInPublicBooking!==false,
+        data:'data-workplace-public-booking-visibility',
+      }],{showStatus:false})}
+    </div>
     ${links({links:w.links||[],name:'workplace-links',label:'Ссылки',compact:true,addInHeader:true})}
     ${textareaField({label:'О рабочем пространстве',name:'workplaceAbout',value:w.about||'',placeholder:'Коротко о рабочем пространстве'})}
     <div class="form-error" data-workplace-error></div>
