@@ -39,6 +39,8 @@ import {
 } from '../../ui/ui.js';
 import { applyUEI, detachUEI, getMembers, getOptions, getUEI } from '../uei.js';
 import { getTags } from '../../settings/tags/data.js';
+import { openTagEditor } from '../../settings/tags/tags.js';
+import { addTagToSelection } from '../../ui/tags/index.js';
 import { getDocuments } from '../../settings/documents/data.js';
 import { getConsents } from '../../settings/documents/consents.js';
 import { getAllPeople, getPeople, savePeople } from './data.js';
@@ -859,7 +861,7 @@ function personDataFields(person, all) {
       + repeatedField({ label: 'Telegram', name: 'telegrams', values: telegramEntries(person, all), addInHeader: true })
       + repeatedField({ label: 'Email', name: 'emails', values: businessEntries(person, all, 'emails'), type: 'email', addInHeader: true })
       + links({ links: person.links || [], name: 'person-links', label: 'Ссылки', compact: true, addInHeader: true })),
-    v2Section('Ярлыки', tags({ tags: getTags(), selected: person.tags || [], name: 'person-tags' })),
+    v2Section('Ярлыки', tags({ tags: getTags(), selected: person.tags || [], name: 'person-tags', allowCreate: true })),
   ].join('');
 }
 
@@ -978,7 +980,12 @@ function openPersonEdit(baseRoot, key, callbacks = {}) {
 
   initMonthDayPickers(layer);
   initLinks(layer);
-  initTags(layer);
+  initTags(layer, { onCreate: (host) => {
+    openTagEditor({ onSaved: (tag) => {
+      if (layer.isConnected === false) return;
+      addTagToSelection(host, tag);
+    } });
+  } });
   initRepeatedFields(layer);
   initUEI(layer);
   // Resolve the visible alias asynchronously, without replacing the stable ID
