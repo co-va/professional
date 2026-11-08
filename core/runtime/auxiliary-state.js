@@ -12,7 +12,8 @@ function clone(value){return value==null?value:JSON.parse(JSON.stringify(value))
 async function payload(response,fallback){const value=await response.json().catch(()=>({}));if(!response.ok)throw new Error(value?.message||fallback);return value;}
 function owns(value,key){return Boolean(value&&Object.prototype.hasOwnProperty.call(value,key));}
 function hydrateAuxiliary(remote){
-  if(owns(remote,'wallets')) hydrateWalletsFromServer(Array.isArray(remote.wallets)?clone(remote.wallets):[]);
+  // Do not erase a known wallet catalog on a malformed/partial response.
+  if(owns(remote,'wallets') && Array.isArray(remote.wallets)) hydrateWalletsFromServer(clone(remote.wallets));
   if(owns(remote,'investments')||owns(remote,'loans')){
     hydrateCashEntitiesFromServer({
       investments:Array.isArray(remote.investments)?clone(remote.investments):[],
