@@ -39,17 +39,18 @@ function renderList(root) {
       : emptyState('Ярлыков пока нет', 'Добавьте первый ярлык кнопкой «+».'),
   ]);
 
-  root.querySelector('[data-tag-add]')?.addEventListener('click', () => openForm(root));
+  root.querySelector('[data-tag-add]')?.addEventListener('click', () =>
+    openTagEditor({ onSaved: () => renderList(root) }));
   root.querySelectorAll('[data-tag-edit]').forEach((card) => {
     card.addEventListener('click', () => {
       const tag = getTags().find((item) => item.id === card.dataset.tagEdit);
-      if (tag) openForm(root, tag);
+      if (tag) openTagEditor({ existing: tag, onSaved: () => renderList(root) });
     });
   });
   window.dispatchEvent(new CustomEvent('va-tools:v2-context-changed'));
 }
 
-function openForm(root, existing = null) {
+export function openTagEditor({ existing = null, onSaved = () => {} } = {}) {
   const title = existing ? 'Изменить ярлык' : 'Новый ярлык';
   const html = `<form class="compact-form" data-tag-form>
     ${colorPicker({ name: 'tagColor', value: existing?.color || '#F6D32D' })}
@@ -77,16 +78,17 @@ function openForm(root, existing = null) {
     if (!name) return;
     const color = String(data.get('tagColor') || '#F6D32D');
 
+    const saved = existing
+      ? { ...existing, name, color, updatedAt: new Date().toISOString() }
+      : createTag({ name, color });
     if (existing) {
-      saveTags(getTags().map((item) => item.id === existing.id
-        ? { ...item, name, color, updatedAt: new Date().toISOString() }
-        : item));
+      saveTags(getTags().map((item) => item.id === saved.id ? saved : item));
     } else {
-      saveTags([...getTags(), createTag({ name, color })]);
+      saveTags([...getTags(), saved]);
     }
 
     layer.v2Close?.();
-    renderList(root);
+    onSaved(saved);
   });
   return layer;
 }
