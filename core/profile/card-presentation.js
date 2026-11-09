@@ -53,7 +53,7 @@ export function profileCardFields(profile = {}, workplaces = [], { previewDiscou
   ];
 }
 
-export function workplaceCardFields(workplace = {}, profile = {}) {
+export function workplaceCardFields(workplace = {}, profile = {}, { previewDiscount = false } = {}) {
   return [
     {value:'workTime',label:'График',text:workplace.from||workplace.to?`${workplace.from||'—'} - ${workplace.to||'—'}`:''},
     {value:'workplaceName',label:'Рабочее пространство',text:workplace.name||''},
@@ -62,6 +62,7 @@ export function workplaceCardFields(workplace = {}, profile = {}) {
     {value:'workplacePhone',label:'Телефон пространства',text:workplace.phone||''},
     {value:'currency',label:'Валюта',text:workplace.currency||''},
     {value:'workplaceAbout',label:'О рабочем пространстве',text:workplace.about||''},
+    {value:'discount',label:'Скидка',text:previewDiscount?'Скидка 10%':''},
     {value:'profileName',label:'Имя и фамилия',text:[profile.name,profile.surname].filter(Boolean).join(' ')},
     {value:'profileFirstName',label:'Имя',text:profile.name||''},
     {value:'profileSurname',label:'Фамилия',text:profile.surname||''},
