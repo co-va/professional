@@ -46,6 +46,7 @@ import { addTagToSelection } from '../../ui/tags/index.js';
 import { getDocuments } from '../../settings/documents/data.js';
 import { getConsents } from '../../settings/documents/consents.js';
 import { getAllPeople, getIdentityMemberKeys, getPeople, savePeople } from './data.js';
+import { flushBusinessPersistence, isBusinessServerReady } from '../business-persistence.js';
 import { bindPersonCreateForm, personCreateForm } from './create.js';
 import { personDisplay } from './presentation.js';
 import { personCardAppearance, personCardFields } from './card-presentation.js';
@@ -1122,30 +1123,42 @@ function openPersonEdit(baseRoot, key, callbacks = {}) {
   const actions = action?.closest('.modal-actions');
   const initialState = formSnapshot(form);
   const isDirty = () => formSnapshot(form) !== initialState;
+  let saving = false;
   const syncAction = () => {
     if (!action) return;
     const visible = isDirty();
     action.hidden = !visible;
+    action.disabled = saving;
     if (actions) actions.hidden = !visible;
     notifyContext();
   };
-  const save = () => {
-    if (!isDirty()) return;
+  const save = async () => {
+    if (saving || !isDirty()) return;
+    saving = true;
+    syncAction();
+    const errorNode = layer.querySelector('[data-person-edit-error]');
+    if (errorNode) errorNode.textContent = '';
     try {
+      if (!isBusinessServerReady()) throw new Error('Нет соединения с сервером. Изменения не сохранены.');
       savePersonData(layer, key);
       const nextKey = savePersonUei(layer, key);
+      // The Q must not close on a successful local write while the real
+      // server mutation is still queued, retrying or rejected.
+      await flushBusinessPersistence();
       layer.v2Close?.();
       callbacks.onSaved?.(nextKey || key);
     } catch (error) {
-      const node = layer.querySelector('[data-person-edit-error]');
-      if (node) node.textContent = error instanceof Error ? error.message : 'Не удалось сохранить';
+      if (errorNode) errorNode.textContent = error instanceof Error ? error.message : 'Не удалось сохранить на сервере';
+    } finally {
+      saving = false;
+      if (layer.isConnected) syncAction();
     }
   };
 
-  action?.addEventListener('click', save);
+  action?.addEventListener('click', () => { void save(); });
   form?.addEventListener('input', syncAction);
   form?.addEventListener('change', syncAction);
-  form?.addEventListener('submit', (event) => { event.preventDefault(); save(); });
+  form?.addEventListener('submit', (event) => { event.preventDefault(); void save(); });
   syncAction();
   return layer;
 }
