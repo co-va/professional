@@ -303,3 +303,71 @@ export function getZReport({ from = null, to = null } = {}) {
     byEconomicType: normalizeRows(economicMap),
   };
 }
+
+// Audit-history payment projection belongs to Finance, not People.
+// This is read-only: no operations, balances or settlements are persisted here.
+const historyText = value => String(value ?? '').trim();
+const historyObject = value => value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+const historyMoney = value => Math.round((Number(value) || 0) * 100) / 100;
+function historyFactSnapshot(fact = {}) {
+  const data = historyObject(fact.data);
+  return historyObject(data.after ?? data.current ?? data.deleted);
+}
+function historyOperationData(fact = {}) {
+  return historyObject(historyFactSnapshot(fact).data);
+}
+function historyLatestBy(items = [], keyOf = item => item?.entityId) {
+  const result = new Map();
+  for (const item of items) {
+    const key = historyText(keyOf(item));
+    if (key && !result.has(key)) result.set(key, item);
+  }
+  return [...result.values()];
+}
+export function financeHistoryOperation(fact = {}) {
+  const row = historyFactSnapshot(fact);
+  const data = historyOperationData(fact);
+  return {
+    id: historyText(row.operationId || fact.entityId),
+    kind: historyText(row.kind || fact.eventType),
+    status: historyText(row.status || fact.status || 'completed'),
+    originalOperationId: historyText(row.originalOperationId),
+    occurredAt: historyText(row.occurredAt || fact.occurredAt),
+    data,
+    total: historyMoney(data.total),
+    serviceAmount: historyMoney(data.serviceAmount ?? data.total),
+    tips: historyMoney(data.tips),
+  };
+}
+
+export function recordFinanceFromHistoryFacts(facts = [], recordId = '') {
+  const operations = historyLatestBy(facts.filter((fact) => fact.entityType === 'finance-operation'
+    && historyText(fact.recordId) === recordId), (fact) => fact.entityId)
+    .map(financeHistoryOperation)
+    .filter((operation) => operation.id && operation.status !== 'deleted' && operation.kind !== 'cancel');
+  const payments = operations.filter((operation) => operation.kind === 'payment' && operation.status !== 'cancelled');
+  const refunds = operations.filter((operation) => operation.kind === 'refund' && operation.status !== 'cancelled');
+  const paidService = historyMoney(payments.reduce((sum, operation) => sum + operation.serviceAmount, 0));
+  const refundedService = historyMoney(refunds.reduce((sum, operation) => sum + operation.serviceAmount, 0));
+  const paidTotal = historyMoney(payments.reduce((sum, operation) => sum + operation.total, 0));
+  const refundedTotal = historyMoney(refunds.reduce((sum, operation) => sum + operation.total, 0));
+
+  const settlementFact = facts.find((fact) => fact.entityType === 'finance-settlement'
+    && historyText(fact.recordId || fact.source?.id) === recordId);
+  const settlement = settlementFact ? historyFactSnapshot(settlementFact) : {};
+  const planTotal = settlementFact ? historyMoney(settlement.planTotal) : null;
+  const netService = historyMoney(Math.max(0, paidService - refundedService));
+  const due = planTotal == null ? null : historyMoney(Math.max(0, planTotal - netService));
+  const paymentState = !settlementFact ? '' : netService <= 0
+    ? (planTotal > 0 ? 'unpaid' : '')
+    : due > 0.009 ? 'partial' : 'paid';
+
+  return {
+    payments,
+    refunds,
+    planTotal,
+    paidAmount: historyMoney(Math.max(0, paidTotal - refundedTotal)),
+    due,
+    paymentState,
+  };
+}

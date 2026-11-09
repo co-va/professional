@@ -45,7 +45,7 @@ import { getTags } from '../../settings/tags/data.js';
 import { openTagEditor } from '../../settings/tags/tags.js';
 import { addTagToSelection } from '../../ui/tags/index.js';
 import { getDocuments } from '../../settings/documents/data.js';
-import { getConsents } from '../../settings/documents/consents.js';
+import { getPersonConsentState, getPersonConsentDocumentIds } from '../../settings/documents/consents.js';
 import { getAllPeople, getIdentityMemberKeys, getPeople, getPersonPriceCondition, savePeople } from './data.js';
 import { flushBusinessPersistence, isBusinessServerReady } from '../business-persistence.js';
 import { bindPersonCreateForm, personCreateForm } from './create.js';
@@ -107,69 +107,12 @@ function consentSignedMoment(fact) {
   return shortDate(fact?.acceptedAt || fact?.eventAt || '', '');
 }
 
-function consentEventTime(fact) {
-  const value = Date.parse(fact?.eventAt || fact?.revokedAt || fact?.acceptedAt || fact?.createdAt || 0);
-  return Number.isFinite(value) ? value : 0;
-}
-
-function canonicalPhone(value) {
-  const digits = String(value || '').replace(/\D/g, '');
-  if (digits.length === 10) return `7${digits}`;
-  if (digits.length === 11 && digits.startsWith('8')) return `7${digits.slice(1)}`;
-  return digits;
-}
-
-function personIdentityMembers(person) {
-  const all = getAllPeople();
-  if (!person?.uei) return [person];
-  const members = all.filter((item) => item.uei === person.uei);
-  return members.length ? members : [person];
-}
-
-function personConsentFactMatches(person, fact) {
-  const members = personIdentityMembers(person);
-  const accounts = new Set(members.flatMap((item) => Array.isArray(item.accounts) ? item.accounts : []).map(String).filter(Boolean));
-  const phones = new Set(members.flatMap((item) => Array.isArray(item.phones) ? item.phones : []).map(canonicalPhone).filter(Boolean));
-  const emails = new Set(members.flatMap((item) => Array.isArray(item.emails) ? item.emails : []).map((value) => String(value || '').trim().toLowerCase()).filter(Boolean));
-  const telegrams = new Set(members.flatMap((item) => Array.isArray(item.telegrams) ? item.telegrams : []).map((value) => String(value || '').trim()).filter(Boolean));
-  if (fact?.subjectType === 'ACCOUNT') return accounts.has(String(fact.subjectKey || ''));
-  if (fact?.subjectType !== 'CONTACT_POINT') return false;
-  if (fact.contactType === 'PHONE') return phones.has(canonicalPhone(fact.contactValue));
-  if (fact.contactType === 'EMAIL') return emails.has(String(fact.contactValue || '').trim().toLowerCase());
-  if (fact.contactType === 'TELEGRAM') return telegrams.has(String(fact.contactValue || '').trim());
-  return false;
-}
-
-function currentConsentFacts(person, documentId) {
-  const relevant = getConsents().filter((fact) => fact.documentId === documentId && personConsentFactMatches(person, fact));
-  const latestBySubject = new Map();
-  for (const fact of relevant) {
-    const key = `${fact.subjectType}:${fact.subjectKey}:${fact.documentId}`;
-    const previous = latestBySubject.get(key);
-    if (!previous || consentEventTime(fact) > consentEventTime(previous)) latestBySubject.set(key, fact);
-  }
-  return [...latestBySubject.values()];
-}
-
-function personConsentState(person, documentItem) {
-  // An earlier document version remains in the audit, but is NOT an active signature.
-  const version = Math.max(1, Number(documentItem?.version || 1));
-  const facts = currentConsentFacts(person, documentItem?.id);
-  const current = facts
-    .filter((fact) => Number(fact.documentVersion) === version)
-    .sort((a, b) => consentEventTime(b) - consentEventTime(a));
-  const accepted = current.find((fact) => fact.status === 'accepted') || null;
-  return { active: Boolean(accepted), fact: accepted };
-}
 
 
 function personDocuments(person) {
   const documents = getDocuments().filter((item) => !item.hidden);
   const byId = new Map(documents.map((item) => [String(item.id || ''), item]));
-  const relevantIds = new Set(getConsents()
-    .filter((fact) => personConsentFactMatches(person, fact))
-    .map((fact) => String(fact.documentId || ''))
-    .filter(Boolean));
+  const relevantIds = new Set(getPersonConsentDocumentIds(person, getAllPeople()));
   return documents.filter((item) => item.personConsent || relevantIds.has(String(item.id || '')))
     .concat([...relevantIds].filter((id) => !byId.has(id)).map((id) => ({
       id, title: id, version: 1, text: '', personConsent: true,
@@ -177,7 +120,7 @@ function personDocuments(person) {
 }
 
 function personDocumentTile(person, documentItem) {
-  const state = personConsentState(person, documentItem);
+  const state = getPersonConsentState(person, documentItem, getAllPeople());
   return documentTile({
     title: documentItem.title || 'Документ',
     meta: state.active ? consentSignedMoment(state.fact) : '',

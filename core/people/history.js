@@ -1,20 +1,18 @@
 import { loadHistoryFacts } from '../history/service.js';
 import { getIdentityMemberKeys } from './data.js';
 import { getRecords } from '../record/index.js';
+import { financeHistoryOperation, recordFinanceFromHistoryFacts } from '../finance/read.js';
 
 const text = (value) => String(value ?? '').trim();
 const objectValue = (value) => value && typeof value === 'object' && !Array.isArray(value) ? value : {};
 const arrayValue = (value) => Array.isArray(value) ? value : [];
-const moneyNumber = (value) => Math.round((Number(value) || 0) * 100) / 100;
 
 function factSnapshot(fact = {}) {
   const data = objectValue(fact.data);
   return objectValue(data.after ?? data.current ?? data.deleted);
 }
 
-function operationData(fact = {}) {
-  return objectValue(factSnapshot(fact).data);
-}
+
 
 function latestBy(items = [], keyOf = (item) => item?.entityId) {
   const result = new Map();
@@ -100,53 +98,7 @@ function statusLabel(state = {}) {
   return 'Запись';
 }
 
-function financeOperation(fact = {}) {
-  const row = factSnapshot(fact);
-  const data = operationData(fact);
-  return {
-    id: text(row.operationId || fact.entityId),
-    kind: text(row.kind || fact.eventType),
-    status: text(row.status || fact.status || 'completed'),
-    originalOperationId: text(row.originalOperationId),
-    occurredAt: text(row.occurredAt || fact.occurredAt),
-    data,
-    total: moneyNumber(data.total),
-    serviceAmount: moneyNumber(data.serviceAmount ?? data.total),
-    tips: moneyNumber(data.tips),
-  };
-}
 
-function recordFinance(facts = [], recordId = '') {
-  const operations = latestBy(facts.filter((fact) => fact.entityType === 'finance-operation'
-    && text(fact.recordId) === recordId), (fact) => fact.entityId)
-    .map(financeOperation)
-    .filter((operation) => operation.id && operation.status !== 'deleted' && operation.kind !== 'cancel');
-  const payments = operations.filter((operation) => operation.kind === 'payment' && operation.status !== 'cancelled');
-  const refunds = operations.filter((operation) => operation.kind === 'refund' && operation.status !== 'cancelled');
-  const paidService = moneyNumber(payments.reduce((sum, operation) => sum + operation.serviceAmount, 0));
-  const refundedService = moneyNumber(refunds.reduce((sum, operation) => sum + operation.serviceAmount, 0));
-  const paidTotal = moneyNumber(payments.reduce((sum, operation) => sum + operation.total, 0));
-  const refundedTotal = moneyNumber(refunds.reduce((sum, operation) => sum + operation.total, 0));
-
-  const settlementFact = facts.find((fact) => fact.entityType === 'finance-settlement'
-    && text(fact.recordId || fact.source?.id) === recordId);
-  const settlement = settlementFact ? factSnapshot(settlementFact) : {};
-  const planTotal = settlementFact ? moneyNumber(settlement.planTotal) : null;
-  const netService = moneyNumber(Math.max(0, paidService - refundedService));
-  const due = planTotal == null ? null : moneyNumber(Math.max(0, planTotal - netService));
-  const paymentState = !settlementFact ? '' : netService <= 0
-    ? (planTotal > 0 ? 'unpaid' : '')
-    : due > 0.009 ? 'partial' : 'paid';
-
-  return {
-    payments,
-    refunds,
-    planTotal,
-    paidAmount: moneyNumber(Math.max(0, paidTotal - refundedTotal)),
-    due,
-    paymentState,
-  };
-}
 
 function recordItem(facts = [], recordId = '') {
   const recordFact = facts.find((fact) => fact.entityType === 'record' && text(fact.entityId) === recordId);
@@ -155,7 +107,7 @@ function recordItem(facts = [], recordId = '') {
   if (!Object.keys(record).length) return null;
   const events = facts.filter((fact) => fact.entityType === 'record-event' && text(fact.recordId) === recordId);
   const state = lifecycle(recordFact, events);
-  const finance = recordFinance(facts, recordId);
+  const finance = recordFinanceFromHistoryFacts(facts, recordId);
   const procedures = procedureNames(record);
   const products = productNames(record);
   const title = [...procedures, ...products].join(', ') || 'Запись';
@@ -186,7 +138,7 @@ function recordItem(facts = [], recordId = '') {
 }
 
 function standaloneFinanceItem(fact = {}) {
-  const operation = financeOperation(fact);
+  const operation = financeHistoryOperation(fact);
   if (!operation.id || operation.status === 'cancelled' || operation.status === 'deleted' || operation.kind === 'cancel') return null;
   const data = operation.data;
   let title = 'Финансовая операция';
