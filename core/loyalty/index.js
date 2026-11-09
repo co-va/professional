@@ -4,7 +4,8 @@ import { canUseCapability } from '../access.js';
 
 const LOYALTY_NAVIGATION = [
   { id: 'deposit', label: 'Депозит' },
-  { id: 'personal-account', label: 'Личный счёт' },
+  // Created automatically on first access for each Person; not a manually issued program.
+  { id: 'personal-account', label: 'Личный счёт', assignableToPerson: false },
   { id: 'certificate', label: 'Сертификат' },
   { id: 'subscription', label: 'Абонемент' },
   { id: 'referral', label: 'Реферальная программа' },
@@ -21,7 +22,9 @@ const LOYALTY_CAPABILITIES = Object.freeze({
 });
 
 export function loyaltyNavigationItems() {
-  return LOYALTY_NAVIGATION.filter((item) => canUseCapability(LOYALTY_CAPABILITIES[item.id])).map(({ id, label }) => ({ id, label }));
+  return LOYALTY_NAVIGATION
+    .filter((item) => canUseCapability(LOYALTY_CAPABILITIES[item.id]))
+    .map(({ id, label, assignableToPerson }) => ({ id, label, assignableToPerson: assignableToPerson !== false }));
 }
 
 export async function renderLoyaltySection(root, section = 'deposit') {
