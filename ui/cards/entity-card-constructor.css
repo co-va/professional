@@ -4,9 +4,9 @@
 .entity-visual-card.has-image .entity-visual-card__surface{background-image:linear-gradient(180deg,rgba(0,0,0,.04),rgba(0,0,0,.18)),var(--entity-visual-image);background-size:cover;background-position:var(--entity-visual-image-position)}
 .entity-visual-card__grid{position:absolute;inset:12px 14px;display:grid;grid-template-rows:repeat(9,minmax(0,1fr));align-items:center}
 .entity-visual-card__line{display:flex;align-items:center;min-width:0;height:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:13px;line-height:1}
-.entity-visual-card__line--full{width:100%}
-.entity-visual-card__line--left{width:50%;justify-self:start}
-.entity-visual-card__line--right{width:50%;justify-self:end}
+.entity-visual-card__row{display:grid;grid-template-columns:minmax(0,1fr);align-items:center;min-width:0;height:100%;gap:3px}
+.entity-visual-card__row--columns{grid-template-columns:repeat(3,minmax(0,1fr))}
+.entity-visual-card__row>.entity-visual-card__line{width:100%;justify-self:stretch}
 .entity-visual-card__line.is-align-left{justify-content:flex-start;text-align:left}
 .entity-visual-card__line.is-align-center{justify-content:center;text-align:center}
 .entity-visual-card__line.is-align-right{justify-content:flex-end;text-align:right}
@@ -41,7 +41,9 @@
 .entity-card-editor__line-picker button{min-width:0;height:36px;border:1px solid #111;border-radius:0;background:#fff;color:#111;font:inherit;font-size:12px}
 .entity-card-editor__line-picker button.is-active{background:#111;color:#fff}
 
-.entity-card-editor__data{margin-bottom:10px}
+.entity-card-editor__data{margin:10px 0}
+.entity-card-editor__control-label{margin:8px 0 5px;font-size:12px;color:var(--text-secondary)}
+.entity-card-editor__tool-group--two{grid-template-columns:repeat(2,minmax(0,1fr))}
 .entity-card-editor__data .ui-select{display:grid;gap:5px}
 .entity-card-editor__data .ui-select>span{color:var(--text-secondary);font-size:12px}
 .entity-card-editor__data .ui-select__control{min-height:44px}

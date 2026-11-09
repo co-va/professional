@@ -13,7 +13,7 @@ export const ENTITY_CARD_DEFAULT_GRADIENT = Object.freeze({
   angle:145,
 });
 
-const ZONES = new Set(['full','left','right']);
+const COLUMNS = ['left','center','right'];
 const ALIGNS = new Set(['left','center','right']);
 const SIZES = new Set(['s','m','l','xl']);
 const COLORS = new Set(['black','gray','white']);
@@ -22,6 +22,23 @@ function bool(value){return Boolean(value)}
 function choice(value,set,fallback){const next=String(value||'');return set.has(next)?next:fallback}
 function hex(value,fallback){const next=String(value||'').trim().toUpperCase();return /^#[0-9A-F]{6}$/.test(next)?next:fallback}
 function number(value,fallback,min,max){const next=Number(value);return Number.isFinite(next)?Math.max(min,Math.min(max,next)):fallback}
+
+
+function normalizeCell(input = {}) {
+  const cell=input&&typeof input==='object'&&!Array.isArray(input)?input:{};
+  return {
+    field:String(cell.field||''),align:choice(cell.align,ALIGNS,'left'),
+    size:choice(cell.size,SIZES,'m'),color:choice(cell.color,COLORS,'white'),
+    bold:bool(cell.bold),italic:bool(cell.italic),underline:bool(cell.underline),uppercase:bool(cell.uppercase),
+  };
+}
+
+export function hasConfiguredEntityCardAppearance(value = {}) {
+  return Array.isArray(value?.lines)&&value.lines.some(line=>
+    Boolean(String(line?.field||'').trim())||
+    COLUMNS.some(col=>Boolean(String(line?.cells?.[col]?.field||'').trim()))
+  );
+}
 
 export function normalizeEntityCardAppearance(value = {}) {
   const source=value&&typeof value==='object'&&!Array.isArray(value)?value:{};
@@ -35,17 +52,16 @@ export function normalizeEntityCardAppearance(value = {}) {
       angle:number(gradient.angle,ENTITY_CARD_DEFAULT_GRADIENT.angle,0,360),
     },
     lines:Array.from({length:ENTITY_CARD_LINE_COUNT},(_,index)=>{
-      const line=lines[index]&&typeof lines[index]==='object'&&!Array.isArray(lines[index])?lines[index]:{};
+      const raw=lines[index]&&typeof lines[index]==='object'&&!Array.isArray(lines[index])?lines[index]:{};
+      const legacyCol=raw.zone==='left'||raw.zone==='right'?raw.zone:'';
+      const saved=raw.cells&&typeof raw.cells==='object'&&!Array.isArray(raw.cells)?raw.cells:null;
+      const cells=Object.fromEntries(COLUMNS.map(col=>[col,normalizeCell(saved?.[col])]));
+      let full=normalizeCell(raw);
+      if(!saved&&legacyCol){cells[legacyCol]=full;full=normalizeCell();}
       return {
-        field:String(line.field||''),
-        zone:choice(line.zone,ZONES,'full'),
-        align:choice(line.align,ALIGNS,'left'),
-        size:choice(line.size,SIZES,'m'),
-        color:choice(line.color,COLORS,'white'),
-        bold:bool(line.bold),
-        italic:bool(line.italic),
-        underline:bool(line.underline),
-        uppercase:bool(line.uppercase),
+        ...full,zone:'full',
+        layout:raw.layout==='columns'||(!raw.layout&&legacyCol)?'columns':'full',
+        cells,
       };
     }),
   };
@@ -77,19 +93,21 @@ export function entityVisualCard({appearance={},fields=[],image='',imagePosition
   ].filter(Boolean).join(';');
   const tag=interactive?'button':'section';
   const attrs=interactive?`type="button"${data?` ${data}`:''}${aria?` aria-label="${escapeHtml(aria)}"`:''}`:'';
-  const rows=config.lines.map((line,index)=>{
-    const text=lineText(line,map);
+
+  const renderCell=(cell,row,col)=>{
+    const value=lineText(cell,map);
     const classes=[
-      'entity-visual-card__line',
-      `entity-visual-card__line--${line.zone}`,
-      `is-align-${line.align}`,
-      `is-size-${line.size}`,
-      `is-color-${line.color}`,
-      line.bold?'is-bold':'',
-      line.italic?'is-italic':'',
-      line.underline?'is-underline':'',
+      'entity-visual-card__line','entity-visual-card__line--'+col,
+      'is-align-'+cell.align,'is-size-'+cell.size,'is-color-'+cell.color,
+      cell.bold?'is-bold':'',cell.italic?'is-italic':'',cell.underline?'is-underline':'',
     ].filter(Boolean).join(' ');
-    return `<span class="${classes}" data-entity-card-line="${index+1}">${escapeHtml(text)}</span>`;
+    return `<span class="${classes}" data-entity-card-line="${row+1}" data-entity-card-column="${col}">${escapeHtml(value)}</span>`;
+  };
+  const rows=config.lines.map((line,index)=>{
+    const isColumns=line.layout==='columns';
+    const inner=isColumns?COLUMNS.map(col=>renderCell(line.cells[col],index,col)).join('')
+      :renderCell(line,index,'full');
+    return `<span class="entity-visual-card__row${isColumns?' entity-visual-card__row--columns':''}">${inner}</span>`;
   }).join('');
   return `<${tag} class="entity-visual-card${image?' has-image':''}${className?` ${escapeHtml(className)}`:''}" style="${style}"${attrs}><span class="entity-visual-card__surface" aria-hidden="true"></span><span class="entity-visual-card__grid">${rows}</span></${tag}>`;
 }
@@ -137,41 +155,46 @@ function editorWorkspace(state,fields,allowPhoto=true){
       <div class="entity-card-editor__direction">${rangeField({label:'Направление',name:'entityCardGradientAngle',value:g.angle,min:0,max:360,step:5,data:'data-card-gradient-angle',aria:'Направление градиента'})}</div>
     </div>`;
   }
-  const line=state.appearance.lines[state.line];
+
+  const row=state.appearance.lines[state.line];
+  const isColumns=row.layout==='columns';
+  const cell=isColumns?row.cells[state.column]:row;
   return `<div class="entity-card-editor__card-tools">
     <div class="entity-card-editor__line-picker">${Array.from({length:ENTITY_CARD_LINE_COUNT},(_,i)=>`<button type="button" class="${i===state.line?'is-active':''}" data-card-line-select="${i}">${i+1}</button>`).join('')}</div>
-    <div class="entity-card-editor__data">${fieldControl(line,fields)}</div>
-
-    <div class="entity-card-editor__tool-row entity-card-editor__tool-row--position" aria-label="Положение">
-      <div class="entity-card-editor__tool-group entity-card-editor__tool-group--three">
-        ${toolButton('Полная','zone:full',line.zone==='full','Полная строка')}
-        ${toolButton('Лево','zone:left',line.zone==='left','Левая половина')}
-        ${toolButton('Право','zone:right',line.zone==='right','Правая половина')}
-      </div>
-      <div class="entity-card-editor__tool-group entity-card-editor__tool-group--three">
-        ${toolButton('←','align:left',line.align==='left','Слева')}
-        ${toolButton('↔','align:center',line.align==='center','По центру')}
-        ${toolButton('→','align:right',line.align==='right','Справа')}
-      </div>
+    <div class="entity-card-editor__control-label">Строка</div>
+    <div class="entity-card-editor__tool-group entity-card-editor__tool-group--two" aria-label="Режим строки">
+      ${toolButton('Вся строка','layout:full',!isColumns,'Вся строка')}
+      ${toolButton('3 столбца','layout:columns',isColumns,'Три столбца')}
     </div>
-
+    ${isColumns?`<div class="entity-card-editor__control-label">Столбец для данных</div>
+      <div class="entity-card-editor__tool-group entity-card-editor__tool-group--three" aria-label="Столбец">
+        ${toolButton('Лево','column:left',state.column==='left','Левый столбец')}
+        ${toolButton('Центр','column:center',state.column==='center','Центральный столбец')}
+        ${toolButton('Право','column:right',state.column==='right','Правый столбец')}
+      </div>`:''}
+    <div class="entity-card-editor__data">${fieldControl(cell,fields)}</div>
+    <div class="entity-card-editor__control-label">Выравнивание текста внутри ячейки</div>
+    <div class="entity-card-editor__tool-group entity-card-editor__tool-group--three" aria-label="Выравнивание">
+      ${toolButton('←','align:left',cell.align==='left','Текст слева')}
+      ${toolButton('↔','align:center',cell.align==='center','Текст по центру')}
+      ${toolButton('→','align:right',cell.align==='right','Текст справа')}
+    </div>
     <div class="entity-card-editor__tool-row entity-card-editor__tool-row--visual" aria-label="Размер и цвет">
       <div class="entity-card-editor__tool-group entity-card-editor__tool-group--four">
-        ${['s','m','l','xl'].map((value)=>toolButton(value.toUpperCase(),`size:${value}`,line.size===value,`Размер ${value.toUpperCase()}`)).join('')}
+        ${['s','m','l','xl'].map(value=>toolButton(value.toUpperCase(),`size:${value}`,cell.size===value,`Размер ${value.toUpperCase()}`)).join('')}
       </div>
       <div class="entity-card-editor__tool-group entity-card-editor__tool-group--three entity-card-editor__tool-group--colors">
-        ${colorTool('black','Чёрный',line.color==='black')}
-        ${colorTool('gray','Серый',line.color==='gray')}
-        ${colorTool('white','Белый',line.color==='white')}
+        ${colorTool('black','Чёрный',cell.color==='black')}
+        ${colorTool('gray','Серый',cell.color==='gray')}
+        ${colorTool('white','Белый',cell.color==='white')}
       </div>
     </div>
-
     <div class="entity-card-editor__tool-row entity-card-editor__tool-row--font" aria-label="Шрифт">
       <div class="entity-card-editor__tool-group entity-card-editor__tool-group--four">
-        ${toolButton('B','bold',line.bold,'Жирный')}
-        ${toolButton('I','italic',line.italic,'Курсив')}
-        ${toolButton('U','underline',line.underline,'Подчёркнутый')}
-        ${toolButton('AA','uppercase',line.uppercase,'Верхний регистр')}
+        ${toolButton('B','bold',cell.bold,'Жирный')}
+        ${toolButton('I','italic',cell.italic,'Курсив')}
+        ${toolButton('U','underline',cell.underline,'Подчёркнутый')}
+        ${toolButton('AA','uppercase',cell.uppercase,'Верхний регистр')}
       </div>
     </div>
   </div>`;
@@ -185,6 +208,7 @@ export function mountEntityCardConstructor(root,{appearance={},fields=[],photo='
     photoPosition:String(photoPosition||'50% 50%'),
     tab:'card',
     line:0,
+    column:'left',
     saving:false,
     error:'',
     dirty:false,
@@ -237,26 +261,33 @@ export function mountEntityCardConstructor(root,{appearance={},fields=[],photo='
   const bindWorkspace=()=>{
     root.querySelectorAll('[data-card-line-select]').forEach((control)=>control.addEventListener('click',()=>{
       state.line=Number(control.dataset.cardLineSelect)||0;
+      const row=state.appearance.lines[state.line];
+      state.column=COLUMNS.find(col=>row.cells[col].field)||'left';
       rerenderWorkspace();
     }));
 
     root.querySelector('input[data-card-line-field]')?.addEventListener('change',(event)=>{
-      state.appearance.lines[state.line].field=event.target.value;
+      const row=state.appearance.lines[state.line];
+      (row.layout==='columns'?row.cells[state.column]:row).field=event.target.value;
       updatePreview();
       markDirty();
     });
 
     root.querySelectorAll('[data-card-tool]').forEach((control)=>control.addEventListener('click',()=>{
       const key=control.dataset.cardTool||'';
-      const line=state.appearance.lines[state.line];
-      if(key.startsWith('zone:'))line.zone=key.slice(5);
-      else if(key.startsWith('align:'))line.align=key.slice(6);
-      else if(key.startsWith('size:'))line.size=key.slice(5);
-      else if(key.startsWith('color:'))line.color=key.slice(6);
-      else if(key==='bold')line.bold=!line.bold;
-      else if(key==='italic')line.italic=!line.italic;
-      else if(key==='underline')line.underline=!line.underline;
-      else if(key==='uppercase')line.uppercase=!line.uppercase;
+      const row=state.appearance.lines[state.line];
+      if(key.startsWith('layout:'))row.layout=key.slice(7)==='columns'?'columns':'full';
+      else if(key.startsWith('column:'))state.column=COLUMNS.includes(key.slice(7))?key.slice(7):'left';
+      else {
+        const cell=row.layout==='columns'?row.cells[state.column]:row;
+        if(key.startsWith('align:'))cell.align=key.slice(6);
+        else if(key.startsWith('size:'))cell.size=key.slice(5);
+        else if(key.startsWith('color:'))cell.color=key.slice(6);
+        else if(key==='bold')cell.bold=!cell.bold;
+        else if(key==='italic')cell.italic=!cell.italic;
+        else if(key==='underline')cell.underline=!cell.underline;
+        else if(key==='uppercase')cell.uppercase=!cell.uppercase;
+      }
       markDirty();
       rerenderWorkspace();
     }));
