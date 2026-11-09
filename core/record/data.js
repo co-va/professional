@@ -29,6 +29,14 @@ export function getRecordRows() {
   return clone(recordRowsState);
 }
 
+/** Select canonical Record rows by procedure ID before cloning or projecting history. */
+export function getRecordRowsForProcedure(procedureId) {
+  const id = normalizeId(procedureId);
+  if (!id) return [];
+  return recordRowsState.filter((row) => (Array.isArray(row?.procedures) ? row.procedures : [])
+    .some((item) => normalizeId(item?.id) === id)).map((row) => clone(row));
+}
+
 /**
  * Read only a specific day's raw Record facts before cloning them.
  * Date/workplace filtering belongs to the storage gateway; Finance and
