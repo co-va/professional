@@ -34,7 +34,7 @@ const settlement = runInNewContext(strip(read('core/finance/settlement.js'))
 });
 const record = {
   id: 'record-1', person: { key: 'person-1' },
-  procedures: [{ id: 'procedure-1', name: 'Процедура', cost: 50000 }],
+  procedures: [{ id: 'procedure-1', name: 'Услуга', cost: 50000 }],
 };
 const scenario = ({ programPercent = 0, manualPercent = 0, paid = false }) => {
   active = programPercent > 0;
