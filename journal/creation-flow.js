@@ -136,8 +136,8 @@ export function openJournalCreation({
     owner.setBackHandler?.(returnToChoices);
     owner.render({
       step: 'procedures',
-      title: 'Выбор процедур',
-      body: '<div class="muted">Загружаем текущие процедуры…</div>',
+      title: 'Выбор услуг',
+      body: '<div class="muted">Загружаем текущие услуги…</div>',
     });
     try {
       const [{ openRecords }, { loadRecordCreationOperationalState }, { hasCurrentProceduresSnapshot }] = await Promise.all([
@@ -169,7 +169,7 @@ export function openJournalCreation({
       if (!owner.isOpen?.() || version !== requestVersion) return;
       const view = owner.render({
         step: 'procedures',
-        title: 'Выбор процедур',
+        title: 'Выбор услуг',
         body: `<p role="alert">${escapeHtml(String(error?.message || 'Не удалось загрузить рабочие данные'))}</p>`,
         action: { label: 'Повторить', data: 'data-record-retry-load' },
       });
