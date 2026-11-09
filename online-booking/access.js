@@ -239,6 +239,10 @@ function selectedProcedures(state, participant) {
 }
 
 function proceduresPrice(state, procedures = []) {
+  // A single service already has its final display text from Core.
+  if (procedures.length === 1) return bookingProcedurePrice(procedures[0], state.workplaceKey);
+  // Only selected-service totals need arithmetic; each individual tariff
+  // remains authoritative on the server.
   return procedures.reduce((summary, procedure) => {
     const price = bookingProcedurePrice(procedure, state.workplaceKey);
     summary.minimum += price.minimum;
