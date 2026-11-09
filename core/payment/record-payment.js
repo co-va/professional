@@ -227,19 +227,16 @@ async function personalAccountForRecord(record, settlement, due) {
 async function openPaymentEntry(record, onCompleted = () => {}) {
   const current = getRecord(record?.id) || record;
   if (!current?.id) return null;
-  const settlement = settlementForRecord(current);
-  const state = paymentStateForRecord(current);
   const recordId = String(current.id);
-  if (state.fullyPaid || paymentInFlightRecords.has(recordId)) return null;
-  if (paymentEntryOpeningRecords.has(recordId)) return null;
-
-  const total = Math.max(0, Number(settlement?.planTotal || 0) - Number(state?.paidTotal || 0));
-  const gratuityOnly = total <= 0.009 && Number(settlement?.serviceTotal || 0) > 0.009;
+  if (paymentInFlightRecords.has(recordId) || paymentEntryOpeningRecords.has(recordId)) return null;
   paymentEntryOpeningRecords.add(recordId);
 
+  // The X opens immediately. Before displaying ANY payable amount or making
+  // a payment, verify current assigned deposit conditions with the server.
+  // A cold/stale cache must not let a 20% program silently become a 0% bill.
   const layer = mountModal(document.body, modal(
     `<div class="compact-form record-payment-entry-x" data-record-payment-entry-host>
-      ${emptyState('Оплата', 'Загрузка…')}
+      ${emptyState('Оплата', 'Проверяем условия скидки…')}
     </div>`,
     { variant: 'x', surface: 'app', title: 'Оплата', className: 'modal--form-sheet' },
   ));
@@ -248,15 +245,35 @@ async function openPaymentEntry(record, onCompleted = () => {}) {
     return null;
   }
 
+  let settlement = null;
+  let state = null;
+  let total = 0;
+  let gratuityOnly = false;
   let deposits = [];
   let personalAccount = null;
   try {
+    const key = String(personForRecord(current)?.key || personForRecord(current)?.id || '').trim();
+    if (key) await listPersonDeposits(key);
+    const verifiedRecord = getRecord(recordId) || current;
+    settlement = settlementForRecord(verifiedRecord);
+    state = paymentStateForRecord(verifiedRecord);
+    if (state.fullyPaid) {
+      layer.v2Close?.();
+      return layer;
+    }
+    total = Math.max(0, Number(settlement?.planTotal || 0) - Number(state?.paidTotal || 0));
+    gratuityOnly = total <= 0.009 && Number(settlement?.serviceTotal || 0) > 0.009;
     [deposits, personalAccount] = gratuityOnly
       ? [[], null]
       : await Promise.all([
-        depositsForRecord(current),
-        personalAccountForRecord(current, settlement, total),
+        depositsForRecord(verifiedRecord),
+        personalAccountForRecord(verifiedRecord, settlement, total),
       ]);
+  } catch (error) {
+    const host = layer.querySelector('[data-record-payment-entry-host]');
+    if (host) host.innerHTML = emptyState('Не удалось проверить условия оплаты',
+      String(error?.message || 'Сервер не подтвердил условия скидки.'));
+    return layer;
   } finally {
     paymentEntryOpeningRecords.delete(recordId);
   }
