@@ -170,7 +170,6 @@ function editorWorkspace(state,fields,allowPhoto=true){
     return `<div class="entity-card-editor__photo">
       ${button(state.photo?'Заменить фото':'Добавить фото',{variant:'secondary',data:'data-card-photo-select'})}
       ${state.photo?button('Удалить фото',{variant:'outline',className:'ui-button--delete-outline',data:'data-card-photo-remove'}):''}
-      <p>Фото заполняет карту. Если фото нет, используется градиентный фон.</p>
     </div>`;
   }
   if(state.tab==='background'){
