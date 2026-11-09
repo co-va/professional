@@ -26,7 +26,7 @@ export function initialProcedure(existing = null, defaultWorkplace = null) {
 export function procedureEditorForm(existing = null) {
   const procedure = initialProcedure(existing);
   return `<form class="compact-form" data-procedure-editor-form>
-    ${field({ label: 'Название', name: 'procedureName', value: procedure.name || '', placeholder: 'Название процедуры', required: true })}
+    ${field({ label: 'Название', name: 'procedureName', value: procedure.name || '', placeholder: 'Название услуги', required: true })}
     ${costField({ value: procedure.cost || {}, name: 'procedureCost' })}
     <div class="work-time-row__fields">
       ${durationPicker({ label: 'Длительность', name: 'procedureDuration', value: procedure.duration || 0 })}
@@ -52,7 +52,7 @@ export function procedureEditorForm(existing = null) {
         inputmode: 'numeric',
       })}
     </div>
-    ${textareaField({ label: 'Описание', name: 'procedureDescription', value: procedure.description || '', placeholder: 'Описание процедуры' })}
+    ${textareaField({ label: 'Описание', name: 'procedureDescription', value: procedure.description || '', placeholder: 'Описание услуги' })}
     <div class="form-error" data-procedure-editor-error></div>
   </form>`;
 }
@@ -92,7 +92,7 @@ export function bindProcedureEditor(root, {
     const name = String(data.get('procedureName') || '').trim();
     const error = root.querySelector('[data-procedure-editor-error]');
     if (!name) {
-      if (error) error.textContent = 'Укажите название процедуры.';
+      if (error) error.textContent = 'Укажите название услуги.';
       return null;
     }
     const groupEnabled = draft.groupBooking?.enabled === true;
