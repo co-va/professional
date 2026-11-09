@@ -1,4 +1,4 @@
-import { normalizeEntityCardAppearance, shortDate } from '../../../ui/ui.js';
+import { normalizeEntityCardAppearance, hasConfiguredEntityCardAppearance, shortDate } from '../../../ui/ui.js';
 import { getCardAppearanceTemplate } from '../../card-appearance-templates.js';
 
 function money(value = 0) {
@@ -24,10 +24,6 @@ function defaultLines(entries = []) {
   return lines;
 }
 
-function hasConfiguredLines(value = {}) {
-  return Array.isArray(value?.lines) && value.lines.some((line) => String(line?.field || '').trim());
-}
-
 export function walletCardFields(wallet = {}, balance = 0) {
   return [
     { value: 'walletName', label: 'Наименование', text: String(wallet?.name || '') },
@@ -36,11 +32,11 @@ export function walletCardFields(wallet = {}, balance = 0) {
 }
 
 export function walletCardAppearance(wallet = {}) {
-  if (hasConfiguredLines(wallet?.cardAppearance)) {
+  if (hasConfiguredEntityCardAppearance(wallet?.cardAppearance)) {
     return normalizeEntityCardAppearance(wallet.cardAppearance);
   }
   const template = getCardAppearanceTemplate('wallet');
-  if (hasConfiguredLines(template?.appearance)) {
+  if (hasConfiguredEntityCardAppearance(template?.appearance)) {
     return normalizeEntityCardAppearance(template.appearance);
   }
   return normalizeEntityCardAppearance({
@@ -77,11 +73,11 @@ export function cashEntityCardFields(entity = {}, balance = 0, kind = '', dueDat
 }
 
 export function cashEntityCardAppearance(entity = {}, kind = '') {
-  if (hasConfiguredLines(entity?.cardAppearance)) {
+  if (hasConfiguredEntityCardAppearance(entity?.cardAppearance)) {
     return normalizeEntityCardAppearance(entity.cardAppearance);
   }
   const template = getCardAppearanceTemplate(kind === 'loan' ? 'loan' : 'investment');
-  if (hasConfiguredLines(template?.appearance)) {
+  if (hasConfiguredEntityCardAppearance(template?.appearance)) {
     return normalizeEntityCardAppearance(template.appearance);
   }
   return normalizeEntityCardAppearance({
