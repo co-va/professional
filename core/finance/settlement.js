@@ -145,7 +145,18 @@ export function recordSettlementPriceCondition(record = null) {
     ? record.loyaltyProgram
     : null;
   const selectedPercent = clampFinancialPercent(selected?.pricePercent || 0);
+  const effective = getPersonPriceCondition(currentPerson(record?.person));
   if (selected && selectedPercent > 0) {
+    // Selected deposits cannot keep applying a frozen 20% after their term
+    // ends or the assignment is cancelled. This is re-evaluated against the
+    // same canonical active-deposit source as the Person editor.
+    if (String(selected.type || '') === 'deposit') {
+      const matched = effective.sources.find((source) => source.type === 'program'
+        && source.programType === 'deposit'
+        && (String(source.depositId || '') === String(selected.assignmentId || '')
+          || (String(source.programId || '') === String(selected.programId || '')));
+      return resolvePersonPriceCondition(null, matched ? [matched] : []);
+    }
     return resolvePersonPriceCondition(null, [{
       type: 'program',
       programType: String(selected?.type || ''),
@@ -159,7 +170,6 @@ export function recordSettlementPriceCondition(record = null) {
   // A person-scoped discount program is already assigned, and must apply to
   // unpaid records automatically. Do not require a SECOND program selection
   // on the Record. Never combine the automatic program with a manual percent.
-  const effective = getPersonPriceCondition(currentPerson(record?.person));
   if (effective.conflict || effective.source?.type !== 'program') return resolvePersonPriceCondition(null, []);
   return resolvePersonPriceCondition(null, [effective.source]);
 }
