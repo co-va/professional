@@ -45,7 +45,7 @@ import { openTagEditor } from '../../settings/tags/tags.js';
 import { addTagToSelection } from '../../ui/tags/index.js';
 import { getDocuments } from '../../settings/documents/data.js';
 import { getConsents } from '../../settings/documents/consents.js';
-import { getAllPeople, getIdentityMemberKeys, getPeople, savePeople } from './data.js';
+import { getAllPeople, getIdentityMemberKeys, getPeople, getPersonPriceCondition, savePeople } from './data.js';
 import { flushBusinessPersistence, isBusinessServerReady } from '../business-persistence.js';
 import { bindPersonCreateForm, personCreateForm } from './create.js';
 import { personDisplay } from './presentation.js';
@@ -60,6 +60,7 @@ import { getCardAppearanceTemplate, saveCardAppearanceTemplate } from '../card-a
 import { getPeopleFilters, getPeopleSortMode, setPeopleFilters, setPeopleSortMode } from './view-state.js';
 import { buildPersonRelationshipSections } from './programs.js';
 import { openPersonProgramActions } from '../loyalty/person-program-actions.js';
+import { listPersonDeposits } from '../loyalty/deposit/data.js';
 import { openPersonRecordCreation } from './record-creation.js';
 import { canUseRealPersonalData } from '../access.js';
 import { isTelegramUserId, loadTelegramUsernames, telegramDisplay } from './telegram-usernames.js';
@@ -959,6 +960,8 @@ function telegramEntries(person, all) {
 }
 
 function personDataFields(person, all) {
+  const discount = getPersonPriceCondition(person);
+  const programDiscount = discount.sources.find((source) => source.type === 'program') || null;
   return [
     `<section class="v2-section"><div class="form-grid people-uei-editor">${uei(ueiData(person, all))}</div></section>`,
     v2Section('Персональные данные', `<div class="form-grid">
@@ -970,7 +973,7 @@ function personDataFields(person, all) {
         { value: 'male', label: 'Мужской' },
       ] })}
       ${monthDayPicker({ label: 'Дата рождения', name: 'birthDate', value: person.birthDate || '' })}
-      ${field({ label: 'Скидка %', name: 'discountPercent', value: person.discountPercent || '', type: 'number', inputmode: 'decimal' })}
+      ${field({ label: 'Скидка %', name: 'discountPercent', value: programDiscount?.percent ?? (person.discountPercent || ''), type: 'number', inputmode: 'decimal', disabled: Boolean(programDiscount) })}
     </div>`),
     v2Section('Контактные данные',
       repeatedField({ label: 'Телефон', name: 'phones', values: businessEntries(person, all, 'phones'), type: 'tel', addInHeader: true })
@@ -984,7 +987,7 @@ function personDataFields(person, all) {
 function formSnapshot(form) {
   if (!form) return '';
   return JSON.stringify({
-    fields: [...new FormData(form).entries()].map(([key, value]) => [key, typeof value === 'string' ? value : '']),
+    fields: [...new FormData(form).entries()].filter(([key]) => key !== 'discountPercent').map(([key, value]) => [key, typeof value === 'string' ? value : '']),
     tags: collectTags(form, 'person-tags'),
   });
 }
@@ -1045,8 +1048,17 @@ function savePersonData(root, key) {
   person.surname = root.querySelector('[name="surname"]')?.value.trim() || '';
   person.gender = root.querySelector('[name="gender"]')?.value || '';
   person.birthDate = root.querySelector('[name="birthDate"]')?.value || '';
-  const rawDiscount = Number(String(root.querySelector('[name="discountPercent"]')?.value || '0').replace(',', '.'));
-  person.discountPercent = Number.isFinite(rawDiscount) ? Math.max(0, Math.min(100, rawDiscount)) : 0;
+  const discountField = root.querySelector('[name="discountPercent"]');
+  const programDiscount = getPersonPriceCondition(person).sources.some((source) => source.type === 'program');
+  // The shown program percentage is derived only. Never write it to
+  // person.discountPercent: that would create a second competing discount.
+  if (programDiscount) {
+    if (!discountField?.disabled) throw new Error('Условия скидки изменились. Откройте данные клиента повторно.');
+  } else {
+    if (discountField?.disabled) throw new Error('Условия скидки изменились. Откройте данные клиента повторно.');
+    const rawDiscount = Number(String(discountField?.value || '0').replace(',', '.'));
+    person.discountPercent = Number.isFinite(rawDiscount) ? Math.max(0, Math.min(100, rawDiscount)) : 0;
+  }
   saveBusinessEntries(all, key, 'phones', collectRepeatedEntries(root, 'phones'), memberKeys);
   saveBusinessEntries(all, key, 'telegrams', collectRepeatedEntries(root, 'telegrams'), memberKeys);
   saveBusinessEntries(all, key, 'emails', collectRepeatedEntries(root, 'emails'), memberKeys);
