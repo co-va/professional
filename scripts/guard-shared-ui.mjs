@@ -76,6 +76,20 @@ assert(entity.includes('aspect-ratio:338/213'), 'EntityCard aspect ratio changed
 assert(entity.includes('grid-template-rows:repeat(9,minmax(0,1fr))'), 'EntityCard row geometry changed');
 assert(rootSelectorCount(entity, '.entity-visual-card') === 1, 'EntityCard geometry must have one owner');
 
+// The approved 2026-11-09 «Вид» UI is implemented by this same Shared
+// constructor. These assertions protect its core design rules; do not build
+// a second UI registry or copy the layout into individual feature modules.
+const cardView = read('ui/cards/entity-card-constructor.js');
+assert(cardView.includes('export const ENTITY_CARD_LINE_COUNT = 9;'), 'Card View: nine rows required');
+assert(cardView.includes("const COLUMNS = ['left','center','right'];"), 'Card View: three independent columns required');
+assert(cardView.includes("[['photo','Фото'],['background','Фон'],['card','Карта']]"), 'Card View: Photo / Background / Card navigation changed');
+assert(entity.includes('.entity-card-editor__photo>.ui-button:only-child{grid-column:1/-1}'), 'Card View: single photo button must fill row');
+assert(entity.includes('white-space:nowrap;'), 'Card View: photo button text must not wrap');
+assert(entity.includes('--entity-card-control-height:calc((100cqw - 8 * var(--entity-card-control-gap)) / 9)'), 'Card View: unified editor control height changed');
+assert(entity.includes('grid-template-columns:repeat(3,minmax(0,1fr)) 10px repeat(4,minmax(0,1fr))'), 'Card View: 3+4 formatting tool groups changed');
+assert(cardView.includes('openColorPickerAction({') && !cardView.includes('<span>Выбрать</span>'), 'Card View: one swatch-only color chooser required');
+
+
 assert(mini.includes('--mini-card-width:238px'), 'MiniCard width changed');
 assert(rootSelectorCount(mini, '.mini-card') === 1, 'MiniCard geometry must have one owner');
 
