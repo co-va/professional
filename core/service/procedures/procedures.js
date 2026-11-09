@@ -20,7 +20,7 @@ import {
   workplaceCountText,
 } from '../../../ui/ui.js';
 import { getSettlementItemTotals, getSettlementItemTotalsForRecords } from '../../../core/finance/index.js';
-import { getRecords } from '../../../core/record/index.js';
+import { getRecordsForProcedure } from '../../../core/record/index.js';
 import { getWorkplaces } from '../../profile/workplaces/data.js';
 import { serviceHeaderContext, notifyServiceContext } from '../context.js';
 import { openServiceWorkplaceSelection } from '../workplace-selection.js';
@@ -32,8 +32,7 @@ const money = (value) => `${new Intl.NumberFormat('ru-RU').format(Number(value |
 
 function activeProcedureRecords(procedureId) {
   const id = String(procedureId || '');
-  return getRecords().filter((record) => record?.status !== 'cancelled'
-    && (record?.procedures || []).some((item) => String(item?.id || '') === id));
+  return getRecordsForProcedure(id).filter((record) => record?.status !== 'cancelled');
 }
 
 function spentMinutes(records, procedure) {
