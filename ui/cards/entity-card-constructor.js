@@ -2,7 +2,7 @@ import { escapeHtml } from '../utils/escape-html.js';
 import { selectPhotoFile } from '../inputs/index.js';
 import { button } from '../buttons/index.js';
 import { select } from '../selectors/index.js';
-import { colorPicker, initColorPickers } from '../colors/index.js';
+import { colorPicker, initColorPickers, openColorPickerAction } from '../colors/index.js';
 import { rangeField } from '../inputs/index.js';
 
 export const ENTITY_CARD_LINE_COUNT = 9;
@@ -16,19 +16,23 @@ export const ENTITY_CARD_DEFAULT_GRADIENT = Object.freeze({
 const COLUMNS = ['left','center','right'];
 const ALIGNS = new Set(['left','center','right']);
 const SIZES = new Set(['s','m','l','xl']);
-const COLORS = new Set(['black','gray','white']);
+const LEGACY_TEXT_COLORS = Object.freeze({black:'#111111',gray:'#777A7D',white:'#FFFFFF'});
 
 function bool(value){return Boolean(value)}
 function choice(value,set,fallback){const next=String(value||'');return set.has(next)?next:fallback}
 function hex(value,fallback){const next=String(value||'').trim().toUpperCase();return /^#[0-9A-F]{6}$/.test(next)?next:fallback}
 function number(value,fallback,min,max){const next=Number(value);return Number.isFinite(next)?Math.max(min,Math.min(max,next)):fallback}
+function textColor(value){
+  const input=String(value||'').trim();
+  return LEGACY_TEXT_COLORS[input.toLowerCase()]||hex(input,'#FFFFFF');
+}
 
 
 function normalizeCell(input = {}, column = 'left') {
   const cell=input&&typeof input==='object'&&!Array.isArray(input)?input:{};
   return {
     field:String(cell.field||''),align:choice(cell.align,ALIGNS,column==='right'?'right':column==='center'?'center':'left'),
-    size:choice(cell.size,SIZES,'m'),color:choice(cell.color,COLORS,'white'),
+    size:choice(cell.size,SIZES,'m'),color:textColor(cell.color),
     bold:bool(cell.bold),italic:bool(cell.italic),underline:bool(cell.underline),uppercase:bool(cell.uppercase),
   };
 }
@@ -136,10 +140,10 @@ export function entityVisualCard({appearance={},fields=[],image='',imagePosition
         :1+2*Math.min(left,right);
       const classes=[
         'entity-visual-card__cell','is-align-'+cell.align,
-        'is-size-'+cell.size,'is-color-'+cell.color,
+        'is-size-'+cell.size,
         cell.bold?'is-bold':'',cell.italic?'is-italic':'',cell.underline?'is-underline':'',
       ].filter(Boolean).join(' ');
-      return `<span class="${classes}" data-entity-card-line="${index+1}" data-entity-card-column="${col}"><span class="entity-visual-card__text" style="--spill-width:${available}">${escapeHtml(lineText(cell,map))}</span></span>`;
+      return `<span class="${classes}" style="color:${cell.color}" data-entity-card-line="${index+1}" data-entity-card-column="${col}"><span class="entity-visual-card__text" style="--spill-width:${available}">${escapeHtml(lineText(cell,map))}</span></span>`;
     }).join('');
     return `<span class="entity-visual-card__row">${cells}</span>`;
   }).join('');
@@ -148,16 +152,6 @@ export function entityVisualCard({appearance={},fields=[],image='',imagePosition
 
 function toolButton(label,key,active=false,title='',className=''){
   return `<button type="button" class="entity-card-editor__tool${active?' is-active':''}${className?` ${className}`:''}" data-card-tool="${escapeHtml(key)}"${title?` aria-label="${escapeHtml(title)}"`:''}>${label}</button>`;
-}
-
-function colorTool(value,label,active){
-  return toolButton(
-    `<span class="entity-card-editor__color-dot is-${escapeHtml(value)}" aria-hidden="true"></span>`,
-    `color:${value}`,
-    active,
-    label,
-    'entity-card-editor__tool--color',
-  );
 }
 
 function fieldControl(line,fields){
@@ -208,17 +202,15 @@ function editorWorkspace(state,fields,allowPhoto=true){
     </div>
     <div class="entity-card-editor__section entity-card-editor__section--format">
       <div class="entity-card-editor__tool-captions"><span>Выравнивание</span><span>Размер</span></div>
-      <div class="entity-card-editor__tools-line" role="group" aria-label="Выравнивание и размер">
+      <div class="entity-card-editor__tools-line entity-card-editor__tools-line--metrics" role="group" aria-label="Выравнивание и размер">
         ${toolButton('←','align:left',cell.align==='left','Текст слева')}
         ${toolButton('↔','align:center',cell.align==='center','Текст по центру')}
         ${toolButton('→','align:right',cell.align==='right','Текст справа')}
         ${['s','m','l','xl'].map(value=>toolButton(value.toUpperCase(),`size:${value}`,cell.size===value,`Размер ${value.toUpperCase()}`)).join('')}
       </div>
       <div class="entity-card-editor__tool-captions"><span>Цвет</span><span>Шрифт</span></div>
-      <div class="entity-card-editor__tools-line" role="group" aria-label="Цвет и шрифт">
-        ${colorTool('black','Чёрный',cell.color==='black')}
-        ${colorTool('gray','Серый',cell.color==='gray')}
-        ${colorTool('white','Белый',cell.color==='white')}
+      <div class="entity-card-editor__tools-line entity-card-editor__tools-line--typography" role="group" aria-label="Цвет и шрифт">
+        <button type="button" class="entity-card-editor__tool entity-card-editor__text-color" data-card-text-color aria-label="Выбрать цвет текста"><span class="entity-card-editor__text-color-swatch" style="background:${cell.color}" aria-hidden="true"></span><span>Выбрать</span></button>
         ${toolButton('B','bold',cell.bold,'Жирный')}
         ${toolButton('I','italic',cell.italic,'Курсив')}
         ${toolButton('U','underline',cell.underline,'Подчёркнутый')}
@@ -307,7 +299,6 @@ export function mountEntityCardConstructor(root,{appearance={},fields=[],photo='
         const cell=row.cells[state.column];
         if(key.startsWith('align:'))cell.align=key.slice(6);
         else if(key.startsWith('size:'))cell.size=key.slice(5);
-        else if(key.startsWith('color:'))cell.color=key.slice(6);
         else if(key==='bold')cell.bold=!cell.bold;
         else if(key==='italic')cell.italic=!cell.italic;
         else if(key==='underline')cell.underline=!cell.underline;
@@ -316,6 +307,21 @@ export function mountEntityCardConstructor(root,{appearance={},fields=[],photo='
       markDirty();
       rerenderWorkspace();
     }));
+
+    root.querySelector('[data-card-text-color]')?.addEventListener('click',()=>{
+      // Bind the color selection to the cell that opened the shared palette.
+      const rowIndex=state.line;
+      const column=state.column;
+      openColorPickerAction({
+        title:'Цвет текста',
+        value:state.appearance.lines[rowIndex].cells[column].color,
+        onSelect:(selected)=>{
+          state.appearance.lines[rowIndex].cells[column].color=textColor(selected);
+          markDirty();
+          rerenderWorkspace();
+        },
+      });
+    });
 
     initColorPickers(root);
     root.querySelectorAll('[data-card-gradient-color]').forEach((holder)=>{
