@@ -20,12 +20,12 @@ function serviceEntities(type) {
 }
 
 function serviceTargetOptions(type) {
-  const allLabel = type === 'product' ? 'Все товары' : 'Все процедуры';
+  const allLabel = type === 'product' ? 'Все товары' : 'Все услуги';
   return [
     { value: 'all', label: allLabel },
     ...serviceEntities(type).map((item) => ({
       value: String(item.id || ''),
-      label: String(item.name || (type === 'product' ? 'Товар' : 'Процедура')),
+      label: String(item.name || (type === 'product' ? 'Товар' : 'Услуга')),
     })),
   ];
 }
@@ -71,7 +71,7 @@ function serviceAppearanceEditor(type, target) {
     };
   }
 
-  const procedure = selected || { id: '', name: 'Процедура', photo: '', cardAppearance: {}, workplaces: [], cost: {}, duration: 0 };
+  const procedure = selected || { id: '', name: 'Услуга', photo: '', cardAppearance: {}, workplaces: [], cost: {}, duration: 0 };
   const records = procedure.id ? recordsFor(type, procedure.id) : [];
   const fact = procedure.id ? getSettlementItemTotals('procedure', procedure.id) : { factTotal: 0 };
   return {
@@ -115,7 +115,7 @@ export function openServiceAppearanceQ(root, { onSaved = () => {} } = {}) {
     title: 'Вид',
     typeLabel: 'Тип карты',
     typeOptions: [
-      { value: 'procedure', label: 'Процедура' },
+      { value: 'procedure', label: 'Услуга' },
       { value: 'product', label: 'Товар' },
     ],
     initialType: 'procedure',
