@@ -147,12 +147,12 @@ export function recordWorkplaceCards(items = [], {
 export function recordProcedureList(items = [], {
   data = 'data-record-procedure',
   selected = [],
-  empty = 'Процедур нет.',
+  empty = 'Услуг нет.',
 } = {}) {
   const selectedSet = new Set((Array.isArray(selected) ? selected : []).map(String));
   const rows = (Array.isArray(items) ? items : []).map((item = {}) => {
     const id = String(item.id || '');
-    const name = String(item.name || item.title || 'Процедура');
+    const name = String(item.name || item.title || 'Услуга');
     return v2ListEntry({
       title: name,
       subtitle: String(item.durationText || item.secondary || ''),
@@ -161,7 +161,7 @@ export function recordProcedureList(items = [], {
       selectable: true,
       selected: selectedSet.has(id),
       data: `${data}="${escapeRecordText(id)}"`,
-      aria: item.aria || `Выбрать процедуру ${name}`,
+      aria: item.aria || `Выбрать услугу ${name}`,
     });
   });
   return rows.length
@@ -232,7 +232,7 @@ export function recordConfirmationMiniCard({
   procedures = [],
 } = {}) {
   const serviceRows = (Array.isArray(procedures) ? procedures : []).map((item = {}) => v2ListEntry({
-    title: item.name || item.title || 'Процедура',
+    title: item.name || item.title || 'Услуга',
     subtitle: item.durationText || item.secondary || '',
     rightTop: item.right || item.costText || '',
     interactive: false,
