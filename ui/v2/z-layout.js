@@ -31,6 +31,9 @@ const Z_BODY_STYLE = [
   'min-height:0',
   'box-sizing:border-box',
   'flex:1 1 auto',
+  // The Z/Q body is never a horizontal rail. Its explicit child rails own pan-x.
+  // Keep vertical scrolling and the separate surface dismiss gesture intact.
+  'overflow-x:hidden',
   'overflow-y:auto',
   'overscroll-behavior:contain',
   '--v2-z-body-section-gap:20px',
