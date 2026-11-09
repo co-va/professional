@@ -401,11 +401,11 @@ export function renderJournal(root, options = {}) {
     const summaryRows = [
       { label: workplaceLabel, value: periodLabel },
       { label: 'Кол-во записей', value: String(records.length) },
-      { label: 'Кол-во процедур', value: String(procedureCount) },
+      { label: 'Кол-во услуг', value: String(procedureCount) },
       { label: 'Кол-во часов', value: formatNumber(hours) },
       isMonth ? { label: 'Кол-во рабочих дней', value: String(workingDayCount) } : null,
       { label: 'Средний чек записи', value: formatRubles(averageRecord) },
-      { label: 'Средний чек процедуры', value: formatRubles(averageProcedure) },
+      { label: 'Средний чек услуги', value: formatRubles(averageProcedure) },
       { label: 'Средний чек часа', value: formatRubles(averageHour) },
       isMonth ? { label: 'Средний чек за рабочий день', value: formatRubles(averageWorkingDay) } : null,
     ].filter(Boolean);
