@@ -30,11 +30,9 @@ import { deleteProcedure as deleteProcedureData, getProcedures, reorderProcedure
 
 const money = (value) => `${new Intl.NumberFormat('ru-RU').format(Number(value || 0))} ₽`;
 
-function activeProcedureRecords(procedureId, workplaceId = '') {
+function activeProcedureRecords(procedureId) {
   const id = String(procedureId || '');
-  const workspace = String(workplaceId || '');
   return getRecords().filter((record) => record?.status !== 'cancelled'
-    && (!workspace || String(record?.workplaceId || '') === workspace)
     && (record?.procedures || []).some((item) => String(item?.id || '') === id));
 }
 
@@ -73,7 +71,7 @@ function procedureRow(procedure) {
     reorderHandle: true,
     reorderAria: 'Изменить порядок',
     data: `data-procedure="${escapeHtml(procedure.id)}" data-reorder-id="${escapeHtml(procedure.id)}"`,
-    aria: `Открыть процедуру ${procedure.name || ''}`,
+    aria: `Открыть услугу ${procedure.name || ''}`,
   });
 }
 
@@ -81,7 +79,7 @@ export function renderProcedureCatalog(host, { root = host, onChanged = () => {}
   const items = getProcedures();
   host.innerHTML = items.length
     ? v2ListEntries(items.map(procedureRow))
-    : emptyState('Процедур пока нет', 'Добавьте первую процедуру кнопкой «+».');
+    : emptyState('Услуг пока нет', 'Добавьте первую услугу кнопкой «+».');
 
   host.querySelectorAll('[data-procedure]').forEach((node) => {
     node.addEventListener('click', () => openProcedureOverview(root, node.dataset.procedure, { onChanged }));
@@ -94,8 +92,7 @@ export function renderProcedureCatalog(host, { root = host, onChanged = () => {}
   });
 }
 
-function procedureOverviewCard(procedure) {
-  const records = activeProcedureRecords(procedure.id);
+function procedureOverviewCard(procedure, records) {
   const fact = getSettlementItemTotals('procedure', procedure.id);
   return entityVisualCard({
     appearance: procedureCardAppearance(procedure),
@@ -109,18 +106,24 @@ function procedureOverviewCard(procedure) {
   });
 }
 
-function procedureWorkplaceCards(procedure) {
+function procedureWorkplaceCards(procedure, records) {
   const byId = new Map(getWorkplaces().map((workplace) => [String(workplace.key || workplace.id || ''), workplace]));
+  const byWorkplace = new Map();
+  for (const record of records) {
+    const id = String(record?.workplaceId || '');
+    if (!byWorkplace.has(id)) byWorkplace.set(id, []);
+    byWorkplace.get(id).push(record);
+  }
   const cards = (procedure.workplaces || []).map((selection) => {
     const id = String(selection.workplaceId || selection.id || selection.key || '');
     const workplace = byId.get(id) || selection;
-    const records = activeProcedureRecords(procedure.id, id);
-    const fact = getSettlementItemTotalsForRecords('procedure', procedure.id, records.map((record) => record.id));
+    const workplaceRecords = byWorkplace.get(id) || [];
+    const fact = getSettlementItemTotalsForRecords('procedure', procedure.id, workplaceRecords.map((record) => record.id));
     return miniCard({
       title: workplace.name || selection.name || 'Рабочее пространство',
       rows: [
-        { label: 'Кол-во', value: String(records.length) },
-        { label: 'Время', value: spentText(spentMinutes(records, procedure)) },
+        { label: 'Кол-во', value: String(workplaceRecords.length) },
+        { label: 'Время', value: spentText(spentMinutes(workplaceRecords, procedure)) },
         { label: 'Сумма', value: money(fact.factTotal) },
       ],
     });
@@ -129,9 +132,9 @@ function procedureWorkplaceCards(procedure) {
 }
 
 function confirmDeleteProcedure(procedure, onDeleted) {
-  const layer = mountModal(document.body, modal(`<div class="modal-title"><h2>Удалить?</h2><p>${escapeHtml(procedure.name || 'Процедура')} будет удалена.</p></div><div class="modal-actions">${button('Удалить', { variant: 'danger', data: 'data-confirm-delete-procedure' })}${button('Отмена', { variant: 'secondary', data: 'data-cancel-delete-procedure' })}</div>`, {
+  const layer = mountModal(document.body, modal(`<div class="modal-title"><h2>Удалить?</h2><p>${escapeHtml(procedure.name || 'Услуга')} будет удалена.</p></div><div class="modal-actions">${button('Удалить', { variant: 'danger', data: 'data-confirm-delete-procedure' })}${button('Отмена', { variant: 'secondary', data: 'data-cancel-delete-procedure' })}</div>`, {
     variant: 'x',
-    title: 'Удаление процедуры',
+    title: 'Удаление услуги',
   }));
   if (!layer) return;
   layer.querySelector('[data-cancel-delete-procedure]')?.addEventListener('click', () => layer.v2Close?.());
@@ -158,7 +161,7 @@ function openProcedureOverviewSettings(layer, baseRoot, procedure, { onChanged =
       },
       {
         id: 'editor',
-        label: 'Редактор процедуры',
+        label: 'Редактор услуги',
         onSelect: () => renderProcedureEditor(layer, baseRoot, procedure, { onChanged }),
       },
       {
@@ -192,15 +195,15 @@ function editorDraftSettings(draft) {
 
 function renderProcedureEditor(layer, baseRoot, existing = null, { onChanged = () => {}, onSaved = () => {} } = {}) {
   const draft = initialProcedure(existing);
-  const title = existing?.name || 'Новая процедура';
+  const title = existing?.name || 'Новая услуга';
   layer.innerHTML = page([
     serviceHeaderContext({
       title,
       settingsData: 'data-procedure-editor-settings',
-      settingsAria: 'Настройки процедуры',
+      settingsAria: 'Настройки услуги',
     }),
     procedureEditorForm(existing),
-    actionBlock(button('Сохранить', { type: 'button', data: 'data-procedure-editor-primary', aria: 'Сохранить процедуру' })),
+    actionBlock(button('Сохранить', { type: 'button', data: 'data-procedure-editor-primary', aria: 'Сохранить услугу' })),
   ]);
 
   layer.querySelector('[data-procedure-editor-settings]')?.addEventListener('click', () => editorDraftSettings(draft));
@@ -233,14 +236,16 @@ function renderProcedureOverview(layer, baseRoot, id, { onChanged = () => {} } =
     onChanged();
     return;
   }
+  // Project Record/Finance once per opened entity, not once per workplace card.
+  const records = activeProcedureRecords(procedure.id);
   layer.innerHTML = page([
     serviceHeaderContext({
-      title: procedure.name || 'Процедура',
+      title: procedure.name || 'Услуга',
       settingsData: 'data-procedure-settings',
-      settingsAria: `Настройки ${procedure.name || 'процедуры'}`,
+      settingsAria: `Настройки ${procedure.name || 'услуги'}`,
     }),
-    procedureOverviewCard(procedure),
-    procedureWorkplaceCards(procedure),
+    procedureOverviewCard(procedure, records),
+    procedureWorkplaceCards(procedure, records),
   ]);
   layer.querySelector('[data-procedure-settings]')?.addEventListener('click', () => openProcedureOverviewSettings(layer, baseRoot, procedure, { onChanged }));
   notifyServiceContext();
