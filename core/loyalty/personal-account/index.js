@@ -144,7 +144,7 @@ function settlementRows(item = {}) {
   const settlement = data?.settlement && typeof data.settlement === 'object' ? data.settlement : null;
   const items = Array.isArray(settlement?.items) ? settlement.items : [];
   return items.map((entry) => ({
-    label: String(entry?.name || (String(entry?.sourceType || '') === 'product' ? 'Товар' : 'Процедура')),
+    label: String(entry?.name || (String(entry?.sourceType || '') === 'product' ? 'Товар' : 'Услуга')),
     value: money(entry?.planAmount ?? entry?.correctedPrice ?? entry?.price),
   }));
 }
