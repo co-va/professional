@@ -26,7 +26,7 @@ export function openRecordConfirmationNotice({
   variable = false,
 } = {}) {
   const rows = (Array.isArray(procedures) ? procedures : []).map((procedure) => ({
-    name: String(procedure?.name || 'Процедура'),
+    name: String(procedure?.name || 'Услуга'),
     value: procedure?.value ?? procedure?.cost ?? 0,
     variable: Boolean(procedure?.variable),
     free: Boolean(procedure?.free),
