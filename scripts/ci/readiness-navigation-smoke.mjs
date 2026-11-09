@@ -53,3 +53,42 @@ console.log('Professional root readiness navigation PASS');
 
 assert.match(source, /if \(!workspaceReady \|\| !sectionAllowed\('chat'\)\) return;/,
   'Record-to-Chat action must not bypass a NOT_READY Chat instrument');
+
+\n// Person Z2 must inherit the Finance and Loyalty tool gates. A saved finance
+// relationship is not proof that its tool is READY/TESTING for this user.
+const peoplePrograms = readFileSync('core/people/programs.js', 'utf8');
+const personFinanceSource = peoplePrograms.match(/function personFinanceEntities\\(person = \\{\\}\\) \\{[\\s\\S]*?\\n\\}/)?.[0];
+assert.ok(personFinanceSource, 'Z2 must explicitly gate finance relationships');
+const financeEnabled = new Set();
+const financePerson = runInNewContext(personFinanceSource + '\\npersonFinanceEntities', {
+  canUseCapability: (key) => financeEnabled.has(key),
+  getInvestmentEntities: () => [
+    { id: 'self', personKey: 'person-1', investmentTerms: { role: 'self' } },
+    { id: 'raise', personKey: 'person-1', investmentTerms: { role: 'raise' } },
+    { id: 'external', personKey: 'person-1', investmentTerms: { role: 'external' } },
+  ],
+  getLoanEntities: () => [{ id: 'loan', personKey: 'person-1' }],
+  normalizeInvestmentTerms: (entity) => entity.investmentTerms || {},
+  text: (value) => String(value ?? '').trim(),
+});
+const person = { key: 'person-1', accounts: [] };
+let financeCards = financePerson(person);
+assert.equal(financeCards.investments.length, 0, 'NOT_READY Investments hidden in Z2');
+assert.equal(financeCards.loans.length, 0, 'NOT_READY Loans hidden in Z2');
+financeEnabled.add('finance.cash.access');
+financeCards = financePerson(person);
+assert.equal(financeCards.investments.length + financeCards.loans.length, 0,
+  'READY wallets do not imply access to Investment or Loan cards');
+financeEnabled.add('finance.special.access');
+financeCards = financePerson(person);
+assert.equal(financeCards.loans.length, 1, 'Ready Loan visible in Z2');
+assert.equal(financeCards.investments.length, 0, 'Loan readiness never exposes Investments');
+financeEnabled.delete('finance.special.access');
+financeEnabled.add('finance.investment.raise.access');
+financeCards = financePerson(person);
+assert.equal(financeCards.investments.length, 1, 'Only the authorized investment role is visible');
+assert.equal(financeCards.investments[0].id, 'raise');
+assert.equal(financeCards.loans.length, 0, 'Investment readiness never exposes Loans');
+assert.match(peoplePrograms, /canSee\\('personal-account'\\)/,
+  'Tester Personal Account uses the existing Loyalty readiness without an extra gate');
+console.log('Person Z2 finance/readiness isolation and tester Personal Account PASS');
