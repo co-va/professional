@@ -111,7 +111,7 @@ async function pull(scopes = ALL_SCOPES) {
     }
 
     if (responses.has('operational')) {
-      const operational = await responseJson(responses.get('operational'), 'Не удалось обновить График, процедуры и онлайн-запись');
+      const operational = await responseJson(responses.get('operational'), 'Не удалось обновить График, услуги и онлайн-запись');
       const daysChanged = hasChanged('operational.days', operational.days || []);
       const proceduresChanged = hasChanged('operational.procedures', operational.procedures || []);
       const bookingSettingsChanged = hasChanged('operational.bookingSettings', operational.bookingSettings || null);
