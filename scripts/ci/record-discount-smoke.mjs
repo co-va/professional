@@ -36,9 +36,9 @@ const record = {
   id: 'record-1', person: { key: 'person-1' },
   procedures: [{ id: 'procedure-1', name: 'Процедура', cost: 50000 }],
 };
-const scenario = ({ percent = 0, withProgram = false, paid = false }) => {
-  active = percent > 0;
-  person.discountPercent = active ? 0 : percent;
+const scenario = ({ programPercent = 0, manualPercent = 0, paid = false }) => {
+  active = programPercent > 0;
+  person.discountPercent = manualPercent;
   stored = paid ? rules.calculateSettlement([
     { sourceType: 'procedure', sourceId: 'procedure-1', price: 50000 },
   ], { pricePercent: 0 }) : null;
@@ -46,7 +46,7 @@ const scenario = ({ percent = 0, withProgram = false, paid = false }) => {
   return settlement.resolveRecordSettlement(record);
 };
 
-let calc = scenario({ percent: 20 });
+let calc = scenario({ programPercent: 20 });
 assert.equal(calc.planTotal, 40000, 'Assigned deposit 20% automatically reduces due');
 assert.equal(calc.items[0].pricePercent, 20, 'Program discount is applied without selecting a Record program');
 assert.equal(calc.items[0].correctionMode, 'none', 'Program does not stack with manual correction');
@@ -61,7 +61,7 @@ let adjustment = procedure(record, 'procedure-1');
 assert.equal(adjustment.programDiscount, true, 'Assigned program locks price editor discount');
 assert.equal(adjustment.discountPercent, 20);
 
-calc = scenario({ percent: 12 });
+calc = scenario({ manualPercent: 12 });
 adjustment = procedure(record, 'procedure-1');
 assert.equal(calc.planTotal, 44000, 'Manual 12% is suggested to the price');
 assert.equal(adjustment.programDiscount, false, 'Manual discount stays editable');
@@ -88,7 +88,7 @@ const unknown = { ...selected, loyaltyProgram: { ...selected.loyaltyProgram, ass
 assert.equal(settlement.resolveRecordSettlement(unknown).planTotal, 50000,
   'Unknown selected deposit cannot borrow another discount');
 
-calc = scenario({ percent: 20, paid: true });
+calc = scenario({ programPercent: 20, paid: true });
 assert.equal(calc.planTotal, 50000,
   'Historical paid settlement must never be repriced by a newly assigned program');
 assert.equal(calc.pricePercent, 0, 'Recorded paid discount remains historical');
