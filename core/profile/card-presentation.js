@@ -30,7 +30,13 @@ function hasConfiguredLines(value = {}) {
   return Array.isArray(value?.lines) && value.lines.some((line)=>String(line?.field||'').trim());
 }
 
-export function profileCardFields(profile = {}, workplaces = [], { previewDiscount = false } = {}) {
+// Professional shows the saved discount position, not a particular Person's value.
+// The User application substitutes the assigned percent or leaves this line empty.
+function discountPositionField() {
+  return { value:'discount', label:'Скидка', text:'%' };
+}
+
+export function profileCardFields(profile = {}, workplaces = []) {
   const supplied=Array.isArray(workplaces)?workplaces:[];
   const values=supplied.length?supplied:(Array.isArray(profile?.workplaces)?profile.workplaces:[]);
   const first=values[0]||{};
@@ -41,8 +47,7 @@ export function profileCardFields(profile = {}, workplaces = [], { previewDiscou
     {value:'firstName',label:'Имя',text:profile.name||''},
     {value:'surname',label:'Фамилия',text:profile.surname||''},
     {value:'profession',label:'Профессия',text:profile.profession||''},
-    // The value is supplied only for appearance preview. User receives its own active discount from Core.
-    {value:'discount',label:'Скидка',text:previewDiscount?'Скидка 10%':''},
+    discountPositionField(),
     {value:'phone',label:'Телефон',text:phoneOf(profile)},
     {value:'email',label:'Email',text:emailOf(profile)},
     {value:'telegram',label:'Telegram',text:telegramOf(profile)},
@@ -53,7 +58,7 @@ export function profileCardFields(profile = {}, workplaces = [], { previewDiscou
   ];
 }
 
-export function workplaceCardFields(workplace = {}, profile = {}, { previewDiscount = false } = {}) {
+export function workplaceCardFields(workplace = {}, profile = {}) {
   return [
     {value:'workTime',label:'График',text:workplace.from||workplace.to?`${workplace.from||'—'} - ${workplace.to||'—'}`:''},
     {value:'workplaceName',label:'Рабочее пространство',text:workplace.name||''},
@@ -62,7 +67,7 @@ export function workplaceCardFields(workplace = {}, profile = {}, { previewDisco
     {value:'workplacePhone',label:'Телефон пространства',text:workplace.phone||''},
     {value:'currency',label:'Валюта',text:workplace.currency||''},
     {value:'workplaceAbout',label:'О рабочем пространстве',text:workplace.about||''},
-    {value:'discount',label:'Скидка',text:previewDiscount?'Скидка 10%':''},
+    discountPositionField(),
     {value:'profileName',label:'Имя и фамилия',text:[profile.name,profile.surname].filter(Boolean).join(' ')},
     {value:'profileFirstName',label:'Имя',text:profile.name||''},
     {value:'profileSurname',label:'Фамилия',text:profile.surname||''},

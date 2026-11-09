@@ -166,7 +166,7 @@ export function openProfileAppearanceQ(root,{onSaved=null,navigateBack=()=>{},op
       if(type==='profile'){
         return {
           appearance:profileCardAppearance(p),
-          fields:profileCardFields(p,values,{previewDiscount:true}),
+          fields:profileCardFields(p,values),
           photo:p.photo||'',
           photoPosition:avatarPosition(p),
         };
@@ -177,7 +177,7 @@ export function openProfileAppearanceQ(root,{onSaved=null,navigateBack=()=>{},op
         : (values.find((item)=>item.key===target)||values[0]||{name:'Рабочее пространство',photo:'',photoCropX:50,photoCropY:50,cardAppearance:{}});
       return {
         appearance:target==='all' && template?.appearance ? template.appearance : workplaceCardAppearance(sample),
-        fields:workplaceCardFields(sample,p,{previewDiscount:true}),
+        fields:workplaceCardFields(sample,p),
         photo:target==='all' ? String(template?.photo||sample.photo||'') : workplaceCardPhoto(sample),
         photoPosition:target==='all' ? String(template?.photoPosition||'50% 50%') : `${crop(sample.photoCropX)}% ${crop(sample.photoCropY)}%`,
       };
