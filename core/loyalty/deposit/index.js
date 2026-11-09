@@ -319,7 +319,7 @@ function settlementRows(operation = null) {
     : null;
   const items = Array.isArray(settlement?.items) ? settlement.items : [];
   return items.map((item) => ({
-    label: String(item?.name || (String(item?.sourceType || '') === 'product' ? 'Товар' : 'Процедура')),
+    label: String(item?.name || (String(item?.sourceType || '') === 'product' ? 'Товар' : 'Услуга')),
     value: money(item?.planAmount ?? item?.correctedPrice ?? item?.price),
   }));
 }
