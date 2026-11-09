@@ -21,7 +21,8 @@ import {
   v2ListEntry,
 } from '../../ui/ui.js';
 import { createRecord, getRecord, updateRecord } from '../record/index.js';
-import { getPeople } from '../people/data.js';
+import { getPeople, getPersonPriceCondition } from '../people/data.js';
+import { listPersonDeposits } from '../loyalty/deposit/data.js';
 import { openPersonCreate } from '../people/create.js';
 import { personDisplay } from '../people/presentation.js';
 import { getProcedures } from '../service/procedures/data.js';
@@ -196,9 +197,20 @@ function timeConflictMessage(result, from, to) {
   return `Интервал ${interval} недоступен.`;
 }
 
-export function openProcedureAdjustment(record, procedureId, { onSaved = () => {} } = {}) {
+export async function openProcedureAdjustment(record, procedureId, { onSaved = () => {} } = {}) {
   const source = getRecord(record?.id) || record;
   if (!source?.id || getRecordPaymentState(source).hasPayments) return null;
+  // Never open a price editor from an unverified deposit snapshot. The
+  // program discount is automatically locked on its procedure lines.
+  const personKey = String(source?.person?.key || source?.person?.id || '').trim();
+  if (personKey) {
+    try {
+      await listPersonDeposits(personKey);
+    } catch (error) {
+      openNotice({ title: 'Условия скидки', message: String(error?.message || 'Не удалось проверить программу.') });
+      return null;
+    }
+  }
   const procedure = (Array.isArray(source.procedures) ? source.procedures : [])
     .find((item) => String(item?.id || '') === String(procedureId || ''));
   const adjustment = getRecordProcedurePaymentAdjustment(source, procedureId);
@@ -864,7 +876,8 @@ export function openRecords({
           duration: entry.duration,
         })),
       });
-    const contactDiscountPercent = Math.max(0, Math.min(100, Number(contact?.discountPercent) || 0));
+    const effectiveDiscount = getPersonPriceCondition(contact);
+    const contactDiscountPercent = Math.max(0, Math.min(100, Number(effectiveDiscount.percent) || 0));
     const discountMoney = Math.max(0, (Number(settlement?.serviceTotal) || 0) - (Number(settlement?.planTotal) || 0));
     const grossTotal = Number(settlement?.serviceTotal ?? (source.total ? source.total(state) : 0)) || 0;
     const identityNameParts = [contact?.name, contact?.surname].map((value) => String(value || '').trim()).filter(Boolean);
