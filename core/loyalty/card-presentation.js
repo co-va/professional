@@ -1,4 +1,4 @@
-import { normalizeEntityCardAppearance, entityCardDefaultRows, hasConfiguredEntityCardAppearance } from '../../ui/ui.js';
+import { normalizeEntityCardAppearance, remapEntityCardAppearanceFields, entityCardDefaultRows, hasConfiguredEntityCardAppearance } from '../../ui/ui.js';
 import { getCardAppearanceTemplate } from '../card-appearance-templates.js';
 
 const TYPES = {
@@ -29,7 +29,7 @@ export function loyaltyCardLabel(type = '') {
 export function loyaltyCardAppearance(type = '') {
   const template = getCardAppearanceTemplate(loyaltyCardScope(type));
   if (hasConfiguredEntityCardAppearance(template?.appearance)) {
-    return normalizeEntityCardAppearance(template.appearance);
+    return type === 'personal-account' ? remapEntityCardAppearanceFields(template.appearance, {metaLeft:'amountLabel',metaRight:'currentAmount'}) : normalizeEntityCardAppearance(template.appearance);
   }
   const personal = type === 'personal-account';
   return normalizeEntityCardAppearance({
