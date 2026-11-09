@@ -36,6 +36,9 @@ function money(value) {
 }
 
 function priceText(price = {}) {
+  // Individual services render the server-authored price; arithmetic remains
+  // solely for multi-service totals where no single catalog price exists.
+  if (text(price.display)) return text(price.display);
   return `${price.variable ? 'от ' : ''}${money(price.minimum)}`;
 }
 
