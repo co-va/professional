@@ -174,7 +174,7 @@ function historyMarkup(instance = {}) {
 
 function historyEventMarkup(item = {}) {
   const rows = [{ label: 'Дата', value: shortDateTime(item.occurredAt, '—') }];
-  if (item.procedure) rows.push({ label: 'Процедура / товар', value: item.procedure });
+  if (item.procedure) rows.push({ label: 'Услуга / товар', value: item.procedure });
   if (item.quantity != null) rows.push({ label: 'Количество', value: String(item.quantity) });
   if (item.remainingAfter != null) rows.push({ label: 'Остаток', value: String(item.remainingAfter) });
   rows.push({ label: 'Дата формирования', value: shortDateTime(item.recordedAt || item.createdAt || item.occurredAt, '—') });
