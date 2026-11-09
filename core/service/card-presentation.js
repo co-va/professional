@@ -1,28 +1,10 @@
-import { costListParts, durationText, normalizeEntityCardAppearance, hasConfiguredEntityCardAppearance } from '../../ui/ui.js';
+import { costListParts, durationText, normalizeEntityCardAppearance, entityCardDefaultRows, hasConfiguredEntityCardAppearance } from '../../ui/ui.js';
 import { getCardAppearanceTemplate } from '../../core/card-appearance-templates.js';
 
 function money(value = 0) {
   return `${new Intl.NumberFormat('ru-RU').format(Number(value || 0))} ₽`;
 }
 
-function defaultLines(entries = []) {
-  const lines = Array.from({ length: 9 }, () => ({
-    field: '',
-    zone: 'full',
-    align: 'left',
-    size: 'm',
-    color: 'white',
-    bold: false,
-    italic: false,
-    underline: false,
-    uppercase: false,
-  }));
-  entries.forEach(({ row, field, zone = 'full', align = 'left', size = 'm', color = 'white', bold = false }) => {
-    const index = Math.max(0, Math.min(8, Number(row) - 1));
-    lines[index] = { field, zone, align, size, color, bold, italic: false, underline: false, uppercase: false };
-  });
-  return lines;
-}
 
 function costText(cost = {}) {
   const parts = costListParts(cost);
@@ -47,14 +29,14 @@ export function procedureCardAppearance(procedure = {}) {
   const template = getCardAppearanceTemplate('procedure');
   if (hasConfiguredEntityCardAppearance(template?.appearance)) return normalizeEntityCardAppearance(template.appearance);
   return normalizeEntityCardAppearance({
-    lines: defaultLines([
-      { row: 1, field: 'duration', zone: 'right', align: 'right' },
-      { row: 2, field: 'cost', zone: 'right', align: 'right' },
-      { row: 3, field: 'workplaceCount', zone: 'right', align: 'right' },
-      { row: 5, field: 'recordCount', zone: 'left', align: 'left' },
-      { row: 6, field: 'spentTime', zone: 'left', align: 'left' },
-      { row: 7, field: 'name', zone: 'full', align: 'left', size: 'l', bold: true },
-      { row: 9, field: 'revenue', zone: 'right', align: 'right', bold: true },
+    lines: entityCardDefaultRows([
+      { row: 1, field: 'duration', column:'right', align: 'right' },
+      { row: 2, field: 'cost', column:'right', align: 'right' },
+      { row: 3, field: 'workplaceCount', column:'right', align: 'right' },
+      { row: 5, field: 'recordCount', column:'left', align: 'left' },
+      { row: 6, field: 'spentTime', column:'left', align: 'left' },
+      { row: 7, field: 'name', column:'left', align: 'left', size: 'l', bold: true },
+      { row: 9, field: 'revenue', column:'right', align: 'right', bold: true },
     ]),
   });
 }
@@ -78,12 +60,12 @@ export function productCardAppearance(product = {}) {
   const template = getCardAppearanceTemplate('product');
   if (hasConfiguredEntityCardAppearance(template?.appearance)) return normalizeEntityCardAppearance(template.appearance);
   return normalizeEntityCardAppearance({
-    lines: defaultLines([
-      { row: 1, field: 'cost', zone: 'right', align: 'right' },
-      { row: 2, field: 'workplaceCount', zone: 'right', align: 'right' },
-      { row: 5, field: 'saleCount', zone: 'left', align: 'left' },
-      { row: 7, field: 'name', zone: 'full', align: 'left', size: 'l', bold: true },
-      { row: 9, field: 'revenue', zone: 'right', align: 'right', bold: true },
+    lines: entityCardDefaultRows([
+      { row: 1, field: 'cost', column:'right', align: 'right' },
+      { row: 2, field: 'workplaceCount', column:'right', align: 'right' },
+      { row: 5, field: 'saleCount', column:'left', align: 'left' },
+      { row: 7, field: 'name', column:'left', align: 'left', size: 'l', bold: true },
+      { row: 9, field: 'revenue', column:'right', align: 'right', bold: true },
     ]),
   });
 }
