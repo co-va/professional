@@ -1,4 +1,4 @@
-import { normalizeEntityCardAppearance, hasConfiguredEntityCardAppearance } from '../../ui/ui.js';
+import { normalizeEntityCardAppearance, entityCardDefaultRows, hasConfiguredEntityCardAppearance } from '../../ui/ui.js';
 import { getCardAppearanceTemplate } from '../../core/card-appearance-templates.js';
 
 function firstOf(value, key) {
@@ -17,14 +17,6 @@ function telegramOf(value = {}) {
   return firstOf(value,'telegrams');
 }
 
-function defaultLines(entries = []) {
-  const lines=Array.from({length:9},()=>({field:'',zone:'full',align:'left',size:'m',color:'white',bold:false,italic:false,underline:false,uppercase:false}));
-  entries.forEach(({row,field,zone='full',align='left',size='m',color='white',bold=false,italic=false,underline=false,uppercase=false})=>{
-    const index=Math.max(0,Math.min(8,Number(row)-1));
-    lines[index]={field,zone,align,size,color,bold,italic,underline,uppercase};
-  });
-  return lines;
-}
 
 // Professional shows the saved discount position, not a particular Person's value.
 // The User application substitutes the assigned percent or leaves this line empty.
@@ -80,12 +72,12 @@ export function workplaceCardFields(workplace = {}, profile = {}) {
 export function profileCardAppearance(profile = {}) {
   if(hasConfiguredEntityCardAppearance(profile.cardAppearance)) return normalizeEntityCardAppearance(profile.cardAppearance);
   return normalizeEntityCardAppearance({
-    lines:defaultLines([
-      {row:1,field:'workTime',zone:'right',align:'right',size:'m'},
-      {row:2,field:'workplaceName',zone:'right',align:'right',size:'m'},
-      {row:7,field:'name',zone:'full',align:'left',size:'l',bold:true},
-      {row:8,field:'profession',zone:'full',align:'left',size:'m'},
-      {row:9,field:'phone',zone:'full',align:'left',size:'m'},
+    lines:entityCardDefaultRows([
+      {row:1,field:'workTime',column:'right',align:'right',size:'m'},
+      {row:2,field:'workplaceName',column:'right',align:'right',size:'m'},
+      {row:7,field:'name',column:'left',align:'left',size:'l',bold:true},
+      {row:8,field:'profession',column:'left',align:'left',size:'m'},
+      {row:9,field:'phone',column:'left',align:'left',size:'m'},
     ]),
   });
 }
@@ -95,12 +87,12 @@ export function workplaceCardAppearance(workplace = {}) {
   const template=getCardAppearanceTemplate('workplace');
   if(hasConfiguredEntityCardAppearance(template?.appearance)) return normalizeEntityCardAppearance(template.appearance);
   return normalizeEntityCardAppearance({
-    lines:defaultLines([
-      {row:1,field:'workTime',zone:'right',align:'right',size:'m'},
-      {row:2,field:'workplaceName',zone:'right',align:'right',size:'m'},
-      {row:7,field:'profileName',zone:'full',align:'left',size:'l',bold:true},
-      {row:8,field:'profession',zone:'full',align:'left',size:'m'},
-      {row:9,field:'profilePhone',zone:'full',align:'left',size:'m'},
+    lines:entityCardDefaultRows([
+      {row:1,field:'workTime',column:'right',align:'right',size:'m'},
+      {row:2,field:'workplaceName',column:'right',align:'right',size:'m'},
+      {row:7,field:'profileName',column:'left',align:'left',size:'l',bold:true},
+      {row:8,field:'profession',column:'left',align:'left',size:'m'},
+      {row:9,field:'profilePhone',column:'left',align:'left',size:'m'},
     ]),
   });
 }
