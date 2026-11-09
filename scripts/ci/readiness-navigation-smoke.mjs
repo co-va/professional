@@ -93,3 +93,42 @@ assert.equal(financeCards.loans.length, 0, 'Investment readiness never exposes L
 assert.match(peoplePrograms, /canSee\('personal-account'\)/,
   'Tester Personal Account uses the existing Loyalty readiness without an extra gate');
 console.log('Person Z2 finance/readiness isolation and tester Personal Account PASS');
+
+
+// Assignment actions are not identical to visible Loyalty E-cards. The
+// automatic Personal Account is visible in Loyalty and Person Z2, but cannot
+// be manually assigned again through the "Choose program" action.
+const loyaltySource = readFileSync('core/loyalty/index.js', 'utf8');
+const assignSource = readFileSync('core/loyalty/person-program-actions.js', 'utf8');
+const personalAccountSource = readFileSync('core/loyalty/personal-account/index.js', 'utf8');
+const extract = (text, expression, description) => {
+  const match = text.match(expression)?.[0];
+  assert.ok(match, description);
+  return match.replace(/^export /, '');
+};
+const registrySource = extract(loyaltySource, /const LOYALTY_NAVIGATION = \[[\s\S]*?\];/, 'Loyalty E registry');
+const capabilitySource = extract(loyaltySource, /const LOYALTY_CAPABILITIES = Object\.freeze\(\{[\s\S]*?\}\);/, 'Loyalty capabilities');
+const navSource = extract(loyaltySource, /export function loyaltyNavigationItems\(\) \{[\s\S]*?\n\}/, 'Loyalty E navigation');
+const typesSource = extract(assignSource, /export function personProgramActionTypes\(\) \{[\s\S]*?\n\}/, 'Person assignment selection');
+const loyaltyEnabled = new Set(['loyalty.deposit.access', 'loyalty.personal_account.access']);
+const assignment = runInNewContext(
+  [registrySource, capabilitySource, navSource, typesSource,
+    '({ loyaltyNavigationItems, personProgramActionTypes })'].join('\n'),
+  { canUseCapability: (key) => loyaltyEnabled.has(key) },
+);
+assert.ok(assignment.loyaltyNavigationItems().some((item) => item.id === 'personal-account'),
+  'Personal Account stays in Loyalty E when TESTING is authorized');
+assert.equal(assignment.personProgramActionTypes().map((item) => item.id).join(','), 'deposit',
+  'Only Deposit is offered for manual assignment with current enabled E');
+loyaltyEnabled.add('loyalty.certificate.access');
+assert.equal(assignment.personProgramActionTypes().map((item) => item.id).join(','), 'deposit,certificate',
+  'New assignable Loyalty E is automatically included');
+loyaltyEnabled.clear();
+loyaltyEnabled.add('loyalty.personal_account.access');
+assert.equal(assignment.personProgramActionTypes().length, 0,
+  'Automatic Personal Account alone cannot be manually assigned');
+assert.match(personalAccountSource, /export async function openPersonalAccountForPerson\(/,
+  'Existing Personal Account still opens from Person Z2');
+assert.doesNotMatch(personalAccountSource, /export async function getPersonProgramChoices\(/,
+  'Automatic Personal Account must not export a manual assignment workflow');
+console.log('Person assignment: automatic Personal Account excluded, Loyalty remains accessible PASS');
