@@ -61,10 +61,11 @@ function resolveIdle() {
 }
 
 async function send(item) {
-  const response = await apiRequest(item.path, {
-    ...item.options,
-    keepalive: true,
-  });
+  // These are regular authenticated API mutations, not unload beacons.
+  // keepalive fetch bodies are capped (~64 KiB) and Safari can reject large
+  // Person/photo, Finance or auxiliary JSON with an opaque "Load failed".
+  // The queue itself retains mutations until the server acknowledges them.
+  const response = await apiRequest(item.path, item.options);
   return responseJson(response, item.fallbackMessage);
 }
 
