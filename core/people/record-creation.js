@@ -1,4 +1,5 @@
 import { openRecords } from '../records/records.js';
+import { listPersonDeposits } from '../loyalty/deposit/data.js';
 import { openNotice } from '../../ui/ui.js';
 import { openRecordConfirmationNotice } from '../../ui/record/confirmation-notice.js';
 import { calculateSettlement, recordSettlementPricePercent } from '../finance/index.js';
@@ -22,7 +23,7 @@ export async function openPersonRecordCreation({ person, onCreated = () => {} } 
   if (!person?.key) return null;
 
   try {
-    await loadRecordCreationOperationalState();
+    await Promise.all([loadRecordCreationOperationalState(), listPersonDeposits(person.key)]);
   } catch (error) {
     openNotice({
       title: 'Запись недоступна',
