@@ -2,6 +2,7 @@ import { normalizeEntityCardAppearance } from '../../ui/ui.js';
 import { getCardAppearanceTemplate } from '../card-appearance-templates.js';
 import { getPersonMetadata, formatPersonVisitDate } from './metadata.js';
 import { telegramDisplay } from './telegram-usernames.js';
+import { getPersonPriceCondition } from './data.js';
 
 function first(values = []) {
   return String(Array.isArray(values) ? (values[0] || '') : '');
@@ -30,6 +31,7 @@ function hasConfiguredLines(value = {}) {
 export function personCardFields(person = {}) {
   const meta = person?.key ? getPersonMetadata(person.key) : { recordCount: 0, paidTotal: 0, lastVisit: '' };
   const fullName = [person.name, person.surname].filter(Boolean).join(' ');
+  const discount = getPersonPriceCondition(person);
   return [
     { value: 'uei', label: 'UEI', text: person.uei || '' },
     { value: 'name', label: 'Имя и фамилия', text: fullName },
@@ -39,7 +41,7 @@ export function personCardFields(person = {}) {
     { value: 'email', label: 'Email', text: first(person.emails) },
     { value: 'telegram', label: 'Telegram', text: telegramDisplay(first(person.telegrams)) },
     { value: 'birthDate', label: 'Дата рождения', text: person.birthDate || '' },
-    { value: 'discount', label: 'Скидка', text: person.discountPercent ? `${Number(person.discountPercent)}%` : '' },
+    { value: 'discount', label: 'Скидка', text: discount.source && !discount.conflict ? `${discount.percent}%` : '' },
     { value: 'recordCount', label: 'Количество записей', text: String(meta.recordCount || 0) },
     { value: 'paidTotal', label: 'Сумма оплат', text: money(meta.paidTotal) },
     { value: 'lastVisit', label: 'Последнее посещение', text: meta.lastVisit ? formatPersonVisitDate(meta.lastVisit) : '' },
