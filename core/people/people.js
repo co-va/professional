@@ -627,7 +627,7 @@ function peopleFilterFields(filters = {}) {
       options:[{value:'',label:'Без фильтра'},{value:'discount',label:'Скидка'},{value:'program',label:'Программа'}],
     })}
     <div data-people-program-filter${filters.loyaltyMode==='program'?'':' hidden'}>
-      ${peopleProgramSelect(filters)}
+      ${filters.loyaltyMode==='program'?peopleProgramSelect(filters):''}
     </div>
     ${select({ label: 'Email', name: 'peopleNoEmailFilter', value: filters.noEmail, options: [{ value: '', label: 'Без фильтра' }, { value: 'has', label: 'Указан' }, { value: 'yes', label: 'Не указан' }] })}
     ${select({ label: 'Посещения', name: 'peopleRecordPeriodFilter', value: filters.recordPeriod, options: [
@@ -703,7 +703,8 @@ function openFilterSettings(root) {
       if(draft.loyaltyMode!=='program')draft.loyaltyProgram='';
       if(programHost){
         programHost.hidden=draft.loyaltyMode!=='program';
-        refreshProgramSelect();
+        if(programHost.hidden)programHost.innerHTML='';
+        else refreshProgramSelect();
       }
     }
     if (key === 'recordPeriod') {

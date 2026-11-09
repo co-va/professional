@@ -12,7 +12,7 @@ const KINDS = Object.freeze({
 });
 const text = value => String(value??'').trim();
 const activeProgram = program => Boolean(program?.id) && !program?.archivedAt && (!program.status || program.status==='active');
-const activeInstance = item => !['closed','ended','expired','cancelled','used'].includes(text(item?.status).toLowerCase());
+const activeInstance = item => !['closed','ended','expired','cancelled','paused','used'].includes(text(item?.status).toLowerCase());
 
 export async function refreshPeopleLoyaltyData(){
   // Actual server assignments, not sample or automatic Personal Accounts.
