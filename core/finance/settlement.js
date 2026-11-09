@@ -151,10 +151,12 @@ export function recordSettlementPriceCondition(record = null) {
     // ends or the assignment is cancelled. This is re-evaluated against the
     // same canonical active-deposit source as the Person editor.
     if (String(selected.type || '') === 'deposit') {
+      const assignmentId = String(selected.assignmentId || '').trim();
+      const programId = String(selected.programId || '').trim();
       const matched = effective.sources.find((source) => source.type === 'program'
         && source.programType === 'deposit'
-        && (String(source.depositId || '') === String(selected.assignmentId || '')
-          || (String(source.programId || '') === String(selected.programId || '')));
+        && ((assignmentId && String(source.depositId || '') === assignmentId)
+          || (programId && String(source.programId || '') === programId)));
       return resolvePersonPriceCondition(null, matched ? [matched] : []);
     }
     return resolvePersonPriceCondition(null, [{
