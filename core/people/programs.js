@@ -13,8 +13,8 @@ import { getUEI } from '../uei.js';
 import { loyaltyNavigationItems } from '../loyalty/index.js';
 import { canUseCapability } from '../access.js';
 import { personalAccountVisualCard } from '../loyalty/personal-account/index.js';
-import { getCachedPersonalAccount, loadPersonalAccount } from '../loyalty/personal-account/data.js';
-import { getDepositInstances, listPersonDeposits } from '../loyalty/deposit/data.js';
+import { getCachedPersonalAccount, loadPersonalAccount, updatePersonalAccountSettings } from '../loyalty/personal-account/data.js';
+import { getDepositInstances, getDepositPrograms, listPersonDeposits, loadDepositPrograms, updateDepositSettings } from '../loyalty/deposit/data.js';
 import {
   depositCardAppearance,
   depositCardFields,
@@ -339,6 +339,37 @@ function personFinanceEntities(person = {}) {
   return { investments, loans };
 }
 
+// The Person Q uses the same persisted visibility contract as each Loyalty Q.
+// "Off" hides the card from this end user, without changing payments or history.
+function personalAccountVisibility(personKey, account) {
+  return {
+    checked: account?.visibleToEndUser !== false,
+    async onToggle(checked) {
+      const latest = getCachedPersonalAccount(personKey) || account;
+      const saved = await updatePersonalAccountSettings(personKey, {
+        spendLimitPercent: latest?.spendLimitPercent ?? 100,
+        visibleToEndUser: checked,
+      });
+      return saved?.visibleToEndUser !== false;
+    },
+  };
+}
+
+function depositVisibility(deposit) {
+  const id = text(deposit?.depositId || deposit?.id);
+  const program = getDepositPrograms().find(item => text(item?.id) === text(deposit?.programId));
+  const inherited = program?.showToAll !== false;
+  return {
+    checked: typeof deposit?.visibleToPersonOverride === 'boolean'
+      ? deposit.visibleToPersonOverride : inherited,
+    async onToggle(checked) {
+      const saved = await updateDepositSettings(id, { visibleToPerson: checked });
+      return typeof saved?.visibleToPersonOverride === 'boolean'
+        ? saved.visibleToPersonOverride : checked;
+    },
+  };
+}
+
 function cachedPersonDeposits(personKey = '') {
   const key = text(personKey);
   if (!key) return [];
@@ -360,7 +391,7 @@ export async function buildPersonRelationshipSections(person = {}, { refresh = t
   const deposits = canSee('deposit') ? cachedPersonDeposits(key) : [];
   const refreshTasks = refresh ? [
     ...(canSee('personal-account') ? [loadPersonalAccount(key)] : []),
-    ...(canSee('deposit') ? [listPersonDeposits(key)] : []),
+    ...(canSee('deposit') ? [loadDepositPrograms(), listPersonDeposits(key)] : []),
   ] : [];
   const refreshPromise = refreshTasks.length ? Promise.allSettled(refreshTasks) : null;
   const certificates = canSee('certificate') ? getCertificateAssignmentsForPerson(key) : [];
@@ -390,8 +421,14 @@ export async function buildPersonRelationshipSections(person = {}, { refresh = t
   ];
 
   const detailByKey = new Map([
-    ...(account ? [['personal-account', { title: 'Личный счёт', body: personalAccountDetail(account, accountError), settings: false }]] : []),
-    ...deposits.map((item) => [`deposit:${item.depositId || item.id}`, { title: item.programName || 'Депозит', body: depositDetail(item) }]),
+    ...(account ? [['personal-account', {
+      title: 'Личный счёт', body: personalAccountDetail(account, accountError),
+      visibility: personalAccountVisibility(key, account),
+    }]] : []),
+    ...deposits.map((item) => [`deposit:${item.depositId || item.id}`, {
+      title: item.programName || 'Депозит', body: depositDetail(item),
+      visibility: depositVisibility(item),
+    }]),
     ...certificates.map((item) => [`certificate:${item.instance?.id}`, { title: item.program?.name || 'Сертификат', body: certificateDetail(item) }]),
     ...subscriptions.map((item) => [`subscription:${item.instance?.id}`, { title: item.program?.name || 'Абонемент', body: subscriptionDetail(item) }]),
     ...referrals.map((item) => [`referral:${item.program?.id}`, { title: item.program?.name || 'Реферальная программа', body: referralDetail(item) }]),

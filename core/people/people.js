@@ -61,6 +61,7 @@ import { getCardAppearanceTemplate, saveCardAppearanceTemplate } from '../card-a
 import { getPeopleFilters, getPeopleSortMode, setPeopleFilters, setPeopleSortMode } from './view-state.js';
 import { buildPersonRelationshipSections } from './programs.js';
 import { openPersonProgramActions } from '../loyalty/person-program-actions.js';
+import { openLoyaltySettingsMenu } from '../loyalty/shared.js';
 import { listPersonDeposits } from '../loyalty/deposit/data.js';
 import { peopleHasAssignedDiscount, peopleAssignedPrograms, peopleProgramOptions, refreshPeopleLoyaltyData } from './loyalty-filter.js';
 import { openPersonRecordCreation } from './record-creation.js';
@@ -225,7 +226,7 @@ function personHistoryMarkup(items = [], query = '') {
   })));
 }
 
-function personQContext(person, { settings = false } = {}) {
+function personQContext(person, { settings = false, settingsData = 'data-person-settings', settingsAria = '' } = {}) {
   return workspaceHeaderContext({
     title: name(person),
     a: {
@@ -233,7 +234,7 @@ function personQContext(person, { settings = false } = {}) {
       image: person.photo || '',
       initials: initials(person),
     },
-    v: settings ? { data: 'data-person-settings', aria: `Настройки ${name(person)}` } : null,
+    v: settings ? { data: settingsData, aria: settingsAria || `Настройки ${name(person)}` } : null,
     d: {
       kind: 'chat',
       data: 'data-person-direct-chat',
@@ -957,7 +958,10 @@ async function renderPersonOverview(layer, baseRoot, key, options = {}) {
       renderPeople(baseRoot, options);
     },
   });
-  relationships.bind(layer, (detail) => openPersonRelationshipQ(baseRoot, person, detail, options));
+  relationships.bind(layer, (detail) => openPersonRelationshipQ(baseRoot, person, detail, {
+    ...options,
+    onVisibilityChanged: () => renderPersonOverview(layer, baseRoot, person.key, options),
+  }));
   layer.querySelector('[data-person-card]')?.addEventListener('click', () => {
     openPersonEdit(baseRoot, person.key, {
       onSaved: (nextKey) => void renderPersonOverview(layer, baseRoot, nextKey || person.key, options),
@@ -967,13 +971,35 @@ async function renderPersonOverview(layer, baseRoot, key, options = {}) {
 }
 
 function openPersonRelationshipQ(root, person, detail, options = {}) {
-  const layer = mountModal(root, modal(`${personQContext(person)}${detail?.body || ''}`, {
+  const visibility = detail?.visibility;
+  const hasVisibility = typeof visibility?.onToggle === 'function';
+  const header = personQContext(person, hasVisibility ? {
+    settings: true,
+    settingsData: 'data-person-program-visibility-settings',
+    settingsAria: 'Настройки видимости карты',
+  } : {});
+  const layer = mountModal(root, modal(`${header}${detail?.body || ''}`, {
     title: detail?.title || name(person),
     variant: 'q',
     surface: 'app',
     className: 'people-program-q',
   }));
-  if (layer) bindPersonContext(layer, person, options);
+  if (!layer) return null;
+  bindPersonContext(layer, person, options);
+  if (hasVisibility) {
+    layer.querySelector('[data-person-program-visibility-settings]')?.addEventListener('click', () => {
+      openLoyaltySettingsMenu({
+        title: detail.title || 'Программа',
+        checked: visibility.checked,
+        onToggle: async (checked) => {
+          const persisted = await visibility.onToggle(checked);
+          visibility.checked = persisted;
+          await options.onVisibilityChanged?.();
+          return persisted;
+        },
+      });
+    });
+  }
   return layer;
 }
 
