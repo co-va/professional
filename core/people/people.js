@@ -563,8 +563,8 @@ function peopleFilterFields(filters = {}) {
     ] })}
     ${select({ label: 'Ярлык', name: 'peopleTagFilter', value: filters.tag, options: tagFilterOptions() })}
     <div data-people-procedure-filter>${hasCurrentProceduresSnapshot()
-      ? select({ label: 'Процедура', name: 'peopleProcedureFilter', value: filters.procedure, options: procedureFilterOptions() })
-      : '<div class="field">Процедура: загрузка…</div>'}</div>
+      ? select({ label: 'Услуга', name: 'peopleProcedureFilter', value: filters.procedure, options: procedureFilterOptions() })
+      : '<div class="field">Услуга: загрузка…</div>'}</div>
     ${workplaceFilterOptions().length ? select({
       label: 'Рабочее пространство', name: 'peopleWorkplaceFilter',
       value: filters.workplace, options: workplaceFilterOptions(),
@@ -713,7 +713,7 @@ function openFilterSettings(root) {
       const host = layer.querySelector('[data-people-procedure-filter]');
       if (!host) return;
       host.innerHTML = select({
-        label: 'Процедура',
+        label: 'Услуга',
         name: 'peopleProcedureFilter',
         value: draft.procedure,
         options: procedureFilterOptions(),
@@ -721,7 +721,7 @@ function openFilterSettings(root) {
     }).catch(() => {
       if (!layer.isConnected) return;
       const host = layer.querySelector('[data-people-procedure-filter]');
-      if (host) host.textContent = 'Не удалось загрузить процедуры';
+      if (host) host.textContent = 'Не удалось загрузить услуги';
     });
   }
   updateAction();
