@@ -104,6 +104,10 @@ assert.ok(fetchIndex > entryStart && priceIndex > fetchIndex,
   'Payment must fetch current deposit conditions before calculating due');
 assert.match(payment, /Не удалось проверить условия оплаты/,
   'A failed deposit check blocks incorrect payment');
+assert.match(payment, /const checkedSettlement = settlementForRecord\(checkedRecord\)/,
+  'Payment must recheck current settlement before committing');
+assert.match(payment, /if \(changed\) throw new Error\('Скидка или сумма оплаты изменилась/,
+  'A changed program or due must reject stale payment');
 assert.match(recordView, /void listPersonDeposits\(personKey\)\.then/,
   'Record view refreshes current program conditions');
 assert.match(creation, /loadRecordCreationOperationalState\(\), listPersonDeposits\(person\.key\)/,
