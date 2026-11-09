@@ -1,4 +1,4 @@
-import { normalizeEntityCardAppearance, hasConfiguredEntityCardAppearance } from '../../ui/ui.js';
+import { normalizeEntityCardAppearance, entityCardDefaultRows, hasConfiguredEntityCardAppearance } from '../../ui/ui.js';
 import { getCardAppearanceTemplate } from '../card-appearance-templates.js';
 
 const TYPES = {
@@ -13,17 +13,6 @@ function typeConfig(type = '') {
   return TYPES[String(type || '').trim()] || TYPES['personal-account'];
 }
 
-function defaultLines(entries = []) {
-  const lines = Array.from({ length: 9 }, () => ({
-    field: '', zone: 'full', align: 'left', size: 'm', color: 'white',
-    bold: false, italic: false, underline: false, uppercase: false,
-  }));
-  entries.forEach(({ row, field, zone = 'full', align = 'left', size = 'm', color = 'white', bold = false }) => {
-    const index = Math.max(0, Math.min(8, Number(row) - 1));
-    lines[index] = { ...lines[index], field, zone, align, size, color, bold };
-  });
-  return lines;
-}
 
 export function loyaltyCardTypes() {
   return Object.entries(TYPES).map(([value, config]) => ({ value, ...config }));
@@ -44,7 +33,7 @@ export function loyaltyCardAppearance(type = '') {
   }
   const personal = type === 'personal-account';
   return normalizeEntityCardAppearance({
-    lines: defaultLines([
+    lines: entityCardDefaultRows([
       { row: 1, field: 'uei', bold: true },
       { row: 2, field: 'status', align: 'right' },
       { row: 6, field: 'title', size: 'xl', bold: true },
