@@ -2,6 +2,7 @@ import {
   actionBlock,
   button,
   columnLayout,
+  costListParts,
   durationText,
   emptyState,
   field,
@@ -28,7 +29,7 @@ import { personDisplay } from '../people/presentation.js';
 import { getProcedures } from '../service/procedures/data.js';
 import { openProcedureEditor } from '../service/procedures/procedures.js';
 import { assignProceduresToWorkplace } from '../service/procedures/assignment.js';
-import { procedureCostForWorkplace, proceduresForWorkplace } from '../service/procedures/selection.js';
+import { costDefinitionForWorkplace, procedureCostForWorkplace, proceduresForWorkplace } from '../service/procedures/selection.js';
 import {
   buildNaturalBookingTimeRows,
   checkTimeAvailability,
@@ -60,6 +61,14 @@ function formatDate(value) {
 
 function formatMoney(value) {
   return `${new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(Number(value) || 0)} ₽`;
+}
+
+function servicePriceText(procedure, workplaceId = '') {
+  // Presentation only: reuse the existing price-field formatter; no tariff
+  // calculation or independent price rules in the Record booking UI.
+  const cost = costDefinitionForWorkplace(procedure, workplaceId);
+  if (typeof cost === 'number' || typeof cost === 'string') return formatMoney(cost);
+  return costListParts(cost).rightTop || '';
 }
 
 function inputNumber(value = 0) {
@@ -110,6 +119,7 @@ function professionalProvider() {
     procedureId: (item) => String(item?.id || ''),
     procedureName: (item) => String(item?.name || ''),
     procedureCost: (item, workplaceId) => procedureCostForWorkplace(item, workplaceId),
+    procedurePriceText: (item, workplaceId) => servicePriceText(item, workplaceId),
     procedureDuration: (item) => Math.max(0, Number(item?.duration) || 0),
     workingDates: (workplaceId) => getWorkplaceWorkingDates(workplaceId),
     timeRows({ workplaceId, date, procedures, state = {} }) {
@@ -175,6 +185,7 @@ function selectionEntry(provider, raw, workplaceId) {
     id: provider.procedureId(raw),
     name: provider.procedureName(raw),
     cost: provider.procedureCost(raw, workplaceId),
+    priceText: provider.procedurePriceText?.(raw, workplaceId) || '',
     duration: provider.procedureDuration(raw),
     raw,
   };
@@ -518,7 +529,7 @@ export function openRecords({
       id: String(item.id || ''),
       name: item.name || '',
       durationText: durationText(item.duration),
-      costText: procedureCostForWorkplace(item, '') !== '' ? `${procedureCostForWorkplace(item, '')} ₽` : '',
+      costText: servicePriceText(item),
     })), { data: 'data-records-price', selected: [], empty: 'Услуг нет.' })
       + actionBlock(button('Добавить', { data: 'data-records-price-add' })), {
       title: 'Из прайса', variant: 'x', surface: 'app', className: 'modal--form-sheet',
@@ -573,7 +584,7 @@ export function openRecords({
         id: source.procedureId(item),
         name: source.procedureName(item),
         durationText: durationText(source.procedureDuration(item)),
-        costText: source.procedureCost(item, state.workplaceId) !== '' ? `${source.procedureCost(item, state.workplaceId)} ₽` : '',
+        costText: source.procedurePriceText?.(item, state.workplaceId) || '',
       })), {
         data: 'data-records-procedure',
         selected: [...selected.keys()],
@@ -900,7 +911,7 @@ export function openRecords({
       procedures: state.procedures.map((entry) => ({
         name: entry.name,
         durationText: durationText(entry.duration),
-        right: entry.cost === '' || entry.cost == null ? '' : formatMoney(entry.cost),
+        right: entry.priceText || (entry.cost === '' || entry.cost == null ? '' : formatMoney(entry.cost)),
       })),
     });
     const view = owner.render({
