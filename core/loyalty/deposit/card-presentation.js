@@ -1,4 +1,4 @@
-import { normalizeEntityCardAppearance } from '../../../ui/ui.js';
+import { normalizeEntityCardAppearance, hasConfiguredEntityCardAppearance } from '../../../ui/ui.js';
 import { getCardAppearanceTemplate } from '../../card-appearance-templates.js';
 
 const SCOPE = 'loyalty-deposit';
@@ -13,25 +13,6 @@ function defaultLines(entries = []) {
     lines[index] = { ...lines[index], field, zone, align, size, color, bold };
   });
   return lines;
-}
-
-function configured(value = {}) {
-  return Array.isArray(value?.lines) && value.lines.some((line) => String(line?.field || '').trim());
-}
-
-// Older layouts used positional labels instead of business values.
-// Resolve these two IDs once, preserving the row, style and alignment.
-function canonicalDepositAppearance(value = {}) {
-  const appearance = normalizeEntityCardAppearance(value);
-  return {
-    ...appearance,
-    lines: appearance.lines.map((line) => ({
-      ...line,
-      field: line.field === 'metaLeft' ? 'benefit'
-        : line.field === 'metaRight' ? 'nominal'
-        : line.field,
-    })),
-  };
 }
 
 function moneyValue(value) {
@@ -62,7 +43,7 @@ export function depositCardScope() {
 
 export function depositCardAppearance() {
   const template = getCardAppearanceTemplate(SCOPE);
-  if (configured(template?.appearance)) return canonicalDepositAppearance(template.appearance);
+  if (hasConfiguredEntityCardAppearance(template?.appearance)) return normalizeEntityCardAppearance(template.appearance);
   return normalizeEntityCardAppearance({
     lines: defaultLines([
       { row: 1, field: 'uei', bold: true },
