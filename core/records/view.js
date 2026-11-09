@@ -1,5 +1,6 @@
 import {
   actionBlock,
+  emptyState,
   bindRecordSettings,
   button,
   durationText,
@@ -15,7 +16,8 @@ import {
 } from '../../ui/ui.js';
 import { readOnlyReceipt } from '../../ui/receipt/index.js';
 import { getWorkplaces } from '../workplace-time.js';
-import { getAllPeople } from '../people/data.js';
+import { getAllPeople, getPersonPriceCondition } from '../people/data.js';
+import { listPersonDeposits } from '../loyalty/deposit/data.js';
 import { openPersonHistoryQ } from '../people/people.js';
 import { personDisplay } from '../people/presentation.js';
 import { getRecordPaymentState, resolveRecordSettlement } from '../finance/index.js';
@@ -471,9 +473,8 @@ export function openRecordView(record, {
       data: 'data-record-view-program',
       aria: 'Выбрать программу записи',
     }) : '';
-    const contactDiscountPercent = readOnlyHistory
-      ? 0
-      : Math.max(0, Math.min(100, Number(contact?.discountPercent) || 0));
+    const contactDiscountPercent = readOnlyHistory ? 0 : Math.max(0, Math.min(100,
+      Number(settlement?.pricePercent) || Number(getPersonPriceCondition(contact).percent) || 0));
     const discountMoney = Math.max(0, (Number(settlement?.serviceTotal) || 0) - (Number(settlement?.planTotal) || 0));
     const grossTotal = Math.max(0, Number(settlement?.serviceTotal) || 0);
     const fromMinutes = timeMinutes(source.from);
@@ -681,6 +682,19 @@ export function openRecordView(record, {
     layer.dataset.recordViewPaymentState = payment.fullyPaid ? 'paid' : payment.partiallyPaid ? 'partial' : 'unpaid';
   };
 
-  render();
+  // Read current deposit conditions before displaying a payable amount.
+  // The record Z/Q opens immediately; it shows a short loading state rather
+  // than briefly showing an incorrect undiscounted total.
+  const personKey = String(currentRecord?.person?.key || currentRecord?.person?.id || '').trim();
+  if (!readOnlyHistory && personKey) {
+    if (root) root.innerHTML = emptyState('Запись', 'Проверяем условия скидки…');
+    void listPersonDeposits(personKey).then(() => {
+      if (layer.isConnected) render();
+    }).catch((error) => {
+      if (layer.isConnected && root) root.innerHTML = emptyState(
+        'Не удалось проверить скидку', String(error?.message || 'Нет ответа от сервера.'),
+      );
+    });
+  } else render();
   return layer;
 }
