@@ -220,17 +220,17 @@ export async function openProcedureAdjustment(record, procedureId, { onSaved = (
     field({ label: 'Цена', name: 'recordProcedurePrice', type: 'number', value: inputNumber(adjustment.price), inputmode: 'decimal', min: 0, step: '0.01', data: 'data-record-procedure-price' }),
     field({ label: 'Скидка %', name: 'recordProcedureDiscountPercent', type: 'number', value: inputNumber(adjustment.discountPercent), inputmode: 'decimal', min: 0, max: 100, step: '0.01', disabled: adjustment.programDiscount, data: 'data-record-procedure-discount-percent' }),
     field({ label: 'Скидка ₽', name: 'recordProcedureDiscountMoney', type: 'number', value: inputNumber(adjustment.discountMoney), inputmode: 'decimal', min: 0, step: '0.01', disabled: adjustment.programDiscount, data: 'data-record-procedure-discount-money' }),
-  ], { columns: 3, ariaLabel: 'Цена и скидка процедуры' });
+  ], { columns: 3, ariaLabel: 'Цена и скидка услуги' });
   const editor = mountModal(document.body, modal(
     `<div class="compact-form">
       ${field({ label: 'Длительность, мин', name: 'recordProcedureDuration', type: 'number', value: String(Math.max(1, Number(procedure.duration) || 0)), inputmode: 'numeric', min: 1, step: 1, data: 'data-record-procedure-duration' })}
       ${priceFields}
       ${actionBlock([
         button('Сохранить', { data: 'data-record-procedure-adjustment-save' }),
-        button('Удалить процедуру', { variant: 'critical', data: 'data-record-procedure-delete' }),
+        button('Удалить услугу', { variant: 'critical', data: 'data-record-procedure-delete' }),
       ].join(''))}
     </div>`,
-    { variant: 'x', surface: 'app', title: procedure.name || 'Процедура', className: 'modal--form-sheet' },
+    { variant: 'x', surface: 'app', title: procedure.name || 'Услуга', className: 'modal--form-sheet' },
   ));
   if (!editor) return null;
 
@@ -281,7 +281,7 @@ export async function openProcedureAdjustment(record, procedureId, { onSaved = (
       to: nextTo,
       excludeId: latest.id,
     }).ok) {
-      openNotice({ title: 'Время процедуры', message: 'Новая длительность пересекается с занятым или недоступным временем.' });
+      openNotice({ title: 'Время услуги', message: 'Новая длительность пересекается с занятым или недоступным временем.' });
       return;
     }
 
@@ -294,11 +294,11 @@ export async function openProcedureAdjustment(record, procedureId, { onSaved = (
         discountMoney: numeric(moneyInput),
       });
       const updated = updateRecord(latest.id, { procedures: nextProcedures, to: nextTo });
-      if (!updated) throw new Error('Не удалось сохранить длительность процедуры.');
+      if (!updated) throw new Error('Не удалось сохранить длительность услуги.');
       await onSaved(updated);
       editor.v2Close?.();
     } catch (error) {
-      openNotice({ title: 'Не удалось сохранить', message: String(error?.message || 'Не удалось скорректировать процедуру.') });
+      openNotice({ title: 'Не удалось сохранить', message: String(error?.message || 'Не удалось скорректировать услугу.') });
       if (submit.isConnected) submit.disabled = false;
     }
   });
@@ -326,7 +326,7 @@ export async function openProcedureAdjustment(record, procedureId, { onSaved = (
       to: nextTo,
       excludeId: latest.id,
     }).ok) {
-      openNotice({ title: 'Удаление процедуры', message: 'После удаления не удалось сохранить время записи.' });
+      openNotice({ title: 'Удаление услуги', message: 'После удаления не удалось сохранить время записи.' });
       return;
     }
 
@@ -334,11 +334,11 @@ export async function openProcedureAdjustment(record, procedureId, { onSaved = (
     try {
       await deleteRecordProcedurePaymentAdjustment(latest, procedureId);
       const updated = updateRecord(latest.id, { procedures: nextProcedures, to: nextTo });
-      if (!updated) throw new Error('Не удалось удалить процедуру из записи.');
+      if (!updated) throw new Error('Не удалось удалить услугу из записи.');
       await onSaved(updated);
       editor.v2Close?.();
     } catch (error) {
-      openNotice({ title: 'Не удалось удалить', message: String(error?.message || 'Не удалось удалить процедуру.') });
+      openNotice({ title: 'Не удалось удалить', message: String(error?.message || 'Не удалось удалить услугу.') });
       if (submit.isConnected) submit.disabled = false;
     }
   });
@@ -519,7 +519,7 @@ export function openRecords({
       name: item.name || '',
       durationText: durationText(item.duration),
       costText: procedureCostForWorkplace(item, '') !== '' ? `${procedureCostForWorkplace(item, '')} ₽` : '',
-    })), { data: 'data-records-price', selected: [], empty: 'Процедур нет.' })
+    })), { data: 'data-records-price', selected: [], empty: 'Услуг нет.' })
       + actionBlock(button('Добавить', { data: 'data-records-price-add' })), {
       title: 'Из прайса', variant: 'x', surface: 'app', className: 'modal--form-sheet',
     }));
@@ -577,11 +577,11 @@ export function openRecords({
       })), {
         data: 'data-records-procedure',
         selected: [...selected.keys()],
-        empty: 'Для этого рабочего пространства процедуры не настроены.',
+        empty: 'Для этого рабочего пространства услуги не настроены.',
       });
       const secondaryActions = professionalActions ? [
         { label: 'Добавить из прайса', data: 'data-records-from-price', variant: 'secondary' },
-        { label: '+ Добавить процедуру', data: 'data-records-add-procedure', variant: 'secondary' },
+        { label: '+ Добавить услугу', data: 'data-records-add-procedure', variant: 'secondary' },
       ] : [];
       const view = owner.render({
         step: 'procedures',
@@ -791,7 +791,7 @@ export function openRecords({
         if (selected.has(key)) selected.delete(key);
         else if (selected.size < capacity) selected.set(key, item);
         else {
-          openNotice({ title: 'Групповая запись', message: `Для выбранных процедур максимум ${capacity} человек.` });
+          openNotice({ title: 'Групповая запись', message: `Для выбранных услуг максимум ${capacity} человек.` });
           return;
         }
         state.people = [...selected.values()];
@@ -814,7 +814,7 @@ export function openRecords({
     enterStep('correction', renderCorrectionMenu);
     const actions = [
       ['Пространство', 'workplace'],
-      ['Процедуры', 'procedures'],
+      ['Услуги', 'procedures'],
       ['Дата', 'date'],
       ['Время', 'time'],
       ...(source.kind === 'professional' ? [['Клиент / участники', 'person']] : []),
