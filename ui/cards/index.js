@@ -1,5 +1,5 @@
 import { escapeHtml } from '../utils/escape-html.js';
-import { entityVisualCard } from './entity-card-constructor.js';
+import { entityVisualCard, entityCardDefaultRows } from './entity-card-constructor.js';
 
 export function entityCard({
   title = '',
@@ -25,13 +25,14 @@ export function entityCard({
       text: String(item?.value || ''),
     })),
   ];
-  const lines = Array.from({ length: 9 }, () => ({}));
-  if (topRightMeta[0]) lines[0] = { field: 'topRight1', zone: 'right', align: 'right', size: 'm', color: 'white' };
-  if (topRightMeta[1]) lines[1] = { field: 'topRight2', zone: 'right', align: 'right', size: 'm', color: 'white' };
-  lines[5] = { field: 'title', zone: 'full', align: 'left', size: 'xl', color: 'white', bold: true };
-  if (subtitle) lines[6] = { field: 'subtitle', zone: 'full', align: 'left', size: 'm', color: 'white' };
-  if (meta[0]) lines[7] = { field: 'meta1', zone: 'left', align: 'left', size: 'm', color: 'white' };
-  if (meta[1]) lines[8] = { field: 'meta2', zone: 'right', align: 'right', size: 'm', color: 'white' };
+  const lines = entityCardDefaultRows([
+    ...(topRightMeta[0]?[{row:1,column:'right',field:'topRight1',align:'right'}]:[]),
+    ...(topRightMeta[1]?[{row:2,column:'right',field:'topRight2',align:'right'}]:[]),
+    {row:6,column:'left',field:'title',size:'xl',bold:true},
+    ...(subtitle?[{row:7,column:'left',field:'subtitle'}]:[]),
+    ...(meta[0]?[{row:8,column:'left',field:'meta1'}]:[]),
+    ...(meta[1]?[{row:9,column:'right',field:'meta2',align:'right'}]:[]),
+  ]);
   return entityVisualCard({
     appearance: { lines },
     fields,
