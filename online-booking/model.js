@@ -34,6 +34,8 @@ export function bookingProcedurePrice(procedure = {}, workplaceKey = '') {
     minimum: Math.max(0, Number(price?.minimum || 0)),
     variable: Boolean(price?.variable),
     free: Boolean(price?.free),
+    // Display text is produced once by the canonical Core ProcedureService.
+    display: String(price?.display || '').trim(),
   };
 }
 
