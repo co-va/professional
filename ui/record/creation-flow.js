@@ -5,7 +5,7 @@ import { timeSlots } from '../time/index.js';
 
 const STEP_TITLES = {
   workplace: 'Выбор пространства',
-  procedures: 'Выбор процедур',
+  procedures: 'Выбор услуг',
   date: 'Выбор даты',
   time: 'Выбор времени',
   person: 'Выбор клиента',
