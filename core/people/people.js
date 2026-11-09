@@ -45,7 +45,7 @@ import { openTagEditor } from '../../settings/tags/tags.js';
 import { addTagToSelection } from '../../ui/tags/index.js';
 import { getDocuments } from '../../settings/documents/data.js';
 import { getConsents } from '../../settings/documents/consents.js';
-import { getAllPeople, getIdentityMemberKeys, getIdentityPeople, getPeople, getPersonPriceCondition, savePeople } from './data.js';
+import { getAllPeople, getIdentityMemberKeys, getPeople, getPersonPriceCondition, savePeople } from './data.js';
 import { flushBusinessPersistence, isBusinessServerReady } from '../business-persistence.js';
 import { bindPersonCreateForm, personCreateForm } from './create.js';
 import { personDisplay } from './presentation.js';
