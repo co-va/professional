@@ -57,10 +57,10 @@ assert.match(source, /if \(!workspaceReady \|\| !sectionAllowed\('chat'\)\) retu
 \n// Person Z2 must inherit the Finance and Loyalty tool gates. A saved finance
 // relationship is not proof that its tool is READY/TESTING for this user.
 const peoplePrograms = readFileSync('core/people/programs.js', 'utf8');
-const personFinanceSource = peoplePrograms.match(/function personFinanceEntities\\(person = \\{\\}\\) \\{[\\s\\S]*?\\n\\}/)?.[0];
+const personFinanceSource = peoplePrograms.match(/function personFinanceEntities\(person = \{\}\) \{[\s\S]*?\n\}/)?.[0];
 assert.ok(personFinanceSource, 'Z2 must explicitly gate finance relationships');
 const financeEnabled = new Set();
-const financePerson = runInNewContext(personFinanceSource + '\\npersonFinanceEntities', {
+const financePerson = runInNewContext(personFinanceSource + '\npersonFinanceEntities', {
   canUseCapability: (key) => financeEnabled.has(key),
   getInvestmentEntities: () => [
     { id: 'self', personKey: 'person-1', investmentTerms: { role: 'self' } },
@@ -89,6 +89,6 @@ financeCards = financePerson(person);
 assert.equal(financeCards.investments.length, 1, 'Only the authorized investment role is visible');
 assert.equal(financeCards.investments[0].id, 'raise');
 assert.equal(financeCards.loans.length, 0, 'Investment readiness never exposes Loans');
-assert.match(peoplePrograms, /canSee\\('personal-account'\\)/,
+assert.match(peoplePrograms, /canSee\('personal-account'\)/,
   'Tester Personal Account uses the existing Loyalty readiness without an extra gate');
 console.log('Person Z2 finance/readiness isolation and tester Personal Account PASS');
