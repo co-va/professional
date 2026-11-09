@@ -1,4 +1,4 @@
-import { normalizeEntityCardAppearance } from '../../ui/ui.js';
+import { normalizeEntityCardAppearance, hasConfiguredEntityCardAppearance } from '../../ui/ui.js';
 import { getCardAppearanceTemplate } from '../../core/card-appearance-templates.js';
 
 function firstOf(value, key) {
@@ -24,10 +24,6 @@ function defaultLines(entries = []) {
     lines[index]={field,zone,align,size,color,bold,italic,underline,uppercase};
   });
   return lines;
-}
-
-function hasConfiguredLines(value = {}) {
-  return Array.isArray(value?.lines) && value.lines.some((line)=>String(line?.field||'').trim());
 }
 
 // Professional shows the saved discount position, not a particular Person's value.
@@ -82,7 +78,7 @@ export function workplaceCardFields(workplace = {}, profile = {}) {
 }
 
 export function profileCardAppearance(profile = {}) {
-  if(hasConfiguredLines(profile.cardAppearance)) return normalizeEntityCardAppearance(profile.cardAppearance);
+  if(hasConfiguredEntityCardAppearance(profile.cardAppearance)) return normalizeEntityCardAppearance(profile.cardAppearance);
   return normalizeEntityCardAppearance({
     lines:defaultLines([
       {row:1,field:'workTime',zone:'right',align:'right',size:'m'},
@@ -95,9 +91,9 @@ export function profileCardAppearance(profile = {}) {
 }
 
 export function workplaceCardAppearance(workplace = {}) {
-  if(hasConfiguredLines(workplace.cardAppearance)) return normalizeEntityCardAppearance(workplace.cardAppearance);
+  if(hasConfiguredEntityCardAppearance(workplace.cardAppearance)) return normalizeEntityCardAppearance(workplace.cardAppearance);
   const template=getCardAppearanceTemplate('workplace');
-  if(hasConfiguredLines(template?.appearance)) return normalizeEntityCardAppearance(template.appearance);
+  if(hasConfiguredEntityCardAppearance(template?.appearance)) return normalizeEntityCardAppearance(template.appearance);
   return normalizeEntityCardAppearance({
     lines:defaultLines([
       {row:1,field:'workTime',zone:'right',align:'right',size:'m'},
