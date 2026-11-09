@@ -1,19 +1,8 @@
-import { normalizeEntityCardAppearance, hasConfiguredEntityCardAppearance } from '../../../ui/ui.js';
+import { normalizeEntityCardAppearance, entityCardDefaultRows, hasConfiguredEntityCardAppearance } from '../../../ui/ui.js';
 import { getCardAppearanceTemplate } from '../../card-appearance-templates.js';
 
 const SCOPE = 'loyalty-deposit';
 
-function defaultLines(entries = []) {
-  const lines = Array.from({ length: 9 }, () => ({
-    field: '', zone: 'full', align: 'left', size: 'm', color: 'white',
-    bold: false, italic: false, underline: false, uppercase: false,
-  }));
-  entries.forEach(({ row, field, zone = 'full', align = 'left', size = 'm', color = 'white', bold = false }) => {
-    const index = Math.max(0, Math.min(8, Number(row) - 1));
-    lines[index] = { ...lines[index], field, zone, align, size, color, bold };
-  });
-  return lines;
-}
 
 function moneyValue(value) {
   if (value === null || value === undefined || value === '') return '';
@@ -45,13 +34,13 @@ export function depositCardAppearance() {
   const template = getCardAppearanceTemplate(SCOPE);
   if (hasConfiguredEntityCardAppearance(template?.appearance)) return normalizeEntityCardAppearance(template.appearance);
   return normalizeEntityCardAppearance({
-    lines: defaultLines([
+    lines: entityCardDefaultRows([
       { row: 1, field: 'uei', bold: true },
-      { row: 2, field: 'status', zone: 'right', align: 'right' },
+      { row: 2, field: 'status', column:'right', align: 'right' },
       { row: 6, field: 'title', size: 'xl', bold: true },
       { row: 7, field: 'subtitle' },
-      { row: 8, field: 'benefit', zone: 'left' },
-      { row: 9, field: 'nominal', zone: 'right', align: 'right' },
+      { row: 8, field: 'benefit', column:'left' },
+      { row: 9, field: 'nominal', column:'right', align: 'right' },
     ]),
   });
 }
