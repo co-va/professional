@@ -382,16 +382,6 @@ export async function openPersonalAccountForPerson(root, person = {}, snapshot =
 }
 
 
-/** Personal Account is already scoped by Person; no second catalog exists. */
-export async function getPersonProgramChoices(person) {
-  return person?.key ? { direct: true, actionLabel: 'Открыть' } : { options: [] };
-}
-
-export async function openPersonProgramChoice(root, person) {
-  if (!person?.key) throw new Error('Клиент не выбран');
-  return openPersonalAccountForPerson(root, person);
-}
-
 export async function renderPersonalAccount(root) {
   const people = availablePeople([]);
   let accounts = [];
