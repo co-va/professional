@@ -148,13 +148,19 @@ export function getPeopleCount() {
   return getPeople().length;
 }
 
+// One canonical calculation for pricing, the Person editor and its card.
+// Program percentage is derived from an active deposit; never persist it
+// as the Person's independent discountPercent (that would double-discount).
+export function getPersonPriceCondition(person = null) {
+  return resolvePersonPriceCondition(person, getPersonDepositPriceConditions(person?.key));
+}
+
 function assertPersonalPricePercentAvailable(person = null, previous = null) {
   const percent = normalizeDiscount(person || {});
   if (percent <= 0) return;
   const previousPercent = normalizeDiscount(previous || {});
   if (previous && previousPercent === percent) return;
-  const programSources = getPersonDepositPriceConditions(person?.key);
-  const condition = resolvePersonPriceCondition(person, programSources);
+  const condition = getPersonPriceCondition(person);
   if (condition.conflict) {
     throw new Error(`Процентная скидка задваивается: ${describePriceConditionConflict(condition)}. Уберите скидку программы или оставьте личную скидку 0%.`);
   }
