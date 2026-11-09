@@ -38,25 +38,25 @@
 .entity-card-editor__background .color-picker__trigger>span:last-child{display:none}
 .entity-card-editor__direction{grid-column:1/-1}
 
-.entity-card-editor__line-picker{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:3px;margin-bottom:10px}
-.entity-card-editor__columns{margin:0 0 8px}
-.entity-card-editor__columns button{min-height:38px}
+.entity-card-editor__line-picker{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:3px}
+.entity-card-editor__columns{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
+.entity-card-editor__columns .entity-card-editor__tool{width:100%;height:42px;aspect-ratio:auto}
+.entity-card-editor__card-tools{min-width:0}
+.entity-card-editor__section{display:grid;gap:8px;min-width:0}
+.entity-card-editor__section + .entity-card-editor__section{border-top:1px solid var(--border,#ddd);margin-top:14px;padding-top:12px}
+.entity-card-editor__tool-captions{display:grid;grid-template-columns:3fr 4fr;gap:5px;color:var(--text-secondary);font-size:12px}
+.entity-card-editor__tool-captions span{min-width:0}
+.entity-card-editor__tools-line{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px;min-width:0}
+.entity-card-editor__tools-line .entity-card-editor__tool{height:auto;min-height:0;aspect-ratio:1/1;padding:0 2px}
 .entity-card-editor__line-picker button{min-width:0;height:36px;border:1px solid #111;border-radius:0;background:#fff;color:#111;font:inherit;font-size:12px}
 .entity-card-editor__line-picker button.is-active{background:#111;color:#fff}
 
-.entity-card-editor__data{margin:10px 0}
-.entity-card-editor__control-label{margin:8px 0 5px;font-size:12px;color:var(--text-secondary)}
+.entity-card-editor__data{margin:0;min-width:0}
+.entity-card-editor__control-label{margin:0;font-size:12px;color:var(--text-secondary)}
 .entity-card-editor__data .ui-select{display:grid;gap:5px}
 .entity-card-editor__data .ui-select>span{color:var(--text-secondary);font-size:12px}
 .entity-card-editor__data .ui-select__control{min-height:44px}
 
-.entity-card-editor__tool-row{display:grid;gap:6px;margin-top:6px}
-.entity-card-editor__tool-row--position{grid-template-columns:1fr 1fr}
-.entity-card-editor__tool-row--visual{grid-template-columns:4fr 3fr}
-.entity-card-editor__tool-row--font{grid-template-columns:1fr}
-.entity-card-editor__tool-group{display:grid;gap:5px;min-width:0}
-.entity-card-editor__tool-group--three{grid-template-columns:repeat(3,minmax(0,1fr))}
-.entity-card-editor__tool-group--four{grid-template-columns:repeat(4,minmax(0,1fr))}
 .entity-card-editor__tool{min-width:0;height:44px;border:1px solid #111;border-radius:0;background:#fff;color:#111;font:inherit;font-size:13px;padding:0 6px;display:flex;align-items:center;justify-content:center}
 .entity-card-editor__tool.is-active{background:#111;color:#fff}
 .entity-card-editor__tool[aria-label="Курсив"]{font-style:italic}

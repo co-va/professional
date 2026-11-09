@@ -194,31 +194,33 @@ function editorWorkspace(state,fields,allowPhoto=true){
   const row=state.appearance.lines[state.line];
   const cell=row.cells[state.column];
   return `<div class="entity-card-editor__card-tools">
-    <div class="entity-card-editor__control-label">Столбец</div>
-    <div class="segment-control entity-card-editor__columns" role="group" aria-label="Выбор столбца">
-      ${COLUMNS.map((column,index)=>`<button type="button" class="${state.column===column?'is-active':''}" data-card-tool="column:${column}" aria-pressed="${state.column===column}" aria-label="Столбец ${index+1}: ${['левый','центральный','правый'][index]}">${['Лево','Центр','Право'][index]}</button>`).join('')}
+    <div class="entity-card-editor__section entity-card-editor__section--placement">
+      <div class="entity-card-editor__control-label">Столбец</div>
+      <div class="entity-card-editor__columns" role="group" aria-label="Выбор столбца">
+        ${COLUMNS.map((column,index)=>toolButton(['Лево','Центр','Право'][index],`column:${column}`,state.column===column,`Столбец ${index+1}: ${['левый','центральный','правый'][index]}`)).join('')}
+      </div>
+      <div class="entity-card-editor__control-label">Строка</div>
+      <div class="entity-card-editor__line-picker">
+        ${Array.from({length:ENTITY_CARD_LINE_COUNT},(_,index)=>`<button type="button" class="${index===state.line?'is-active':''}" data-card-line-select="${index}" aria-pressed="${index===state.line}" aria-label="Строка ${index+1}">${index+1}</button>`).join('')}
+      </div>
     </div>
-    <div class="entity-card-editor__control-label">Строка</div>
-    <div class="entity-card-editor__line-picker">${Array.from({length:ENTITY_CARD_LINE_COUNT},(_,i)=>`<button type="button" class="${i===state.line?'is-active':''}" data-card-line-select="${i}" aria-pressed="${i===state.line}" aria-label="Строка ${i+1}">${i+1}</button>`).join('')}</div>
-    <div class="entity-card-editor__data">${fieldControl(cell,fields)}</div>
-    <div class="entity-card-editor__control-label">Выравнивание текста</div>
-    <div class="entity-card-editor__tool-group entity-card-editor__tool-group--three" aria-label="Выравнивание">
-      ${toolButton('←','align:left',cell.align==='left','Текст слева')}
-      ${toolButton('↔','align:center',cell.align==='center','Текст по центру')}
-      ${toolButton('→','align:right',cell.align==='right','Текст справа')}
+    <div class="entity-card-editor__section entity-card-editor__section--data">
+      <div class="entity-card-editor__data">${fieldControl(cell,fields)}</div>
     </div>
-    <div class="entity-card-editor__tool-row entity-card-editor__tool-row--visual" aria-label="Размер и цвет">
-      <div class="entity-card-editor__tool-group entity-card-editor__tool-group--four">
+    <div class="entity-card-editor__section entity-card-editor__section--format">
+      <div class="entity-card-editor__control-label">Оформление</div>
+      <div class="entity-card-editor__tool-captions"><span>Выравнивание</span><span>Размер</span></div>
+      <div class="entity-card-editor__tools-line" role="group" aria-label="Выравнивание и размер">
+        ${toolButton('←','align:left',cell.align==='left','Текст слева')}
+        ${toolButton('↔','align:center',cell.align==='center','Текст по центру')}
+        ${toolButton('→','align:right',cell.align==='right','Текст справа')}
         ${['s','m','l','xl'].map(value=>toolButton(value.toUpperCase(),`size:${value}`,cell.size===value,`Размер ${value.toUpperCase()}`)).join('')}
       </div>
-      <div class="entity-card-editor__tool-group entity-card-editor__tool-group--three entity-card-editor__tool-group--colors">
+      <div class="entity-card-editor__tool-captions"><span>Цвет</span><span>Шрифт</span></div>
+      <div class="entity-card-editor__tools-line" role="group" aria-label="Цвет и шрифт">
         ${colorTool('black','Чёрный',cell.color==='black')}
         ${colorTool('gray','Серый',cell.color==='gray')}
         ${colorTool('white','Белый',cell.color==='white')}
-      </div>
-    </div>
-    <div class="entity-card-editor__tool-row entity-card-editor__tool-row--font" aria-label="Шрифт">
-      <div class="entity-card-editor__tool-group entity-card-editor__tool-group--four">
         ${toolButton('B','bold',cell.bold,'Жирный')}
         ${toolButton('I','italic',cell.italic,'Курсив')}
         ${toolButton('U','underline',cell.underline,'Подчёркнутый')}
