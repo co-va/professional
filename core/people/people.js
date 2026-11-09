@@ -623,7 +623,7 @@ function peopleFilterFields(filters = {}) {
       value: filters.workplace, options: workplaceFilterOptions(),
     }) : ''}
     ${select({
-      name:'peopleLoyaltyFilter',value:filters.loyaltyMode,aria:'Скидка или программа',
+      label:'Скидка / программа',name:'peopleLoyaltyFilter',value:filters.loyaltyMode,aria:'Скидка или программа',
       options:[{value:'',label:'Без фильтра'},{value:'discount',label:'Скидка'},{value:'program',label:'Программа'}],
     })}
     <div data-people-program-filter${filters.loyaltyMode==='program'?'':' hidden'}>
