@@ -24,6 +24,7 @@ import {
   monthDayPicker,
   mountModal,
   mountV2ZLayer,
+  openNotice,
   page,
   repeatedField,
   select,
@@ -826,6 +827,15 @@ function openPeopleAppearanceQ(root, options = {}) {
 }
 
 function downloadCsv(root) {
+  // Use exactly the displayed list. Never export stale or incomplete cached
+  // loyalty assignments while the filtered list shows loading or an error.
+  if (currentPeopleFilters().loyaltyMode && (root.peopleLoyaltyLoading || root.peopleLoyaltyError)) {
+    openNotice({
+      title:'Выгрузка',
+      message:root.peopleLoyaltyError || 'Данные программ ещё загружаются. Повторите выгрузку после загрузки списка.',
+    });
+    return;
+  }
   const headers = ['Имя', 'Фамилия', 'Телефон', 'Email'];
   const rows = visiblePeople(root).map((person) => [person.name, person.surname, person.phones?.[0], person.emails?.[0]]);
   const text = '\uFEFF' + [headers, ...rows]
