@@ -1,4 +1,4 @@
-import { normalizeEntityCardAppearance } from '../../ui/ui.js';
+import { normalizeEntityCardAppearance, hasConfiguredEntityCardAppearance } from '../../ui/ui.js';
 import { getCardAppearanceTemplate } from '../card-appearance-templates.js';
 
 const TYPES = {
@@ -25,10 +25,6 @@ function defaultLines(entries = []) {
   return lines;
 }
 
-function configured(value = {}) {
-  return Array.isArray(value?.lines) && value.lines.some((line) => String(line?.field || '').trim());
-}
-
 export function loyaltyCardTypes() {
   return Object.entries(TYPES).map(([value, config]) => ({ value, ...config }));
 }
@@ -43,29 +39,20 @@ export function loyaltyCardLabel(type = '') {
 
 export function loyaltyCardAppearance(type = '') {
   const template = getCardAppearanceTemplate(loyaltyCardScope(type));
-  const saved = configured(template?.appearance);
-  const appearance = normalizeEntityCardAppearance(saved ? template.appearance : {
+  if (hasConfiguredEntityCardAppearance(template?.appearance)) {
+    return normalizeEntityCardAppearance(template.appearance);
+  }
+  const personal = type === 'personal-account';
+  return normalizeEntityCardAppearance({
     lines: defaultLines([
       { row: 1, field: 'uei', bold: true },
-      { row: 2, field: 'status', zone: 'right', align: 'right' },
+      { row: 2, field: 'status', align: 'right' },
       { row: 6, field: 'title', size: 'xl', bold: true },
       { row: 7, field: 'subtitle' },
-      { row: 8, field: 'metaLeft', zone: 'left' },
-      { row: 9, field: 'metaRight', zone: 'right', align: 'right' },
+      { row: 8, field: personal ? 'amountLabel' : 'metaLeft' },
+      { row: 9, field: personal ? 'currentAmount' : 'metaRight', align: 'right' },
     ]),
   });
-  // Personal Account has semantic amounts; all other loyalty types retain
-  // their own independent field contract and saved appearance.
-  if (type !== 'personal-account') return appearance;
-  return {
-    ...appearance,
-    lines: appearance.lines.map((line) => ({
-      ...line,
-      field: line.field === 'metaLeft' ? 'amountLabel'
-        : line.field === 'metaRight' ? 'currentAmount'
-        : line.field,
-    })),
-  };
 }
 
 export function loyaltyCardPhoto(type = '') {
