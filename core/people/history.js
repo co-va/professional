@@ -91,12 +91,12 @@ function lifecycle(recordFact, eventFacts = []) {
 
 function statusLabel(state = {}) {
   if (state.status === 'deleted') return 'Запись удалена';
-  if (state.status === 'cancelled') return 'Запись отменена';
+  if (state.status === 'cancelled') return 'Отменена';
   if (state.attendance === 'no-show') return 'Не пришёл';
   if (state.attendance === 'arrived') return 'Пришёл';
   if (state.status === 'completed') return 'Завершена';
   if (state.confirmed) return 'Подтверждена';
-  return 'Запись';
+  return '';
 }
 
 
@@ -218,11 +218,11 @@ export function getCurrentPersonHistory(key = '') {
         procedures,
         products,
         title: [...procedures, ...products].join(', ') || 'Запись',
-        subtitle: record.status === 'cancelled' ? 'Запись отменена'
+        subtitle: record.status === 'cancelled' ? 'Отменена'
           : record.attendance === 'no-show' ? 'Не пришёл'
           : record.completed ? 'Завершена'
           : record.attendance === 'arrived' ? 'Пришёл'
-          : record.confirmed ? 'Подтверждена' : 'Запись',
+          : record.confirmed ? 'Подтверждена' : '',
         amount: null,
         status: text(record.status || 'active'),
         visualClass: recordListStatusClass(record, { paid: getRecordPaymentState(record).fullyPaid }),

@@ -159,6 +159,7 @@ function personHistoryMarkup(items = [], query = '') {
     overline: item.kind === 'finance' ? 'Продажа / операция' : 'Запись',
     title: item.title || (item.kind === 'finance' ? 'Финансовая операция' : 'Запись'),
     subtitle: item.subtitle || '',
+    omitEmptySubtitle: true,
     className: item.kind === 'record' ? (item.visualClass || '') : '',
     rightTop: item.amount == null ? shortDateTime(item.occurredAt, '') : money(item.amount),
     rightBottom: item.amount == null ? '' : shortDateTime(item.occurredAt, ''),

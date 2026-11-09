@@ -22,6 +22,7 @@ export function v2ListEntry({
   overline = '',
   title = '',
   subtitle = '',
+  omitEmptySubtitle = false,
   rightTop = '',
   rightBottom = '',
   columns = [],
@@ -54,6 +55,7 @@ export function v2ListEntry({
     : '';
   const style = image ? ` style="--list-entry-image:url('${escapeHtml(image)}')"` : '';
   const secondLine = subtitle || '\u00a0';
+  const subtitleHtml = subtitle || !omitEmptySubtitle ? `<small>${escapeHtml(secondLine)}</small>` : '';
   const swatch = leadingSwatch ? `<span class="list-entry__swatch" style="--list-entry-swatch:${escapeHtml(leadingSwatch)}" aria-hidden="true"></span>` : '';
   const right = rightTop || rightBottom
     ? `<span class="list-entry__right">${rightTop ? `<strong>${escapeHtml(rightTop)}</strong>` : ''}${rightBottom ? `<small>${escapeHtml(rightBottom)}</small>` : ''}</span>`
@@ -89,7 +91,7 @@ export function v2ListEntry({
   return `<${tag} class="${classes}"${attrs}${style}>
     <span class="list-entry__background" aria-hidden="true">${image ? '' : `<span>${escapeHtml(initial)}</span>`}</span>
     <span class="list-entry__content">
-      ${reorderAction}<span class="list-entry__main${swatch ? ' has-swatch' : ''}">${swatch}<span class="list-entry__text">${firstLine}<strong>${escapeHtml(title)}</strong><small>${escapeHtml(secondLine)}</small></span></span>
+      ${reorderAction}<span class="list-entry__main${swatch ? ' has-swatch' : ''}">${swatch}<span class="list-entry__text">${firstLine}<strong>${escapeHtml(title)}</strong>${subtitleHtml}</span></span>
       ${right}${toggleAction}${action}${deleteAction}${selectionAction}
     </span>
   </${tag}>`;
