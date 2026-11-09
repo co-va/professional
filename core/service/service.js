@@ -61,11 +61,10 @@ export function renderService(root, navigateBack = () => {}) {
     disposeCatalog?.();
     disposeCatalog = () => {};
     const view = views.some((item) => item.id === activeView) ? activeView : 'procedures';
-    const title = view === 'products' ? 'Товары' : 'Услуги';
 
     root.innerHTML = page([
       serviceHeaderContext({
-        title,
+        title: 'Сервис',
         settingsData: 'data-service-settings',
         settingsAria: 'Настройки сервиса',
         c: {
