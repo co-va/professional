@@ -39,6 +39,8 @@
 .entity-card-editor__direction{grid-column:1/-1}
 
 .entity-card-editor__line-picker{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:3px;margin-bottom:10px}
+.entity-card-editor__columns{margin:0 0 8px}
+.entity-card-editor__columns button{min-height:38px}
 .entity-card-editor__line-picker button{min-width:0;height:36px;border:1px solid #111;border-radius:0;background:#fff;color:#111;font:inherit;font-size:12px}
 .entity-card-editor__line-picker button.is-active{background:#111;color:#fff}
 
