@@ -127,9 +127,9 @@ function openRecordZReport(record) {
   const groups = [
     [
       { label: workplaceName(current?.workplaceId), value: dateLabel },
-      { label: 'Кол-во процедур', value: String(procedureCount) },
+      { label: 'Кол-во услуг', value: String(procedureCount) },
       { label: 'Кол-во часов', value: formatReportNumber(hours) },
-      { label: 'Средний чек процедуры', value: formatReportRubles(averageProcedure) },
+      { label: 'Средний чек услуги', value: formatReportRubles(averageProcedure) },
       { label: 'Средний чек часа', value: formatReportRubles(averageHour) },
     ],
     recordReportStatusRows(current, state),
@@ -504,7 +504,7 @@ export function openRecordView(record, {
         ...procedures.map((item) => {
           const financeItem = settlementByProcedure.get(String(item?.id || ''));
           return {
-            name: item?.name || 'Процедура',
+            name: item?.name || 'Услуга',
             durationText: durationText(Number(item?.duration) || 0),
             right: readOnlyHistory
               ? (item?.cost !== '' && item?.cost != null ? formatMoney(item.cost) : '—')
@@ -512,7 +512,7 @@ export function openRecordView(record, {
             ...(capabilities.procedureSettings && !payment.hasPayments ? {
               action: {
                 data: 'data-record-view-procedure-settings',
-                aria: `Настроить ${item?.name || 'процедуру'}`,
+                aria: `Настроить ${item?.name || 'услугу'}`,
                 label: '⚙',
               },
             } : {}),
