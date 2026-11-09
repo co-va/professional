@@ -66,7 +66,7 @@
 /* The spacer after the third button distinguishes the two functions. */
 .entity-card-editor__tools-line>.entity-card-editor__tool:nth-child(4){grid-column:5}
 .entity-card-editor__section{display:grid;gap:8px;min-width:0}
-.entity-card-editor__section + .entity-card-editor__section{border-top:1px solid var(--border,#ddd);margin-top:14px;padding-top:12px}
+.entity-card-editor__section + .entity-card-editor__section{margin-top:12px}
 .entity-card-editor__tool-captions{display:grid;grid-template-columns:3fr 4fr;gap:calc(10px + var(--entity-card-control-gap) * 2);color:var(--text-secondary);font-size:12px}
 .entity-card-editor__tool-captions span{min-width:0}
 .entity-card-editor__line-picker button{border:1px solid #111;background:#fff;color:#111;font:inherit;font-size:12px}
