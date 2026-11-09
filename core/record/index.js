@@ -4,6 +4,7 @@ export {
   getActiveRecordCountForDay,
   getRecord,
   getRecords,
+  getRecordsForProcedure,
   getRecordsForDay,
   getRecordsInRange,
   readRecord,
