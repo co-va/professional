@@ -119,14 +119,14 @@
 .entity-card-editor__tool.is-active{background:#111;color:#fff}
 .entity-card-editor__tool[aria-label="Курсив"]{font-style:italic}
 .entity-card-editor__tool[aria-label="Подчёркнутый"]{text-decoration:underline}
-.entity-card-editor__text-color{display:flex;gap:7px;white-space:nowrap}
+.entity-card-editor__text-color{display:flex;align-items:center;justify-content:center}
 .entity-card-editor__text-color-swatch{
   display:block;
-  flex:0 0 20px;
-  width:20px;
-  height:20px;
+  flex:0 1 58px;
+  width:min(58px,calc(100% - 8px));
+  height:min(28px,calc(var(--entity-card-control-height) - 6px));
   border:1px solid #111;
-  border-radius:3px;
+  border-radius:4px;
   box-sizing:border-box;
 }
 

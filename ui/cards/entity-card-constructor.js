@@ -209,7 +209,7 @@ function editorWorkspace(state,fields,allowPhoto=true){
       </div>
       <div class="entity-card-editor__tool-captions"><span>Цвет</span><span>Шрифт</span></div>
       <div class="entity-card-editor__tools-line entity-card-editor__tools-line--typography" role="group" aria-label="Цвет и шрифт">
-        <button type="button" class="entity-card-editor__tool entity-card-editor__text-color" data-card-text-color aria-label="Выбрать цвет текста"><span class="entity-card-editor__text-color-swatch" style="background:${cell.color}" aria-hidden="true"></span><span>Выбрать</span></button>
+        <button type="button" class="entity-card-editor__tool entity-card-editor__text-color" data-card-text-color aria-label="Выбрать цвет текста"><span class="entity-card-editor__text-color-swatch" style="background:${cell.color}" aria-hidden="true"></span></button>
         ${toolButton('B','bold',cell.bold,'Жирный')}
         ${toolButton('I','italic',cell.italic,'Курсив')}
         ${toolButton('U','underline',cell.underline,'Подчёркнутый')}
