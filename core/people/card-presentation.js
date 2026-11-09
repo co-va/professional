@@ -1,4 +1,4 @@
-import { normalizeEntityCardAppearance, hasConfiguredEntityCardAppearance } from '../../ui/ui.js';
+import { normalizeEntityCardAppearance, entityCardDefaultRows, hasConfiguredEntityCardAppearance } from '../../ui/ui.js';
 import { getCardAppearanceTemplate } from '../card-appearance-templates.js';
 import { getPersonMetadata, formatPersonVisitDate } from './metadata.js';
 import { telegramDisplay } from './telegram-usernames.js';
@@ -12,17 +12,6 @@ function money(value) {
   return new Intl.NumberFormat('ru-RU').format(Math.max(0, Number(value) || 0)) + ' ₽';
 }
 
-function defaultLines(entries = []) {
-  const lines = Array.from({ length: 9 }, () => ({
-    field: '', zone: 'full', align: 'left', size: 'm', color: 'white',
-    bold: false, italic: false, underline: false, uppercase: false,
-  }));
-  entries.forEach(({ row, field, zone = 'full', align = 'left', size = 'm', color = 'white', bold = false }) => {
-    const index = Math.max(0, Math.min(8, Number(row) - 1));
-    lines[index] = { ...lines[index], field, zone, align, size, color, bold };
-  });
-  return lines;
-}
 
 export function personCardFields(person = {}) {
   const meta = person?.key ? getPersonMetadata(person.key) : { recordCount: 0, paidTotal: 0, lastVisit: '' };
@@ -48,7 +37,7 @@ export function personCardAppearance() {
   const template = getCardAppearanceTemplate('person');
   if (hasConfiguredEntityCardAppearance(template?.appearance)) return normalizeEntityCardAppearance(template.appearance);
   return normalizeEntityCardAppearance({
-    lines: defaultLines([
+    lines: entityCardDefaultRows([
       { row: 1, field: 'uei', bold: true },
       { row: 7, field: 'name', size: 'l', bold: true },
       { row: 8, field: 'phone' },
