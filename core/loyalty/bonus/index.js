@@ -525,7 +525,7 @@ async function openProgramLayer(root, programId, onChanged) {
   return layer;
 }
 
-export function getBonusAssignmentsForPerson(personKey = '') {
+export function getBonusAssignmentsForPerson(personKey = '', { includeHidden = false } = {}) {
   const key = String(personKey || '');
   return programs
     .filter((program) => program?.status === 'active')
@@ -536,7 +536,7 @@ export function getBonusAssignmentsForPerson(personKey = '') {
       const visible = typeof participant?.visibleToPersonOverride === 'boolean'
         ? participant.visibleToPersonOverride
         : program.showToAll !== false;
-      if (!visible) return null;
+      if (!includeHidden && !visible) return null;
       return { program: { ...program }, participant: participant ? { ...participant } : null };
     })
     .filter(Boolean);

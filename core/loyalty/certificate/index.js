@@ -439,12 +439,13 @@ async function openProgramLayer(root, programId, onChanged) {
   return layer;
 }
 
-export function getCertificateAssignmentsForPerson(personKey = '') {
+export function getCertificateAssignmentsForPerson(personKey = '', { includeHidden = false } = {}) {
   const key = String(personKey || '');
   return instances
     .filter((instance) => String(instance?.ownerKey || '') === key)
     .filter((instance) => {
       const program = programs.find((item) => item.id === instance.programId) || {};
+      if (includeHidden) return true;
       return typeof instance.visibleToPersonOverride === 'boolean'
         ? instance.visibleToPersonOverride
         : program.showToAll !== false;

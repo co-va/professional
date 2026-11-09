@@ -390,7 +390,7 @@ async function openProgramLayer(root, programId, onChanged) {
   return layer;
 }
 
-export function getReferralAssignmentsForPerson(personKey = '') {
+export function getReferralAssignmentsForPerson(personKey = '', { includeHidden = false } = {}) {
   const key = String(personKey || '');
   return programs
     .filter((program) => program?.status === 'active')
@@ -401,7 +401,7 @@ export function getReferralAssignmentsForPerson(personKey = '') {
       const visible = typeof relation?.visibleToPersonOverride === 'boolean'
         ? relation.visibleToPersonOverride
         : program.showToAll !== false;
-      if (!visible) return null;
+      if (!includeHidden && !visible) return null;
       return { program: { ...program }, relation: relation ? { ...relation } : null };
     })
     .filter(Boolean);

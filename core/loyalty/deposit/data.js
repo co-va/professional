@@ -73,13 +73,17 @@ export function hydrateDepositInstances(values=[]){
   return getDepositInstances();
 }
 
+// One active-assignment predicate for pricing and the People filter.
+export function isActiveDepositAssignment(deposit=null){
+  return text(deposit?.status)==='active' && termsActive(deposit?.terms);
+}
+
 export function getPersonDepositPriceConditions(personKey=''){
   const key=text(personKey);
   if(!key)return [];
   return deposits
     .filter((deposit)=>personKeyOf(deposit)===key
-      && text(deposit?.status)==='active'
-      && termsActive(deposit?.terms)
+      && isActiveDepositAssignment(deposit)
       && percent(deposit?.discountPercent)>0)
     .map((deposit)=>({
       type:'program',

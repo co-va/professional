@@ -45,7 +45,7 @@ import { openTagEditor } from '../../settings/tags/tags.js';
 import { addTagToSelection } from '../../ui/tags/index.js';
 import { getDocuments } from '../../settings/documents/data.js';
 import { getConsents } from '../../settings/documents/consents.js';
-import { getAllPeople, getIdentityMemberKeys, getPeople, getPersonPriceCondition, savePeople } from './data.js';
+import { getAllPeople, getIdentityMemberKeys, getIdentityPeople, getPeople, getPersonPriceCondition, savePeople } from './data.js';
 import { flushBusinessPersistence, isBusinessServerReady } from '../business-persistence.js';
 import { bindPersonCreateForm, personCreateForm } from './create.js';
 import { personDisplay } from './presentation.js';
@@ -61,6 +61,7 @@ import { getPeopleFilters, getPeopleSortMode, setPeopleFilters, setPeopleSortMod
 import { buildPersonRelationshipSections } from './programs.js';
 import { openPersonProgramActions } from '../loyalty/person-program-actions.js';
 import { listPersonDeposits } from '../loyalty/deposit/data.js';
+import { peopleHasAssignedDiscount, peopleAssignedPrograms, peopleProgramOptions, refreshPeopleLoyaltyData } from './loyalty-filter.js';
 import { openPersonRecordCreation } from './record-creation.js';
 import { canUseRealPersonalData } from '../access.js';
 import { isTelegramUserId, loadTelegramUsernames, telegramDisplay } from './telegram-usernames.js';
@@ -441,6 +442,11 @@ function applyPeopleFilters(items = [], filters = currentPeopleFilters()) {
     if (filters.birthday === 'has' && !person.birthDate) return false;
     if (selectedMonth >= 1 && selectedMonth <= 12 && birthMonth(person.birthDate) !== selectedMonth) return false;
     if (filters.tag && !(person.tags || []).includes(filters.tag)) return false;
+    if (filters.loyaltyMode === 'discount' && !peopleHasAssignedDiscount(person)) return false;
+    if (filters.loyaltyMode === 'program') {
+      const assigned=peopleAssignedPrograms(person);
+      if (!assigned.size || (filters.loyaltyProgram && !assigned.has(filters.loyaltyProgram))) return false;
+    }
     if (recordKeys) {
       const matched = getIdentityMemberKeys(person.key).some((key) => recordKeys.has(String(key)));
       if (filters.recordPeriod === 'none' ? matched : !matched) return false;
@@ -514,6 +520,14 @@ function visiblePeople(root) {
 function refreshPeopleList(root) {
   const host = root.querySelector('[data-people-list-host]');
   if (!host) return;
+  if (currentPeopleFilters().loyaltyMode && root.peopleLoyaltyLoading) {
+    host.textContent='Загружаем контакты…';
+    return;
+  }
+  if (currentPeopleFilters().loyaltyMode && root.peopleLoyaltyError) {
+    host.textContent=root.peopleLoyaltyError;
+    return;
+  }
   const query = root.peopleSearchInput?.value || '';
   const items = visiblePeople(root);
   host.innerHTML = listMarkup(items, query);
@@ -545,7 +559,21 @@ export function renderPeople(root, options = {}) {
     <div class="people-search-divider ui-search-divider" aria-hidden="true"></div>
   </div>`]);
   root.peopleSearchInput = searchRow?.querySelector('[data-people-search]') || null;
+  root.peopleLoyaltyLoading=Boolean(currentPeopleFilters().loyaltyMode);
+  root.peopleLoyaltyError='';
   refreshPeopleList(root);
+  if(root.peopleLoyaltyLoading){
+    void refreshPeopleLoyaltyData().then(()=>{
+      if(!root.isConnected)return;
+      root.peopleLoyaltyLoading=false;
+      refreshPeopleList(root);
+    }).catch(()=>{
+      if(!root.isConnected)return;
+      root.peopleLoyaltyLoading=false;
+      root.peopleLoyaltyError='Не удалось загрузить программы. Повторите попытку.';
+      refreshPeopleList(root);
+    });
+  }
   root.peopleSearchInput?.addEventListener('input', () => refreshPeopleList(root));
   root.querySelector('[data-people-list-settings]')?.addEventListener('click', () => openListSettings(root, options));
   root.querySelector('[data-add]')?.addEventListener('click', () => openAddMenu(root, options));
@@ -566,6 +594,17 @@ function openSortSettings(root) {
   return layer;
 }
 
+function peopleProgramSelect(filters={}){
+  const options=[{value:'',label:'Все программы'},...peopleProgramOptions(getPeople())];
+  if(filters.loyaltyProgram&&!options.some(item=>item.value===filters.loyaltyProgram)){
+    options.push({value:filters.loyaltyProgram,label:'Программа недоступна'});
+  }
+  return select({
+    name:'peopleLoyaltyProgramFilter',value:filters.loyaltyProgram||'',aria:'Выбор программы',
+    options,
+  });
+}
+
 function peopleFilterFields(filters = {}) {
   return `<div class="form-grid">
     ${select({ label: 'Пол', name: 'peopleGenderFilter', value: filters.gender, options: [
@@ -583,6 +622,13 @@ function peopleFilterFields(filters = {}) {
       label: 'Рабочее пространство', name: 'peopleWorkplaceFilter',
       value: filters.workplace, options: workplaceFilterOptions(),
     }) : ''}
+    ${select({
+      name:'peopleLoyaltyFilter',value:filters.loyaltyMode,aria:'Скидка или программа',
+      options:[{value:'',label:'Без фильтра'},{value:'discount',label:'Скидка'},{value:'program',label:'Программа'}],
+    })}
+    <div data-people-program-filter${filters.loyaltyMode==='program'?'':' hidden'}>
+      ${peopleProgramSelect(filters)}
+    </div>
     ${select({ label: 'Email', name: 'peopleNoEmailFilter', value: filters.noEmail, options: [{ value: '', label: 'Без фильтра' }, { value: 'has', label: 'Указан' }, { value: 'yes', label: 'Не указан' }] })}
     ${select({ label: 'Посещения', name: 'peopleRecordPeriodFilter', value: filters.recordPeriod, options: [
       { value: '', label: 'Без фильтра' },
@@ -615,6 +661,12 @@ function openFilterSettings(root) {
   initDatePickers(layer);
   const action = layer.querySelector('[data-people-filter-action]');
   const actions = layer.querySelector('[data-people-filter-actions]');
+  let loyaltyReady=false;
+  let loyaltyError='';
+  const programHost=layer.querySelector('[data-people-program-filter]');
+  const refreshProgramSelect=()=>{
+    if(programHost && draft.loyaltyMode==='program')programHost.innerHTML=peopleProgramSelect(draft);
+  };
 
   const updateAction = () => {
     const changed = !sameFilters(draft, applied);
@@ -622,7 +674,7 @@ function openFilterSettings(root) {
       /^\d{4}-\d{2}-\d{2}$/.test(draft.recordFrom)
       && /^\d{4}-\d{2}-\d{2}$/.test(draft.recordTo)
       && draft.recordFrom <= draft.recordTo);
-    action.disabled = changed && !datesValid;
+    action.disabled = changed && (!datesValid || (Boolean(draft.loyaltyMode) && (!loyaltyReady || Boolean(loyaltyError))));
     const reset = !changed && hasFilters(applied);
     actions.hidden = !changed && !reset;
     action.textContent = changed ? 'Применить' : 'Сбросить';
@@ -638,6 +690,8 @@ function openFilterSettings(root) {
       peopleProcedureFilter: 'procedure',
       peopleWorkplaceFilter: 'workplace',
       peopleNoEmailFilter: 'noEmail',
+      peopleLoyaltyFilter: 'loyaltyMode',
+      peopleLoyaltyProgramFilter: 'loyaltyProgram',
       peopleRecordPeriodFilter: 'recordPeriod',
       peopleRecordFromFilter: 'recordFrom',
       peopleRecordToFilter: 'recordTo',
@@ -645,6 +699,13 @@ function openFilterSettings(root) {
     const key = keyByName[event.target?.name];
     if (!key) return;
     draft[key] = String(event.target.value || '');
+    if (key === 'loyaltyMode') {
+      if(draft.loyaltyMode!=='program')draft.loyaltyProgram='';
+      if(programHost){
+        programHost.hidden=draft.loyaltyMode!=='program';
+        refreshProgramSelect();
+      }
+    }
     if (key === 'recordPeriod') {
       if (draft.recordPeriod !== 'range') {
         draft.recordFrom = '';
@@ -660,6 +721,8 @@ function openFilterSettings(root) {
     if (!sameFilters(draft, applied)) {
       if (action.disabled) return;
       applied = setPeopleFilters(draft);
+      root.peopleLoyaltyLoading=false;
+      root.peopleLoyaltyError='';
       refreshPeopleList(root);
       layer.v2Close?.();
       return;
@@ -667,6 +730,8 @@ function openFilterSettings(root) {
     if (!hasFilters(applied)) return;
     applied = setPeopleFilters({});
     draft = { ...applied };
+    root.peopleLoyaltyLoading=false;
+    root.peopleLoyaltyError='';
     const fields = layer.querySelector('[data-people-filter-fields]');
     if (fields) {
       fields.innerHTML = peopleFilterFields(draft);
@@ -676,6 +741,24 @@ function openFilterSettings(root) {
     updateAction();
   });
 
+  // Fetch real assignments and available program definitions without delaying X opening.
+  void refreshPeopleLoyaltyData().then(()=>{
+    loyaltyReady=true;
+    if(!layer.isConnected)return;
+    refreshProgramSelect();
+    if(currentPeopleFilters().loyaltyMode){
+      root.peopleLoyaltyLoading=false;
+      root.peopleLoyaltyError='';
+      refreshPeopleList(root);
+    }
+    updateAction();
+  }).catch(()=>{
+    loyaltyReady=false;
+    loyaltyError='Не удалось загрузить программы';
+    if(!layer.isConnected)return;
+    if(programHost && draft.loyaltyMode==='program')programHost.textContent=loyaltyError;
+    updateAction();
+  });
   if (!hasCurrentProceduresSnapshot()) {
     void loadRecordCreationOperationalState().then(() => {
       if (!layer.isConnected) return;

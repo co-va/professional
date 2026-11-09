@@ -9,6 +9,8 @@ const DEFAULT_FILTERS = Object.freeze({
   procedure: '',
   workplace: '',
   noEmail: '',
+  loyaltyMode: '',
+  loyaltyProgram: '',
   recordPeriod: '',
   recordFrom: '',
   recordTo: '',
@@ -38,6 +40,8 @@ export function getPeopleFilters() {
       result.recordPeriod = 'none';
     }
     if (result.birthday === 'month') result.birthday = String(new Date().getMonth() + 1);
+    if (!['','discount','program'].includes(result.loyaltyMode)) result.loyaltyMode = '';
+    if (result.loyaltyMode !== 'program') result.loyaltyProgram = '';
     if (!['', '1', '3', '6', 'range', 'none'].includes(result.recordPeriod)) result.recordPeriod = '';
     if (result.recordPeriod !== 'range') {
       result.recordFrom = '';
@@ -51,6 +55,8 @@ export function getPeopleFilters() {
 
 export function setPeopleFilters(value = {}) {
   const next = Object.fromEntries(Object.keys(DEFAULT_FILTERS).map((key) => [key, String(value?.[key] || '')]));
+  if (!['','discount','program'].includes(next.loyaltyMode)) next.loyaltyMode = '';
+  if (next.loyaltyMode !== 'program') next.loyaltyProgram = '';
   localStorage.setItem(FILTER_KEY, JSON.stringify(next));
   return next;
 }
