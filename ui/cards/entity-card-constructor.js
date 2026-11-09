@@ -53,15 +53,11 @@ export function normalizeEntityCardAppearance(value = {}) {
     },
     lines:Array.from({length:ENTITY_CARD_LINE_COUNT},(_,index)=>{
       const raw=lines[index]&&typeof lines[index]==='object'&&!Array.isArray(lines[index])?lines[index]:{};
-      const legacyCol=raw.zone==='left'||raw.zone==='right'?raw.zone:'';
-      const saved=raw.cells&&typeof raw.cells==='object'&&!Array.isArray(raw.cells)?raw.cells:null;
-      const cells=Object.fromEntries(COLUMNS.map(col=>[col,normalizeCell(saved?.[col])]));
-      let full=normalizeCell(raw);
-      if(!saved&&legacyCol){cells[legacyCol]=full;full=normalizeCell();}
+      const saved=raw.cells&&typeof raw.cells==='object'&&!Array.isArray(raw.cells)?raw.cells:{};
       return {
-        ...full,zone:'full',
-        layout:raw.layout==='columns'||(!raw.layout&&legacyCol)?'columns':'full',
-        cells,
+        ...normalizeCell(raw),
+        layout:raw.layout==='columns'?'columns':'full',
+        cells:Object.fromEntries(COLUMNS.map(col=>[col,normalizeCell(saved[col])])),
       };
     }),
   };
