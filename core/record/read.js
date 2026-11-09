@@ -1,5 +1,5 @@
 import { hydrateRecordSettlement } from '../finance/index.js';
-import { getRecordRow, getRecordRows, getRecordRowsForDay, getRecordRowsInRange } from './data.js';
+import { getRecordRow, getRecordRows, getRecordRowsForDay, getRecordRowsForProcedure, getRecordRowsInRange } from './data.js';
 import { getRecordEvents } from './events.js';
 import { projectRecordLifecycle } from './state.js';
 
@@ -23,6 +23,11 @@ export function getRecord(id) {
 
 export function getRecords() {
   return getRecordRows().map(readRecord).filter(Boolean);
+}
+
+/** The same Record/Finance/lifecycle projection, restricted to a single service. */
+export function getRecordsForProcedure(procedureId) {
+  return getRecordRowsForProcedure(procedureId).map(readRecord).filter(Boolean);
 }
 
 export function getRecordsForDay(date, workplaceId = '') {
