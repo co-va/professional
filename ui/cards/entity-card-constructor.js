@@ -164,7 +164,6 @@ function fieldControl(line,fields){
   const registry=entityCardFieldRegistry(fields);
   return select({
     name:'entityCardLineField',
-    label:'Данные',
     value:line.field,
     options:[{value:'',label:'Пусто'},...registry.map((item)=>({value:item.value,label:item.label}))],
     data:'data-card-line-field',
@@ -208,7 +207,6 @@ function editorWorkspace(state,fields,allowPhoto=true){
       <div class="entity-card-editor__data">${fieldControl(cell,fields)}</div>
     </div>
     <div class="entity-card-editor__section entity-card-editor__section--format">
-      <div class="entity-card-editor__control-label">Оформление</div>
       <div class="entity-card-editor__tool-captions"><span>Выравнивание</span><span>Размер</span></div>
       <div class="entity-card-editor__tools-line" role="group" aria-label="Выравнивание и размер">
         ${toolButton('←','align:left',cell.align==='left','Текст слева')}
