@@ -4,7 +4,7 @@
 import { getStoredSettlement } from './data.js';
 import { getActiveDDSMovements, getActiveDDSMovementsForSource } from './read.js';
 import { personalPricePercentSource, resolvePersonPriceCondition } from '../loyalty/price-condition.js';
-import { getAllPeople } from '../people/data.js';
+import { getAllPeople, getPersonPriceCondition } from '../people/data.js';
 import {
   calculateSettlementTotals,
   calculateSettlementItemTotals,
@@ -145,15 +145,23 @@ export function recordSettlementPriceCondition(record = null) {
     ? record.loyaltyProgram
     : null;
   const selectedPercent = clampFinancialPercent(selected?.pricePercent || 0);
-  if (!selected || selectedPercent <= 0) return resolvePersonPriceCondition(null, []);
-  return resolvePersonPriceCondition(null, [{
-    type: 'program',
-    programType: String(selected?.type || ''),
-    programId: String(selected?.programId || ''),
-    assignmentId: String(selected?.assignmentId || ''),
-    name: String(selected?.name || 'Программа'),
-    percent: selectedPercent,
-  }]);
+  if (selected && selectedPercent > 0) {
+    return resolvePersonPriceCondition(null, [{
+      type: 'program',
+      programType: String(selected?.type || ''),
+      programId: String(selected?.programId || ''),
+      assignmentId: String(selected?.assignmentId || ''),
+      name: String(selected?.name || 'Программа'),
+      percent: selectedPercent,
+    }]);
+  }
+
+  // A person-scoped discount program is already assigned, and must apply to
+  // unpaid records automatically. Do not require a SECOND program selection
+  // on the Record. Never combine the automatic program with a manual percent.
+  const effective = getPersonPriceCondition(currentPerson(record?.person));
+  if (effective.conflict || effective.source?.type !== 'program') return resolvePersonPriceCondition(null, []);
+  return resolvePersonPriceCondition(null, [effective.source]);
 }
 
 export function recordSettlementPricePercent(record = null) {
