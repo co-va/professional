@@ -317,6 +317,18 @@ async function openPaymentEntry(record, onCompleted = () => {}) {
     let completed = null;
     paymentInFlightRecords.add(recordId);
     try {
+      // The payment X may stay open across a program expiry or a second-device
+      // edit. Recheck before committing an irreversible financial operation.
+      const personKey = String(personForRecord(latest)?.key || personForRecord(latest)?.id || '').trim();
+      if (personKey) await listPersonDeposits(personKey);
+      const checkedRecord = getRecord(recordId) || latest;
+      const checkedSettlement = settlementForRecord(checkedRecord);
+      const checkedPayment = paymentStateForRecord(checkedRecord);
+      const changed = Math.abs(Number(checkedSettlement?.planTotal || 0) - Number(settlement?.planTotal || 0)) > 0.009
+        || Math.abs(Number(checkedSettlement?.pricePercent || 0) - Number(settlement?.pricePercent || 0)) > 0.009
+        || Math.abs(Number(checkedPayment?.paidTotal || 0) - Number(state?.paidTotal || 0)) > 0.009
+        || checkedPayment.fullyPaid;
+      if (changed) throw new Error('Скидка или сумма оплаты изменилась. Закройте оплату и откройте её заново.');
       if (!hasMoney) {
         const saved = await saveSettlementSnapshot({ source: { type: 'record', id: latest.id }, settlement });
         if (!saved) throw new Error('Не удалось сохранить расчёт');
