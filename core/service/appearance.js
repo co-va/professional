@@ -1,7 +1,7 @@
 import { openEntityCardAppearanceQ } from '../../ui/ui.js';
 import { getCardAppearanceTemplate, saveCardAppearanceTemplate } from '../../core/card-appearance-templates.js';
 import { getSettlementItemTotals } from '../../core/finance/index.js';
-import { getRecords } from '../../core/record/index.js';
+import { getRecords, getRecordsForProcedure } from '../../core/record/index.js';
 import { getProcedures, saveProcedure } from './procedures/data.js';
 import { getProducts, pushProductHistory, saveProduct } from './products/data.js';
 import {
@@ -32,7 +32,8 @@ function serviceTargetOptions(type) {
 
 function recordsFor(type, id) {
   const key = type === 'product' ? 'products' : 'procedures';
-  return getRecords().filter((record) => record?.status !== 'cancelled'
+  const records = type === 'procedure' ? getRecordsForProcedure(id) : getRecords();
+  return records.filter((record) => record?.status !== 'cancelled'
     && (record?.[key] || []).some((item) => String(item?.id || '') === String(id || '')));
 }
 
