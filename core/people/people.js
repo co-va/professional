@@ -1134,18 +1134,47 @@ function openPersonEdit(baseRoot, key, callbacks = {}) {
   const action = layer.querySelector('[data-person-q-save]');
   const actions = action?.closest('.modal-actions');
   const initialState = formSnapshot(form);
-  const isDirty = () => formSnapshot(form) !== initialState;
+  const discountField = layer.querySelector('[name="discountPercent"]');
+  const initialManualDiscount = String(person.discountPercent || '');
+  let discountVerified = false;
   let saving = false;
+  // A locked program discount is a view of the program, NOT a personal
+  // discount edit. Ignore that derived value in dirty-state detection.
+  const isDirty = () => formSnapshot(form) !== initialState
+    || Boolean(discountField && !discountField.disabled
+      && String(discountField.value || '') !== initialManualDiscount);
   const syncAction = () => {
     if (!action) return;
     const visible = isDirty();
     action.hidden = !visible;
-    action.disabled = saving;
+    action.disabled = saving || !discountVerified;
     if (actions) actions.hidden = !visible;
     notifyContext();
   };
+
+  // The Q renders immediately, but the discount input stays locked until its
+  // active program is confirmed by the server. This prevents stale local
+  // caches from allowing a conflicting manual discount after reloading.
+  if (discountField) discountField.disabled = true;
+  void listPersonDeposits(key).then(() => {
+    if (layer.isConnected === false) return;
+    const condition = getPersonPriceCondition(person);
+    const programDiscount = condition.sources.find((source) => source.type === 'program') || null;
+    if (discountField) {
+      discountField.value = String(programDiscount?.percent ?? (person.discountPercent || ''));
+      discountField.disabled = Boolean(programDiscount);
+    }
+    discountVerified = true;
+    syncAction();
+  }).catch((error) => {
+    if (layer.isConnected === false) return;
+    const node = layer.querySelector('[data-person-edit-error]');
+    if (node) node.textContent = `Не удалось проверить условия скидки: ${error instanceof Error ? error.message : 'Нет ответа сервера'}`;
+    syncAction();
+  });
+
   const save = async () => {
-    if (saving || !isDirty()) return;
+    if (saving || !discountVerified || !isDirty()) return;
     saving = true;
     syncAction();
     const errorNode = layer.querySelector('[data-person-edit-error]');
