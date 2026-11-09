@@ -24,10 +24,10 @@ function hex(value,fallback){const next=String(value||'').trim().toUpperCase();r
 function number(value,fallback,min,max){const next=Number(value);return Number.isFinite(next)?Math.max(min,Math.min(max,next)):fallback}
 
 
-function normalizeCell(input = {}) {
+function normalizeCell(input = {}, column = 'left') {
   const cell=input&&typeof input==='object'&&!Array.isArray(input)?input:{};
   return {
-    field:String(cell.field||''),align:choice(cell.align,ALIGNS,'left'),
+    field:String(cell.field||''),align:choice(cell.align,ALIGNS,column==='right'?'right':column==='center'?'center':'left'),
     size:choice(cell.size,SIZES,'m'),color:choice(cell.color,COLORS,'white'),
     bold:bool(cell.bold),italic:bool(cell.italic),underline:bool(cell.underline),uppercase:bool(cell.uppercase),
   };
@@ -53,9 +53,21 @@ export function normalizeEntityCardAppearance(value = {}) {
     lines:Array.from({length:ENTITY_CARD_LINE_COUNT},(_,index)=>{
       const raw=lines[index]&&typeof lines[index]==='object'&&!Array.isArray(lines[index])?lines[index]:{};
       const cells=raw.cells&&typeof raw.cells==='object'&&!Array.isArray(raw.cells)?raw.cells:{};
-      return {cells:Object.fromEntries(COLUMNS.map(col=>[col,normalizeCell(cells[col])]))};
+      return {cells:Object.fromEntries(COLUMNS.map(col=>[col,normalizeCell(cells[col],col)]))};
     }),
   };
+}
+
+// One canonical default layout builder for every card type.
+export function entityCardDefaultRows(entries = []) {
+  const rows=normalizeEntityCardAppearance({}).lines;
+  for(const entry of Array.isArray(entries)?entries:[]){
+    const index=Number(entry?.row)-1;
+    if(!Number.isInteger(index)||index<0||index>=ENTITY_CARD_LINE_COUNT)continue;
+    const column=COLUMNS.includes(entry?.column)?entry.column:'left';
+    rows[index].cells[column]=normalizeCell(entry,column);
+  }
+  return rows;
 }
 
 export function entityCardFieldRegistry(items = []) {
@@ -130,7 +142,7 @@ function fieldControl(line,fields){
     value:line.field,
     options:[{value:'',label:'Пусто'},...registry.map((item)=>({value:item.value,label:item.label}))],
     data:'data-card-line-field',
-    aria:'Данные строки карты',
+    aria:'Показатель выбранной строки и столбца',
   });
 }
 
@@ -156,15 +168,14 @@ function editorWorkspace(state,fields,allowPhoto=true){
   const row=state.appearance.lines[state.line];
   const cell=row.cells[state.column];
   return `<div class="entity-card-editor__card-tools">
-    <div class="entity-card-editor__line-picker">${Array.from({length:ENTITY_CARD_LINE_COUNT},(_,i)=>`<button type="button" class="${i===state.line?'is-active':''}" data-card-line-select="${i}">${i+1}</button>`).join('')}</div>
-    <div class="entity-card-editor__control-label">Столбец для данных</div>
-    <div class="entity-card-editor__tool-group entity-card-editor__tool-group--three" aria-label="Столбец">
-      ${toolButton('Лево','column:left',state.column==='left','Левый столбец')}
-      ${toolButton('Центр','column:center',state.column==='center','Центральный столбец')}
-      ${toolButton('Право','column:right',state.column==='right','Правый столбец')}
+    <div class="entity-card-editor__control-label">Столбец</div>
+    <div class="segment-control entity-card-editor__columns" role="group" aria-label="Выбор столбца">
+      ${COLUMNS.map((column,index)=>`<button type="button" class="${state.column===column?'is-active':''}" data-card-tool="column:${column}" aria-pressed="${state.column===column}" aria-label="Столбец ${index+1}: ${['левый','центральный','правый'][index]}">${['Лево','Центр','Право'][index]}</button>`).join('')}
     </div>
+    <div class="entity-card-editor__control-label">Строка</div>
+    <div class="entity-card-editor__line-picker">${Array.from({length:ENTITY_CARD_LINE_COUNT},(_,i)=>`<button type="button" class="${i===state.line?'is-active':''}" data-card-line-select="${i}" aria-pressed="${i===state.line}" aria-label="Строка ${i+1}">${i+1}</button>`).join('')}</div>
     <div class="entity-card-editor__data">${fieldControl(cell,fields)}</div>
-    <div class="entity-card-editor__control-label">Выравнивание текста внутри ячейки</div>
+    <div class="entity-card-editor__control-label">Выравнивание текста</div>
     <div class="entity-card-editor__tool-group entity-card-editor__tool-group--three" aria-label="Выравнивание">
       ${toolButton('←','align:left',cell.align==='left','Текст слева')}
       ${toolButton('↔','align:center',cell.align==='center','Текст по центру')}
