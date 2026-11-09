@@ -166,7 +166,7 @@ export function openProfileAppearanceQ(root,{onSaved=null,navigateBack=()=>{},op
       if(type==='profile'){
         return {
           appearance:profileCardAppearance(p),
-          fields:profileCardFields(p,values),
+          fields:profileCardFields(p,values,{previewDiscount:true}),
           photo:p.photo||'',
           photoPosition:avatarPosition(p),
         };

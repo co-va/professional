@@ -30,7 +30,7 @@ function hasConfiguredLines(value = {}) {
   return Array.isArray(value?.lines) && value.lines.some((line)=>String(line?.field||'').trim());
 }
 
-export function profileCardFields(profile = {}, workplaces = []) {
+export function profileCardFields(profile = {}, workplaces = [], { previewDiscount = false } = {}) {
   const supplied=Array.isArray(workplaces)?workplaces:[];
   const values=supplied.length?supplied:(Array.isArray(profile?.workplaces)?profile.workplaces:[]);
   const first=values[0]||{};
@@ -41,6 +41,8 @@ export function profileCardFields(profile = {}, workplaces = []) {
     {value:'firstName',label:'Имя',text:profile.name||''},
     {value:'surname',label:'Фамилия',text:profile.surname||''},
     {value:'profession',label:'Профессия',text:profile.profession||''},
+    // The value is supplied only for appearance preview. User receives its own active discount from Core.
+    {value:'discount',label:'Скидка',text:previewDiscount?'Скидка 10%':''},
     {value:'phone',label:'Телефон',text:phoneOf(profile)},
     {value:'email',label:'Email',text:emailOf(profile)},
     {value:'telegram',label:'Telegram',text:telegramOf(profile)},
