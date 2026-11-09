@@ -201,7 +201,8 @@ async function openPersonHistoryItemQ(root, person, item, options = {}) {
     const snapshot = item.recordSnapshot || null;
     const record = current || (snapshot?.id ? {
       ...snapshot,
-      // Deleted/history-only records retain their original Record values.
+      // History-only Record snapshots retain their original values; deleted
+      // records are excluded from the working history at the data owner.
       person: snapshot.person?.key ? snapshot.person : person,
     } : null);
     if (!record?.id) return null;

@@ -100,6 +100,17 @@ function statusLabel(state = {}) {
 
 
 
+// Deletion remains in the append-only History audit, never in the ordinary
+// professional Person history. A delete tombstone supersedes earlier snapshots
+// even if the server returns facts in a different order.
+function deletedRecordIdsFromFacts(facts = []) {
+  return new Set(facts
+    .filter((fact) => fact?.entityType === 'record'
+      && (fact.status === 'deleted' || fact.eventType === 'delete'))
+    .map((fact) => text(fact.entityId || fact.recordId))
+    .filter(Boolean));
+}
+
 function recordItem(facts = [], recordId = '') {
   const recordFact = facts.find((fact) => fact.entityType === 'record' && text(fact.entityId) === recordId);
   if (!recordFact) return null;
@@ -166,8 +177,10 @@ function standaloneFinanceItem(fact = {}) {
 
 export function projectPersonHistoryFacts(facts = []) {
   const rows = Array.isArray(facts) ? facts : [];
+  const deletedIds = deletedRecordIdsFromFacts(rows);
   const recordIds = [...new Set(rows.map((fact) => text(fact.recordId || (fact.entityType === 'record' ? fact.entityId : ''))).filter(Boolean))];
-  const records = recordIds.map((recordId) => recordItem(rows, recordId)).filter(Boolean);
+  const records = recordIds.filter((recordId) => !deletedIds.has(recordId))
+    .map((recordId) => recordItem(rows, recordId)).filter(Boolean);
   const standaloneFinance = latestBy(rows.filter((fact) => fact.entityType === 'finance-operation' && !text(fact.recordId)), (fact) => fact.entityId)
     .map(standaloneFinanceItem)
     .filter(Boolean);
@@ -178,13 +191,14 @@ export function projectPersonHistoryFacts(facts = []) {
 
 // A read-only projection of Record facts already hydrated for the Journal.
 // It lets the contact history open immediately, without waiting for /history.
-// Historical deletions and financial audit details still come from /history.
+// The audit enriches live records; deleted records stay audit-only.
 export function getCurrentPersonHistory(key = '') {
   const identityKeys = new Set(getIdentityMemberKeys(key).map(text).filter(Boolean));
   if (!identityKeys.size && text(key)) identityKeys.add(text(key));
   if (!identityKeys.size) return [];
   return getRecords()
-    .filter((record) => identityKeys.has(text(record?.person?.key)) && text(record.id))
+    .filter((record) => identityKeys.has(text(record?.person?.key)) && text(record.id)
+      && record.status !== 'deleted' && !record.deletedAt)
     .map((record) => {
       const procedures = procedureNames(record);
       const products = productNames(record);
@@ -216,9 +230,10 @@ export function getCurrentPersonHistory(key = '') {
     .sort((a, b) => text(b.occurredAt).localeCompare(text(a.occurredAt)));
 }
 
-function mergePersonHistory(audit = [], current = []) {
+function mergePersonHistory(audit = [], current = [], deletedIds = new Set()) {
   const auditedRecords = new Set(audit.filter((item) => item.kind === 'record').map((item) => text(item.recordId)));
-  return [...audit, ...current.filter((item) => !auditedRecords.has(text(item.recordId)))]
+  return [...audit, ...current.filter((item) => !deletedIds.has(text(item.recordId))
+    && !auditedRecords.has(text(item.recordId)))]
     .sort((a, b) => text(b.occurredAt).localeCompare(text(a.occurredAt)));
 }
 
@@ -231,5 +246,9 @@ export async function getPersonHistory(key = '') {
     entityTypes: ['record', 'record-event', 'finance-operation', 'finance-settlement'],
     limit: 2000,
   });
-  return mergePersonHistory(projectPersonHistoryFacts(facts), getCurrentPersonHistory(key));
+  return mergePersonHistory(
+    projectPersonHistoryFacts(facts),
+    getCurrentPersonHistory(key),
+    deletedRecordIdsFromFacts(facts),
+  );
 }
