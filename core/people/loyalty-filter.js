@@ -12,7 +12,17 @@ const KINDS = Object.freeze({
 });
 const text = value => String(value??'').trim();
 const activeProgram = program => Boolean(program?.id) && !program?.archivedAt && (!program.status || program.status==='active');
-const activeInstance = item => !['closed','ended','expired','cancelled','paused','used'].includes(text(item?.status).toLowerCase());
+function activeInstance(item){
+  if(['closed','ended','expired','cancelled','paused','used'].includes(text(item?.status).toLowerCase()))return false;
+  const expiry=text(item?.expiresAt).slice(0,10);
+  // Some program types use a descriptive string (e.g. "Бессрочно"), not a date.
+  if(/^\d{4}-\d{2}-\d{2}$/.test(expiry)){
+    const now=new Date();
+    const today=[now.getFullYear(),String(now.getMonth()+1).padStart(2,'0'),String(now.getDate()).padStart(2,'0')].join('-');
+    if(expiry<today)return false;
+  }
+  return true;
+}
 
 export async function refreshPeopleLoyaltyData(){
   // Actual server assignments, not sample or automatic Personal Accounts.
