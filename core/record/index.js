@@ -40,4 +40,5 @@ export {
   recordPaymentStatus,
   recordVisitState,
   recordVisualState,
+  recordListStatusClass,
 } from './state.js';

@@ -2,7 +2,7 @@ import { ALL_WORKPLACES_ID, emptyState, escapeHtml, v2ListEntries, v2ListEntry, 
 import { getWorkplaces } from '../core/workplace-time.js';
 import { getRecordPaymentState, recordAmountDue } from '../core/finance/index.js';
 import { getRecordsInRange } from '../core/record/index.js';
-import { isRecordCompletedSide, recordActivityTime, recordAppointmentTime, recordVisualState } from '../core/record/index.js';
+import { isRecordCompletedSide, recordActivityTime, recordAppointmentTime, recordListStatusClass } from '../core/record/index.js';
 
 let recordViewModulePromise = null;
 function loadRecordViewModule() {
@@ -35,10 +35,6 @@ function paymentFor(record) {
 
 function displayAmountDue(record = null) { return recordAmountDue(record); }
 
-function recordStatusClass(record, paid = false) {
-  return `journal-list-record--${recordVisualState(record, { paid })}`;
-}
-
 function recordId(record) {
   return String(record?.id || record?.sourceId || '');
 }
@@ -46,7 +42,7 @@ function recordId(record) {
 function recordEntry(record, workplaces, { focus = false, paid = false } = {}) {
   const presentation = recordPresentation(record, workplaces);
   const name = personName(presentation.person, 'Человек');
-  const classes = [recordStatusClass(record, paid), focus ? 'journal-list-focus' : ''].filter(Boolean).join(' ');
+  const classes = [recordListStatusClass(record, { paid }), focus ? 'journal-list-focus' : ''].filter(Boolean).join(' ');
   const id = recordId(record);
   return v2ListEntry({
     overline: presentation.workplace,

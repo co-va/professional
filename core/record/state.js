@@ -112,6 +112,11 @@ export function recordVisualState(record, { paid = false } = {}) {
   return 'active';
 }
 
+// One visual-status contract for Journal and Contact History.
+export function recordListStatusClass(record, { paid = false } = {}) {
+  return `journal-list-record--${recordVisualState(record, { paid })}`;
+}
+
 export function isRecordCompletedSide(record, { paid = false, now = Date.now() } = {}) {
   return record?.status === 'cancelled'
     || record?.attendance === 'no-show'

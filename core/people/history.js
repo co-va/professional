@@ -1,6 +1,7 @@
 import { loadHistoryFacts } from '../history/service.js';
 import { getIdentityMemberKeys } from './data.js';
-import { getRecords } from '../record/index.js';
+import { getRecords, recordListStatusClass } from '../record/index.js';
+import { getRecordPaymentState } from '../finance/index.js';
 import { financeHistoryOperation, recordFinanceFromHistoryFacts } from '../finance/read.js';
 
 const text = (value) => String(value ?? '').trim();
@@ -141,6 +142,7 @@ function recordItem(facts = [], recordId = '') {
     subtitle: statusLabel(state),
     amount: null,
     status: state.status,
+    visualClass: recordListStatusClass({ ...record, ...state }, { paid: finance.paymentState === 'paid' }),
     attendance: state.attendance,
     confirmed: state.confirmed,
     statusAt: state.statusAt,
@@ -223,6 +225,7 @@ export function getCurrentPersonHistory(key = '') {
           : record.confirmed ? 'Подтверждена' : 'Запись',
         amount: null,
         status: text(record.status || 'active'),
+        visualClass: recordListStatusClass(record, { paid: getRecordPaymentState(record).fullyPaid }),
         attendance: text(record.attendance),
         confirmed: record.confirmed === true,
       };
@@ -231,8 +234,14 @@ export function getCurrentPersonHistory(key = '') {
 }
 
 function mergePersonHistory(audit = [], current = [], deletedIds = new Set()) {
+  const currentById = new Map(current.filter(item => item.kind === 'record')
+    .map(item => [text(item.recordId), item]));
   const auditedRecords = new Set(audit.filter((item) => item.kind === 'record').map((item) => text(item.recordId)));
-  return [...audit, ...current.filter((item) => !deletedIds.has(text(item.recordId))
+  // Audit supplies the details; live Record/Finance supplies the current color.
+  const enrichedAudit = audit.map(item => item.kind === 'record'
+    ? { ...item, visualClass: currentById.get(text(item.recordId))?.visualClass || item.visualClass }
+    : item);
+  return [...enrichedAudit, ...current.filter((item) => !deletedIds.has(text(item.recordId))
     && !auditedRecords.has(text(item.recordId)))]
     .sort((a, b) => text(b.occurredAt).localeCompare(text(a.occurredAt)));
 }
