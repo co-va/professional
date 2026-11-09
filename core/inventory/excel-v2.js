@@ -194,7 +194,7 @@ function enhanceMovementEditor(root, layer) {
   const metadata = document.createElement('div');
   metadata.innerHTML = `${sectionDatalist()}
     ${field({ label: 'UEI', name: 'personUei', value: movement?.personUei || '', readonly: Boolean(movement) })}
-    ${field({ label: 'Процедура', name: 'procedureKey', value: movement?.procedureKey || '', readonly: Boolean(movement) })}
+    ${field({ label: 'Услуга', name: 'procedureKey', value: movement?.procedureKey || '', readonly: Boolean(movement) })}
     ${field({ label: 'Часть / зона', name: 'section', value: existingSection, autocomplete: 'off', data: 'list="inventory-section-values"' })}`;
   const rows = form.querySelector('[data-inventory-movement-rows]');
   if (rows) rows.before(...metadata.childNodes);
