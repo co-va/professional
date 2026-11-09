@@ -1110,7 +1110,7 @@ export async function issueDepositForPerson(root, person, programId, onSaved = (
 
 export async function openAssignedDepositForPerson(root, person, depositId, onChanged = () => {}) {
   if (!person?.key) throw new Error('Клиент не выбран');
-  const deposits = await listPersonDeposits(person.key);
+  const [deposits] = await Promise.all([listPersonDeposits(person.key), loadDepositPrograms()]);
   if (!deposits.some((item) => String(item?.depositId || item?.id) === String(depositId))) {
     throw new Error('Депозит не принадлежит выбранному клиенту');
   }

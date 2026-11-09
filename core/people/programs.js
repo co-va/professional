@@ -13,8 +13,8 @@ import { getUEI } from '../uei.js';
 import { loyaltyNavigationItems } from '../loyalty/index.js';
 import { canUseCapability } from '../access.js';
 import { personalAccountVisualCard } from '../loyalty/personal-account/index.js';
-import { getCachedPersonalAccount, loadPersonalAccount, updatePersonalAccountSettings } from '../loyalty/personal-account/data.js';
-import { getDepositInstances, getDepositPrograms, listPersonDeposits, loadDepositPrograms, updateDepositSettings } from '../loyalty/deposit/data.js';
+import { getCachedPersonalAccount, loadPersonalAccount } from '../loyalty/personal-account/data.js';
+import { getDepositInstances, listPersonDeposits } from '../loyalty/deposit/data.js';
 import {
   depositCardAppearance,
   depositCardFields,
@@ -69,27 +69,6 @@ function historyList(items = [], emptyText = 'Истории пока нет') {
   })));
 }
 
-function personalAccountDetail(account, loadError = '') {
-  if (loadError) return emptyState('Личный счёт временно недоступен', loadError);
-  const value = account || {};
-  const movements = (Array.isArray(value.movements) ? value.movements : []).slice().reverse().map((item) => ({
-    title: item.kind === 'funding' ? 'Пополнение' : item.kind === 'withdrawal' ? 'Возврат' : item.kind === 'payment' ? 'Оплата' : 'Операция',
-    subtitle: shortDateTime(item.occurredAt, '—'),
-    rightTop: `${String(item.direction || '').toUpperCase() === 'IN' ? '+' : '−'}${money(item.amount)}`,
-    rightBottom: `Остаток ${money(item.balanceAfter)}`,
-  }));
-  const debts = (Array.isArray(value.debts) ? value.debts : []).map((item) => ({
-    title: Number(item.outstandingAmount || 0) > 0.009 ? 'Задолженность' : 'Погашено',
-    subtitle: shortDateTime(item.occurredAt, '—'),
-    rightTop: money(item.outstandingAmount || item.originalAmount),
-  }));
-  return `${detailsSection([
-    { label: 'Денежный остаток', value: money(value.balance) },
-    { label: 'Задолженность', value: money(value.debtTotal) },
-    { label: 'Можно оплатить со счёта', value: `${Math.max(0, Math.min(100, Number(value.spendLimitPercent ?? 100) || 0))}%` },
-  ])}${debts.length ? v2Section('Задолженности', historyList(debts)) : ''}${v2Section('История', historyList(movements))}`;
-}
-
 function depositCard(deposit) {
   const terms = deposit?.terms && typeof deposit.terms === 'object' ? deposit.terms : {};
   const nominal = Number(terms.amount);
@@ -115,25 +94,6 @@ function depositCard(deposit) {
     data: `data-person-program="deposit:${escapeHtml(deposit?.depositId || deposit?.id || '')}"`,
     aria: `Открыть депозит ${deposit?.programName || ''}`,
   });
-}
-
-function depositDetail(deposit = {}) {
-  const terms = deposit?.terms && typeof deposit.terms === 'object' ? deposit.terms : {};
-  const rows = [
-    { label: 'UEI', value: getUEI('loyalty-deposit', deposit?.depositId || deposit?.id) || '—' },
-    { label: 'Дата оформления', value: shortDateTime(deposit?.fundedAt, '—') },
-    { label: 'Внесено', value: money(deposit?.fundedAmount) },
-    { label: 'Остаток', value: money(deposit?.balance) },
-    { label: 'Срок', value: terms.termRule || 'Бессрочно' },
-    { label: 'Условие выгоды', value: terms.benefit || 'Без дополнительной выгоды' },
-    { label: 'Состояние', value: statusLabel(deposit?.status) },
-  ];
-  const history = (Array.isArray(deposit.history) ? deposit.history : []).slice().reverse().map((item) => ({
-    title: item.kind === 'deposit-funding' ? 'Внесение' : item.kind === 'deposit-withdrawal' ? 'Возврат остатка' : item.kind === 'payment' ? 'Использование при оплате' : 'Операция',
-    subtitle: shortDateTime(item.occurredAt, '—'),
-    rightTop: `${String(item.direction || '').toUpperCase() === 'IN' ? '+' : '−'}${money(item.amount)}`,
-  }));
-  return `${detailsSection(rows)}${v2Section('История', historyList(history, 'Истории депозита пока нет'))}`;
 }
 
 function certificateCard({ instance, program }) {
@@ -339,37 +299,6 @@ function personFinanceEntities(person = {}) {
   return { investments, loans };
 }
 
-// The Person Q uses the same persisted visibility contract as each Loyalty Q.
-// "Off" hides the card from this end user, without changing payments or history.
-function personalAccountVisibility(personKey, account) {
-  return {
-    checked: account?.visibleToEndUser !== false,
-    async onToggle(checked) {
-      const latest = getCachedPersonalAccount(personKey) || account;
-      const saved = await updatePersonalAccountSettings(personKey, {
-        spendLimitPercent: latest?.spendLimitPercent ?? 100,
-        visibleToEndUser: checked,
-      });
-      return saved?.visibleToEndUser !== false;
-    },
-  };
-}
-
-function depositVisibility(deposit) {
-  const id = text(deposit?.depositId || deposit?.id);
-  const program = getDepositPrograms().find(item => text(item?.id) === text(deposit?.programId));
-  const inherited = program?.showToAll !== false;
-  return {
-    checked: typeof deposit?.visibleToPersonOverride === 'boolean'
-      ? deposit.visibleToPersonOverride : inherited,
-    async onToggle(checked) {
-      const saved = await updateDepositSettings(id, { visibleToPerson: checked });
-      return typeof saved?.visibleToPersonOverride === 'boolean'
-        ? saved.visibleToPersonOverride : checked;
-    },
-  };
-}
-
 function cachedPersonDeposits(personKey = '') {
   const key = text(personKey);
   if (!key) return [];
@@ -387,11 +316,10 @@ export async function buildPersonRelationshipSections(person = {}, { refresh = t
   const allowed = new Set(loyaltyNavigationItems().map(({ id }) => id));
   const canSee = (kind) => allowed.has(kind);
   const account = canSee('personal-account') ? getCachedPersonalAccount(key) : null;
-  const accountError = '';
   const deposits = canSee('deposit') ? cachedPersonDeposits(key) : [];
   const refreshTasks = refresh ? [
     ...(canSee('personal-account') ? [loadPersonalAccount(key)] : []),
-    ...(canSee('deposit') ? [loadDepositPrograms(), listPersonDeposits(key)] : []),
+    ...(canSee('deposit') ? [listPersonDeposits(key)] : []),
   ] : [];
   const refreshPromise = refreshTasks.length ? Promise.allSettled(refreshTasks) : null;
   const certificates = canSee('certificate') ? getCertificateAssignmentsForPerson(key) : [];
@@ -422,12 +350,12 @@ export async function buildPersonRelationshipSections(person = {}, { refresh = t
 
   const detailByKey = new Map([
     ...(account ? [['personal-account', {
-      title: 'Личный счёт', body: personalAccountDetail(account, accountError),
-      visibility: personalAccountVisibility(key, account),
+      title: 'Личный счёт', nativeScreen: 'personal-account',
     }]] : []),
     ...deposits.map((item) => [`deposit:${item.depositId || item.id}`, {
-      title: item.programName || 'Депозит', body: depositDetail(item),
-      visibility: depositVisibility(item),
+      title: item.programName || 'Депозит',
+      nativeScreen: 'deposit',
+      depositId: String(item.depositId || item.id || ''),
     }]),
     ...certificates.map((item) => [`certificate:${item.instance?.id}`, { title: item.program?.name || 'Сертификат', body: certificateDetail(item) }]),
     ...subscriptions.map((item) => [`subscription:${item.instance?.id}`, { title: item.program?.name || 'Абонемент', body: subscriptionDetail(item) }]),
