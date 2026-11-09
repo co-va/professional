@@ -58,6 +58,7 @@ import {
   depositCardPhoto,
   depositCardPhotoPosition,
   depositCardScope,
+  depositCardStatusLabel,
 } from './card-presentation.js';
 
 const PROGRAM_UEI_TYPE = 'loyalty-deposit-program';
@@ -96,12 +97,6 @@ function depositHeaderContext({ title = 'Депозит', settingsData = '', set
 
 function formObject(form) {
   return Object.fromEntries([...new FormData(form).entries()].map(([key, value]) => [key, typeof value === 'string' ? value.trim() : value]));
-}
-
-function programStatusLabel(status = '') {
-  if (status === 'paused') return 'Приостановлена';
-  if (status === 'closed' || status === 'ended') return 'Завершена';
-  return 'Активна';
 }
 
 function depositStatusLabel(status = '') {
@@ -183,7 +178,7 @@ function programFields(program = {}) {
     uei: programUei(program),
     title: program?.name || 'Депозит',
     subtitle: program?.termRule || 'Бессрочно',
-    status: programStatusLabel(program?.status),
+    status: depositCardStatusLabel(program?.status),
     metaLeft: program?.benefit || 'Без дополнительной выгоды',
     metaRight: amount > 0 ? money(amount) : 'Свободная сумма',
   });
@@ -204,7 +199,7 @@ function card(fields, { data = '', aria = '', interactive = true } = {}) {
 function programConditions(program = {}, issuedCount = null) {
   const lines = [
     `UEI: ${programUei(program) || '—'}`,
-    `Состояние: ${programStatusLabel(program?.status)}`,
+    `Состояние: ${depositCardStatusLabel(program?.status)}`,
     `Сумма: ${Number(program?.amount || 0) > 0 ? money(program.amount) : 'Свободная'}`,
     `Срок: ${program?.termRule || 'Бессрочно'}`,
     `Выгода: ${program?.benefit || 'Без дополнительной выгоды'}`,

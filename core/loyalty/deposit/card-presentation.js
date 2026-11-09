@@ -46,6 +46,15 @@ export function depositCardPhotoPosition() {
   return String(getCardAppearanceTemplate(SCOPE)?.photoPosition || '50% 50%');
 }
 
+// One status label for the Deposit program and its assigned Person card.
+// Rendering still reflects each entity's actual status.
+export function depositCardStatusLabel(status = '') {
+  if (status === 'paused') return 'Приостановлена';
+  if (status === 'closed' || status === 'ended') return 'Завершена';
+  if (status === 'expired') return 'Срок завершён';
+  return 'Активна';
+}
+
 export function depositCardFields({
   uei = '',
   title = 'Депозит',

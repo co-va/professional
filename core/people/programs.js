@@ -20,6 +20,7 @@ import {
   depositCardFields,
   depositCardPhoto,
   depositCardPhotoPosition,
+  depositCardStatusLabel,
 } from '../loyalty/deposit/card-presentation.js';
 import { getCertificateAssignmentsForPerson } from '../loyalty/certificate/index.js';
 import { getSubscriptionAssignmentsForPerson } from '../loyalty/subscription/index.js';
@@ -93,10 +94,10 @@ function depositCard(deposit) {
   return entityVisualCard({
     appearance: depositCardAppearance(),
     fields: depositCardFields({
-      uei: getUEI('loyalty-deposit', deposit?.depositId || deposit?.id) || '',
+      uei: getUEI('loyalty-deposit-program', deposit?.programId) || '',
       title: deposit?.programName || 'Депозит',
       subtitle: terms.termRule || 'Бессрочно',
-      status: statusLabel(deposit?.status),
+      status: depositCardStatusLabel(deposit?.status),
       metaLeft: terms.benefit || 'Депозит',
       metaRight: money(deposit?.balance),
     }),
