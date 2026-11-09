@@ -12,12 +12,13 @@ export function proceduresForWorkplace(procedures = [], workplaceId = '') {
   return (Array.isArray(procedures) ? procedures : []).filter((procedure) => procedureForWorkplace(procedure, workplaceId));
 }
 
-function costDefinitionForWorkplace(procedure = {}, workplaceId = '') {
+export function costDefinitionForWorkplace(procedure = {}, workplaceId = '') {
   const assignment = procedureWorkplaceAssignment(procedure, workplaceId);
   const assigned = assignment?.cost;
   const base = procedure?.cost;
-  const hasAssigned = assigned && typeof assigned === 'object' && !assigned.free && (
-    assigned.amount !== '' && assigned.amount != null
+  const hasAssigned = assigned && typeof assigned === 'object' && (
+    assigned.free === true
+    || assigned.amount !== '' && assigned.amount != null
     || assigned.from !== '' && assigned.from != null
     || assigned.to !== '' && assigned.to != null
   );
@@ -36,7 +37,9 @@ export function procedurePricingForWorkplace(procedure = {}, workplaceId = '') {
     || mode === 'from-to'
     || (!mode && (hasTo || (!hasAmount && hasFrom)));
   return {
-    value: hasAmount ? cost.amount : hasFrom ? cost.from : 0,
+    value: (mode === 'from' || mode === 'from-to') && hasFrom
+      ? cost.from
+      : hasAmount ? cost.amount : hasFrom ? cost.from : 0,
     variable,
     free: false,
   };
