@@ -1,4 +1,4 @@
-import { normalizeEntityCardAppearance } from '../../ui/ui.js';
+import { normalizeEntityCardAppearance, hasConfiguredEntityCardAppearance } from '../../ui/ui.js';
 import { getCardAppearanceTemplate } from '../card-appearance-templates.js';
 import { getPersonMetadata, formatPersonVisitDate } from './metadata.js';
 import { telegramDisplay } from './telegram-usernames.js';
@@ -24,10 +24,6 @@ function defaultLines(entries = []) {
   return lines;
 }
 
-function hasConfiguredLines(value = {}) {
-  return Array.isArray(value?.lines) && value.lines.some((line) => String(line?.field || '').trim());
-}
-
 export function personCardFields(person = {}) {
   const meta = person?.key ? getPersonMetadata(person.key) : { recordCount: 0, paidTotal: 0, lastVisit: '' };
   const fullName = [person.name, person.surname].filter(Boolean).join(' ');
@@ -50,7 +46,7 @@ export function personCardFields(person = {}) {
 
 export function personCardAppearance() {
   const template = getCardAppearanceTemplate('person');
-  if (hasConfiguredLines(template?.appearance)) return normalizeEntityCardAppearance(template.appearance);
+  if (hasConfiguredEntityCardAppearance(template?.appearance)) return normalizeEntityCardAppearance(template.appearance);
   return normalizeEntityCardAppearance({
     lines: defaultLines([
       { row: 1, field: 'uei', bold: true },
