@@ -7,7 +7,7 @@ const Z_HEADER_STYLE = [
   'z-index:20',
   'box-sizing:border-box',
   'min-height:28px',
-  'margin:0 -18px',
+  'margin-inline:-18px',
   'padding:0 18px 0 0',
   'display:flex',
   'flex:0 0 auto',

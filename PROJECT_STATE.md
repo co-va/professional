@@ -818,3 +818,10 @@ Professional отделён только если одновременно до�
 - Причина: `v2QFrame` задавал отступ `18px` только когда HTML заголовка был непустым в момент создания. Редактор «Вид» добавляет селекторы в Header позже, поэтому Header и Body соприкасались.
 - Правило вынесено в единственный Shared UI owner `ui/v2/surface-header.css`: если содержимое Z/Q Header непустое, между Header и Body ровно `8px`; если Header пуст — лишнего отступа нет. Правило реагирует и на динамическое добавление элементов без JS-перерасчётов.
 - Удалена старая условная inline-геометрия из `ui/v2/z-layout.js`, чтобы она не перекрывала единый CSS-контракт. Отступы отдельных карточек/фич не менялись. В рамках задачи изменён только `co-va/professional/staging`; User/Core/main не менялись.
+
+## Shared UI Header / Body — консолидация границы 2026-11-09
+
+- Единый контракт отделения Header от Body принадлежит исключительно `ui/v2/surface-header.css`: у Z и Q заполненный Header задаёт `margin-bottom:8px`; пустой Header не добавляет промежуток. Работает и при динамическом добавлении селекторов после создания Q.
+- `ui/v2/z-layout.js` больше не фиксирует вертикальные поля Header inline через `margin:0 -18px`; используется только горизонтальный `margin-inline:-18px`, чтобы CSS владел вертикальным отступом и его не приходилось перебивать `!important`.
+- Удалено специальное исключение `[data-v2-q-body] > .workspace-header-context + .entity-details { margin-top:0 }`; не допускаются feature-specific правки расстояния между Header и Body. Дублирующие `padding-bottom:0!important` у пустого Header удалены.
+- Переходы Z/Q, высота Header, размеры полей, keyboard/scroll, save-action не менялись. Правка только `co-va/professional/staging` (Amvera); `core`, `user`, `main` не затронуты.
