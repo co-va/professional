@@ -1,9 +1,11 @@
 import { button, emptyState, modal, mountModal, openNotice, select } from '../../ui/ui.js';
 import { loyaltyNavigationItems } from './index.js';
 
-// The selector always mirrors the Loyalty E-cards. No second feature list.
+// Use the canonical Loyalty E list, but only programs that require manual
+// assignment. Personal Account is automatic and stays accessible from the
+// Person card and Loyalty E, never from the issue-program selector.
 export function personProgramActionTypes() {
-  return loyaltyNavigationItems();
+  return loyaltyNavigationItems().filter((item) => item.assignableToPerson);
 }
 
 // Each Loyalty module provides these exports when its person-scoped workflow
