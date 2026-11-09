@@ -54,7 +54,8 @@ console.log('Professional root readiness navigation PASS');
 assert.match(source, /if \(!workspaceReady \|\| !sectionAllowed\('chat'\)\) return;/,
   'Record-to-Chat action must not bypass a NOT_READY Chat instrument');
 
-\n// Person Z2 must inherit the Finance and Loyalty tool gates. A saved finance
+
+// Person Z2 must inherit the Finance and Loyalty tool gates. A saved finance
 // relationship is not proof that its tool is READY/TESTING for this user.
 const peoplePrograms = readFileSync('core/people/programs.js', 'utf8');
 const personFinanceSource = peoplePrograms.match(/function personFinanceEntities\(person = \{\}\) \{[\s\S]*?\n\}/)?.[0];
