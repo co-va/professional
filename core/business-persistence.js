@@ -22,9 +22,18 @@ async function responseJson(response, fallbackMessage) {
   return payload;
 }
 
-function reportError(error) {
+function reportError(error, item) {
   const previousMessage = lastError?.message || '';
-  lastError = error instanceof Error ? error : new Error(String(error || 'Ошибка серверного сохранения'));
+  const status = Number(error?.status) || 0;
+  const reason = String(error?.message || error || '');
+  // iOS Safari reports failed fetches as "Load failed", without an HTTP code.
+  // Name the failed operation; never misreport a network failure as saved.
+  const networkFailure = !status && (error instanceof TypeError
+    || /^(Load failed|Failed to fetch|NetworkError)/i.test(reason));
+  lastError = networkFailure
+    ? new Error(`${item?.fallbackMessage || 'Не удалось сохранить данные'}: нет ответа от сервера. Повторяю отправку.`)
+    : (error instanceof Error ? error : new Error(reason || 'Ошибка серверного сохранения'));
+  if (status) lastError.status = status;
   if (typeof window !== 'undefined' && lastError.message !== previousMessage) {
     window.dispatchEvent(new CustomEvent('professional:business-persistence-error', { detail: { message: lastError.message } }));
   }
@@ -115,7 +124,7 @@ async function runQueue() {
         item.resolve?.(result);
         markMutationCompleted(item.path);
       } catch (error) {
-        reportError(error);
+        reportError(error, item);
         const status = Number(error?.status) || 0;
         if (status >= 400 && status < 500) {
           queue.shift();
