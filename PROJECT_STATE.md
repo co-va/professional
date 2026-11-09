@@ -887,3 +887,12 @@ Professional отделён только если одновременно до�
 - Проверка: синтаксическая компиляция 17 затронутых JS-файлов — PASS; изолированная проверка канонического Record selector (услуга на двух пространствах, исключение остальных записей, пустой ID, независимость копии) — PASS. Live API, Amvera/iPhone, фактическая скорость и реальное server acknowledgement на пользовательском аккаунте ещё не проверены.
 - CORE HANDOFF (вне этого этапа): server/src/procedure/procedure.service.ts не исключает deletedAt в текущих publicBookingCatalog/snapshots, поэтому удалённая услуга может попасть в гостевой каталог/запрос; сервер должен фильтровать актуально удалённые услуги, сохранив чтение исторических Record. Там же costSourceFor не учитывает assignment.cost.free=true без суммы; согласовать с Professional pricing и исправить серверным контрактом. Не маскировать guest UI костылём.
 - Изменения только co-va/professional/staging. main, co-va/core, co-va/user не изменены.
+
+## Guest booking: Core-authored display price 2026-11-10
+
+- Public/guest Online Booking must use the display-ready price from the current Core `ProcedureService`, not independently decide the `от` prefix from a raw number. `online-booking/model.js::bookingProcedurePrice` retains `bookingPrice.display`. `online-booking/access.js::priceText` prefers `display` directly for each service and when a participant chose exactly one service.
+- Minimum, variable/free flags remain for totals when several services/participants are selected; combining those already resolved numbers is not an independent service tariff engine. Legacy display fallback remains to avoid breaking users while Core main is deployed, but new Core responses supply authoritative display.
+- `co-va/user/staging` already prefers `price.display` in `recordProcedurePriceText`; its frontend was not changed.
+- Core staging implements `amount`, `from`, `from-to`, workplace-specific free price, precomputed display, and removed the duplicate account-context price implementation. No new price state owner, no new booking route, no change to Record/Finance IDs.
+- These changes are limited to `co-va/professional/staging`. `main` unchanged; a staging code change is not proof of live deployment.
+
