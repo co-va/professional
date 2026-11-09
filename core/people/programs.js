@@ -11,6 +11,7 @@ import {
 } from '../../ui/ui.js';
 import { getUEI } from '../uei.js';
 import { loyaltyNavigationItems } from '../loyalty/index.js';
+import { canUseCapability } from '../access.js';
 import { personalAccountVisualCard } from '../loyalty/personal-account/index.js';
 import { getCachedPersonalAccount, loadPersonalAccount } from '../loyalty/personal-account/data.js';
 import { getDepositInstances, listPersonDeposits } from '../loyalty/deposit/data.js';
@@ -303,15 +304,29 @@ function financeDetail(entity, kind) {
 }
 
 function personFinanceEntities(person = {}) {
+  // The Z2 relationship card must obey exactly the same server-resolved
+  // readiness/capabilities as Finance → Cash. Stored data are never deleted.
+  const canSeeInvestments = canUseCapability('finance.investment.self.access')
+    || canUseCapability('finance.investment.raise.access')
+    || canUseCapability('finance.investment.external.access');
+  const canSeeLoans = canUseCapability('finance.special.access');
+  if (!canSeeInvestments && !canSeeLoans) return { investments: [], loans: [] };
+
   const personKey = text(person.key || person.id);
   const accountIds = new Set((Array.isArray(person.accounts) ? person.accounts : []).map(text).filter(Boolean));
-  const investments = getInvestmentEntities().filter((entity) => {
+  const investments = canSeeInvestments ? getInvestmentEntities().filter((entity) => {
     const terms = normalizeInvestmentTerms(entity);
-    return Boolean(terms.participantAccountId && accountIds.has(text(terms.participantAccountId)))
-      || text(entity.personKey) === personKey;
-  });
-  const loans = getLoanEntities().filter((entity) => text(entity.personKey) === personKey
-    || (entity.loanTerms?.participantAccountId && accountIds.has(text(entity.loanTerms.participantAccountId))));
+    const role = text(terms.role || 'raise');
+    const allowedRole = role === 'self'
+      ? canUseCapability('finance.investment.self.access')
+      : role === 'external'
+        ? canUseCapability('finance.investment.external.access')
+        : canUseCapability('finance.investment.raise.access');
+    return allowedRole && (Boolean(terms.participantAccountId && accountIds.has(text(terms.participantAccountId)))
+      || text(entity.personKey) === personKey);
+  }) : [];
+  const loans = canSeeLoans ? getLoanEntities().filter((entity) => text(entity.personKey) === personKey
+    || (entity.loanTerms?.participantAccountId && accountIds.has(text(entity.loanTerms.participantAccountId)))) : [];
   return { investments, loans };
 }
 
