@@ -1,28 +1,10 @@
-import { normalizeEntityCardAppearance, hasConfiguredEntityCardAppearance, shortDate } from '../../../ui/ui.js';
+import { normalizeEntityCardAppearance, entityCardDefaultRows, hasConfiguredEntityCardAppearance, shortDate } from '../../../ui/ui.js';
 import { getCardAppearanceTemplate } from '../../card-appearance-templates.js';
 
 function money(value = 0) {
   return `${(Number(value) || 0).toLocaleString('ru-RU')} ₽`;
 }
 
-function defaultLines(entries = []) {
-  const lines = Array.from({ length: 9 }, () => ({
-    field: '',
-    zone: 'full',
-    align: 'left',
-    size: 'm',
-    color: 'white',
-    bold: false,
-    italic: false,
-    underline: false,
-    uppercase: false,
-  }));
-  entries.forEach(({ row, field, zone = 'full', align = 'left', size = 'm', color = 'white', bold = false }) => {
-    const index = Math.max(0, Math.min(8, Number(row) - 1));
-    lines[index] = { field, zone, align, size, color, bold, italic: false, underline: false, uppercase: false };
-  });
-  return lines;
-}
 
 export function walletCardFields(wallet = {}, balance = 0) {
   return [
@@ -40,9 +22,9 @@ export function walletCardAppearance(wallet = {}) {
     return normalizeEntityCardAppearance(template.appearance);
   }
   return normalizeEntityCardAppearance({
-    lines: defaultLines([
-      { row: 7, field: 'walletName', zone: 'full', align: 'left', size: 'l', bold: true },
-      { row: 9, field: 'balance', zone: 'right', align: 'right', size: 'm', bold: true },
+    lines: entityCardDefaultRows([
+      { row: 7, field: 'walletName', column:'left', align: 'left', size: 'l', bold: true },
+      { row: 9, field: 'balance', column:'right', align: 'right', size: 'm', bold: true },
     ]),
   });
 }
@@ -81,10 +63,10 @@ export function cashEntityCardAppearance(entity = {}, kind = '') {
     return normalizeEntityCardAppearance(template.appearance);
   }
   return normalizeEntityCardAppearance({
-    lines: defaultLines([
-      { row: 7, field: 'entityName', zone: 'full', align: 'left', size: 'l', bold: true },
-      { row: 8, field: kind === 'loan' ? 'dueDate' : kind === 'investment' ? 'investmentRole' : '', zone: 'left', align: 'left', size: 'm' },
-      { row: 9, field: 'balance', zone: 'right', align: 'right', size: 'm', bold: true },
+    lines: entityCardDefaultRows([
+      { row: 7, field: 'entityName', column:'left', align: 'left', size: 'l', bold: true },
+      { row: 8, field: kind === 'loan' ? 'dueDate' : kind === 'investment' ? 'investmentRole' : '', column:'left', align: 'left', size: 'm' },
+      { row: 9, field: 'balance', column:'right', align: 'right', size: 'm', bold: true },
     ]),
   });
 }
