@@ -33,3 +33,12 @@
 [data-v2-q-body] > .workspace-header-context + .entity-details{
   margin-top:0;
 }
+
+/* Shared Z/Q contract: a populated Header is visually separated from the
+   scrolling Body by a compact gap. This also handles Header content inserted
+   after the surface mounts (selectors, updated titles, etc.). Empty Headers
+   retain their compact affordance footprint without an artificial gap. */
+[data-v2-z-header]:has(> [data-v2-z-header-content]:not(:empty)) + [data-v2-z-body],
+[data-v2-q-header]:has(> [data-v2-q-header-content]:not(:empty)) + [data-v2-q-body]{
+  padding-top:8px;
+}
