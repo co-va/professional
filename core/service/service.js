@@ -9,7 +9,7 @@ import { loadOperationalState } from '../runtime/operational-state.js';
 import { serviceHeaderContext, notifyServiceContext } from './context.js';
 
 const views = [
-  { id: 'procedures', label: 'Процедуры' },
+  { id: 'procedures', label: 'Услуги' },
   { id: 'products', label: 'Товары' },
 ];
 
@@ -61,7 +61,7 @@ export function renderService(root, navigateBack = () => {}) {
     disposeCatalog?.();
     disposeCatalog = () => {};
     const view = views.some((item) => item.id === activeView) ? activeView : 'procedures';
-    const title = view === 'products' ? 'Товары' : 'Процедуры';
+    const title = view === 'products' ? 'Товары' : 'Услуги';
 
     root.innerHTML = page([
       serviceHeaderContext({
@@ -71,7 +71,7 @@ export function renderService(root, navigateBack = () => {}) {
         c: {
           label: '+',
           data: 'data-service-add',
-          aria: view === 'products' ? 'Добавить товар' : 'Добавить процедуру',
+          aria: view === 'products' ? 'Добавить товар' : 'Добавить услугу',
         },
       }),
       viewNavigation({ views, activeView: view, ariaLabel: 'Сервис' }),
