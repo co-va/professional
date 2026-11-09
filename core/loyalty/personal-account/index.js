@@ -90,9 +90,12 @@ export function personalAccountCardFields({ person = null, title = '', balance =
     title: title || personLabel(person || {}),
     subtitle: 'Личный счёт',
     status: resolvedDebt > 0.009 ? 'Есть задолженность' : resolvedBalance > 0.009 ? 'Есть остаток' : 'Нулевой остаток',
-    metaLeft: resolvedDebt > 0.009 ? 'Задолженность' : 'Денежный остаток',
-    metaRight: money(resolvedDebt > 0.009 ? resolvedDebt : resolvedBalance),
-  });
+  }).filter((field) => field.value !== 'metaLeft' && field.value !== 'metaRight').concat([
+    { value: 'amountLabel', label: 'Какой показатель на карте', text: resolvedDebt > 0.009 ? 'Задолженность' : 'Денежный остаток' },
+    { value: 'currentAmount', label: 'Остаток или долг (автоматически)', text: money(resolvedDebt > 0.009 ? resolvedDebt : resolvedBalance) },
+    { value: 'balance', label: 'Денежный остаток', text: money(resolvedBalance) },
+    { value: 'debt', label: 'Задолженность', text: money(resolvedDebt) },
+  ]);
 }
 
 export function personalAccountVisualCard({

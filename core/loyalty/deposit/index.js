@@ -172,15 +172,23 @@ function ueiField({ name = 'uei', value = '', readonly = false, required = true 
   });
 }
 
-function programFields(program = {}) {
+function programFields(program = {}, { editorPreview = false } = {}) {
   const amount = Number(program?.amount || 0);
   return depositCardFields({
     uei: programUei(program),
     title: program?.name || 'Депозит',
     subtitle: program?.termRule || 'Бессрочно',
     status: depositCardStatusLabel(program?.status),
-    metaLeft: program?.benefit || 'Без дополнительной выгоды',
-    metaRight: amount > 0 ? money(amount) : 'Свободная сумма',
+    benefit: program?.benefit || 'Без дополнительной выгоды',
+    nominal: amount > 0 ? amount : 'Свободная сумма',
+    // A catalog program has no Person transactions. The editor shows only
+    // clearly marked positions, never fictitious amounts on actual cards.
+    ...(editorPreview ? {
+      funded: 'Пример: внесено',
+      spent: 'Пример: списано',
+      balance: 'Пример: остаток',
+      toFund: 'Пример: к внесению',
+    } : {}),
   });
 }
 
@@ -456,7 +464,7 @@ function openAppearanceQ(root, onSaved = () => {}) {
     allowPhoto: true,
     resolve: () => ({
       appearance: depositCardAppearance(),
-      fields: programFields(sample),
+      fields: programFields(sample, { editorPreview: true }),
       photo: depositCardPhoto(),
       photoPosition: depositCardPhotoPosition(),
     }),

@@ -21,6 +21,7 @@ import {
   depositCardPhoto,
   depositCardPhotoPosition,
   depositCardStatusLabel,
+  depositSpentAmount,
 } from '../loyalty/deposit/card-presentation.js';
 import { getCertificateAssignmentsForPerson } from '../loyalty/certificate/index.js';
 import { getSubscriptionAssignmentsForPerson } from '../loyalty/subscription/index.js';
@@ -91,6 +92,9 @@ function personalAccountDetail(account, loadError = '') {
 
 function depositCard(deposit) {
   const terms = deposit?.terms && typeof deposit.terms === 'object' ? deposit.terms : {};
+  const nominal = Number(terms.amount);
+  const funded = Number(deposit?.fundedAmount);
+  const hasNominal = terms.amount !== undefined && terms.amount !== null && nominal > 0;
   return entityVisualCard({
     appearance: depositCardAppearance(),
     fields: depositCardFields({
@@ -98,8 +102,12 @@ function depositCard(deposit) {
       title: deposit?.programName || 'Депозит',
       subtitle: terms.termRule || 'Бессрочно',
       status: depositCardStatusLabel(deposit?.status),
-      metaLeft: terms.benefit || 'Депозит',
-      metaRight: money(deposit?.balance),
+      benefit: terms.benefit || 'Депозит',
+      nominal: hasNominal ? nominal : null,
+      funded: deposit?.fundedAmount ?? null,
+      spent: depositSpentAmount(deposit),
+      balance: deposit?.balance ?? null,
+      toFund: hasNominal && Number.isFinite(funded) ? Math.max(0, nominal - funded) : null,
     }),
     image: depositCardPhoto(),
     imagePosition: depositCardPhotoPosition(),

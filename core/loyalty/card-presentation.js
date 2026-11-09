@@ -43,8 +43,8 @@ export function loyaltyCardLabel(type = '') {
 
 export function loyaltyCardAppearance(type = '') {
   const template = getCardAppearanceTemplate(loyaltyCardScope(type));
-  if (configured(template?.appearance)) return normalizeEntityCardAppearance(template.appearance);
-  return normalizeEntityCardAppearance({
+  const saved = configured(template?.appearance);
+  const appearance = normalizeEntityCardAppearance(saved ? template.appearance : {
     lines: defaultLines([
       { row: 1, field: 'uei', bold: true },
       { row: 2, field: 'status', zone: 'right', align: 'right' },
@@ -54,6 +54,18 @@ export function loyaltyCardAppearance(type = '') {
       { row: 9, field: 'metaRight', zone: 'right', align: 'right' },
     ]),
   });
+  // Personal Account has semantic amounts; all other loyalty types retain
+  // their own independent field contract and saved appearance.
+  if (type !== 'personal-account') return appearance;
+  return {
+    ...appearance,
+    lines: appearance.lines.map((line) => ({
+      ...line,
+      field: line.field === 'metaLeft' ? 'amountLabel'
+        : line.field === 'metaRight' ? 'currentAmount'
+        : line.field,
+    })),
+  };
 }
 
 export function loyaltyCardPhoto(type = '') {
