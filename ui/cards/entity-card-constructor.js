@@ -263,8 +263,7 @@ export function mountEntityCardConstructor(root,{appearance={},fields=[],photo='
   const bindWorkspace=()=>{
     root.querySelectorAll('[data-card-line-select]').forEach((control)=>control.addEventListener('click',()=>{
       state.line=Number(control.dataset.cardLineSelect)||0;
-      const row=state.appearance.lines[state.line];
-      state.column=COLUMNS.find(col=>row.cells[col].field)||'left';
+      // The selected column is independent of the selected row.
       rerenderWorkspace();
     }));
 
