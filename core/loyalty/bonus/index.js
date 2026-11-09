@@ -6,6 +6,7 @@ import {
   datePicker,
   details,
   emptyState,
+  escapeHtml,
   entityCardStack,
   field,
   formValidationMessage,
@@ -41,6 +42,9 @@ import {
   loyaltyTermFields,
   loyaltyVisualCard,
   notifyLoyaltyContext,
+  relationshipDetailsSection,
+  relationshipHistoryList,
+  relationshipStatusLabel,
   normalizeOptionalUei,
   openLoyaltyProgramSettings,
   openLoyaltySettingsMenu,
@@ -542,6 +546,50 @@ export function getBonusAssignmentsForPerson(personKey = '', { includeHidden = f
     .filter(Boolean);
 }
 
+function personBonusCard({ program, participant = null }) {
+  return loyaltyVisualCard('bonus', loyaltyCardFields({
+    uei: program?.uei || '',
+    title: program?.name || 'Бонусная программа',
+    subtitle: 'Бонусная программа',
+    status: relationshipStatusLabel(program?.status),
+    metaLeft: program?.term || 'Бессрочно',
+    metaRight: participant ? `${Math.max(0, Number(participant.available || 0))} бонусов` : `${Math.max(0, Number(program?.rewardValue || 0))}${program?.rewardType === 'percent' ? '%' : ''}`,
+  }), {
+    data: `data-person-program="bonus:${escapeHtml(program?.id || '')}"`,
+    aria: `Открыть бонусную программу ${program?.name || ''}`,
+  });
+}
+
+function personBonusDetail({ program = {}, participant = null }) {
+  const rows = [
+    { label: 'Программа', value: program.name || '—' },
+    { label: 'Срок', value: program.term || 'Бессрочно' },
+    { label: 'Состояние', value: relationshipStatusLabel(program.status) },
+  ];
+  if (participant) {
+    rows.push(
+      { label: 'Начислено', value: `${Math.max(0, Number(participant.earned || 0))} бонусов` },
+      { label: 'Использовано', value: `${Math.max(0, Number(participant.spent || 0))} бонусов` },
+      { label: 'Доступно', value: `${Math.max(0, Number(participant.available || 0))} бонусов` },
+    );
+  }
+  return details(rows);
+}
+
+
+export function getPersonLoyaltyCards(person = {}) {
+  const key = String(person?.key || person?.id || '').trim();
+  return {
+    cards: getBonusAssignmentsForPerson(key).map(item => {
+      const id = String(item.program?.id || '');
+      return {
+        key: 'bonus:' + id,
+        markup: personBonusCard(item),
+        detail: { title: item.program?.name || 'Бонусная программа', body: personBonusDetail(item) },
+      };
+    }),
+  };
+}
 export async function renderBonus(root) {
   const render = async () => {
     const cards = programs.length
@@ -569,3 +617,5 @@ export async function renderBonus(root) {
   };
   await render();
 }
+
+export { renderBonus as render };

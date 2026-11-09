@@ -6,6 +6,7 @@ import {
   datePicker,
   details,
   emptyState,
+  escapeHtml,
   entityCardStack,
   field,
   formValidationMessage,
@@ -40,6 +41,9 @@ import {
   loyaltyVisualCard,
   money,
   notifyLoyaltyContext,
+  relationshipDetailsSection,
+  relationshipHistoryList,
+  relationshipStatusLabel,
   normalizeOptionalUei,
   openLoyaltyProgramSettings,
   openLoyaltySettingsMenu,
@@ -570,6 +574,53 @@ export function getSubscriptionAssignmentsForPerson(personKey = '', { includeHid
     }));
 }
 
+function personSubscriptionCard({ instance, program }) {
+  const unlimited = program?.compositionMode === 'unlimited';
+  return loyaltyVisualCard('subscription', loyaltyCardFields({
+    uei: program?.uei || '',
+    title: program?.name || 'Абонемент',
+    subtitle: 'Абонемент',
+    status: relationshipStatusLabel(instance?.status),
+    metaLeft: instance?.expiresAt || program?.termValue || 'Бессрочно',
+    metaRight: unlimited ? 'Безлимит' : `Осталось ${Math.max(0, Number(instance?.remaining || 0))}`,
+  }), {
+    data: `data-person-program="subscription:${escapeHtml(instance?.id || '')}"`,
+    aria: `Открыть абонемент ${program?.name || ''}`,
+  });
+}
+
+function personSubscriptionDetail({ instance = {}, program = {} }) {
+  const unlimited = program?.compositionMode === 'unlimited';
+  const history = (Array.isArray(instance.history) ? instance.history : []).slice().reverse().map((item) => ({
+    title: item.title || 'Использование',
+    subtitle: shortDateTime(item.occurredAt, '—'),
+    rightTop: item.procedure || '',
+  }));
+  return `${relationshipDetailsSection([
+    { label: 'Абонемент', value: program.name || '—' },
+    { label: 'Дата оформления', value: shortDateTime(instance.issuedAt, '—') },
+    { label: 'Использовано', value: String(Math.max(0, Number(instance.used || 0))) },
+    { label: 'Остаток', value: unlimited ? 'Безлимит' : String(Math.max(0, Number(instance.remaining || 0))) },
+    { label: 'Начало', value: instance.startsAt || '—' },
+    { label: 'Срок', value: instance.expiresAt || program.termValue || 'Бессрочно' },
+    { label: 'Состояние', value: relationshipStatusLabel(instance.status) },
+  ])}${v2Section('История', relationshipHistoryList(history, 'Истории абонемента пока нет'))}`;
+}
+
+
+export function getPersonLoyaltyCards(person = {}) {
+  const key = String(person?.key || person?.id || '').trim();
+  return {
+    cards: getSubscriptionAssignmentsForPerson(key).map(item => {
+      const id = String(item.instance?.id || '');
+      return {
+        key: 'subscription:' + id,
+        markup: personSubscriptionCard(item),
+        detail: { title: item.program?.name || 'Абонемент', body: personSubscriptionDetail(item) },
+      };
+    }),
+  };
+}
 export async function renderSubscription(root) {
   const render = async () => {
     const cards = programs.length ? entityCardStack(programs.map((program) => loyaltyVisualCard('subscription', programCardFields(program), {
@@ -595,3 +646,5 @@ export async function renderSubscription(root) {
   };
   await render();
 }
+
+export { renderSubscription as render };

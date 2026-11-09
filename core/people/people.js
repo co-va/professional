@@ -970,25 +970,19 @@ async function renderPersonOverview(layer, baseRoot, key, options = {}) {
 }
 
 async function openPersonRelationshipQ(root, person, detail, options = {}) {
-  // The Personal Account and Deposit Qs, including all V actions, belong
-  // to Loyalty. Never duplicate them in the People feature.
-  try {
-    if (detail?.nativeScreen === 'personal-account') {
-      const { openPersonalAccountForPerson } = await import('../loyalty/personal-account/index.js');
-      return await openPersonalAccountForPerson(root, person);
+  // The E owner supplies its original Q with full V actions. Contacts has
+  // no Loyalty-specific type branches, menu copies, or business logic.
+  if (typeof detail?.open === 'function') {
+    try {
+      return await detail.open(root, person, options.onNativeChanged);
+    } catch (error) {
+      openNotice({
+        title: detail?.title || 'Программа',
+        message: error instanceof Error ? error.message : 'Не удалось открыть программу',
+      });
+      return null;
     }
-    if (detail?.nativeScreen === 'deposit') {
-      const { openAssignedDepositForPerson } = await import('../loyalty/deposit/index.js');
-      return await openAssignedDepositForPerson(root, person, detail.depositId, options.onNativeChanged);
-    }
-  } catch (error) {
-    openNotice({
-      title: detail?.title || 'Программа',
-      message: error instanceof Error ? error.message : 'Не удалось открыть программу',
-    });
-    return null;
   }
-
   const layer = mountModal(root, modal(`${personQContext(person)}${detail?.body || ''}`, {
     title: detail?.title || name(person),
     variant: 'q',

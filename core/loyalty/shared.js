@@ -1,5 +1,7 @@
 import {
   datePicker,
+  details,
+  emptyState,
   entityVisualCard,
   escapeHtml,
   field,
@@ -8,6 +10,8 @@ import {
   mountModal,
   openEntityCardAppearanceQ,
   openSharedProfileSettingsMenu,
+  shortDateTime,
+  v2Section,
   select,
   twoColumnLayout,
   v2ListEntries,
@@ -34,6 +38,24 @@ export const money = (value) => `${new Intl.NumberFormat('ru-RU', { maximumFract
 export const text = (value) => String(value ?? '').trim();
 export const uid = (prefix = 'loyalty') => globalThis.crypto?.randomUUID?.() || `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
+export function relationshipStatusLabel(value = '') {
+  if (value === 'used' || value === 'closed' || value === 'ended') return 'Завершено';
+  if (value === 'paused') return 'Приостановлено';
+  if (value === 'expired') return 'Срок завершён';
+  return 'Активно';
+}
+export function relationshipDetailsSection(rows) {
+  return `<section class="v2-section">${details(rows)}</section>`;
+}
+export function relationshipHistoryList(items = [], emptyText = 'Истории пока нет') {
+  if (!items.length) return emptyState(emptyText, 'Движения появятся после использования.');
+  return v2ListEntries(items.map(item => v2ListEntry({
+    title: item.title || 'Операция',
+    subtitle: item.subtitle || shortDateTime(item.occurredAt, '—'),
+    rightTop: item.rightTop || '', rightBottom: item.rightBottom || '',
+    interactive: false, initial: '',
+  })));
+}
 export function notifyLoyaltyContext() {
   window.dispatchEvent(new CustomEvent('va-tools:v2-context-changed'));
 }

@@ -9,26 +9,8 @@ import {
   v2ListEntry,
   v2Section,
 } from '../../ui/ui.js';
-import { getUEI } from '../uei.js';
-import { loyaltyNavigationItems } from '../loyalty/index.js';
+import { collectPersonLoyaltyCards } from '../loyalty/index.js';
 import { canUseCapability } from '../access.js';
-import { personalAccountVisualCard } from '../loyalty/personal-account/index.js';
-import { getCachedPersonalAccount, loadPersonalAccount } from '../loyalty/personal-account/data.js';
-import { getDepositInstances, listPersonDeposits } from '../loyalty/deposit/data.js';
-import {
-  depositCardAppearance,
-  depositCardFields,
-  depositCardPhoto,
-  depositCardPhotoPosition,
-  depositCardStatusLabel,
-  depositSpentAmount,
-} from '../loyalty/deposit/card-presentation.js';
-import { getCertificateAssignmentsForPerson } from '../loyalty/certificate/index.js';
-import { getSubscriptionAssignmentsForPerson } from '../loyalty/subscription/index.js';
-import { getReferralAssignmentsForPerson } from '../loyalty/referral/index.js';
-import { getBonusAssignmentsForPerson } from '../loyalty/bonus/index.js';
-import { loyaltyCardFields } from '../loyalty/card-presentation.js';
-import { loyaltyVisualCard } from '../loyalty/shared.js';
 import {
   calculateInvestmentState,
   calculateLoanState,
@@ -45,13 +27,6 @@ import {
 const text = (value) => String(value ?? '').trim();
 const money = (value) => `${new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(Number(value || 0)).replaceAll('\u00a0', ' ')} ₽`;
 
-function statusLabel(value = '') {
-  if (value === 'used' || value === 'closed' || value === 'ended') return 'Завершено';
-  if (value === 'paused') return 'Приостановлено';
-  if (value === 'expired') return 'Срок завершён';
-  return 'Активно';
-}
-
 // Keep all summary panels on the same shared vertical rhythm as titled sections.
 function detailsSection(rows) {
   return `<section class="v2-section">${details(rows)}</section>`;
@@ -67,157 +42,6 @@ function historyList(items = [], emptyText = 'Истории пока нет') {
     interactive: false,
     initial: '',
   })));
-}
-
-function depositCard(deposit) {
-  const terms = deposit?.terms && typeof deposit.terms === 'object' ? deposit.terms : {};
-  const nominal = Number(terms.amount);
-  const funded = Number(deposit?.fundedAmount);
-  const hasNominal = terms.amount !== undefined && terms.amount !== null && nominal > 0;
-  return entityVisualCard({
-    appearance: depositCardAppearance(),
-    fields: depositCardFields({
-      uei: getUEI('loyalty-deposit-program', deposit?.programId) || '',
-      title: deposit?.programName || 'Депозит',
-      subtitle: terms.termRule || 'Бессрочно',
-      status: depositCardStatusLabel(deposit?.status),
-      benefit: terms.benefit || 'Депозит',
-      nominal: hasNominal ? nominal : null,
-      funded: deposit?.fundedAmount ?? null,
-      spent: depositSpentAmount(deposit),
-      balance: deposit?.balance ?? null,
-      toFund: hasNominal && Number.isFinite(funded) ? Math.max(0, nominal - funded) : null,
-    }),
-    image: depositCardPhoto(),
-    imagePosition: depositCardPhotoPosition(),
-    interactive: true,
-    data: `data-person-program="deposit:${escapeHtml(deposit?.depositId || deposit?.id || '')}"`,
-    aria: `Открыть депозит ${deposit?.programName || ''}`,
-  });
-}
-
-function certificateCard({ instance, program }) {
-  return loyaltyVisualCard('certificate', loyaltyCardFields({
-    uei: program?.uei || '',
-    title: program?.name || 'Сертификат',
-    subtitle: 'Сертификат',
-    status: statusLabel(instance?.status),
-    metaLeft: instance?.expiresAt || program?.term || 'Бессрочно',
-    metaRight: program?.type === 'amount' ? money(instance?.balance) : (instance?.status === 'used' ? 'Использован' : 'Активен'),
-  }), {
-    data: `data-person-program="certificate:${escapeHtml(instance?.id || '')}"`,
-    aria: `Открыть сертификат ${program?.name || ''}`,
-  });
-}
-
-function certificateDetail({ instance = {}, program = {} }) {
-  const history = (Array.isArray(instance.history) ? instance.history : []).slice().reverse().map((item) => ({
-    title: item.title || 'Использование',
-    subtitle: shortDateTime(item.occurredAt, '—'),
-    rightTop: item.amount ? `−${money(item.amount)}` : '',
-  }));
-  return `${detailsSection([
-    { label: 'Сертификат', value: program.name || '—' },
-    { label: 'Дата оформления', value: shortDateTime(instance.issuedAt, '—') },
-    { label: 'Исходное право', value: program.type === 'amount' ? money(instance.initialValue) : (program.service || 'Право по программе') },
-    { label: 'Остаток', value: program.type === 'amount' ? money(instance.balance) : statusLabel(instance.status) },
-    { label: 'Срок', value: instance.expiresAt || program.term || 'Бессрочно' },
-    { label: 'Состояние', value: statusLabel(instance.status) },
-  ])}${v2Section('История', historyList(history, 'Истории сертификата пока нет'))}`;
-}
-
-function subscriptionCard({ instance, program }) {
-  const unlimited = program?.compositionMode === 'unlimited';
-  return loyaltyVisualCard('subscription', loyaltyCardFields({
-    uei: program?.uei || '',
-    title: program?.name || 'Абонемент',
-    subtitle: 'Абонемент',
-    status: statusLabel(instance?.status),
-    metaLeft: instance?.expiresAt || program?.termValue || 'Бессрочно',
-    metaRight: unlimited ? 'Безлимит' : `Осталось ${Math.max(0, Number(instance?.remaining || 0))}`,
-  }), {
-    data: `data-person-program="subscription:${escapeHtml(instance?.id || '')}"`,
-    aria: `Открыть абонемент ${program?.name || ''}`,
-  });
-}
-
-function subscriptionDetail({ instance = {}, program = {} }) {
-  const unlimited = program?.compositionMode === 'unlimited';
-  const history = (Array.isArray(instance.history) ? instance.history : []).slice().reverse().map((item) => ({
-    title: item.title || 'Использование',
-    subtitle: shortDateTime(item.occurredAt, '—'),
-    rightTop: item.procedure || '',
-  }));
-  return `${detailsSection([
-    { label: 'Абонемент', value: program.name || '—' },
-    { label: 'Дата оформления', value: shortDateTime(instance.issuedAt, '—') },
-    { label: 'Использовано', value: String(Math.max(0, Number(instance.used || 0))) },
-    { label: 'Остаток', value: unlimited ? 'Безлимит' : String(Math.max(0, Number(instance.remaining || 0))) },
-    { label: 'Начало', value: instance.startsAt || '—' },
-    { label: 'Срок', value: instance.expiresAt || program.termValue || 'Бессрочно' },
-    { label: 'Состояние', value: statusLabel(instance.status) },
-  ])}${v2Section('История', historyList(history, 'Истории абонемента пока нет'))}`;
-}
-
-function referralCard({ program }) {
-  return loyaltyVisualCard('referral', loyaltyCardFields({
-    uei: program?.uei || '',
-    title: program?.name || 'Реферальная программа',
-    subtitle: 'Реферальная программа',
-    status: statusLabel(program?.status),
-    metaLeft: program?.term || 'Бессрочно',
-    metaRight: `${Math.max(1, Number(program?.levels || 1))} ур.`,
-  }), {
-    data: `data-person-program="referral:${escapeHtml(program?.id || '')}"`,
-    aria: `Открыть реферальную программу ${program?.name || ''}`,
-  });
-}
-
-function referralDetail({ program = {}, relation = null }) {
-  const rows = [
-    { label: 'Программа', value: program.name || '—' },
-    { label: 'Срок', value: program.term || 'Бессрочно' },
-    { label: 'Состояние', value: statusLabel(program.status) },
-    { label: 'Уровней', value: String(Math.max(1, Number(program.levels || 1))) },
-  ];
-  if (relation) {
-    rows.push(
-      { label: 'Пригласил', value: relation.inviterName || '—' },
-      { label: 'Приглашён', value: relation.inviteeName || '—' },
-      { label: 'Начислено', value: `${Math.max(0, Number(relation.reward || 0))} бонусов` },
-    );
-  }
-  return details(rows);
-}
-
-function bonusCard({ program, participant = null }) {
-  return loyaltyVisualCard('bonus', loyaltyCardFields({
-    uei: program?.uei || '',
-    title: program?.name || 'Бонусная программа',
-    subtitle: 'Бонусная программа',
-    status: statusLabel(program?.status),
-    metaLeft: program?.term || 'Бессрочно',
-    metaRight: participant ? `${Math.max(0, Number(participant.available || 0))} бонусов` : `${Math.max(0, Number(program?.rewardValue || 0))}${program?.rewardType === 'percent' ? '%' : ''}`,
-  }), {
-    data: `data-person-program="bonus:${escapeHtml(program?.id || '')}"`,
-    aria: `Открыть бонусную программу ${program?.name || ''}`,
-  });
-}
-
-function bonusDetail({ program = {}, participant = null }) {
-  const rows = [
-    { label: 'Программа', value: program.name || '—' },
-    { label: 'Срок', value: program.term || 'Бессрочно' },
-    { label: 'Состояние', value: statusLabel(program.status) },
-  ];
-  if (participant) {
-    rows.push(
-      { label: 'Начислено', value: `${Math.max(0, Number(participant.earned || 0))} бонусов` },
-      { label: 'Использовано', value: `${Math.max(0, Number(participant.spent || 0))} бонусов` },
-      { label: 'Доступно', value: `${Math.max(0, Number(participant.available || 0))} бонусов` },
-    );
-  }
-  return details(rows);
 }
 
 function financeCard(entity, kind) {
@@ -299,49 +123,11 @@ function personFinanceEntities(person = {}) {
   return { investments, loans };
 }
 
-function cachedPersonDeposits(personKey = '') {
-  const key = text(personKey);
-  if (!key) return [];
-  return getDepositInstances().filter((item) => {
-    const person = item?.person && typeof item.person === 'object' ? item.person : {};
-    return text(person.key || person.personKey || person.id) === key;
-  });
-}
-
 export async function buildPersonRelationshipSections(person = {}, { refresh = true } = {}) {
-  const key = text(person.key || person.id);
-  // Use exactly the same resolved access/readiness as the Loyalty navigation.
-  // NOT_READY is denied to everyone; TESTING/READY are resolved by the server
-  // for the current account. Never infer readiness from program sample data.
-  const allowed = new Set(loyaltyNavigationItems().map(({ id }) => id));
-  const canSee = (kind) => allowed.has(kind);
-  const account = canSee('personal-account') ? getCachedPersonalAccount(key) : null;
-  const deposits = canSee('deposit') ? cachedPersonDeposits(key) : [];
-  const refreshTasks = refresh ? [
-    ...(canSee('personal-account') ? [loadPersonalAccount(key)] : []),
-    ...(canSee('deposit') ? [listPersonDeposits(key)] : []),
-  ] : [];
-  const refreshPromise = refreshTasks.length ? Promise.allSettled(refreshTasks) : null;
-  const certificates = canSee('certificate') ? getCertificateAssignmentsForPerson(key) : [];
-  const subscriptions = canSee('subscription') ? getSubscriptionAssignmentsForPerson(key) : [];
-  const referrals = canSee('referral') ? getReferralAssignmentsForPerson(key) : [];
-  const bonuses = canSee('bonus') ? getBonusAssignmentsForPerson(key) : [];
+  const { cards: programEntries, refreshPromise } = await collectPersonLoyaltyCards(person, { refresh });
   const finance = personFinanceEntities(person);
 
-  const programCards = [
-    ...(account ? [personalAccountVisualCard({
-      person,
-      balance: account.balance || 0,
-      debt: account.debtTotal || 0,
-      data: 'data-person-program="personal-account"',
-      aria: 'Открыть Личный счёт',
-    })] : []),
-    ...deposits.map(depositCard),
-    ...certificates.map(certificateCard),
-    ...subscriptions.map(subscriptionCard),
-    ...referrals.map(referralCard),
-    ...bonuses.map(bonusCard),
-  ];
+  const programCards = programEntries.map(entry => entry.markup);
 
   const financeCards = [
     ...finance.investments.map((item) => financeCard(item, 'investment')),
@@ -349,20 +135,9 @@ export async function buildPersonRelationshipSections(person = {}, { refresh = t
   ];
 
   const detailByKey = new Map([
-    ...(account ? [['personal-account', {
-      title: 'Личный счёт', nativeScreen: 'personal-account',
-    }]] : []),
-    ...deposits.map((item) => [`deposit:${item.depositId || item.id}`, {
-      title: item.programName || 'Депозит',
-      nativeScreen: 'deposit',
-      depositId: String(item.depositId || item.id || ''),
-    }]),
-    ...certificates.map((item) => [`certificate:${item.instance?.id}`, { title: item.program?.name || 'Сертификат', body: certificateDetail(item) }]),
-    ...subscriptions.map((item) => [`subscription:${item.instance?.id}`, { title: item.program?.name || 'Абонемент', body: subscriptionDetail(item) }]),
-    ...referrals.map((item) => [`referral:${item.program?.id}`, { title: item.program?.name || 'Реферальная программа', body: referralDetail(item) }]),
-    ...bonuses.map((item) => [`bonus:${item.program?.id}`, { title: item.program?.name || 'Бонусная программа', body: bonusDetail(item) }]),
-    ...finance.investments.map((item) => [`investment:${item.id}`, { title: item.name || 'Инвестиция', body: financeDetail(item, 'investment') }]),
-    ...finance.loans.map((item) => [`loan:${item.id}`, { title: item.name || 'Займ', body: financeDetail(item, 'loan') }]),
+    ...programEntries.map(entry => [entry.key, entry.detail]),
+    ...finance.investments.map(item => [`investment:${item.id}`, { title: item.name || 'Инвестиция', body: financeDetail(item, 'investment') }]),
+    ...finance.loans.map(item => [`loan:${item.id}`, { title: item.name || 'Займ', body: financeDetail(item, 'loan') }]),
   ]);
 
   const sectionMarkup = `${programCards.length ? v2Section('Программы', entityCardRail(programCards)) : ''}${financeCards.length ? v2Section('Инвестиции / Займы', entityCardRail(financeCards)) : ''}`;

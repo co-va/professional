@@ -5,6 +5,7 @@ import {
   collectCheckList,
   details,
   emptyState,
+  escapeHtml,
   entityCardStack,
   field,
   formValidationMessage,
@@ -37,6 +38,9 @@ import {
   loyaltyTermFields,
   loyaltyVisualCard,
   notifyLoyaltyContext,
+  relationshipDetailsSection,
+  relationshipHistoryList,
+  relationshipStatusLabel,
   normalizeOptionalUei,
   openLoyaltyProgramSettings,
   openLoyaltySettingsMenu,
@@ -407,6 +411,51 @@ export function getReferralAssignmentsForPerson(personKey = '', { includeHidden 
     .filter(Boolean);
 }
 
+function personReferralCard({ program }) {
+  return loyaltyVisualCard('referral', loyaltyCardFields({
+    uei: program?.uei || '',
+    title: program?.name || 'Реферальная программа',
+    subtitle: 'Реферальная программа',
+    status: relationshipStatusLabel(program?.status),
+    metaLeft: program?.term || 'Бессрочно',
+    metaRight: `${Math.max(1, Number(program?.levels || 1))} ур.`,
+  }), {
+    data: `data-person-program="referral:${escapeHtml(program?.id || '')}"`,
+    aria: `Открыть реферальную программу ${program?.name || ''}`,
+  });
+}
+
+function personReferralDetail({ program = {}, relation = null }) {
+  const rows = [
+    { label: 'Программа', value: program.name || '—' },
+    { label: 'Срок', value: program.term || 'Бессрочно' },
+    { label: 'Состояние', value: relationshipStatusLabel(program.status) },
+    { label: 'Уровней', value: String(Math.max(1, Number(program.levels || 1))) },
+  ];
+  if (relation) {
+    rows.push(
+      { label: 'Пригласил', value: relation.inviterName || '—' },
+      { label: 'Приглашён', value: relation.inviteeName || '—' },
+      { label: 'Начислено', value: `${Math.max(0, Number(relation.reward || 0))} бонусов` },
+    );
+  }
+  return details(rows);
+}
+
+
+export function getPersonLoyaltyCards(person = {}) {
+  const key = String(person?.key || person?.id || '').trim();
+  return {
+    cards: getReferralAssignmentsForPerson(key).map(item => {
+      const id = String(item.program?.id || '');
+      return {
+        key: 'referral:' + id,
+        markup: personReferralCard(item),
+        detail: { title: item.program?.name || 'Реферальная программа', body: personReferralDetail(item) },
+      };
+    }),
+  };
+}
 export async function renderReferral(root) {
   const render = async () => {
     const cards = programs.length ? entityCardStack(programs.map((program) => loyaltyVisualCard('referral', programCardFields(program), { data: `data-referral-program="${program.id}"`, aria: `Открыть ${program.name}` }))) : emptyState('Реферальных программ пока нет', 'Создайте первую программу кнопкой «+».');
@@ -418,3 +467,5 @@ export async function renderReferral(root) {
   };
   await render();
 }
+
+export { renderReferral as render };

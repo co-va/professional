@@ -45,8 +45,10 @@ import {
   deleteDepositFunding,
   fundDeposit,
   fundExistingDeposit,
+  getDepositInstances,
   getDepositPrograms,
   listAllDeposits,
+  listPersonDeposits,
   loadDepositPrograms,
   saveDepositPrograms,
   updateDepositSettings,
@@ -59,6 +61,7 @@ import {
   depositCardPhotoPosition,
   depositCardScope,
   depositCardStatusLabel,
+  depositSpentAmount,
 } from './card-presentation.js';
 
 const PROGRAM_UEI_TYPE = 'loyalty-deposit-program';
@@ -1057,6 +1060,55 @@ async function openProgramLayer(root, programId, { person = null, onChanged = ()
   return layer;
 }
 
+function personDepositCard(deposit) {
+  const terms = deposit?.terms && typeof deposit.terms === 'object' ? deposit.terms : {};
+  const nominal = Number(terms.amount);
+  const funded = Number(deposit?.fundedAmount);
+  const hasNominal = terms.amount !== undefined && terms.amount !== null && nominal > 0;
+  return entityVisualCard({
+    appearance: depositCardAppearance(),
+    fields: depositCardFields({
+      uei: getUEI('loyalty-deposit-program', deposit?.programId) || '',
+      title: deposit?.programName || 'Депозит',
+      subtitle: terms.termRule || 'Бессрочно',
+      status: depositCardStatusLabel(deposit?.status),
+      benefit: terms.benefit || 'Депозит',
+      nominal: hasNominal ? nominal : null,
+      funded: deposit?.fundedAmount ?? null,
+      spent: depositSpentAmount(deposit),
+      balance: deposit?.balance ?? null,
+      toFund: hasNominal && Number.isFinite(funded) ? Math.max(0, nominal - funded) : null,
+    }),
+    image: depositCardPhoto(),
+    imagePosition: depositCardPhotoPosition(),
+    interactive: true,
+    data: `data-person-program="deposit:${escapeHtml(deposit?.depositId || deposit?.id || '')}"`,
+    aria: `Открыть депозит ${deposit?.programName || ''}`,
+  });
+}
+
+
+export function getPersonLoyaltyCards(person = {}, { refresh = true } = {}) {
+  const key = String(person?.key || person?.id || '').trim();
+  const deposits = key ? getDepositInstances().filter(item => {
+    const owner = item?.person && typeof item.person === 'object' ? item.person : {};
+    return String(owner.key || owner.personKey || owner.id || '') === key;
+  }) : [];
+  return {
+    cards: deposits.map(deposit => {
+      const id = String(deposit.depositId || deposit.id || '');
+      return {
+        key: 'deposit:' + id, markup: personDepositCard(deposit),
+        detail: {
+          title: deposit.programName || 'Депозит',
+          open: (root, currentPerson, onChanged) =>
+            openAssignedDepositForPerson(root, currentPerson, id, onChanged),
+        },
+      };
+    }),
+    refreshPromise: refresh && key ? listPersonDeposits(key) : null,
+  };
+}
 export async function openDepositForPerson(root, person = null) {
   await loadDepositPrograms();
   const layer = mountV2ZLayer(root, v2ZLayer('', { className: 'loyalty-deposit-z' }), { stack: true });

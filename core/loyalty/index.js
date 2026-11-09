@@ -3,63 +3,53 @@ import { loyaltyHeader } from './shared.js';
 import { canUseCapability } from '../access.js';
 
 const LOYALTY_NAVIGATION = [
-  { id: 'deposit', label: 'Депозит' },
+  { id: 'deposit', label: 'Депозит', capability: 'loyalty.deposit.access' },
   // Created automatically on first access for each Person; not a manually issued program.
-  { id: 'personal-account', label: 'Личный счёт', assignableToPerson: false },
-  { id: 'certificate', label: 'Сертификат' },
-  { id: 'subscription', label: 'Абонемент' },
-  { id: 'referral', label: 'Реферальная программа' },
-  { id: 'bonus', label: 'Бонусная программа' },
+  { id: 'personal-account', label: 'Личный счёт', capability: 'loyalty.personal_account.access', assignableToPerson: false },
+  { id: 'certificate', label: 'Сертификат', capability: 'loyalty.certificate.access' },
+  { id: 'subscription', label: 'Абонемент', capability: 'loyalty.subscription.access' },
+  { id: 'referral', label: 'Реферальная программа', capability: 'loyalty.referral.access' },
+  { id: 'bonus', label: 'Бонусная программа', capability: 'loyalty.bonus.access' },
 ];
-
-const LOYALTY_CAPABILITIES = Object.freeze({
-  'deposit': 'loyalty.deposit.access',
-  'personal-account': 'loyalty.personal_account.access',
-  'certificate': 'loyalty.certificate.access',
-  'subscription': 'loyalty.subscription.access',
-  'referral': 'loyalty.referral.access',
-  'bonus': 'loyalty.bonus.access',
-});
 
 export function loyaltyNavigationItems() {
   return LOYALTY_NAVIGATION
-    .filter((item) => canUseCapability(LOYALTY_CAPABILITIES[item.id]))
+    .filter((item) => canUseCapability(item.capability))
     .map(({ id, label, assignableToPerson }) => ({ id, label, assignableToPerson: assignableToPerson !== false }));
 }
 
+/**
+ * Single E-type registry. Each registered E module supplies its own Person
+ * cards, detail body and opening action. Contacts never enumerate E types.
+ */
+export async function collectPersonLoyaltyCards(person = {}, { refresh = true } = {}) {
+  const groups = await Promise.all(loyaltyNavigationItems().map(async ({ id }) => {
+    const owner = await import(`./${id}/index.js`);
+    if (typeof owner.getPersonLoyaltyCards !== 'function') {
+      throw new Error(`Loyalty E "${id}" has no Person card contract`);
+    }
+    const result = await owner.getPersonLoyaltyCards(person, { refresh });
+    if (!result || !Array.isArray(result.cards)) {
+      throw new Error(`Loyalty E "${id}" returned an invalid Person card contract`);
+    }
+    return result;
+  }));
+  const tasks = refresh ? groups.map(group => group.refreshPromise).filter(Boolean) : [];
+  return {
+    cards: groups.flatMap(group => group.cards),
+    refreshPromise: tasks.length ? Promise.allSettled(tasks) : null,
+  };
+}
 export async function renderLoyaltySection(root, section = 'deposit') {
   if (!loyaltyNavigationItems().some((item) => item.id === section)) {
     root.innerHTML = page([loyaltyHeader('Лояльность'), emptyState('Инструмент недоступен', 'У вас нет доступа к этому инструменту.')]);
     return;
   }
-  if (section === 'deposit') {
-    const { renderDeposit } = await import('./deposit/index.js');
-    return renderDeposit(root);
+  const owner = await import(`./${section}/index.js`);
+  if (typeof owner.render !== 'function') {
+    throw new Error(`Loyalty E "${section}" has no render entrypoint`);
   }
-  if (section === 'personal-account') {
-    const { renderPersonalAccount } = await import('./personal-account/index.js');
-    return renderPersonalAccount(root);
-  }
-  if (section === 'certificate') {
-    const { renderCertificate } = await import('./certificate/index.js');
-    return renderCertificate(root);
-  }
-  if (section === 'subscription') {
-    const { renderSubscription } = await import('./subscription/index.js');
-    return renderSubscription(root);
-  }
-  if (section === 'referral') {
-    const { renderReferral } = await import('./referral/index.js');
-    return renderReferral(root);
-  }
-  if (section === 'bonus') {
-    const { renderBonus } = await import('./bonus/index.js');
-    return renderBonus(root);
-  }
-  root.innerHTML = page([
-    loyaltyHeader('Лояльность'),
-    emptyState('Раздел не найден', 'Выберите инструмент Лояльности в меню.'),
-  ]);
+  return owner.render(root);
 }
 
 export { renderLoyaltySection as render };

@@ -90,7 +90,7 @@ financeCards = financePerson(person);
 assert.equal(financeCards.investments.length, 1, 'Only the authorized investment role is visible');
 assert.equal(financeCards.investments[0].id, 'raise');
 assert.equal(financeCards.loans.length, 0, 'Investment readiness never exposes Loans');
-assert.match(peoplePrograms, /canSee\('personal-account'\)/,
+assert.match(peoplePrograms, /collectPersonLoyaltyCards\(person, \{ refresh \}\)/,
   'Tester Personal Account uses the existing Loyalty readiness without an extra gate');
 console.log('Person Z2 finance/readiness isolation and tester Personal Account PASS');
 
@@ -107,12 +107,11 @@ const extract = (text, expression, description) => {
   return match.replace(/^export /, '');
 };
 const registrySource = extract(loyaltySource, /const LOYALTY_NAVIGATION = \[[\s\S]*?\];/, 'Loyalty E registry');
-const capabilitySource = extract(loyaltySource, /const LOYALTY_CAPABILITIES = Object\.freeze\(\{[\s\S]*?\}\);/, 'Loyalty capabilities');
 const navSource = extract(loyaltySource, /export function loyaltyNavigationItems\(\) \{[\s\S]*?\n\}/, 'Loyalty E navigation');
 const typesSource = extract(assignSource, /export function personProgramActionTypes\(\) \{[\s\S]*?\n\}/, 'Person assignment selection');
 const loyaltyEnabled = new Set(['loyalty.deposit.access', 'loyalty.personal_account.access']);
 const assignment = runInNewContext(
-  [registrySource, capabilitySource, navSource, typesSource,
+  [registrySource, navSource, typesSource,
     '({ loyaltyNavigationItems, personProgramActionTypes })'].join('\n'),
   { canUseCapability: (key) => loyaltyEnabled.has(key) },
 );

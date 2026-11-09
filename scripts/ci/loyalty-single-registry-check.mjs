@@ -9,6 +9,8 @@ const canonical = 'core/loyalty/index.js';
 const owner = read(canonical);
 const matches = [...owner.matchAll(/\bconst\s+LOYALTY_NAVIGATION\s*=\s*\[([\s\S]*?)\];/g)];
 assert.equal(matches.length, 1, 'There must be exactly one Loyalty E registry');
+assert.doesNotMatch(owner, /const\s+LOYALTY_CAPABILITIES\s*=/,
+  'Capability information belongs to the single E registry, not a duplicate type list');
 
 const kinds = [...matches[0][1].matchAll(/\bid:\s*'([^']+)'/g)].map(match => match[1]);
 assert.ok(kinds.length > 0, 'Loyalty E registry is empty');
@@ -37,26 +39,21 @@ for (const filename of [...walk('core/loyalty'), ...walk('core/people')]) {
 
 const people = read('core/people/programs.js');
 const assignment = read('core/loyalty/person-program-actions.js');
-assert.match(people, /loyaltyNavigationItems\(\)\.map\(\(\{\s*id\s*\}\)\s*=>\s*id\)/,
-  'Contacts must derive available E types from the Loyalty registry');
+assert.match(people, /collectPersonLoyaltyCards\(person, \{ refresh \}\)/,
+  'Contacts must derive Loyalty E cards from the canonical registry');
+assert.doesNotMatch(people, /canSee\('[a-z-]+'\)|function (?:deposit|certificate|subscription|referral|bonus)Card\(/,
+  'Contacts must not own Loyalty E card renderers');
+assert.match(owner, /loyaltyNavigationItems\(\)\.map\(async \(\{ id \}\)/,
+  'The canonical E registry must drive Person card discovery');
 assert.match(assignment, /loyaltyNavigationItems\(\)\.filter\(\(item\)\s*=>\s*item\.assignableToPerson\)/,
-  'Program assignment must use the same Loyalty registry');
-
-const BT = String.fromCharCode(96);
-const dollar = String.fromCharCode(36);
-assert.ok(assignment.includes('import(' + BT + './' + dollar + '{kind}/index.js' + BT + ')'),
-  'Program assignment must load modules by type instead of using a second catalog');
+  'Program assignment must derive types from the canonical registry');
 for (const kind of kinds) {
-  assert.ok(existsSync('core/loyalty/' + kind + '/index.js'),
-    'Missing owning Loyalty module for ' + kind);
-  assert.ok(people.includes("canSee('" + kind + "')"),
-    'Contacts omit registered type ' + kind + ' from visibility');
-  assert.ok(people.includes('data-person-program="' + kind + (kind === 'personal-account' ? '"' : ':')),
-    'Contacts omit registered E card ' + kind);
-  const detail = kind === 'personal-account'
-    ? "[['personal-account'"
-    : '[' + BT + kind + ':' + dollar + '{';
-  assert.ok(people.includes(detail),
-    'Contacts omit opening registered E ' + kind);
+  const pathname = 'core/loyalty/' + kind + '/index.js';
+  assert.ok(existsSync(pathname), 'Registered E missing owner: ' + kind);
+  const module = read(pathname);
+  assert.match(module, /export function getPersonLoyaltyCards\(/,
+    'Registered E missing Person card interface: ' + kind);
+  assert.match(module, /export \{ render[A-Za-z]+ as render \};/,
+    'Registered E missing its Loyalty screen entrypoint: ' + kind);
 }
-console.log('PASS: single Loyalty registry and Contacts coverage for every E');
+console.log('PASS: single Loyalty E registry, all Person cards owned by E modules');

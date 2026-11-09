@@ -34,6 +34,7 @@ import {
 } from '../shared.js';
 import {
   fundPersonalAccount,
+  getCachedPersonalAccount,
   loadPersonalAccount,
   loadPersonalAccounts,
   settlePersonalAccountDebt,
@@ -385,6 +386,25 @@ export async function openPersonalAccountForPerson(root, person = {}, snapshot =
 }
 
 
+export function getPersonLoyaltyCards(person = {}, { refresh = true } = {}) {
+  const key = personKey(person);
+  const account = key ? getCachedPersonalAccount(key) : null;
+  return {
+    cards: account ? [{
+      key: 'personal-account',
+      markup: personalAccountVisualCard({
+        person, balance: account.balance || 0, debt: account.debtTotal || 0,
+        data: 'data-person-program="personal-account"',
+        aria: 'Открыть Личный счёт',
+      }),
+      detail: {
+        title: 'Личный счёт',
+        open: (root, currentPerson) => openPersonalAccountForPerson(root, currentPerson),
+      },
+    }] : [],
+    refreshPromise: refresh && key ? loadPersonalAccount(key) : null,
+  };
+}
 export async function renderPersonalAccount(root) {
   const people = availablePeople([]);
   let accounts = [];
@@ -437,3 +457,5 @@ export async function renderPersonalAccount(root) {
   });
   notifyLoyaltyContext();
 }
+
+export { renderPersonalAccount as render };

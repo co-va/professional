@@ -6,6 +6,7 @@ import {
   datePicker,
   details,
   emptyState,
+  escapeHtml,
   entityCardStack,
   field,
   formValidationMessage,
@@ -42,6 +43,9 @@ import {
   loyaltyVisualCard,
   money,
   notifyLoyaltyContext,
+  relationshipDetailsSection,
+  relationshipHistoryList,
+  relationshipStatusLabel,
   normalizeOptionalUei,
   openLoyaltyProgramSettings,
   openLoyaltySettingsMenu,
@@ -456,6 +460,50 @@ export function getCertificateAssignmentsForPerson(personKey = '', { includeHidd
     }));
 }
 
+function personCertificateCard({ instance, program }) {
+  return loyaltyVisualCard('certificate', loyaltyCardFields({
+    uei: program?.uei || '',
+    title: program?.name || 'Сертификат',
+    subtitle: 'Сертификат',
+    status: relationshipStatusLabel(instance?.status),
+    metaLeft: instance?.expiresAt || program?.term || 'Бессрочно',
+    metaRight: program?.type === 'amount' ? money(instance?.balance) : (instance?.status === 'used' ? 'Использован' : 'Активен'),
+  }), {
+    data: `data-person-program="certificate:${escapeHtml(instance?.id || '')}"`,
+    aria: `Открыть сертификат ${program?.name || ''}`,
+  });
+}
+
+function personCertificateDetail({ instance = {}, program = {} }) {
+  const history = (Array.isArray(instance.history) ? instance.history : []).slice().reverse().map((item) => ({
+    title: item.title || 'Использование',
+    subtitle: shortDateTime(item.occurredAt, '—'),
+    rightTop: item.amount ? `−${money(item.amount)}` : '',
+  }));
+  return `${relationshipDetailsSection([
+    { label: 'Сертификат', value: program.name || '—' },
+    { label: 'Дата оформления', value: shortDateTime(instance.issuedAt, '—') },
+    { label: 'Исходное право', value: program.type === 'amount' ? money(instance.initialValue) : (program.service || 'Право по программе') },
+    { label: 'Остаток', value: program.type === 'amount' ? money(instance.balance) : relationshipStatusLabel(instance.status) },
+    { label: 'Срок', value: instance.expiresAt || program.term || 'Бессрочно' },
+    { label: 'Состояние', value: relationshipStatusLabel(instance.status) },
+  ])}${v2Section('История', relationshipHistoryList(history, 'Истории сертификата пока нет'))}`;
+}
+
+
+export function getPersonLoyaltyCards(person = {}) {
+  const key = String(person?.key || person?.id || '').trim();
+  return {
+    cards: getCertificateAssignmentsForPerson(key).map(item => {
+      const id = String(item.instance?.id || '');
+      return {
+        key: 'certificate:' + id,
+        markup: personCertificateCard(item),
+        detail: { title: item.program?.name || 'Сертификат', body: personCertificateDetail(item) },
+      };
+    }),
+  };
+}
 export async function renderCertificate(root) {
   const render = async () => {
     const cards = programs.length ? entityCardStack(programs.map((program) => loyaltyVisualCard('certificate', programCardFields(program), {
@@ -481,3 +529,5 @@ export async function renderCertificate(root) {
   };
   await render();
 }
+
+export { renderCertificate as render };
