@@ -1,4 +1,4 @@
-import { normalizeEntityCardAppearance, entityCardDefaultRows, hasConfiguredEntityCardAppearance } from '../../../ui/ui.js';
+import { normalizeEntityCardAppearance, remapEntityCardAppearanceFields, entityCardDefaultRows, hasConfiguredEntityCardAppearance } from '../../../ui/ui.js';
 import { getCardAppearanceTemplate } from '../../card-appearance-templates.js';
 
 const SCOPE = 'loyalty-deposit';
@@ -32,7 +32,7 @@ export function depositCardScope() {
 
 export function depositCardAppearance() {
   const template = getCardAppearanceTemplate(SCOPE);
-  if (hasConfiguredEntityCardAppearance(template?.appearance)) return normalizeEntityCardAppearance(template.appearance);
+  if (hasConfiguredEntityCardAppearance(template?.appearance)) return remapEntityCardAppearanceFields(template.appearance, {metaLeft:'benefit',metaRight:'nominal'});
   return normalizeEntityCardAppearance({
     lines: entityCardDefaultRows([
       { row: 1, field: 'uei', bold: true },
