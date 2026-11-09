@@ -1,4 +1,4 @@
-import { costListParts, durationText, normalizeEntityCardAppearance } from '../../ui/ui.js';
+import { costListParts, durationText, normalizeEntityCardAppearance, hasConfiguredEntityCardAppearance } from '../../ui/ui.js';
 import { getCardAppearanceTemplate } from '../../core/card-appearance-templates.js';
 
 function money(value = 0) {
@@ -24,10 +24,6 @@ function defaultLines(entries = []) {
   return lines;
 }
 
-function hasConfiguredLines(value = {}) {
-  return Array.isArray(value?.lines) && value.lines.some((line) => String(line?.field || '').trim());
-}
-
 function costText(cost = {}) {
   const parts = costListParts(cost);
   return [parts.rightTop, parts.rightBottom].filter(Boolean).join(' ');
@@ -47,9 +43,9 @@ export function procedureCardFields(procedure = {}, stats = {}) {
 }
 
 export function procedureCardAppearance(procedure = {}) {
-  if (hasConfiguredLines(procedure.cardAppearance)) return normalizeEntityCardAppearance(procedure.cardAppearance);
+  if (hasConfiguredEntityCardAppearance(procedure.cardAppearance)) return normalizeEntityCardAppearance(procedure.cardAppearance);
   const template = getCardAppearanceTemplate('procedure');
-  if (hasConfiguredLines(template?.appearance)) return normalizeEntityCardAppearance(template.appearance);
+  if (hasConfiguredEntityCardAppearance(template?.appearance)) return normalizeEntityCardAppearance(template.appearance);
   return normalizeEntityCardAppearance({
     lines: defaultLines([
       { row: 1, field: 'duration', zone: 'right', align: 'right' },
@@ -78,9 +74,9 @@ export function productCardFields(product = {}, stats = {}) {
 }
 
 export function productCardAppearance(product = {}) {
-  if (hasConfiguredLines(product.cardAppearance)) return normalizeEntityCardAppearance(product.cardAppearance);
+  if (hasConfiguredEntityCardAppearance(product.cardAppearance)) return normalizeEntityCardAppearance(product.cardAppearance);
   const template = getCardAppearanceTemplate('product');
-  if (hasConfiguredLines(template?.appearance)) return normalizeEntityCardAppearance(template.appearance);
+  if (hasConfiguredEntityCardAppearance(template?.appearance)) return normalizeEntityCardAppearance(template.appearance);
   return normalizeEntityCardAppearance({
     lines: defaultLines([
       { row: 1, field: 'cost', zone: 'right', align: 'right' },
