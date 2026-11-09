@@ -38,17 +38,28 @@
 .entity-card-editor__background .color-picker__trigger>span:last-child{display:none}
 .entity-card-editor__direction{grid-column:1/-1}
 
-.entity-card-editor__line-picker{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:3px}
-.entity-card-editor__columns{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
-.entity-card-editor__columns .entity-card-editor__tool{width:100%;height:42px;aspect-ratio:auto}
-.entity-card-editor__card-tools{min-width:0}
+/* All editor tools share the smallest available cell: one ninth of the row. */
+.entity-card-editor__card-tools{--entity-card-control-gap:3px;min-width:0}
+.entity-card-editor__line-picker,
+.entity-card-editor__columns,
+.entity-card-editor__tools-line{
+  display:grid;
+  grid-template-columns:repeat(9,minmax(0,1fr));
+  gap:var(--entity-card-control-gap);
+  min-width:0;
+}
+/* Column buttons sit at left, centre and right grid positions. */
+.entity-card-editor__columns .entity-card-editor__tool:nth-child(1){grid-column:1}
+.entity-card-editor__columns .entity-card-editor__tool:nth-child(2){grid-column:5}
+.entity-card-editor__columns .entity-card-editor__tool:nth-child(3){grid-column:9}
+.entity-card-editor__columns .entity-card-editor__tool{font-size:clamp(9px,2.7vw,11px);letter-spacing:-.2px;white-space:nowrap}
+/* Each seven-tool row is centred without enlarging its buttons. */
+.entity-card-editor__tools-line>.entity-card-editor__tool:first-child{grid-column:2}
 .entity-card-editor__section{display:grid;gap:8px;min-width:0}
 .entity-card-editor__section + .entity-card-editor__section{border-top:1px solid var(--border,#ddd);margin-top:14px;padding-top:12px}
 .entity-card-editor__tool-captions{display:grid;grid-template-columns:3fr 4fr;gap:5px;color:var(--text-secondary);font-size:12px}
 .entity-card-editor__tool-captions span{min-width:0}
-.entity-card-editor__tools-line{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px;min-width:0}
-.entity-card-editor__tools-line .entity-card-editor__tool{height:auto;min-height:0;aspect-ratio:1/1;padding:0 2px}
-.entity-card-editor__line-picker button{min-width:0;height:36px;border:1px solid #111;border-radius:0;background:#fff;color:#111;font:inherit;font-size:12px}
+.entity-card-editor__line-picker button{border:1px solid #111;background:#fff;color:#111;font:inherit;font-size:12px}
 .entity-card-editor__line-picker button.is-active{background:#111;color:#fff}
 
 .entity-card-editor__data{margin:0;min-width:0}
@@ -57,13 +68,25 @@
 .entity-card-editor__data .ui-select>span{color:var(--text-secondary);font-size:12px}
 .entity-card-editor__data .ui-select__control{min-height:44px}
 
-.entity-card-editor__tool{min-width:0;height:44px;border:1px solid #111;border-radius:0;background:#fff;color:#111;font:inherit;font-size:13px;padding:0 6px;display:flex;align-items:center;justify-content:center}
+.entity-card-editor__tool{border:1px solid #111;background:#fff;color:#111;font:inherit;font-size:12px;display:flex;align-items:center;justify-content:center}
+.entity-card-editor__line-picker button,
+.entity-card-editor__columns .entity-card-editor__tool,
+.entity-card-editor__tools-line .entity-card-editor__tool{
+  box-sizing:border-box;
+  min-width:0;
+  width:100%;
+  height:auto;
+  min-height:0;
+  aspect-ratio:1/1;
+  border-radius:0;
+  padding:0;
+}
 .entity-card-editor__tool.is-active{background:#111;color:#fff}
 .entity-card-editor__tool[aria-label="Курсив"]{font-style:italic}
 .entity-card-editor__tool[aria-label="Подчёркнутый"]{text-decoration:underline}
 .entity-card-editor__tool--color{padding:0}
 .entity-card-editor__tool--color.is-active{background:#fff;color:#111;box-shadow:inset 0 0 0 3px #111}
-.entity-card-editor__color-dot{display:block;width:min(58px,calc(100% - 8px));height:28px;min-width:0;border-radius:4px;border:1px solid #111;box-sizing:border-box}
+.entity-card-editor__color-dot{display:block;width:calc(100% - 8px);aspect-ratio:1/1;min-width:0;border-radius:4px;border:1px solid #111;box-sizing:border-box}
 .entity-card-editor__color-dot.is-black{background:#111}
 .entity-card-editor__color-dot.is-gray{background:#777A7D}
 .entity-card-editor__color-dot.is-white{background:#fff}
@@ -75,7 +98,7 @@
 
 @media(max-width:360px){
   .entity-visual-card__grid{inset:10px 12px}
-  .entity-card-editor__line-picker{gap:2px}
+  .entity-card-editor__card-tools{--entity-card-control-gap:2px}
   .entity-card-editor__line-picker button{font-size:11px}
-  .entity-card-editor__tool{font-size:12px;padding:0 4px}
+  .entity-card-editor__tool{font-size:11px}
 }
