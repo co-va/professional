@@ -34,9 +34,8 @@ function normalizeCell(input = {}) {
 }
 
 export function hasConfiguredEntityCardAppearance(value = {}) {
-  return Array.isArray(value?.lines)&&value.lines.some(line=>
-    Boolean(String(line?.field||'').trim())||
-    COLUMNS.some(col=>Boolean(String(line?.cells?.[col]?.field||'').trim()))
+  return Array.isArray(value?.lines)&&value.lines.some(row=>
+    COLUMNS.some(col=>Boolean(String(row?.cells?.[col]?.field||'').trim()))
   );
 }
 
@@ -53,12 +52,8 @@ export function normalizeEntityCardAppearance(value = {}) {
     },
     lines:Array.from({length:ENTITY_CARD_LINE_COUNT},(_,index)=>{
       const raw=lines[index]&&typeof lines[index]==='object'&&!Array.isArray(lines[index])?lines[index]:{};
-      const saved=raw.cells&&typeof raw.cells==='object'&&!Array.isArray(raw.cells)?raw.cells:{};
-      return {
-        ...normalizeCell(raw),
-        layout:raw.layout==='columns'?'columns':'full',
-        cells:Object.fromEntries(COLUMNS.map(col=>[col,normalizeCell(saved[col])])),
-      };
+      const cells=raw.cells&&typeof raw.cells==='object'&&!Array.isArray(raw.cells)?raw.cells:{};
+      return {cells:Object.fromEntries(COLUMNS.map(col=>[col,normalizeCell(cells[col])]))};
     }),
   };
 }
@@ -90,20 +85,25 @@ export function entityVisualCard({appearance={},fields=[],image='',imagePosition
   const tag=interactive?'button':'section';
   const attrs=interactive?`type="button"${data?` ${data}`:''}${aria?` aria-label="${escapeHtml(aria)}"`:''}`:'';
 
-  const renderCell=(cell,row,col)=>{
-    const value=lineText(cell,map);
-    const classes=[
-      'entity-visual-card__line','entity-visual-card__line--'+col,
-      'is-align-'+cell.align,'is-size-'+cell.size,'is-color-'+cell.color,
-      cell.bold?'is-bold':'',cell.italic?'is-italic':'',cell.underline?'is-underline':'',
-    ].filter(Boolean).join(' ');
-    return `<span class="${classes}" data-entity-card-line="${row+1}" data-entity-card-column="${col}">${escapeHtml(value)}</span>`;
-  };
-  const rows=config.lines.map((line,index)=>{
-    const isColumns=line.layout==='columns';
-    const inner=isColumns?COLUMNS.map(col=>renderCell(line.cells[col],index,col)).join('')
-      :renderCell(line,index,'full');
-    return `<span class="entity-visual-card__row${isColumns?' entity-visual-card__row--columns':''}">${inner}</span>`;
+  const rows=config.lines.map((row,index)=>{
+    const cells=COLUMNS.map((col,i)=>{
+      const cell=row.cells[col];
+      // Reserve configured cells. Text may extend into adjacent empty cells
+      // in its alignment direction, but never over a configured neighbor.
+      let left=0,right=0;
+      for(let j=i-1;j>=0&&!row.cells[COLUMNS[j]].field;j--)left++;
+      for(let j=i+1;j<3&&!row.cells[COLUMNS[j]].field;j++)right++;
+      const available=cell.align==='left'?1+right
+        :cell.align==='right'?1+left
+        :1+2*Math.min(left,right);
+      const classes=[
+        'entity-visual-card__cell','is-align-'+cell.align,
+        'is-size-'+cell.size,'is-color-'+cell.color,
+        cell.bold?'is-bold':'',cell.italic?'is-italic':'',cell.underline?'is-underline':'',
+      ].filter(Boolean).join(' ');
+      return `<span class="${classes}" data-entity-card-line="${index+1}" data-entity-card-column="${col}"><span class="entity-visual-card__text" style="--spill-width:${available}">${escapeHtml(lineText(cell,map))}</span></span>`;
+    }).join('');
+    return `<span class="entity-visual-card__row">${cells}</span>`;
   }).join('');
   return `<${tag} class="entity-visual-card${image?' has-image':''}${className?` ${escapeHtml(className)}`:''}" style="${style}"${attrs}><span class="entity-visual-card__surface" aria-hidden="true"></span><span class="entity-visual-card__grid">${rows}</span></${tag}>`;
 }
@@ -152,22 +152,17 @@ function editorWorkspace(state,fields,allowPhoto=true){
     </div>`;
   }
 
+
   const row=state.appearance.lines[state.line];
-  const isColumns=row.layout==='columns';
-  const cell=isColumns?row.cells[state.column]:row;
+  const cell=row.cells[state.column];
   return `<div class="entity-card-editor__card-tools">
     <div class="entity-card-editor__line-picker">${Array.from({length:ENTITY_CARD_LINE_COUNT},(_,i)=>`<button type="button" class="${i===state.line?'is-active':''}" data-card-line-select="${i}">${i+1}</button>`).join('')}</div>
-    <div class="entity-card-editor__control-label">Строка</div>
-    <div class="entity-card-editor__tool-group entity-card-editor__tool-group--two" aria-label="Режим строки">
-      ${toolButton('Вся строка','layout:full',!isColumns,'Вся строка')}
-      ${toolButton('3 столбца','layout:columns',isColumns,'Три столбца')}
+    <div class="entity-card-editor__control-label">Столбец для данных</div>
+    <div class="entity-card-editor__tool-group entity-card-editor__tool-group--three" aria-label="Столбец">
+      ${toolButton('Лево','column:left',state.column==='left','Левый столбец')}
+      ${toolButton('Центр','column:center',state.column==='center','Центральный столбец')}
+      ${toolButton('Право','column:right',state.column==='right','Правый столбец')}
     </div>
-    ${isColumns?`<div class="entity-card-editor__control-label">Столбец для данных</div>
-      <div class="entity-card-editor__tool-group entity-card-editor__tool-group--three" aria-label="Столбец">
-        ${toolButton('Лево','column:left',state.column==='left','Левый столбец')}
-        ${toolButton('Центр','column:center',state.column==='center','Центральный столбец')}
-        ${toolButton('Право','column:right',state.column==='right','Правый столбец')}
-      </div>`:''}
     <div class="entity-card-editor__data">${fieldControl(cell,fields)}</div>
     <div class="entity-card-editor__control-label">Выравнивание текста внутри ячейки</div>
     <div class="entity-card-editor__tool-group entity-card-editor__tool-group--three" aria-label="Выравнивание">
@@ -263,8 +258,7 @@ export function mountEntityCardConstructor(root,{appearance={},fields=[],photo='
     }));
 
     root.querySelector('input[data-card-line-field]')?.addEventListener('change',(event)=>{
-      const row=state.appearance.lines[state.line];
-      (row.layout==='columns'?row.cells[state.column]:row).field=event.target.value;
+      state.appearance.lines[state.line].cells[state.column].field=event.target.value;
       updatePreview();
       markDirty();
     });
@@ -272,10 +266,9 @@ export function mountEntityCardConstructor(root,{appearance={},fields=[],photo='
     root.querySelectorAll('[data-card-tool]').forEach((control)=>control.addEventListener('click',()=>{
       const key=control.dataset.cardTool||'';
       const row=state.appearance.lines[state.line];
-      if(key.startsWith('layout:'))row.layout=key.slice(7)==='columns'?'columns':'full';
-      else if(key.startsWith('column:'))state.column=COLUMNS.includes(key.slice(7))?key.slice(7):'left';
+      if(key.startsWith('column:'))state.column=COLUMNS.includes(key.slice(7))?key.slice(7):'left';
       else {
-        const cell=row.layout==='columns'?row.cells[state.column]:row;
+        const cell=row.cells[state.column];
         if(key.startsWith('align:'))cell.align=key.slice(6);
         else if(key.startsWith('size:'))cell.size=key.slice(5);
         else if(key.startsWith('color:'))cell.color=key.slice(6);
