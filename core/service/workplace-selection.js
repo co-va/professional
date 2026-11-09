@@ -11,7 +11,10 @@ export function openServiceWorkplaceSelection({
   title = 'Рабочие пространства',
   onChange = () => {},
 } = {}) {
-  const selectedIds = new Set((Array.isArray(selected) ? selected : []).map(workplaceId).filter(Boolean));
+  const selectedAssignments = new Map((Array.isArray(selected) ? selected : [])
+    .map((assignment) => [workplaceId(assignment), assignment])
+    .filter(([id]) => Boolean(id)));
+  const selectedIds = new Set(selectedAssignments.keys());
   const workplaces = getWorkplaces();
   const body = notificationSettings(workplaces.map((workplace) => ({
     label: String(workplace.name || 'Рабочее пространство'),
@@ -33,10 +36,14 @@ export function openServiceWorkplaceSelection({
       .filter(Boolean));
     const next = workplaces
       .filter((workplace) => ids.has(String(workplace.key || workplace.id || '')))
-      .map((workplace) => ({
-        workplaceId: String(workplace.key || workplace.id || ''),
-        name: String(workplace.name || ''),
-      }));
+      .map((workplace) => {
+        const id = String(workplace.key || workplace.id || '');
+        return {
+          ...(selectedAssignments.get(id) || {}),
+          workplaceId: id,
+          name: String(workplace.name || ''),
+        };
+      });
     onChange(next);
   };
 
