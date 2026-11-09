@@ -35,6 +35,7 @@ function normalizeCell(input = {}, column = 'left') {
 
 export function hasConfiguredEntityCardAppearance(value = {}) {
   return Array.isArray(value?.lines)&&value.lines.some(row=>
+    Boolean(String(row?.field||'').trim()) ||
     COLUMNS.some(col=>Boolean(String(row?.cells?.[col]?.field||'').trim()))
   );
 }
@@ -52,9 +53,34 @@ export function normalizeEntityCardAppearance(value = {}) {
     },
     lines:Array.from({length:ENTITY_CARD_LINE_COUNT},(_,index)=>{
       const raw=lines[index]&&typeof lines[index]==='object'&&!Array.isArray(lines[index])?lines[index]:{};
-      const cells=raw.cells&&typeof raw.cells==='object'&&!Array.isArray(raw.cells)?raw.cells:{};
-      return {cells:Object.fromEntries(COLUMNS.map(col=>[col,normalizeCell(cells[col],col)]))};
+      const existing=raw.cells&&typeof raw.cells==='object'&&!Array.isArray(raw.cells)?raw.cells:{};
+      const cells=Object.fromEntries(COLUMNS.map(col=>[col,normalizeCell(existing[col],col)]));
+      // Previously there was one value per row. Its old position determines
+      // the new cell; text alignment remains an independent formatting choice.
+      if(String(raw.field||'').trim()){
+        const position=raw.zone==='left'||raw.zone==='right'?raw.zone
+          :raw.align==='center'||raw.align==='right'?raw.align:'left';
+        const target=!cells[position].field?position:
+          COLUMNS.find(col=>!cells[col].field);
+        if(target)cells[target]=normalizeCell(raw,target);
+      }
+      return {cells};
     }),
+  };
+}
+
+// Field-name changes are defined by the card type, never by the shared grid.
+export function remapEntityCardAppearanceFields(value = {}, names = {}) {
+  const appearance=normalizeEntityCardAppearance(value);
+  return {
+    ...appearance,
+    lines:appearance.lines.map(row=>({
+      cells:Object.fromEntries(COLUMNS.map(column=>[column,{
+        ...row.cells[column],
+        field:Object.prototype.hasOwnProperty.call(names,row.cells[column].field)
+          ? String(names[row.cells[column].field]) : row.cells[column].field,
+      }])),
+    })),
   };
 }
 
