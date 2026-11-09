@@ -1,5 +1,6 @@
 import { collectCost, costField, durationPicker, field, initCostFields, initDurationPickers, setSharedProfilePrimary, textareaField, v2ListEntries, v2ListEntry } from '../../../ui/ui.js';
 import { saveProcedure as saveProcedureData } from './data.js';
+import { flushBusinessPersistence } from '../../../core/business-persistence.js';
 
 export function initialProcedure(existing = null, defaultWorkplace = null) {
   if (existing) return {
@@ -87,7 +88,9 @@ export function bindProcedureEditor(root, {
   });
   syncGroupBooking();
 
+  let saving = false;
   const save = async () => {
+    if (saving) return null;
     const data = new FormData(form);
     const name = String(data.get('procedureName') || '').trim();
     const error = root.querySelector('[data-procedure-editor-error]');
@@ -101,6 +104,7 @@ export function bindProcedureEditor(root, {
       if (error) error.textContent = 'Для групповой записи укажите минимум 2 человека.';
       return null;
     }
+    saving = true;
     setSharedProfilePrimary(primary, { visible: true, label: 'Сохранить', disabled: true });
     const item = {
       ...(existing || {}),
@@ -119,7 +123,17 @@ export function bindProcedureEditor(root, {
       createdAt: existing?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
-    saveProcedureData(item);
+    try {
+      saveProcedureData(item);
+      // The editor must not report success until the canonical API queue is acknowledged.
+      await flushBusinessPersistence();
+    } catch (failure) {
+      if (error) error.textContent = failure instanceof Error ? failure.message : 'Не удалось сохранить услугу.';
+      return null;
+    } finally {
+      saving = false;
+      setSharedProfilePrimary(primary, { visible: true, label: 'Сохранить' });
+    }
     if (error) error.textContent = '';
     onSaved(item);
     return item;
