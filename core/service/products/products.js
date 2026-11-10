@@ -27,7 +27,7 @@ import { getSettlementItemTotals, getSettlementItemTotalsForRecords } from '../.
 import { getRecords } from '../../../core/record/index.js';
 import { getWorkplaces } from '../../profile/workplaces/data.js';
 import { serviceHeaderContext, notifyServiceContext } from '../context.js';
-import { bindServiceWorkplaceSelection, serviceWorkplaceChecklist } from '../workplace-selection.js';
+import { bindServiceWorkplaceSelection, serviceWorkplaceSelector } from '../workplace-selection.js';
 import { flushBusinessPersistence } from '../../../core/business-persistence.js';
 import { productCardAppearance, productCardFields, productCardPhoto } from '../card-presentation.js';
 import { deleteProduct as deleteProductData, getProducts, pushProductHistory, reorderProducts, saveProduct as saveProductData } from './data.js';
@@ -158,7 +158,7 @@ function productEditorForm(product) {
     ${textareaField({ label: 'Описание', name: 'productAbout', value: product.about || '', rows: 7, maxlength: 5000, placeholder: 'Описание товара' })}
     <div class="field">
       <span>Рабочие пространства</span>
-      ${serviceWorkplaceChecklist(product.workplaces)}
+      ${serviceWorkplaceSelector(product.workplaces)}
     </div>
     <div class="form-error" role="alert" data-product-editor-error></div>
   </form>`;
