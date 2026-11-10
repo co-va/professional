@@ -1,0 +1,28 @@
+name: Service Q editor
+
+on:
+  push:
+    branches: [staging]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: service-editor-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  service-workplace-picker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Verify Shared workplace selector and Q ownership
+        run: node scripts/ci/service-workplace-picker-smoke.mjs
