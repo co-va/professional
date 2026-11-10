@@ -16,17 +16,9 @@ import { getRecordPaymentState, recordAmountDue } from '../core/finance/index.js
 import { getNotesForDay } from '../core/note/index.js';
 import { noteTargetLabel, noteVisibleForWorkplace } from './note-target.js';
 
-// Load Record creation only when a person starts a new Record.
-let creationModuleRequest = null;
-function loadJournalCreationModule() {
-  if (!creationModuleRequest) {
-    creationModuleRequest = import('./creation-flow.js').catch((error) => {
-      creationModuleRequest = null;
-      throw error;
-    });
-  }
-  return creationModuleRequest;
-}
+// The lightweight Journal chooser is available when Day becomes interactive.
+// Record/Event/Note data and editors still load only after a choice.
+import { openJournalCreation } from './creation-flow.js';
 
 function dateKey(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -77,8 +69,6 @@ export function renderJournalDay(root, {
   const contentRoot = root.querySelector('[data-journal-day-content]');
   const timelineRoot = contentRoot?.querySelector('[data-journal-timeline-host]');
   const dayDate = dateKey(date);
-  // No automatic import of the Record creation flow while the first Journal
-  // Day frame is becoming interactive. The slot click imports it on demand.
   const dispose = () => {
     clearV2Y(root);
   };
@@ -217,7 +207,6 @@ export function renderJournalDay(root, {
       }
       if (minuteState.state !== 'free') return;
 
-      const { openJournalCreation } = await loadJournalCreationModule();
       if (!root.isConnected) return;
       openJournalCreation({
         date: dayDate,
