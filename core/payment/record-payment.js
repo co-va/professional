@@ -17,7 +17,6 @@ import {
   correctFinanceOperation,
   getRecordPaymentState,
   getRefundsForPayment,
-  getWallets,
   hardDeleteFinanceOperation,
   recordPaymentIncome,
   recordRefundExpense,
@@ -33,6 +32,7 @@ import { getAllPeople } from '../people/data.js';
 import { personDisplay } from '../people/presentation.js';
 import { completeRecord, getRecord, refreshRecordsFromServer } from '../record/index.js';
 import { flushBusinessPersistence } from '../business-persistence.js';
+import { loadWalletCatalog } from '../runtime/auxiliary-state.js';
 import { getProfile } from '../profile/data.js';
 import { readOnlyReceipt } from '../../ui/receipt/index.js';
 
@@ -236,7 +236,7 @@ async function openPaymentEntry(record, onCompleted = () => {}) {
   // A cold/stale cache must not let a 20% program silently become a 0% bill.
   const layer = mountModal(document.body, modal(
     `<div class="compact-form record-payment-entry-x" data-record-payment-entry-host>
-      ${emptyState('Оплата', 'Проверяем условия скидки…')}
+      ${emptyState('Оплата', 'Загружаем источники оплаты и проверяем условия скидки…')}
     </div>`,
     { variant: 'x', surface: 'app', title: 'Оплата', className: 'modal--form-sheet' },
   ));
@@ -251,9 +251,15 @@ async function openPaymentEntry(record, onCompleted = () => {}) {
   let gratuityOnly = false;
   let deposits = [];
   let personalAccount = null;
+  let wallets = [];
   try {
     const key = String(personForRecord(current)?.key || personForRecord(current)?.id || '').trim();
-    if (key) await listPersonDeposits(key);
+    // A cold Journal/Record route may not have loaded Finance/Cash.
+    // Resolve the actual wallet catalog before rendering any source picker.
+    [wallets] = await Promise.all([
+      loadWalletCatalog(),
+      key ? listPersonDeposits(key) : Promise.resolve(),
+    ]);
     const verifiedRecord = getRecord(recordId) || current;
     settlement = settlementForRecord(verifiedRecord);
     state = paymentStateForRecord(verifiedRecord);
@@ -272,7 +278,7 @@ async function openPaymentEntry(record, onCompleted = () => {}) {
   } catch (error) {
     const host = layer.querySelector('[data-record-payment-entry-host]');
     if (host) host.innerHTML = emptyState('Не удалось проверить условия оплаты',
-      String(error?.message || 'Сервер не подтвердил условия скидки.'));
+      String(error?.message || 'Не удалось загрузить источники или условия оплаты.'));
     return layer;
   } finally {
     paymentEntryOpeningRecords.delete(recordId);
@@ -283,7 +289,7 @@ async function openPaymentEntry(record, onCompleted = () => {}) {
   if (!host) return layer;
   host.innerHTML = `
     ${readOnlyReceipt({ totals: [{ label: 'К оплате', value: money(total), strong: true }] })}
-    ${paymentMethods({ wallets: getWallets(), deposits, personalAccount, total, showAction: false, showTotal: false })}
+    ${paymentMethods({ wallets, deposits, personalAccount, total, showAction: false, showTotal: false })}
     ${actionBlock(button(gratuityOnly ? 'Завершить' : 'Оплатить', { data: 'data-record-payment-entry-submit', disabled: !gratuityOnly }))}`;
 
   const submit = host.querySelector('[data-record-payment-entry-submit]');
@@ -379,7 +385,17 @@ async function openPaymentCorrection(record, payment, onSaved) {
   const serviceAmount = Math.max(0, Number(payment?.serviceAmount || 0));
   const initialAllocations = paymentAllocations(payment);
   const initialDepositAllocations = paymentDepositAllocations(payment);
-  const deposits = await depositsForRecord(record, payment);
+  let wallets;
+  let deposits;
+  try {
+    [wallets, deposits] = await Promise.all([
+      loadWalletCatalog(),
+      depositsForRecord(record, payment),
+    ]);
+  } catch (error) {
+    openNotice({ title: 'Корректировка оплаты', message: String(error?.message || 'Не удалось загрузить кошельки') });
+    return null;
+  }
   const layer = mountPaymentQ(record, {
     title: 'Корректировка оплаты',
     className: 'record-payment-correction-q',
@@ -391,7 +407,7 @@ async function openPaymentCorrection(record, payment, onSaved) {
     ${readOnlyReceipt({ totals: [{ label: 'Оплата', value: money(payment.total), strong: true }] })}
     <div class="form-grid">
       ${datePicker({ label: 'Дата оплаты', name: 'recordPaymentCorrectionDate', value: paymentDateValue(payment), showYear: false, modalVariant: 'bottom', modalClassName: 'modal--form-sheet', modalSurface: 'app', allowClear: false })}
-      ${paymentMethods({ wallets: getWallets(), deposits, total: serviceAmount, showAction: false, showTotal: false, initialAllocations, initialDepositAllocations })}
+      ${paymentMethods({ wallets, deposits, total: serviceAmount, showAction: false, showTotal: false, initialAllocations, initialDepositAllocations })}
     </div>
     <div class="modal-actions" data-record-payment-correction-primary></div>`;
   initDatePickers(host);
@@ -431,7 +447,7 @@ async function openPaymentCorrection(record, payment, onSaved) {
   return layer;
 }
 
-function openPaymentRefund(record, payment, onSaved) {
+async function openPaymentRefund(record, payment, onSaved) {
   if (!payment?.id) return null;
   const refunds = getRefundsForPayment(payment.id);
   const refunded = refunds.reduce((sum, item) => sum + Number(item?.total || 0), 0);
@@ -440,7 +456,13 @@ function openPaymentRefund(record, payment, onSaved) {
     openNotice({ title: 'Возврат', message: 'Эта оплата уже возвращена полностью.' });
     return null;
   }
-  const wallets = getWallets();
+  let wallets;
+  try {
+    wallets = await loadWalletCatalog();
+  } catch (error) {
+    openNotice({ title: 'Возврат', message: String(error?.message || 'Не удалось загрузить кошельки') });
+    return null;
+  }
   const allocations = paymentAllocations(payment);
   const defaultWalletId = allocations.length === 1 ? String(allocations[0]?.walletId || '') : '';
   const layer = mountModal(document.body, modal(
@@ -457,7 +479,7 @@ function openPaymentRefund(record, payment, onSaved) {
   const amountInput = layer.querySelector('input[name="recordPaymentRefundAmount"]');
   const walletInput = layer.querySelector('input[name="recordPaymentRefundWallet"]');
   const submit = layer.querySelector('[data-record-payment-refund-confirm]');
-  const hasCash = paymentAllocations(payment).reduce((sum, item) => sum + Number(item.amount || 0), 0) > 0.009;
+  const hasCash = allocations.reduce((sum, item) => sum + Number(item.amount || 0), 0) > 0.009;
   const sync = () => {
     const amount = Math.max(0, Math.min(remaining, Number(String(amountInput?.value || '0').replace(',', '.')) || 0));
     if (submit) submit.disabled = amount <= 0 || (hasCash && !walletInput?.value);
