@@ -16,6 +16,7 @@ import {
   mountModal,
   mountV2ZLayer,
   page,
+  setSharedProfilePrimary,
   textareaField,
   v2ListEntries,
   v2ListEntry,
@@ -208,7 +209,7 @@ export function openProductEditor(root, existing = null, {
       return null;
     }
     saving = true;
-    if (primary) primary.disabled = true;
+    setSharedProfilePrimary(primary, { visible: true, label: 'Сохранить', disabled: true });
     const item = {
       ...(existing || {}),
       id: existing?.id || crypto.randomUUID(),
@@ -229,7 +230,7 @@ export function openProductEditor(root, existing = null, {
       return null;
     } finally {
       saving = false;
-      if (primary) primary.disabled = false;
+      setSharedProfilePrimary(primary, { visible: true, label: 'Сохранить' });
     }
     if (error) error.textContent = '';
     layer.v2Close?.();
@@ -251,6 +252,7 @@ export function openProductEditor(root, existing = null, {
       });
     });
   }
+  setSharedProfilePrimary(primary, { visible: true, label: 'Сохранить' });
   notifyServiceContext();
   return layer;
 }
