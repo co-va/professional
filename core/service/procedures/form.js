@@ -1,6 +1,7 @@
 import { collectCost, costField, durationPicker, field, initCostFields, initDurationPickers, setSharedProfilePrimary, textareaField, v2ListEntries, v2ListEntry } from '../../../ui/ui.js';
 import { saveProcedure as saveProcedureData } from './data.js';
 import { flushBusinessPersistence } from '../../../core/business-persistence.js';
+import { bindServiceWorkplaceSelection, serviceWorkplaceChecklist } from '../workplace-selection.js';
 
 export function initialProcedure(existing = null, defaultWorkplace = null) {
   if (existing) return {
@@ -24,8 +25,7 @@ export function initialProcedure(existing = null, defaultWorkplace = null) {
   };
 }
 
-export function procedureEditorForm(existing = null) {
-  const procedure = initialProcedure(existing);
+export function procedureEditorForm(procedure = initialProcedure()) {
   return `<form class="compact-form" data-procedure-editor-form>
     ${field({ label: 'Название', name: 'procedureName', value: procedure.name || '', placeholder: 'Название услуги', required: true })}
     ${costField({ value: procedure.cost || {}, name: 'procedureCost' })}
@@ -54,6 +54,10 @@ export function procedureEditorForm(existing = null) {
       })}
     </div>
     ${textareaField({ label: 'Описание', name: 'procedureDescription', value: procedure.description || '', placeholder: 'Описание услуги' })}
+    <div class="field">
+      <span>Рабочие пространства</span>
+      ${serviceWorkplaceChecklist(procedure.workplaces)}
+    </div>
     <div class="form-error" data-procedure-editor-error></div>
   </form>`;
 }
@@ -69,6 +73,10 @@ export function bindProcedureEditor(root, {
 
   initCostFields(root);
   initDurationPickers(root);
+  bindServiceWorkplaceSelection(root, {
+    selected: draft.workplaces,
+    onChange: (workplaces) => { draft.workplaces = workplaces; },
+  });
 
   const groupToggle = root.querySelector('[data-procedure-group-toggle]');
   const groupCapacityHost = root.querySelector('[data-procedure-group-capacity]');
