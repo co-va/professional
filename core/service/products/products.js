@@ -156,10 +156,7 @@ function productEditorForm(product) {
     ${field({ label: 'Название', name: 'productName', value: product.name || '', placeholder: 'Название товара', required: true })}
     ${costField({ value: product.cost || {}, name: 'productCost' })}
     ${textareaField({ label: 'Описание', name: 'productAbout', value: product.about || '', rows: 7, maxlength: 5000, placeholder: 'Описание товара' })}
-    <div class="field">
-      <span>Рабочие пространства</span>
-      ${serviceWorkplaceSelector(product.workplaces)}
-    </div>
+    ${serviceWorkplaceSelector(product.workplaces)}
     <div class="form-error" role="alert" data-product-editor-error></div>
   </form>`;
 }
