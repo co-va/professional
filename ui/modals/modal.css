@@ -15,18 +15,19 @@
   padding-bottom:calc(var(--ui-action-height,0px) + 44px);
   scroll-padding-bottom:calc(var(--ui-action-height,0px) + 44px);
 }
+/* The Z body excludes the existing horizontal overscan. Center its footer
+   on the same visible work area, without changing the primary button width. */
+[data-v2-z-body]{--ui-action-shift:calc(var(--v2-z-viewport-overscan) / 2)}
+[data-v2-q-body]{--ui-action-shift:0px}
 :is([data-v2-z-body],[data-v2-q-body]) .modal-actions{
   position:absolute;
   z-index:5;
-  left:36px;
-  right:36px;
+  left:calc(var(--ui-action-inset) - var(--ui-action-shift,0px));
+  right:calc(var(--ui-action-inset) + var(--ui-action-shift,0px));
   bottom:calc(24px + var(--ui-bottom-safe,env(safe-area-inset-bottom)));
   box-sizing:border-box;
   margin:0;
   padding:0;
-}
-@media(max-width:360px){
-  :is([data-v2-z-body],[data-v2-q-body]) .modal-actions{left:32px;right:32px}
 }
 /* X action is the final part of its natural content, not a floating
    second footer. There is no scrollable blank area after the button. */

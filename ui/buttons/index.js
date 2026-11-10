@@ -1,15 +1,17 @@
 import { escapeHtml } from '../utils/escape-html.js';
 
 const BUTTON_VARIANTS = {
+  primary: '',
+  'delete-outline': 'ui-button--delete-outline',
   secondary: 'ui-button--secondary',
   danger: 'ui-button--danger',
   critical: 'ui-button--critical',
   outline: 'ui-button--outline',
 };
 
-export function button(label, { className = '', data = '', type = 'button', aria = '', variant = '', disabled = false } = {}) {
+export function button(label, { className = '', data = '', type = 'button', aria = '', variant = 'primary', disabled = false } = {}) {
   if (/^назад$/i.test(String(label || '').trim())) return '';
-  const variantClass = BUTTON_VARIANTS[variant] || '';
+  const variantClass = BUTTON_VARIANTS[variant || 'primary'] ?? BUTTON_VARIANTS.secondary;
   return `<button type="${type}" class="ui-button ${variantClass} ${className}" ${data}${aria ? ` aria-label="${escapeHtml(aria)}"` : ''}${disabled ? ' disabled' : ''}>${label}</button>`;
 }
 

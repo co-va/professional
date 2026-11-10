@@ -12,7 +12,7 @@ export function settingToggle({ label = '', checked = false, data = '', disabled
 export function settingsPanel(items = []) {
   return `<div class="app-settings-panel">${(Array.isArray(items) ? items : []).filter(Boolean).map((item) => {
     if (item.type === 'toggle') return settingToggle(item);
-    return button(text(item.label || ''), { className: 'app-settings-panel__button', data: item.data || '', aria: item.aria || item.label || '', variant: item.variant || '', disabled: Boolean(item.disabled) });
+    return button(text(item.label || ''), { className: 'app-settings-panel__button', data: item.data || '', aria: item.aria || item.label || '', variant: item.variant || 'secondary', disabled: Boolean(item.disabled) });
   }).join('')}</div>`;
 }
 
