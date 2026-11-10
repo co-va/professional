@@ -36,33 +36,23 @@ function workplaceOptions(workplaces = []) {
   })).filter((option) => option.value);
 }
 
-function row(name, value, options, selected = {}, withCost = false, { rowLabel = 'Рабочее место', placeholder = 'Выбор рабочего места' } = {}) {
+function row(name, value, options, selected = {}, withCost = false) {
   const cost = selected?.cost || {};
   return `<div class="workplace-select-row" data-workplace-row>${select({
-    label: rowLabel,
+    label: 'Рабочее место',
     name,
     value,
-    options: [{ value: '', label: placeholder }, ...options],
-    aria: placeholder,
+    options: [{ value: '', label: 'Выбор рабочего места' }, ...options],
     data: 'data-workplace-value',
-  })}${withCost ? costField({ name: `${name}-cost-${Math.random().toString(36).slice(2, 8)}`, value: cost }) : ''}<button type="button" class="remove-button" data-remove-workplace aria-label="Удалить рабочее пространство из выбора">×</button></div>`;
+  })}${withCost ? costField({ name: `${name}-cost-${Math.random().toString(36).slice(2, 8)}`, value: cost }) : ''}<button type="button" class="remove-button" data-remove-workplace aria-label="Удалить рабочее место">×</button></div>`;
 }
 
-export function workplaceSelector({
-  name = 'workplaces',
-  selected = [],
-  allowMultiple = true,
-  costPerWorkplace = false,
-  workplaces = [],
-  rowLabel = 'Рабочее место',
-  placeholder = 'Выбор рабочего места',
-  addLabel = '+ Добавить рабочее место',
-} = {}) {
+export function workplaceSelector({ name = 'workplaces', selected = [], allowMultiple = true, costPerWorkplace = false, workplaces = [] } = {}) {
   const options = workplaceOptions(workplaces);
-  const selections = (Array.isArray(selected) ? selected : []).filter((item) => item && (item.workplaceId || item.id || item.key));
-  const rows = selections.length ? (allowMultiple ? selections : selections.slice(0, 1)) : [{}];
+  const selections = Array.isArray(selected) ? selected : [];
+  const first = String(selections[0]?.workplaceId || selections[0]?.id || selections[0]?.key || '');
   const catalog = escapeHtml(JSON.stringify(options));
-  return `<div class="workplace-selector" data-workplace-selector="${escapeHtml(name)}" data-cost-per-workplace="${costPerWorkplace ? 'true' : 'false'}" data-workplace-placeholder="${escapeHtml(placeholder)}" data-workplace-options="${catalog}"><div data-workplace-rows>${rows.map((item, i) => row(name, String(item.workplaceId || item.id || item.key || ''), options, item, costPerWorkplace, { rowLabel: i === 0 ? rowLabel : '', placeholder })).join('')}</div>${allowMultiple ? workplaceAddButton({ label: addLabel }) : ''}</div>`;
+  return `<div class="workplace-selector" data-workplace-selector="${escapeHtml(name)}" data-cost-per-workplace="${costPerWorkplace ? 'true' : 'false'}" data-workplace-options="${catalog}"><div data-workplace-rows>${row(name, first, options, selections[0], costPerWorkplace)}</div>${allowMultiple ? workplaceAddButton() : ''}</div>`;
 }
 
 export function initWorkplaceSelectors(root) {
@@ -75,10 +65,7 @@ export function initWorkplaceSelectors(root) {
       if (!rows) return;
       const options = JSON.parse(host.dataset.workplaceOptions || '[]');
       const withCost = host.dataset.costPerWorkplace === 'true';
-      rows.insertAdjacentHTML('beforeend', row(host.dataset.workplaceSelector, '', options, {}, withCost, {
-        rowLabel: '',
-        placeholder: host.dataset.workplacePlaceholder || 'Выбор рабочего места',
-      }));
+      rows.insertAdjacentHTML('beforeend', row(host.dataset.workplaceSelector, '', options, {}, withCost));
       const added = rows.lastElementChild;
       if (withCost && added) initCostFields(added);
     });
@@ -93,15 +80,13 @@ export function collectWorkplaceSelections(root, name = 'workplaces') {
   const host = root.querySelector(`[data-workplace-selector="${CSS.escape(name)}"]`);
   if (!host) return [];
   const options = JSON.parse(host.dataset.workplaceOptions || '[]');
-  const used = new Set();
   return [...host.querySelectorAll('[data-workplace-row]')].map((item) => {
     const input = item.querySelector('input[type="hidden"][data-workplace-value]');
     const workplaceId = String(input?.value || '');
-    if (!workplaceId || used.has(workplaceId) || !options.some((option) => option.value === workplaceId)) return null;
-    used.add(workplaceId);
+    if (!workplaceId) return null;
     const label = options.find((option) => option.value === workplaceId)?.label || '';
     const costHost = item.querySelector('[data-cost-field]');
-    return { workplaceId, name: label, ...(costHost ? { cost: collectCost(item, costHost.dataset.costField) } : {}) };
+    return { workplaceId, name: label, cost: costHost ? collectCost(item, costHost.dataset.costField) : {} };
   }).filter(Boolean);
 }
 
