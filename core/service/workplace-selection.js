@@ -1,5 +1,8 @@
-import { notificationSettings } from '../../ui/settings/index.js';
-import { escapeHtml } from '../../ui/utils/escape-html.js';
+import {
+  collectWorkplaceSelections,
+  initWorkplaceSelectors,
+  workplaceSelector,
+} from '../../ui/workplaces/index.js';
 import { getWorkplaces } from '../profile/workplaces/data.js';
 
 function workplaceId(value = {}) {
@@ -12,45 +15,43 @@ function selectedAssignmentMap(selected = []) {
     .filter(([id]) => Boolean(id)));
 }
 
-// Existing Shared checkbox list, consumed directly in the Service Q editors.
-// Selections are draft data and persist only with the editor's Save action.
-export function serviceWorkplaceChecklist(selected = [], { showStatus = false } = {}) {
-  const chosen = selectedAssignmentMap(selected);
-  const workplaces = getWorkplaces();
-  if (!workplaces.length) return '<div class="muted">Рабочих пространств пока нет.</div>';
-  return notificationSettings(workplaces.map((workplace) => ({
-    label: String(workplace.name || 'Рабочее пространство'),
-    checked: chosen.has(String(workplace.key || workplace.id || '')),
-    data: `data-service-workplace="${escapeHtml(String(workplace.key || workplace.id || ''))}"`,
-  })), { showStatus });
+// Use the existing Shared compact workplace picker inside Q.
+// The selection edits only the local draft, never the stored catalog.
+export function serviceWorkplaceSelector(selected = []) {
+  return workplaceSelector({
+    name: 'serviceWorkplaces',
+    selected,
+    workplaces: getWorkplaces(),
+    rowLabel: '',
+    placeholder: 'Выберите рабочее пространство',
+    addLabel: '+ Рабочее пространство',
+  });
 }
 
 export function bindServiceWorkplaceSelection(root, {
   selected = [],
   onChange = () => {},
 } = {}) {
-  const selectedAssignments = selectedAssignmentMap(selected);
-  const workplaces = getWorkplaces();
-  const inputs = [...root.querySelectorAll('[data-service-workplace]')];
+  const assignments = selectedAssignmentMap(selected);
+  const host = root.querySelector('[data-workplace-selector="serviceWorkplaces"]');
+  if (!host) return { read: () => [] };
+  initWorkplaceSelectors(root);
 
   const emit = () => {
-    const ids = new Set(inputs
-      .filter((input) => input.checked)
-      .map((input) => String(input.dataset.serviceWorkplace || ''))
-      .filter(Boolean));
-    const next = workplaces
-      .filter((workplace) => ids.has(String(workplace.key || workplace.id || '')))
-      .map((workplace) => {
-        const id = String(workplace.key || workplace.id || '');
-        return {
-          ...(selectedAssignments.get(id) || {}),
-          workplaceId: id,
-          name: String(workplace.name || ''),
-        };
+    const next = collectWorkplaceSelections(root, 'serviceWorkplaces')
+      .map(({ workplaceId: id, name }) => {
+        const original = assignments.get(id) || {};
+        const assignment = { ...original, workplaceId: id, name };
+        assignments.set(id, assignment); // preserve per-workplace pricing across a temporary removal
+        return assignment;
       });
     onChange(next);
+    return next;
   };
 
-  inputs.forEach((input) => input.addEventListener('change', emit));
+  host.addEventListener('change', emit);
+  host.addEventListener('click', (event) => {
+    if (event.target.closest('[data-add-workplace], [data-remove-workplace]')) emit();
+  });
   return { read: emit };
 }
