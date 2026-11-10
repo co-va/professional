@@ -1,5 +1,5 @@
 import { apiRequest } from '../auth.js';
-import { hydrateCashEntitiesFromServer, hydrateFinanceFromServer, hydrateWalletsFromServer } from '../finance/index.js';
+import { getWallets, hydrateCashEntitiesFromServer, hydrateFinanceFromServer, hydrateWalletsFromServer } from '../finance/index.js';
 import { hydrateProductsFromServer } from '../../core/service/products/data.js';
 import { hydrateTagsFromServer } from '../../settings/tags/data.js';
 import { hydrateCardAppearanceTemplates } from '../card-appearance-templates.js';
@@ -71,9 +71,26 @@ export async function loadAuxiliaryState(scope=''){
     const path=key==='all'?'/auxiliary-state':`/auxiliary-state/${encodeURIComponent(key)}`;
     const request=apiRequest(path)
       .then((response)=>payload(response,'Не удалось загрузить связанные данные'))
-      .then((remote)=>{if(epoch!==auxiliaryEpoch)return null;hydrateAuxiliary(remote);return remote;})
+      .then((remote)=>{
+        if(epoch!==auxiliaryEpoch)return null;
+        // Finance and loyalty explicitly include the canonical wallet catalog.
+        // A malformed response must not become a permanently cached success.
+        if((key==='finance'||key==='loyalty')&&!Array.isArray(remote?.wallets)){
+          throw new Error('Сервер не вернул список кошельков');
+        }
+        hydrateAuxiliary(remote);
+        return remote;
+      })
       .catch((error)=>{if(epoch===auxiliaryEpoch)auxiliaryStateLoads.delete(key);throw error;});
     auxiliaryStateLoads.set(key,request);
   }
   return auxiliaryStateLoads.get(key);
+}
+
+// Payment, correction, refund and Finance must enter through this loader,
+// never assume a previously opened Cash screen has hydrated the catalog.
+export async function loadWalletCatalog(){
+  const remote=await loadAuxiliaryState('finance');
+  if(!Array.isArray(remote?.wallets))throw new Error('Не удалось загрузить кошельки');
+  return getWallets();
 }
