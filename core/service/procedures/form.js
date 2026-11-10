@@ -1,7 +1,7 @@
 import { collectCost, costField, durationPicker, field, initCostFields, initDurationPickers, setSharedProfilePrimary, textareaField, v2ListEntries, v2ListEntry } from '../../../ui/ui.js';
 import { saveProcedure as saveProcedureData } from './data.js';
 import { flushBusinessPersistence } from '../../../core/business-persistence.js';
-import { bindServiceWorkplaceSelection, serviceWorkplaceChecklist } from '../workplace-selection.js';
+import { bindServiceWorkplaceSelection, serviceWorkplaceSelector } from '../workplace-selection.js';
 
 export function initialProcedure(existing = null, defaultWorkplace = null) {
   if (existing) return {
@@ -56,7 +56,7 @@ export function procedureEditorForm(procedure = initialProcedure()) {
     ${textareaField({ label: 'Описание', name: 'procedureDescription', value: procedure.description || '', placeholder: 'Описание услуги' })}
     <div class="field">
       <span>Рабочие пространства</span>
-      ${serviceWorkplaceChecklist(procedure.workplaces)}
+      ${serviceWorkplaceSelector(procedure.workplaces)}
     </div>
     <div class="form-error" data-procedure-editor-error></div>
   </form>`;
