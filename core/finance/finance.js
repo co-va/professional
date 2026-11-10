@@ -24,7 +24,7 @@ export function financeNavigationItems() {
 
 export function renderFinanceSection(root, section = 'cash', options = {}) {
   return import('../runtime/auxiliary-state.js')
-    .then(({ loadFinanceState }) => loadFinanceState({ full: true }))
+    .then(({ loadFinanceState, loadWalletCatalog }) => Promise.all([loadFinanceState(), loadWalletCatalog()]))
     .then(() => {
       if (section === 'dds') {
         return import('./dds/index.js').then(({ renderDDS }) => renderDDS(root));
