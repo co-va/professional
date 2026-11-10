@@ -54,10 +54,7 @@ export function procedureEditorForm(procedure = initialProcedure()) {
       })}
     </div>
     ${textareaField({ label: 'Описание', name: 'procedureDescription', value: procedure.description || '', placeholder: 'Описание услуги' })}
-    <div class="field">
-      <span>Рабочие пространства</span>
-      ${serviceWorkplaceSelector(procedure.workplaces)}
-    </div>
+    ${serviceWorkplaceSelector(procedure.workplaces)}
     <div class="form-error" data-procedure-editor-error></div>
   </form>`;
 }
