@@ -85,8 +85,8 @@ assert.equal(inputs.length, workplaces.length);
 assert.deepEqual(inputs.map((input) => input.checked), [true, false, false, false, false]);
 assert.match(options.content, /ui-compact-check/);
 assert.doesNotMatch(options.content, /app-notification-row|ui-select__control|workplace-select-row/);
-assert.equal((options.content.match(/Бьюти тория/g) || []).length, 1);
-assert.equal((options.content.match(/Фея/g) || []).length, 1);
+assert.equal((options.content.match(/<span class="ui-compact-check__label">Бьюти тория<\/span>/g) || []).length, 1);
+assert.equal((options.content.match(/<span class="ui-compact-check__label">Фея<\/span>/g) || []).length, 1);
 
 inputs[0].change(false);
 assert.deepEqual(draftChanges.at(-1), []);
