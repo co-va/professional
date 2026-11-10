@@ -1,5 +1,6 @@
 import { modal, mountModal } from '../../ui/ui.js';
 import { notificationSettings } from '../../ui/settings/index.js';
+import { escapeHtml } from '../../ui/utils/escape-html.js';
 import { getWorkplaces } from '../profile/workplaces/data.js';
 
 function workplaceId(value = {}) {
@@ -21,7 +22,7 @@ export function serviceWorkplaceChecklist(selected = [], { showStatus = false } 
   return notificationSettings(workplaces.map((workplace) => ({
     label: String(workplace.name || 'Рабочее пространство'),
     checked: chosen.has(String(workplace.key || workplace.id || '')),
-    data: `data-service-workplace="${String(workplace.key || workplace.id || '')}"`,
+    data: `data-service-workplace="${escapeHtml(String(workplace.key || workplace.id || ''))}"`,
   })), { showStatus });
 }
 
