@@ -15,9 +15,7 @@ import {
   modal,
   mountModal,
   mountV2ZLayer,
-  openSharedProfileSettingsMenu,
   page,
-  setSharedProfilePrimary,
   textareaField,
   v2ListEntries,
   v2ListEntry,
@@ -28,7 +26,8 @@ import { getSettlementItemTotals, getSettlementItemTotalsForRecords } from '../.
 import { getRecords } from '../../../core/record/index.js';
 import { getWorkplaces } from '../../profile/workplaces/data.js';
 import { serviceHeaderContext, notifyServiceContext } from '../context.js';
-import { openServiceWorkplaceSelection } from '../workplace-selection.js';
+import { bindServiceWorkplaceSelection, serviceWorkplaceChecklist } from '../workplace-selection.js';
+import { flushBusinessPersistence } from '../../../core/business-persistence.js';
 import { productCardAppearance, productCardFields, productCardPhoto } from '../card-presentation.js';
 import { deleteProduct as deleteProductData, getProducts, pushProductHistory, reorderProducts, saveProduct as saveProductData } from './data.js';
 
@@ -55,13 +54,6 @@ function activeProductRecords(productId, workplaceId = '') {
   return getRecords().filter((record) => record?.status !== 'cancelled'
     && (!workspace || String(record?.workplaceId || '') === workspace)
     && (record?.products || []).some((item) => String(item?.id || '') === id));
-}
-
-function updateProduct(current, patch) {
-  const next = { ...current, ...patch, updatedAt: new Date().toISOString() };
-  pushProductHistory(current, 'updated');
-  saveProductData(next);
-  return next;
 }
 
 function productRow(product) {
@@ -109,6 +101,9 @@ function productOverviewCard(product) {
     }),
     image: productCardPhoto(product),
     className: 'entity-visual-card--service',
+    interactive: true,
+    data: 'data-product-open-editor',
+    aria: `Редактировать товар ${product.name || ''}`,
   });
 }
 
@@ -131,102 +126,89 @@ function productWorkplaceCards(product) {
 }
 
 function confirmDeleteProduct(product, onDeleted) {
-  const layer = mountModal(document.body, modal(`<div class="modal-title"><h2>Удалить?</h2><p>${escapeHtml(product.name || 'Товар')} будет удалён.</p></div><div class="modal-actions">${button('Удалить', { variant: 'danger', data: 'data-confirm-delete-product' })}${button('Отмена', { variant: 'secondary', data: 'data-cancel-delete-product' })}</div>`, {
+  const layer = mountModal(document.body, modal(`<div class="modal-title"><h2>Удалить товар?</h2><p>${escapeHtml(product.name || 'Товар')} будет исключён из прайса. История сохранится.</p></div><div class="form-error" role="alert" data-product-delete-error></div><div class="modal-actions">${button('Удалить', { variant: 'danger', data: 'data-confirm-delete-product' })}${button('Отмена', { variant: 'secondary', data: 'data-cancel-delete-product' })}</div>`, {
     variant: 'x',
     title: 'Удаление товара',
   }));
-  if (!layer) return;
+  if (!layer) return null;
   layer.querySelector('[data-cancel-delete-product]')?.addEventListener('click', () => layer.v2Close?.());
-  layer.querySelector('[data-confirm-delete-product]')?.addEventListener('click', () => {
-    if (deleteProductData(product.id)) onDeleted?.();
-    layer.v2Close?.();
+  const confirm = layer.querySelector('[data-confirm-delete-product]');
+  confirm?.addEventListener('click', async () => {
+    if (confirm.disabled) return;
+    confirm.disabled = true;
+    try {
+      if (!deleteProductData(product.id)) throw new Error('Товар уже удалён.');
+      await flushBusinessPersistence();
+      layer.v2Close?.();
+      onDeleted?.();
+    } catch (error) {
+      const message = layer.querySelector('[data-product-delete-error]');
+      if (message) message.textContent = error instanceof Error ? error.message : 'Не удалось удалить товар.';
+      confirm.disabled = false;
+    }
   });
+  return layer;
 }
 
-function openProductOverviewSettings(layer, baseRoot, product, { onChanged = () => {} } = {}) {
-  return openSharedProfileSettingsMenu({
-    title: 'Настройки',
-    actions: [
-      {
-        id: 'workplaces',
-        label: 'Рабочие пространства',
-        onSelect: () => openServiceWorkplaceSelection({
-          selected: product.workplaces || [],
-          onChange: (workplaces) => {
-            product = updateProduct(product, { workplaces });
-            renderProductOverview(layer, baseRoot, product.id, { onChanged });
-          },
-        }),
-      },
-      {
-        id: 'editor',
-        label: 'Редактор товара',
-        onSelect: () => renderProductEditor(layer, baseRoot, product, { onChanged }),
-      },
-      {
-        id: 'delete',
-        label: 'Удалить',
-        variant: 'danger',
-        onSelect: () => confirmDeleteProduct(product, () => {
-          layer.v2Close?.();
-          onChanged();
-        }),
-      },
-    ],
-  });
-}
-
-function productEditorForm(existing = null) {
-  const product = initialProduct(existing);
+function productEditorForm(product) {
   return `<form class="compact-form" data-product-editor-form>
     ${field({ label: 'Название', name: 'productName', value: product.name || '', placeholder: 'Название товара', required: true })}
     ${costField({ value: product.cost || {}, name: 'productCost' })}
     ${textareaField({ label: 'Описание', name: 'productAbout', value: product.about || '', rows: 7, maxlength: 5000, placeholder: 'Описание товара' })}
-    <div class="form-error" data-product-editor-error></div>
+    <div class="field">
+      <span>Рабочие пространства</span>
+      ${serviceWorkplaceChecklist(product.workplaces)}
+    </div>
+    <div class="form-error" role="alert" data-product-editor-error></div>
   </form>`;
 }
 
-function editorDraftSettings(draft) {
-  return openSharedProfileSettingsMenu({
-    title: 'Настройки',
-    actions: [
-      {
-        id: 'workplaces',
-        label: 'Рабочие пространства',
-        onSelect: () => openServiceWorkplaceSelection({
-          selected: draft.workplaces || [],
-          onChange: (workplaces) => { draft.workplaces = workplaces; },
-        }),
-      },
-    ],
-  });
-}
-
-function renderProductEditor(layer, baseRoot, existing = null, { onChanged = () => {} } = {}) {
+// One editor for create, update, workplace assignments, and delete.
+// The service card opens Q directly; there is no V button menu or Z editor.
+export function openProductEditor(root, existing = null, {
+  onChanged = () => {},
+  onSaved = () => {},
+  onDeleted = () => {},
+} = {}) {
   const draft = initialProduct(existing);
-  layer.innerHTML = page([
-    serviceHeaderContext({
-      title: existing?.name || 'Новый товар',
-      settingsData: 'data-product-editor-settings',
-      settingsAria: 'Настройки товара',
-    }),
-    productEditorForm(existing),
+  const body = [
+    productEditorForm(draft),
     actionBlock(button('Сохранить', { type: 'button', data: 'data-product-editor-primary', aria: 'Сохранить товар' })),
-  ]);
+    existing ? `<div class="app-settings-panel">${button('Удалить товар', {
+      type: 'button',
+      variant: 'outline',
+      className: 'ui-button--delete-outline',
+      data: 'data-product-editor-delete',
+    })}</div>` : '',
+  ].join('');
+  const layer = mountModal(document.body, modal(body, {
+    title: existing?.name || 'Новый товар',
+    variant: 'q',
+    surface: 'app',
+    className: 'service-product-editor-layer',
+  }));
+  if (!layer) return null;
+
   initCostFields(layer);
-  layer.querySelector('[data-product-editor-settings]')?.addEventListener('click', () => editorDraftSettings(draft));
+  bindServiceWorkplaceSelection(layer, {
+    selected: draft.workplaces,
+    onChange: (workplaces) => { draft.workplaces = workplaces; },
+  });
 
   const form = layer.querySelector('[data-product-editor-form]');
   const primary = layer.querySelector('[data-product-editor-primary]');
-  const save = () => {
+  let saving = false;
+  const save = async () => {
+    if (saving || !form) return null;
     const data = new FormData(form);
     const name = String(data.get('productName') || '').trim();
     const error = layer.querySelector('[data-product-editor-error]');
     if (!name) {
       if (error) error.textContent = 'Укажите название товара.';
-      return;
+      return null;
     }
-    setSharedProfilePrimary(primary, { visible: true, label: 'Сохранить', disabled: true });
+    saving = true;
+    if (primary) primary.disabled = true;
     const item = {
       ...(existing || {}),
       id: existing?.id || crypto.randomUUID(),
@@ -238,24 +220,38 @@ function renderProductEditor(layer, baseRoot, existing = null, { onChanged = () 
       createdAt: existing?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
-    if (existing) pushProductHistory(existing, 'updated');
-    saveProductData(item);
-    if (existing) renderProductOverview(layer, baseRoot, item.id, { onChanged });
-    else {
-      layer.v2Close?.();
-      onChanged();
+    try {
+      if (existing) pushProductHistory(existing, 'updated');
+      saveProductData(item);
+      await flushBusinessPersistence();
+    } catch (failure) {
+      if (error) error.textContent = failure instanceof Error ? failure.message : 'Не удалось сохранить товар.';
+      return null;
+    } finally {
+      saving = false;
+      if (primary) primary.disabled = false;
     }
+    if (error) error.textContent = '';
+    layer.v2Close?.();
+    onSaved(item);
+    onChanged();
+    return item;
   };
-  primary?.addEventListener('click', save);
-  form?.addEventListener('submit', (event) => { event.preventDefault(); save(); });
-  setSharedProfilePrimary(primary, { visible: true, label: 'Сохранить' });
+  primary?.addEventListener('click', () => { void save(); });
+  form?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    void save();
+  });
+  if (existing) {
+    layer.querySelector('[data-product-editor-delete]')?.addEventListener('click', () => {
+      confirmDeleteProduct(existing, () => {
+        layer.v2Close?.();
+        onDeleted(existing);
+        onChanged();
+      });
+    });
+  }
   notifyServiceContext();
-}
-
-export function openProductEditor(root, existing = null, { onChanged = () => {} } = {}) {
-  const layer = mountV2ZLayer(root, v2ZLayer('', { className: 'service-product-editor-layer' }), { stack: true });
-  if (!layer) return null;
-  renderProductEditor(layer, root, existing, { onChanged });
   return layer;
 }
 
@@ -267,15 +263,19 @@ function renderProductOverview(layer, baseRoot, id, { onChanged = () => {} } = {
     return;
   }
   layer.innerHTML = page([
-    serviceHeaderContext({
-      title: product.name || 'Товар',
-      settingsData: 'data-product-settings',
-      settingsAria: `Настройки ${product.name || 'товара'}`,
-    }),
+    serviceHeaderContext({ title: product.name || 'Товар' }),
     productOverviewCard(product),
     productWorkplaceCards(product),
   ]);
-  layer.querySelector('[data-product-settings]')?.addEventListener('click', () => openProductOverviewSettings(layer, baseRoot, product, { onChanged }));
+  layer.querySelector('[data-product-open-editor]')?.addEventListener('click', () => {
+    openProductEditor(baseRoot, product, {
+      onSaved: (saved) => {
+        if (layer.isConnected) renderProductOverview(layer, baseRoot, saved.id, { onChanged });
+      },
+      onDeleted: () => layer.v2Close?.(),
+      onChanged,
+    });
+  });
   notifyServiceContext();
 }
 
