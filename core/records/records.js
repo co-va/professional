@@ -560,16 +560,13 @@ export function openRecords({
   };
 
   const openAddProcedure = () => {
+    const workplace = source.workplaces().find((item) => source.workplaceId(item) === state.workplaceId);
     openProcedureEditor(document.querySelector('[data-v2-app]') || document.body, null, {
-      onSaved: (created) => {
-        const workplace = source.workplaces().find((item) => source.workplaceId(item) === state.workplaceId);
-        assignProceduresToWorkplace({
-          procedureIds: [created.id],
-          workplaceId: state.workplaceId,
-          workplaceName: workplace?.name || workplace?.title || '',
-        });
-        renderProcedures();
+      defaultWorkplace: {
+        workplaceId: state.workplaceId,
+        name: workplace?.name || workplace?.title || '',
       },
+      onSaved: () => renderProcedures(),
     });
   };
 
