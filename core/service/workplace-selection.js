@@ -1,4 +1,3 @@
-import { modal, mountModal } from '../../ui/ui.js';
 import { notificationSettings } from '../../ui/settings/index.js';
 import { escapeHtml } from '../../ui/utils/escape-html.js';
 import { getWorkplaces } from '../profile/workplaces/data.js';
@@ -13,8 +12,8 @@ function selectedAssignmentMap(selected = []) {
     .filter(([id]) => Boolean(id)));
 }
 
-// The same existing Shared checkbox list is used inside Q editors and the
-// standalone X picker. Selection does not persist until its owner saves.
+// Existing Shared checkbox list, consumed directly in the Service Q editors.
+// Selections are draft data and persist only with the editor's Save action.
 export function serviceWorkplaceChecklist(selected = [], { showStatus = false } = {}) {
   const chosen = selectedAssignmentMap(selected);
   const workplaces = getWorkplaces();
@@ -54,21 +53,4 @@ export function bindServiceWorkplaceSelection(root, {
 
   inputs.forEach((input) => input.addEventListener('change', emit));
   return { read: emit };
-}
-
-export function openServiceWorkplaceSelection({
-  selected = [],
-  title = 'Рабочие пространства',
-  onChange = () => {},
-} = {}) {
-  const layer = mountModal(document.body, modal(
-    serviceWorkplaceChecklist(selected, { showStatus: true }), {
-      variant: 'x',
-      title,
-      className: 'modal--profile-settings-sheet modal--service-workplaces',
-    },
-  ));
-  if (!layer) return null;
-  bindServiceWorkplaceSelection(layer, { selected, onChange });
-  return layer;
 }
