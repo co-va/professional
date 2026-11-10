@@ -157,8 +157,9 @@ export function openProcedureEditor(root, existing = null, {
   onChanged = () => {},
   onSaved = () => {},
   onDeleted = () => {},
+  defaultWorkplace = null,
 } = {}) {
-  const draft = initialProcedure(existing);
+  const draft = initialProcedure(existing, defaultWorkplace);
   const body = [
     procedureEditorForm(draft),
     actionBlock(button('Сохранить', { type: 'button', data: 'data-procedure-editor-primary', aria: 'Сохранить услугу' })),
