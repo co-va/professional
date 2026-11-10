@@ -12,7 +12,6 @@ import {
   modal,
   mountModal,
   mountV2ZLayer,
-  openSharedProfileSettingsMenu,
   page,
   v2ListEntries,
   v2ListEntry,
@@ -23,10 +22,10 @@ import { getSettlementItemTotals, getSettlementItemTotalsForRecords } from '../.
 import { getRecordsForProcedure } from '../../../core/record/index.js';
 import { getWorkplaces } from '../../profile/workplaces/data.js';
 import { serviceHeaderContext, notifyServiceContext } from '../context.js';
-import { openServiceWorkplaceSelection } from '../workplace-selection.js';
 import { procedureCardAppearance, procedureCardFields, procedureCardPhoto } from '../card-presentation.js';
 import { bindProcedureEditor, initialProcedure, procedureEditorForm } from './form.js';
-import { deleteProcedure as deleteProcedureData, getProcedures, reorderProcedures, saveProcedure as saveProcedureData } from './data.js';
+import { deleteProcedure as deleteProcedureData, getProcedures, reorderProcedures } from './data.js';
+import { flushBusinessPersistence } from '../../../core/business-persistence.js';
 
 const money = (value) => `${new Intl.NumberFormat('ru-RU').format(Number(value || 0))} ₽`;
 
@@ -49,12 +48,6 @@ function spentText(minutes) {
   if (!hours) return `${rest} мин`;
   if (!rest) return `${hours} ч`;
   return `${hours} ч ${rest} мин`;
-}
-
-function updateProcedure(current, patch) {
-  const next = { ...current, ...patch, updatedAt: new Date().toISOString() };
-  saveProcedureData(next);
-  return next;
 }
 
 function procedureRow(procedure) {
@@ -102,6 +95,9 @@ function procedureOverviewCard(procedure, records) {
     }),
     image: procedureCardPhoto(procedure),
     className: 'entity-visual-card--service',
+    interactive: true,
+    data: 'data-procedure-open-editor',
+    aria: `Редактировать услугу ${procedure.name || ''}`,
   });
 }
 
@@ -131,100 +127,74 @@ function procedureWorkplaceCards(procedure, records) {
 }
 
 function confirmDeleteProcedure(procedure, onDeleted) {
-  const layer = mountModal(document.body, modal(`<div class="modal-title"><h2>Удалить?</h2><p>${escapeHtml(procedure.name || 'Услуга')} будет удалена.</p></div><div class="modal-actions">${button('Удалить', { variant: 'danger', data: 'data-confirm-delete-procedure' })}${button('Отмена', { variant: 'secondary', data: 'data-cancel-delete-procedure' })}</div>`, {
+  const layer = mountModal(document.body, modal(`<div class="modal-title"><h2>Удалить услугу?</h2><p>${escapeHtml(procedure.name || 'Услуга')} будет исключена из прайса и новой записи. История сохранится.</p></div><div class="form-error" role="alert" data-procedure-delete-error></div><div class="modal-actions">${button('Удалить', { variant: 'danger', data: 'data-confirm-delete-procedure' })}${button('Отмена', { variant: 'secondary', data: 'data-cancel-delete-procedure' })}</div>`, {
     variant: 'x',
     title: 'Удаление услуги',
   }));
-  if (!layer) return;
+  if (!layer) return null;
   layer.querySelector('[data-cancel-delete-procedure]')?.addEventListener('click', () => layer.v2Close?.());
-  layer.querySelector('[data-confirm-delete-procedure]')?.addEventListener('click', () => {
-    if (deleteProcedureData(procedure.id)) onDeleted?.();
-    layer.v2Close?.();
+  const confirm = layer.querySelector('[data-confirm-delete-procedure]');
+  confirm?.addEventListener('click', async () => {
+    if (confirm.disabled) return;
+    confirm.disabled = true;
+    try {
+      if (!deleteProcedureData(procedure.id)) throw new Error('Услуга уже удалена.');
+      await flushBusinessPersistence();
+      layer.v2Close?.();
+      onDeleted?.();
+    } catch (error) {
+      const message = layer.querySelector('[data-procedure-delete-error]');
+      if (message) message.textContent = error instanceof Error ? error.message : 'Не удалось удалить услугу.';
+      confirm.disabled = false;
+    }
   });
+  return layer;
 }
 
-function openProcedureOverviewSettings(layer, baseRoot, procedure, { onChanged = () => {} } = {}) {
-  return openSharedProfileSettingsMenu({
-    title: 'Настройки',
-    actions: [
-      {
-        id: 'workplaces',
-        label: 'Рабочие пространства',
-        onSelect: () => openServiceWorkplaceSelection({
-          selected: procedure.workplaces || [],
-          onChange: (workplaces) => {
-            procedure = updateProcedure(procedure, { workplaces });
-            renderProcedureOverview(layer, baseRoot, procedure.id, { onChanged });
-          },
-        }),
-      },
-      {
-        id: 'editor',
-        label: 'Редактор услуги',
-        onSelect: () => renderProcedureEditor(layer, baseRoot, procedure, { onChanged }),
-      },
-      {
-        id: 'delete',
-        label: 'Удалить',
-        variant: 'danger',
-        onSelect: () => confirmDeleteProcedure(procedure, () => {
-          layer.v2Close?.();
-          onChanged();
-        }),
-      },
-    ],
-  });
-}
-
-function editorDraftSettings(draft) {
-  return openSharedProfileSettingsMenu({
-    title: 'Настройки',
-    actions: [
-      {
-        id: 'workplaces',
-        label: 'Рабочие пространства',
-        onSelect: () => openServiceWorkplaceSelection({
-          selected: draft.workplaces || [],
-          onChange: (workplaces) => { draft.workplaces = workplaces; },
-        }),
-      },
-    ],
-  });
-}
-
-function renderProcedureEditor(layer, baseRoot, existing = null, { onChanged = () => {}, onSaved = () => {} } = {}) {
+// The service Q editor owns editing, workplace assignment and deletion.
+// Neither overview nor editor needs a V/settings menu.
+export function openProcedureEditor(root, existing = null, {
+  onChanged = () => {},
+  onSaved = () => {},
+  onDeleted = () => {},
+} = {}) {
   const draft = initialProcedure(existing);
-  const title = existing?.name || 'Новая услуга';
-  layer.innerHTML = page([
-    serviceHeaderContext({
-      title,
-      settingsData: 'data-procedure-editor-settings',
-      settingsAria: 'Настройки услуги',
-    }),
-    procedureEditorForm(existing),
+  const body = [
+    procedureEditorForm(draft),
     actionBlock(button('Сохранить', { type: 'button', data: 'data-procedure-editor-primary', aria: 'Сохранить услугу' })),
-  ]);
-
-  layer.querySelector('[data-procedure-editor-settings]')?.addEventListener('click', () => editorDraftSettings(draft));
+    existing ? `<div class="app-settings-panel">${button('Удалить услугу', {
+      type: 'button',
+      variant: 'outline',
+      className: 'ui-button--delete-outline',
+      data: 'data-procedure-editor-delete',
+    })}</div>` : '',
+  ].join('');
+  const layer = mountModal(document.body, modal(body, {
+    title: existing?.name || 'Новая услуга',
+    variant: 'q',
+    surface: 'app',
+    className: 'service-procedure-editor-layer',
+  }));
+  if (!layer) return null;
   bindProcedureEditor(layer, {
     existing,
     draft,
     onSaved: (saved) => {
+      layer.v2Close?.();
       onSaved(saved);
-      if (existing) renderProcedureOverview(layer, baseRoot, saved.id, { onChanged });
-      else {
-        layer.v2Close?.();
-        onChanged();
-      }
+      onChanged();
     },
   });
+  if (existing) {
+    layer.querySelector('[data-procedure-editor-delete]')?.addEventListener('click', () => {
+      confirmDeleteProcedure(existing, () => {
+        layer.v2Close?.();
+        onDeleted(existing);
+        onChanged();
+      });
+    });
+  }
   notifyServiceContext();
-}
-
-export function openProcedureEditor(root, existing = null, { onChanged = () => {}, onSaved = () => {} } = {}) {
-  const layer = mountV2ZLayer(root, v2ZLayer('', { className: 'service-procedure-editor-layer' }), { stack: true });
-  if (!layer) return null;
-  renderProcedureEditor(layer, root, existing, { onChanged, onSaved });
   return layer;
 }
 
@@ -238,15 +208,19 @@ function renderProcedureOverview(layer, baseRoot, id, { onChanged = () => {} } =
   // Project Record/Finance once per opened entity, not once per workplace card.
   const records = activeProcedureRecords(procedure.id);
   layer.innerHTML = page([
-    serviceHeaderContext({
-      title: procedure.name || 'Услуга',
-      settingsData: 'data-procedure-settings',
-      settingsAria: `Настройки ${procedure.name || 'услуги'}`,
-    }),
+    serviceHeaderContext({ title: procedure.name || 'Услуга' }),
     procedureOverviewCard(procedure, records),
     procedureWorkplaceCards(procedure, records),
   ]);
-  layer.querySelector('[data-procedure-settings]')?.addEventListener('click', () => openProcedureOverviewSettings(layer, baseRoot, procedure, { onChanged }));
+  layer.querySelector('[data-procedure-open-editor]')?.addEventListener('click', () => {
+    openProcedureEditor(baseRoot, procedure, {
+      onSaved: (saved) => {
+        if (layer.isConnected) renderProcedureOverview(layer, baseRoot, saved.id, { onChanged });
+      },
+      onDeleted: () => layer.v2Close?.(),
+      onChanged,
+    });
+  });
   notifyServiceContext();
 }
 
