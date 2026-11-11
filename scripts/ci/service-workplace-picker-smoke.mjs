@@ -18,19 +18,24 @@ const snapshot = new Function(moduleSource(signature) +
   'return { procedureEditorSignature, rebaseWorkplaceAssignmentSignature };')();
 
 assert.match(selection, /data-service-workplace-add/);
+assert.match(selection, /\+ Рабочее пространство/);
 assert.match(selection, /data-service-workplace-choose/);
 assert.match(selection, /data-service-workplace-prices/);
-assert.match(selection, /v2ListEntries\(read\(\)/);
-assert.match(selection, /v2ListEntries\(available\.map/);
+assert.match(selection, /sharedList\(\{ className: 'ui-list--dense', items: read\(\)/);
+assert.match(selection, /sharedList\(\{ className: 'ui-list--dense', items: available\.map/);
 assert.doesNotMatch(selection, /service-workplace-price-row|service-workplace-add-option/);
 assert.match(selection, /data-service-workplace-editor/);
 assert.match(selection, /durationPicker\(\{/);
 assert.match(selection, /costField\(\{/);
 assert.match(selection, /textareaField\(\{/);
 assert.match(selection, /data-local-online/);
-assert.match(selection, /data-local-group/);
+assert.match(selection, /data-local-group-toggle/);
+assert.match(selection, /procedureGroupBookingFields\(/);
+assert.match(selection, /bindProcedureGroupBooking\(/);
 assert.doesNotMatch(selection, /data-service-workplace-options|selectedIds|compactCheck\(\{\s*label: space\.name/);
 assert.match(procedureForm, /data-procedure-online-check/);
+assert.match(procedureForm, /procedureGroupBookingFields\(/);
+assert.match(procedureForm, /bindProcedureGroupBooking\(/);
 assert.match(procedureForm, /serviceWorkplaceAssignmentList\(/);
 assert.match(procedureForm, /bindServiceWorkplaceAssignments\(/);
 assert.match(productEditor, /bindServiceWorkplaceAssignments\(/);
@@ -40,6 +45,15 @@ assert.match(persistence, /function changeServiceItemWorkplace/);
 assert.ok(procedureEditor.indexOf('serviceWorkplaceAddButton()') < procedureEditor.indexOf('data-procedure-editor-delete'));
 assert.ok(productEditor.indexOf('serviceWorkplaceAddButton()') < productEditor.indexOf('data-product-editor-delete'));
 assert.match(recordEditor, /procedureDurationForWorkplace/);
+assert.match(read('core/service/workplace-selection.css'), /service-workplace-add-button\{white-space:nowrap\}/);
+assert.match(read('core/service/workplace-selection.css'), /service-workplace-add-panel\{margin-top:16px;margin-bottom:16px\}/);
+const groupBookingUi = read('core/service/procedures/group-booking-ui.js');
+assert.match(groupBookingUi, /function procedureGroupBookingFields/);
+assert.match(groupBookingUi, /function bindProcedureGroupBooking/);
+assert.match(groupBookingUi, /v2ListEntry\(\{/);
+assert.match(groupBookingUi, /Максимум людей/);
+assert.doesNotMatch(selection, /compactCheck\(\{ label: 'Групповая запись'/);
+
 
 const procedure = {
   name: 'Укладка', duration: 30, breakDuration: 5, description: 'Основа',

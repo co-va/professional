@@ -4,3 +4,9 @@
 .service-workplace-price-editor__actions{display:grid;gap:8px}
 .service-workplace-price-editor [hidden]{display:none!important}
 .service-workplace-extra{display:grid;gap:10px}
+
+/* Keep the shared secondary action on one line at phone widths. */
+.service-workplace-add-button{white-space:nowrap}
+
+/* Independent controls must never visually touch the destructive action. */
+.service-workplace-add-panel{margin-top:16px;margin-bottom:16px}

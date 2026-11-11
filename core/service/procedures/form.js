@@ -1,9 +1,10 @@
-import { collectCost, validateCostDefinition, costField, durationPicker, field, initCostFields, initDurationPickers, setSharedProfilePrimary, textareaField, v2ListEntries, v2ListEntry } from '../../../ui/ui.js';
+import { collectCost, validateCostDefinition, costField, durationPicker, field, initCostFields, initDurationPickers, setSharedProfilePrimary, textareaField } from '../../../ui/ui.js';
 import { getProcedures, commitProcedure, commitProcedureWorkplace } from './data.js';
 import { setSharedActionVisible } from '../../../ui/page/page.js';
 import { procedureEditorSignature, rebaseWorkplaceAssignmentSignature } from '../editor-signature.js';
 import { bindServiceWorkplaceAssignments, serviceWorkplaceAssignmentList } from '../workplace-selection.js';
 import { compactCheck } from '../../../ui/selection/check-list.js';
+import { procedureGroupBookingFields, bindProcedureGroupBooking } from './group-booking-ui.js';
 
 export function initialProcedure(existing = null, defaultWorkplace = null) {
   if (existing) return {
@@ -37,26 +38,13 @@ export function procedureEditorForm(procedure = initialProcedure()) {
     </div>
     ${costField({ value: procedure.cost || {}, name: 'procedureCost' })}
     ${textareaField({ label: 'Описание', name: 'procedureDescription', value: procedure.description || '', placeholder: 'Описание услуги' })}
-    ${v2ListEntries([v2ListEntry({
-      title: 'Групповая запись',
-      subtitle: 'Разрешить запись нескольких людей',
-      interactive: false,
+    ${procedureGroupBookingFields({
+      enabled: procedure.groupBooking.enabled,
+      capacity: procedure.groupBooking.capacity,
       toggleData: 'data-procedure-group-toggle',
-      toggleAria: 'Групповая запись',
-      toggleChecked: procedure.groupBooking.enabled,
-    })])}
-    <div data-procedure-group-capacity${procedure.groupBooking.enabled ? '' : ' hidden'}>
-      ${field({
-        label: 'Максимум людей',
-        name: 'procedureGroupCapacity',
-        type: 'number',
-        value: String(procedure.groupBooking.capacity),
-        min: '2',
-        max: '999',
-        step: '1',
-        inputmode: 'numeric',
-      })}
-    </div>
+      capacityData: 'data-procedure-group-capacity',
+      capacityName: 'procedureGroupCapacity',
+    })}
     ${compactCheck({ label: 'Для онлайн-записи', checked: procedure.visibleInPublicBooking !== false, data: 'data-procedure-online-check' })}
     ${serviceWorkplaceAssignmentList()}
     <div class="form-error" data-procedure-editor-error></div>
@@ -140,24 +128,18 @@ export function bindProcedureEditor(root, {
     },
   });
 
-  const groupToggle = root.querySelector('[data-procedure-group-toggle]');
-  const groupCapacityHost = root.querySelector('[data-procedure-group-capacity]');
-  const syncGroupBooking = () => {
-    const enabled = draft.groupBooking?.enabled === true;
-    groupToggle?.setAttribute('aria-pressed', String(enabled));
-    groupToggle?.classList.toggle('is-on', enabled);
-    groupToggle?.querySelector('.app-setting-toggle__switch')?.classList.toggle('is-on', enabled);
-    if (groupCapacityHost) groupCapacityHost.hidden = !enabled;
-  };
-  groupToggle?.addEventListener('click', () => {
-    draft.groupBooking = {
-      enabled: draft.groupBooking?.enabled !== true,
-      capacity: Math.max(2, Math.floor(Number(draft.groupBooking?.capacity) || 2)),
-    };
-    syncGroupBooking();
-    syncDirty();
+  bindProcedureGroupBooking(root, {
+    toggleSelector: '[data-procedure-group-toggle]',
+    capacitySelector: '[data-procedure-group-capacity]',
+    isEnabled: () => draft.groupBooking?.enabled === true,
+    toggle: () => {
+      draft.groupBooking = {
+        enabled: draft.groupBooking?.enabled !== true,
+        capacity: Math.max(2, Math.floor(Number(draft.groupBooking?.capacity) || 2)),
+      };
+    },
+    onChange: syncDirty,
   });
-  syncGroupBooking();
   onlineCheck?.addEventListener('change', syncDirty);
 
   form.addEventListener('input', syncDirty);

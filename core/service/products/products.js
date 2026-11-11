@@ -161,7 +161,7 @@ export function openProductEditor(root, existing = null, {
   const body = [
     productEditorForm(draft),
     actionBlock(button('Сохранить', { type: 'button', data: 'data-product-editor-primary', aria: 'Сохранить товар' })),
-    `<div class="app-settings-panel">${serviceWorkplaceAddButton()}</div>`,
+    `<div class="app-settings-panel service-workplace-add-panel">${serviceWorkplaceAddButton()}</div>`,
     existing ? `<div class="app-settings-panel">${button('Удалить товар', {
       type: 'button',
       variant: 'outline',

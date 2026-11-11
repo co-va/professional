@@ -132,7 +132,7 @@ export function openProcedureEditor(root, existing = null, {
   const body = [
     procedureEditorForm(draft),
     actionBlock(button('Сохранить', { type: 'button', data: 'data-procedure-editor-primary', aria: 'Сохранить услугу' })),
-    `<div class="app-settings-panel">${serviceWorkplaceAddButton()}</div>`,
+    `<div class="app-settings-panel service-workplace-add-panel">${serviceWorkplaceAddButton()}</div>`,
     existing ? `<div class="app-settings-panel">${button('Удалить услугу', {
       type: 'button',
       variant: 'outline',

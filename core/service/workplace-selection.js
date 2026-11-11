@@ -5,7 +5,8 @@ import { collectCost, costField, initCostFields, validateCostDefinition, costLis
 import { durationPicker, durationText, initDurationPickers } from '../../ui/duration/index.js';
 import { field, textareaField } from '../../ui/inputs/index.js';
 import { compactCheck } from '../../ui/selection/check-list.js';
-import { v2ListEntry, v2ListEntries } from '../../ui/lists/list-entry.js';
+import { list as sharedList } from '../../ui/lists/list.js';
+import { procedureGroupBookingFields, bindProcedureGroupBooking } from './procedures/group-booking-ui.js';
 import { costSnapshot } from './editor-signature.js';
 import { getWorkplaces } from '../profile/workplaces/data.js';
 
@@ -36,8 +37,8 @@ export function serviceWorkplaceAssignmentList() {
 }
 
 export function serviceWorkplaceAddButton() {
-  return button('Добавить рабочее пространство', {
-    variant: 'secondary', data: 'data-service-workplace-add',
+  return button('+ Рабочее пространство', {
+    variant: 'secondary', className: 'service-workplace-add-button', data: 'data-service-workplace-add',
   });
 }
 
@@ -64,20 +65,20 @@ export function bindServiceWorkplaceAssignments(root, {
   }));
   const render = () => {
     const base = getBase();
-    list.innerHTML = v2ListEntries(read()
+    list.innerHTML = sharedList({ className: 'ui-list--dense', items: read()
       .filter((item) => catalog.some((space) => space.id === item.workplaceId))
       .map((item) => {
         const cost = hasPrice(item.cost) ? item.cost : base.cost;
         const duration = minutes(item.duration ?? base.duration);
-        const subtitle = isProcedure ? `${durationText(duration)} · ${costText(cost)}` : costText(cost);
-        return v2ListEntry({
+        const summary = isProcedure ? `${durationText(duration)} · ${costText(cost)}` : costText(cost);
+        return {
           title: item.name,
-          initial: String(item.name || '?').slice(0, 1).toUpperCase(),
-          subtitle,
+          secondary: summary,
+          interactive: true,
           data: `data-service-workplace-open="${escapeHtml(item.workplaceId)}"`,
           aria: `Настройки ${item.name}`,
-        });
-      }));
+        };
+      }) });
   };
   const publish = () => { render(); onChange(read()); };
 
@@ -118,11 +119,13 @@ export function bindServiceWorkplaceAssignments(root, {
       ${textareaField({ label: 'Описание', name: 'localDescription', value: values.description, rows: 3 })}
       ${isProcedure ? `<div class="service-workplace-extra">
         ${compactCheck({ label: 'Для онлайн-записи', checked: values.visibleInPublicBooking !== false, data: 'data-local-online' })}
-        ${compactCheck({ label: 'Групповая запись', checked: values.groupBooking.enabled === true, data: 'data-local-group' })}
-        <div data-local-group-count${values.groupBooking.enabled === true ? '' : ' hidden'}>
-          ${field({ label: 'Максимум людей', name: 'localCapacity', type: 'number',
-            value: String(values.groupBooking.capacity || 2), min: '2', max: '999', step: '1', inputmode: 'numeric' })}
-        </div>
+        ${procedureGroupBookingFields({
+          enabled: values.groupBooking.enabled === true,
+          capacity: values.groupBooking.capacity,
+          toggleData: 'data-local-group-toggle',
+          capacityData: 'data-local-group-count',
+          capacityName: 'localCapacity',
+        })}
       </div>` : ''}
       <div class="form-error" role="alert" data-service-workplace-error></div>
       <div class="service-workplace-price-editor__actions">
@@ -143,8 +146,9 @@ export function bindServiceWorkplaceAssignments(root, {
     initCostFields(layer);
     if (isProcedure) initDurationPickers(layer);
     let saving = false;
+    let localGroupEnabled = values.groupBooking.enabled === true;
     const readValues = () => {
-      const groupEnabled = layer.querySelector('[data-local-group]')?.checked ?? false;
+      const groupEnabled = localGroupEnabled;
       return {
         cost: collectCost(layer, 'workplaceCost'),
         duration: isProcedure ? Number(layer.querySelector('[name="localDuration"]')?.value || 0) : 0,
@@ -165,10 +169,12 @@ export function bindServiceWorkplaceAssignments(root, {
         .forEach((node) => { node.disabled = saving; });
       return changed;
     };
-    const groupCheck = layer.querySelector('[data-local-group]');
-    groupCheck?.addEventListener('change', () => {
-      const capacity = layer.querySelector('[data-local-group-count]');
-      if (capacity) capacity.hidden = !groupCheck.checked;
+    if (isProcedure) bindProcedureGroupBooking(layer, {
+      toggleSelector: '[data-local-group-toggle]',
+      capacitySelector: '[data-local-group-count]',
+      isEnabled: () => localGroupEnabled,
+      toggle: () => { localGroupEnabled = !localGroupEnabled; },
+      onChange: sync,
     });
     layer.addEventListener('input', sync);
     layer.addEventListener('change', sync);
@@ -244,13 +250,12 @@ export function bindServiceWorkplaceAssignments(root, {
         { variant: 'x', xRole: 'picker' }));
       return layer;
     }
-    const content = v2ListEntries(available.map((space) => v2ListEntry({
+    const content = sharedList({ className: 'ui-list--dense', items: available.map((space) => ({
       title: space.name,
-      initial: String(space.name || '?').slice(0, 1).toUpperCase(),
-      omitEmptySubtitle: true,
+      interactive: true,
       data: `data-service-workplace-choose="${escapeHtml(space.id)}"`,
-      aria: `Добавить ${space.name}`,
-    })));
+      aria: `Выбрать ${space.name}`,
+    })) });
     const picker = mountModal(document.body, modal(content, { variant: 'x', xRole: 'picker', title: 'Рабочее пространство' }));
     picker?.querySelectorAll('[data-service-workplace-choose]').forEach((choice) => {
       choice.addEventListener('click', () => {
