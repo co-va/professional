@@ -17,6 +17,7 @@ export function openEntityCardAppearanceQ(root, {
   initialType = '',
   targetLabel = 'Карта',
   initialTarget = 'all',
+  defaultTarget = () => 'all',
   targetOptions = () => [],
   resolve = () => ({}),
   save = async () => {},
@@ -43,6 +44,7 @@ export function openEntityCardAppearanceQ(root, {
     const targets = Array.isArray(targetOptions(type)) ? targetOptions(type).filter(Boolean) : [];
     target = targets.length ? optionValue(targets, target) : '';
     const editor = resolve(type, target) || {};
+    const canEditPhoto = typeof allowPhoto === 'function' ? Boolean(allowPhoto(type, target)) : Boolean(allowPhoto);
     const typeSelector = types.length > 1 ? select({
       name: 'entityCardAppearanceType',
       label: '',
@@ -75,7 +77,7 @@ export function openEntityCardAppearanceQ(root, {
 
     headerHost.querySelector('[name="entityCardAppearanceType"]')?.addEventListener('change', (event) => {
       type = String(event.target.value || '');
-      target = 'all';
+      target = String(defaultTarget(type) || 'all');
       render();
     });
     headerHost.querySelector('[name="entityCardAppearanceTarget"]')?.addEventListener('change', (event) => {
@@ -97,7 +99,7 @@ export function openEntityCardAppearanceQ(root, {
       fields: editor.fields || [],
       photo: editor.photo || '',
       photoPosition: editor.photoPosition || '50% 50%',
-      allowPhoto,
+      allowPhoto: canEditPhoto,
       onSave: async ({ appearance, photo }) => {
         await save({ type, target, appearance, photo, editor });
         layer.v2Close?.();

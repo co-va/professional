@@ -157,8 +157,10 @@ export function openProfileAppearanceQ(root,{onSaved=null,navigateBack=()=>{},op
     initialType:'profile',
     targetLabel:'Рабочее пространство',
     initialTarget:'all',
+    defaultTarget:(type)=>type==='workplace'?workplaces()[0]?.key||'all':'all',
+    allowPhoto:(type,target)=>type==='profile'||(type==='workplace'&&target!=='all'),
     targetOptions:(type)=>type==='workplace'
-      ? [{value:'all',label:'Все рабочие пространства'},...workplaces().map((item)=>({value:item.key,label:item.name||'Рабочее пространство'}))]
+      ? [{value:'all',label:'Общий вид'},...workplaces().map((item)=>({value:item.key,label:item.name||'Рабочее пространство'}))]
       : [],
     resolve:(type,target)=>{
       const p=getProfile();
@@ -178,8 +180,8 @@ export function openProfileAppearanceQ(root,{onSaved=null,navigateBack=()=>{},op
       return {
         appearance:target==='all' && template?.appearance ? template.appearance : workplaceCardAppearance(sample),
         fields:workplaceCardFields(sample,p),
-        photo:target==='all' ? String(template?.photo||sample.photo||'') : workplaceCardPhoto(sample),
-        photoPosition:target==='all' ? String(template?.photoPosition||'50% 50%') : `${crop(sample.photoCropX)}% ${crop(sample.photoCropY)}%`,
+        photo:String(sample.photo||''),
+        photoPosition:`${crop(sample.photoCropX)}% ${crop(sample.photoCropY)}%`,
       };
     },
     save:async({type,target,appearance,photo,editor})=>{
@@ -191,8 +193,10 @@ export function openProfileAppearanceQ(root,{onSaved=null,navigateBack=()=>{},op
       if(target==='all'){
         saveCardAppearanceTemplate('workplace',{
           appearance,
-          photo,
-          photoPosition:editor?.photoPosition||'50% 50%',
+          // The common View configures presentation only. It must never copy
+          // the example workplace's photo into every other workplace.
+          photo:getCardAppearanceTemplate('workplace')?.photo||'',
+          photoPosition:getCardAppearanceTemplate('workplace')?.photoPosition||'50% 50%',
         });
         const values=workplaces().map((item)=>({...item,cardAppearance:{}}));
         if(values.length)await saveWorkplaces(values);

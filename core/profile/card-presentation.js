@@ -98,5 +98,7 @@ export function workplaceCardAppearance(workplace = {}) {
 }
 
 export function workplaceCardPhoto(workplace = {}) {
-  return String(workplace.photo || getCardAppearanceTemplate('workplace')?.photo || '');
+  // Photo belongs to the concrete Workplace, not the common presentation
+  // template. Empty means removed; never resurrect it via global fallback.
+  return String(workplace.photo || '');
 }

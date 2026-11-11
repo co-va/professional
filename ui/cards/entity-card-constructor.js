@@ -1,5 +1,5 @@
 import { escapeHtml } from '../utils/escape-html.js';
-import { selectPhotoFile } from '../inputs/index.js';
+import { photoFileDataUrl } from '../inputs/index.js';
 import { button } from '../buttons/index.js';
 import { select } from '../selectors/index.js';
 import { colorPicker, initColorPickers, openColorPickerAction } from '../colors/index.js';
@@ -167,8 +167,14 @@ function fieldControl(line,fields){
 
 function editorWorkspace(state,fields,allowPhoto=true){
   if(allowPhoto && state.tab==='photo'){
+    const label=state.photo?'Заменить фото':'Добавить фото';
+    // Native file input receives the tap directly. Programmatic input.click()
+    // on a hidden detached picker can fail without feedback in iOS WebKit.
     return `<div class="entity-card-editor__photo">
-      ${button(state.photo?'Заменить фото':'Добавить фото',{variant:'secondary',data:'data-card-photo-select'})}
+      <label class="ui-button ui-button--secondary entity-card-editor__photo-select">
+        ${escapeHtml(label)}
+        <input type="file" accept="image/*" data-card-photo-input aria-label="${escapeHtml(label)}">
+      </label>
       ${state.photo?button('Удалить фото',{variant:'outline',className:'ui-button--delete-outline',data:'data-card-photo-remove'}):''}
     </div>`;
   }
@@ -338,13 +344,22 @@ export function mountEntityCardConstructor(root,{appearance={},fields=[],photo='
       markDirty();
     });
 
-    root.querySelector('[data-card-photo-select]')?.addEventListener('click',async()=>{
-      const src=await selectPhotoFile().catch(()=> '');
-      if(!src)return;
-      state.photo=src;
-      onPhotoChange(state.photo);
-      markDirty();
-      render();
+    root.querySelector('[data-card-photo-input]')?.addEventListener('change',async(event)=>{
+      const file=event.currentTarget.files?.[0];
+      if(!file)return;
+      try{
+        const src=await photoFileDataUrl(file);
+        if(!root.isConnected || !src)return;
+        state.photo=src;
+        state.error='';
+        onPhotoChange(src);
+        markDirty();
+        render();
+      }catch(error){
+        if(!root.isConnected)return;
+        state.error=error instanceof Error?error.message:'Не удалось прочитать фото';
+        render();
+      }
     });
 
     root.querySelector('[data-card-photo-remove]')?.addEventListener('click',()=>{

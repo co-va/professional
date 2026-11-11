@@ -145,7 +145,7 @@ function photoCropPosition(value) {
   const numeric = Number(value);
   return Number.isFinite(numeric) ? Math.max(0, Math.min(100, Math.round(numeric))) : 50;
 }
-function photoFileDataUrl(file) {
+export function photoFileDataUrl(file) {
   return new Promise((resolve, reject) => {
     if (!file) {
       resolve('');

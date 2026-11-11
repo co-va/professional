@@ -141,3 +141,7 @@
   .entity-card-editor__line-picker button{font-size:11px}
   .entity-card-editor__tool{font-size:11px}
 }
+
+/* The iOS file picker is opened by its own native control, not JS input.click(). */
+.entity-card-editor__photo-select{position:relative;display:grid;place-items:center;cursor:pointer;overflow:hidden}
+.entity-card-editor__photo-select [data-card-photo-input]{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
