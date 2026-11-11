@@ -83,9 +83,24 @@ function notifyProfileChanged(detail = {}) {
 }
 
 export function hydrateProfileFromServer(profile = {}, customProfessions = [], professionCatalog = []) {
+  const previous = profileState;
   profileState = normalizeProfile(profile);
   customProfessionsState = normalizeCustomProfessions(customProfessions);
   professionCatalogState = normalizeProfessionCatalog(professionCatalog);
+
+  // The shared Header A reads the canonical profile cache. Refresh its avatar
+  // as soon as the API hydrates the profile, not only when a page is re-rendered.
+  // This is a UI notification, not another photo state or network request.
+  if (typeof window !== 'undefined' && (
+    !previous
+    || previous.photo !== profileState.photo
+    || previous.photoCropX !== profileState.photoCropX
+    || previous.photoCropY !== profileState.photoCropY
+    || previous.name !== profileState.name
+    || previous.surname !== profileState.surname
+  )) {
+    window.dispatchEvent(new CustomEvent('va-tools:v2-context-changed'));
+  }
   return profileState;
 }
 
