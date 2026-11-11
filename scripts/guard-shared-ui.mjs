@@ -93,6 +93,17 @@ assert(cardView.includes('openColorPickerAction({') && !cardView.includes('<span
 assert(mini.includes('--mini-card-width:238px'), 'MiniCard width changed');
 assert(rootSelectorCount(mini, '.mini-card') === 1, 'MiniCard geometry must have one owner');
 
+// Shared MiniCard has one rounded geometry contract (co-va/user/staging).
+// No feature card may flatten the MiniCard's corners or create a local clone.
+const miniGeometry = [
+  [/\.mini-card\{[^}]*border-radius:16px;/, 'MiniCard outer radius must be 16px'],
+  [/\.mini-card__media\{[^}]*border-radius:10px;/, 'MiniCard media radius must be 10px'],
+  [/\.mini-card__context-action\{[^}]*border-radius:10px;/, 'MiniCard context radius must be 10px'],
+  [/\.mini-card__compact-action\{[^}]*border-radius:9px;/, 'MiniCard compact action radius must be 9px'],
+];
+for (const [rule, message] of miniGeometry) assert(rule.test(mini), message);
+
+
 assert(list.includes('min-height:78px'), 'V2 list entry geometry changed');
 assert(count(list, '.list-entry{') === 1, 'V2 list entry geometry must have one owner');
 

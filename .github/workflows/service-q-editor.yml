@@ -28,3 +28,5 @@ jobs:
         run: node scripts/ci/service-workplace-picker-smoke.mjs
       - name: Verify Procedure field order and change-only Save
         run: node scripts/ci/procedure-editor-state-smoke.mjs
+      - name: Guard Shared UI geometry, including rounded MiniCard
+        run: node scripts/guard-shared-ui.mjs
