@@ -9,3 +9,6 @@
 .service-workplace-price-editor{display:grid;gap:15px;padding:8px 0}
 .service-workplace-price-editor__title{font-size:17px;line-height:1.2;overflow-wrap:anywhere}
 .service-workplace-price-editor__actions{display:grid;gap:8px}
+
+.service-workplace-price-editor__common{min-height:72px;display:grid;place-items:center;font-size:18px;font-weight:700;text-align:center}
+.service-workplace-price-editor [hidden]{display:none}

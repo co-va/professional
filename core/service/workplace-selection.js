@@ -4,6 +4,7 @@ import { modal, mountModal } from '../../ui/modals/index.js';
 import { escapeHtml } from '../../ui/utils/escape-html.js';
 import { button } from '../../ui/buttons/index.js';
 import { collectCost, costField, initCostFields, validateCostDefinition, costListParts } from '../../ui/cost/index.js';
+import { segmentControl, initSegmentControls } from '../../ui/selection/segment-control.js';
 import { getWorkplaces } from '../profile/workplaces/data.js';
 
 function workplaceId(value = {}) {
@@ -84,36 +85,52 @@ export function bindServiceWorkplaceSelection(root, {
     const override = hasOwnCost(current.cost);
     const body = `<div class="service-workplace-price-editor">
       <strong class="service-workplace-price-editor__title">${escapeHtml(entry.name)}</strong>
-      ${costField({ name: 'workplaceCost', value: override ? current.cost : getBaseCost() })}
+      ${segmentControl([
+        { value: 'base', label: 'Общая цена' },
+        { value: 'own', label: 'Своя цена' },
+      ], { value: override ? 'own' : 'base', name: 'workplacePriceMode', aria: 'Цена рабочего пространства' })}
+      <div class="service-workplace-price-editor__common" data-service-workplace-common-price${override ? ' hidden' : ''}>
+        ${escapeHtml(priceLabel(getBaseCost()))}
+      </div>
+      <div data-service-workplace-own-price${override ? '' : ' hidden'}>
+        ${costField({ name: 'workplaceCost', value: override ? current.cost : getBaseCost() })}
+      </div>
       <div class="form-error" role="alert" data-service-workplace-cost-error></div>
       <div class="service-workplace-price-editor__actions">
-        ${button('Применить', { data: 'data-service-workplace-cost-apply' })}
-        ${override ? button('Общая цена', { variant: 'secondary', data: 'data-service-workplace-cost-reset' }) : ''}
-        ${button('Отмена', { variant: 'secondary', data: 'data-service-workplace-cost-cancel' })}
+        ${button('Готово', { data: 'data-service-workplace-cost-done' })}
       </div>
     </div>`;
     const layer = mountModal(document.body, modal(body, { variant: 'x', title: `Цена · ${entry.name}`, xRole: 'editor' }));
     if (!layer) return;
     initCostFields(layer);
-    layer.querySelector('[data-service-workplace-cost-apply]')?.addEventListener('click', () => {
-      const value = collectCost(layer, 'workplaceCost');
-      const error = validateCostDefinition(value);
-      if (error || !hasOwnCost(value)) {
-        const label = layer.querySelector('[data-service-workplace-cost-error]');
-        if (label) label.textContent = error || 'Укажите цену или используйте общую стоимость.';
-        return;
+    initSegmentControls(layer);
+    const mode = layer.querySelector('[name="workplacePriceMode"]');
+    mode?.addEventListener('change', () => {
+      const own = mode.value === 'own';
+      const common = layer.querySelector('[data-service-workplace-common-price]');
+      const fields = layer.querySelector('[data-service-workplace-own-price]');
+      if (common) common.hidden = own;
+      if (fields) fields.hidden = !own;
+      const error = layer.querySelector('[data-service-workplace-cost-error]');
+      if (error) error.textContent = '';
+    });
+    layer.querySelector('[data-service-workplace-cost-done]')?.addEventListener('click', () => {
+      if (mode?.value !== 'own') {
+        const { cost: _removed, ...rest } = assignments.get(id) || {};
+        assignments.set(id, rest);
+      } else {
+        const value = collectCost(layer, 'workplaceCost');
+        const error = validateCostDefinition(value);
+        if (error || !hasOwnCost(value)) {
+          const label = layer.querySelector('[data-service-workplace-cost-error]');
+          if (label) label.textContent = error || 'Укажите цену.';
+          return;
+        }
+        assignments.set(id, { ...assignments.get(id), workplaceId: id, cost: value });
       }
-      assignments.set(id, { ...assignments.get(id), workplaceId: id, cost: value });
       emit();
       layer.v2Close?.();
     });
-    layer.querySelector('[data-service-workplace-cost-reset]')?.addEventListener('click', () => {
-      const { cost: _removed, ...rest } = assignments.get(id) || {};
-      assignments.set(id, rest);
-      emit();
-      layer.v2Close?.();
-    });
-    layer.querySelector('[data-service-workplace-cost-cancel]')?.addEventListener('click', () => layer.v2Close?.());
   };
 
   pricesHost.addEventListener('click', (event) => {
