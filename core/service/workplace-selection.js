@@ -4,7 +4,7 @@ import { modal, mountModal } from '../../ui/modals/index.js';
 import { escapeHtml } from '../../ui/utils/escape-html.js';
 import { button } from '../../ui/buttons/index.js';
 import { collectCost, costField, initCostFields, validateCostDefinition, costListParts } from '../../ui/cost/index.js';
-import { segmentControl, initSegmentControls } from '../../ui/selection/segment-control.js';
+import { costSnapshot } from './editor-signature.js';
 import { getWorkplaces } from '../profile/workplaces/data.js';
 
 function workplaceId(value = {}) {
@@ -51,6 +51,7 @@ export function bindServiceWorkplaceSelection(root, {
   selected = [],
   getBaseCost = () => ({}),
   onChange = () => {},
+  onPersistPrice = async () => {},
 } = {}) {
   const assignments = selectedAssignmentMap(selected);
   const selectedIds = new Set(assignments.keys());
@@ -71,7 +72,7 @@ export function bindServiceWorkplaceSelection(root, {
       const override = hasOwnCost(cost);
       return `<button type="button" class="service-workplace-price-row" data-service-workplace-price="${escapeHtml(id)}" aria-label="Цена для ${escapeHtml(name)}">
         <span class="service-workplace-price-row__name">${escapeHtml(name)}</span>
-        <span class="service-workplace-price-row__price"><small>${override ? 'Своя цена' : 'Общая цена'}</small><strong>${escapeHtml(priceLabel(override ? cost : baseCost))}</strong></span>
+        <span class="service-workplace-price-row__price"><strong>${escapeHtml(priceLabel(override ? cost : baseCost))}</strong></span>
         <span class="service-workplace-price-row__chevron" aria-hidden="true">›</span>
       </button>`;
     }).join('');
@@ -83,54 +84,82 @@ export function bindServiceWorkplaceSelection(root, {
     if (!entry) return;
     const current = assignments.get(id) || {};
     const override = hasOwnCost(current.cost);
+    const initialCost = override ? current.cost : getBaseCost();
+    const initialSignature = JSON.stringify(costSnapshot(initialCost));
     const body = `<div class="service-workplace-price-editor">
       <strong class="service-workplace-price-editor__title">${escapeHtml(entry.name)}</strong>
-      ${segmentControl([
-        { value: 'base', label: 'Общая цена' },
-        { value: 'own', label: 'Своя цена' },
-      ], { value: override ? 'own' : 'base', name: 'workplacePriceMode', aria: 'Цена рабочего пространства' })}
-      <div class="service-workplace-price-editor__common" data-service-workplace-common-price${override ? ' hidden' : ''}>
-        ${escapeHtml(priceLabel(getBaseCost()))}
-      </div>
-      <div data-service-workplace-own-price${override ? '' : ' hidden'}>
-        ${costField({ name: 'workplaceCost', value: override ? current.cost : getBaseCost() })}
-      </div>
+      ${costField({ name: 'workplaceCost', value: initialCost })}
       <div class="form-error" role="alert" data-service-workplace-cost-error></div>
-      <div class="service-workplace-price-editor__actions">
-        ${button('Готово', { data: 'data-service-workplace-cost-done' })}
+      <div class="service-workplace-price-editor__actions" data-service-workplace-cost-actions${override ? '' : ' hidden'}>
+        <div data-service-workplace-apply-host hidden>
+          ${button('Применить', { data: 'data-service-workplace-cost-apply' })}
+        </div>
+        ${override ? button('Отменить', {
+          variant: 'secondary',
+          data: 'data-service-workplace-cost-reset',
+          aria: `Отменить индивидуальную цену для ${entry.name}`,
+        }) : ''}
       </div>
     </div>`;
     const layer = mountModal(document.body, modal(body, { variant: 'x', title: `Цена · ${entry.name}`, xRole: 'editor' }));
     if (!layer) return;
     initCostFields(layer);
-    initSegmentControls(layer);
-    const mode = layer.querySelector('[name="workplacePriceMode"]');
-    mode?.addEventListener('change', () => {
-      const own = mode.value === 'own';
-      const common = layer.querySelector('[data-service-workplace-common-price]');
-      const fields = layer.querySelector('[data-service-workplace-own-price]');
-      if (common) common.hidden = own;
-      if (fields) fields.hidden = !own;
-      const error = layer.querySelector('[data-service-workplace-cost-error]');
-      if (error) error.textContent = '';
-    });
-    layer.querySelector('[data-service-workplace-cost-done]')?.addEventListener('click', () => {
-      if (mode?.value !== 'own') {
-        const { cost: _removed, ...rest } = assignments.get(id) || {};
-        assignments.set(id, rest);
-      } else {
-        const value = collectCost(layer, 'workplaceCost');
-        const error = validateCostDefinition(value);
-        if (error || !hasOwnCost(value)) {
-          const label = layer.querySelector('[data-service-workplace-cost-error]');
-          if (label) label.textContent = error || 'Укажите цену.';
-          return;
+
+    const actions = layer.querySelector('[data-service-workplace-cost-actions]');
+    const applyHost = layer.querySelector('[data-service-workplace-apply-host]');
+    const apply = layer.querySelector('[data-service-workplace-cost-apply]');
+    const reset = layer.querySelector('[data-service-workplace-cost-reset]');
+    const errorNode = layer.querySelector('[data-service-workplace-cost-error]');
+    let busy = false;
+
+    const sync = () => {
+      const changed = JSON.stringify(costSnapshot(collectCost(layer, 'workplaceCost'))) !== initialSignature;
+      if (applyHost) applyHost.hidden = !changed;
+      if (actions) actions.hidden = !changed && !override;
+      if (apply) apply.disabled = busy;
+      if (reset) reset.disabled = busy;
+      return changed;
+    };
+    layer.addEventListener('input', sync);
+    layer.addEventListener('change', sync);
+    // Shared Cost emits "change" after a mode switch.
+    sync();
+
+    const persist = async (cost) => {
+      if (busy) return;
+      busy = true;
+      sync();
+      if (errorNode) errorNode.textContent = '';
+      try {
+        await onPersistPrice(id, cost, entry.name);
+        const previous = assignments.get(id) || {};
+        if (cost === null) {
+          const { cost: _removed, ...rest } = previous;
+          assignments.set(id, rest);
+        } else {
+          assignments.set(id, { ...previous, workplaceId: id, cost });
         }
-        assignments.set(id, { ...assignments.get(id), workplaceId: id, cost: value });
+        emit();
+        layer.v2Close?.();
+      } catch (error) {
+        if (errorNode) errorNode.textContent = error instanceof Error ? error.message : 'Не удалось сохранить цену.';
+      } finally {
+        busy = false;
+        if (layer.isConnected) sync();
       }
-      emit();
-      layer.v2Close?.();
+    };
+
+    apply?.addEventListener('click', () => {
+      if (!sync()) return;
+      const value = collectCost(layer, 'workplaceCost');
+      const error = validateCostDefinition(value);
+      if (error || !hasOwnCost(value)) {
+        if (errorNode) errorNode.textContent = error || 'Укажите цену.';
+        return;
+      }
+      void persist(value);
     });
+    reset?.addEventListener('click', () => { void persist(null); });
   };
 
   pricesHost.addEventListener('click', (event) => {

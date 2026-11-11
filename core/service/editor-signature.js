@@ -2,7 +2,7 @@
 const text = (value) => String(value ?? '').trim();
 const minutes = (value) => Math.max(0, Number(value) || 0);
 
-function costSnapshot(cost = {}) {
+export function costSnapshot(cost = {}) {
   const mode = ['amount', 'from', 'from-to'].includes(cost?.mode) ? cost.mode : 'amount';
   if (cost?.free === true) return { mode, free: true };
   if (mode === 'from-to') return { mode, free: false, from: text(cost.from), to: text(cost.to) };
@@ -47,4 +47,18 @@ export function productEditorSignature({
     description: text(description),
     workplaces: workplaceSnapshot(workplaces),
   });
+}
+
+
+// Only the workplace's price has been persisted. Preserve the baseline for
+// all unrelated fields and pending changes in the enclosing Q editor.
+export function rebaseWorkplacePriceSignature(signature, workplaceId, cost) {
+  const snapshot = JSON.parse(signature);
+  const id = String(workplaceId || '');
+  const assignments = Array.isArray(snapshot.workplaces) ? snapshot.workplaces : [];
+  const row = assignments.find((entry) => entry.id === id);
+  if (row) row.cost = cost === null ? null : costSnapshot(cost);
+  else assignments.push({ id, cost: cost === null ? null : costSnapshot(cost) });
+  snapshot.workplaces = assignments.sort((a, b) => a.id.localeCompare(b.id));
+  return JSON.stringify(snapshot);
 }
