@@ -30,10 +30,9 @@ import { bindServiceWorkplaceAssignments, serviceWorkplaceAssignmentList, servic
 import { flushBusinessPersistence } from '../../../core/business-persistence.js';
 import { setSharedActionVisible } from '../../../ui/page/page.js';
 import { productEditorSignature, rebaseWorkplaceAssignmentSignature } from '../editor-signature.js';
-import { persistServiceWorkplaceAssignment } from '../workplace-assignment.js';
 import { scheduleServiceStatistics, serviceItemStatistics } from '../statistics.js';
 import { productCardAppearance, productCardFields, productCardPhoto } from '../card-presentation.js';
-import { deleteProduct as deleteProductData, getProducts, pushProductHistory, reorderProducts, saveProduct as saveProductData } from './data.js';
+import { deleteProduct as deleteProductData, getProducts, pushProductHistory, reorderProducts, commitProduct, commitProductWorkplace } from './data.js';
 
 const money = (value) => `${new Intl.NumberFormat('ru-RU').format(Number(value || 0))} ₽`;
 
@@ -197,24 +196,30 @@ export function openProductEditor(root, existing = null, {
   let initialSignature = signature();
   const actions = primary.closest('.modal-actions');
   let visible = null;
+  let wasBusy = null;
   let saving = false;
   let assignmentSaving = false;
   const syncDirty = () => {
     const changed = signature() !== initialSignature;
-    if (visible === changed) return changed;
+    const busy = saving || assignmentSaving;
+    if (visible === changed && wasBusy === busy) return changed;
+    if (visible !== changed) setSharedActionVisible(actions, changed);
     visible = changed;
-    setSharedActionVisible(actions, changed);
-    setSharedProfilePrimary(primary, { visible: changed, label: 'Сохранить', disabled: saving || assignmentSaving });
+    wasBusy = busy;
+    setSharedProfilePrimary(primary, { visible: changed, label: 'Сохранить', disabled: busy });
     return changed;
   };
 
   bindServiceWorkplaceAssignments(layer, {
     kind: 'product',
     selected: draft.workplaces,
-    getBase: () => ({
-      cost: collectCost(layer, 'productCost'),
-      description: form.querySelector('[name="productAbout"]')?.value || '',
-    }),
+    getBase: () => {
+      const stored = existing?.id ? getProducts().find((item) => item.id === existing.id) || existing : null;
+      return {
+        cost: stored?.cost || collectCost(layer, 'productCost'),
+        description: stored?.about ?? form.querySelector('[name="productAbout"]')?.value ?? '',
+      };
+    },
     onChange: (workplaces) => {
       draft.workplaces = workplaces;
       syncDirty();
@@ -225,14 +230,7 @@ export function openProductEditor(root, existing = null, {
       assignmentSaving = true;
       syncDirty();
       try {
-        await persistServiceWorkplaceAssignment({
-          entityId: existing.id,
-          workplaceId,
-          assignment,
-          readEntity: (id) => getProducts().find((item) => String(item.id) === id),
-          writeEntity: saveProductData,
-          beforeWrite: (previous) => pushProductHistory(previous, 'updated'),
-        });
+        await commitProductWorkplace(existing.id, workplaceId, assignment);
         initialSignature = rebaseWorkplaceAssignmentSignature(initialSignature, workplaceId, assignment);
       } finally {
         assignmentSaving = false;
@@ -273,9 +271,11 @@ export function openProductEditor(root, existing = null, {
       updatedAt: new Date().toISOString(),
     };
     try {
-      if (existing) pushProductHistory(existing, 'updated');
-      saveProductData(item);
-      await flushBusinessPersistence();
+      await commitProduct(item);
+      if (existing) {
+        pushProductHistory(existing, 'updated');
+        await flushBusinessPersistence();
+      }
     } catch (failure) {
       if (error) error.textContent = failure instanceof Error ? failure.message : 'Не удалось сохранить товар.';
       return null;

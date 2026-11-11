@@ -1,9 +1,7 @@
 import { collectCost, validateCostDefinition, costField, durationPicker, field, initCostFields, initDurationPickers, setSharedProfilePrimary, textareaField, v2ListEntries, v2ListEntry } from '../../../ui/ui.js';
-import { getProcedures, saveProcedure as saveProcedureData } from './data.js';
-import { flushBusinessPersistence } from '../../../core/business-persistence.js';
+import { getProcedures, commitProcedure, commitProcedureWorkplace } from './data.js';
 import { setSharedActionVisible } from '../../../ui/page/page.js';
 import { procedureEditorSignature, rebaseWorkplaceAssignmentSignature } from '../editor-signature.js';
-import { persistServiceWorkplaceAssignment } from '../workplace-assignment.js';
 import { bindServiceWorkplaceAssignments, serviceWorkplaceAssignmentList } from '../workplace-selection.js';
 import { compactCheck } from '../../../ui/selection/check-list.js';
 
@@ -95,28 +93,34 @@ export function bindProcedureEditor(root, {
   let initialSignature = signature();
   const actions = primary.closest('.modal-actions');
   let visible = null;
+  let wasBusy = null;
   let saving = false;
   let assignmentSaving = false;
   const syncDirty = () => {
     const changed = signature() !== initialSignature;
-    if (visible === changed) return changed;
+    const busy = saving || assignmentSaving;
+    if (visible === changed && wasBusy === busy) return changed;
+    if (visible !== changed) setSharedActionVisible(actions, changed);
     visible = changed;
-    setSharedActionVisible(actions, changed);
-    setSharedProfilePrimary(primary, { visible: changed, label: 'Сохранить', disabled: saving || assignmentSaving });
+    wasBusy = busy;
+    setSharedProfilePrimary(primary, { visible: changed, label: 'Сохранить', disabled: busy });
     return changed;
   };
 
   bindServiceWorkplaceAssignments(root, {
     kind: 'procedure',
     selected: draft.workplaces,
-    getBase: () => ({
-      cost: collectCost(root, 'procedureCost'),
-      duration: Number(form.querySelector('[name="procedureDuration"]')?.value || 0),
-      breakDuration: Number(form.querySelector('[name="procedureBreak"]')?.value || 0),
-      description: form.querySelector('[name="procedureDescription"]')?.value || '',
-      visibleInPublicBooking: onlineCheck?.checked !== false,
-      groupBooking: draft.groupBooking,
-    }),
+    getBase: () => {
+      const stored = existing?.id ? getProcedures().find((item) => item.id === existing.id) || existing : null;
+      return {
+        cost: stored?.cost || collectCost(root, 'procedureCost'),
+        duration: stored?.duration ?? Number(form.querySelector('[name="procedureDuration"]')?.value || 0),
+        breakDuration: stored?.breakDuration ?? Number(form.querySelector('[name="procedureBreak"]')?.value || 0),
+        description: stored?.description ?? form.querySelector('[name="procedureDescription"]')?.value ?? '',
+        visibleInPublicBooking: stored?.visibleInPublicBooking ?? (onlineCheck?.checked !== false),
+        groupBooking: stored?.groupBooking || draft.groupBooking,
+      };
+    },
     onChange: (workplaces) => {
       draft.workplaces = workplaces;
       syncDirty();
@@ -127,13 +131,7 @@ export function bindProcedureEditor(root, {
       assignmentSaving = true;
       syncDirty();
       try {
-        await persistServiceWorkplaceAssignment({
-          entityId: existing.id,
-          workplaceId,
-          assignment,
-          readEntity: (id) => getProcedures().find((item) => String(item.id) === id),
-          writeEntity: saveProcedureData,
-        });
+        await commitProcedureWorkplace(existing.id, workplaceId, assignment);
         initialSignature = rebaseWorkplaceAssignmentSignature(initialSignature, workplaceId, assignment);
       } finally {
         assignmentSaving = false;
@@ -210,9 +208,7 @@ export function bindProcedureEditor(root, {
       updatedAt: new Date().toISOString(),
     };
     try {
-      saveProcedureData(item);
-      // The editor must not report success until the canonical API queue is acknowledged.
-      await flushBusinessPersistence();
+      await commitProcedure(item);
     } catch (failure) {
       if (error) error.textContent = failure instanceof Error ? failure.message : 'Не удалось сохранить услугу.';
       return null;

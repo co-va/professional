@@ -1,14 +1,6 @@
-/* Service-owned workplace assignment rows, shared data/field controls. */
-.service-workplace-price-list{display:grid;gap:0}
-.service-workplace-price-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,auto) 16px;align-items:center;gap:8px;width:100%;min-height:57px;padding:10px 2px;border:0;border-bottom:1px solid var(--border);background:transparent;color:var(--text);font:inherit;text-align:left;cursor:pointer}
-.service-workplace-price-row__name{min-width:0;font-size:14px;font-weight:700;overflow-wrap:anywhere}
-.service-workplace-price-row__price{min-width:0;max-width:160px;text-align:right}
-.service-workplace-price-row__price strong{font-size:13px;font-weight:650;overflow-wrap:anywhere}
-.service-workplace-price-row__chevron{font-size:23px;line-height:1;color:var(--text-secondary)}
+/* Service editor layout uses shared V2 List Entries, buttons and form controls. */
 .service-workplace-price-editor{display:grid;gap:14px;padding:8px 0}
 .service-workplace-price-editor__title{font-size:16px;font-weight:750;overflow-wrap:anywhere}
 .service-workplace-price-editor__actions{display:grid;gap:8px}
 .service-workplace-price-editor [hidden]{display:none!important}
 .service-workplace-extra{display:grid;gap:10px}
-.service-workplace-add-option{display:block;width:100%;min-height:56px;border:0;border-bottom:1px solid var(--border);background:transparent;text-align:left;padding:12px 4px;font:inherit;font-weight:650;color:var(--text);cursor:pointer}
-.service-workplace-price-editor .service-workplace-remove-link{min-height:35px;padding:4px 8px;margin-top:10px;background:transparent;border:0;color:var(--text-secondary);font-size:13px;text-decoration:underline;box-shadow:none}

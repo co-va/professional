@@ -67,9 +67,9 @@ export function procedureDescriptionForWorkplace(procedure = {}, workplaceId = '
 }
 
 export function procedureVisibleInBooking(procedure = {}, workplaceId = '') {
-  if (procedure?.visibleInPublicBooking === false) return false;
   const assignment = procedureWorkplaceAssignment(procedure, workplaceId);
-  return Boolean(assignment) && assignment?.visibleInPublicBooking !== false;
+  if (!assignment) return false;
+  return (assignment.visibleInPublicBooking ?? procedure?.visibleInPublicBooking ?? true) !== false;
 }
 
 export function procedureGroupBookingForWorkplace(procedure = {}, workplaceId = '') {

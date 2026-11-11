@@ -1,37 +1,32 @@
-import { getProcedures, saveProcedure } from './data.js';
+import { getProcedures, commitProcedureBatch } from './data.js';
+import { changeWorkplaceAssignment } from '../workplace-assignment.js';
+import { procedureWorkplaceAssignment } from './selection.js';
 
-const normalizeId = (value) => String(value || '').trim();
+const idOf = (value) => String(value || '').trim();
 
-function hasWorkplace(procedure, workplaceId) {
-  const id = normalizeId(workplaceId);
-  return (Array.isArray(procedure?.workplaces) ? procedure.workplaces : [])
-    .some((item) => normalizeId(item?.workplaceId ?? item?.id ?? item?.key) === id);
-}
-
-export function assignProceduresToWorkplace({
+// A single batched ACK for all selected Procedures. Uses the same immutable
+// transformation as Q's individual workspace editor.
+export async function assignProceduresToWorkplace({
   procedureIds = [],
   workplaceId = '',
   workplaceName = '',
 } = {}) {
-  const targetWorkplaceId = normalizeId(workplaceId);
-  const ids = new Set((Array.isArray(procedureIds) ? procedureIds : []).map(normalizeId).filter(Boolean));
-  if (!targetWorkplaceId || !ids.size) return [];
+  const id = idOf(workplaceId);
+  const selected = new Set((Array.isArray(procedureIds) ? procedureIds : []).map(idOf).filter(Boolean));
+  if (!id || !selected.size) return [];
+  if (!getProcedures().some((procedure) => selected.has(idOf(procedure.id)) && !procedureWorkplaceAssignment(procedure, id))) return [];
 
-  const updated = [];
-  getProcedures().forEach((procedure) => {
-    const procedureId = normalizeId(procedure?.id);
-    if (!ids.has(procedureId) || hasWorkplace(procedure, targetWorkplaceId)) return;
-
-    const next = {
-      ...procedure,
-      workplaces: [
-        ...(Array.isArray(procedure?.workplaces) ? procedure.workplaces : []),
-        { workplaceId: targetWorkplaceId, name: String(workplaceName || '').trim() },
-      ],
-      updatedAt: new Date().toISOString(),
-    };
-    saveProcedure(next);
-    updated.push(next);
+  const assigned = [];
+  await commitProcedureBatch((values) => {
+    assigned.length = 0;
+    return values.map((procedure) => {
+      if (procedure.deletedAt || !selected.has(idOf(procedure.id)) || procedureWorkplaceAssignment(procedure, id)) return procedure;
+      const next = changeWorkplaceAssignment(procedure, id, {
+        workplaceId: id, name: String(workplaceName || '').trim(),
+      });
+      assigned.push(next);
+      return next;
+    });
   });
-  return updated;
+  return assigned;
 }

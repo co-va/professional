@@ -1,4 +1,5 @@
 import { queueOperationalDataset } from '../../../core/business-persistence.js';
+import { commitServiceCollection, replaceServiceItem, changeServiceItemWorkplace } from '../workplace-assignment.js';
 
 let proceduresState = [];
 let proceduresSnapshotReady = false;
@@ -78,4 +79,36 @@ export function resetProcedureCardAppearances() {
   });
   if (changed) writeProcedures(updated);
   return changed;
+}
+
+
+// Committed write: the canonical owner is hydrated only after server ACK.
+export async function commitProcedure(item) {
+  await commitServiceCollection({
+    read: readRawProcedures,
+    persist: (values) => queueOperationalDataset('procedures', values),
+    hydrate: hydrateCurrentProceduresFromServer,
+    mutate: (values) => replaceServiceItem(values, item),
+  });
+  return item;
+}
+
+export async function commitProcedureWorkplace(entityId, workplaceId, assignment) {
+  await commitServiceCollection({
+    read: readRawProcedures,
+    persist: (values) => queueOperationalDataset('procedures', values),
+    hydrate: hydrateCurrentProceduresFromServer,
+    mutate: (values) => changeServiceItemWorkplace(values, entityId, workplaceId, assignment),
+  });
+}
+
+
+// Journal's batch assignment uses the same ACK-first dataset owner as Service.
+export async function commitProcedureBatch(mutate) {
+  return commitServiceCollection({
+    read: readRawProcedures,
+    persist: (values) => queueOperationalDataset('procedures', values),
+    hydrate: hydrateCurrentProceduresFromServer,
+    mutate,
+  });
 }

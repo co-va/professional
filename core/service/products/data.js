@@ -1,4 +1,5 @@
 import { queueAuxiliaryDataset } from '../../../core/business-persistence.js';
+import { commitServiceCollection, replaceServiceItem, changeServiceItemWorkplace } from '../workplace-assignment.js';
 
 let productsState = [];
 let historyState = [];
@@ -88,4 +89,24 @@ export function resetProductCardAppearances() {
   });
   if (changed) writeProducts(updated);
   return changed;
+}
+
+
+export async function commitProduct(item) {
+  await commitServiceCollection({
+    read: readRawProducts,
+    persist: (values) => queueAuxiliaryDataset('products', values),
+    hydrate: (values) => { productsState = clone(values); },
+    mutate: (values) => replaceServiceItem(values, item),
+  });
+  return item;
+}
+
+export async function commitProductWorkplace(entityId, workplaceId, assignment) {
+  await commitServiceCollection({
+    read: readRawProducts,
+    persist: (values) => queueAuxiliaryDataset('products', values),
+    hydrate: (values) => { productsState = clone(values); },
+    mutate: (values) => changeServiceItemWorkplace(values, entityId, workplaceId, assignment),
+  });
 }

@@ -545,17 +545,25 @@ export function openRecords({
         values.forEach((value) => selected.add(String(value)));
       },
     });
-    layer.querySelector('[data-records-price-add]')?.addEventListener('click', () => {
+    layer.querySelector('[data-records-price-add]')?.addEventListener('click', async (event) => {
       if (!selected.size) return;
+      const applyButton = event.currentTarget;
+      if (applyButton.disabled) return;
+      applyButton.disabled = true;
       const workplace = source.workplaces().find((item) => source.workplaceId(item) === state.workplaceId);
-      assignProceduresToWorkplace({
-        procedureIds: [...selected],
-        workplaceId: state.workplaceId,
-        workplaceName: workplace?.name || workplace?.title || '',
-      });
-      controller?.destroy?.();
-      layer.v2Close?.();
-      renderProcedures();
+      try {
+        await assignProceduresToWorkplace({
+          procedureIds: [...selected],
+          workplaceId: state.workplaceId,
+          workplaceName: workplace?.name || workplace?.title || '',
+        });
+        controller?.destroy?.();
+        layer.v2Close?.();
+        renderProcedures();
+      } catch (error) {
+        openNotice({ title: 'Не удалось добавить', message: String(error?.message || 'Изменения не сохранены.') });
+        applyButton.disabled = false;
+      }
     });
   };
 

@@ -20,6 +20,9 @@ const snapshot = new Function(moduleSource(signature) +
 assert.match(selection, /data-service-workplace-add/);
 assert.match(selection, /data-service-workplace-choose/);
 assert.match(selection, /data-service-workplace-prices/);
+assert.match(selection, /v2ListEntries\(read\(\)/);
+assert.match(selection, /v2ListEntries\(available\.map/);
+assert.doesNotMatch(selection, /service-workplace-price-row|service-workplace-add-option/);
 assert.match(selection, /data-service-workplace-editor/);
 assert.match(selection, /durationPicker\(\{/);
 assert.match(selection, /costField\(\{/);
@@ -31,7 +34,9 @@ assert.match(procedureForm, /data-procedure-online-check/);
 assert.match(procedureForm, /serviceWorkplaceAssignmentList\(/);
 assert.match(procedureForm, /bindServiceWorkplaceAssignments\(/);
 assert.match(productEditor, /bindServiceWorkplaceAssignments\(/);
-assert.match(persistence, /async function persistServiceWorkplaceAssignment/);
+assert.match(persistence, /async function commitServiceCollection/);
+assert.match(persistence, /function changeWorkplaceAssignment/);
+assert.match(persistence, /function changeServiceItemWorkplace/);
 assert.ok(procedureEditor.indexOf('serviceWorkplaceAddButton()') < procedureEditor.indexOf('data-procedure-editor-delete'));
 assert.ok(productEditor.indexOf('serviceWorkplaceAddButton()') < productEditor.indexOf('data-product-editor-delete'));
 assert.match(recordEditor, /procedureDurationForWorkplace/);
@@ -62,3 +67,47 @@ const removed = snapshot.rebaseWorkplaceAssignmentSignature(rebased, 'c', null);
 assert.equal(removed, old);
 
 console.log('PASS: button picker, one Service workplace assignment contract, local price/duration/description/booking and Q rebase');
+
+
+// ACK-first behavior: rejected requests cannot change the Service data owner.
+const collectionSource = read('core/service/workplace-assignment.js')
+  .replace(/^import\s+[\s\S]*?\sfrom\s+['"][^'"]+['"];\s*/gm, '')
+  .replace(/^export\s+/gm, '');
+let serverReady = true;
+const collection = new Function('flushBusinessPersistence', 'isBusinessServerReady',
+  collectionSource + '\nreturn { commitServiceCollection, changeServiceItemWorkplace };')(
+  async () => {}, () => serverReady,
+);
+const clone = (value) => JSON.parse(JSON.stringify(value));
+const original = [{ id: 'hair', name: 'Укладка', workplaces: [
+  { workplaceId: 'a', name: 'Ромашка', cost: { amount: '1000' } },
+  { workplaceId: 'b', name: 'Чародейка', cost: { amount: '2000' } },
+]}];
+let owned = clone(original);
+let writes = 0;
+const mutation = (items) => collection.changeServiceItemWorkplace(items, 'hair', 'a', { duration: 60 });
+const readOwner = () => clone(owned);
+const hydrateOwner = (items) => { owned = clone(items); };
+const rejected = async () => { writes += 1; return { ok: false, error: new Error('Rejected') }; };
+await assert.rejects(
+  () => collection.commitServiceCollection({
+    read: readOwner, persist: rejected, hydrate: hydrateOwner, mutate: mutation,
+  }), /Rejected/,
+);
+assert.deepEqual(owned, original, 'Rejected request must not mutate cached Service data');
+assert.equal(writes, 1, 'One request is attempted, never a silent second write');
+await collection.commitServiceCollection({
+  read: readOwner,
+  persist: async () => { writes += 1; return { ok: true }; },
+  hydrate: hydrateOwner, mutate: mutation,
+});
+assert.equal(writes, 2);
+assert.equal(owned[0].workplaces[0].duration, 60);
+assert.equal(owned[0].workplaces[1].cost.amount, '2000');
+serverReady = false;
+await assert.rejects(
+  () => collection.commitServiceCollection({
+    read: readOwner, persist: rejected, hydrate: hydrateOwner, mutate: mutation,
+  }), /Нет соединения/,
+);
+assert.equal(writes, 2, 'Offline must never claim success');

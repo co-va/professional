@@ -5,6 +5,7 @@ import { collectCost, costField, initCostFields, validateCostDefinition, costLis
 import { durationPicker, durationText, initDurationPickers } from '../../ui/duration/index.js';
 import { field, textareaField } from '../../ui/inputs/index.js';
 import { compactCheck } from '../../ui/selection/check-list.js';
+import { v2ListEntry, v2ListEntries } from '../../ui/lists/list-entry.js';
 import { costSnapshot } from './editor-signature.js';
 import { getWorkplaces } from '../profile/workplaces/data.js';
 
@@ -63,17 +64,19 @@ export function bindServiceWorkplaceAssignments(root, {
   }));
   const render = () => {
     const base = getBase();
-    list.innerHTML = read().filter((item) => catalog.some((space) => space.id === item.workplaceId)).map((item) => {
-      const cost = hasPrice(item.cost) ? item.cost : base.cost;
-      const duration = minutes(item.duration ?? base.duration);
-      const summary = isProcedure ? `${durationText(duration)} · ${costText(cost)}` : costText(cost);
-      return `<button type="button" class="service-workplace-price-row" data-service-workplace-open="${escapeHtml(item.workplaceId)}"
-        aria-label="Настройки ${escapeHtml(item.name)}">
-        <span class="service-workplace-price-row__name">${escapeHtml(item.name)}</span>
-        <span class="service-workplace-price-row__price"><strong>${escapeHtml(summary)}</strong></span>
-        <span class="service-workplace-price-row__chevron" aria-hidden="true">›</span>
-      </button>`;
-    }).join('');
+    list.innerHTML = v2ListEntries(read()
+      .filter((item) => catalog.some((space) => space.id === item.workplaceId))
+      .map((item) => {
+        const cost = hasPrice(item.cost) ? item.cost : base.cost;
+        const duration = minutes(item.duration ?? base.duration);
+        const subtitle = isProcedure ? `${durationText(duration)} · ${costText(cost)}` : costText(cost);
+        return v2ListEntry({
+          title: item.name,
+          subtitle,
+          data: `data-service-workplace-open="${escapeHtml(item.workplaceId)}"`,
+          aria: `Настройки ${item.name}`,
+        });
+      }));
   };
   const publish = () => { render(); onChange(read()); };
 
@@ -130,7 +133,7 @@ export function bindServiceWorkplaceAssignments(root, {
           aria: 'Отменить индивидуальную цену',
         }) : ''}
         ${!isNew ? button('Убрать из услуги', {
-          variant: 'secondary', className: 'service-workplace-remove-link', data: 'data-service-workplace-remove',
+          variant: 'secondary', data: 'data-service-workplace-remove',
         }) : ''}
       </div>
     </div>`;
@@ -240,8 +243,12 @@ export function bindServiceWorkplaceAssignments(root, {
         { variant: 'x', xRole: 'picker' }));
       return layer;
     }
-    const content = available.map((space) => `<button type="button" class="service-workplace-add-option"
-      data-service-workplace-choose="${escapeHtml(space.id)}">${escapeHtml(space.name)}</button>`).join('');
+    const content = v2ListEntries(available.map((space) => v2ListEntry({
+      title: space.name,
+      omitEmptySubtitle: true,
+      data: `data-service-workplace-choose="${escapeHtml(space.id)}"`,
+      aria: `Добавить ${space.name}`,
+    })));
     const picker = mountModal(document.body, modal(content, { variant: 'x', xRole: 'picker', title: 'Рабочее пространство' }));
     picker?.querySelectorAll('[data-service-workplace-choose]').forEach((choice) => {
       choice.addEventListener('click', () => {
