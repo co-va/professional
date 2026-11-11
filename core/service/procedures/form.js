@@ -101,6 +101,7 @@ export function bindProcedureEditor(root, {
 
   bindServiceWorkplaceSelection(root, {
     selected: draft.workplaces,
+    getBaseCost: () => collectCost(root, 'procedureCost'),
     onChange: (workplaces) => {
       draft.workplaces = workplaces;
       syncDirty();

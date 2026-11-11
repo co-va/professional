@@ -207,6 +207,7 @@ export function openProductEditor(root, existing = null, {
 
   bindServiceWorkplaceSelection(layer, {
     selected: draft.workplaces,
+    getBaseCost: () => collectCost(layer, 'productCost'),
     onChange: (workplaces) => {
       draft.workplaces = workplaces;
       syncDirty();
