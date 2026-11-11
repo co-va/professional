@@ -964,3 +964,10 @@ Professional отделён только если одновременно до�
 - Привязанные салоны показываются единым компактным Shared UI List (`ui-list--dense`) со строками «салон / длительность и цена». X выбора также использует Shared UI List. Несколько пространств больше не образуют набор крупных V2 карточек.
 - «Групповая запись» в общей процедуре и внутри каждого пространства использует один `core/service/procedures/group-booking-ui.js`: Shared V2 List Entry с тумблером и поле «Максимум людей», видимое только при включении. Логика показа/переключения также общая. «Для онлайн-записи» остаётся простой галочкой, поскольку не имеет дополнительного поля.
 - Модель procedure/workplaces, owner данных, сохранение ACK-first и публичный Core не менялись. Изолированная smoke-проверка и проверка управления групповой записью пройдены; пользовательская iPhone-проверка ещё требуется.
+
+## Authenticated online presence — 2026-11-11 (staging)
+- `core/presence.js` is Professional's only client heartbeat. Called after `renderAuthenticated` loads access and renders workspace, stopped on logout/suspension.
+- Signal is POST `/auth/presence` through canonical `core/auth.js` with 5-second timeout. It runs once and every 45 seconds only while the app is in the foreground, with immediate resume and a 20-second minimum gap; failures never block UI.
+- Core owns `TenantAccountPresence`, authentication and Admin online/offline projection (120-second threshold); Professional owns no presence database, custom auth transport or extra session lifecycle.
+- Launch dependency: Core migration + API deployment must happen before live status appears. This staging frontend will silently retry after transient 404/unavailability and must not be mistaken for successful backend deployment.
+- Manual isolated check: `node scripts/ci/presence-runtime-smoke.mjs`. No permanent Professional CI introduced.

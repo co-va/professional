@@ -14,6 +14,7 @@ import { loadOperationalState } from '../core/runtime/operational-state.js';
 import { ensureRknGuide, loadTenantDocumentArchive, refreshTenantDocumentArchive } from '../core/runtime/tenant-document-archive.js';
 import { loadAuxiliaryState, loadFinanceState } from '../core/runtime/auxiliary-state.js';
 import { startProfessionalServerSync, stopProfessionalServerSync } from '../core/runtime/server-sync.js';
+import { startProfessionalPresence, stopProfessionalPresence } from '../core/presence.js';
 import { getJournalTimeUsages } from '../journal/time-usage-source.js';
 import { configureWorkplaceSource } from '../core/workplace-time.js';
 import { configureTimeUsageSource } from '../core/time/index.js';
@@ -566,6 +567,7 @@ function renderWorkspace() {
 }
 
 function renderSuspended() {
+  stopProfessionalPresence();
   app.classList.remove('app-shell--booking');
   workspaceReady = false;
   disposeView();
@@ -615,9 +617,11 @@ export async function renderAuthenticated(account = authenticatedAccount) {
   history.replaceState({}, '', `#${state.activeSection}`);
   renderWorkspace();
   startRegularPlatformNotices();
+  startProfessionalPresence();
 }
 
 window.addEventListener('professional:auth-logout', () => {
+  stopProfessionalPresence();
   authenticatedAccount = null;
   workspaceReady = false;
   disposeView();
