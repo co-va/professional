@@ -6,6 +6,7 @@ import {
   viewNavigation,
 } from '../../ui/ui.js';
 import { loadOperationalState } from '../runtime/operational-state.js';
+import { hasCurrentProceduresSnapshot } from './procedures/data.js';
 import { serviceHeaderContext, notifyServiceContext } from './context.js';
 
 const views = [
@@ -111,16 +112,23 @@ export function renderService(root, navigateBack = () => {}) {
     notifyServiceContext();
   };
 
-  root.innerHTML = page([serviceHeaderContext({ title: 'Сервис' }), emptyState('Загрузка', 'Загружаем сервис.')]);
-  void loadOperationalState({ full: true })
-    .then(renderCurrent)
-    .catch((error) => {
-      if (disposed) return;
-      root.innerHTML = page([
-        serviceHeaderContext({ title: 'Сервис' }),
-        emptyState('Не удалось открыть сервис', error instanceof Error ? error.message : 'Ошибка загрузки'),
-      ]);
-    });
+  // Workspace already hydrates the operational Service snapshot on entry.
+  // Do not run a second full hydration or delay catalog rendering.
+  if (hasCurrentProceduresSnapshot()) {
+    renderCurrent();
+  } else {
+    // Direct mounts outside the Professional workspace still obtain their own snapshot.
+    root.innerHTML = page([serviceHeaderContext({ title: 'Сервис' }), emptyState('Загрузка', 'Загружаем сервис.')]);
+    void loadOperationalState({ full: true })
+      .then(renderCurrent)
+      .catch((error) => {
+        if (disposed) return;
+        root.innerHTML = page([
+          serviceHeaderContext({ title: 'Сервис' }),
+          emptyState('Не удалось открыть сервис', error instanceof Error ? error.message : 'Ошибка загрузки'),
+        ]);
+      });
+  }
 
   return () => {
     disposed = true;

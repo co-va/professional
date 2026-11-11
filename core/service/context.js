@@ -1,31 +1,17 @@
-import { workspaceHeaderContext } from '../../ui/ui.js';
-import { getProfile } from '../profile/data.js';
-
-function crop(value) {
-  const number = Number(value);
-  return Number.isFinite(number) ? Math.max(0, Math.min(100, Math.round(number))) : 50;
-}
+import { workspaceHeaderContext } from '../../ui/header/index.js';
 
 export function serviceHeaderContext({
   title = '',
   settingsData = '',
   settingsAria = 'Настройки',
-  hideD = false,
   c = null,
   d = null,
 } = {}) {
-  const profile = getProfile();
-  const name = [profile.name, profile.surname].filter(Boolean).join(' ') || 'Профиль';
+  // The shared Professional workspace owns Header A, including the live
+  // profile photo. Service must not construct a second/stale avatar source.
   return workspaceHeaderContext({
     title,
-    a: {
-      kind: 'avatar',
-      image: String(profile.photo || ''),
-      imagePosition: `${crop(profile.photoCropX)}% ${crop(profile.photoCropY)}%`,
-      initials: name.slice(0, 1).toUpperCase() || '?',
-    },
     v: settingsData ? { data: settingsData, aria: settingsAria } : null,
-    hideD,
     c,
     d,
   });

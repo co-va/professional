@@ -6,7 +6,6 @@ import { renderJournal } from '../journal/journal.js';
 import { settingsNavigationItems, renderSettingsSection } from '../settings/settings.js';
 import { render as renderProfile } from '../core/profile/profile.js';
 import { getProfile } from '../core/profile/data.js';
-import { render as renderService } from '../core/service/service.js';
 import { renderChat } from '../chat/chat.js';
 import { getWorkplaces as getWorkplaceEntities } from '../core/profile/workplaces/data.js';
 import { loadProfileState } from '../core/profile/runtime.js';
@@ -359,14 +358,15 @@ async function ensureWorkspaceState(section) {
   const tasks = [];
   if (section === 'journal' || section === 'profile' || section === 'people' || section === 'service' || section === 'settings') tasks.push(loadProfileState());
   if (section === 'journal' || section === 'people' || section === 'loyalty') tasks.push(loadBusinessState());
-  if (section === 'journal' || section === 'service') tasks.push(loadOperationalState());
+  if (section === 'journal') tasks.push(loadOperationalState());
+  if (section === 'service') tasks.push(loadOperationalState({ full: true }));
   if (section === 'journal' || section === 'finance') tasks.push(loadFinanceState());
   const needsAuxiliary = section === 'people'
     || section === 'loyalty'
     || section === 'service'
     || (section === 'finance' && secondary === 'cash')
     || (section === 'settings' && secondary === 'tags');
-  if (needsAuxiliary) tasks.push(loadAuxiliaryState());
+  if (needsAuxiliary) tasks.push(loadAuxiliaryState(section === 'service' ? 'service' : ''));
   if (section === 'people' || (section === 'settings' && secondary === 'documents')) tasks.push(loadTenantDocumentArchive());
   await Promise.all(tasks);
 }
@@ -395,7 +395,10 @@ async function renderActiveWorkspaceSurface(surface) {
   if (section === 'profile') return renderProfile(surface, openNavigation, {
     accountEmail: authenticatedAccount?.account?.email || '',
   });
-  if (section === 'service') return renderService(surface, openNavigation);
+  if (section === 'service') {
+    const { renderService } = await import('../core/service/service.js');
+    return surface.isConnected ? renderService(surface, openNavigation) : null;
+  }
   if (section === 'settings') return renderSettingsSection(surface, ensureSecondary('settings'), { onBack: openNavigation });
   if (section === 'chat') return renderChat(surface, { personKey: state.chatPersonKey });
   return renderPeople(surface);
