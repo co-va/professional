@@ -23,8 +23,7 @@ import { serviceHeaderContext, notifyServiceContext } from '../context.js';
 import { procedureCardAppearance, procedureCardFields, procedureCardPhoto } from '../card-presentation.js';
 import { bindProcedureEditor, initialProcedure, procedureEditorForm } from './form.js';
 import { serviceWorkplaceAddButton } from '../workplace-selection.js';
-import { deleteProcedure as deleteProcedureData, getProcedures, reorderProcedures } from './data.js';
-import { flushBusinessPersistence } from '../../../core/business-persistence.js';
+import { commitDeleteProcedure, getProcedures, reorderProcedures } from './data.js';
 import { scheduleServiceStatistics, serviceItemStatistics, serviceSpentText } from '../statistics.js';
 
 const money = (value) => `${new Intl.NumberFormat('ru-RU').format(Number(value || 0))} ₽`;
@@ -109,8 +108,7 @@ function confirmDeleteProcedure(procedure, onDeleted) {
     if (confirm.disabled) return;
     confirm.disabled = true;
     try {
-      if (!deleteProcedureData(procedure.id)) throw new Error('Услуга уже удалена.');
-      await flushBusinessPersistence();
+      await commitDeleteProcedure(procedure.id);
       layer.v2Close?.();
       onDeleted?.();
     } catch (error) {

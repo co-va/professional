@@ -29,14 +29,12 @@ export async function commitServiceCollection({ read, persist, hydrate, mutate }
   if (JSON.stringify(updated) === JSON.stringify(before)) return before;
   const ack = await persist(updated);
   if (ack?.ok === false) throw ack.error || new Error('Сервер отклонил сохранение.');
-  await flushBusinessPersistence();
   const current = read();
   if (JSON.stringify(current) === JSON.stringify(updated)) return current;
   if (JSON.stringify(current) !== JSON.stringify(before)) {
     const reconciled = mutate(current);
     const retry = await persist(reconciled);
     if (retry?.ok === false) throw retry.error || new Error('Сервер отклонил сохранение.');
-    await flushBusinessPersistence();
     hydrate(reconciled);
     return reconciled;
   }

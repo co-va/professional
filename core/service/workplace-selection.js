@@ -72,6 +72,7 @@ export function bindServiceWorkplaceAssignments(root, {
         const subtitle = isProcedure ? `${durationText(duration)} · ${costText(cost)}` : costText(cost);
         return v2ListEntry({
           title: item.name,
+          initial: String(item.name || '?').slice(0, 1).toUpperCase(),
           subtitle,
           data: `data-service-workplace-open="${escapeHtml(item.workplaceId)}"`,
           aria: `Настройки ${item.name}`,
@@ -245,6 +246,7 @@ export function bindServiceWorkplaceAssignments(root, {
     }
     const content = v2ListEntries(available.map((space) => v2ListEntry({
       title: space.name,
+      initial: String(space.name || '?').slice(0, 1).toUpperCase(),
       omitEmptySubtitle: true,
       data: `data-service-workplace-choose="${escapeHtml(space.id)}"`,
       aria: `Добавить ${space.name}`,

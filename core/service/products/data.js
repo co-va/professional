@@ -1,4 +1,4 @@
-import { queueAuxiliaryDataset } from '../../../core/business-persistence.js';
+import { queueAuxiliaryDataset, isBusinessServerReady } from '../../../core/business-persistence.js';
 import { commitServiceCollection, replaceServiceItem, changeServiceItemWorkplace } from '../workplace-assignment.js';
 
 let productsState = [];
@@ -92,21 +92,59 @@ export function resetProductCardAppearances() {
 }
 
 
+async function commitProductHistory(previous, action = 'updated') {
+  if (!previous) return;
+  // The product operation already succeeded. A history failure must never
+  // report the product itself as unsaved or leave its Q/X draft out of sync.
+  if (!isBusinessServerReady()) return false;
+  const next = [...readHistory(), {
+    ...previous, historyAction: action, historyAt: new Date().toISOString(),
+  }];
+  try {
+    const result = await queueAuxiliaryDataset('productHistory', next);
+    if (result?.ok === false) throw result.error || new Error('Сервер отклонил историю.');
+    historyState = clone(next);
+  } catch (error) {
+    // Existing persistence queue emits the canonical error notification.
+    // Do not reject the acknowledged Product save for its independent history.
+    return false;
+  }
+  return true;
+}
+
 export async function commitProduct(item) {
+  const previous = readRawProducts().find((value) => value.id === item.id && !value.deletedAt);
   await commitServiceCollection({
     read: readRawProducts,
     persist: (values) => queueAuxiliaryDataset('products', values),
     hydrate: (values) => { productsState = clone(values); },
     mutate: (values) => replaceServiceItem(values, item),
   });
+  await commitProductHistory(previous);
   return item;
 }
 
 export async function commitProductWorkplace(entityId, workplaceId, assignment) {
+  const previous = readRawProducts().find((value) => String(value.id) === String(entityId) && !value.deletedAt);
   await commitServiceCollection({
     read: readRawProducts,
     persist: (values) => queueAuxiliaryDataset('products', values),
     hydrate: (values) => { productsState = clone(values); },
     mutate: (values) => changeServiceItemWorkplace(values, entityId, workplaceId, assignment),
   });
+  await commitProductHistory(previous);
+}
+
+export async function commitDeleteProduct(id) {
+  const key = String(id || '');
+  const previous = readRawProducts().find((value) => String(value.id) === key && !value.deletedAt);
+  if (!previous) throw new Error('Товар уже удалён.');
+  await commitServiceCollection({
+    read: readRawProducts,
+    persist: (values) => queueAuxiliaryDataset('products', values),
+    hydrate: (values) => { productsState = clone(values); },
+    mutate: (values) => values.map((value) => String(value.id) === key
+      ? { ...value, deletedAt: new Date().toISOString() } : value),
+  });
+  await commitProductHistory(previous, 'deleted');
 }

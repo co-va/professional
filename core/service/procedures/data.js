@@ -112,3 +112,17 @@ export async function commitProcedureBatch(mutate) {
     mutate,
   });
 }
+
+
+// Soft delete of the canonical procedure after server ACK only.
+export async function commitDeleteProcedure(id) {
+  const target = String(id || '');
+  if (!getProcedures().some((item) => String(item.id) === target)) throw new Error('Услуга уже удалена.');
+  await commitServiceCollection({
+    read: readRawProcedures,
+    persist: (values) => queueOperationalDataset('procedures', values),
+    hydrate: hydrateCurrentProceduresFromServer,
+    mutate: (values) => values.map((item) =>
+      String(item.id) === target ? { ...item, deletedAt: new Date().toISOString() } : item),
+  });
+}

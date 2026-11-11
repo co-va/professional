@@ -27,12 +27,11 @@ import {
 import { getWorkplaces } from '../../profile/workplaces/data.js';
 import { serviceHeaderContext, notifyServiceContext } from '../context.js';
 import { bindServiceWorkplaceAssignments, serviceWorkplaceAssignmentList, serviceWorkplaceAddButton } from '../workplace-selection.js';
-import { flushBusinessPersistence } from '../../../core/business-persistence.js';
 import { setSharedActionVisible } from '../../../ui/page/page.js';
 import { productEditorSignature, rebaseWorkplaceAssignmentSignature } from '../editor-signature.js';
 import { scheduleServiceStatistics, serviceItemStatistics } from '../statistics.js';
 import { productCardAppearance, productCardFields, productCardPhoto } from '../card-presentation.js';
-import { deleteProduct as deleteProductData, getProducts, pushProductHistory, reorderProducts, commitProduct, commitProductWorkplace } from './data.js';
+import { commitDeleteProduct, getProducts, reorderProducts, commitProduct, commitProductWorkplace } from './data.js';
 
 const money = (value) => `${new Intl.NumberFormat('ru-RU').format(Number(value || 0))} ₽`;
 
@@ -129,8 +128,7 @@ function confirmDeleteProduct(product, onDeleted) {
     if (confirm.disabled) return;
     confirm.disabled = true;
     try {
-      if (!deleteProductData(product.id)) throw new Error('Товар уже удалён.');
-      await flushBusinessPersistence();
+      await commitDeleteProduct(product.id);
       layer.v2Close?.();
       onDeleted?.();
     } catch (error) {
@@ -272,10 +270,6 @@ export function openProductEditor(root, existing = null, {
     };
     try {
       await commitProduct(item);
-      if (existing) {
-        pushProductHistory(existing, 'updated');
-        await flushBusinessPersistence();
-      }
     } catch (failure) {
       if (error) error.textContent = failure instanceof Error ? failure.message : 'Не удалось сохранить товар.';
       return null;
