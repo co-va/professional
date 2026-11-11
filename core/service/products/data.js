@@ -3,6 +3,13 @@ import { queueAuxiliaryDataset } from '../../../core/business-persistence.js';
 let productsState = [];
 let historyState = [];
 
+if (typeof window !== 'undefined') {
+  window.addEventListener('professional:auth-logout', () => {
+    productsState = [];
+    historyState = [];
+  });
+}
+
 function clone(value) {
   return value == null ? value : JSON.parse(JSON.stringify(value));
 }

@@ -9,6 +9,14 @@ SCOPES.add('loyalty-referral');
 SCOPES.add('loyalty-bonus');
 let templatesState = [];
 
+// Card templates are account-scoped. A second login must never inherit the
+// first account's visual template through the local timestamp merge.
+if (typeof window !== 'undefined') {
+  window.addEventListener('professional:auth-logout', () => {
+    templatesState = [];
+  });
+}
+
 function clone(value) {
   return value == null ? value : JSON.parse(JSON.stringify(value));
 }
