@@ -26,11 +26,11 @@ import {
 } from '../../../ui/ui.js';
 import { getWorkplaces } from '../../profile/workplaces/data.js';
 import { serviceHeaderContext, notifyServiceContext } from '../context.js';
-import { bindServiceWorkplaceSelection, serviceWorkplaceSelector } from '../workplace-selection.js';
+import { bindServiceWorkplaceAssignments, serviceWorkplaceAssignmentList, serviceWorkplaceAddButton } from '../workplace-selection.js';
 import { flushBusinessPersistence } from '../../../core/business-persistence.js';
 import { setSharedActionVisible } from '../../../ui/page/page.js';
-import { productEditorSignature, rebaseWorkplacePriceSignature } from '../editor-signature.js';
-import { persistServiceWorkplacePrice } from '../workplace-price.js';
+import { productEditorSignature, rebaseWorkplaceAssignmentSignature } from '../editor-signature.js';
+import { persistServiceWorkplaceAssignment } from '../workplace-assignment.js';
 import { scheduleServiceStatistics, serviceItemStatistics } from '../statistics.js';
 import { productCardAppearance, productCardFields, productCardPhoto } from '../card-presentation.js';
 import { deleteProduct as deleteProductData, getProducts, pushProductHistory, reorderProducts, saveProduct as saveProductData } from './data.js';
@@ -148,7 +148,7 @@ function productEditorForm(product) {
     ${field({ label: 'Название', name: 'productName', value: product.name || '', placeholder: 'Название товара', required: true })}
     ${costField({ value: product.cost || {}, name: 'productCost' })}
     ${textareaField({ label: 'Описание', name: 'productAbout', value: product.about || '', rows: 7, maxlength: 5000, placeholder: 'Описание товара' })}
-    ${serviceWorkplaceSelector(product.workplaces)}
+    ${serviceWorkplaceAssignmentList()}
     <div class="form-error" role="alert" data-product-editor-error></div>
   </form>`;
 }
@@ -164,6 +164,7 @@ export function openProductEditor(root, existing = null, {
   const body = [
     productEditorForm(draft),
     actionBlock(button('Сохранить', { type: 'button', data: 'data-product-editor-primary', aria: 'Сохранить товар' })),
+    `<div class="app-settings-panel">${serviceWorkplaceAddButton()}</div>`,
     existing ? `<div class="app-settings-panel">${button('Удалить товар', {
       type: 'button',
       variant: 'outline',
@@ -197,50 +198,54 @@ export function openProductEditor(root, existing = null, {
   const actions = primary.closest('.modal-actions');
   let visible = null;
   let saving = false;
-  let priceSaving = false;
+  let assignmentSaving = false;
   const syncDirty = () => {
     const changed = signature() !== initialSignature;
     if (visible === changed) return changed;
     visible = changed;
     setSharedActionVisible(actions, changed);
-    setSharedProfilePrimary(primary, { visible: changed, label: 'Сохранить', disabled: saving || priceSaving });
+    setSharedProfilePrimary(primary, { visible: changed, label: 'Сохранить', disabled: saving || assignmentSaving });
     return changed;
   };
 
-  bindServiceWorkplaceSelection(layer, {
+  bindServiceWorkplaceAssignments(layer, {
+    kind: 'product',
     selected: draft.workplaces,
-    getBaseCost: () => collectCost(layer, 'productCost'),
+    getBase: () => ({
+      cost: collectCost(layer, 'productCost'),
+      description: form.querySelector('[name="productAbout"]')?.value || '',
+    }),
     onChange: (workplaces) => {
       draft.workplaces = workplaces;
       syncDirty();
     },
-    onPersistPrice: async (workplaceId, cost, workplaceName) => {
-      if (!existing?.id) return; // Initial Q Save creates a new Product.
-      if (saving || priceSaving) throw new Error('Дождитесь завершения сохранения.');
-      priceSaving = true;
+    onPersistAssignment: async (workplaceId, assignment) => {
+      if (!existing?.id) return;
+      if (saving || assignmentSaving) throw new Error('Дождитесь завершения сохранения.');
+      assignmentSaving = true;
       syncDirty();
       try {
-        await persistServiceWorkplacePrice({
+        await persistServiceWorkplaceAssignment({
           entityId: existing.id,
           workplaceId,
-          workplaceName,
-          cost,
+          assignment,
           readEntity: (id) => getProducts().find((item) => String(item.id) === id),
           writeEntity: saveProductData,
           beforeWrite: (previous) => pushProductHistory(previous, 'updated'),
         });
-        initialSignature = rebaseWorkplacePriceSignature(initialSignature, workplaceId, cost);
+        initialSignature = rebaseWorkplaceAssignmentSignature(initialSignature, workplaceId, assignment);
       } finally {
-        priceSaving = false;
+        assignmentSaving = false;
         syncDirty();
       }
     },
   });
+
   form.addEventListener('input', syncDirty);
   form.addEventListener('change', syncDirty);
 
   const save = async () => {
-    if (saving || priceSaving || !syncDirty()) return null;
+    if (saving || assignmentSaving || !syncDirty()) return null;
     const data = new FormData(form);
     const name = String(data.get('productName') || '').trim();
     const error = layer.querySelector('[data-product-editor-error]');

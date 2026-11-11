@@ -29,7 +29,7 @@ import { personDisplay } from '../people/presentation.js';
 import { getProcedures } from '../service/procedures/data.js';
 import { openProcedureEditor } from '../service/procedures/procedures.js';
 import { assignProceduresToWorkplace } from '../service/procedures/assignment.js';
-import { costDefinitionForWorkplace, procedureCostForWorkplace, proceduresForWorkplace } from '../service/procedures/selection.js';
+import { costDefinitionForWorkplace, procedureCostForWorkplace, proceduresForWorkplace, procedureDurationForWorkplace, procedureGroupBookingForWorkplace } from '../service/procedures/selection.js';
 import {
   buildNaturalBookingTimeRows,
   checkTimeAvailability,
@@ -120,7 +120,7 @@ function professionalProvider() {
     procedureName: (item) => String(item?.name || ''),
     procedureCost: (item, workplaceId) => procedureCostForWorkplace(item, workplaceId),
     procedurePriceText: (item, workplaceId) => servicePriceText(item, workplaceId),
-    procedureDuration: (item) => Math.max(0, Number(item?.duration) || 0),
+    procedureDuration: (item, workplaceId) => procedureDurationForWorkplace(item, workplaceId),
     workingDates: (workplaceId) => getWorkplaceWorkingDates(workplaceId),
     timeRows({ workplaceId, date, procedures, state = {} }) {
       const duration = Math.max(5, procedures.reduce((sum, item) => sum + (Number(item.duration) || 0), 0));
@@ -186,8 +186,8 @@ function selectionEntry(provider, raw, workplaceId) {
     name: provider.procedureName(raw),
     cost: provider.procedureCost(raw, workplaceId),
     priceText: provider.procedurePriceText?.(raw, workplaceId) || '',
-    duration: provider.procedureDuration(raw),
-    raw,
+    duration: provider.procedureDuration(raw, workplaceId),
+    raw: { ...raw, groupBooking: procedureGroupBookingForWorkplace(raw, workplaceId) },
   };
 }
 

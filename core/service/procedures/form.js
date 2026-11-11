@@ -2,9 +2,10 @@ import { collectCost, validateCostDefinition, costField, durationPicker, field, 
 import { getProcedures, saveProcedure as saveProcedureData } from './data.js';
 import { flushBusinessPersistence } from '../../../core/business-persistence.js';
 import { setSharedActionVisible } from '../../../ui/page/page.js';
-import { procedureEditorSignature, rebaseWorkplacePriceSignature } from '../editor-signature.js';
-import { persistServiceWorkplacePrice } from '../workplace-price.js';
-import { bindServiceWorkplaceSelection, serviceWorkplaceSelector } from '../workplace-selection.js';
+import { procedureEditorSignature, rebaseWorkplaceAssignmentSignature } from '../editor-signature.js';
+import { persistServiceWorkplaceAssignment } from '../workplace-assignment.js';
+import { bindServiceWorkplaceAssignments, serviceWorkplaceAssignmentList } from '../workplace-selection.js';
+import { compactCheck } from '../../../ui/selection/check-list.js';
 
 export function initialProcedure(existing = null, defaultWorkplace = null) {
   if (existing) return {
@@ -24,6 +25,7 @@ export function initialProcedure(existing = null, defaultWorkplace = null) {
     breakDuration: 0,
     cost: { mode: 'amount', amount: '', free: false },
     groupBooking: { enabled: false, capacity: 2 },
+    visibleInPublicBooking: true,
     workplaces: defaultWorkplace ? [{ ...defaultWorkplace }] : [],
   };
 }
@@ -57,7 +59,8 @@ export function procedureEditorForm(procedure = initialProcedure()) {
         inputmode: 'numeric',
       })}
     </div>
-    ${serviceWorkplaceSelector(procedure.workplaces)}
+    ${compactCheck({ label: 'Для онлайн-записи', checked: procedure.visibleInPublicBooking !== false, data: 'data-procedure-online-check' })}
+    ${serviceWorkplaceAssignmentList()}
     <div class="form-error" data-procedure-editor-error></div>
   </form>`;
 }
@@ -84,47 +87,56 @@ export function bindProcedureEditor(root, {
       description: data.get('procedureDescription'),
       groupEnabled: draft.groupBooking?.enabled === true,
       groupCapacity: data.get('procedureGroupCapacity'),
+      visibleInPublicBooking: onlineCheck?.checked !== false,
       workplaces: draft.workplaces,
     });
   };
+  const onlineCheck = root.querySelector('[data-procedure-online-check]');
   let initialSignature = signature();
   const actions = primary.closest('.modal-actions');
   let visible = null;
   let saving = false;
-  let priceSaving = false;
+  let assignmentSaving = false;
   const syncDirty = () => {
     const changed = signature() !== initialSignature;
     if (visible === changed) return changed;
     visible = changed;
     setSharedActionVisible(actions, changed);
-    setSharedProfilePrimary(primary, { visible: changed, label: 'Сохранить', disabled: saving || priceSaving });
+    setSharedProfilePrimary(primary, { visible: changed, label: 'Сохранить', disabled: saving || assignmentSaving });
     return changed;
   };
 
-  bindServiceWorkplaceSelection(root, {
+  bindServiceWorkplaceAssignments(root, {
+    kind: 'procedure',
     selected: draft.workplaces,
-    getBaseCost: () => collectCost(root, 'procedureCost'),
+    getBase: () => ({
+      cost: collectCost(root, 'procedureCost'),
+      duration: Number(form.querySelector('[name="procedureDuration"]')?.value || 0),
+      breakDuration: Number(form.querySelector('[name="procedureBreak"]')?.value || 0),
+      description: form.querySelector('[name="procedureDescription"]')?.value || '',
+      visibleInPublicBooking: onlineCheck?.checked !== false,
+      groupBooking: draft.groupBooking,
+    }),
     onChange: (workplaces) => {
       draft.workplaces = workplaces;
       syncDirty();
     },
-    onPersistPrice: async (workplaceId, cost, workplaceName) => {
-      if (!existing?.id) return; // Initial Q Save creates a new Procedure.
-      if (saving || priceSaving) throw new Error('Дождитесь завершения сохранения.');
-      priceSaving = true;
+    onPersistAssignment: async (workplaceId, assignment) => {
+      if (!existing?.id) return; // First Q Save creates a new Procedure.
+      if (saving || assignmentSaving) throw new Error('Дождитесь завершения сохранения.');
+      assignmentSaving = true;
       syncDirty();
       try {
-        await persistServiceWorkplacePrice({
+        await persistServiceWorkplaceAssignment({
           entityId: existing.id,
           workplaceId,
-          workplaceName,
-          cost,
+          assignment,
           readEntity: (id) => getProcedures().find((item) => String(item.id) === id),
           writeEntity: saveProcedureData,
         });
-        initialSignature = rebaseWorkplacePriceSignature(initialSignature, workplaceId, cost);
+        initialSignature = rebaseWorkplaceAssignmentSignature(initialSignature, workplaceId, assignment);
       } finally {
-        priceSaving = false;
+        assignmentSaving = false;
         syncDirty();
       }
     },
@@ -148,6 +160,7 @@ export function bindProcedureEditor(root, {
     syncDirty();
   });
   syncGroupBooking();
+  onlineCheck?.addEventListener('change', syncDirty);
 
   form.addEventListener('input', syncDirty);
   form.addEventListener('change', syncDirty);
@@ -156,7 +169,7 @@ export function bindProcedureEditor(root, {
   });
 
   const save = async () => {
-    if (saving || priceSaving || !syncDirty()) return null;
+    if (saving || assignmentSaving || !syncDirty()) return null;
     const data = new FormData(form);
     const name = String(data.get('procedureName') || '').trim();
     const error = root.querySelector('[data-procedure-editor-error]');
@@ -187,6 +200,7 @@ export function bindProcedureEditor(root, {
       duration: Number(data.get('procedureDuration') || 0),
       breakDuration: Number(data.get('procedureBreak') || 0),
       cost: price,
+      visibleInPublicBooking: onlineCheck?.checked !== false,
       groupBooking: {
         enabled: groupEnabled,
         capacity: groupEnabled ? Math.min(999, groupCapacity) : Math.max(2, Math.floor(Number(draft.groupBooking?.capacity) || 2)),

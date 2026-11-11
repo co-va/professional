@@ -15,6 +15,14 @@ function workplaceSnapshot(workplaces = []) {
     .map((item) => ({
       id: text(item?.workplaceId || item?.id || item?.key),
       cost: item?.cost ? costSnapshot(item.cost) : null,
+      duration: item?.duration == null ? null : minutes(item.duration),
+      breakDuration: item?.breakDuration == null ? null : minutes(item.breakDuration),
+      description: item?.description == null ? null : String(item.description),
+      visibleInPublicBooking: item?.visibleInPublicBooking == null ? null : item.visibleInPublicBooking === true,
+      groupBooking: item?.groupBooking ? {
+        enabled: item.groupBooking.enabled === true,
+        capacity: Math.max(2, Math.floor(Number(item.groupBooking.capacity) || 2)),
+      } : null,
     }))
     .filter((item) => item.id)
     .sort((a, b) => a.id.localeCompare(b.id));
@@ -22,7 +30,7 @@ function workplaceSnapshot(workplaces = []) {
 
 export function procedureEditorSignature({
   name = '', duration = 0, breakDuration = 0, cost = {}, description = '',
-  groupEnabled = false, groupCapacity = 2, workplaces = [],
+  groupEnabled = false, groupCapacity = 2, visibleInPublicBooking = true, workplaces = [],
 } = {}) {
   const enabled = groupEnabled === true;
   const assignments = workplaceSnapshot(workplaces);
@@ -33,6 +41,7 @@ export function procedureEditorSignature({
     cost: costSnapshot(cost),
     description: text(description),
     groupEnabled: enabled,
+    visibleInPublicBooking: visibleInPublicBooking !== false,
     groupCapacity: enabled ? Math.max(2, Math.floor(Number(groupCapacity) || 2)) : null,
     workplaces: assignments,
   });
@@ -50,15 +59,17 @@ export function productEditorSignature({
 }
 
 
-// Only the workplace's price has been persisted. Preserve the baseline for
-// all unrelated fields and pending changes in the enclosing Q editor.
-export function rebaseWorkplacePriceSignature(signature, workplaceId, cost) {
+// Refresh the baseline only for the independently persisted assignment.
+// Pending unrelated Q edits must remain dirty.
+export function rebaseWorkplaceAssignmentSignature(signature, workplaceId, assignment = null) {
   const snapshot = JSON.parse(signature);
-  const id = String(workplaceId || '');
-  const assignments = Array.isArray(snapshot.workplaces) ? snapshot.workplaces : [];
-  const row = assignments.find((entry) => entry.id === id);
-  if (row) row.cost = cost === null ? null : costSnapshot(cost);
-  else assignments.push({ id, cost: cost === null ? null : costSnapshot(cost) });
-  snapshot.workplaces = assignments.sort((a, b) => a.id.localeCompare(b.id));
+  const id = text(workplaceId);
+  const before = Array.isArray(snapshot.workplaces) ? snapshot.workplaces : [];
+  const others = before.filter((row) => row.id !== id);
+  if (assignment) {
+    const next = workplaceSnapshot([{ ...assignment, workplaceId: id }])[0];
+    if (next) others.push(next);
+  }
+  snapshot.workplaces = others.sort((a, b) => a.id.localeCompare(b.id));
   return JSON.stringify(snapshot);
 }

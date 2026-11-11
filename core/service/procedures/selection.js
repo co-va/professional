@@ -49,3 +49,29 @@ export function procedureCostForWorkplace(procedure = {}, workplaceId = '') {
   const pricing = procedurePricingForWorkplace(procedure, workplaceId);
   return pricing.free ? '' : pricing.value;
 }
+
+
+export function procedureDurationForWorkplace(procedure = {}, workplaceId = '') {
+  const assigned = procedureWorkplaceAssignment(procedure, workplaceId)?.duration;
+  return Math.max(0, Number(assigned ?? procedure?.duration ?? 0) || 0);
+}
+
+export function procedureBreakForWorkplace(procedure = {}, workplaceId = '') {
+  const assigned = procedureWorkplaceAssignment(procedure, workplaceId)?.breakDuration;
+  return Math.max(0, Number(assigned ?? procedure?.breakDuration ?? 0) || 0);
+}
+
+export function procedureDescriptionForWorkplace(procedure = {}, workplaceId = '') {
+  const assigned = procedureWorkplaceAssignment(procedure, workplaceId)?.description;
+  return String(assigned ?? procedure?.description ?? '');
+}
+
+export function procedureVisibleInBooking(procedure = {}, workplaceId = '') {
+  if (procedure?.visibleInPublicBooking === false) return false;
+  const assignment = procedureWorkplaceAssignment(procedure, workplaceId);
+  return Boolean(assignment) && assignment?.visibleInPublicBooking !== false;
+}
+
+export function procedureGroupBookingForWorkplace(procedure = {}, workplaceId = '') {
+  return procedureWorkplaceAssignment(procedure, workplaceId)?.groupBooking || procedure?.groupBooking || { enabled: false, capacity: 2 };
+}

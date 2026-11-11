@@ -22,6 +22,7 @@ import { getWorkplaces } from '../../profile/workplaces/data.js';
 import { serviceHeaderContext, notifyServiceContext } from '../context.js';
 import { procedureCardAppearance, procedureCardFields, procedureCardPhoto } from '../card-presentation.js';
 import { bindProcedureEditor, initialProcedure, procedureEditorForm } from './form.js';
+import { serviceWorkplaceAddButton } from '../workplace-selection.js';
 import { deleteProcedure as deleteProcedureData, getProcedures, reorderProcedures } from './data.js';
 import { flushBusinessPersistence } from '../../../core/business-persistence.js';
 import { scheduleServiceStatistics, serviceItemStatistics, serviceSpentText } from '../statistics.js';
@@ -133,6 +134,7 @@ export function openProcedureEditor(root, existing = null, {
   const body = [
     procedureEditorForm(draft),
     actionBlock(button('Сохранить', { type: 'button', data: 'data-procedure-editor-primary', aria: 'Сохранить услугу' })),
+    `<div class="app-settings-panel">${serviceWorkplaceAddButton()}</div>`,
     existing ? `<div class="app-settings-panel">${button('Удалить услугу', {
       type: 'button',
       variant: 'outline',
