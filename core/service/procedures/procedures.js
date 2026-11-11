@@ -135,8 +135,7 @@ export function openProcedureEditor(root, existing = null, {
     `<div class="app-settings-panel service-workplace-add-panel">${serviceWorkplaceAddButton()}</div>`,
     existing ? `<div class="app-settings-panel">${button('Удалить услугу', {
       type: 'button',
-      variant: 'outline',
-      className: 'ui-button--delete-outline',
+      variant: 'danger',
       data: 'data-procedure-editor-delete',
     })}</div>` : '',
   ].join('');

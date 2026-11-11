@@ -164,8 +164,7 @@ export function openProductEditor(root, existing = null, {
     `<div class="app-settings-panel service-workplace-add-panel">${serviceWorkplaceAddButton()}</div>`,
     existing ? `<div class="app-settings-panel">${button('Удалить товар', {
       type: 'button',
-      variant: 'outline',
-      className: 'ui-button--delete-outline',
+      variant: 'danger',
       data: 'data-product-editor-delete',
     })}</div>` : '',
   ].join('');

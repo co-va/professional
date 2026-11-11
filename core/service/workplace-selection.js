@@ -137,7 +137,7 @@ export function bindServiceWorkplaceAssignments(root, {
           aria: 'Отменить индивидуальную цену',
         }) : ''}
         ${!isNew ? button('Убрать из услуги', {
-          variant: 'secondary', data: 'data-service-workplace-remove',
+          variant: 'danger', data: 'data-service-workplace-remove',
         }) : ''}
       </div>
     </div>`;
