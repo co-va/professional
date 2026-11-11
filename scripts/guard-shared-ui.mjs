@@ -92,7 +92,7 @@ assert(cardView.includes('openColorPickerAction({') && !cardView.includes('<span
 
 assert(mini.includes('--mini-card-width:238px'), 'MiniCard width changed');
 assert(rootSelectorCount(mini, '.mini-card') === 1, 'MiniCard geometry must have one owner');
-assert(/\.mini-card:has\(>\.mini-card__rows\):not\(\.mini-card--lines\)\s*\{[^}]*height:auto;[^}]*max-height:none;/.test(mini), 'MiniCard rows must expand height without expanding width');
+assert(!mini.includes('.mini-card:has(>.mini-card__rows)'), 'Do not override User MiniCard base geometry in Professional');
 
 
 // Shared MiniCard has one rounded geometry contract (co-va/user/staging).

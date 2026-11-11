@@ -23,7 +23,7 @@ assert.match(miniCardRail([card]), /data-mini-card-rail/, 'Shared rail remains u
 const expanded = miniCard({ title: 'Пространство', rows: Array.from({ length: 12 }, (_, i) => ({
   label: 'Строка ' + i, value: 'Значение ' + i,
 })) });
-assert.equal((expanded.match(/class="mini-card__row"/g) || []).length, 12, 'No additional lines are discarded');
+assert.equal((expanded.match(/class="mini-card__row"/g) || []).length, 12, 'Markup retains all supplied rows; the fixed User paper height is unchanged');
 assert.match(css, /\.mini-card\{[^}]*--mini-card-width:238px;[^}]*max-width:var\(--mini-card-width\)/,
   'Paper width must remain 238px');
 assert.match(css, /\.mini-card:has\(>\.mini-card__rows\):not\(\.mini-card--lines\)\s*\{[^}]*height:auto;[^}]*max-height:none;/,
@@ -37,4 +37,4 @@ assert.match(paired, /mini-card__line--pair/);
 assert.match(paired, /mini-card__line--moment/);
 assert.match(paired, /mini-card__line-right/);
 assert.match(js, /const hasCompactAction = Boolean/, 'User shared compact-action semantics must be used');
-console.log('PASS: User MiniCard markup, Professional labels and values, rounded corners, vertical expansion with fixed width');
+console.log('PASS: User MiniCard markup and fixed base geometry, Professional labels, rounded corners and variable-height line variant');
