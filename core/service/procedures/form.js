@@ -1,6 +1,8 @@
 import { collectCost, costField, durationPicker, field, initCostFields, initDurationPickers, setSharedProfilePrimary, textareaField, v2ListEntries, v2ListEntry } from '../../../ui/ui.js';
 import { saveProcedure as saveProcedureData } from './data.js';
 import { flushBusinessPersistence } from '../../../core/business-persistence.js';
+import { setSharedActionVisible } from '../../../ui/page/page.js';
+import { procedureEditorSignature } from './editor-signature.js';
 import { bindServiceWorkplaceSelection, serviceWorkplaceSelector } from '../workplace-selection.js';
 
 export function initialProcedure(existing = null, defaultWorkplace = null) {
@@ -28,11 +30,12 @@ export function initialProcedure(existing = null, defaultWorkplace = null) {
 export function procedureEditorForm(procedure = initialProcedure()) {
   return `<form class="compact-form" data-procedure-editor-form>
     ${field({ label: 'Название', name: 'procedureName', value: procedure.name || '', placeholder: 'Название услуги', required: true })}
-    ${costField({ value: procedure.cost || {}, name: 'procedureCost' })}
     <div class="work-time-row__fields">
       ${durationPicker({ label: 'Длительность', name: 'procedureDuration', value: procedure.duration || 0 })}
       ${durationPicker({ label: 'Перерыв', name: 'procedureBreak', value: procedure.breakDuration || 0 })}
     </div>
+    ${costField({ value: procedure.cost || {}, name: 'procedureCost' })}
+    ${textareaField({ label: 'Описание', name: 'procedureDescription', value: procedure.description || '', placeholder: 'Описание услуги' })}
     ${v2ListEntries([v2ListEntry({
       title: 'Групповая запись',
       subtitle: 'Разрешить запись нескольких людей',
@@ -53,7 +56,6 @@ export function procedureEditorForm(procedure = initialProcedure()) {
         inputmode: 'numeric',
       })}
     </div>
-    ${textareaField({ label: 'Описание', name: 'procedureDescription', value: procedure.description || '', placeholder: 'Описание услуги' })}
     ${serviceWorkplaceSelector(procedure.workplaces)}
     <div class="form-error" data-procedure-editor-error></div>
   </form>`;
@@ -70,9 +72,39 @@ export function bindProcedureEditor(root, {
 
   initCostFields(root);
   initDurationPickers(root);
+
+  const signature = () => {
+    const data = new FormData(form);
+    return procedureEditorSignature({
+      name: data.get('procedureName'),
+      duration: data.get('procedureDuration'),
+      breakDuration: data.get('procedureBreak'),
+      cost: collectCost(root, 'procedureCost'),
+      description: data.get('procedureDescription'),
+      groupEnabled: draft.groupBooking?.enabled === true,
+      groupCapacity: data.get('procedureGroupCapacity'),
+      workplaces: draft.workplaces,
+    });
+  };
+  const initialSignature = signature();
+  const actions = primary.closest('.modal-actions');
+  let visible = null;
+  let saving = false;
+  const syncDirty = () => {
+    const changed = signature() !== initialSignature;
+    if (visible === changed) return changed;
+    visible = changed;
+    setSharedActionVisible(actions, changed);
+    setSharedProfilePrimary(primary, { visible: changed, label: 'Сохранить', disabled: saving });
+    return changed;
+  };
+
   bindServiceWorkplaceSelection(root, {
     selected: draft.workplaces,
-    onChange: (workplaces) => { draft.workplaces = workplaces; },
+    onChange: (workplaces) => {
+      draft.workplaces = workplaces;
+      syncDirty();
+    },
   });
 
   const groupToggle = root.querySelector('[data-procedure-group-toggle]');
@@ -90,12 +122,18 @@ export function bindProcedureEditor(root, {
       capacity: Math.max(2, Math.floor(Number(draft.groupBooking?.capacity) || 2)),
     };
     syncGroupBooking();
+    syncDirty();
   });
   syncGroupBooking();
 
-  let saving = false;
+  form.addEventListener('input', syncDirty);
+  form.addEventListener('change', syncDirty);
+  form.addEventListener('click', (event) => {
+    if (event.target.closest('[data-cost-mode]')) syncDirty();
+  });
+
   const save = async () => {
-    if (saving) return null;
+    if (saving || !syncDirty()) return null;
     const data = new FormData(form);
     const name = String(data.get('procedureName') || '').trim();
     const error = root.querySelector('[data-procedure-editor-error]');
@@ -137,7 +175,7 @@ export function bindProcedureEditor(root, {
       return null;
     } finally {
       saving = false;
-      setSharedProfilePrimary(primary, { visible: true, label: 'Сохранить' });
+      setSharedProfilePrimary(primary, { visible, label: 'Сохранить' });
     }
     if (error) error.textContent = '';
     onSaved(item);
@@ -149,6 +187,6 @@ export function bindProcedureEditor(root, {
     event.preventDefault();
     void save();
   });
-  setSharedProfilePrimary(primary, { visible: true, label: 'Сохранить' });
+  syncDirty();
   return { save };
 }

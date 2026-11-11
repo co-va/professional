@@ -26,3 +26,5 @@ jobs:
           node-version: 24
       - name: Verify Shared workplace selector and Q ownership
         run: node scripts/ci/service-workplace-picker-smoke.mjs
+      - name: Verify Procedure field order and change-only Save
+        run: node scripts/ci/procedure-editor-state-smoke.mjs

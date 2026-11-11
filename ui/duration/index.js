@@ -86,6 +86,7 @@ function open(host){
     const total=hours*60+minutes;
     hidden.value=String(total);
     host.querySelector('[data-duration-open]').textContent=durationText(total);
+    hidden.dispatchEvent(new Event('change',{bubbles:true}));
     modalRoot.v2Close?.();
   });
 }
