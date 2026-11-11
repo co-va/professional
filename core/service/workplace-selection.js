@@ -1,5 +1,5 @@
 import { compactCheck } from '../../ui/selection/check-list.js';
-import { list } from '../../ui/lists/list.js';
+import { selectionTrigger } from '../../ui/selectors/index.js';
 import { modal, mountModal } from '../../ui/modals/index.js';
 import { escapeHtml } from '../../ui/utils/escape-html.js';
 import { getWorkplaces } from '../profile/workplaces/data.js';
@@ -24,15 +24,11 @@ function workplaceOptions() {
 // One compact row in Q. The existing X picker shows checkmarks only when tapped.
 export function serviceWorkplaceSelector(selected = []) {
   const count = selectedAssignmentMap(selected).size;
-  return list({
-    className: 'ui-list--dense',
-    items: [{
-      title: 'Рабочие пространства',
-      right: [count ? `Выбрано: ${count}` : 'Не выбрано'],
-      interactive: true,
-      data: 'data-service-workplace-open',
-      aria: 'Выбрать рабочие пространства',
-    }],
+  return selectionTrigger({
+    value: 'Рабочие пространства',
+    meta: count ? `Выбрано: ${count}` : 'Не выбрано',
+    data: 'data-service-workplace-open',
+    aria: 'Выбрать рабочие пространства',
   });
 }
 
@@ -54,7 +50,7 @@ export function bindServiceWorkplaceSelection(root, {
   });
   const syncSummary = () => {
     const count = read().length;
-    const countNode = trigger.querySelector('.ui-list__right-secondary span');
+    const countNode = trigger.querySelector('.ui-select__meta');
     if (countNode) countNode.textContent = count ? `Выбрано: ${count}` : 'Не выбрано';
   };
   const emit = () => {

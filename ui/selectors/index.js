@@ -156,6 +156,24 @@ function openSelector(trigger) {
   }
 }
 
+
+/** Shared presentation for all selectors, independent of selection cardinality. */
+function selectorControl({ value = '', meta = '', indicatorColor = '', attributes = '' } = {}) {
+  return `<button type="button" class="ui-select__control"${attributes ? ` ${attributes}` : ''}>
+      <span class="ui-select__selection">
+        <span class="ui-select__indicator"${indicatorColor ? ` style="--ui-select-indicator:${escapeHtml(indicatorColor)}"` : ' hidden'} aria-hidden="true"></span>
+        <span class="ui-select__text"><span class="ui-select__value">${escapeHtml(value)}</span><small class="ui-select__meta"${meta ? '' : ' hidden'}>${escapeHtml(meta)}</small></span>
+      </span>
+      <span class="ui-select__chevron" aria-hidden="true">⌄</span>
+    </button>`;
+}
+
+/** Shared selector appearance, external picker (e.g. multiple choice). */
+export function selectionTrigger({ value = 'Выбрать', meta = '', aria = '', data = '', className = '' } = {}) {
+  const attributes = `${data ? ` ${data}` : ''}${aria ? ` aria-label="${escapeHtml(aria)}"` : ''} aria-haspopup="dialog"`;
+  return `<div class="field ui-select${className ? ` ${escapeHtml(className)}` : ''}">${selectorControl({ value, meta, attributes })}</div>`;
+}
+
 export function select({ name = '', label = '', value = '', options = [], aria = '', className = '', data = '', searchable = false, allowCustom = false, placeholder = '' } = {}) {
   ensureSelectorEvents();
 
@@ -170,13 +188,12 @@ export function select({ name = '', label = '', value = '', options = [], aria =
   return `<label class="field ui-select ${escapeHtml(className)}">
     ${label ? `<span>${escapeHtml(label)}</span>` : ''}
     <input id="${inputId}" type="hidden" name="${escapeHtml(name)}" value="${escapeHtml(stringValue)}"${dataAttrs}>
-    <button type="button" class="ui-select__control" data-ui-select-trigger data-input-id="${inputId}" data-options="${optionData}" data-searchable="${searchable ? 'true' : 'false'}" data-allow-custom="${allowCustom ? 'true' : 'false'}" data-placeholder="${escapeHtml(placeholder)}"${aria ? ` aria-label="${escapeHtml(aria)}"` : ''}${dataAttrs}>
-      <span class="ui-select__selection">
-        <span class="ui-select__indicator"${current.indicatorColor ? ` style="--ui-select-indicator:${escapeHtml(current.indicatorColor)}"` : ' hidden'} aria-hidden="true"></span>
-        <span class="ui-select__text"><span class="ui-select__value">${escapeHtml(current.label)}</span><small class="ui-select__meta"${current.meta ? '' : ' hidden'}>${escapeHtml(current.meta || '')}</small></span>
-      </span>
-      <span class="ui-select__chevron" aria-hidden="true">⌄</span>
-    </button>
+    ${selectorControl({
+      value: current.label,
+      meta: current.meta || '',
+      indicatorColor: current.indicatorColor,
+      attributes: `data-ui-select-trigger data-input-id="${inputId}" data-options="${optionData}" data-searchable="${searchable ? 'true' : 'false'}" data-allow-custom="${allowCustom ? 'true' : 'false'}" data-placeholder="${escapeHtml(placeholder)}"${aria ? ` aria-label="${escapeHtml(aria)}"` : ''}${dataAttrs}`,
+    })}
   </label>`;
 }
 

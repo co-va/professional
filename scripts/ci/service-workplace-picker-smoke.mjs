@@ -19,7 +19,8 @@ function loadHelper(path, fn) {
 }
 
 const compactCheck = loadHelper('ui/selection/check-list.js', 'compactCheck');
-const list = loadHelper('ui/lists/list.js', 'list');
+const selectionTrigger = loadHelper('ui/selectors/index.js', 'selectionTrigger');
+const singleSelect = loadHelper('ui/selectors/index.js', 'select');
 const workplaces = [
   { key: 'a', name: 'Бьюти тория' },
   { key: 'b', name: 'Фея' },
@@ -48,10 +49,10 @@ const mountModal = (_root, surface) => {
 const module = source
   .replace(/^import\s+[\s\S]*?\sfrom\s+['"][^'"]+['"];\s*/gm, '')
   .replace(/^export\s+/gm, '');
-const picker = new Function('compactCheck', 'list', 'modal', 'mountModal', 'escapeHtml',
+const picker = new Function('compactCheck', 'selectionTrigger', 'modal', 'mountModal', 'escapeHtml',
   'getWorkplaces', 'document', module +
   '\nreturn { serviceWorkplaceSelector, bindServiceWorkplaceSelection };')(
-    compactCheck, list, modal, mountModal, escapeHtml,
+    compactCheck, selectionTrigger, modal, mountModal, escapeHtml,
     () => workplaces, { body: {} },
   );
 
@@ -62,7 +63,18 @@ const markup = picker.serviceWorkplaceSelector(selected);
 assert.match(markup, /data-service-workplace-open/);
 assert.match(markup, /Рабочие пространства/);
 assert.match(markup, /Выбрано: 1/);
-assert.match(markup, /ui-list--dense/);
+assert.match(markup, /ui-select__control/);
+assert.match(markup, /ui-select__value/);
+assert.match(markup, /ui-select__meta/);
+assert.doesNotMatch(markup, /ui-list--dense|ui-list__item/);
+const profession = singleSelect({ name: 'profession', value: 'Парикмахер', options: ['Парикмахер'] });
+assert.match(profession, /ui-select__control/);
+assert.match(profession, /ui-select__value/);
+assert.match(profession, /ui-select__chevron/);
+assert.match(markup, /ui-select__chevron/);
+const selectorCss = read('ui/selectors/selectors.css');
+assert.match(selectorCss, /--ui-selector-control-height:48px/);
+assert.match(selectorCss, /\.ui-select__control\{[^}]*min-height:var\(--ui-selector-control-height\)/);
 assert.doesNotMatch(markup, /type="checkbox"|data-add-workplace|data-workplace-selector|app-notification/);
 const count = { textContent: 'Выбрано: 1' };
 const trigger = {
