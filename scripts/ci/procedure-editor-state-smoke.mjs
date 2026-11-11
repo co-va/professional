@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { procedureEditorSignature } from '../../core/service/procedures/editor-signature.js';
+import { procedureEditorSignature } from '../../core/service/editor-signature.js';
 
 const original = {
   name: 'Укладка', duration: 30, breakDuration: 0,

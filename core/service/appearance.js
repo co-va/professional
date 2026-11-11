@@ -1,9 +1,8 @@
 import { openEntityCardAppearanceQ } from '../../ui/ui.js';
 import { getCardAppearanceTemplate, saveCardAppearanceTemplate } from '../../core/card-appearance-templates.js';
-import { getSettlementItemTotals } from '../../core/finance/index.js';
-import { getRecords, getRecordsForProcedure } from '../../core/record/index.js';
-import { getProcedures, saveProcedure } from './procedures/data.js';
-import { getProducts, pushProductHistory, saveProduct } from './products/data.js';
+import { getProcedures, resetProcedureCardAppearances, saveProcedure } from './procedures/data.js';
+import { getProducts, pushProductHistory, resetProductCardAppearances, saveProduct } from './products/data.js';
+import { serviceItemStatistics, serviceSpentText } from './statistics.js';
 import {
   procedureCardAppearance,
   procedureCardFields,
@@ -30,29 +29,6 @@ function serviceTargetOptions(type) {
   ];
 }
 
-function recordsFor(type, id) {
-  const key = type === 'product' ? 'products' : 'procedures';
-  const records = type === 'procedure' ? getRecordsForProcedure(id) : getRecords();
-  return records.filter((record) => record?.status !== 'cancelled'
-    && (record?.[key] || []).some((item) => String(item?.id || '') === String(id || '')));
-}
-
-function spentMinutes(records = [], procedure = {}) {
-  return records.reduce((sum, record) => {
-    const item = (record?.procedures || []).find((value) => String(value?.id || '') === String(procedure.id || ''));
-    return sum + Math.max(0, Number(item?.duration ?? procedure.duration ?? 0) || 0);
-  }, 0);
-}
-
-function spentText(minutes = 0) {
-  const total = Math.max(0, Number(minutes) || 0);
-  const hours = Math.floor(total / 60);
-  const rest = total % 60;
-  if (!hours) return `${rest} мин`;
-  if (!rest) return `${hours} ч`;
-  return `${hours} ч ${rest} мин`;
-}
-
 function serviceAppearanceEditor(type, target) {
   const values = serviceEntities(type);
   const selected = target === 'all'
@@ -62,25 +38,23 @@ function serviceAppearanceEditor(type, target) {
 
   if (type === 'product') {
     const product = selected || { id: '', name: 'Товар', photo: '', cardAppearance: {}, workplaces: [], cost: {} };
-    const records = product.id ? recordsFor(type, product.id) : [];
-    const fact = product.id ? getSettlementItemTotals('product', product.id) : { factTotal: 0 };
+    const statistics = serviceItemStatistics('product', product);
     return {
       appearance: target === 'all' && template?.appearance ? template.appearance : productCardAppearance(product),
-      fields: productCardFields(product, { saleCount: records.length, revenue: fact.factTotal }),
+      fields: productCardFields(product, { saleCount: statistics.count, revenue: statistics.revenue }),
       photo: target === 'all' ? String(template?.photo || product.photo || '') : productCardPhoto(product),
       photoPosition: String(template?.photoPosition || '50% 50%'),
     };
   }
 
   const procedure = selected || { id: '', name: 'Услуга', photo: '', cardAppearance: {}, workplaces: [], cost: {}, duration: 0 };
-  const records = procedure.id ? recordsFor(type, procedure.id) : [];
-  const fact = procedure.id ? getSettlementItemTotals('procedure', procedure.id) : { factTotal: 0 };
+  const statistics = serviceItemStatistics('procedure', procedure);
   return {
     appearance: target === 'all' && template?.appearance ? template.appearance : procedureCardAppearance(procedure),
     fields: procedureCardFields(procedure, {
-      recordCount: records.length,
-      spentTime: spentText(spentMinutes(records, procedure)),
-      revenue: fact.factTotal,
+      recordCount: statistics.count,
+      spentTime: serviceSpentText(statistics.minutes),
+      revenue: statistics.revenue,
     }),
     photo: target === 'all' ? String(template?.photo || procedure.photo || '') : procedureCardPhoto(procedure),
     photoPosition: String(template?.photoPosition || '50% 50%'),
@@ -94,10 +68,8 @@ async function saveServiceAppearance({ type, target, appearance, photo, editor }
       photo,
       photoPosition: editor?.photoPosition || '50% 50%',
     });
-    serviceEntities(type).forEach((item) => {
-      if (type === 'product') saveProduct({ ...item, cardAppearance: {}, updatedAt: new Date().toISOString() });
-      else saveProcedure({ ...item, cardAppearance: {}, updatedAt: new Date().toISOString() });
-    });
+    if (type === 'product') resetProductCardAppearances();
+    else resetProcedureCardAppearances();
     return;
   }
 

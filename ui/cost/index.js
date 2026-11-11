@@ -1,5 +1,5 @@
 const esc=(v='')=>String(v).replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
-const money=v=>v===''||v==null?'':`${Number(v).toLocaleString('ru-RU')} ₽`;
+const money=v=>{if(v===''||v==null)return '';const n=Number(String(v).replace(',','.'));return Number.isFinite(n)?`${n.toLocaleString('ru-RU')} ₽`:''};
 
 export function costField({name='cost',value={},modes=['amount','from','from-to'],free=true}={}){const mode=value.mode||'amount';return `<div class="cost-field" data-cost-field="${esc(name)}"><span class="cost-field__label">Стоимость</span>${free?`<label class="cost-free"><input type="checkbox" data-cost-free ${value.free?'checked':''}><span>Бесплатно</span></label>`:''}<div class="segment-control cost-modes" data-cost-modes>${modes.map(m=>`<button type="button" data-cost-mode="${m}" class="${mode===m?'is-active':''}">${m==='amount'?'Стоимость':m==='from'?'от':'от–до'}</button>`).join('')}</div><div class="cost-inputs" data-cost-inputs>${renderInputs(mode,value)}</div></div>`}
 function renderInputs(mode,v){if(v.free)return '';if(mode==='from-to')return `<div class="cost-range"><label class="field"><span>от</span><input type="number" min="0" step="1" data-cost-from value="${esc(v.from??'')}" inputmode="decimal"></label><label class="field"><span>до</span><input type="number" min="0" step="1" data-cost-to value="${esc(v.to??'')}" inputmode="decimal"></label></div>`;return `<label class="field"><span>${mode==='from'?'от':'Сумма'}</span><input type="number" min="0" step="1" data-cost-amount value="${esc(mode==='from'?(v.from!==''&&v.from!=null?v.from:(v.amount??'')):(v.amount!==''&&v.amount!=null?v.amount:(v.from??'')))}" inputmode="decimal"></label>`}
@@ -55,9 +55,9 @@ export function collectCost(root,name='cost'){const host=root.querySelector(`[da
 
 export function costListParts(cost={}){
   if(cost?.free)return{rightTop:'Бесплатно',rightBottom:''};
-  if(cost?.mode==='from-to')return{rightTop:`от ${money(cost.from)}`,rightBottom:`до ${money(cost.to)}`};
-  if(cost?.mode==='from')return{rightTop:`от ${money(cost.from??cost.amount)}`,rightBottom:''};
-  return{rightTop:money(cost?.amount??cost?.from),rightBottom:''};
+  if(cost?.mode==='from-to'){const from=money(cost.from),to=money(cost.to);return{rightTop:from?`от ${from}`:'',rightBottom:to?`до ${to}`:''}}
+  if(cost?.mode==='from'){const from=money(cost.from!==''&&cost.from!=null?cost.from:cost.amount);return{rightTop:from?`от ${from}`:'',rightBottom:''}}
+  return{rightTop:money(cost?.amount!==''&&cost?.amount!=null?cost.amount:cost?.from),rightBottom:''};
 }
 
 export function costCardMeta(cost={}){
@@ -65,4 +65,23 @@ export function costCardMeta(cost={}){
   if(cost?.mode==='from-to')return[{value:`от ${money(cost.from)}`},{value:`до ${money(cost.to)}`}];
   if(cost?.mode==='from')return[{value:'от'},{value:money(cost.from??cost.amount)}];
   return[{value:'стоимость'},{value:money(cost?.amount??cost?.from)||'—'}];
+}
+
+/** Validate the same price object that collectCost() submits. */
+export function validateCostDefinition(cost = {}) {
+  if (cost?.free === true) return '';
+  const mode = ['amount', 'from', 'from-to'].includes(cost?.mode) ? cost.mode : 'amount';
+  const raw = mode === 'from-to' ? [cost.from, cost.to] : [mode === 'from' ? (cost.from ?? cost.amount) : cost.amount];
+  if (raw.every((value) => value == null || String(value).trim() === '')) return '';
+  if (raw.some((value) => value == null || String(value).trim() === '')) {
+    return 'Укажите обе границы диапазона стоимости.';
+  }
+  const amounts = raw.map((value) => Number(String(value).replace(',', '.')));
+  if (amounts.some((value) => !Number.isFinite(value) || value < 0)) {
+    return 'Стоимость должна быть неотрицательным числом.';
+  }
+  if (mode === 'from-to' && amounts[1] < amounts[0]) {
+    return 'Стоимость «до» не может быть меньше стоимости «от».';
+  }
+  return '';
 }

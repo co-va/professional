@@ -18,37 +18,15 @@ import {
   v2ZLayer,
   workplaceCountText,
 } from '../../../ui/ui.js';
-import { getSettlementItemTotals, getSettlementItemTotalsForRecords } from '../../../core/finance/index.js';
-import { getRecordsForProcedure } from '../../../core/record/index.js';
 import { getWorkplaces } from '../../profile/workplaces/data.js';
 import { serviceHeaderContext, notifyServiceContext } from '../context.js';
 import { procedureCardAppearance, procedureCardFields, procedureCardPhoto } from '../card-presentation.js';
 import { bindProcedureEditor, initialProcedure, procedureEditorForm } from './form.js';
 import { deleteProcedure as deleteProcedureData, getProcedures, reorderProcedures } from './data.js';
 import { flushBusinessPersistence } from '../../../core/business-persistence.js';
+import { scheduleServiceStatistics, serviceItemStatistics, serviceSpentText } from '../statistics.js';
 
 const money = (value) => `${new Intl.NumberFormat('ru-RU').format(Number(value || 0))} ₽`;
-
-function activeProcedureRecords(procedureId) {
-  const id = String(procedureId || '');
-  return getRecordsForProcedure(id).filter((record) => record?.status !== 'cancelled');
-}
-
-function spentMinutes(records, procedure) {
-  return (Array.isArray(records) ? records : []).reduce((sum, record) => {
-    const item = (record?.procedures || []).find((value) => String(value?.id || '') === String(procedure?.id || ''));
-    return sum + Math.max(0, Number(item?.duration ?? procedure?.duration ?? 0) || 0);
-  }, 0);
-}
-
-function spentText(minutes) {
-  const total = Math.max(0, Number(minutes) || 0);
-  const hours = Math.floor(total / 60);
-  const rest = total % 60;
-  if (!hours) return `${rest} мин`;
-  if (!rest) return `${hours} ч`;
-  return `${hours} ч ${rest} мин`;
-}
 
 function procedureRow(procedure) {
   const price = costListParts(procedure.cost);
@@ -84,15 +62,14 @@ export function renderProcedureCatalog(host, { root = host, onChanged = () => {}
   });
 }
 
-function procedureOverviewCard(procedure, records) {
-  const fact = getSettlementItemTotals('procedure', procedure.id);
+function procedureOverviewCard(procedure, statistics = null) {
   return entityVisualCard({
     appearance: procedureCardAppearance(procedure),
-    fields: procedureCardFields(procedure, {
-      recordCount: records.length,
-      spentTime: spentText(spentMinutes(records, procedure)),
-      revenue: fact.factTotal,
-    }),
+    fields: procedureCardFields(procedure, statistics ? {
+      recordCount: statistics.count,
+      spentTime: serviceSpentText(statistics.minutes),
+      revenue: statistics.revenue,
+    } : null),
     image: procedureCardPhoto(procedure),
     className: 'entity-visual-card--service',
     interactive: true,
@@ -101,25 +78,18 @@ function procedureOverviewCard(procedure, records) {
   });
 }
 
-function procedureWorkplaceCards(procedure, records) {
+function procedureWorkplaceCards(procedure, statistics = null) {
   const byId = new Map(getWorkplaces().map((workplace) => [String(workplace.key || workplace.id || ''), workplace]));
-  const byWorkplace = new Map();
-  for (const record of records) {
-    const id = String(record?.workplaceId || '');
-    if (!byWorkplace.has(id)) byWorkplace.set(id, []);
-    byWorkplace.get(id).push(record);
-  }
   const cards = (procedure.workplaces || []).map((selection) => {
     const id = String(selection.workplaceId || selection.id || selection.key || '');
     const workplace = byId.get(id) || selection;
-    const workplaceRecords = byWorkplace.get(id) || [];
-    const fact = getSettlementItemTotalsForRecords('procedure', procedure.id, workplaceRecords.map((record) => record.id));
+    const group = statistics?.byWorkplace.get(id) || null;
     return miniCard({
       title: workplace.name || selection.name || 'Рабочее пространство',
       rows: [
-        { label: 'Кол-во', value: String(workplaceRecords.length) },
-        { label: 'Время', value: spentText(spentMinutes(workplaceRecords, procedure)) },
-        { label: 'Сумма', value: money(fact.factTotal) },
+        { label: 'Кол-во', value: statistics ? String(group?.count || 0) : '—' },
+        { label: 'Время', value: statistics ? serviceSpentText(group?.minutes || 0) : '—' },
+        { label: 'Сумма', value: statistics ? money(group?.revenue || 0) : '—' },
       ],
     });
   });
@@ -199,19 +169,18 @@ export function openProcedureEditor(root, existing = null, {
   return layer;
 }
 
-function renderProcedureOverview(layer, baseRoot, id, { onChanged = () => {} } = {}) {
+function renderProcedureOverview(layer, baseRoot, id, { onChanged = () => {}, statistics = null } = {}) {
   const procedure = getProcedures().find((item) => String(item.id) === String(id));
   if (!procedure) {
     layer.v2Close?.();
     onChanged();
     return;
   }
-  // Project Record/Finance once per opened entity, not once per workplace card.
-  const records = activeProcedureRecords(procedure.id);
+  layer.dataset.serviceOverview = 'procedure:' + id;
   layer.innerHTML = page([
     serviceHeaderContext({ title: procedure.name || 'Услуга' }),
-    procedureOverviewCard(procedure, records),
-    procedureWorkplaceCards(procedure, records),
+    procedureOverviewCard(procedure, statistics),
+    procedureWorkplaceCards(procedure, statistics),
   ]);
   layer.querySelector('[data-procedure-open-editor]')?.addEventListener('click', () => {
     openProcedureEditor(baseRoot, procedure, {
@@ -223,6 +192,15 @@ function renderProcedureOverview(layer, baseRoot, id, { onChanged = () => {} } =
     });
   });
   notifyServiceContext();
+  if (!statistics) {
+    scheduleServiceStatistics(layer, 'procedure', id, () => {
+      const latest = getProcedures().find((item) => String(item.id) === String(id));
+      if (latest) renderProcedureOverview(layer, baseRoot, id, {
+        onChanged,
+        statistics: serviceItemStatistics('procedure', latest),
+      });
+    });
+  }
 }
 
 export function openProcedureOverview(root, id, { onChanged = () => {} } = {}) {

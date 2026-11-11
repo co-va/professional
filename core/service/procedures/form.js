@@ -1,8 +1,8 @@
-import { collectCost, costField, durationPicker, field, initCostFields, initDurationPickers, setSharedProfilePrimary, textareaField, v2ListEntries, v2ListEntry } from '../../../ui/ui.js';
+import { collectCost, validateCostDefinition, costField, durationPicker, field, initCostFields, initDurationPickers, setSharedProfilePrimary, textareaField, v2ListEntries, v2ListEntry } from '../../../ui/ui.js';
 import { saveProcedure as saveProcedureData } from './data.js';
 import { flushBusinessPersistence } from '../../../core/business-persistence.js';
 import { setSharedActionVisible } from '../../../ui/page/page.js';
-import { procedureEditorSignature } from './editor-signature.js';
+import { procedureEditorSignature } from '../editor-signature.js';
 import { bindServiceWorkplaceSelection, serviceWorkplaceSelector } from '../workplace-selection.js';
 
 export function initialProcedure(existing = null, defaultWorkplace = null) {
@@ -141,6 +141,12 @@ export function bindProcedureEditor(root, {
       if (error) error.textContent = 'Укажите название услуги.';
       return null;
     }
+    const price = collectCost(root, 'procedureCost');
+    const priceError = validateCostDefinition(price);
+    if (priceError) {
+      if (error) error.textContent = priceError;
+      return null;
+    }
     const groupEnabled = draft.groupBooking?.enabled === true;
     const groupCapacity = Math.floor(Number(data.get('procedureGroupCapacity')) || Number(draft.groupBooking?.capacity) || 0);
     if (groupEnabled && groupCapacity < 2) {
@@ -157,7 +163,7 @@ export function bindProcedureEditor(root, {
       description: String(data.get('procedureDescription') || '').trim(),
       duration: Number(data.get('procedureDuration') || 0),
       breakDuration: Number(data.get('procedureBreak') || 0),
-      cost: collectCost(root, 'procedureCost'),
+      cost: price,
       groupBooking: {
         enabled: groupEnabled,
         capacity: groupEnabled ? Math.min(999, groupCapacity) : Math.max(2, Math.floor(Number(draft.groupBooking?.capacity) || 2)),

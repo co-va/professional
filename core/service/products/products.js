@@ -2,6 +2,7 @@ import {
   actionBlock,
   button,
   collectCost,
+  validateCostDefinition,
   costField,
   costListParts,
   emptyState,
@@ -23,12 +24,13 @@ import {
   v2ZLayer,
   workplaceCountText,
 } from '../../../ui/ui.js';
-import { getSettlementItemTotals, getSettlementItemTotalsForRecords } from '../../../core/finance/index.js';
-import { getRecords } from '../../../core/record/index.js';
 import { getWorkplaces } from '../../profile/workplaces/data.js';
 import { serviceHeaderContext, notifyServiceContext } from '../context.js';
 import { bindServiceWorkplaceSelection, serviceWorkplaceSelector } from '../workplace-selection.js';
 import { flushBusinessPersistence } from '../../../core/business-persistence.js';
+import { setSharedActionVisible } from '../../../ui/page/page.js';
+import { productEditorSignature } from '../editor-signature.js';
+import { scheduleServiceStatistics, serviceItemStatistics } from '../statistics.js';
 import { productCardAppearance, productCardFields, productCardPhoto } from '../card-presentation.js';
 import { deleteProduct as deleteProductData, getProducts, pushProductHistory, reorderProducts, saveProduct as saveProductData } from './data.js';
 
@@ -47,14 +49,6 @@ function initialProduct(existing = null) {
     about: '',
     workplaces: [],
   };
-}
-
-function activeProductRecords(productId, workplaceId = '') {
-  const id = String(productId || '');
-  const workspace = String(workplaceId || '');
-  return getRecords().filter((record) => record?.status !== 'cancelled'
-    && (!workspace || String(record?.workplaceId || '') === workspace)
-    && (record?.products || []).some((item) => String(item?.id || '') === id));
 }
 
 function productRow(product) {
@@ -91,15 +85,13 @@ export function renderProductCatalog(host, { root = host, onChanged = () => {} }
   });
 }
 
-function productOverviewCard(product) {
-  const records = activeProductRecords(product.id);
-  const fact = getSettlementItemTotals('product', product.id);
+function productOverviewCard(product, statistics = null) {
   return entityVisualCard({
     appearance: productCardAppearance(product),
-    fields: productCardFields(product, {
-      saleCount: records.length,
-      revenue: fact.factTotal,
-    }),
+    fields: productCardFields(product, statistics ? {
+      saleCount: statistics.count,
+      revenue: statistics.revenue,
+    } : null),
     image: productCardPhoto(product),
     className: 'entity-visual-card--service',
     interactive: true,
@@ -108,18 +100,17 @@ function productOverviewCard(product) {
   });
 }
 
-function productWorkplaceCards(product) {
+function productWorkplaceCards(product, statistics = null) {
   const byId = new Map(getWorkplaces().map((workplace) => [String(workplace.key || workplace.id || ''), workplace]));
   const cards = (product.workplaces || []).map((selection) => {
     const id = String(selection.workplaceId || selection.id || selection.key || '');
     const workplace = byId.get(id) || selection;
-    const records = activeProductRecords(product.id, id);
-    const fact = getSettlementItemTotalsForRecords('product', product.id, records.map((record) => record.id));
+    const group = statistics?.byWorkplace.get(id) || null;
     return miniCard({
       title: workplace.name || selection.name || 'Рабочее пространство',
       rows: [
-        { label: 'Кол-во', value: String(records.length) },
-        { label: 'Сумма', value: money(fact.factTotal) },
+        { label: 'Кол-во', value: statistics ? String(group?.count || 0) : '—' },
+        { label: 'Сумма', value: statistics ? money(group?.revenue || 0) : '—' },
       ],
     });
   });
@@ -188,21 +179,55 @@ export function openProductEditor(root, existing = null, {
   if (!layer) return null;
 
   initCostFields(layer);
-  bindServiceWorkplaceSelection(layer, {
-    selected: draft.workplaces,
-    onChange: (workplaces) => { draft.workplaces = workplaces; },
-  });
-
   const form = layer.querySelector('[data-product-editor-form]');
   const primary = layer.querySelector('[data-product-editor-primary]');
+  if (!form || !primary) return layer;
+
+  const signature = () => {
+    const data = new FormData(form);
+    return productEditorSignature({
+      name: data.get('productName'),
+      cost: collectCost(layer, 'productCost'),
+      description: data.get('productAbout'),
+      workplaces: draft.workplaces,
+    });
+  };
+  const initialSignature = signature();
+  const actions = primary.closest('.modal-actions');
+  let visible = null;
   let saving = false;
+  const syncDirty = () => {
+    const changed = signature() !== initialSignature;
+    if (visible === changed) return changed;
+    visible = changed;
+    setSharedActionVisible(actions, changed);
+    setSharedProfilePrimary(primary, { visible: changed, label: 'Сохранить', disabled: saving });
+    return changed;
+  };
+
+  bindServiceWorkplaceSelection(layer, {
+    selected: draft.workplaces,
+    onChange: (workplaces) => {
+      draft.workplaces = workplaces;
+      syncDirty();
+    },
+  });
+  form.addEventListener('input', syncDirty);
+  form.addEventListener('change', syncDirty);
+
   const save = async () => {
-    if (saving || !form) return null;
+    if (saving || !syncDirty()) return null;
     const data = new FormData(form);
     const name = String(data.get('productName') || '').trim();
     const error = layer.querySelector('[data-product-editor-error]');
     if (!name) {
       if (error) error.textContent = 'Укажите название товара.';
+      return null;
+    }
+    const price = collectCost(layer, 'productCost');
+    const priceError = validateCostDefinition(price);
+    if (priceError) {
+      if (error) error.textContent = priceError;
       return null;
     }
     saving = true;
@@ -212,7 +237,7 @@ export function openProductEditor(root, existing = null, {
       id: existing?.id || crypto.randomUUID(),
       photo: String(draft.photo || existing?.photo || ''),
       name,
-      cost: collectCost(layer, 'productCost'),
+      cost: price,
       about: String(data.get('productAbout') || '').trim(),
       workplaces: Array.isArray(draft.workplaces) ? draft.workplaces.map((value) => ({ ...value })) : [],
       createdAt: existing?.createdAt || new Date().toISOString(),
@@ -227,7 +252,7 @@ export function openProductEditor(root, existing = null, {
       return null;
     } finally {
       saving = false;
-      setSharedProfilePrimary(primary, { visible: true, label: 'Сохранить' });
+      setSharedProfilePrimary(primary, { visible, label: 'Сохранить' });
     }
     if (error) error.textContent = '';
     layer.v2Close?.();
@@ -249,22 +274,23 @@ export function openProductEditor(root, existing = null, {
       });
     });
   }
-  setSharedProfilePrimary(primary, { visible: true, label: 'Сохранить' });
+  syncDirty();
   notifyServiceContext();
   return layer;
 }
 
-function renderProductOverview(layer, baseRoot, id, { onChanged = () => {} } = {}) {
+function renderProductOverview(layer, baseRoot, id, { onChanged = () => {}, statistics = null } = {}) {
   const product = getProducts().find((item) => String(item.id) === String(id));
   if (!product) {
     layer.v2Close?.();
     onChanged();
     return;
   }
+  layer.dataset.serviceOverview = 'product:' + id;
   layer.innerHTML = page([
     serviceHeaderContext({ title: product.name || 'Товар' }),
-    productOverviewCard(product),
-    productWorkplaceCards(product),
+    productOverviewCard(product, statistics),
+    productWorkplaceCards(product, statistics),
   ]);
   layer.querySelector('[data-product-open-editor]')?.addEventListener('click', () => {
     openProductEditor(baseRoot, product, {
@@ -276,6 +302,15 @@ function renderProductOverview(layer, baseRoot, id, { onChanged = () => {} } = {
     });
   });
   notifyServiceContext();
+  if (!statistics) {
+    scheduleServiceStatistics(layer, 'product', id, () => {
+      const latest = getProducts().find((item) => String(item.id) === String(id));
+      if (latest) renderProductOverview(layer, baseRoot, id, {
+        onChanged,
+        statistics: serviceItemStatistics('product', latest),
+      });
+    });
+  }
 }
 
 export function openProductOverview(root, id, { onChanged = () => {} } = {}) {

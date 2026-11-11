@@ -18,9 +18,9 @@ export function procedureCardFields(procedure = {}, stats = {}) {
     { value: 'cost', label: 'Стоимость', text: costText(procedure.cost) },
     { value: 'groupBooking', label: 'Групповая запись', text: procedure?.groupBooking?.enabled === true ? `До ${Math.max(2, Math.floor(Number(procedure?.groupBooking?.capacity) || 2))} человек` : 'Нет' },
     { value: 'workplaceCount', label: 'Кол-во пространств', text: String((procedure.workplaces || []).length) },
-    { value: 'recordCount', label: 'Кол-во записей', text: String(Number(stats.recordCount || 0)) },
-    { value: 'spentTime', label: 'Потраченное время', text: String(stats.spentTime || '') },
-    { value: 'revenue', label: 'Заработанная сумма', text: money(stats.revenue || 0) },
+    { value: 'recordCount', label: 'Кол-во записей', text: stats === null ? '—' : String(Number(stats.recordCount || 0)) },
+    { value: 'spentTime', label: 'Потраченное время', text: stats === null ? '—' : String(stats.spentTime || '') },
+    { value: 'revenue', label: 'Заработанная сумма', text: stats === null ? '—' : money(stats.revenue || 0) },
   ];
 }
 
@@ -50,8 +50,8 @@ export function productCardFields(product = {}, stats = {}) {
     { value: 'name', label: 'Наименование', text: String(product.name || '') },
     { value: 'cost', label: 'Стоимость', text: costText(product.cost) },
     { value: 'workplaceCount', label: 'Кол-во пространств', text: String((product.workplaces || []).length) },
-    { value: 'saleCount', label: 'Кол-во продаж', text: String(Number(stats.saleCount || 0)) },
-    { value: 'revenue', label: 'Заработанная сумма', text: money(stats.revenue || 0) },
+    { value: 'saleCount', label: 'Кол-во продаж', text: stats === null ? '—' : String(Number(stats.saleCount || 0)) },
+    { value: 'revenue', label: 'Заработанная сумма', text: stats === null ? '—' : money(stats.revenue || 0) },
   ];
 }
 

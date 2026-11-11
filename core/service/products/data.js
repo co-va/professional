@@ -68,3 +68,17 @@ export function reorderProducts(ids = []) {
   writeProducts([...order.map((id) => byId.get(id)), ...deleted]);
   return true;
 }
+
+// Reset all local overrides in one domain-owned write when a shared card
+// template is applied. No per-entity queue/serialization storm.
+export function resetProductCardAppearances() {
+  const values = readRawProducts();
+  let changed = 0;
+  const updated = values.map((item) => {
+    if (item.deletedAt || !item.cardAppearance || !Object.keys(item.cardAppearance).length) return item;
+    changed += 1;
+    return { ...item, cardAppearance: {}, updatedAt: new Date().toISOString() };
+  });
+  if (changed) writeProducts(updated);
+  return changed;
+}

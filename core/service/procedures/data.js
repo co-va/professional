@@ -65,3 +65,17 @@ export function reorderProcedures(ids = []) {
   writeProcedures([...order.map((id) => byId.get(id)), ...deleted]);
   return true;
 }
+
+// Reset all local overrides in one domain-owned write when a shared card
+// template is applied. No per-entity queue/serialization storm.
+export function resetProcedureCardAppearances() {
+  const values = readRawProcedures();
+  let changed = 0;
+  const updated = values.map((item) => {
+    if (item.deletedAt || !item.cardAppearance || !Object.keys(item.cardAppearance).length) return item;
+    changed += 1;
+    return { ...item, cardAppearance: {}, updatedAt: new Date().toISOString() };
+  });
+  if (changed) writeProcedures(updated);
+  return changed;
+}

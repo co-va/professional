@@ -36,8 +36,10 @@ function hydrate(remote = {}) {
 }
 
 let businessStateLoad = null;
+let businessEpoch = 0;
 if (typeof window !== 'undefined') {
   window.addEventListener('professional:auth-logout', () => {
+    businessEpoch += 1;
     businessStateLoad = null;
     setBusinessServerReady(false);
   });
@@ -45,15 +47,20 @@ if (typeof window !== 'undefined') {
 export function loadBusinessState() {
   if (!businessStateLoad) {
     setBusinessServerReady(false);
+    const epoch = businessEpoch;
     businessStateLoad = apiRequest('/business-state/journal')
       .then((response) => payload(response, 'Не удалось загрузить данные Журнала'))
       .then((remote) => {
+        if (epoch !== businessEpoch) return null;
         hydrate(remote);
         setBusinessServerReady(true);
         return remote;
       })
       .catch((error) => {
-        if (epoch === businessEpoch) businessStateLoad = null;
+        if (epoch === businessEpoch) {
+          businessStateLoad = null;
+          setBusinessServerReady(false);
+        }
         throw error;
       });
   }
