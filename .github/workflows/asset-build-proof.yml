@@ -1,0 +1,33 @@
+name: Professional / Temporary Asset Build Proof
+on:
+  push:
+    branches: [staging]
+    paths:
+      - 'scripts/build-web.mjs'
+      - 'Dockerfile'
+      - 'nginx.conf'
+      - '.github/workflows/asset-build-proof.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify immutable asset build
+        run: |
+          npm install --no-save --no-package-lock esbuild@0.25.12
+          node scripts/build-web.mjs
+          grep -Eq '/assets/[0-9a-f]{20}/professional-[A-Za-z0-9_-]+\.js' dist/index.html
+          grep -Eq '/assets/[0-9a-f]{20}/online-booking/booking-entry-[A-Za-z0-9_-]+\.js' dist/booking.html
+          grep -Eq '/assets/[0-9a-f]{20}/invite/invite-[A-Za-z0-9_-]+\.js' dist/invite/index.html
+          test "$(find dist/assets -name 'styles-*.css' | wc -l)" -ge 4
+      - name: Verify deployable Docker image and Nginx configuration
+        run: |
+          docker build --progress=plain -t professional-asset-proof .
+          docker run --rm professional-asset-proof nginx -t
