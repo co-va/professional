@@ -971,3 +971,9 @@ Professional отделён только если одновременно до�
 - Core owns `TenantAccountPresence`, authentication and Admin online/offline projection (120-second threshold); Professional owns no presence database, custom auth transport or extra session lifecycle.
 - Launch dependency: Core migration + API deployment must happen before live status appears. This staging frontend will silently retry after transient 404/unavailability and must not be mistaken for successful backend deployment.
 - Manual isolated check: `node scripts/ci/presence-runtime-smoke.mjs`. No permanent Professional CI introduced.
+
+### 2026-11-11 — оптимизация доставки статики (staging)
+- Docker собирает JS в ESM entrypoints/chunks и объединяет CSS каждого HTML в порядке исходных подключений. Исходные Shared UI и бизнес-логика не изменяются.
+- Файлы `/assets/<sha256>/...` имеют `Cache-Control: public, max-age=31536000, immutable`; HTML остаётся `no-cache`. Каждая новая сборка получает новый URL и не требует ручной очистки кеша.
+- Проверена реальная Docker-сборка, все пять HTML-страниц, Nginx `-t`; временная CI-проверка удалена после успешного прогона. `core` и `main` не затронуты.
+- Ускорение на физическом iPhone и серверные задержки API отдельно не замерены, поэтому абсолютных значений скорости не заявлять.
