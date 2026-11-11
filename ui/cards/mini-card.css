@@ -11,3 +11,11 @@
 
 .mini-card--lines{height:auto;min-height:176px;max-height:none;grid-template-rows:auto auto;padding:14px 16px}.mini-card__lines{display:grid;gap:4px;align-content:start}.mini-card__line,.mini-card__line-action{width:100%;min-width:0}.mini-card__line{display:block;font-size:12px;line-height:1.2;white-space:normal;overflow-wrap:anywhere}.mini-card__line--left{text-align:left}.mini-card__line--right{text-align:right}.mini-card__line.is-strong{font-weight:800}.mini-card__line--title{font-size:11px;line-height:1.15;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.mini-card__line--primary{font-size:16px;line-height:1.05;font-weight:850;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.mini-card__line--muted{font-size:10.5px;line-height:1.15;font-weight:450;color:#777A7D;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.mini-card__line-action{border:0;padding:0;background:transparent;color:inherit;font:inherit;text-align:inherit;cursor:pointer}.mini-card--lines .mini-card__rows{margin-top:6px}.mini-card--lines .mini-card__row{min-height:26px;padding:4px 0}.mini-card--lines .mini-card__row-value{font-size:16px}
 .mini-card--dual-action{position:relative}.mini-card--dual-action .mini-card__head{padding-right:38px}.mini-card--lines.mini-card--dual-action .mini-card__line:nth-child(-n+2){box-sizing:border-box;padding-right:38px}.mini-card__surface-action{position:absolute;inset:0;z-index:1;border:0;border-radius:inherit;padding:0;background:transparent;cursor:pointer}.mini-card__surface-action:focus-visible{outline:2px solid #111;outline-offset:-4px}.mini-card__compact-action{position:absolute;top:10px;right:10px;z-index:2;width:30px;height:30px;border:0;border-radius:9px;padding:0;display:grid;place-items:center;background:#111;color:#fff;font:inherit;font-size:18px;line-height:1;cursor:pointer}.mini-card__compact-action:active{transform:translateY(1px)}.mini-card__compact-action:focus-visible{outline:2px solid #111;outline-offset:2px}
+
+/* A MiniCard with extra factual rows grows vertically, never horizontally.
+   Exact 238px paper width and existing professional content stay unchanged.
+   Bounded line-layout cards (record/payment) retain their feature geometry. */
+.mini-card:has(>.mini-card__rows):not(.mini-card--lines){
+  height:auto;
+  max-height:none;
+}

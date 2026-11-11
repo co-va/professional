@@ -17,14 +17,18 @@ function rowMarkup(row = {}) {
 function lineMarkup(line = {}) {
   const value = escapeHtml(line.value || '');
   const align = line.align === 'right' ? 'right' : 'left';
-  const variant = ['title', 'primary', 'muted'].includes(line.variant) ? line.variant : '';
+  const variant = ['title', 'primary', 'muted', 'moment'].includes(line.variant) ? line.variant : '';
   const classes = [
     'mini-card__line',
     `mini-card__line--${align}`,
     variant ? `mini-card__line--${variant}` : '',
+    line.rightValue != null && line.rightValue !== '' ? 'mini-card__line--pair' : '',
     line.strong ? 'is-strong' : '',
   ].filter(Boolean).join(' ');
-  const content = `<span class="${classes}">${value || '&nbsp;'}</span>`;
+  const right = line.rightValue != null && line.rightValue !== ''
+    ? `<span class="mini-card__line-text">${value || '&nbsp;'}</span><strong class="mini-card__line-right">${escapeHtml(line.rightValue)}</strong>`
+    : (value || '&nbsp;');
+  const content = `<span class="${classes}">${right}</span>`;
   if (line.data) {
     return `<button type="button" class="mini-card__line-action"${attrs(line.data, line.aria || line.value)}>${content}</button>`;
   }
@@ -57,14 +61,15 @@ export function miniCard({
   const resolvedCompactAction = compactAction && typeof compactAction === 'object'
     ? compactAction
     : null;
-  const dualAction = Boolean(interactive && resolvedCompactAction?.data && resolvedCompactAction?.label);
+  const hasCompactAction = Boolean(resolvedCompactAction?.data && resolvedCompactAction?.label);
+  const dualAction = Boolean(interactive && hasCompactAction);
   const tag = dualAction ? 'section' : interactive ? 'button' : 'section';
   const resolvedSurface = surface === 'photo' ? 'photo' : 'default';
   const classes = [
     'mini-card',
     `mini-card--surface-${resolvedSurface}`,
     interactive ? 'mini-card--interactive' : '',
-    dualAction ? 'mini-card--dual-action' : '',
+    hasCompactAction ? 'mini-card--dual-action' : '',
     image ? 'has-image' : '',
     className,
   ].filter(Boolean).join(' ');
@@ -86,7 +91,7 @@ export function miniCard({
   const surfaceAction = dualAction
     ? `<button type="button" class="mini-card__surface-action"${attrs(data, aria || title)}></button>`
     : '';
-  const compactActionMarkup = dualAction
+  const compactActionMarkup = hasCompactAction
     ? `<button type="button" class="mini-card__compact-action"${attrs(resolvedCompactAction.data, resolvedCompactAction.aria || resolvedCompactAction.label)}>${escapeHtml(resolvedCompactAction.label)}</button>`
     : '';
 
