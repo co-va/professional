@@ -606,17 +606,33 @@ export async function openInventoryConsumption(root, { record = null, onSaved = 
 }
 
 function openMovementKind(root) {
-  openSharedProfileSettingsMenu({
-    title: 'Операция',
-    actions: [
-      { id: 'receipt', label: 'Приход', onSelect: () => openMovementEditor(root, '', 'RECEIPT') },
-      { id: 'consumption', label: 'Расход', onSelect: () => { void openInventoryConsumption(root, { onSaved: () => renderMovements(root) }); } },
-      { id: 'write-off', label: 'Списание', onSelect: () => openMovementEditor(root, '', 'WRITE_OFF') },
-      { id: 'return', label: 'Возврат', onSelect: () => openMovementEditor(root, '', 'RETURN') },
-      ...(canUseCapability('inventory.stocktake.access') ? [
-        { id: 'stocktake', label: 'Инвентаризация', onSelect: () => openInventoryAuditSelection(root, { onSaved: () => renderMovements(root) }) },
-      ] : []),
-    ],
+  const choices = [
+    ['RECEIPT', 'Приход'],
+    ['CONSUMPTION', 'Расход'],
+    ['WRITE_OFF', 'Списание'],
+    ['RETURN', 'Возврат'],
+    ...(canUseCapability('inventory.stocktake.access') ? [['ADJUSTMENT', 'Инвентаризация']] : []),
+  ];
+  // Bind actions to the actual X surface, without an intermediary settings callback.
+  // Reuse shared settings-panel spacing rather than a row of adjacent buttons.
+  const markup = `<div class="app-settings-panel">${choices.map(([kind, label]) => button(label, {
+    className: 'app-settings-panel__button',
+    variant: 'outline',
+    data: `data-inventory-operation="${kind}"`,
+  })).join('')}</div>`;
+  const layer = mountModal(root, modal(markup, { title: 'Операция', variant: 'x', xRole: 'action' }));
+  layer?.addEventListener('click', event => {
+    const control = event.target.closest?.('[data-inventory-operation]');
+    if (!control || !layer.contains(control)) return;
+    const kind = control.dataset.inventoryOperation;
+    layer.v2Close?.();
+    if (kind === 'ADJUSTMENT') {
+      openInventoryAuditSelection(root, { onSaved: () => renderMovements(root) });
+    } else if (kind === 'CONSUMPTION') {
+      openMovementEditor(root, '', 'CONSUMPTION');
+    } else {
+      openMovementEditor(root, '', kind);
+    }
   });
 }
 
