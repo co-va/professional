@@ -27,7 +27,7 @@ import { setSharedActionVisible } from '../../ui/page/page.js';
 import { getCardAppearanceTemplate, saveCardAppearanceTemplate } from '../card-appearance-templates.js';
 import { loadAuxiliaryState } from '../runtime/auxiliary-state.js';
 import { inventoryManufacturerCompletion } from './completeness.js';
-import { openInventoryProductOverview } from './product-overview.js';
+import { openInventoryProductAppearanceQ, openInventoryProductOverview } from './product-overview.js';
 import {
   getInventoryItem,
   getInventoryItems,
@@ -652,6 +652,17 @@ function openManufacturerStock(root, manufacturer) {
     openSharedProfileSettingsMenu({
       title: '',
       actions: [
+        {
+          id: 'appearance',
+          label: 'Вид',
+          variant: 'secondary',
+          onSelect: () => {
+            // One shared inventory-item appearance for all products.
+            // This product supplies only preview values in the existing card constructor.
+            const sample = getInventoryItems().find((item) => manufacturerName(item) === manufacturer);
+            if (sample) openInventoryProductAppearanceQ(sample.itemId, renderList);
+          },
+        },
         { id: 'sort', label: 'Сортировка', variant: 'secondary', onSelect: () => openStockControls(layer, 'items', manufacturer, renderList, 'sort') },
         { id: 'filter', label: 'Фильтр', variant: 'secondary', onSelect: () => openStockControls(layer, 'items', manufacturer, renderList, 'filter') },
       ],
