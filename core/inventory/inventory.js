@@ -27,6 +27,7 @@ import { setSharedActionVisible } from '../../ui/page/page.js';
 import { getCardAppearanceTemplate, saveCardAppearanceTemplate } from '../card-appearance-templates.js';
 import { loadAuxiliaryState } from '../runtime/auxiliary-state.js';
 import { inventoryManufacturerCompletion } from './completeness.js';
+import { openInventoryProductOverview } from './product-overview.js';
 import {
   getInventoryItem,
   getInventoryItems,
@@ -228,7 +229,6 @@ function advancedItemFields(item = {}) {
       { value: 'track', label: 'Только учёт' },
     ] })}
     ${field({ label: 'Категория', name: 'category', value: item.category || '' })}
-    ${field({ label: 'Основной поставщик', name: 'supplier', value: item.supplier || '' })}
     ${field({ label: 'Место хранения', name: 'location', value: item.location || '' })}
     ${field({ label: 'Артикул', name: 'sku', value: item.sku || '' })}
     ${field({ label: 'Штрихкод', name: 'barcode', value: item.barcode || '' })}
@@ -242,29 +242,8 @@ function advancedItemFields(item = {}) {
       field({ label: 'Масса тары, г', name: 'tareWeight', value: item.tareWeight ?? '', type: 'number', min: '0', step: '0.001', inputmode: 'decimal' }),
       { ariaLabel: 'Масса упаковки и тары' },
     )}
-    ${field({ label: 'Масса нетто, г', name: 'netWeight', value: '', readonly: true })}`;
-}
-
-function productReadouts(item = {}) {
-  const offers = Array.isArray(item.supplierOffers) ? item.supplierOffers : [];
-  const supplierRows = offers.map((offer) => {
-    const listPrice = offer.listPrice == null ? null : Number(offer.listPrice);
-    const discount = offer.discountPercent == null ? 0 : Number(offer.discountPercent);
-    const actual = offer.actualPrice == null ? null : Number(offer.actualPrice);
-    const price = actual ?? (listPrice == null ? null : listPrice * (1 - discount / 100));
-    const details = [
-      offer.listPrice == null ? '' : `Прайс ${moneyText(listPrice)}`,
-      offer.discountPercent == null ? '' : `−${numberText(discount)}%`,
-    ].filter(Boolean).join(' · ');
-    const supplier = String(offer.supplier || 'Поставщик').trim();
-    return `<div><span>${escapeHtml([supplier, details].filter(Boolean).join(' · '))}</span><strong>${escapeHtml(price == null ? 'Цена не указана' : moneyText(price))}</strong></div>`;
-  }).join('');
-  return `
-    <div class="entity-details entity-details--split">
-      <div><span>Текущий остаток</span><strong>${escapeHtml(`${numberText(item.balance)} ${item.unit}`)}</strong></div>
-      ${item.lastPurchasePrice == null ? '' : `<div><span>Последняя закупка</span><strong>${escapeHtml(moneyText(item.lastPurchasePrice))}</strong></div>`}
-    </div>
-    ${supplierRows ? `<div class="entity-details entity-details--split">${supplierRows}</div>` : ''}`;
+    ${field({ label: 'Масса нетто, г', name: 'netWeight', value: '', readonly: true })}
+    ${field({ label: 'Базовая цена, ₽', name: 'referencePrice', value: item.referencePrice ?? '', type: 'number', min: '0', step: '0.01', inputmode: 'decimal' })}`;
 }
 
 function collectOptionalNumber(form, name) {
@@ -285,7 +264,6 @@ function openItemEditor(root, itemId = '', defaults = {}, onSaved = () => {}) {
         { ariaLabel: 'Учёт продукта и номинал упаковки' },
       )}
       ${creating ? '' : advancedItemFields(item)}
-      ${creating ? '' : productReadouts(item)}
       ${actionBlock(button(creating ? 'Применить' : 'Сохранить', { type: 'button', data: 'data-inventory-item-save', aria: creating ? 'Добавить продукт' : 'Сохранить продукт' }))}
     </form>`;
   const layer = mountModal(document.body, modal(markup, {
@@ -347,6 +325,7 @@ function openItemEditor(root, itemId = '', defaults = {}, onSaved = () => {}) {
       const usage = String(data.get('usage') || 'consume');
       Object.assign(value, {
         productType: String(data.get('productType') || '').trim(),
+        referencePrice: collectOptionalNumber(form, 'referencePrice'),
         category: String(data.get('category') || '').trim(),
         supplier: String(data.get('supplier') || '').trim(),
         location: String(data.get('location') || '').trim(),
@@ -365,7 +344,6 @@ function openItemEditor(root, itemId = '', defaults = {}, onSaved = () => {}) {
       if (creating) await createInventoryItem(value);
       else await updateInventoryItem(item.itemId, value);
       layer.v2Close?.();
-      renderStock(root);
       onSaved();
     } catch (error) {
       primary.disabled = false;
@@ -660,7 +638,13 @@ function openManufacturerStock(root, manufacturer) {
   const renderList = () => {
     const query = searchInput?.value || '';
     if (listHost) listHost.innerHTML = stockListMarkup(manufacturer, query);
-    listHost?.querySelectorAll('[data-inventory-item]').forEach((control) => control.addEventListener('click', () => openItemEditor(root, control.dataset.inventoryItem, {}, renderList)));
+    listHost?.querySelectorAll('[data-inventory-item]').forEach((control) => control.addEventListener('click', () => {
+      const itemId = control.dataset.inventoryItem;
+      openInventoryProductOverview(itemId, {
+        edit: (onSaved) => openItemEditor(root, itemId, {}, onSaved),
+        onChanged: renderList,
+      });
+    }));
   };
 
   searchInput?.addEventListener('input', renderList);
@@ -748,7 +732,7 @@ function renderStock(root) {
       ],
     });
   });
-  root.querySelector('[data-inventory-add-item]')?.addEventListener('click', () => openItemEditor(root));
+  root.querySelector('[data-inventory-add-item]')?.addEventListener('click', () => openItemEditor(root, '', {}, () => renderStock(root)));
   renderManufacturers();
   notifyContext();
 }
