@@ -135,8 +135,8 @@ function openAssignmentAction(tag, assignment, refresh) {
   };
   const showActions = () => {
     host.innerHTML = actionBlock(
-      button('Удалить ярлык', { variant: 'danger', data: 'data-tag-detach' }) +
-      button('Перенести', { variant: 'secondary', data: 'data-tag-transfer' }),
+      button('Перенести', { variant: 'secondary', data: 'data-tag-transfer' }) +
+      button('Удалить ярлык', { variant: 'danger', data: 'data-tag-detach' }),
     );
     host.querySelector('[data-tag-detach]')?.addEventListener('click', () => { void apply(); });
     host.querySelector('[data-tag-transfer]')?.addEventListener('click', showTransfer);
