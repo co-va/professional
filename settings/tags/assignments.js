@@ -12,6 +12,25 @@ function includesTag(values, tag) {
   });
 }
 
+export function replaceAssignmentTag(values, fromTag, toId = '') {
+  const raw = list(values);
+  if (!raw.some((value) => {
+    const id = value && typeof value === 'object' ? text(value.id ?? value.tagId) : text(value);
+    return id === text(fromTag.id) || (id && id === text(fromTag.name));
+  })) throw new Error('Ярлык уже снят с этой позиции.');
+
+  const remaining = raw.filter((value) => {
+    const id = value && typeof value === 'object' ? text(value.id ?? value.tagId) : text(value);
+    return id !== text(fromTag.id) && id !== text(fromTag.name);
+  });
+  const target = text(toId);
+  if (target && !remaining.some((value) => {
+    const id = value && typeof value === 'object' ? text(value.id ?? value.tagId) : text(value);
+    return id === target;
+  })) remaining.push(target);
+  return remaining;
+}
+
 const definitions = [
   {
     source: 'people', kind: 'Человек', id: (item) => item.key || item.id,
@@ -37,6 +56,8 @@ export function tagAssignments(tag = {}, sources = {}) {
       if (!id) continue;
       results.push({
         key: `${definition.source}:${id}`,
+        source: definition.source,
+        id,
         kind: definition.kind,
         title: text(definition.label(item)),
       });

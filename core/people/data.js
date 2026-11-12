@@ -1,6 +1,6 @@
 import { normalizePhoneForStorage, phonesMatch } from '../phone/index.js';
 import { getMembers, getUEI } from '../uei.js';
-import { queuePersonDelete, queuePersonUpsert } from '../business-persistence.js';
+import { flushBusinessPersistence, isBusinessServerReady, queuePersonDelete, queuePersonUpsert } from '../business-persistence.js';
 import { getTags } from '../../settings/tags/data.js';
 import { getPersonDepositPriceConditions } from '../loyalty/deposit/data.js';
 import { describePriceConditionConflict, resolvePersonPriceCondition } from '../loyalty/price-condition.js';
@@ -187,6 +187,32 @@ export function savePeople(people = []) {
       void queuePersonUpsert(next.person, next.position);
     }
   }
+}
+
+// Targeted tag mutation, persisted before changing the Person projection.
+export async function commitPersonTags(keyValue, tagIds = []) {
+  if (!isBusinessServerReady()) throw new Error('Нет соединения с сервером. Ярлык не изменён.');
+  const key = String(keyValue || '');
+  await flushBusinessPersistence();
+  const index = peopleState.findIndex((person) => person.key === key);
+  if (index < 0) throw new Error('Человек не найден.');
+  const before = clone(peopleState[index]);
+  const updated = normalizePerson({ ...before, tags: normalizeTagAssignments(tagIds) });
+  const result = await queuePersonUpsert(updated, index);
+  if (result?.ok === false) throw result.error || new Error('Не удалось сохранить ярлык.');
+  const currentIndex = peopleState.findIndex((person) => person.key === key);
+  if (currentIndex < 0) return updated;
+  const current = peopleState[currentIndex];
+  if (JSON.stringify(current) !== JSON.stringify(before)) {
+    // Another owner mutation happened during the request; keep its fields.
+    const reconciled = normalizePerson({ ...current, tags: updated.tags });
+    const retry = await queuePersonUpsert(reconciled, currentIndex);
+    if (retry?.ok === false) throw retry.error || new Error('Не удалось сохранить ярлык.');
+    peopleState[currentIndex] = clone(reconciled);
+    return clone(reconciled);
+  }
+  peopleState[currentIndex] = clone(updated);
+  return clone(updated);
 }
 
 export function createPerson(name, surname, phone = '') {

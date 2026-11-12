@@ -1,4 +1,4 @@
-import { queueAuxiliaryDataset } from '../../core/business-persistence.js';
+import { flushBusinessPersistence, isBusinessServerReady, queueAuxiliaryDataset } from '../../core/business-persistence.js';
 
 let tagsState = [];
 
@@ -30,6 +30,18 @@ export function getTags() {
 export function saveTags(tags = []) {
   tagsState = (Array.isArray(tags) ? tags : []).map(normalizeTag);
   void queueAuxiliaryDataset('tags', tagsState);
+}
+
+// ACK-first path for editor actions. Do not change the legacy saveTags
+// contract used elsewhere in the existing application.
+export async function commitTags(tags = []) {
+  if (!isBusinessServerReady()) throw new Error('Нет соединения с сервером. Ярлык не сохранён.');
+  await flushBusinessPersistence();
+  const next = (Array.isArray(tags) ? tags : []).map(normalizeTag);
+  const result = await queueAuxiliaryDataset('tags', next);
+  if (result?.ok === false) throw result.error || new Error('Не удалось сохранить ярлык.');
+  tagsState = next;
+  return getTags();
 }
 
 export function createTag({ name, color }) {
