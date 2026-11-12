@@ -1,7 +1,6 @@
 /* Root Z keeps only the compact Shared Header footprint required by its affordance. */
 [data-v2-z-header]:has(> [data-v2-z-header-content]:empty){
   min-height:28px!important;
-  padding-bottom:0!important;
   background:var(--v2-white,#fff)!important;
 }
 
@@ -33,3 +32,9 @@
 [data-v2-q-body] > .workspace-header-context + .entity-details{
   margin-top:0;
 }
+
+/* Shared Z header alone owns spacing; no second margins on search/navigation. */
+[data-v2-z-header-content] .ui-search-field{padding:0}
+[data-v2-z-header-content] .ui-search-divider{margin:var(--v2-z-header-spacing) 0 0}
+[data-v2-z-header-content] .segment-control{margin-bottom:0}
+[data-v2-z-header] > [data-v2-z-dismiss]{margin-bottom:0!important}

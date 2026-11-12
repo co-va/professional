@@ -2,20 +2,38 @@ import { v2ZDismissAffordance } from './z-affordance.js';
 
 const Z_VIEWPORT_OVERSCAN = 'var(--v2-z-viewport-overscan)';
 const Q_HEADER_BODY_GAP = '18px';
-const Z_HEADER_BODY_GAP = '14px';
+// One spacing value for all three Z Header rows and gaps between controls.
+// Use the existing 12px application spacing: no per-screen sizes.
+const Z_HEADER_SPACING = '12px';
 
-const Z_HEADER_STYLE = [
+const SHARED_SURFACE_HEADER_STYLE = [
   'position:relative',
   'z-index:20',
   'box-sizing:border-box',
   'min-height:28px',
   'margin:0 -18px',
   'padding:0 18px 0 0',
-  'display:flex',
   'flex:0 0 auto',
+  'background:var(--v2-white,#fff)',
+];
+
+// Z: spacer / flexible content with a vertically centred dismiss / spacer.
+const Z_HEADER_STYLE = [
+  ...SHARED_SURFACE_HEADER_STYLE,
+  `--v2-z-header-spacing:${Z_HEADER_SPACING}`,
+  'display:grid',
+  'grid-template-columns:24px minmax(0,1fr)',
+  'align-items:center',
+  'padding-top:var(--v2-z-header-spacing)',
+  'padding-bottom:var(--v2-z-header-spacing)',
+].join(';');
+
+// Q has its own approved geometry; changing Z does not reposition Q.
+const Q_HEADER_STYLE = [
+  ...SHARED_SURFACE_HEADER_STYLE,
+  'display:flex',
   'flex-direction:row',
   'align-items:flex-start',
-  'background:var(--v2-white,#fff)',
 ].join(';');
 
 const Z_HEADER_CONTENT_STYLE = [
@@ -25,7 +43,7 @@ const Z_HEADER_CONTENT_STYLE = [
   'padding-left:18px',
   'display:flex',
   'flex-direction:column',
-  'gap:8px',
+  'gap:var(--v2-z-header-spacing,8px)',
 ].join(';');
 
 const Z_BODY_STYLE = [
@@ -65,9 +83,7 @@ function surfaceHeader(content = '', { kind = 'z', dismiss = true } = {}) {
   const data = kind === 'q' ? 'data-v2-q-header' : 'data-v2-z-header';
   const contentData = kind === 'q' ? 'data-v2-q-header-content' : 'data-v2-z-header-content';
   const contentStyle = visibleWorkAreaStyle(Z_HEADER_CONTENT_STYLE, kind);
-  // Reserve a persistent gap below Z navigation, even while its body scrolls.
-  // Empty Z headers remain compact via surface-header.css.
-  const headerStyle = kind === 'z' ? `${Z_HEADER_STYLE};padding-bottom:${Z_HEADER_BODY_GAP}` : Z_HEADER_STYLE;
+  const headerStyle = kind === 'z' ? Z_HEADER_STYLE : Q_HEADER_STYLE;
   return `<div ${data} style="${headerStyle}">${dismiss ? v2ZDismissAffordance() : ''}<div ${contentData} style="${contentStyle}">${content}</div></div>`;
 }
 
