@@ -547,15 +547,18 @@ function openStockControls(trigger, level, manufacturer, onChange) {
       options: stockSortOptions(level),
       aria: 'Сортировка остатков',
     })}
-    ${select({
+    ${level === 'items' ? select({
       label: 'Фильтр',
       name: 'inventoryType',
       value: STOCK_VIEW[typeKey],
-      options: stockTypeOptions(level === 'items' ? manufacturer : ''),
+      options: stockTypeOptions(manufacturer),
       aria: 'Фильтр по типу продукта',
-    })}
+    }) : ''}
   </div>`;
-  const modalRoot = mountModal(trigger, modal(content, { title: 'Сортировка и фильтр', variant: 'x' }));
+  const modalRoot = mountModal(trigger, modal(content, {
+    title: level === 'manufacturers' ? 'Сортировка' : 'Сортировка и фильтр',
+    variant: 'x',
+  }));
   modalRoot?.querySelector('input[name="inventorySort"]')?.addEventListener('change', (event) => {
     STOCK_VIEW[sortKey] = event.target.value;
     onChange?.();
@@ -648,9 +651,9 @@ function renderStock(root) {
   ]);
   // Canonical Z1 header search: identical shell/spacing to Contacts.
   // Only manufacturer cards belong to the scrollable Z1 body.
-  const [searchRow] = setV2ZHeaderRows(root, [`<div class="ui-search-field">
+  const [searchRow] = setV2ZHeaderRows(root, [`<div class="people-search ui-search-field">
     ${field({ name: 'inventorySearch', type: 'search', placeholder: 'Название, тип, артикул…', autocomplete: 'off', data: 'data-inventory-stock-search' })}
-    <div class="ui-search-divider" aria-hidden="true"></div>
+    <div class="people-search-divider ui-search-divider" aria-hidden="true"></div>
   </div>`]);
   const searchInput = searchRow?.querySelector('[data-inventory-stock-search]') || null;
   const listHost = root.querySelector('[data-inventory-manufacturer-list]');
@@ -665,7 +668,7 @@ function renderStock(root) {
       title: 'Настройки остатков',
       actions: [
         { id: 'appearance', label: 'Вид', onSelect: () => openManufacturerAppearance(root, renderManufacturers) },
-        { id: 'controls', label: 'Сортировка и фильтр', onSelect: () => openStockControls(root, 'manufacturers', '', renderManufacturers) },
+        { id: 'controls', label: 'Сортировка', onSelect: () => openStockControls(root, 'manufacturers', '', renderManufacturers) },
       ],
     });
   });
