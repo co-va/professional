@@ -1,6 +1,6 @@
 import {
   actionBlock, button, emptyState, entityCardDefaultRows, entityVisualCard, field,
-  modal, mountModal, openEntityCardAppearanceQ, openNotice, openSharedProfileSettingsMenu,
+  modal, mountModal, openEntityCardAppearanceQ, openNotice,
   page, select, twoColumnLayout, v2ListEntries, v2ListEntry, v2Section,
   workspaceHeaderContext,
 } from '../../ui/ui.js';
@@ -230,7 +230,7 @@ function openSupplierEditor(itemId, offerId = '', onSaved = () => {}) {
   return layer;
 }
 
-function openProductAppearance(itemId, onSaved) {
+export function openInventoryProductAppearanceQ(itemId, onSaved = () => {}) {
   const item = getInventoryItem(itemId);
   if (!item) return null;
   return openEntityCardAppearanceQ(document.body, {
@@ -305,27 +305,15 @@ export function openInventoryProductOverview(itemId, { edit = () => {}, onChange
     const host = layer.querySelector('[data-inventory-product-overview]');
     if (!host) return;
     host.innerHTML = page([
-      workspaceHeaderContext({
-        title: item.name,
-        v: { data: 'data-inventory-product-view', aria: 'Вид карты продукта' },
-      }),
+      workspaceHeaderContext({ title: item.name }),
       productCard(item),
-      v2Section('Поставщики', supplierRows(item) + actionBlock(button('Добавить', {
+      v2Section('Поставщики', supplierRows(item) + button('Добавить', {
         variant: 'secondary', data: 'data-inventory-supplier-add', aria: 'Добавить место покупки',
-      }))),
+      })),
       button('Удалить продукт', {
         variant: 'critical', data: 'data-inventory-product-delete',
       }),
     ]);
-    host.querySelector('[data-inventory-product-view]')?.addEventListener('click', () => {
-      openSharedProfileSettingsMenu({
-        title: '',
-        actions: [{
-          id: 'appearance', label: 'Вид',
-          onSelect: () => openProductAppearance(itemId, render),
-        }],
-      });
-    });
     host.querySelector('[data-inventory-product-card]')?.addEventListener('click', () => {
       edit(() => {
         render();
