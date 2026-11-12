@@ -909,14 +909,9 @@ function openInventoryAuditSelection(root, { mode, manufacturer = '', query = ''
 
 
 function inventoryAuditInput(item, index) {
-  const expected = `${numberText(item.balance)} ${item.unit}`;
   if (isWeighedInventoryItem(item)) {
-    const tare = item.tareWeight == null ? 'не указана' : `${numberText(item.tareWeight)} г`;
-    const pack = Number(item.packageQuantity) > 0 ? ` · содержимое тюбика ${numberText(item.packageQuantity)} г` : '';
-    const counted = tubeCountText(item);
     return `<section>
       <strong>${escapeHtml(item.name)}</strong>
-      <p>По учёту ${escapeHtml(expected)} · ${escapeHtml(counted)} · тара ${escapeHtml(tare)}/шт.${pack}</p>
       ${twoColumnLayout(
         field({ label: 'Тюбиков, шт.', name: `auditTubes-${index}`, type: 'number', min: '0',
           step: '1', inputmode: 'numeric' }),
@@ -924,15 +919,14 @@ function inventoryAuditInput(item, index) {
           step: '0.001', inputmode: 'decimal' }),
         { ariaLabel: `Количество и вес: ${item.name}` },
       )}
-      <p data-inventory-audit-result="${index}">Введите количество и общий вес.</p>
+      <p data-inventory-audit-result="${index}">Остаток красителя появится после взвешивания.</p>
     </section>`;
   }
   return `<section>
     <strong>${escapeHtml(item.name)}</strong>
-    <p>По учёту ${escapeHtml(expected)}</p>
     ${field({ label: `Фактически, ${item.unit}`, name: `auditActual-${index}`,
       type: 'number', min: '0', step: '0.001', inputmode: 'decimal' })}
-    <p data-inventory-audit-result="${index}">Введите фактический остаток.</p>
+    <p data-inventory-audit-result="${index}"></p>
   </section>`;
 }
 
@@ -978,7 +972,7 @@ function openInventoryAuditCriteria(root, { mode, ids = [], onSaved = () => {} }
     <p>Выбрано: ${items.length} позиций</p>
     ${fields}
     <p class="form-error" role="status" data-inventory-audit-status></p>
-    ${actionBlock(button(isData ? 'Применить' : 'Проверить', { type:'submit', data:'data-inventory-audit-apply' }))}
+    ${actionBlock(button(isData ? 'Применить' : 'Сохранить', { type:'submit', data:'data-inventory-audit-apply' }))}
   </form>`;
   const layer = mountModal(root, modal(markup, {
     title: isData ? 'Инвентаризация данных' : 'Инвентаризация остатков',
@@ -991,7 +985,6 @@ function openInventoryAuditCriteria(root, { mode, ids = [], onSaved = () => {} }
   const balances = new Map(items.map(item => [item.itemId, Number(item.balance) || 0]));
   const knownContainers = new Map(items.map(item => [item.itemId, item.containerCount == null ? null : Number(item.containerCount)]));
   let saving = false;
-  let stage = 'edit';
 
   function calculate() {
     const data = new FormData(form);
@@ -1003,24 +996,18 @@ function openInventoryAuditCriteria(root, { mode, ids = [], onSaved = () => {} }
       try {
         const measurement = inventoryAuditMeasure(item, index, data);
         if (!measurement) {
-          if (result) result.textContent = 'Не проверено';
+          if (result) result.textContent = isWeighedInventoryItem(item) ? 'Остаток красителя появится после взвешивания.' : '';
           continue;
         }
         measured++;
         const expected = balances.get(item.itemId);
         const diff = Math.round((measurement.actual - expected) * 1000) / 1000;
-        const difference = Math.abs(diff) < 0.000001 ? 'Граммы совпадают'
-          : diff < 0 ? `Недостача ${numberText(-diff)} ${item.unit}`
-          : `Излишек ${numberText(diff)} ${item.unit}`;
         const beforeTubes = knownContainers.get(item.itemId);
         const hasPhysicalCount = measurement.containers !== undefined;
         const physicalChanged = hasPhysicalCount && (beforeTubes == null || beforeTubes !== measurement.containers);
-        const countChange = hasPhysicalCount
-          ? beforeTubes == null ? 'число тюбиков будет зафиксировано впервые'
-            : beforeTubes === measurement.containers ? 'тюбики совпадают'
-            : `тюбиков: ${numberText(beforeTubes)} → ${numberText(measurement.containers)}`
-          : '';
-        if (result) result.textContent = `Факт ${numberText(measurement.actual)} ${item.unit}${hasPhysicalCount ? ` · ${numberText(measurement.containers)} тюб.` : ''} · ${difference}${countChange ? ` · ${countChange}` : ''}`;
+        if (result) result.textContent = hasPhysicalCount
+          ? `Остаток красителя: ${numberText(measurement.actual)} ${item.unit} · ${numberText(measurement.containers)} тюб.`
+          : `Остаток: ${numberText(measurement.actual)} ${item.unit}`;
         if (Math.abs(diff) >= 0.000001 || physicalChanged) lines.push({
           itemId: item.itemId, quantity: diff, expectedQuantity: expected,
           actualQuantity: measurement.actual,
@@ -1042,12 +1029,8 @@ function openInventoryAuditCriteria(root, { mode, ids = [], onSaved = () => {} }
     // The form is never rebuilt while iOS keyboard is open.
     form.addEventListener('input', () => {
       if (saving) return;
-      stage = 'edit';
-      submit.textContent = 'Проверить';
       const result = calculate();
-      status.textContent = result.measured || result.invalid
-        ? `Проверено ${result.measured} · Расхождений ${result.lines.length}${result.invalid ? ` · Ошибок ${result.invalid}` : ''}`
-        : '';
+      status.textContent = result.invalid ? 'Проверьте введённые значения.' : '';
     });
   }
 
@@ -1066,20 +1049,8 @@ function openInventoryAuditCriteria(root, { mode, ids = [], onSaved = () => {} }
         return;
       }
       if (!review.lines.length) {
-        if (stage === 'clean') {
-          layer.v2Close?.();
-          onSaved();
-        } else {
-          stage = 'clean';
-          submit.textContent = 'Закрыть';
-          status.textContent = `Проверено ${review.measured}. Расхождений нет. Остатки не изменены.`;
-        }
-        return;
-      }
-      if (stage !== 'review') {
-        stage = 'review';
-        submit.textContent = 'Подтвердить';
-        status.textContent = `Проверено ${review.measured}. Расхождений: ${review.lines.length}. Подтвердите корректировку.`;
+        layer.v2Close?.();
+        onSaved();
         return;
       }
       // Prevent silently losing counts if an older Core instance is still live.
@@ -1111,11 +1082,8 @@ function openInventoryAuditCriteria(root, { mode, ids = [], onSaved = () => {} }
         });
         layer.v2Close?.();
         onSaved();
-        openNotice({ title: 'Инвентаризация',
-          message: `Проверено ${review.measured}. Скорректировано ${review.lines.length} позиций.` });
+        openNotice({ title: 'Инвентаризация', message: 'Остатки сохранены.' });
       } catch(error) {
-        stage = 'edit';
-        submit.textContent = 'Проверить';
         status.textContent = error instanceof Error ? error.message : 'Не удалось сохранить остатки.';
       } finally {
         saving = false;
