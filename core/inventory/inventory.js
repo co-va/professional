@@ -635,7 +635,7 @@ function openManufacturerStock(root, manufacturer) {
   searchInput?.addEventListener('input', renderList);
   layer.querySelector('[data-inventory-item-controls]')?.addEventListener('click', () => {
     openSharedProfileSettingsMenu({
-      title: 'Настройки товаров',
+      title: '',
       actions: [
         { id: 'sort', label: 'Сортировка', variant: 'secondary', onSelect: () => openStockControls(layer, 'items', manufacturer, renderList, 'sort') },
         { id: 'filter', label: 'Фильтр', variant: 'secondary', onSelect: () => openStockControls(layer, 'items', manufacturer, renderList, 'filter') },
