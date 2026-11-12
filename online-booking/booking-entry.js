@@ -71,6 +71,10 @@ async function resolveRoute() {
   return {
     tenantId: String(resolved?.tenantId || ''),
     workplaceKey: String(resolved?.workplaceKey || ''),
+    // Only path-based individual links carry this capability. Legacy query
+    // ?booking=...&workplace=... has no direct workplace permission.
+    routeProfileSlug: workplaceSlug ? profileSlug : '',
+    routeWorkplaceSlug: workplaceSlug,
     ...routeQuery(params),
   };
 }

@@ -164,6 +164,10 @@ function restoreDraft(state) {
 async function refreshContext(state) {
   const params = new URLSearchParams();
   if (state.lockedWorkplaceKey) params.set('workplace', state.lockedWorkplaceKey);
+  if (state.lockedWorkplaceKey && state.directRoute.profileSlug && state.directRoute.workplaceSlug) {
+    params.set('profileSlug', state.directRoute.profileSlug);
+    params.set('workplaceSlug', state.directRoute.workplaceSlug);
+  }
   const suffix = params.toString() ? `?${params}` : '';
   state.context = await jsonRequest(
     `/online-booking/${encodeURIComponent(state.tenantId)}/context${suffix}`,
@@ -808,6 +812,8 @@ async function confirmBooking(state, action) {
             procedureIds: participant.procedureIds,
           })),
           consents: consentFacts(state),
+          // Core revalidates both slugs against the tenant and workplace.
+          directRoute: state.directRoute,
         }),
       },
       'Не удалось подтвердить запись',
@@ -919,10 +925,13 @@ export async function renderAccess(root, {
   tenantId = '',
   workplaceKey = '',
   procedureIds = [],
+  routeProfileSlug = '',
+  routeWorkplaceSlug = '',
 } = {}) {
   const state = {
     tenantId: text(tenantId),
     lockedWorkplaceKey: text(workplaceKey),
+    directRoute: { profileSlug: text(routeProfileSlug), workplaceSlug: text(routeWorkplaceSlug) },
     repeatProcedureIds: [...new Set((Array.isArray(procedureIds) ? procedureIds : []).map(text).filter(Boolean))],
     context: {},
     settings: normalizeBookingSettings(),
