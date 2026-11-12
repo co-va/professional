@@ -432,156 +432,180 @@ function openItemEditor(root, itemId = '', defaults = {}, onSaved = () => {}) {
   notifyContext();
 }
 
-function movementEditorRow(row = {}, index = 0, kind = 'CONSUMPTION') {
-  const item = getInventoryItem(row.itemId);
-  const quantity = row.quantity == null ? '' : Number(row.quantity);
-  const direction = row.direction === 'IN' || row.direction === 'OUT' ? row.direction : '';
-  const outgoing = direction ? direction === 'OUT' : ['CONSUMPTION', 'SALE', 'WRITE_OFF'].includes(kind);
-  const tubes = row.containerDelta == null ? '' : Math.abs(Number(row.containerDelta));
-  return `<div class="form-grid" data-inventory-movement-row data-row-index="${index}" data-row-direction="${escapeHtml(direction)}">
-    ${searchableSelect({
-      label: 'Материал',
-      name: `itemId-${index}`,
-      value: row.itemId || '',
-      options: itemOptions(),
-      placeholder: 'Выбрать материал',
-      required: true,
-    })}
-    ${field({
-      label: item?.unit ? `Количество, ${item.unit}` : 'Количество',
-      name: `quantity-${index}`,
-      value: quantity,
-      type: 'number',
-      min: '0',
-      step: '0.001',
-      inputmode: 'decimal',
-    })}
-    <div data-inventory-movement-tubes${isWeighedInventoryItem(item) ? '' : ' hidden'}>
-      ${field({
-        label: outgoing ? 'Выбыло тюбиков, шт. (если тара убрана)' : 'Пришло тюбиков, шт.',
-        name: `containers-${index}`, value: tubes,
-        type: 'number', min: '0', step: '1', inputmode: 'numeric',
-      })}
-    </div>
-  </div>`;
-}
-function collectMovementRows(host, kind = 'CONSUMPTION') {
-  return [...host.querySelectorAll('[data-inventory-movement-row]')].map((row) => {
-    const index = row.dataset.rowIndex;
-    const itemId = row.querySelector(`[name="itemId-${CSS.escape(index)}"]`)?.value || '';
-    const quantity = Number(String(row.querySelector(`[name="quantity-${CSS.escape(index)}"]`)?.value || '0').replace(',', '.')) || 0;
-    const direction = row.dataset.rowDirection === 'IN' || row.dataset.rowDirection === 'OUT' ? row.dataset.rowDirection : undefined;
-    const item = getInventoryItem(itemId);
-    const rawTubes = String(row.querySelector(`[name="containers-${CSS.escape(index)}"]`)?.value || '').trim();
-    let containerDelta = null;
-    if (isWeighedInventoryItem(item) && rawTubes !== '') {
-      const count = Number(rawTubes.replace(',', '.'));
-      if (!Number.isSafeInteger(count) || count < 0) throw new Error('Укажите целое число тюбиков.');
-      const outgoing = direction ? direction === 'OUT' : ['CONSUMPTION', 'SALE', 'WRITE_OFF'].includes(kind);
-      containerDelta = outgoing ? -count : count;
-    }
-    return { itemId, quantity, ...(direction ? { direction } : {}),
-      ...(containerDelta != null ? { containerDelta } : {}) };
-  }).filter(row => row.itemId && (row.quantity > 0 || row.containerDelta));
+function movementNoteLabel(kind) {
+  if (kind === 'RECEIPT') return 'Основание прихода';
+  if (kind === 'WRITE_OFF') return 'Причина списания';
+  if (kind === 'RETURN') return 'Основание возврата';
+  return 'Примечание';
 }
 
 function openMovementEditor(root, movementId = '', kind = 'CONSUMPTION', { record = null, onSaved = null } = {}) {
   const movement = movementId ? getInventoryMovement(movementId) : null;
   const correcting = Boolean(movement);
-  // A physical stocktake is an absolute measurement, not an editable goods movement.
-  // Correct with a new audit; otherwise editing the mass would undo the tube count.
   if (correcting && movement.kind === 'ADJUSTMENT'
       && movement.lines?.some(line => line.actualContainerCount != null)) {
     openNotice({ title: 'Инвентаризация', message: 'Для исправления физического пересчёта проведите новую инвентаризацию.' });
     return;
   }
   const actualKind = movement?.kind || kind;
-  const initialRows = movement?.lines?.length
-    ? movement.lines.map((line) => ({ itemId: line.itemId, quantity: line.quantity,
-        direction: line.direction, containerDelta: line.containerDelta }))
-    : [{ itemId: '', quantity: '' }];
-  const title = correcting ? movementTitle(movement) : movementTitle({ kind });
-  const recordCode = String(record?.personUei || '').trim();
-  const recordName = String(record?.personName || '').trim();
-  const recordLabel = [recordCode, recordName].filter(Boolean).join(' · ');
-  const markup = `
-    <form class="form-grid" data-inventory-movement-form>
-      ${recordLabel && !correcting ? `<p>${escapeHtml(recordLabel)}</p>` : ''}
-      ${correcting && movement.personUei ? `<p>${escapeHtml(movement.personUei)}</p>` : ''}
-      ${v2Section('Материалы', `
-        <div class="form-grid" data-inventory-movement-rows>${initialRows.map((row, index) => movementEditorRow(row, index, actualKind)).join('')}</div>
-        ${button('+ Добавить позицию', { type: 'button', variant: 'secondary', data: 'data-inventory-add-movement-row' })}
-      `)}
-      ${field({ label: 'Примечание', name: 'note', value: movement?.note || '' })}
-      ${actionBlock(button(correcting ? 'Исправить' : 'Сохранить', { type: 'button', data: 'data-inventory-movement-save' }))}
+  const title = correcting ? movementTitle(movement) : movementTitle({ kind: actualKind });
+  const originalLines = new Map((movement?.lines || []).map(line => [line.itemId, line]));
+  const selected = new Set(originalLines.keys());
+  const recordLabel = [record?.personUei, record?.personName].map(value => String(value || '').trim()).filter(Boolean).join(' · ');
+
+  // First select the actual stock items. The quantity fields do not exist yet.
+  const selectionMarkup = `<div class="form-grid" data-inventory-movement-selection>
+    ${recordLabel ? `<p>${escapeHtml(recordLabel)}</p>` : ''}
+    ${stockSearchField('', 'data-inventory-movement-search')}
+    <p data-inventory-movement-count></p>
+    <div data-inventory-movement-choices></div>
+    ${actionBlock(button('Продолжить', { data: 'data-inventory-movement-next', disabled: !selected.size }))}
+  </div>`;
+  const selectionLayer = mountModal(root, modal(selectionMarkup, { title, variant: 'q' }));
+  if (!selectionLayer) return;
+  const choiceHost = selectionLayer.querySelector('[data-inventory-movement-choices]');
+  const search = selectionLayer.querySelector('[data-inventory-movement-search]');
+  const countHost = selectionLayer.querySelector('[data-inventory-movement-count]');
+  const nextButton = selectionLayer.querySelector('[data-inventory-movement-next]');
+
+  const renderChoices = () => {
+    const query = normalizedSearch(search?.value);
+    const items = getInventoryItems()
+      .filter(item => actualKind !== 'CONSUMPTION' || item.canConsume !== false)
+      .filter(item => actualKind !== 'SALE' || item.canSell === true)
+      .filter(item => !query || `${manufacturerName(item)} ${itemSearchText(item)}`.toLocaleLowerCase('ru-RU').includes(query))
+      .sort((a, b) => String(a.name).localeCompare(String(b.name), 'ru', { numeric: true, sensitivity: 'base' }));
+    choiceHost.innerHTML = items.length
+      ? items.map(item => compactCheck({
+          label: `${manufacturerName(item)} · ${item.name} (${numberText(item.balance)} ${item.unit})`,
+          checked: selected.has(item.itemId),
+          data: `data-inventory-movement-item="${escapeHtml(item.itemId)}"`,
+        })).join('')
+      : emptyState('Материалы не найдены', 'Измените поиск или добавьте материал в остатках.');
+    countHost.textContent = `Выбрано ${selected.size}`;
+    nextButton.disabled = selected.size === 0;
+  };
+  selectionLayer.addEventListener('change', event => {
+    const input = event.target.closest?.('[data-inventory-movement-item]');
+    if (!input) return;
+    if (input.checked) selected.add(input.dataset.inventoryMovementItem);
+    else selected.delete(input.dataset.inventoryMovementItem);
+    countHost.textContent = `Выбрано ${selected.size}`;
+    nextButton.disabled = selected.size === 0;
+  });
+  search?.addEventListener('input', renderChoices);
+
+  // Second enter amounts for the selected items only. Q2 can close back to Q1.
+  nextButton.addEventListener('click', () => {
+    if (!selected.size) return;
+    const rows = [...selected].map(itemId => ({
+      item: getInventoryItem(itemId),
+      previous: originalLines.get(itemId) || null,
+    })).filter(row => row.item);
+    if (!rows.length) {
+      openNotice({ title: 'Материалы', message: 'Выбранные позиции не найдены на складе.' });
+      return;
+    }
+    const rowMarkup = rows.map(({ item, previous }) => {
+      const outgoing = previous?.direction ? previous.direction === 'OUT'
+        : ['CONSUMPTION', 'SALE', 'WRITE_OFF'].includes(actualKind);
+      const containers = previous?.containerDelta == null ? '' : Math.abs(Number(previous.containerDelta));
+      return `<div class="form-grid" data-inventory-movement-row data-item-id="${escapeHtml(item.itemId)}"
+          data-row-direction="${escapeHtml(previous?.direction || '')}">
+        <p><strong>${escapeHtml(item.name)}</strong> · ${numberText(item.balance)} ${escapeHtml(item.unit)} на складе</p>
+        ${field({
+          label: `Количество, ${item.unit}`,
+          name: `quantity-${item.itemId}`,
+          value: previous?.quantity ?? '',
+          type: 'number', min: '0', step: '0.001', inputmode: 'decimal',
+        })}
+        ${isWeighedInventoryItem(item) ? field({
+          label: outgoing ? 'Убрано пустых тюбиков, шт.' : 'Поступило тюбиков, шт.',
+          name: `containers-${item.itemId}`,
+          value: containers,
+          type: 'number', min: '0', step: '1', inputmode: 'numeric',
+        }) : ''}
+      </div>`;
+    }).join('');
+    const editorMarkup = `<form class="form-grid" data-inventory-movement-form>
+      ${rowMarkup}
+      ${actualKind === 'RECEIPT' && !correcting ? field({
+        label: 'Поставщик', name: 'supplier', placeholder: 'Необязательно',
+      }) : ''}
+      ${field({ label: movementNoteLabel(actualKind), name: 'note', value: movement?.note || '' })}
+      <div class="form-error" data-inventory-movement-error role="alert"></div>
+      ${actionBlock(button(correcting ? 'Исправить' : 'Сохранить', { type: 'submit', data: 'data-inventory-movement-save' }))}
     </form>`;
-  const layer = mountModal(root, modal(markup, { title, variant: 'q' }));
-  if (!layer) return;
-
-  let rowIndex = initialRows.length;
-  layer.querySelector('[data-inventory-add-movement-row]')?.addEventListener('click', () => {
-    layer.querySelector('[data-inventory-movement-rows]')?.insertAdjacentHTML('beforeend', movementEditorRow({}, rowIndex, actualKind));
-    rowIndex += 1;
-  });
-
-  layer.addEventListener('change', (event) => {
-    const selectInput = event.target.closest?.('input[name^="itemId-"]');
-    if (!selectInput) return;
-    const row = selectInput.closest('[data-inventory-movement-row]');
-    const item = getInventoryItem(selectInput.value);
-    const label = row?.querySelector('input[name^="quantity-"]')?.closest('.field')?.querySelector(':scope > span');
-    if (label) label.textContent = item?.unit ? `Количество, ${item.unit}` : 'Количество';
-    const physicalField = row?.querySelector('[data-inventory-movement-tubes]');
-    if (physicalField) {
-      physicalField.hidden = !isWeighedInventoryItem(item);
-      if (physicalField.hidden) {
-        const input = physicalField.querySelector('input');
-        if (input) input.value = '';
-      }
-    }
-  });
-
-  layer.querySelector('[data-inventory-movement-save]')?.addEventListener('click', async () => {
-    const form = layer.querySelector('[data-inventory-movement-form]');
-    let lines;
-    try { lines = collectMovementRows(layer, actualKind); }
-    catch (error) {
-      openNotice({ title: 'Количество тюбиков', message: error instanceof Error ? error.message : 'Проверьте количество.' });
-      return;
-    }
-    if (!lines.length) {
-      openNotice({ title: 'Позиции', message: 'Добавьте хотя бы один материал и количество.' });
-      return;
-    }
-    try {
-      if (correcting) {
-        await correctInventoryMovement(movement.movementId, {
-          lines,
-          note: String(new FormData(form).get('note') || '').trim(),
-        });
-      } else {
-        await createInventoryMovement({
-          kind: actualKind,
-          sourceType: record?.recordId ? 'record' : 'manual',
-          ...(record?.recordId ? { recordId: String(record.recordId) } : {}),
-          ...(record?.personKey ? { personKey: String(record.personKey) } : {}),
-          ...(record?.personUei ? { personUei: String(record.personUei) } : {}),
-          ...(record?.procedureKey ? { procedureKey: String(record.procedureKey) } : {}),
-          ...(record?.workplaceKey ? { workplaceKey: String(record.workplaceKey) } : {}),
-          note: String(new FormData(form).get('note') || '').trim(),
-          lines,
+    const editorLayer = mountModal(selectionLayer, modal(editorMarkup, { title: 'Количество', variant: 'q' }));
+    if (!editorLayer) return;
+    const form = editorLayer.querySelector('[data-inventory-movement-form]');
+    const errorHost = editorLayer.querySelector('[data-inventory-movement-error]');
+    const saveButton = editorLayer.querySelector('[data-inventory-movement-save]');
+    form.addEventListener('submit', async event => {
+      event.preventDefault();
+      if (saveButton.disabled) return;
+      errorHost.textContent = '';
+      const lines = [];
+      for (const element of form.querySelectorAll('[data-inventory-movement-row]')) {
+        const itemId = element.dataset.itemId;
+        const item = getInventoryItem(itemId);
+        if (!item) { errorHost.textContent = 'Один из материалов больше не доступен.'; return; }
+        const quantityRaw = element.querySelector('[name^="quantity-"]')?.value.trim() || '';
+        const quantity = Number(quantityRaw.replace(',', '.'));
+        const tubeRaw = element.querySelector('[name^="containers-"]')?.value.trim() || '';
+        const tubeCount = tubeRaw ? Number(tubeRaw.replace(',', '.')) : null;
+        if (!quantityRaw || !Number.isFinite(quantity) || quantity < 0
+            || (quantity === 0 && (!tubeCount || tubeCount <= 0))) {
+          errorHost.textContent = `Проверьте количество: ${item.name}`;
+          return;
+        }
+        if (tubeCount != null && (!Number.isSafeInteger(tubeCount) || tubeCount < 0)) {
+          errorHost.textContent = `Проверьте количество тюбиков: ${item.name}`;
+          return;
+        }
+        const direction = element.dataset.rowDirection;
+        const outgoing = direction ? direction === 'OUT'
+          : ['CONSUMPTION', 'SALE', 'WRITE_OFF'].includes(actualKind);
+        lines.push({
+          itemId, quantity,
+          ...(direction ? { direction } : {}),
+          ...(tubeCount != null ? { containerDelta: outgoing ? -tubeCount : tubeCount } : {}),
         });
       }
-      layer.v2Close?.();
-      if (typeof onSaved === 'function') onSaved();
-      else renderMovements(root);
-    } catch (error) {
-      openNotice({ title: 'Не удалось сохранить', message: error instanceof Error ? error.message : 'Ошибка склада' });
-    }
+      if (!lines.length) { errorHost.textContent = 'Выберите материалы.'; return; }
+      const values = new FormData(form);
+      const note = String(values.get('note') || '').trim();
+      saveButton.disabled = true;
+      try {
+        if (correcting) {
+          await correctInventoryMovement(movement.movementId, { lines, note });
+        } else {
+          await createInventoryMovement({
+            kind: actualKind,
+            sourceType: record?.recordId ? 'record' : 'manual',
+            ...(record?.recordId ? { recordId: String(record.recordId) } : {}),
+            ...(record?.personKey ? { personKey: String(record.personKey) } : {}),
+            ...(record?.personUei ? { personUei: String(record.personUei) } : {}),
+            ...(record?.procedureKey ? { procedureKey: String(record.procedureKey) } : {}),
+            ...(record?.workplaceKey ? { workplaceKey: String(record.workplaceKey) } : {}),
+            ...(actualKind === 'RECEIPT' ? { supplier: String(values.get('supplier') || '').trim() } : {}),
+            note, lines,
+          });
+        }
+        editorLayer.v2Close?.();
+        selectionLayer.v2Close?.();
+        if (typeof onSaved === 'function') onSaved();
+        else renderMovements(root);
+      } catch (error) {
+        errorHost.textContent = error instanceof Error ? error.message : 'Не удалось сохранить движение.';
+        saveButton.disabled = false;
+      }
+    });
+    notifyContext();
   });
+  renderChoices();
   notifyContext();
 }
-
 
 /**
  * Shared material-consumption entry point.
