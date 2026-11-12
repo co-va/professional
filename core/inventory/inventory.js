@@ -438,8 +438,8 @@ function openMovementEditor(root, movementId = '', kind = 'CONSUMPTION', { recor
     openNotice({ title: 'Инвентаризация', message: 'Для исправления физического пересчёта проведите новую инвентаризацию.' });
     return;
   }
-  const actualKind = movement?.kind || kind;
-  const title = correcting ? movementTitle(movement) : movementTitle({ kind: actualKind });
+  let actualKind = movement?.kind || kind;
+  const title = correcting ? movementTitle(movement) : actualKind ? movementTitle({ kind: actualKind }) : 'Движение';
   const originalLines = new Map((movement?.lines || []).map(line => [line.itemId, line]));
   const selected = new Set(originalLines.keys());
   const recordLabel = [record?.personUei, record?.personName].map(value => String(value || '').trim()).filter(Boolean).join(' · ');
@@ -447,6 +447,18 @@ function openMovementEditor(root, movementId = '', kind = 'CONSUMPTION', { recor
   // First select the actual stock items. The quantity fields do not exist yet.
   const selectionMarkup = `<div class="form-grid" data-inventory-movement-selection>
     ${recordLabel ? `<p>${escapeHtml(recordLabel)}</p>` : ''}
+    ${!correcting && !kind ? select({
+      label: 'Операция',
+      name: 'movementKind',
+      value: '',
+      options: [
+        { value: '', label: 'Выбрать' },
+        { value: 'RECEIPT', label: 'Приход' },
+        { value: 'CONSUMPTION', label: 'Расход' },
+        { value: 'WRITE_OFF', label: 'Списание' },
+        { value: 'RETURN', label: 'Возврат' },
+      ],
+    }) : ''}
     ${stockSearchField('', 'data-inventory-movement-search')}
     <p data-inventory-movement-count></p>
     <div data-inventory-movement-choices></div>
@@ -460,6 +472,12 @@ function openMovementEditor(root, movementId = '', kind = 'CONSUMPTION', { recor
   const nextButton = selectionLayer.querySelector('[data-inventory-movement-next]');
 
   const renderChoices = () => {
+    if (!actualKind) {
+      choiceHost.innerHTML = '';
+      countHost.textContent = 'Выберите операцию';
+      nextButton.disabled = true;
+      return;
+    }
     const query = normalizedSearch(search?.value);
     const items = getInventoryItems()
       .filter(item => actualKind !== 'CONSUMPTION' || item.canConsume !== false)
@@ -477,6 +495,17 @@ function openMovementEditor(root, movementId = '', kind = 'CONSUMPTION', { recor
     nextButton.disabled = selected.size === 0;
   };
   selectionLayer.addEventListener('change', event => {
+    if (event.target.matches?.('input[name="movementKind"]')) {
+      actualKind = ['RECEIPT', 'CONSUMPTION', 'WRITE_OFF', 'RETURN'].includes(event.target.value)
+        ? event.target.value : '';
+      if (actualKind === 'CONSUMPTION') {
+        [...selected].forEach(itemId => {
+          if (getInventoryItem(itemId)?.canConsume === false) selected.delete(itemId);
+        });
+      }
+      renderChoices();
+      return;
+    }
     const input = event.target.closest?.('[data-inventory-movement-item]');
     if (!input) return;
     if (input.checked) selected.add(input.dataset.inventoryMovementItem);
@@ -488,7 +517,7 @@ function openMovementEditor(root, movementId = '', kind = 'CONSUMPTION', { recor
 
   // Second enter amounts for the selected items only. Q2 can close back to Q1.
   nextButton.addEventListener('click', () => {
-    if (!selected.size) return;
+    if (!actualKind || !selected.size) return;
     const rows = [...selected].map(itemId => ({
       item: getInventoryItem(itemId),
       previous: originalLines.get(itemId) || null,
@@ -615,37 +644,6 @@ export async function openInventoryConsumption(root, { record = null, onSaved = 
     return;
   }
   openMovementEditor(root, '', 'CONSUMPTION', { record, onSaved });
-}
-
-function openMovementKind(root) {
-  const choices = [
-    ['RECEIPT', 'Приход'],
-    ['CONSUMPTION', 'Расход'],
-    ['WRITE_OFF', 'Списание'],
-    ['RETURN', 'Возврат'],
-    ...(canUseCapability('inventory.stocktake.access') ? [['ADJUSTMENT', 'Инвентаризация']] : []),
-  ];
-  // Bind actions to the actual X surface, without an intermediary settings callback.
-  // Reuse shared settings-panel spacing rather than a row of adjacent buttons.
-  const markup = `<div class="app-settings-panel">${choices.map(([kind, label]) => button(label, {
-    className: 'app-settings-panel__button',
-    variant: 'outline',
-    data: `data-inventory-operation="${kind}"`,
-  })).join('')}</div>`;
-  const layer = mountModal(root, modal(markup, { title: 'Операция', variant: 'x', xRole: 'action' }));
-  layer?.addEventListener('click', event => {
-    const control = event.target.closest?.('[data-inventory-operation]');
-    if (!control || !layer.contains(control)) return;
-    const kind = control.dataset.inventoryOperation;
-    layer.v2Close?.();
-    if (kind === 'ADJUSTMENT') {
-      openInventoryAuditSelection(root, { onSaved: () => renderMovements(root) });
-    } else if (kind === 'CONSUMPTION') {
-      openMovementEditor(root, '', 'CONSUMPTION');
-    } else {
-      openMovementEditor(root, '', kind);
-    }
-  });
 }
 
 function stockSearchField(value = '', data = 'data-inventory-stock-search') {
@@ -1372,7 +1370,7 @@ function renderMovements(root) {
   root.innerHTML = `${context('Движения', {
     c: { label: '+', data: 'data-inventory-add-movement', aria: 'Добавить движение' },
   })}${movementJournalMarkup()}`;
-  root.querySelector('[data-inventory-add-movement]')?.addEventListener('click', () => openMovementKind(root));
+  root.querySelector('[data-inventory-add-movement]')?.addEventListener('click', () => openMovementEditor(root, '', ''));
   root.querySelectorAll('[data-inventory-movement]').forEach((control) => control.addEventListener('click', () => openMovementDetails(root, control.dataset.inventoryMovement)));
   notifyContext();
 }
