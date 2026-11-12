@@ -23,6 +23,7 @@ import {
   workspaceHeaderContext,
 } from '../../ui/ui.js';
 import { escapeHtml } from '../../ui/utils/escape-html.js';
+import { setSharedActionVisible } from '../../ui/page/page.js';
 import { getCardAppearanceTemplate, saveCardAppearanceTemplate } from '../card-appearance-templates.js';
 import { loadAuxiliaryState } from '../runtime/auxiliary-state.js';
 import { inventoryManufacturerCompletion } from './completeness.js';
@@ -285,18 +286,30 @@ function openItemEditor(root, itemId = '', defaults = {}, onSaved = () => {}) {
       )}
       ${creating ? '' : advancedItemFields(item)}
       ${creating ? '' : productReadouts(item)}
-      ${actionBlock(button('Сохранить', { type: 'button', data: 'data-inventory-item-save', aria: 'Сохранить позицию' }))}
+      ${actionBlock(button(creating ? 'Применить' : 'Сохранить', { type: 'button', data: 'data-inventory-item-save', aria: creating ? 'Добавить продукт' : 'Сохранить продукт' }))}
     </form>`;
   const layer = mountModal(document.body, modal(markup, {
     title: creating ? 'Новый продукт' : item.name,
-    variant: 'q',
-    surface: 'app',
+    variant: creating ? 'x' : 'q',
+    surface: creating ? '' : 'app',
+    xRole: creating ? 'editor' : '',
   }));
   if (!layer) return;
 
   // Net content is derived from gross and tare; it is not a separate API field.
   const form = layer.querySelector('[data-inventory-item-form]');
-  const netInput = form?.querySelector('[name="netWeight"]');
+  const primary = layer.querySelector('[data-inventory-item-save]');
+  const actions = primary?.closest('.modal-actions');
+  const signature = () => JSON.stringify([...new FormData(form).entries()]
+    .filter(([name]) => name !== 'netWeight')
+    .map(([name, value]) => [name, typeof value === 'string' ? value : '']));
+  const initialSignature = signature();
+  const syncDirty = () => {
+    if (!creating) setSharedActionVisible(actions, signature() !== initialSignature);
+  };
+  form.addEventListener('input', syncDirty);
+  form.addEventListener('change', syncDirty);
+  const netInput = form.querySelector('[name="netWeight"]');
   if (netInput) {
     const updateNet = () => {
       const grossRaw = String(form.elements.namedItem('grossWeight')?.value ?? '').trim();
@@ -312,8 +325,11 @@ function openItemEditor(root, itemId = '', defaults = {}, onSaved = () => {}) {
     updateNet();
   }
 
-  layer.querySelector('[data-inventory-item-save]')?.addEventListener('click', async () => {
-    const form = layer.querySelector('[data-inventory-item-form]');
+  syncDirty();
+
+  const save = async () => {
+    if (primary.disabled || (!creating && signature() === initialSignature)) return;
+
     const data = new FormData(form);
     const name = String(data.get('name') || '').trim();
     if (!name) {
@@ -344,6 +360,7 @@ function openItemEditor(root, itemId = '', defaults = {}, onSaved = () => {}) {
         canSell: usage === 'sale' || usage === 'both',
       });
     }
+    primary.disabled = true;
     try {
       if (creating) await createInventoryItem(value);
       else await updateInventoryItem(item.itemId, value);
@@ -351,8 +368,14 @@ function openItemEditor(root, itemId = '', defaults = {}, onSaved = () => {}) {
       renderStock(root);
       onSaved();
     } catch (error) {
+      primary.disabled = false;
       openNotice({ title: 'Не удалось сохранить', message: error instanceof Error ? error.message : 'Ошибка склада' });
     }
+  };
+  primary.addEventListener('click', () => { void save(); });
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    void save();
   });
   notifyContext();
 }
