@@ -469,15 +469,14 @@ function openMovementKind(root, trigger) {
 }
 
 function stockSearchField(value = '', data = 'data-inventory-stock-search') {
-  return field({
-    label: 'Поиск',
+  return `<div class="ui-search-field">${field({
     name: 'inventorySearch',
     value,
     type: 'search',
     autocomplete: 'off',
     placeholder: 'Название, тип, артикул…',
     data,
-  });
+  })}</div>`;
 }
 
 function manufacturerCardFields({ name, items } = {}) {
@@ -615,19 +614,20 @@ function openManufacturerStock(root, manufacturer) {
       a: { kind: 'settings', data: 'data-inventory-item-controls', aria: 'Сортировка и фильтр товаров' },
       c: { label: '+', data: 'data-inventory-add-item', aria: 'Добавить позицию' },
     })}
-    ${stockSearchField('', 'data-inventory-company-search')}
     <div data-inventory-company-list>${stockListMarkup(manufacturer)}</div>`;
   const layer = mountV2ZLayer(root, v2ZLayer(markup, { className: 'inventory-manufacturer-z' }), { stack: true });
   if (!layer) return;
+  const [searchRow] = setV2ZHeaderRows(layer, [stockSearchField('', 'data-inventory-company-search')]);
+  const searchInput = searchRow?.querySelector('[data-inventory-company-search]') || null;
 
   const listHost = layer.querySelector('[data-inventory-company-list]');
   const renderList = () => {
-    const query = layer.querySelector('[name="inventorySearch"]')?.value || '';
+    const query = searchInput?.value || '';
     if (listHost) listHost.innerHTML = stockListMarkup(manufacturer, query);
     listHost?.querySelectorAll('[data-inventory-item]').forEach((control) => control.addEventListener('click', () => openItemEditor(root, control.dataset.inventoryItem)));
   };
 
-  layer.querySelector('[name="inventorySearch"]')?.addEventListener('input', renderList);
+  searchInput?.addEventListener('input', renderList);
   layer.querySelector('[data-inventory-item-controls]')?.addEventListener('click', (event) => openStockControls(event.currentTarget, 'items', manufacturer, renderList));
   layer.querySelector('[data-inventory-add-item]')?.addEventListener('click', () => openItemEditor(root, '', { manufacturer: manufacturer === EMPTY_MANUFACTURER ? '' : manufacturer }));
   renderList();
@@ -686,7 +686,6 @@ function renderStock(root) {
   // Only manufacturer cards belong to the scrollable Z1 body.
   const [searchRow] = setV2ZHeaderRows(root, [`<div class="people-search ui-search-field">
     ${field({ name: 'inventorySearch', type: 'search', placeholder: 'Название, тип, артикул…', autocomplete: 'off', data: 'data-inventory-stock-search' })}
-    <div class="people-search-divider ui-search-divider" aria-hidden="true"></div>
   </div>`]);
   const searchInput = searchRow?.querySelector('[data-inventory-stock-search]') || null;
   const listHost = root.querySelector('[data-inventory-manufacturer-list]');

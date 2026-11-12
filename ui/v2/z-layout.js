@@ -1,49 +1,34 @@
 import { v2ZDismissAffordance } from './z-affordance.js';
 
 const Z_VIEWPORT_OVERSCAN = 'var(--v2-z-viewport-overscan)';
-const Q_HEADER_BODY_GAP = '18px';
-// One spacing value for all three Z Header rows and gaps between controls.
-// Use the existing 12px application spacing: no per-screen sizes.
-const Z_HEADER_SPACING = '12px';
+// One geometry and one 12px spacing token for Z and Q.
+const SURFACE_HEADER_SPACING = '12px';
 
-const SHARED_SURFACE_HEADER_STYLE = [
+const SURFACE_HEADER_STYLE = [
   'position:relative',
   'z-index:20',
   'box-sizing:border-box',
   'min-height:28px',
   'margin:0 -18px',
   'padding:0 18px 0 0',
-  'flex:0 0 auto',
-  'background:var(--v2-white,#fff)',
-];
-
-// Z: spacer / flexible content with a vertically centred dismiss / spacer.
-const Z_HEADER_STYLE = [
-  ...SHARED_SURFACE_HEADER_STYLE,
-  `--v2-z-header-spacing:${Z_HEADER_SPACING}`,
+  `--v2-surface-header-spacing:${SURFACE_HEADER_SPACING}`,
   'display:grid',
+  'flex:0 0 auto',
   'grid-template-columns:24px minmax(0,1fr)',
   'align-items:center',
-  'padding-top:var(--v2-z-header-spacing)',
-  'padding-bottom:var(--v2-z-header-spacing)',
+  'padding-top:var(--v2-surface-header-spacing)',
+  'padding-bottom:var(--v2-surface-header-spacing)',
+  'background:var(--v2-white,#fff)',
 ].join(';');
 
-// Q has its own approved geometry; changing Z does not reposition Q.
-const Q_HEADER_STYLE = [
-  ...SHARED_SURFACE_HEADER_STYLE,
-  'display:flex',
-  'flex-direction:row',
-  'align-items:flex-start',
-].join(';');
-
-const Z_HEADER_CONTENT_STYLE = [
+const SURFACE_HEADER_CONTENT_STYLE = [
   'box-sizing:border-box',
   'min-width:0',
   'flex:1 1 auto',
   'padding-left:18px',
   'display:flex',
   'flex-direction:column',
-  'gap:var(--v2-z-header-spacing,8px)',
+  'gap:var(--v2-surface-header-spacing)',
 ].join(';');
 
 const Z_BODY_STYLE = [
@@ -82,16 +67,13 @@ function visibleWorkAreaStyle(style, kind = 'z') {
 function surfaceHeader(content = '', { kind = 'z', dismiss = true } = {}) {
   const data = kind === 'q' ? 'data-v2-q-header' : 'data-v2-z-header';
   const contentData = kind === 'q' ? 'data-v2-q-header-content' : 'data-v2-z-header-content';
-  const contentStyle = visibleWorkAreaStyle(Z_HEADER_CONTENT_STYLE, kind);
-  const headerStyle = kind === 'z' ? Z_HEADER_STYLE : Q_HEADER_STYLE;
-  return `<div ${data} style="${headerStyle}">${dismiss ? v2ZDismissAffordance() : ''}<div ${contentData} style="${contentStyle}">${content}</div></div>`;
+  const contentStyle = visibleWorkAreaStyle(SURFACE_HEADER_CONTENT_STYLE, kind);
+  return `<div ${data} style="${SURFACE_HEADER_STYLE}">${dismiss ? v2ZDismissAffordance() : ''}<div ${contentData} style="${contentStyle}">${content}</div></div>`;
 }
 
-function surfaceBody(content = '', { kind = 'z', topGap = false } = {}) {
+function surfaceBody(content = '', { kind = 'z' } = {}) {
   const data = kind === 'q' ? 'data-v2-q-body' : 'data-v2-z-body';
-  const gapStyle = topGap ? `;padding-top:${Q_HEADER_BODY_GAP}` : '';
-  const bodyStyle = `${visibleWorkAreaStyle(Z_BODY_STYLE, kind)}${gapStyle}`;
-  return `<div ${data} style="${bodyStyle}">${content}</div>`;
+  return `<div ${data} style="${visibleWorkAreaStyle(Z_BODY_STYLE, kind)}">${content}</div>`;
 }
 
 export function v2ZHeader(content = '') {
@@ -134,7 +116,7 @@ export function v2ZFrame(content = '', { header = '', dismiss = true } = {}) {
 }
 
 export function v2QFrame(content = '', { header = '' } = {}) {
-  return `${v2QHeader(header)}${surfaceBody(content, { kind: 'q', topGap: Boolean(String(header || '').trim()) })}`;
+  return `${v2QHeader(header)}${v2QBody(content)}`;
 }
 
 function resolveZSurface(root) {

@@ -19,7 +19,7 @@
 .entity-visual-card__cell.is-italic{font-style:italic}
 .entity-visual-card__cell.is-underline{text-decoration:underline}
 
-.entity-card-appearance-q__selectors{display:grid;gap:8px;min-width:0;width:100%}
+.entity-card-appearance-q__selectors{display:grid;gap:var(--v2-surface-header-spacing);min-width:0;width:100%}
 .entity-card-appearance-q__selectors .ui-select{width:100%}
 
 .entity-card-editor{

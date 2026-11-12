@@ -1,40 +1,25 @@
-/* Root Z keeps only the compact Shared Header footprint required by its affordance. */
+/* Z and Q Header geometry is owned only by ui/v2/z-layout.js. */
 [data-v2-z-header]:has(> [data-v2-z-header-content]:empty){
   min-height:28px!important;
   background:var(--v2-white,#fff)!important;
 }
-
-/* Q keeps fixed Header + scrolling Body technically, but both are one visual surface. */
 [data-v2-q-header],
 [data-v2-q-header] > [data-v2-q-header-content]{
   background:transparent!important;
   border:0!important;
   box-shadow:none!important;
 }
-
-/* Empty Q keeps only the same compact Shared affordance footprint. */
 [data-v2-q-header]:has(> [data-v2-q-header-content]:empty){
   min-height:28px!important;
-  padding-bottom:0!important;
   background:transparent!important;
 }
-
-[data-v2-q-header]:has(> [data-v2-q-header-content]:empty) > [data-v2-z-dismiss]{
-  margin-top:0!important;
-  margin-bottom:2px!important;
-}
-
 [data-v2-q-header]:has(> [data-v2-q-header-content]:empty) > [data-v2-q-header-content]{
   display:none!important;
 }
-
-/* A Q body starts directly after its compact empty Header; feature margins must not recreate a fake Header strip. */
 [data-v2-q-body] > .workspace-header-context + .entity-details{
   margin-top:0;
 }
-
-/* Shared Z header alone owns spacing; no second margins on search/navigation. */
-[data-v2-z-header-content] .ui-search-field{padding:0}
-[data-v2-z-header-content] .ui-search-divider{margin:var(--v2-z-header-spacing) 0 0}
-[data-v2-z-header-content] .segment-control{margin-bottom:0}
-[data-v2-z-header] > [data-v2-z-dismiss]{margin-bottom:0!important}
+/* Controls retain their geometry, but only their Shared Header owns outer gaps. */
+:is([data-v2-z-header-content],[data-v2-q-header-content]) .ui-search-field{padding:0}
+:is([data-v2-z-header-content],[data-v2-q-header-content]) .ui-search-divider{display:none!important}
+:is([data-v2-z-header-content],[data-v2-q-header-content]) .segment-control{margin:0}

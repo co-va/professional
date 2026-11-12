@@ -240,7 +240,6 @@ export async function openPersonHistoryQ(root, person, options = {}) {
   if (header) {
     header.innerHTML = `<div class="people-history-search ui-search-field">
       ${field({ name: 'personHistorySearch', type: 'search', placeholder: 'Поиск', autocomplete: 'off', data: 'data-person-history-search' })}
-      <div class="people-search-divider ui-search-divider" aria-hidden="true"></div>
     </div>`;
   }
   const host = layer.querySelector('[data-person-history-host]');
@@ -503,7 +502,6 @@ export function renderPeople(root, options = {}) {
   ]);
   const [searchRow] = setV2ZHeaderRows(root, [`<div class="people-search ui-search-field">
     ${field({ name: 'peopleSearch', type: 'search', placeholder: 'Поиск по имени или UEI', autocomplete: 'off', data: 'data-people-search' })}
-    <div class="people-search-divider ui-search-divider" aria-hidden="true"></div>
   </div>`]);
   root.peopleSearchInput = searchRow?.querySelector('[data-people-search]') || null;
   root.peopleLoyaltyLoading=Boolean(currentPeopleFilters().loyaltyMode);

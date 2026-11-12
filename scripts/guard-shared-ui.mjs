@@ -56,18 +56,22 @@ assert(v2.includes('padding:0 18px calc(24px + env(safe-area-inset-bottom))'), '
 assert(rootSelectorCount(v2, '.v2-header') === 1, 'Shared H geometry must have one owner');
 assert(rootSelectorCount(v2, '.v2-z') === 1, 'Shared Z geometry must have one owner');
 assert(!zStack.includes('padding-top:0'), 'Nested Z must not override Shared top padding');
-assert(zLayout.includes("const Z_HEADER_SPACING = '12px'"), 'Shared Z header spacing token changed');
-assert(zLayout.includes("const Q_HEADER_BODY_GAP = '18px'"), 'Shared Q header must use User geometry');
-assert(zLayout.includes("topGap: Boolean(String(header || '').trim())"), 'Shared Q header/body boundary changed');
-assert(!zHeaderCss.includes('margin-bottom:8px'), 'Professional-specific Z/Q header margin must not return');
-assert(zLayout.includes("'grid-template-columns:24px minmax(0,1fr)'") && zLayout.includes("'align-items:center'"), 'Z dismiss must be centred in the content row');
-assert(zLayout.includes("'padding-top:var(--v2-z-header-spacing)'") && zLayout.includes("'padding-bottom:var(--v2-z-header-spacing)'"), 'Z must have equal top and bottom spacing');
-assert(zLayout.includes("'gap:var(--v2-z-header-spacing,8px)'"), 'Z header children must share the same spacing');
-assert(zHeaderCss.includes('.ui-search-field{padding:0}') && zHeaderCss.includes('.segment-control{margin-bottom:0}'), 'No inherited search/navigation outer gaps in Z');
-assert(zHeaderCss.includes('.ui-search-divider{margin:var(--v2-z-header-spacing) 0 0}'), 'Search divider must use shared Z header spacing');
-assert(zHeaderCss.includes('[data-v2-z-header] > [data-v2-z-dismiss]{margin-bottom:0!important}'), 'Z arrow must align with content centre');
-assert(zHeaderCss.includes('padding-bottom:0!important'), 'Empty Q headers must remain compact');
-
+assert(zLayout.includes("const SURFACE_HEADER_SPACING = '12px'"), 'Z/Q Header must share one 12px token');
+assert(zLayout.includes('const SURFACE_HEADER_STYLE = [') && !zLayout.includes('Q_HEADER_STYLE'), 'Z/Q must have one Header geometry owner');
+assert(zLayout.includes("'padding-top:var(--v2-surface-header-spacing)'")
+  && zLayout.includes("'padding-bottom:var(--v2-surface-header-spacing)'"), 'Z/Q Header top and bottom gaps must be identical');
+assert(zLayout.includes("'gap:var(--v2-surface-header-spacing)'"), 'Header content items must use the same gap');
+assert(zLayout.includes("'grid-template-columns:24px minmax(0,1fr)'")
+  && zLayout.includes("'align-items:center'"), 'Z/Q arrow must be centred in the content row');
+assert(!zLayout.includes('Q_HEADER_BODY_GAP') && !zLayout.includes('topGap'), 'No additional Q Header/Body gap');
+assert(!zHeaderCss.includes('margin-bottom:8px') && !zHeaderCss.includes('padding-bottom:0!important'), 'No per-surface Header spacing overrides');
+assert(zHeaderCss.includes('.ui-search-divider{display:none!important}'), 'No separator inside any Z/Q Header');
+assert(zHeaderCss.includes('.ui-search-field{padding:0}') && zHeaderCss.includes('.segment-control{margin:0}'), 'Controls cannot own outer Header gaps');
+assert(v2.includes('bottom:0;padding-top:0}'), 'Q layer must not add a hidden top gap');
+assert(read('ui/v2/z-affordance.js').includes("'margin:0 0 0 18px'"), 'Header arrow has no vertical offset');
+assert(read('ui/cards/entity-card-constructor.css').includes('gap:var(--v2-surface-header-spacing)'), 'Q card selector gap is not shared');
+assert(!read('core/inventory/inventory.js').includes('people-search-divider ui-search-divider'), 'Stock Header must contain only search');
+assert(!read('core/people/people.js').includes('people-search-divider ui-search-divider'), 'Contacts and History Headers must contain only search');
 // Q geometry and modal lifecycle remain centralized.
 assert(geometry.includes('export function v2QModalPortalGeometry'), 'Shared Q geometry missing');
 assert(count(geometry, 'export function v2QModalPortalGeometry') === 1, 'Q geometry must have one owner');
