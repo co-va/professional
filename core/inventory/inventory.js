@@ -14,7 +14,6 @@ import {
   openEntityCardAppearanceQ,
   openSharedProfileSettingsMenu,
   page,
-  searchableSelect,
   select,
   setV2ZHeaderRows,
   shortDateTimeParts,
@@ -221,14 +220,6 @@ function notifyContext() {
 
 function context(title, { a = null, v = null, c = null } = {}) {
   return workspaceHeaderContext({ title, a, v, c });
-}
-
-function itemOptions() {
-  return getInventoryItems().map((item) => ({
-    value: item.itemId,
-    label: item.name,
-    meta: [ `${numberText(item.balance)} ${item.unit}`, tubeCountText(item) ].filter(Boolean).join(' · '),
-  }));
 }
 
 function itemUsageMode(item = {}) {
