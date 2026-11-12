@@ -9,6 +9,7 @@ import {
   modal,
   mountModal,
   page,
+  select,
   v2ListEntry,
   v2ListEntries,
   workspaceHeaderContext,
@@ -117,16 +118,24 @@ function openAssignmentAction(tag, assignment, refresh) {
 
   const showTransfer = () => {
     const choices = getTags().filter((item) => item.id !== tag.id);
-    // Reuse exactly the same rectangular color swatch as the Settings list.
-    host.innerHTML = `<div class="settings-tags-v2">${v2ListEntries(choices.map((item) => v2ListEntry({
-      title: item.name,
-      leadingSwatch: item.color,
-      omitEmptySubtitle: true,
-      data: `data-tag-target="${escapeHtml(item.id)}"`,
-    })))}</div>${actionBlock(button('+ Создать ярлык', { data: 'data-tag-create' }))}`;
-    host.querySelectorAll('[data-tag-target]').forEach((row) => row.addEventListener('click', () => {
-      void apply(row.dataset.tagTarget);
-    }));
+    // The same shared dropdown used to assign tags in Contacts.
+    host.innerHTML = `<div class="compact-form">
+      ${select({
+        name: 'tag-transfer-target',
+        value: '',
+        options: [
+          { value: '', label: 'Выбрать ярлык' },
+          ...choices.map((item) => ({ value: item.id, label: item.name })),
+        ],
+        aria: 'Выбрать ярлык',
+        data: 'data-tag-transfer-choice',
+      })}
+      ${actionBlock(button('+ Создать ярлык', { data: 'data-tag-create' }))}
+    </div>`;
+    host.querySelector('input[data-tag-transfer-choice]')?.addEventListener('change', (event) => {
+      const target = event.target.value;
+      if (target) void apply(target);
+    });
     host.querySelector('[data-tag-create]')?.addEventListener('click', startCreate);
   };
   const showActions = () => {
