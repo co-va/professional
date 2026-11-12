@@ -11,7 +11,7 @@
    or whether they live in a form, settings panel or action stack.
    Compact header, composer and paired card-editor controls remain distinct. */
 @container ui-action-surface (min-width:0px){
-  :where([data-v2-z-body],[data-v2-q-body],.v2-layer--bottom) .ui-button:not(:where(.app-header__control,.message-composer__send,.entity-card-editor__photo>.ui-button)){
+  :where([data-v2-z-body],[data-v2-q-body],.v2-layer--bottom) .ui-button:not(:where(.app-header__control,.message-composer__send,.entity-card-editor__photo>.ui-button,.array-row__add,.ui-links__add)){
     max-inline-size:calc(100cqi - 2 * (var(--ui-action-inset) - 18px));
     margin-inline:auto;
   }
