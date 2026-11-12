@@ -253,7 +253,7 @@ function collectOptionalNumber(form, name) {
   return raw === '' ? null : Number(raw.replace(',', '.'));
 }
 
-function openItemEditor(root, itemId = '', defaults = {}) {
+function openItemEditor(root, itemId = '', defaults = {}, onSaved = () => {}) {
   const item = itemId ? getInventoryItem(itemId) : null;
   const creating = !item;
   const markup = `
@@ -274,7 +274,11 @@ function openItemEditor(root, itemId = '', defaults = {}) {
       ${item ? itemSummary(item) : ''}
       ${actionBlock(button('Сохранить', { type: 'button', data: 'data-inventory-item-save', aria: 'Сохранить позицию' }))}
     </form>`;
-  const layer = mountV2ZLayer(root, v2ZLayer(markup, { className: 'inventory-item-z' }), { stack: true });
+  const layer = mountModal(document.body, modal(markup, {
+    title: creating ? 'Новая позиция' : item.name,
+    variant: 'q',
+    surface: 'app',
+  }));
   if (!layer) return;
 
   let advanced = {
@@ -337,6 +341,7 @@ function openItemEditor(root, itemId = '', defaults = {}) {
       else await updateInventoryItem(item.itemId, value);
       layer.v2Close?.();
       renderStock(root);
+      onSaved();
     } catch (error) {
       openNotice({ title: 'Не удалось сохранить', message: error instanceof Error ? error.message : 'Ошибка склада' });
     }
@@ -624,12 +629,12 @@ function openManufacturerStock(root, manufacturer) {
   const renderList = () => {
     const query = searchInput?.value || '';
     if (listHost) listHost.innerHTML = stockListMarkup(manufacturer, query);
-    listHost?.querySelectorAll('[data-inventory-item]').forEach((control) => control.addEventListener('click', () => openItemEditor(root, control.dataset.inventoryItem)));
+    listHost?.querySelectorAll('[data-inventory-item]').forEach((control) => control.addEventListener('click', () => openItemEditor(root, control.dataset.inventoryItem, {}, renderList)));
   };
 
   searchInput?.addEventListener('input', renderList);
   layer.querySelector('[data-inventory-item-controls]')?.addEventListener('click', (event) => openStockControls(event.currentTarget, 'items', manufacturer, renderList));
-  layer.querySelector('[data-inventory-add-item]')?.addEventListener('click', () => openItemEditor(root, '', { manufacturer: manufacturer === EMPTY_MANUFACTURER ? '' : manufacturer }));
+  layer.querySelector('[data-inventory-add-item]')?.addEventListener('click', () => openItemEditor(root, '', { manufacturer: manufacturer === EMPTY_MANUFACTURER ? '' : manufacturer }, renderList));
   renderList();
   notifyContext();
 }
