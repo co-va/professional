@@ -279,7 +279,7 @@ function openItemEditor(root, itemId = '', defaults = {}, onSaved = () => {}) {
       ${field({ label: 'Производитель', name: 'manufacturer', value: item?.manufacturer || defaults.manufacturer || '', autocomplete: 'off' })}
       ${field({ label: 'Наименование', name: 'name', value: item?.name || '', required: true, autocomplete: 'off' })}
       ${twoColumnLayout(
-        select({ label: 'Единица учёта и расхода', name: 'unit', value: item?.unit || 'шт.', options: UNIT_OPTIONS }),
+        select({ label: 'Единица', name: 'unit', value: item?.unit || 'шт.', options: UNIT_OPTIONS }),
         field({ label: 'Номинал упаковки', name: 'packageQuantity', value: item?.packageQuantity ?? '', type: 'number', min: '0', step: '0.001', inputmode: 'decimal' }),
         { ariaLabel: 'Учёт продукта и номинал упаковки' },
       )}
