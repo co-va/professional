@@ -74,7 +74,7 @@ const EDITABLE_TAG_SOURCES = new Set(['people', 'products', 'procedures']);
 
 function openAssignmentAction(tag, assignment, refresh) {
   const body = `<div class="compact-form">
-    <div class="modal-title"><h2>${escapeHtml(assignment.title)}</h2><p>${escapeHtml(assignment.kind)}</p></div>
+    <div class="modal-title"><h2>${escapeHtml(assignment.title)}</h2></div>
     <div data-tag-assignment-actions></div>
     <p class="form-error" role="alert" data-tag-assignment-error hidden></p>
   </div>`;
@@ -124,9 +124,9 @@ function openAssignmentAction(tag, assignment, refresh) {
         omitEmptySubtitle: true,
         data: `data-tag-target="${escapeHtml(item.id)}"`,
       })),
-      v2ListEntry({ title: '+ Создать ярлык', data: 'data-tag-create' }),
-      v2ListEntry({ title: 'Назад', data: 'data-tag-action-back' }),
     ]);
+    host.insertAdjacentHTML('beforeend', actionBlock(button('+ Создать ярлык', { data: 'data-tag-create' }) +
+      button('Отмена', { variant: 'secondary', data: 'data-tag-action-back' })));
     host.querySelectorAll('[data-tag-target]').forEach((row) => row.addEventListener('click', () => {
       void apply(row.dataset.tagTarget);
     }));
@@ -134,14 +134,12 @@ function openAssignmentAction(tag, assignment, refresh) {
     host.querySelector('[data-tag-action-back]')?.addEventListener('click', showActions);
   };
   const showActions = () => {
-    host.innerHTML = v2ListEntries([
-      v2ListEntry({ title: 'Снять', data: 'data-tag-detach' }),
-      v2ListEntry({ title: 'Перенести', data: 'data-tag-transfer' }),
-      v2ListEntry({ title: '+ Создать ярлык', data: 'data-tag-create' }),
-    ]);
+    host.innerHTML = actionBlock(
+      button('Удалить ярлык', { variant: 'danger', data: 'data-tag-detach' }) +
+      button('Перенести', { variant: 'secondary', data: 'data-tag-transfer' }),
+    );
     host.querySelector('[data-tag-detach]')?.addEventListener('click', () => { void apply(); });
     host.querySelector('[data-tag-transfer]')?.addEventListener('click', showTransfer);
-    host.querySelector('[data-tag-create]')?.addEventListener('click', startCreate);
   };
   showActions();
   return layer;
@@ -161,7 +159,7 @@ function openTagAssignments(tag, onSaved) {
     host.innerHTML = assignments.length
       ? v2ListEntries(assignments.map((item) => v2ListEntry({
           title: item.title,
-          subtitle: item.kind,
+          omitEmptySubtitle: true,
           interactive: EDITABLE_TAG_SOURCES.has(item.source),
           data: EDITABLE_TAG_SOURCES.has(item.source) ? `data-tag-assignment="${escapeHtml(item.key)}"` : '',
         })))
