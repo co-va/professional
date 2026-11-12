@@ -6,6 +6,10 @@ const start = inventory.indexOf('function movementNoteLabel(');
 const end = inventory.indexOf('\n/**\n * Shared material-consumption', start);
 assert.ok(start >= 0 && end > start, 'One shared movement editor must exist');
 const editorSource = inventory.slice(start, end);
+assert.doesNotMatch(inventory, /function openMovementKind\(/, 'No obsolete action-button menu');
+assert.match(inventory, /addEventListener\('click', \(\) => openMovementEditor\(root, '', ''\)\)/, 'Plus opens one shared form');
+assert.match(editorSource, /name: 'movementKind'/, 'Operation is selected inside the form');
+assert.match(inventory, /id: 'inventory', label: 'Инвентаризация'/, 'Stocktake remains under Stock');
 assert.doesNotMatch(editorSource, /function movementEditorRow\(|searchableSelect\(/, 'No obsolete per-item dropdown forms');
 assert.ok(editorSource.indexOf('data-inventory-movement-selection') < editorSource.indexOf('data-inventory-movement-row'), 'Select items before quantities');
 
@@ -34,6 +38,7 @@ for (const kind of ['RECEIPT', 'CONSUMPTION', 'WRITE_OFF', 'RETURN']) {
   const save = { disabled: false };
   const deps = {
     getInventoryMovement: () => null,
+    select: () => '<operation-selector>',
     getInventoryItems: () => [item],
     getInventoryItem: () => item,
     movementTitle: value => value.kind,
@@ -79,8 +84,11 @@ for (const kind of ['RECEIPT', 'CONSUMPTION', 'WRITE_OFF', 'RETURN']) {
   const open = new Function('deps',
     `const { ${Object.keys(deps).join(',')} } = deps; ${editorSource}; return openMovementEditor;`)(deps);
 
-  open({}, '', kind);
-  assert.match(nodes.choices.innerHTML, /<check>/, `${kind}: item options`);
+  open({}, '', '');
+  assert.equal(nodes.choices.innerHTML, '', `${kind}: no items before selecting operation`);
+  assert.equal(nodes.next.disabled, true, `${kind}: disabled without operation`);
+  first.change({ target: { matches: selector => selector === 'input[name="movementKind"]', value: kind } });
+  assert.match(nodes.choices.innerHTML, /<check>/, `${kind}: item options after selecting operation`);
   assert.equal(nodes.next.disabled, true, `${kind}: cannot advance without a material`);
   first.change({ target: { closest: () => ({ checked: true, dataset: { inventoryMovementItem: 'A' } }) } });
   assert.equal(nodes.next.disabled, false, `${kind}: selected material allows advancing`);
