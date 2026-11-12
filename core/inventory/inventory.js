@@ -488,7 +488,7 @@ function collectMovementRows(host, kind = 'CONSUMPTION') {
   }).filter(row => row.itemId && (row.quantity > 0 || row.containerDelta));
 }
 
-function openMovementEditor(root, movementId = '', kind = 'CONSUMPTION') {
+function openMovementEditor(root, movementId = '', kind = 'CONSUMPTION', { record = null, onSaved = null } = {}) {
   const movement = movementId ? getInventoryMovement(movementId) : null;
   const correcting = Boolean(movement);
   // A physical stocktake is an absolute measurement, not an editable goods movement.
@@ -504,10 +504,14 @@ function openMovementEditor(root, movementId = '', kind = 'CONSUMPTION') {
         direction: line.direction, containerDelta: line.containerDelta }))
     : [{ itemId: '', quantity: '' }];
   const title = correcting ? movementTitle(movement) : movementTitle({ kind });
+  const recordCode = String(record?.personUei || '').trim();
+  const recordName = String(record?.personName || '').trim();
+  const recordLabel = [recordCode, recordName].filter(Boolean).join(' · ');
   const markup = `
     ${context(title)}
     <form data-inventory-movement-form>
-      ${correcting && movement.personUei ? `<div class="entity-details"><div><span>UEI</span><strong>${escapeHtml(movement.personUei)}</strong></div></div>` : ''}
+      ${recordLabel && !correcting ? `<p>${escapeHtml(recordLabel)}</p>` : ''}
+      ${correcting && movement.personUei ? `<p>${escapeHtml(movement.personUei)}</p>` : ''}
       <div data-inventory-movement-rows>${initialRows.map((row, index) => movementEditorRow(row, index, actualKind)).join('')}</div>
       ${button('+ Добавить позицию', { type: 'button', variant: 'secondary', data: 'data-inventory-add-movement-row' })}
       ${field({ label: 'Примечание', name: 'note', value: movement?.note || '' })}
@@ -559,14 +563,20 @@ function openMovementEditor(root, movementId = '', kind = 'CONSUMPTION') {
         });
       } else {
         await createInventoryMovement({
-          kind,
-          sourceType: 'manual',
+          kind: actualKind,
+          sourceType: record?.recordId ? 'record' : 'manual',
+          ...(record?.recordId ? { recordId: String(record.recordId) } : {}),
+          ...(record?.personKey ? { personKey: String(record.personKey) } : {}),
+          ...(record?.personUei ? { personUei: String(record.personUei) } : {}),
+          ...(record?.procedureKey ? { procedureKey: String(record.procedureKey) } : {}),
+          ...(record?.workplaceKey ? { workplaceKey: String(record.workplaceKey) } : {}),
           note: String(new FormData(form).get('note') || '').trim(),
           lines,
         });
       }
       layer.v2Close?.();
-      renderMovements(root);
+      if (typeof onSaved === 'function') onSaved();
+      else renderMovements(root);
     } catch (error) {
       openNotice({ title: 'Не удалось сохранить', message: error instanceof Error ? error.message : 'Ошибка склада' });
     }
@@ -574,12 +584,32 @@ function openMovementEditor(root, movementId = '', kind = 'CONSUMPTION') {
   notifyContext();
 }
 
+
+/**
+ * Shared material-consumption entry point.
+ * A future Record action passes its existing record context; it must not
+ * introduce a second editor or create a new Record.
+ */
+export async function openInventoryConsumption(root, { record = null, onSaved = null } = {}) {
+  if (!canUseCapability('inventory.movements.access')) {
+    openNotice({ title: 'Расход', message: 'Нет доступа к складским движениям.' });
+    return;
+  }
+  try {
+    await loadInventory();
+  } catch (error) {
+    openNotice({ title: 'Расход', message: error instanceof Error ? error.message : 'Не удалось загрузить склад.' });
+    return;
+  }
+  openMovementEditor(root, '', 'CONSUMPTION', { record, onSaved });
+}
+
 function openMovementKind(root) {
   openSharedProfileSettingsMenu({
     title: 'Операция',
     actions: [
       { id: 'receipt', label: 'Приход', onSelect: () => openMovementEditor(root, '', 'RECEIPT') },
-      { id: 'consumption', label: 'Расход', onSelect: () => openMovementEditor(root, '', 'CONSUMPTION') },
+      { id: 'consumption', label: 'Расход', onSelect: () => { void openInventoryConsumption(root, { onSaved: () => renderMovements(root) }); } },
       { id: 'write-off', label: 'Списание', onSelect: () => openMovementEditor(root, '', 'WRITE_OFF') },
       { id: 'return', label: 'Возврат', onSelect: () => openMovementEditor(root, '', 'RETURN') },
       ...(canUseCapability('inventory.stocktake.access') ? [
