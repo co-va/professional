@@ -1,4 +1,4 @@
-import { button } from '../buttons/index.js';
+import { compactAddButton } from '../buttons/index.js';
 import { escapeHtml } from '../utils/escape-html.js';
 import { select } from '../selectors/index.js';
 
@@ -26,7 +26,7 @@ function linkRow(link = {}, { compact = false } = {}) {
 
 export function links({ links: values = [], name = 'links', label = '', compact = false, addInHeader = false } = {}) {
   const rows = values.length ? values : [{ type: 'Instagram', url: '' }];
-  const add = button('+', {
+  const add = compactAddButton({
     className: compact && addInHeader ? 'array-row__add' : 'ui-links__add',
     data: `data-add-link="${escapeHtml(name)}"`,
     aria: 'Добавить ссылку',

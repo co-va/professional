@@ -128,7 +128,10 @@ for (const [rule, message] of miniGeometry) assert(rule.test(mini), message);
 // Header-level "+" controls are not full-size action buttons. Their owner is
 // the Shared repeated-fields / links layout, so they must never inherit
 // the auto margins that center primary action buttons.
-assert(buttons.includes('.ui-button:not(:where(.app-header__control,.message-composer__send,.entity-card-editor__photo>.ui-button,.array-row__add,.ui-links__add))'), 'Compact add buttons must not inherit centered action geometry');
+assert(buttons.includes('.array-row__add,.ui-links__add{display:block;box-sizing:border-box;'), 'Compact add controls must own styling independently');
+assert(!read('ui/repeated-fields/index.js').includes("button('+',"), 'Repeated-field add must not use the full-size action factory');
+assert(!read('ui/links/index.js').includes("button('+',"), 'Links add must not use the full-size action factory');
+assert(read('ui/buttons/index.js').includes('export function compactAddButton('), 'Compact add control factory missing');
 assert(inputs.includes('.array-group[data-repeated-add-placement="header"] .array-group__header{display:flex;align-items:center;justify-content:space-between'), 'Repeated-field add buttons must remain right-aligned');
 assert(list.includes('min-height:78px'), 'V2 list entry geometry changed');
 assert(count(list, '.list-entry{') === 1, 'V2 list entry geometry must have one owner');
