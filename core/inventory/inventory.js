@@ -25,6 +25,8 @@ import {
   workspaceHeaderContext,
 } from '../../ui/ui.js';
 import { escapeHtml } from '../../ui/utils/escape-html.js';
+import { compactCheck } from '../../ui/selection/check-list.js';
+import { canUseCapability } from '../access.js';
 import { setSharedActionVisible } from '../../ui/page/page.js';
 import { getCardAppearanceTemplate, saveCardAppearanceTemplate } from '../card-appearance-templates.js';
 import { loadAuxiliaryState } from '../runtime/auxiliary-state.js';
@@ -722,6 +724,12 @@ function openManufacturerStock(root, manufacturer) {
         },
         { id: 'sort', label: 'Сортировка', variant: 'secondary', onSelect: () => openStockControls(layer, 'items', manufacturer, renderList, 'sort') },
         { id: 'filter', label: 'Фильтр', variant: 'secondary', onSelect: () => openStockControls(layer, 'items', manufacturer, renderList, 'filter') },
+        ...(canUseCapability('inventory.stocktake.access') ? [{
+          id: 'inventory', label: 'Инвентаризация', variant: 'secondary',
+          onSelect: () => openInventoryAuditMode(layer, {
+            manufacturer, query: searchInput?.value || '', type: STOCK_VIEW.itemsType, onSaved: renderList,
+          }),
+        }] : []),
       ],
     });
   });
@@ -759,15 +767,204 @@ function orderMarkup() {
   })));
 }
 
-function inventoryCountMarkup() {
-  const items = getInventoryItems();
-  if (!items.length) return emptyState('Склад пуст', 'Сначала добавьте позиции.');
-  return `<form data-inventory-count-form>${items.map((item, index) => twoColumnLayout(
-    field({ label: item.name, name: `expected-${index}`, value: `${numberText(item.balance)} ${item.unit}`, readonly: true }),
-    field({ label: 'По факту', name: `actual-${index}`, value: '', type: 'number', min: '0', step: '0.001', inputmode: 'decimal', data: `data-count-item="${escapeHtml(item.itemId)}"` }),
-    { ariaLabel: `Инвентаризация ${item.name}` },
-  )).join('')}</form>`;
+
+function inventoryAuditScope({ manufacturer = '', query = '', type = '' } = {}) {
+  const needle = normalizedSearch(query);
+  return getInventoryItems().filter(item =>
+    (!manufacturer || manufacturerName(item) === manufacturer)
+    && matchesType(item, type)
+    && (!needle || `${manufacturerName(item)} ${itemSearchText(item)}`.toLocaleLowerCase('ru-RU').includes(needle))
+  ).map(item => item.itemId);
 }
+
+function inventoryAuditItems(ids) {
+  const byId = new Map(getInventoryItems().map(item => [item.itemId, item]));
+  return ids.map(id => byId.get(id)).filter(Boolean);
+}
+
+function openInventoryAuditSelection(root, { mode, manufacturer = '', query = '', type = '', onSaved = () => {} } = {}) {
+  // Freeze the current manufacturer/search/type scope before any selection.
+  const ids = [...new Set(inventoryAuditScope({ manufacturer, query, type }))];
+  if (!ids.length) {
+    openNotice({ title: 'Инвентаризация', message: 'В текущей выборке нет позиций.' });
+    return null;
+  }
+  const markup = page([
+    context('Инвентаризация'),
+    `<div class="form-grid" data-inventory-audit-selection>
+      ${compactCheck({ label: 'Выбрать все показанные', data: 'data-inventory-audit-all' })}
+      <p data-inventory-audit-count>Выбрано 0 из ${ids.length}</p>
+      <div data-inventory-audit-list></div>
+    </div>`,
+    actionBlock(button('Продолжить', { data: 'data-inventory-audit-next' })),
+  ]);
+  const layer = mountV2ZLayer(root, v2ZLayer(markup, { className: 'inventory-audit-z' }), { stack: true });
+  if (!layer) return null;
+  const [searchRow] = setV2ZHeaderRows(layer, [stockSearchField('', 'data-inventory-audit-search')]);
+  const search = searchRow?.querySelector('[data-inventory-audit-search]');
+  const list = layer.querySelector('[data-inventory-audit-list]');
+  const all = layer.querySelector('[data-inventory-audit-all]');
+  const count = layer.querySelector('[data-inventory-audit-count]');
+  const next = layer.querySelector('[data-inventory-audit-next]');
+  const selected = new Set();
+  let visible = [];
+  const sync = () => {
+    if (count) count.textContent = `Выбрано ${selected.size} из ${ids.length}`;
+    if (next) { next.disabled = !selected.size; next.textContent = `Продолжить · ${selected.size}`; }
+    if (all) { all.checked = visible.length > 0 && visible.every(id => selected.has(id)); all.disabled = !visible.length; }
+  };
+  const render = () => {
+    const needle = normalizedSearch(search?.value);
+    const items = inventoryAuditItems(ids).filter(item => !needle ||
+      `${manufacturerName(item)} ${itemSearchText(item)}`.toLocaleLowerCase('ru-RU').includes(needle))
+      .sort((a,b) => String(a.name).localeCompare(String(b.name), 'ru', { numeric:true }));
+    visible = items.map(item => item.itemId);
+    if (list) list.innerHTML = items.length
+      ? items.map(item => compactCheck({
+        label: manufacturer ? item.name : `${manufacturerName(item)} · ${item.name}`,
+        checked: selected.has(item.itemId),
+        data: `data-inventory-audit-item="${escapeHtml(item.itemId)}"`,
+      })).join('')
+      : emptyState('Ничего не найдено', 'Измените поиск.');
+    sync();
+  };
+  list?.addEventListener('change', event => {
+    const input = event.target.closest?.('[data-inventory-audit-item]');
+    if (!input) return;
+    if (input.checked) selected.add(input.dataset.inventoryAuditItem);
+    else selected.delete(input.dataset.inventoryAuditItem);
+    sync();
+  });
+  all?.addEventListener('change', () => {
+    visible.forEach(id => all.checked ? selected.add(id) : selected.delete(id));
+    render();
+  });
+  search?.addEventListener('input', render);
+  next?.addEventListener('click', () => {
+    if (!selected.size) return;
+    openInventoryAuditCriteria(layer, { mode, ids: [...selected], onSaved: () => {
+      layer.v2Close?.();
+      onSaved();
+    }});
+  });
+  render();
+  notifyContext();
+  return layer;
+}
+
+function openInventoryAuditCriteria(root, { mode, ids = [], onSaved = () => {} } = {}) {
+  const items = inventoryAuditItems(ids);
+  if (!items.length) return openNotice({ title: 'Инвентаризация', message: 'Позиции не найдены.' });
+  const isData = mode === 'data';
+  const fields = isData
+    ? `<div class="form-grid">
+      ${select({ label: 'Что изменить', name: 'auditField', value: 'category', options: [
+        { value: 'category', label: 'Категория' },
+        { value: 'productType', label: 'Тип продукта' },
+      ] })}
+      ${field({ label: 'Новое значение', name: 'auditValue', autocomplete:'off' })}
+    </div>`
+    : `<div class="form-grid">${items.map((item, i) => field({
+      label: `${item.name} · сейчас ${numberText(item.balance)} ${item.unit}`,
+      name: `auditActual-${i}`, type:'number', value:'', min:'0', step:'0.001', inputmode:'decimal',
+    })).join('')}</div>`;
+  const markup = `<form data-inventory-audit-criteria>
+    <p>Выбрано: ${items.length} позиций</p>
+    ${fields}
+    <p class="form-error" role="status" data-inventory-audit-status></p>
+    ${actionBlock(button(isData ? 'Применить' : 'Завершить', { type:'submit', data:'data-inventory-audit-apply' }))}
+  </form>`;
+  const layer = mountModal(root, modal(markup, {
+    title:isData ? 'Инвентаризация данных' : 'Инвентаризация остатков', variant:'x', xRole:'editor',
+  }));
+  if (!layer) return null;
+  const form = layer.querySelector('[data-inventory-audit-criteria]');
+  const submit = layer.querySelector('[data-inventory-audit-apply]');
+  const status = layer.querySelector('[data-inventory-audit-status]');
+  const balances = new Map(items.map(item => [item.itemId, Number(item.balance) || 0]));
+  let saving = false;
+  form?.addEventListener('submit', async event => {
+    event.preventDefault();
+    if (saving) return;
+    const data = new FormData(form);
+    const fieldName = String(data.get('auditField') || '');
+    const value = String(data.get('auditValue') || '').trim();
+    let changes = [];
+    if (isData) {
+      if (!['category','productType'].includes(fieldName) || !value) {
+        status.textContent = 'Укажите поле и новое значение.';
+        return;
+      }
+      changes = items.filter(item => getInventoryItem(item.itemId)
+        && String(getInventoryItem(item.itemId)?.[fieldName] || '').trim() !== value);
+      if (!changes.length) { status.textContent = 'У выбранных позиций уже указано это значение.'; return; }
+    } else {
+      const lines = [];
+      for (let i=0; i<items.length; i++) {
+        const item = items[i], raw = String(data.get(`auditActual-${i}`) ?? '').trim();
+        if (!raw) continue;
+        const actual = Number(raw.replace(',','.'));
+        if (!Number.isFinite(actual) || actual < 0) { status.textContent = `Проверьте количество: ${item.name}.`; return; }
+        const current = getInventoryItem(item.itemId);
+        const expected = balances.get(item.itemId);
+        if (!current || Math.abs((Number(current.balance)||0) - expected) > .000001) {
+          status.textContent = 'Остатки изменились. Повторите инвентаризацию.';
+          return;
+        }
+        if (Math.abs(actual-expected) > .000001) lines.push({
+          itemId:item.itemId, quantity:actual-expected, expectedQuantity:expected, actualQuantity:actual,
+        });
+      }
+      if (!lines.length) { status.textContent = 'Введите фактические остатки, отличающиеся от учётных.'; return; }
+      saving = true; submit.disabled = true; status.textContent = 'Сохранение…';
+      try {
+        await createInventoryMovement({ kind:'ADJUSTMENT', sourceType:'inventory-count', note:'Инвентаризация', lines });
+        layer.v2Close?.(); onSaved();
+        openNotice({ title:'Инвентаризация', message:`Обновлено ${lines.length} позиций.` });
+      } catch(error) {
+        status.textContent = error instanceof Error ? error.message : 'Не удалось сохранить остатки.';
+      } finally { saving = false; if(submit.isConnected) submit.disabled = false; }
+      return;
+    }
+    saving = true; submit.disabled = true;
+    let saved = 0; const failed = [];
+    // The Core partial-item endpoint updates only the named master-data field.
+    for (let i=0; i<changes.length; i+=4) {
+      const batch = changes.slice(i, i+4);
+      const results = await Promise.allSettled(batch.map(item =>
+        updateInventoryItem(item.itemId, { [fieldName]:value })));
+      results.forEach((result,j) => result.status === 'fulfilled'
+        ? saved++ : failed.push(batch[j].itemId));
+      status.textContent = `Сохранение: ${saved} из ${changes.length}`;
+    }
+    try { await loadInventory(); } catch(error) { failed.push('refresh'); }
+    saving = false;
+    if (submit.isConnected) submit.disabled = false;
+    if (failed.length) {
+      status.textContent = `Исправлено ${saved}. Не удалось: ${failed.length}. Повторите для оставшихся.`;
+      return;
+    }
+    layer.v2Close?.(); onSaved();
+    openNotice({ title:'Инвентаризация', message:`Изменено ${saved} позиций.` });
+  });
+  return layer;
+}
+
+function openInventoryAuditMode(root, { manufacturer = '', query = '', type = '', onSaved = () => {} } = {}) {
+  const markup = `<div class="form-grid">
+    ${button('Данные', { variant:'secondary', data:'data-inventory-audit-mode="data"' })}
+    ${button('Остатки', { variant:'secondary', data:'data-inventory-audit-mode="stock"' })}
+  </div>`;
+  const layer = mountModal(root, modal(markup, { title:'Инвентаризация', variant:'x', xRole:'action' }));
+  layer?.querySelectorAll('[data-inventory-audit-mode]').forEach(control =>
+    control.addEventListener('click', () => {
+      const mode = control.dataset.inventoryAuditMode;
+      layer.v2Close?.();
+      openInventoryAuditSelection(root, { mode, manufacturer, query, type, onSaved });
+    }));
+  return layer;
+}
+
 
 function renderStock(root) {
   STOCK_VIEW.manufacturersType = '';
@@ -797,6 +994,12 @@ function renderStock(root) {
       actions: [
         { id: 'appearance', label: 'Вид', onSelect: () => openManufacturerAppearance(root, renderManufacturers) },
         { id: 'controls', label: 'Сортировка', onSelect: () => openStockControls(root, 'manufacturers', '', renderManufacturers) },
+        ...(canUseCapability('inventory.stocktake.access') ? [{
+          id: 'inventory', label: 'Инвентаризация',
+          onSelect: () => openInventoryAuditMode(root, {
+            query: searchInput?.value || '', type: STOCK_VIEW.manufacturersType, onSaved: renderManufacturers,
+          }),
+        }] : []),
       ],
     });
   });
@@ -819,40 +1022,6 @@ function renderOrders(root) {
   notifyContext();
 }
 
-function renderInventoryCount(root) {
-  root.innerHTML = `${context('Инвентаризация')}${inventoryCountMarkup()}${actionBlock(button('Завершить', { type: 'button', data: 'data-inventory-count-save', aria: 'Завершить инвентаризацию' }))}`;
-  root.querySelector('[data-inventory-count-save]')?.addEventListener('click', async () => {
-    const form = root.querySelector('[data-inventory-count-form]');
-    if (!form) return;
-    const lines = [...form.querySelectorAll('[data-count-item]')].map((input) => {
-      const item = getInventoryItem(input.dataset.countItem);
-      const raw = String(input.value || '').trim();
-      if (!raw || !item) return null;
-      const actual = Math.max(0, Number(raw.replace(',', '.')) || 0);
-      const expected = Number(item.balance) || 0;
-      const difference = actual - expected;
-      if (Math.abs(difference) < 0.000001) return null;
-      return {
-        itemId: item.itemId,
-        quantity: difference,
-        expectedQuantity: expected,
-        actualQuantity: actual,
-      };
-    }).filter(Boolean);
-    if (!lines.length) {
-      openNotice({ title: 'Инвентаризация', message: 'Расхождений нет или фактические значения не введены.' });
-      return;
-    }
-    try {
-      await createInventoryMovement({ kind: 'ADJUSTMENT', sourceType: 'inventory-count', note: 'Инвентаризация', lines });
-      renderInventoryCount(root);
-    } catch (error) {
-      openNotice({ title: 'Не удалось завершить', message: error instanceof Error ? error.message : 'Ошибка склада' });
-    }
-  });
-  notifyContext();
-}
-
 export async function renderInventory(root, section = 'stock') {
   root.innerHTML = emptyState('Склад', 'Загружаем данные…');
   try {
@@ -867,7 +1036,6 @@ export async function renderInventory(root, section = 'stock') {
 
   if (section === 'movements') renderMovements(root);
   else if (section === 'orders') renderOrders(root);
-  else if (section === 'counts') renderInventoryCount(root);
   else renderStock(root);
   return () => {};
 }

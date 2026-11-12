@@ -4,7 +4,6 @@ const INVENTORY_NAVIGATION = [
   { id: 'stock', label: 'Остатки', capability: 'inventory.stock.access' },
   { id: 'movements', label: 'Движения', capability: 'inventory.movements.access' },
   { id: 'orders', label: 'Заказ', capability: 'inventory.order.access' },
-  { id: 'counts', label: 'Инвентаризация', capability: 'inventory.stocktake.access' },
 ];
 
 export function inventoryNavigationItems() {
