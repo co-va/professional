@@ -16,4 +16,6 @@ assert.throws(()=>netStocktakeGrams({gross:220,containers:3,tareWeight:null}),/�
 assert.throws(()=>netStocktakeGrams({gross:20,containers:3,tareWeight:15}),/превышает/);
 assert.throws(()=>netStocktakeGrams({gross:220,containers:2.5,tareWeight:15}),/количество/);
 assert.equal(isWeighedInventoryItem({unit:'шт.'}),false);
+assert.equal(isWeighedInventoryItem(null),false,'empty movement row must not crash');
+assert.equal(isWeighedInventoryItem(undefined),false,'unselected material must not crash');
 console.log('PASS: inventory completeness, zero tare, weighted count formula, no guessed containers');
