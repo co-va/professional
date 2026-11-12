@@ -307,12 +307,14 @@ export function openInventoryProductOverview(itemId, { edit = () => {}, onChange
     host.innerHTML = page([
       workspaceHeaderContext({ title: item.name }),
       productCard(item),
-      v2Section('Поставщики', supplierRows(item) + button('Добавить', {
-        variant: 'secondary', data: 'data-inventory-supplier-add', aria: 'Добавить место покупки',
-      })),
-      button('Удалить продукт', {
-        variant: 'critical', data: 'data-inventory-product-delete',
-      }),
+      v2Section('Поставщики', supplierRows(item)),
+      actionBlock(
+        button('Добавить', {
+          variant: 'secondary', data: 'data-inventory-supplier-add', aria: 'Добавить место покупки',
+        }) + button('Удалить продукт', {
+          variant: 'critical', data: 'data-inventory-product-delete',
+        }),
+      ),
     ]);
     host.querySelector('[data-inventory-product-card]')?.addEventListener('click', () => {
       edit(() => {
