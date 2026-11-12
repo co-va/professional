@@ -39,3 +39,28 @@ export async function correctInventoryMovement(movementId, value = {}) {
     body: JSON.stringify(value),
   });
 }
+
+// Offers are persisted only by Core. A successful response refreshes the same inventory snapshot.
+const itemOffersPath = (itemId) => `/items/${encodeURIComponent(String(itemId || ''))}/offers`;
+
+export async function createInventorySupplierOffer(itemId, value = {}) {
+  return inventoryRequest(itemOffersPath(itemId), { method: 'POST', body: JSON.stringify(value) });
+}
+
+export async function updateInventorySupplierOffer(itemId, offerId, value = {}) {
+  return inventoryRequest(`${itemOffersPath(itemId)}/${encodeURIComponent(String(offerId || ''))}`, {
+    method: 'PUT', body: JSON.stringify(value),
+  });
+}
+
+export async function archiveInventorySupplierOffer(itemId, offerId) {
+  return inventoryRequest(`${itemOffersPath(itemId)}/${encodeURIComponent(String(offerId || ''))}`, {
+    method: 'DELETE',
+  });
+}
+
+export async function setInventoryPrimarySupplierOffer(itemId, offerId = '') {
+  return inventoryRequest(`/items/${encodeURIComponent(String(itemId || ''))}/primary-offer`, {
+    method: 'PUT', body: JSON.stringify({ offerId: String(offerId || '') }),
+  });
+}
