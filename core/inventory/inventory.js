@@ -818,7 +818,7 @@ function openManufacturerStock(root, manufacturer) {
         { id: 'filter', label: 'Фильтр', variant: 'secondary', onSelect: () => openStockControls(layer, 'items', manufacturer, renderList, 'filter') },
         ...(canUseCapability('inventory.stocktake.access') ? [{
           id: 'inventory', label: 'Инвентаризация', variant: 'secondary',
-          onSelect: () => openInventoryAuditMode(layer, {
+          onSelect: () => openInventoryAuditSelection(layer, {
             manufacturer, onSaved: renderList,
           }),
         }] : []),
@@ -1253,10 +1253,6 @@ function openInventoryAuditCriteria(root, { mode, ids = [], onSaved = () => {} }
   return layer;
 }
 
-function openInventoryAuditMode(root, { manufacturer = '', onSaved = () => {} } = {}) {
-  return openInventoryAuditSelection(root, { manufacturer, onSaved });
-}
-
 
 function renderStock(root) {
   STOCK_VIEW.manufacturersType = '';
@@ -1288,7 +1284,7 @@ function renderStock(root) {
         { id: 'controls', label: 'Сортировка', onSelect: () => openStockControls(root, 'manufacturers', '', renderManufacturers) },
         ...(canUseCapability('inventory.stocktake.access') ? [{
           id: 'inventory', label: 'Инвентаризация',
-          onSelect: () => openInventoryAuditMode(root, {
+          onSelect: () => openInventoryAuditSelection(root, {
             onSaved: renderManufacturers,
           }),
         }] : []),
