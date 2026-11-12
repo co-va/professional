@@ -14,12 +14,18 @@ assert.match(z1, /fields: manufacturerCardFields\(group\)/);
 
 const page = inventory.slice(inventory.indexOf('function renderStock(root) {'), inventory.indexOf('function renderMovements(root)'));
 assert.match(page, /root\.innerHTML = page\(\[/, 'Shared vertical page spacing');
+assert.doesNotMatch(page.slice(page.indexOf('root.innerHTML = page(['), page.indexOf('const [searchRow]')), /stockSearchField\(\)/, 'Search must never be in Z1 body');
+assert.match(page, /setV2ZHeaderRows\(root,/, 'Use canonical Z1 header rows');
+assert.match(page, /class="ui-search-field"/, 'Use shared header search field');
+assert.match(page, /class="ui-search-divider"/, 'Use shared search divider');
+assert.match(page, /searchInput\?\.addEventListener\('input', renderManufacturers\)/, 'Header search filters Z1 cards');
+assert.doesNotMatch(page, /label: 'Поиск'/, 'Header search has no visible label');
 assert.match(page, /v: \{ data: 'data-inventory-stock-menu'/, 'Canonical V action');
 const appearanceIndex = page.indexOf("{ id: 'appearance', label: 'Вид'");
 const sortingIndex = page.indexOf("{ id: 'controls', label: 'Сортировка и фильтр'");
 assert.ok(appearanceIndex >= 0 && sortingIndex > appearanceIndex, 'View is the first item of the menu');
 assert.match(page, /openSharedProfileSettingsMenu\(/, 'Reuse existing settings action menu');
-assert.match(page, /stockSearchField\(\)/, 'Existing stock search');
+assert.match(page, /setV2ZHeaderRows\(root,/, 'Existing header search');
 assert.match(page, /bindManufacturerCards\(root, listHost\)/, 'All brand cards remain interactive');
 
 const view = inventory.slice(inventory.indexOf('function openManufacturerAppearance('), inventory.indexOf('function stockListMarkup('));

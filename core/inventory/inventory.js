@@ -14,6 +14,7 @@ import {
   page,
   searchableSelect,
   select,
+  setV2ZHeaderRows,
   shortDateTimeParts,
   twoColumnLayout,
   v2ListEntries,
@@ -643,16 +644,22 @@ function renderStock(root) {
       v: { data: 'data-inventory-stock-menu', aria: 'Настройки остатков' },
       c: { label: '+', data: 'data-inventory-add-item', aria: 'Добавить позицию' },
     }),
-    stockSearchField(),
     '<div data-inventory-manufacturer-list></div>',
   ]);
+  // Canonical Z1 header search: identical shell/spacing to Contacts.
+  // Only manufacturer cards belong to the scrollable Z1 body.
+  const [searchRow] = setV2ZHeaderRows(root, [`<div class="ui-search-field">
+    ${field({ name: 'inventorySearch', type: 'search', placeholder: 'Название, тип, артикул…', autocomplete: 'off', data: 'data-inventory-stock-search' })}
+    <div class="ui-search-divider" aria-hidden="true"></div>
+  </div>`]);
+  const searchInput = searchRow?.querySelector('[data-inventory-stock-search]') || null;
   const listHost = root.querySelector('[data-inventory-manufacturer-list]');
   const renderManufacturers = () => {
-    const query = root.querySelector('[name="inventorySearch"]')?.value || '';
+    const query = searchInput?.value || '';
     if (listHost) listHost.innerHTML = stockManufacturerCardsMarkup(query);
     if (listHost) bindManufacturerCards(root, listHost);
   };
-  root.querySelector('[name="inventorySearch"]')?.addEventListener('input', renderManufacturers);
+  searchInput?.addEventListener('input', renderManufacturers);
   root.querySelector('[data-inventory-stock-menu]')?.addEventListener('click', () => {
     openSharedProfileSettingsMenu({
       title: 'Настройки остатков',
