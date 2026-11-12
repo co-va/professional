@@ -837,6 +837,22 @@ function inventoryAuditItems(ids) {
   return ids.map(id => byId.get(id)).filter(Boolean);
 }
 
+function inventoryAuditFilters(items, manufacturer = '') {
+  const definitions = [
+    ['manufacturer', 'Производитель'],
+    ['productType', 'Тип продукта'],
+    ['category', 'Категория'],
+    ['location', 'Место хранения'],
+    ['supplier', 'Поставщик'],
+    ['unit', 'Единица'],
+  ];
+  return definitions.filter(([key]) => key !== 'manufacturer' || !manufacturer).map(([key, label]) => {
+    const options = [...new Set(items.map(item => String(item[key] ?? '').trim()).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b, 'ru', { numeric: true, sensitivity: 'base' }));
+    return { key, label, options: [{ value: '', label: 'Все' }, ...options.map(value => ({ value, label: value }))] };
+  }).filter(filter => filter.options.length > 2);
+}
+
 function openInventoryAuditSelection(root, { mode, manufacturer = '', query = '', type = '', onSaved = () => {} } = {}) {
   // Freeze the current manufacturer/search/type scope before any selection.
   const ids = [...new Set(inventoryAuditScope({ manufacturer, query, type }))];
@@ -844,6 +860,8 @@ function openInventoryAuditSelection(root, { mode, manufacturer = '', query = ''
     openNotice({ title: 'Инвентаризация', message: 'В текущей выборке нет позиций.' });
     return null;
   }
+  const availableFilters = inventoryAuditFilters(inventoryAuditItems(ids), manufacturer);
+  const filterValues = Object.fromEntries(availableFilters.map(({ key }) => [key, '']));
   const markup = `<div class="form-grid" data-inventory-audit-selection>
     ${stockSearchField('', 'data-inventory-audit-search')}
     ${compactCheck({ label: 'Выбрать все показанные', data: 'data-inventory-audit-all' })}
@@ -853,6 +871,15 @@ function openInventoryAuditSelection(root, { mode, manufacturer = '', query = ''
   </div>`;
   const layer = mountModal(root, modal(markup, { title: 'Инвентаризация', variant: 'q' }));
   if (!layer) return null;
+  if (availableFilters.length) {
+    const header = layer.querySelector('[data-v2-q-header-content]');
+    if (header) {
+      header.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+        <h2 class="v2-q-title">Инвентаризация</h2>
+        ${button('V', { variant: 'secondary', data: 'data-inventory-audit-v', aria: 'Фильтры инвентаризации' })}
+      </div>`;
+    }
+  }
   const search = layer.querySelector('[data-inventory-audit-search]');
   const list = layer.querySelector('[data-inventory-audit-list]');
   const all = layer.querySelector('[data-inventory-audit-all]');
@@ -867,8 +894,9 @@ function openInventoryAuditSelection(root, { mode, manufacturer = '', query = ''
   };
   const render = () => {
     const needle = normalizedSearch(search?.value);
-    const items = inventoryAuditItems(ids).filter(item => !needle ||
-      `${manufacturerName(item)} ${itemSearchText(item)}`.toLocaleLowerCase('ru-RU').includes(needle))
+    const items = inventoryAuditItems(ids).filter(item =>
+      (!needle || `${manufacturerName(item)} ${itemSearchText(item)}`.toLocaleLowerCase('ru-RU').includes(needle))
+      && availableFilters.every(({ key }) => !filterValues[key] || String(item[key] ?? '').trim() === filterValues[key]))
       .sort((a,b) => String(a.name).localeCompare(String(b.name), 'ru', { numeric:true }));
     visible = items.map(item => item.itemId);
     if (list) list.innerHTML = items.length
@@ -892,6 +920,28 @@ function openInventoryAuditSelection(root, { mode, manufacturer = '', query = ''
     render();
   });
   search?.addEventListener('input', render);
+  layer.querySelector('[data-inventory-audit-v]')?.addEventListener('click', () => {
+    openSharedProfileSettingsMenu({
+      title: 'Фильтр',
+      content: `<div class="form-grid" data-inventory-audit-filter-fields>
+        ${availableFilters.map(({ key, label, options }) => select({
+          label, name: `auditFilter-${key}`, value: filterValues[key], options,
+        })).join('')}
+      </div>`,
+      actions: [{ id: 'reset', label: 'Сбросить', onSelect: () => {
+        availableFilters.forEach(({ key }) => { filterValues[key] = ''; });
+        render();
+      } }],
+      onMount: filterLayer => {
+        availableFilters.forEach(({ key }) => {
+          filterLayer.querySelector(`input[name="auditFilter-${key}"]`)?.addEventListener('change', event => {
+            filterValues[key] = String(event.target.value || '');
+            render();
+          });
+        });
+      },
+    });
+  });
   next?.addEventListener('click', () => {
     if (!selected.size) return;
     openInventoryAuditCriteria(layer, { mode, ids: [...selected], onSaved: () => {
