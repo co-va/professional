@@ -438,27 +438,24 @@ function movementEditorRow(row = {}, index = 0, kind = 'CONSUMPTION') {
   const direction = row.direction === 'IN' || row.direction === 'OUT' ? row.direction : '';
   const outgoing = direction ? direction === 'OUT' : ['CONSUMPTION', 'SALE', 'WRITE_OFF'].includes(kind);
   const tubes = row.containerDelta == null ? '' : Math.abs(Number(row.containerDelta));
-  return `<div data-inventory-movement-row data-row-index="${index}" data-row-direction="${escapeHtml(direction)}">
-    ${twoColumnLayout(
-      searchableSelect({
-        label: 'Материал',
-        name: `itemId-${index}`,
-        value: row.itemId || '',
-        options: itemOptions(),
-        placeholder: 'Выбрать',
-        required: true,
-      }),
-      field({
-        label: item?.unit ? `Количество, ${item.unit}` : 'Количество',
-        name: `quantity-${index}`,
-        value: quantity,
-        type: 'number',
-        min: '0',
-        step: '0.001',
-        inputmode: 'decimal',
-      }),
-      { ariaLabel: 'Материал и количество' },
-    )}
+  return `<div class="form-grid" data-inventory-movement-row data-row-index="${index}" data-row-direction="${escapeHtml(direction)}">
+    ${searchableSelect({
+      label: 'Материал',
+      name: `itemId-${index}`,
+      value: row.itemId || '',
+      options: itemOptions(),
+      placeholder: 'Выбрать материал',
+      required: true,
+    })}
+    ${field({
+      label: item?.unit ? `Количество, ${item.unit}` : 'Количество',
+      name: `quantity-${index}`,
+      value: quantity,
+      type: 'number',
+      min: '0',
+      step: '0.001',
+      inputmode: 'decimal',
+    })}
     <div data-inventory-movement-tubes${isWeighedInventoryItem(item) ? '' : ' hidden'}>
       ${field({
         label: outgoing ? 'Выбыло тюбиков, шт. (если тара убрана)' : 'Пришло тюбиков, шт.',
@@ -468,7 +465,6 @@ function movementEditorRow(row = {}, index = 0, kind = 'CONSUMPTION') {
     </div>
   </div>`;
 }
-
 function collectMovementRows(host, kind = 'CONSUMPTION') {
   return [...host.querySelectorAll('[data-inventory-movement-row]')].map((row) => {
     const index = row.dataset.rowIndex;
@@ -509,11 +505,13 @@ function openMovementEditor(root, movementId = '', kind = 'CONSUMPTION', { recor
   const recordName = String(record?.personName || '').trim();
   const recordLabel = [recordCode, recordName].filter(Boolean).join(' · ');
   const markup = `
-    <form data-inventory-movement-form>
+    <form class="form-grid" data-inventory-movement-form>
       ${recordLabel && !correcting ? `<p>${escapeHtml(recordLabel)}</p>` : ''}
       ${correcting && movement.personUei ? `<p>${escapeHtml(movement.personUei)}</p>` : ''}
-      <div data-inventory-movement-rows>${initialRows.map((row, index) => movementEditorRow(row, index, actualKind)).join('')}</div>
-      ${button('+ Добавить позицию', { type: 'button', variant: 'secondary', data: 'data-inventory-add-movement-row' })}
+      ${v2Section('Материалы', `
+        <div class="form-grid" data-inventory-movement-rows>${initialRows.map((row, index) => movementEditorRow(row, index, actualKind)).join('')}</div>
+        ${button('+ Добавить позицию', { type: 'button', variant: 'secondary', data: 'data-inventory-add-movement-row' })}
+      `)}
       ${field({ label: 'Примечание', name: 'note', value: movement?.note || '' })}
       ${actionBlock(button(correcting ? 'Исправить' : 'Сохранить', { type: 'button', data: 'data-inventory-movement-save' }))}
     </form>`;
