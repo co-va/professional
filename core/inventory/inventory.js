@@ -30,7 +30,7 @@ import { canUseCapability } from '../access.js';
 import { setSharedActionVisible } from '../../ui/page/page.js';
 import { getCardAppearanceTemplate, saveCardAppearanceTemplate } from '../card-appearance-templates.js';
 import { loadAuxiliaryState } from '../runtime/auxiliary-state.js';
-import { inventoryManufacturerCompletion } from './completeness.js';
+import { inventoryManufacturerCompletion, isWeighedInventoryItem, netStocktakeGrams } from './completeness.js';
 import { openInventoryProductAppearanceQ, openInventoryProductOverview } from './product-overview.js';
 import {
   getInventoryItem,
@@ -852,6 +852,55 @@ function openInventoryAuditSelection(root, { mode, manufacturer = '', query = ''
   return layer;
 }
 
+
+function inventoryAuditInput(item, index) {
+  const expected = `${numberText(item.balance)} ${item.unit}`;
+  if (isWeighedInventoryItem(item)) {
+    const tare = item.tareWeight == null ? 'не указана' : `${numberText(item.tareWeight)} г`;
+    const pack = Number(item.packageQuantity) > 0 ? ` · содержимое тюбика ${numberText(item.packageQuantity)} г` : '';
+    return `<section>
+      <strong>${escapeHtml(item.name)}</strong>
+      <p>По учёту ${escapeHtml(expected)} · тара ${escapeHtml(tare)}/шт.${pack}</p>
+      ${twoColumnLayout(
+        field({ label: 'Тюбиков, шт.', name: `auditTubes-${index}`, type: 'number', min: '0',
+          step: '1', inputmode: 'numeric' }),
+        field({ label: 'Общий вес с тарой, г', name: `auditGross-${index}`, type: 'number', min: '0',
+          step: '0.001', inputmode: 'decimal' }),
+        { ariaLabel: `Количество и вес: ${item.name}` },
+      )}
+      <p data-inventory-audit-result="${index}">Введите количество и общий вес.</p>
+    </section>`;
+  }
+  return `<section>
+    <strong>${escapeHtml(item.name)}</strong>
+    <p>По учёту ${escapeHtml(expected)}</p>
+    ${field({ label: `Фактически, ${item.unit}`, name: `auditActual-${index}`,
+      type: 'number', min: '0', step: '0.001', inputmode: 'decimal' })}
+    <p data-inventory-audit-result="${index}">Введите фактический остаток.</p>
+  </section>`;
+}
+
+function inventoryAuditMeasure(item, index, data) {
+  if (isWeighedInventoryItem(item)) {
+    const tubeText = String(data.get(`auditTubes-${index}`) ?? '').trim();
+    const grossText = String(data.get(`auditGross-${index}`) ?? '').trim();
+    if (!tubeText && !grossText) return null;
+    if (!tubeText || !grossText) throw new Error('Введите и количество тюбиков, и общий вес.');
+    const tubes = Number(tubeText.replace(',', '.'));
+    const gross = Number(grossText.replace(',', '.'));
+    const actual = netStocktakeGrams({ gross, containers: tubes, tareWeight: item.tareWeight });
+    return {
+      actual,
+      note: `Тюбиков: ${tubes}; общий вес: ${numberText(gross)} г; тара/шт.: ${numberText(item.tareWeight)} г`,
+    };
+  }
+  const raw = String(data.get(`auditActual-${index}`) ?? '').trim();
+  if (!raw) return null;
+  const actual = Number(raw.replace(',', '.'));
+  if (!Number.isFinite(actual) || actual < 0) throw new Error('Проверьте фактическое количество.');
+  return { actual, note: '' };
+}
+
 function openInventoryAuditCriteria(root, { mode, ids = [], onSaved = () => {} } = {}) {
   const items = inventoryAuditItems(ids);
   if (!items.length) return openNotice({ title: 'Инвентаризация', message: 'Позиции не найдены.' });
@@ -864,18 +913,16 @@ function openInventoryAuditCriteria(root, { mode, ids = [], onSaved = () => {} }
       ] })}
       ${field({ label: 'Новое значение', name: 'auditValue', autocomplete:'off' })}
     </div>`
-    : `<div class="form-grid">${items.map((item, i) => field({
-      label: `${item.name} · сейчас ${numberText(item.balance)} ${item.unit}`,
-      name: `auditActual-${i}`, type:'number', value:'', min:'0', step:'0.001', inputmode:'decimal',
-    })).join('')}</div>`;
+    : `<div class="form-grid">${items.map(inventoryAuditInput).join('')}</div>`;
   const markup = `<form data-inventory-audit-criteria>
     <p>Выбрано: ${items.length} позиций</p>
     ${fields}
     <p class="form-error" role="status" data-inventory-audit-status></p>
-    ${actionBlock(button(isData ? 'Применить' : 'Завершить', { type:'submit', data:'data-inventory-audit-apply' }))}
+    ${actionBlock(button(isData ? 'Применить' : 'Проверить', { type:'submit', data:'data-inventory-audit-apply' }))}
   </form>`;
   const layer = mountModal(root, modal(markup, {
-    title:isData ? 'Инвентаризация данных' : 'Инвентаризация остатков', variant:'x', xRole:'editor',
+    title: isData ? 'Инвентаризация данных' : 'Инвентаризация остатков',
+    variant: 'x', xRole: 'editor',
   }));
   if (!layer) return null;
   const form = layer.querySelector('[data-inventory-audit-criteria]');
@@ -883,57 +930,140 @@ function openInventoryAuditCriteria(root, { mode, ids = [], onSaved = () => {} }
   const status = layer.querySelector('[data-inventory-audit-status]');
   const balances = new Map(items.map(item => [item.itemId, Number(item.balance) || 0]));
   let saving = false;
-  form?.addEventListener('submit', async event => {
+  let stage = 'edit';
+
+  function calculate() {
+    const data = new FormData(form);
+    const lines = [];
+    let measured = 0;
+    let invalid = 0;
+    for (const [index, item] of items.entries()) {
+      const result = form.querySelector(`[data-inventory-audit-result="${index}"]`);
+      try {
+        const measurement = inventoryAuditMeasure(item, index, data);
+        if (!measurement) {
+          if (result) result.textContent = 'Не проверено';
+          continue;
+        }
+        measured++;
+        const expected = balances.get(item.itemId);
+        const diff = Math.round((measurement.actual - expected) * 1000) / 1000;
+        const difference = Math.abs(diff) < 0.000001 ? 'Совпадает'
+          : diff < 0 ? `Недостача ${numberText(-diff)} ${item.unit}`
+          : `Излишек ${numberText(diff)} ${item.unit}`;
+        if (result) result.textContent = `Факт ${numberText(measurement.actual)} ${item.unit} · ${difference}`;
+        if (Math.abs(diff) >= 0.000001) lines.push({
+          itemId: item.itemId, quantity: diff, expectedQuantity: expected,
+          actualQuantity: measurement.actual,
+          ...(measurement.note ? { note: measurement.note } : {}),
+        });
+      } catch (error) {
+        invalid++;
+        if (result) result.textContent = error instanceof Error ? error.message : 'Проверьте измерения.';
+      }
+    }
+    return { lines, measured, invalid };
+  }
+
+  if (!isData) {
+    // The form is never rebuilt while iOS keyboard is open.
+    form.addEventListener('input', () => {
+      if (saving) return;
+      stage = 'edit';
+      submit.textContent = 'Проверить';
+      const result = calculate();
+      status.textContent = result.measured || result.invalid
+        ? `Проверено ${result.measured} · Расхождений ${result.lines.length}${result.invalid ? ` · Ошибок ${result.invalid}` : ''}`
+        : '';
+    });
+  }
+
+  form.addEventListener('submit', async (event) => {
     event.preventDefault();
     if (saving) return;
     const data = new FormData(form);
-    const fieldName = String(data.get('auditField') || '');
-    const value = String(data.get('auditValue') || '').trim();
-    let changes = [];
-    if (isData) {
-      if (!['category','productType'].includes(fieldName) || !value) {
-        status.textContent = 'Укажите поле и новое значение.';
+    if (!isData) {
+      const review = calculate();
+      if (review.invalid) {
+        status.textContent = `Проверьте ошибки измерений: ${review.invalid}.`;
         return;
       }
-      changes = items.filter(item => getInventoryItem(item.itemId)
-        && String(getInventoryItem(item.itemId)?.[fieldName] || '').trim() !== value);
-      if (!changes.length) { status.textContent = 'У выбранных позиций уже указано это значение.'; return; }
-    } else {
-      const lines = [];
-      for (let i=0; i<items.length; i++) {
-        const item = items[i], raw = String(data.get(`auditActual-${i}`) ?? '').trim();
-        if (!raw) continue;
-        const actual = Number(raw.replace(',','.'));
-        if (!Number.isFinite(actual) || actual < 0) { status.textContent = `Проверьте количество: ${item.name}.`; return; }
-        const current = getInventoryItem(item.itemId);
-        const expected = balances.get(item.itemId);
-        if (!current || Math.abs((Number(current.balance)||0) - expected) > .000001) {
-          status.textContent = 'Остатки изменились. Повторите инвентаризацию.';
-          return;
-        }
-        if (Math.abs(actual-expected) > .000001) lines.push({
-          itemId:item.itemId, quantity:actual-expected, expectedQuantity:expected, actualQuantity:actual,
-        });
+      if (!review.measured) {
+        status.textContent = 'Введите данные хотя бы по одной позиции.';
+        return;
       }
-      if (!lines.length) { status.textContent = 'Введите фактические остатки, отличающиеся от учётных.'; return; }
-      saving = true; submit.disabled = true; status.textContent = 'Сохранение…';
+      if (!review.lines.length) {
+        if (stage === 'clean') {
+          layer.v2Close?.();
+          onSaved();
+        } else {
+          stage = 'clean';
+          submit.textContent = 'Закрыть';
+          status.textContent = `Проверено ${review.measured}. Расхождений нет. Остатки не изменены.`;
+        }
+        return;
+      }
+      if (stage !== 'review') {
+        stage = 'review';
+        submit.textContent = 'Подтвердить';
+        status.textContent = `Проверено ${review.measured}. Расхождений: ${review.lines.length}. Подтвердите корректировку.`;
+        return;
+      }
+      saving = true;
+      submit.disabled = true;
+      status.textContent = 'Проверка актуальных остатков…';
       try {
-        await createInventoryMovement({ kind:'ADJUSTMENT', sourceType:'inventory-count', note:'Инвентаризация', lines });
-        layer.v2Close?.(); onSaved();
-        openNotice({ title:'Инвентаризация', message:`Обновлено ${lines.length} позиций.` });
+        await loadInventory();
+        if (items.some(item => {
+          const actualItem = getInventoryItem(item.itemId);
+          return !actualItem
+            || Math.abs((Number(actualItem.balance) || 0) - balances.get(item.itemId)) > 0.000001
+            || (isWeighedInventoryItem(item) && String(actualItem.tareWeight ?? '') !== String(item.tareWeight ?? ''));
+        })) {
+          throw new Error('Учётные остатки или тара изменились. Закройте форму и проведите инвентаризацию заново.');
+        }
+        status.textContent = 'Сохранение…';
+        await createInventoryMovement({
+          kind: 'ADJUSTMENT', sourceType: 'inventory-count',
+          note: 'Инвентаризация фактических остатков', lines: review.lines,
+        });
+        layer.v2Close?.();
+        onSaved();
+        openNotice({ title: 'Инвентаризация',
+          message: `Проверено ${review.measured}. Скорректировано ${review.lines.length} позиций.` });
       } catch(error) {
+        stage = 'edit';
+        submit.textContent = 'Проверить';
         status.textContent = error instanceof Error ? error.message : 'Не удалось сохранить остатки.';
-      } finally { saving = false; if(submit.isConnected) submit.disabled = false; }
+      } finally {
+        saving = false;
+        if (submit.isConnected) submit.disabled = false;
+      }
       return;
     }
-    saving = true; submit.disabled = true;
-    let saved = 0; const failed = [];
-    // The Core partial-item endpoint updates only the named master-data field.
-    for (let i=0; i<changes.length; i+=4) {
-      const batch = changes.slice(i, i+4);
+
+    const fieldName = String(data.get('auditField') || '');
+    const value = String(data.get('auditValue') || '').trim();
+    if (!['category', 'productType'].includes(fieldName) || !value) {
+      status.textContent = 'Укажите поле и новое значение.';
+      return;
+    }
+    const changes = items.filter(item => getInventoryItem(item.itemId)
+      && String(getInventoryItem(item.itemId)?.[fieldName] || '').trim() !== value);
+    if (!changes.length) {
+      status.textContent = 'У выбранных позиций уже указано это значение.';
+      return;
+    }
+    saving = true;
+    submit.disabled = true;
+    let saved = 0;
+    const failed = [];
+    // Existing item endpoint updates only supplied field; unchanged from data mode.
+    for (let i = 0; i < changes.length; i += 4) {
+      const batch = changes.slice(i, i + 4);
       const results = await Promise.allSettled(batch.map(item =>
-        updateInventoryItem(item.itemId, { [fieldName]:value })));
-      results.forEach((result,j) => result.status === 'fulfilled'
+        updateInventoryItem(item.itemId, { [fieldName]: value })));
+      results.forEach((result, j) => result.status === 'fulfilled'
         ? saved++ : failed.push(batch[j].itemId));
       status.textContent = `Сохранение: ${saved} из ${changes.length}`;
     }
@@ -944,8 +1074,9 @@ function openInventoryAuditCriteria(root, { mode, ids = [], onSaved = () => {} }
       status.textContent = `Исправлено ${saved}. Не удалось: ${failed.length}. Повторите для оставшихся.`;
       return;
     }
-    layer.v2Close?.(); onSaved();
-    openNotice({ title:'Инвентаризация', message:`Изменено ${saved} позиций.` });
+    layer.v2Close?.();
+    onSaved();
+    openNotice({ title: 'Инвентаризация', message: `Изменено ${saved} позиций.` });
   });
   return layer;
 }

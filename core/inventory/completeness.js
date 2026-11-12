@@ -59,8 +59,13 @@ export function netStocktakeGrams({ gross, containers, tareWeight } = {}) {
   const numericTare = Number(tareWeight);
   if (gross === '' || gross == null || !Number.isFinite(numericGross) || numericGross < 0)
     throw new Error('Укажите общий вес с тарой.');
-  if (containers === '' || containers == null || !Number.isInteger(numericCount) || numericCount < 1)
+  if (containers === '' || containers == null || !Number.isInteger(numericCount) || numericCount < 0)
     throw new Error('Укажите количество тюбиков.');
+  // An empty location may contain zero tubes and zero grams of gross weight.
+  if (numericCount === 0) {
+    if (numericGross !== 0) throw new Error('При нуле тюбиков общий вес должен быть равен нулю.');
+    return 0;
+  }
   if (tareWeight === '' || tareWeight == null || !Number.isFinite(numericTare) || numericTare < 0)
     throw new Error('В карточке товара не указана масса тары.');
   const content = numericGross - numericCount * numericTare;
