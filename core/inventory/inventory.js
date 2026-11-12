@@ -909,27 +909,30 @@ function openInventoryAuditSelection(root, { mode, manufacturer = '', query = ''
 
 
 function inventoryAuditInput(item, index) {
+  const previous = isWeighedInventoryItem(item)
+    ? `${item.containerCount == null ? '— тюб.' : `${numberText(item.containerCount)} тюб.`} · ${numberText(item.balance)} ${item.unit}`
+    : `${numberText(item.balance)} ${item.unit}`;
+  const heading = `<div class="field-inline-label"><strong>${escapeHtml(item.name)}</strong><span>${escapeHtml(previous)}</span></div>`;
   if (isWeighedInventoryItem(item)) {
     return `<section>
-      <strong>${escapeHtml(item.name)}</strong>
+      ${heading}
       ${twoColumnLayout(
-        field({ label: 'Тюбиков, шт.', name: `auditTubes-${index}`, type: 'number', min: '0',
+        field({ label: '', placeholder: 'Тюбиков, шт.', name: `auditTubes-${index}`, type: 'number', min: '0',
           step: '1', inputmode: 'numeric' }),
-        field({ label: 'Общий вес с тарой, г', name: `auditGross-${index}`, type: 'number', min: '0',
+        field({ label: '', placeholder: 'Общий вес, г', name: `auditGross-${index}`, type: 'number', min: '0',
           step: '0.001', inputmode: 'decimal' }),
         { ariaLabel: `Количество и вес: ${item.name}` },
       )}
-      <p data-inventory-audit-result="${index}">Остаток красителя появится после взвешивания.</p>
+      <p data-inventory-audit-result="${index}"></p>
     </section>`;
   }
   return `<section>
-    <strong>${escapeHtml(item.name)}</strong>
-    ${field({ label: `Фактически, ${item.unit}`, name: `auditActual-${index}`,
+    ${heading}
+    ${field({ label: '', placeholder: `Фактически, ${item.unit}`, name: `auditActual-${index}`,
       type: 'number', min: '0', step: '0.001', inputmode: 'decimal' })}
     <p data-inventory-audit-result="${index}"></p>
   </section>`;
 }
-
 function inventoryAuditMeasure(item, index, data) {
   if (isWeighedInventoryItem(item)) {
     const tubeText = String(data.get(`auditTubes-${index}`) ?? '').trim();
@@ -969,7 +972,6 @@ function openInventoryAuditCriteria(root, { mode, ids = [], onSaved = () => {} }
     </div>`
     : `<div class="form-grid">${items.map(inventoryAuditInput).join('')}</div>`;
   const markup = `<form data-inventory-audit-criteria>
-    <p>Выбрано: ${items.length} позиций</p>
     ${fields}
     <p class="form-error" role="status" data-inventory-audit-status></p>
     ${actionBlock(button(isData ? 'Применить' : 'Сохранить', { type:'submit', data:'data-inventory-audit-apply' }))}
@@ -996,7 +998,7 @@ function openInventoryAuditCriteria(root, { mode, ids = [], onSaved = () => {} }
       try {
         const measurement = inventoryAuditMeasure(item, index, data);
         if (!measurement) {
-          if (result) result.textContent = isWeighedInventoryItem(item) ? 'Остаток красителя появится после взвешивания.' : '';
+          if (result) result.textContent = '';
           continue;
         }
         measured++;
@@ -1005,9 +1007,7 @@ function openInventoryAuditCriteria(root, { mode, ids = [], onSaved = () => {} }
         const beforeTubes = knownContainers.get(item.itemId);
         const hasPhysicalCount = measurement.containers !== undefined;
         const physicalChanged = hasPhysicalCount && (beforeTubes == null || beforeTubes !== measurement.containers);
-        if (result) result.textContent = hasPhysicalCount
-          ? `Остаток красителя: ${numberText(measurement.actual)} ${item.unit} · ${numberText(measurement.containers)} тюб.`
-          : `Остаток: ${numberText(measurement.actual)} ${item.unit}`;
+        if (result) result.textContent = `Остаток: ${numberText(measurement.actual)} ${item.unit}`;
         if (Math.abs(diff) >= 0.000001 || physicalChanged) lines.push({
           itemId: item.itemId, quantity: diff, expectedQuantity: expected,
           actualQuantity: measurement.actual,
