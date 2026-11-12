@@ -972,6 +972,7 @@ function openInventoryAuditCriteria(root, { mode, ids = [], onSaved = () => {} }
     </div>`
     : `<div class="form-grid">${items.map(inventoryAuditInput).join('')}</div>`;
   const markup = `<form data-inventory-audit-criteria>
+    <p>Выбрано: ${items.length} позиций</p>
     ${fields}
     <p class="form-error" role="status" data-inventory-audit-status></p>
     ${actionBlock(button(isData ? 'Применить' : 'Сохранить', { type:'submit', data:'data-inventory-audit-apply' }))}
