@@ -103,6 +103,20 @@ function numberText(value, maximum = 3) {
   return number.toLocaleString('ru-RU', { maximumFractionDigits: maximum }).replaceAll('\u00a0', ' ');
 }
 
+// The exact physical count is an independent stock fact. Before the first
+// measurement, only the theoretical minimum can be displayed (not as fact).
+function tubeCountText(item = {}) {
+  if (!isWeighedInventoryItem(item)) return '';
+  if (Number.isSafeInteger(item.containerCount) && item.containerCount >= 0) {
+    return `${numberText(item.containerCount)} тюб.`;
+  }
+  const amount = Number(item.balance);
+  const capacity = Number(item.packageQuantity);
+  return Number.isFinite(amount) && amount >= 0 && Number.isFinite(capacity) && capacity > 0
+    ? `тюб. неизвестно · минимум ${Math.ceil(amount / capacity)}`
+    : 'тюб. неизвестно';
+}
+
 function moneyText(value) {
   const number = Number(value) || 0;
   return `${number.toLocaleString('ru-RU', { maximumFractionDigits: 2 }).replaceAll('\u00a0', ' ')} ₽`;
@@ -212,7 +226,7 @@ function itemOptions() {
   return getInventoryItems().map((item) => ({
     value: item.itemId,
     label: item.name,
-    meta: `${numberText(item.balance)} ${item.unit}`,
+    meta: [ `${numberText(item.balance)} ${item.unit}`, tubeCountText(item) ].filter(Boolean).join(' · '),
   }));
 }
 
@@ -417,10 +431,12 @@ function openItemEditor(root, itemId = '', defaults = {}, onSaved = () => {}) {
   notifyContext();
 }
 
-function movementEditorRow(row = {}, index = 0) {
+function movementEditorRow(row = {}, index = 0, kind = 'CONSUMPTION') {
   const item = getInventoryItem(row.itemId);
   const quantity = row.quantity == null ? '' : Number(row.quantity);
   const direction = row.direction === 'IN' || row.direction === 'OUT' ? row.direction : '';
+  const outgoing = direction ? direction === 'OUT' : ['CONSUMPTION', 'SALE', 'WRITE_OFF'].includes(kind);
+  const tubes = row.containerDelta == null ? '' : Math.abs(Number(row.containerDelta));
   return `<div data-inventory-movement-row data-row-index="${index}" data-row-direction="${escapeHtml(direction)}">
     ${twoColumnLayout(
       searchableSelect({
@@ -442,31 +458,57 @@ function movementEditorRow(row = {}, index = 0) {
       }),
       { ariaLabel: 'Материал и количество' },
     )}
+    <div data-inventory-movement-tubes${isWeighedInventoryItem(item) ? '' : ' hidden'}>
+      ${field({
+        label: outgoing ? 'Выбыло тюбиков, шт. (если тара убрана)' : 'Пришло тюбиков, шт.',
+        name: `containers-${index}`, value: tubes,
+        type: 'number', min: '0', step: '1', inputmode: 'numeric',
+      })}
+    </div>
   </div>`;
 }
 
-function collectMovementRows(host) {
+function collectMovementRows(host, kind = 'CONSUMPTION') {
   return [...host.querySelectorAll('[data-inventory-movement-row]')].map((row) => {
     const index = row.dataset.rowIndex;
     const itemId = row.querySelector(`[name="itemId-${CSS.escape(index)}"]`)?.value || '';
     const quantity = Number(String(row.querySelector(`[name="quantity-${CSS.escape(index)}"]`)?.value || '0').replace(',', '.')) || 0;
     const direction = row.dataset.rowDirection === 'IN' || row.dataset.rowDirection === 'OUT' ? row.dataset.rowDirection : undefined;
-    return { itemId, quantity, ...(direction ? { direction } : {}) };
-  }).filter((row) => row.itemId && row.quantity > 0);
+    const item = getInventoryItem(itemId);
+    const rawTubes = String(row.querySelector(`[name="containers-${CSS.escape(index)}"]`)?.value || '').trim();
+    let containerDelta = null;
+    if (isWeighedInventoryItem(item) && rawTubes !== '') {
+      const count = Number(rawTubes.replace(',', '.'));
+      if (!Number.isSafeInteger(count) || count < 0) throw new Error('Укажите целое число тюбиков.');
+      const outgoing = direction ? direction === 'OUT' : ['CONSUMPTION', 'SALE', 'WRITE_OFF'].includes(kind);
+      containerDelta = outgoing ? -count : count;
+    }
+    return { itemId, quantity, ...(direction ? { direction } : {}),
+      ...(containerDelta != null ? { containerDelta } : {}) };
+  }).filter(row => row.itemId && (row.quantity > 0 || row.containerDelta));
 }
 
 function openMovementEditor(root, movementId = '', kind = 'CONSUMPTION') {
   const movement = movementId ? getInventoryMovement(movementId) : null;
   const correcting = Boolean(movement);
+  // A physical stocktake is an absolute measurement, not an editable goods movement.
+  // Correct with a new audit; otherwise editing the mass would undo the tube count.
+  if (correcting && movement.kind === 'ADJUSTMENT'
+      && movement.lines?.some(line => line.actualContainerCount != null)) {
+    openNotice({ title: 'Инвентаризация', message: 'Для исправления физического пересчёта проведите новую инвентаризацию.' });
+    return;
+  }
+  const actualKind = movement?.kind || kind;
   const initialRows = movement?.lines?.length
-    ? movement.lines.map((line) => ({ itemId: line.itemId, quantity: line.quantity, direction: line.direction }))
+    ? movement.lines.map((line) => ({ itemId: line.itemId, quantity: line.quantity,
+        direction: line.direction, containerDelta: line.containerDelta }))
     : [{ itemId: '', quantity: '' }];
   const title = correcting ? movementTitle(movement) : movementTitle({ kind });
   const markup = `
     ${context(title)}
     <form data-inventory-movement-form>
       ${correcting && movement.personUei ? `<div class="entity-details"><div><span>UEI</span><strong>${escapeHtml(movement.personUei)}</strong></div></div>` : ''}
-      <div data-inventory-movement-rows>${initialRows.map(movementEditorRow).join('')}</div>
+      <div data-inventory-movement-rows>${initialRows.map((row, index) => movementEditorRow(row, index, actualKind)).join('')}</div>
       ${button('+ Добавить позицию', { type: 'button', variant: 'secondary', data: 'data-inventory-add-movement-row' })}
       ${field({ label: 'Примечание', name: 'note', value: movement?.note || '' })}
       ${actionBlock(button(correcting ? 'Исправить' : 'Сохранить', { type: 'button', data: 'data-inventory-movement-save' }))}
@@ -476,7 +518,7 @@ function openMovementEditor(root, movementId = '', kind = 'CONSUMPTION') {
 
   let rowIndex = initialRows.length;
   layer.querySelector('[data-inventory-add-movement-row]')?.addEventListener('click', () => {
-    layer.querySelector('[data-inventory-movement-rows]')?.insertAdjacentHTML('beforeend', movementEditorRow({}, rowIndex));
+    layer.querySelector('[data-inventory-movement-rows]')?.insertAdjacentHTML('beforeend', movementEditorRow({}, rowIndex, actualKind));
     rowIndex += 1;
   });
 
@@ -487,11 +529,24 @@ function openMovementEditor(root, movementId = '', kind = 'CONSUMPTION') {
     const item = getInventoryItem(selectInput.value);
     const label = row?.querySelector('input[name^="quantity-"]')?.closest('.field')?.querySelector(':scope > span');
     if (label) label.textContent = item?.unit ? `Количество, ${item.unit}` : 'Количество';
+    const physicalField = row?.querySelector('[data-inventory-movement-tubes]');
+    if (physicalField) {
+      physicalField.hidden = !isWeighedInventoryItem(item);
+      if (physicalField.hidden) {
+        const input = physicalField.querySelector('input');
+        if (input) input.value = '';
+      }
+    }
   });
 
   layer.querySelector('[data-inventory-movement-save]')?.addEventListener('click', async () => {
     const form = layer.querySelector('[data-inventory-movement-form]');
-    const lines = collectMovementRows(layer);
+    let lines;
+    try { lines = collectMovementRows(layer, actualKind); }
+    catch (error) {
+      openNotice({ title: 'Количество тюбиков', message: error instanceof Error ? error.message : 'Проверьте количество.' });
+      return;
+    }
     if (!lines.length) {
       openNotice({ title: 'Позиции', message: 'Добавьте хотя бы один материал и количество.' });
       return;
@@ -613,7 +668,7 @@ function stockListMarkup(manufacturer, query = '') {
   if (!items.length) return emptyState('Ничего не найдено', 'Измените поиск или фильтр.');
   return v2ListEntries(items.map((item) => v2ListEntry({
     title: item.name,
-    subtitle: [productTypeText(item), item.location].filter(Boolean).join(' · '),
+    subtitle: [productTypeText(item), item.location, tubeCountText(item)].filter(Boolean).join(' · '),
     rightTop: `${numberText(item.balance)} ${item.unit}`,
     rightBottom: item.lastPurchasePrice == null ? '' : moneyText(item.lastPurchasePrice),
     interactive: true,
@@ -858,9 +913,10 @@ function inventoryAuditInput(item, index) {
   if (isWeighedInventoryItem(item)) {
     const tare = item.tareWeight == null ? 'не указана' : `${numberText(item.tareWeight)} г`;
     const pack = Number(item.packageQuantity) > 0 ? ` · содержимое тюбика ${numberText(item.packageQuantity)} г` : '';
+    const counted = tubeCountText(item);
     return `<section>
       <strong>${escapeHtml(item.name)}</strong>
-      <p>По учёту ${escapeHtml(expected)} · тара ${escapeHtml(tare)}/шт.${pack}</p>
+      <p>По учёту ${escapeHtml(expected)} · ${escapeHtml(counted)} · тара ${escapeHtml(tare)}/шт.${pack}</p>
       ${twoColumnLayout(
         field({ label: 'Тюбиков, шт.', name: `auditTubes-${index}`, type: 'number', min: '0',
           step: '1', inputmode: 'numeric' }),
@@ -889,8 +945,12 @@ function inventoryAuditMeasure(item, index, data) {
     const tubes = Number(tubeText.replace(',', '.'));
     const gross = Number(grossText.replace(',', '.'));
     const actual = netStocktakeGrams({ gross, containers: tubes, tareWeight: item.tareWeight });
+    const capacity = Number(item.packageQuantity);
+    if (Number.isFinite(capacity) && capacity > 0 && actual > tubes * capacity + 0.001)
+      throw new Error('Масса красителя превышает вместимость выбранных тюбиков.');
     return {
       actual,
+      containers: tubes,
       note: `Тюбиков: ${tubes}; общий вес: ${numberText(gross)} г; тара/шт.: ${numberText(item.tareWeight)} г`,
     };
   }
@@ -929,6 +989,7 @@ function openInventoryAuditCriteria(root, { mode, ids = [], onSaved = () => {} }
   const submit = layer.querySelector('[data-inventory-audit-apply]');
   const status = layer.querySelector('[data-inventory-audit-status]');
   const balances = new Map(items.map(item => [item.itemId, Number(item.balance) || 0]));
+  const knownContainers = new Map(items.map(item => [item.itemId, item.containerCount == null ? null : Number(item.containerCount)]));
   let saving = false;
   let stage = 'edit';
 
@@ -948,13 +1009,25 @@ function openInventoryAuditCriteria(root, { mode, ids = [], onSaved = () => {} }
         measured++;
         const expected = balances.get(item.itemId);
         const diff = Math.round((measurement.actual - expected) * 1000) / 1000;
-        const difference = Math.abs(diff) < 0.000001 ? 'Совпадает'
+        const difference = Math.abs(diff) < 0.000001 ? 'Граммы совпадают'
           : diff < 0 ? `Недостача ${numberText(-diff)} ${item.unit}`
           : `Излишек ${numberText(diff)} ${item.unit}`;
-        if (result) result.textContent = `Факт ${numberText(measurement.actual)} ${item.unit} · ${difference}`;
-        if (Math.abs(diff) >= 0.000001) lines.push({
+        const beforeTubes = knownContainers.get(item.itemId);
+        const hasPhysicalCount = measurement.containers !== undefined;
+        const physicalChanged = hasPhysicalCount && (beforeTubes == null || beforeTubes !== measurement.containers);
+        const countChange = hasPhysicalCount
+          ? beforeTubes == null ? 'число тюбиков будет зафиксировано впервые'
+            : beforeTubes === measurement.containers ? 'тюбики совпадают'
+            : `тюбиков: ${numberText(beforeTubes)} → ${numberText(measurement.containers)}`
+          : '';
+        if (result) result.textContent = `Факт ${numberText(measurement.actual)} ${item.unit}${hasPhysicalCount ? ` · ${numberText(measurement.containers)} тюб.` : ''} · ${difference}${countChange ? ` · ${countChange}` : ''}`;
+        if (Math.abs(diff) >= 0.000001 || physicalChanged) lines.push({
           itemId: item.itemId, quantity: diff, expectedQuantity: expected,
           actualQuantity: measurement.actual,
+          ...(hasPhysicalCount ? {
+            expectedContainerCount: beforeTubes,
+            actualContainerCount: measurement.containers,
+          } : {}),
           ...(measurement.note ? { note: measurement.note } : {}),
         });
       } catch (error) {
@@ -1009,6 +1082,12 @@ function openInventoryAuditCriteria(root, { mode, ids = [], onSaved = () => {} }
         status.textContent = `Проверено ${review.measured}. Расхождений: ${review.lines.length}. Подтвердите корректировку.`;
         return;
       }
+      // Prevent silently losing counts if an older Core instance is still live.
+      if (items.some(item => isWeighedInventoryItem(item)
+        && !Object.prototype.hasOwnProperty.call(getInventoryItem(item.itemId) || {}, 'containerCount'))) {
+        status.textContent = 'Сервер склада ещё не поддерживает учёт тюбиков. Сохранение отменено.';
+        return;
+      }
       saving = true;
       submit.disabled = true;
       status.textContent = 'Проверка актуальных остатков…';
@@ -1018,7 +1097,10 @@ function openInventoryAuditCriteria(root, { mode, ids = [], onSaved = () => {} }
           const actualItem = getInventoryItem(item.itemId);
           return !actualItem
             || Math.abs((Number(actualItem.balance) || 0) - balances.get(item.itemId)) > 0.000001
-            || (isWeighedInventoryItem(item) && String(actualItem.tareWeight ?? '') !== String(item.tareWeight ?? ''));
+            || (isWeighedInventoryItem(item) && (
+              String(actualItem.tareWeight ?? '') !== String(item.tareWeight ?? '')
+              || (actualItem.containerCount == null ? null : Number(actualItem.containerCount)) !== knownContainers.get(item.itemId)
+            ));
         })) {
           throw new Error('Учётные остатки или тара изменились. Закройте форму и проведите инвентаризацию заново.');
         }
