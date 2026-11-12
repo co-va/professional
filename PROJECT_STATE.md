@@ -1008,3 +1008,10 @@ Professional отделён только если одновременно до�
 - В общей V-кнопке меню первый пункт «Вид», второй — сохранённая «Сортировка и фильтр». Меню — `openSharedProfileSettingsMenu`, редактирование — общий `openEntityCardAppearanceQ` и девятистрочный `entityVisualCard`; никаких локальных UI/CSS.
 - Новый scope `inventory-manufacturer` в **существующем** сохранении шаблонов `cardAppearanceTemplates`, без изменений серверного API. Все компании отображаются по одному общему виду; поля: компания, позиции, заполненность %, заполнено/не заполнено (реальная проекция из `core/inventory/completeness.js`).
 - Z2, карточку отдельного товара, Q, текущие складские движения и Core/User не меняли. Проверка iPhone отдельно.
+
+
+### 2026-11-12 — Shared Z/Q Header: геометрия по User (Professional staging)
+
+- Эталон: `co-va/user/staging` в `ui/v2/z-layout.js` и `ui/v2/surface-header.css`. У Professional был отдельный `margin-bottom:8px`, а в эталоне Z использует 14px снизу, Q — 18px над содержимым при непустом заголовке; пустой Header компактный.
+- Общие границы Z/Q синхронизированы с User; сохранена только ранее существовавшая у Professional защита Body от горизонтального скролла `overflow-x:hidden`. Нет новых экранных стилей, UI-элементов и новых вариантов Header. Журнал/Профиль/Контакты/Склад не переписаны. Новый guard удерживает соответствие.
+- Только Professional staging. User/Core/main не изменены. Ручная визуальная проверка iPhone/Amvera остаётся необходимой.

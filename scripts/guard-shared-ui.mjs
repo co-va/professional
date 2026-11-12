@@ -33,6 +33,8 @@ function walk(dir) {
 }
 
 const v2 = read('ui/v2/v2.css');
+const zLayout = read('ui/v2/z-layout.js');
+const zHeaderCss = read('ui/v2/surface-header.css');
 const geometry = read('ui/v2/geometry.js');
 const header = read('ui/v2/header.js');
 const zStack = read('ui/v2/z-stack.js');
@@ -54,6 +56,11 @@ assert(v2.includes('padding:22px 18px calc(24px + env(safe-area-inset-bottom))')
 assert(rootSelectorCount(v2, '.v2-header') === 1, 'Shared H geometry must have one owner');
 assert(rootSelectorCount(v2, '.v2-z') === 1, 'Shared Z geometry must have one owner');
 assert(!zStack.includes('padding-top:0'), 'Nested Z must not override Shared top padding');
+assert(zLayout.includes("const Z_HEADER_BODY_GAP = '14px'"), 'Shared Z header must use User geometry');
+assert(zLayout.includes("const Q_HEADER_BODY_GAP = '18px'"), 'Shared Q header must use User geometry');
+assert(zLayout.includes("topGap: Boolean(String(header || '').trim())"), 'Shared Q header/body boundary changed');
+assert(!zHeaderCss.includes('margin-bottom:8px'), 'Professional-specific Z/Q header margin must not return');
+assert(zHeaderCss.includes('padding-bottom:0!important'), 'Empty Shared headers must remain compact');
 
 // Q geometry and modal lifecycle remain centralized.
 assert(geometry.includes('export function v2QModalPortalGeometry'), 'Shared Q geometry missing');

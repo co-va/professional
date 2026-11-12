@@ -1,13 +1,15 @@
 import { v2ZDismissAffordance } from './z-affordance.js';
 
 const Z_VIEWPORT_OVERSCAN = 'var(--v2-z-viewport-overscan)';
+const Q_HEADER_BODY_GAP = '18px';
+const Z_HEADER_BODY_GAP = '14px';
 
 const Z_HEADER_STYLE = [
   'position:relative',
   'z-index:20',
   'box-sizing:border-box',
   'min-height:28px',
-  'margin-inline:-18px',
+  'margin:0 -18px',
   'padding:0 18px 0 0',
   'display:flex',
   'flex:0 0 auto',
@@ -63,12 +65,16 @@ function surfaceHeader(content = '', { kind = 'z', dismiss = true } = {}) {
   const data = kind === 'q' ? 'data-v2-q-header' : 'data-v2-z-header';
   const contentData = kind === 'q' ? 'data-v2-q-header-content' : 'data-v2-z-header-content';
   const contentStyle = visibleWorkAreaStyle(Z_HEADER_CONTENT_STYLE, kind);
-  return `<div ${data} style="${Z_HEADER_STYLE}">${dismiss ? v2ZDismissAffordance() : ''}<div ${contentData} style="${contentStyle}">${content}</div></div>`;
+  // Reserve a persistent gap below Z navigation, even while its body scrolls.
+  // Empty Z headers remain compact via surface-header.css.
+  const headerStyle = kind === 'z' ? `${Z_HEADER_STYLE};padding-bottom:${Z_HEADER_BODY_GAP}` : Z_HEADER_STYLE;
+  return `<div ${data} style="${headerStyle}">${dismiss ? v2ZDismissAffordance() : ''}<div ${contentData} style="${contentStyle}">${content}</div></div>`;
 }
 
-function surfaceBody(content = '', { kind = 'z' } = {}) {
+function surfaceBody(content = '', { kind = 'z', topGap = false } = {}) {
   const data = kind === 'q' ? 'data-v2-q-body' : 'data-v2-z-body';
-  const bodyStyle = visibleWorkAreaStyle(Z_BODY_STYLE, kind);
+  const gapStyle = topGap ? `;padding-top:${Q_HEADER_BODY_GAP}` : '';
+  const bodyStyle = `${visibleWorkAreaStyle(Z_BODY_STYLE, kind)}${gapStyle}`;
   return `<div ${data} style="${bodyStyle}">${content}</div>`;
 }
 
@@ -112,7 +118,7 @@ export function v2ZFrame(content = '', { header = '', dismiss = true } = {}) {
 }
 
 export function v2QFrame(content = '', { header = '' } = {}) {
-  return `${v2QHeader(header)}${v2QBody(content)}`;
+  return `${v2QHeader(header)}${surfaceBody(content, { kind: 'q', topGap: Boolean(String(header || '').trim()) })}`;
 }
 
 function resolveZSurface(root) {

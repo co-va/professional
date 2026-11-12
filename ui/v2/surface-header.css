@@ -1,6 +1,7 @@
 /* Root Z keeps only the compact Shared Header footprint required by its affordance. */
 [data-v2-z-header]:has(> [data-v2-z-header-content]:empty){
   min-height:28px!important;
+  padding-bottom:0!important;
   background:var(--v2-white,#fff)!important;
 }
 
@@ -15,6 +16,7 @@
 /* Empty Q keeps only the same compact Shared affordance footprint. */
 [data-v2-q-header]:has(> [data-v2-q-header-content]:empty){
   min-height:28px!important;
+  padding-bottom:0!important;
   background:transparent!important;
 }
 
@@ -27,10 +29,7 @@
   display:none!important;
 }
 
-/* ONE Shared boundary contract for Z/Q. A populated Header owns the compact
-   8px separation from its Body, including headers populated after mount.
-   An empty Header retains its compact dismissal footprint with no gap. */
-[data-v2-z-header]:has(> [data-v2-z-header-content]:not(:empty)),
-[data-v2-q-header]:has(> [data-v2-q-header-content]:not(:empty)){
-  margin-bottom:8px;
+/* A Q body starts directly after its compact empty Header; feature margins must not recreate a fake Header strip. */
+[data-v2-q-body] > .workspace-header-context + .entity-details{
+  margin-top:0;
 }
