@@ -1,6 +1,7 @@
 import {
   actionBlock,
   button,
+  columnLayout,
   emptyState,
   entityVisualCard,
   entityCardStack,
@@ -230,20 +231,21 @@ function advancedItemFields(item = {}) {
     ] })}
     ${field({ label: 'Категория', name: 'category', value: item.category || '' })}
     ${field({ label: 'Место хранения', name: 'location', value: item.location || '' })}
-    ${field({ label: 'Артикул', name: 'sku', value: item.sku || '' })}
-    ${field({ label: 'Штрихкод', name: 'barcode', value: item.barcode || '' })}
+    ${twoColumnLayout(
+      field({ label: 'Артикул', name: 'sku', value: item.sku || '' }),
+      field({ label: 'Штрихкод', name: 'barcode', value: item.barcode || '' }),
+      { ariaLabel: 'Артикул и штрихкод' },
+    )}
     ${twoColumnLayout(
       field({ label: 'Минимум', name: 'minStock', value: item.minStock ?? '', type: 'number', min: '0', step: '0.001', inputmode: 'decimal' }),
       field({ label: 'Цель', name: 'targetStock', value: item.targetStock ?? '', type: 'number', min: '0', step: '0.001', inputmode: 'decimal' }),
       { ariaLabel: 'Правила остатка' },
     )}
-    ${twoColumnLayout(
-      field({ label: 'Масса брутто, г', name: 'grossWeight', value: item.grossWeight ?? '', type: 'number', min: '0', step: '0.001', inputmode: 'decimal' }),
-      field({ label: 'Масса тары, г', name: 'tareWeight', value: item.tareWeight ?? '', type: 'number', min: '0', step: '0.001', inputmode: 'decimal' }),
-      { ariaLabel: 'Масса упаковки и тары' },
-    )}
-    ${field({ label: 'Масса нетто, г', name: 'netWeight', value: '', readonly: true })}
-    ${field({ label: 'Базовая цена, ₽', name: 'referencePrice', value: item.referencePrice ?? '', type: 'number', min: '0', step: '0.01', inputmode: 'decimal' })}`;
+    ${columnLayout([
+      field({ label: 'Брутто, г', name: 'grossWeight', value: item.grossWeight ?? '', type: 'number', min: '0', step: '0.001', inputmode: 'decimal' }),
+      field({ label: 'Нетто, г', name: 'netWeight', value: '', readonly: true }),
+      field({ label: 'Тара, г', name: 'tareWeight', value: item.tareWeight ?? '', type: 'number', min: '0', step: '0.001', inputmode: 'decimal' }),
+    ], { columns: 3, ariaLabel: 'Масса упаковки: брутто, нетто и тара' })}`;
 }
 
 function collectOptionalNumber(form, name) {
@@ -258,11 +260,11 @@ function openItemEditor(root, itemId = '', defaults = {}, onSaved = () => {}) {
     <form data-inventory-item-form>
       ${field({ label: 'Производитель', name: 'manufacturer', value: item?.manufacturer || defaults.manufacturer || '', autocomplete: 'off' })}
       ${field({ label: 'Наименование', name: 'name', value: item?.name || '', required: true, autocomplete: 'off' })}
-      ${twoColumnLayout(
+      ${columnLayout([
         select({ label: 'Единица', name: 'unit', value: item?.unit || 'шт.', options: UNIT_OPTIONS }),
-        field({ label: 'Номинал упаковки', name: 'packageQuantity', value: item?.packageQuantity ?? '', type: 'number', min: '0', step: '0.001', inputmode: 'decimal' }),
-        { ariaLabel: 'Учёт продукта и номинал упаковки' },
-      )}
+        field({ label: 'Упаковка', name: 'packageQuantity', value: item?.packageQuantity ?? '', type: 'number', min: '0', step: '0.001', inputmode: 'decimal' }),
+        field({ label: 'Цена', name: 'referencePrice', value: item?.referencePrice ?? '', type: 'number', min: '0', step: '0.01', inputmode: 'decimal' }),
+      ], { columns: 3, ariaLabel: 'Единица, упаковка и цена' })}
       ${creating ? '' : advancedItemFields(item)}
       ${actionBlock(button(creating ? 'Применить' : 'Сохранить', { type: 'button', data: 'data-inventory-item-save', aria: creating ? 'Добавить продукт' : 'Сохранить продукт' }))}
     </form>`;
@@ -319,13 +321,13 @@ function openItemEditor(root, itemId = '', defaults = {}, onSaved = () => {}) {
       name,
       unit: String(data.get('unit') || 'шт.'),
       packageQuantity: collectOptionalNumber(form, 'packageQuantity'),
+      referencePrice: collectOptionalNumber(form, 'referencePrice'),
     };
     // The product card defines master data; only movements change stock balances.
     if (!creating) {
       const usage = String(data.get('usage') || 'consume');
       Object.assign(value, {
         productType: String(data.get('productType') || '').trim(),
-        referencePrice: collectOptionalNumber(form, 'referencePrice'),
         category: String(data.get('category') || '').trim(),
         supplier: String(data.get('supplier') || '').trim(),
         location: String(data.get('location') || '').trim(),
