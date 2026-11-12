@@ -699,6 +699,9 @@ function stockSortOptions(level) {
 function openStockControls(trigger, level, manufacturer, onChange, mode = 'sort') {
   const sortKey = level === 'manufacturers' ? 'manufacturersSort' : 'itemsSort';
   const typeKey = level === 'manufacturers' ? 'manufacturersType' : 'itemsType';
+  const isFilter = level === 'items' && mode === 'filter';
+  let applied = STOCK_VIEW[typeKey];
+  let draft = applied;
   const content = `<div data-inventory-stock-controls>
     ${mode !== 'filter' ? select({
       label: 'Сортировка',
@@ -707,13 +710,16 @@ function openStockControls(trigger, level, manufacturer, onChange, mode = 'sort'
       options: stockSortOptions(level),
       aria: 'Сортировка остатков',
     }) : ''}
-    ${level === 'items' && mode === 'filter' ? select({
+    ${isFilter ? select({
       label: 'Фильтр',
       name: 'inventoryType',
-      value: STOCK_VIEW[typeKey],
+      value: draft,
       options: stockTypeOptions(manufacturer),
       aria: 'Фильтр по типу продукта',
     }) : ''}
+    ${isFilter ? `<div class="modal-actions" data-inventory-stock-filter-actions hidden>
+      ${button('Применить', { data: 'data-inventory-stock-filter-action' })}
+    </div>` : ''}
   </div>`;
   const modalRoot = mountModal(trigger, modal(content, {
     title: mode === 'filter' ? 'Фильтр' : 'Сортировка',
@@ -723,12 +729,43 @@ function openStockControls(trigger, level, manufacturer, onChange, mode = 'sort'
     saveInventorySortMode(sortKey, event.target.value);
     onChange?.();
   });
-  modalRoot?.querySelector('input[name="inventoryType"]')?.addEventListener('change', (event) => {
-    STOCK_VIEW[typeKey] = event.target.value;
-    onChange?.();
+  if (!isFilter || !modalRoot) return;
+  const action = modalRoot.querySelector('[data-inventory-stock-filter-action]');
+  const actions = modalRoot.querySelector('[data-inventory-stock-filter-actions]');
+  const syncAction = () => {
+    const changed = draft !== applied;
+    const reset = !changed && Boolean(applied);
+    actions.hidden = !changed && !reset;
+    action.textContent = changed ? 'Применить' : 'Сбросить';
+    action.classList.toggle('ui-button--secondary', reset);
+  };
+  modalRoot.querySelector('input[name="inventoryType"]')?.addEventListener('change', event => {
+    draft = String(event.target.value || '');
+    syncAction();
   });
+  action.addEventListener('click', () => {
+    if (draft !== applied) {
+      applied = draft;
+      STOCK_VIEW[typeKey] = applied;
+      onChange?.();
+      modalRoot.v2Close?.();
+      return;
+    }
+    if (!applied) return;
+    applied = '';
+    draft = '';
+    STOCK_VIEW[typeKey] = '';
+    const input = modalRoot.querySelector('input[name="inventoryType"]');
+    if (input) {
+      input.value = '';
+      const label = input.closest('.ui-select')?.querySelector('.ui-select__value');
+      if (label) label.textContent = 'Все типы';
+    }
+    onChange?.();
+    syncAction();
+  });
+  syncAction();
 }
-
 function bindManufacturerCards(root, host) {
   host.querySelectorAll('[data-inventory-manufacturer]').forEach((control) => {
     control.addEventListener('click', () => openManufacturerStock(root, control.dataset.inventoryManufacturer));
