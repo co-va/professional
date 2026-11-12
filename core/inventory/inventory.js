@@ -1,6 +1,7 @@
 import {
   actionBlock,
   button,
+  details,
   columnLayout,
   emptyState,
   entityVisualCard,
@@ -869,20 +870,18 @@ function movementJournalMarkup() {
 function openMovementDetails(root, movementId) {
   const movement = getInventoryMovement(movementId);
   if (!movement) return;
-  const details = v2ListEntries((movement.lines || []).map(line => v2ListEntry({
-    title: line.name || getInventoryItem(line.itemId)?.name || 'Позиция',
-    rightTop: `${movementSign(line)}${numberText(line.quantity)} ${line.unit || getInventoryItem(line.itemId)?.unit || ''}`,
-    initial: '',
-    interactive: false,
-    omitEmptySubtitle: true,
-  })));
+  // The journal is the V2 list. An opened movement is a detail card, never a second list.
+  const lines = details((movement.lines || []).map(line => ({
+    left: line.name || getInventoryItem(line.itemId)?.name || 'Позиция',
+    right: `${movementSign(line)}${numberText(line.quantity)} ${line.unit || getInventoryItem(line.itemId)?.unit || ''}`,
+  })), { variant: 'split' });
   const physicalAudit = movement.kind === 'ADJUSTMENT' &&
     movement.lines?.some(line => line.actualContainerCount != null);
   const markup = `<div class="form-grid">
     ${movementMoment(movement.occurredAt) ? `<p>${escapeHtml(movementMoment(movement.occurredAt))}</p>` : ''}
-    ${movement.personUei ? `<p>UEI ${escapeHtml(movement.personUei)}</p>` : ''}
+    ${movement.personUei ? `<p>${escapeHtml(movement.personUei)}</p>` : ''}
     ${movementSubtitle(movement) ? `<p>${escapeHtml(movementSubtitle(movement))}</p>` : ''}
-    ${details}
+    ${lines}
     ${physicalAudit ? '' : actionBlock(button('Исправить', { data: 'data-inventory-movement-correct' }))}
   </div>`;
   const layer = mountModal(root, modal(markup, { title: movementTitle(movement), variant: 'q' }));
