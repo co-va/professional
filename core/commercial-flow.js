@@ -1,346 +1,167 @@
 import { apiRequest } from './auth.js';
-import { actionBlock, button, checkList, escapeHtml, initCheckList, modal, mountModal, v2Section } from '../ui/ui.js';
+import { actionBlock, button, escapeHtml, initSegmentControls, modal, mountModal, segmentControl, v2Section } from '../ui/ui.js';
 
 let activeFlow = null;
-
 async function request(path = '', options = {}) {
-  const response = await apiRequest(`/saas-commercial${path}`, options);
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(payload?.message || 'Не удалось открыть выбор инструментов');
-  return payload;
+  const response = await apiRequest('/saas-commercial' + path, options);
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data?.message || 'Тарифы временно недоступны');
+  return data;
 }
-
-function rubles(minor) {
-  return `${new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(Number(minor || 0) / 100)} ₽`;
+function price(minor) {
+  return new Intl.NumberFormat('ru-RU', {style:'currency',currency:'RUB',maximumFractionDigits:0})
+    .format(Number(minor || 0)/100);
 }
-
-function effectiveDiscount(terms = {}) {
-  if (terms.freeForever) return 100;
-  const freeUntil = new Date(terms.freeUntil || 0).getTime();
-  if (Number.isFinite(freeUntil) && freeUntil >= Date.now()) return 100;
-  return Math.max(0, Math.min(100, Math.round(Number(terms.discountPercent || 0))));
+function isAdminManaged(data) {
+  return data.access?.commercialMode === 'LIVE' && data.selfServiceManaged !== true;
 }
-
-function selectedDescendants(products, selectedKeys) {
-  const byKey = new Map(products.map((product) => [product.key, product]));
-  const included = new Set();
-  const visit = (key) => {
-    const product = byKey.get(key);
-    for (const childKey of product?.includedProductKeys || []) {
-      if (included.has(childKey)) continue;
-      included.add(childKey);
-      visit(childKey);
-    }
-  };
-  for (const key of selectedKeys) visit(key);
-  return included;
+function pendingContent(data) {
+  const order = data.order || {};
+  const name = order.tariffKey === 'tariff.pro' ? 'Pro' : order.tariffKey === 'tariff.start-plus' ? 'Start+' : 'LIVE';
+  return '<div class="modal-title"><h2>Ожидает оплаты</h2><p>Пока оплата не подтверждена, доступен бесплатный LIVE Start.</p></div>' +
+    v2Section('Счёт', '<div><strong>' + escapeHtml(price(order.totalMinor)) +
+      '</strong></div><p>' + escapeHtml(name) + ' · ' + Number(order.accessDays || 30) +
+      ' дней после оплаты. Счёт отправляется на email.</p>') +
+    '<p class="form-error" data-commercial-error></p>' +
+    actionBlock(button('Продолжить работать', {data:'data-commercial-check'}));
 }
-
-function directSelection(products, manualSelected) {
-  const included = selectedDescendants(products, manualSelected);
-  return [...manualSelected].filter((key) => !included.has(key));
+function selectionContent(data) {
+  const plans = data.tariffOffers.professional || [];
+  const durations = data.tariffOffers.periods || [];
+  const current = plans.some(p => p.key === data.currentTariffKey)
+    ? data.currentTariffKey : 'tariff.start';
+  return '<div class="modal-title"><h2>Выбор тарифа</h2>' +
+    '<p>DEMO необязателен. Можно сразу начать работать в LIVE.</p></div>' +
+    v2Section('Тариф', segmentControl(plans.map(p => ({value:p.key,label:p.name})),
+      {value:current,name:'tariff',aria:'Тариф'})) +
+    v2Section('Срок оплаты', segmentControl(durations.map(p => ({
+      value:String(p.months),label:p.months === 1 ? '1 месяц' : p.months + ' месяцев'
+    })), {value:'1',name:'period',aria:'Срок оплаты'})) +
+    v2Section('Условия', '<div><strong data-commercial-total>—</strong></div>' +
+      '<p data-commercial-summary></p>') +
+    '<p class="form-error" data-commercial-error></p>' +
+    actionBlock(button('Продолжить', {data:'data-commercial-confirm'}));
 }
-
-function sameSelection(left = [], right = []) {
-  const a = [...left].sort();
-  const b = [...right].sort();
-  return a.length === b.length && a.every((value, index) => value === b[index]);
-}
-
-function paidPeriodActive(commercial) {
-  if (commercial?.access?.paidAccessExpired === true) return false;
-  const endsAt = new Date(commercial?.access?.paidAccessEndsAt || 0).getTime();
-  return Number.isFinite(endsAt) && endsAt > Date.now();
-}
-
-function baseList(products = []) {
-  if (!products.length) return '<p>Базовый набор включён в LIVE.</p>';
-  return checkList(products.map((product) => ({
-    value: product.key,
-    label: product.name,
-    secondary: 'Входит в LIVE · 0 ₽',
-    checked: true,
-    data: 'disabled',
-  })));
-}
-
-function productList(products = []) {
-  if (!products.length) return '<p>Дополнительных инструментов сейчас нет.</p>';
-  return checkList(products.map((product) => ({
-    value: product.key,
-    label: product.name,
-    secondary: product.isFree
-      ? 'Сейчас бесплатно · включено'
-      : `${rubles(product.priceMinor)} · 30 дней${product.includedProducts?.length ? ` · включает ${product.includedProducts.map((item) => item.name).join(', ')}` : ''}`,
-    checked: Boolean(product.selected),
-    data: `data-commercial-product="${escapeHtml(product.key)}"`,
-  })));
-}
-
-function pendingContent(commercial) {
-  const order = commercial.order || {};
-  return `
-    <div class="modal-title">
-      <h2>Ожидает оплаты</h2>
-      <p>Бесплатный LIVE уже работает. После подтверждения оплаты выбранные платные инструменты включатся на 30 дней.</p>
-    </div>
-    ${v2Section('Счёт', `
-      <div><strong>${escapeHtml(rubles(order.totalMinor || commercial.quote?.totalMinor || 0))}</strong></div>
-      <p>Счёт отправлен на email. Пока оплата подтверждается, можно продолжать работать в бесплатном LIVE.</p>
-    `)}
-    <p class="form-error" data-commercial-error></p>
-    ${actionBlock(button('Продолжить работать', { data:'data-commercial-check' }))}
-  `;
-}
-
-function protectedGrantContent() {
-  return `
-    <div class="modal-title">
-      <h2>Индивидуальный доступ</h2>
-      <p>Этот LIVE был выдан отдельно от подписки. Текущие бесплатные инструменты сохраняются без изменений и не будут отключены новым коммерческим контуром.</p>
-    </div>
-    ${v2Section('Доступ', '<p>Оплата и срок 30 дней к этому индивидуальному доступу не применяются. Изменить его может администратор.</p>')}
-    ${actionBlock(button('Продолжить работать', { data:'data-commercial-protected-close' }))}
-  `;
-}
-
-function selectionContent(commercial) {
-  const products = Array.isArray(commercial.products) ? commercial.products : [];
-  const baseProducts = Array.isArray(commercial.baseProducts) ? commercial.baseProducts : [];
-  const renewal = commercial?.access?.paidAccessExpired === true;
-  const alreadyLive = commercial?.access?.commercialMode === 'LIVE';
-  const activePaid = paidPeriodActive(commercial);
-  const title = renewal ? 'Продление платного доступа' : (alreadyLive ? 'Инструменты LIVE' : 'Переход в LIVE');
-  const description = renewal
-    ? 'Платный период завершён. Бесплатный LIVE продолжает работать. Выберите инструменты на следующие 30 дней.'
-    : alreadyLive
-      ? 'Бесплатный LIVE уже работает. Здесь можно добавить платные инструменты.'
-      : 'Базовый набор уже входит. Дополнительные инструменты можно добавить сейчас.';
-  const summary = activePaid
-    ? 'Текущий оплаченный набор действует до указанной даты. Можно добавить инструменты; оплата продлит платный период ещё на 30 дней.'
-    : renewal
-      ? 'Выберите платные инструменты для следующего периода на 30 дней.'
-      : alreadyLive
-        ? 'Если ничего не менять, текущий доступ останется как есть.'
-        : 'Можно начать LIVE с тарифом 0 ₽ и добавить платные инструменты позже.';
-  return `
-    <div class="modal-title">
-      <h2>${title}</h2>
-      <p>${description}</p>
-    </div>
-    ${v2Section('Базовый набор', baseList(baseProducts))}
-    ${v2Section('Дополнительные инструменты', productList(products))}
-    ${v2Section('Тариф', `
-      <div><strong data-commercial-total>${escapeHtml(rubles(commercial.quote?.totalMinor || 0))}</strong></div>
-      <p data-commercial-summary>${summary}</p>
-    `)}
-    <p class="form-error" data-commercial-error></p>
-    ${actionBlock(button(renewal ? 'Продлить на 30 дней' : (alreadyLive ? 'Готово' : 'Начать LIVE'), { data:'data-commercial-confirm' }))}
-  `;
-}
-
-function content(commercial, { manage = false } = {}) {
-  if (manage && commercial?.access?.commercialMode === 'LIVE' && commercial?.selfServiceManaged !== true) {
-    return protectedGrantContent();
+function content(data, {manage = false} = {}) {
+  if (data.order?.status === 'PENDING') return pendingContent(data);
+  if (manage && isAdminManaged(data)) {
+    return '<div class="modal-title"><h2>Индивидуальный доступ</h2>' +
+      '<p>Текущие условия назначены администратором и сохраняются.</p></div>' +
+      actionBlock(button('Продолжить работать', {data:'data-commercial-protected-close'}));
   }
-  if (commercial?.order?.status === 'PENDING') return pendingContent(commercial);
-  return selectionContent(commercial);
+  return selectionContent(data);
 }
-
-function bindPendingFlow(layer, finish) {
-  const control = layer.querySelector('[data-commercial-check]');
-  const error = layer.querySelector('[data-commercial-error]');
-  control?.addEventListener('click', async () => {
-    control.disabled = true;
-    if (error) error.textContent = '';
+function bindPending(layer, finish) {
+  layer.querySelector('[data-commercial-check]')?.addEventListener('click', async (event) => {
+    const node = event.currentTarget;
+    node.disabled = true;
     try {
       const latest = await request('/me');
-      if (latest?.access?.commercialMode === 'LIVE') {
-        layer.v2Close?.();
-        finish({
-          access: latest.access,
-          commercial: latest,
-          order: latest.order || null,
-        });
-        return;
-      }
-      if (error) error.textContent = 'Не удалось открыть бесплатный LIVE.';
-    } catch (checkError) {
-      if (error) error.textContent = checkError instanceof Error ? checkError.message : 'Не удалось проверить LIVE';
-    } finally {
-      if (control.isConnected) control.disabled = false;
-    }
-  });
-}
-
-function bindProtectedGrantFlow(layer, commercial, finish) {
-  layer.querySelector('[data-commercial-protected-close]')?.addEventListener('click', () => {
-    layer.v2Close?.();
-    finish({ access: commercial.access, commercial, order: commercial.order || null, protectedGrant:true });
-  });
-}
-
-function bindSelectionFlow(layer, commercial, finish) {
-  const products = Array.isArray(commercial.products) ? commercial.products : [];
-  const byKey = new Map(products.map((product) => [product.key, product]));
-  const manualSelected = new Set(products.filter((product) => product.selected).map((product) => product.key));
-  for (const product of products) {
-    if (product.isFree) manualSelected.add(product.key);
-  }
-  const initialDirectKeys = directSelection(products, manualSelected);
-  const renewal = commercial?.access?.paidAccessExpired === true;
-  const alreadyLive = commercial?.access?.commercialMode === 'LIVE';
-  const activePaid = paidPeriodActive(commercial);
-
-  initCheckList(layer);
-
-  const sync = () => {
-    const included = selectedDescendants(products, manualSelected);
-    for (const product of products) {
-      const input = layer.querySelector(`[data-commercial-product="${CSS.escape(product.key)}"]`);
-      if (!input) continue;
-      const free = Boolean(product.isFree);
-      const inherited = included.has(product.key);
-      const lockedPaid = activePaid && Boolean(product.selected) && !free;
-      input.checked = free || inherited || manualSelected.has(product.key);
-      input.disabled = free || inherited || lockedPaid;
-      const row = input.closest('.ui-check-list__item');
-      row?.classList.toggle('is-checked', input.checked);
-      const mark = row?.querySelector('.ui-check-list__mark');
-      if (mark) mark.textContent = input.checked ? '✓' : '';
-    }
-
-    const directKeys = directSelection(products, manualSelected);
-    const changed = !sameSelection(directKeys, initialDirectKeys);
-    const subtotal = directKeys.reduce((sum, key) => {
-      const product = byKey.get(key);
-      return sum + (product?.isFree ? 0 : Math.max(0, Number(product?.priceMinor || 0)));
-    }, 0);
-    const discount = effectiveDiscount(commercial.terms || {});
-    const total = Math.max(0, subtotal - Math.round(subtotal * discount / 100));
-    const totalNode = layer.querySelector('[data-commercial-total]');
-    const summaryNode = layer.querySelector('[data-commercial-summary]');
-    const confirmNode = layer.querySelector('[data-commercial-confirm]');
-    if (totalNode) totalNode.textContent = rubles(total);
-    if (confirmNode) {
-      confirmNode.textContent = alreadyLive && !renewal && !changed
-        ? 'Готово'
-        : total > 0
-          ? 'Получить счёт · 30 дней'
-          : (renewal ? 'Оставить бесплатный LIVE' : (alreadyLive ? 'Сохранить инструменты' : 'Начать LIVE'));
-    }
-    if (summaryNode) {
-      const paidCount = directKeys.filter((key) => !byKey.get(key)?.isFree).length;
-      if (alreadyLive && !renewal && !changed) {
-        summaryNode.textContent = activePaid && commercial?.access?.paidAccessEndsAt
-          ? `Текущий оплаченный набор действует до ${new Intl.DateTimeFormat('ru-RU').format(new Date(commercial.access.paidAccessEndsAt))}.`
-          : 'Текущий LIVE остаётся без изменений.';
-      } else if (paidCount) {
-        summaryNode.textContent = activePaid
-          ? `Выбрано дополнительных инструментов: ${paidCount}. Оплата добавит их и продлит платный период ещё на 30 дней.`
-          : `Выбрано дополнительных инструментов: ${paidCount}. Оплата открывает их на 30 дней. Бесплатный LIVE работает без ограничения этого периода.`;
-      } else {
-        summaryNode.textContent = 'Бесплатный LIVE продолжает работать без оплаты.';
-      }
-    }
-  };
-
-  layer.querySelectorAll('[data-commercial-product]').forEach((input) => {
-    input.addEventListener('change', () => {
-      const key = String(input.dataset.commercialProduct || '');
-      if (!key || input.disabled) return;
-      if (input.checked) manualSelected.add(key);
-      else manualSelected.delete(key);
-      sync();
-    });
-  });
-
-  layer.querySelector('[data-commercial-confirm]')?.addEventListener('click', async (event) => {
-    const control = event.currentTarget;
-    const error = layer.querySelector('[data-commercial-error]');
-    const directKeys = directSelection(products, manualSelected);
-    if (alreadyLive && !renewal && sameSelection(directKeys, initialDirectKeys)) {
       layer.v2Close?.();
-      finish({ access: commercial.access, commercial, order: commercial.order || null, unchanged:true });
-      return;
+      finish({access:latest.access,commercial:latest,order:latest.order || null});
+    } catch (error) {
+      const message = layer.querySelector('[data-commercial-error]');
+      if (message) message.textContent = error instanceof Error ? error.message : 'Ошибка';
+      node.disabled = false;
     }
-    control.disabled = true;
+  });
+}
+function bindSelection(layer, data, finish) {
+  initSegmentControls(layer);
+  const plans = new Map((data.tariffOffers.professional || []).map(p => [p.key,p]));
+  const periods = new Map((data.tariffOffers.periods || []).map(p => [String(p.months),p]));
+  const tier = layer.querySelector('[data-segment-value][name="tariff"]');
+  const months = layer.querySelector('[data-segment-value][name="period"]');
+  const total = layer.querySelector('[data-commercial-total]');
+  const summary = layer.querySelector('[data-commercial-summary]');
+  const confirm = layer.querySelector('[data-commercial-confirm]');
+  for (const choice of layer.querySelectorAll('[data-segment-option^="tariff."]')) {
+    if (!plans.get(choice.dataset.segmentOption)?.purchasable) {
+      choice.disabled = true;
+      choice.title = 'Цена пока не установлена';
+    }
+  }
+  function sync() {
+    const plan = plans.get(tier?.value);
+    const period = periods.get(months?.value);
+    const isStart = plan?.key === 'tariff.start';
+    const ready = Boolean(plan?.purchasable && period);
+    if (total) total.textContent = !ready ? 'Цена не установлена'
+      : isStart ? 'Бесплатно' : price(plan.priceMinor * period.months);
+    if (summary) summary.textContent = isStart
+      ? 'LIVE Start, бесплатно и без ограничения срока.'
+      : period ? period.accessDays + ' дней, в том числе ' + period.bonusDays + ' бонусных.' : '';
+    if (confirm) {
+      confirm.disabled = !ready;
+      confirm.textContent = isStart ? 'Начать LIVE Start' : 'Получить счёт';
+    }
+  }
+  tier?.addEventListener('change',sync);
+  months?.addEventListener('change',sync);
+  confirm?.addEventListener('click',async () => {
+    const error = layer.querySelector('[data-commercial-error]');
+    confirm.disabled = true;
     if (error) error.textContent = '';
     try {
-      const payload = await request('/confirm-live', {
-        method:'POST',
-        body:JSON.stringify({ productKeys: directKeys }),
+      const result = await request('/confirm-tariff', {
+        method:'POST',body:JSON.stringify({
+          tariffKey:tier?.value,periodMonths:Number(months?.value || 1)
+        }),
       });
-      if (payload?.requiresPayment && payload?.access?.commercialMode === 'LIVE') {
-        layer.v2Close?.();
-        finish(payload);
-        return;
-      }
-      if (payload?.requiresPayment) {
-        const current = payload.commercial || commercial;
-        current.order = payload.order || current.order;
-        const body = layer.querySelector('[data-v2-q-body]');
-        if (!body) throw new Error('Не удалось открыть состояние оплаты');
-        body.innerHTML = pendingContent(current);
-        bindPendingFlow(layer, finish);
-        return;
+      if (result.requiresPayment) {
+        const next = result.commercial || data;
+        next.order = result.order || next.order;
+        const host = layer.querySelector('[data-v2-q-body]');
+        if (host) {
+          host.innerHTML = pendingContent(next);
+          if (result.invoice?.error) {
+            const notice = host.querySelector('[data-commercial-error]');
+            if (notice) notice.textContent = result.invoice.error;
+          }
+          bindPending(layer,finish);
+          return;
+        }
       }
       layer.v2Close?.();
-      finish(payload);
-    } catch (submitError) {
-      if (error) error.textContent = submitError instanceof Error ? submitError.message : 'Не удалось перейти в LIVE';
-      control.disabled = false;
+      finish(result);
+    } catch (cause) {
+      if (error) error.textContent = cause instanceof Error ? cause.message : 'Ошибка выбора тарифа';
+      sync();
     }
   });
-
   sync();
 }
-
-function bindFlow(layer, commercial, finish, { manage = false } = {}) {
-  if (manage && commercial?.access?.commercialMode === 'LIVE' && commercial?.selfServiceManaged !== true) {
-    bindProtectedGrantFlow(layer, commercial, finish);
-    return;
-  }
-  if (commercial?.order?.status === 'PENDING') {
-    bindPendingFlow(layer, finish);
-    return;
-  }
-  bindSelectionFlow(layer, commercial, finish);
-}
-
-export function openCommercialLiveFlow({ required = false, manage = false } = {}) {
-  if (activeFlow) return activeFlow;
-
-  activeFlow = (async () => {
-    const commercial = await request('/me');
-    if (!commercial?.tenantId || !Array.isArray(commercial.products) || !commercial.quote) {
-      throw new Error('Коммерческий каталог временно недоступен');
-    }
-    if (commercial?.access?.commercialMode === 'LIVE' && commercial?.access?.paidAccessExpired !== true && !manage) {
-      return { access: commercial.access, commercial, order: commercial.order || null };
-    }
-    return new Promise((resolve) => {
-      const layer = mountModal(document.body, modal(content(commercial, { manage }), {
-        variant:'q',
-        title:'LIVE',
-        surface:'app',
-      }));
-      if (!layer) {
-        resolve({ cancelled:true });
-        return;
-      }
-
-      const close = layer.querySelector('[data-modal-close]');
-      if (required) {
-        close?.remove();
-      } else {
-        close?.addEventListener('click', () => resolve({ cancelled:true }), { once:true });
-      }
-      bindFlow(layer, commercial, resolve, { manage });
+function bind(layer, data, finish, opts) {
+  if (data.order?.status === 'PENDING') return bindPending(layer,finish);
+  if (opts.manage && isAdminManaged(data)) {
+    layer.querySelector('[data-commercial-protected-close]')?.addEventListener('click', () => {
+      layer.v2Close?.();
+      finish({access:data.access,commercial:data,protectedGrant:true});
     });
-  })().finally(() => {
-    activeFlow = null;
-  });
-
+    return;
+  }
+  bindSelection(layer,data,finish);
+}
+export function openCommercialLiveFlow({required = false,manage = false} = {}) {
+  if (activeFlow) return activeFlow;
+  activeFlow = (async () => {
+    const data = await request('/me');
+    if (!data?.tenantId || !data?.tariffOffers?.professional) {
+      throw new Error('Тарифы временно недоступны');
+    }
+    if (data.access?.commercialMode === 'LIVE' && data.access?.paidAccessExpired !== true && !manage) {
+      return {access:data.access,commercial:data,order:data.order || null};
+    }
+    return new Promise(resolve => {
+      const layer = mountModal(document.body,modal(content(data,{manage}),{
+        variant:'q',title:'LIVE',surface:'app',
+      }));
+      if (!layer) return resolve({cancelled:true});
+      const close = layer.querySelector('[data-modal-close]');
+      if (required) close?.remove();
+      else close?.addEventListener('click',() => resolve({cancelled:true}),{once:true});
+      bind(layer,data,resolve,{manage});
+    });
+  })().finally(() => {activeFlow = null;});
   return activeFlow;
 }
