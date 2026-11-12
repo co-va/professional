@@ -43,12 +43,45 @@ import {
 
 const UNIT_OPTIONS = ['шт.', 'г', 'кг', 'мл', 'л', 'м', 'уп.'].map((value) => ({ value, label: value }));
 const EMPTY_MANUFACTURER = 'Без производителя';
+const INVENTORY_SORT_KEY = 'professional.inventory.sort';
+const INVENTORY_SORT_MODES = {
+  manufacturersSort: ['name-asc', 'name-desc', 'count-desc', 'count-asc'],
+  itemsSort: ['name-asc', 'name-desc', 'type-asc', 'balance-desc', 'balance-asc'],
+};
+
+// Reuse the Contacts convention for persistent local sort preferences.
+function readInventorySortModes() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(INVENTORY_SORT_KEY) || '{}');
+    return {
+      manufacturersSort: INVENTORY_SORT_MODES.manufacturersSort.includes(stored?.manufacturersSort)
+        ? stored.manufacturersSort : 'name-asc',
+      itemsSort: INVENTORY_SORT_MODES.itemsSort.includes(stored?.itemsSort)
+        ? stored.itemsSort : 'name-asc',
+    };
+  } catch {
+    return { manufacturersSort: 'name-asc', itemsSort: 'name-asc' };
+  }
+}
+
 const STOCK_VIEW = {
-  manufacturersSort: 'name-asc',
+  ...readInventorySortModes(),
   manufacturersType: '',
-  itemsSort: 'name-asc',
   itemsType: '',
 };
+
+function saveInventorySortMode(key, value) {
+  if (!INVENTORY_SORT_MODES[key]?.includes(value)) return;
+  STOCK_VIEW[key] = value;
+  try {
+    localStorage.setItem(INVENTORY_SORT_KEY, JSON.stringify({
+      manufacturersSort: STOCK_VIEW.manufacturersSort,
+      itemsSort: STOCK_VIEW.itemsSort,
+    }));
+  } catch {
+    // Storage disabled: keep the selected order active for this session.
+  }
+}
 const MANUFACTURER_CARD_APPEARANCE = {
   lines: [
     {}, {}, {}, {}, {},
@@ -560,7 +593,7 @@ function openStockControls(trigger, level, manufacturer, onChange) {
     variant: 'x',
   }));
   modalRoot?.querySelector('input[name="inventorySort"]')?.addEventListener('change', (event) => {
-    STOCK_VIEW[sortKey] = event.target.value;
+    saveInventorySortMode(sortKey, event.target.value);
     onChange?.();
   });
   modalRoot?.querySelector('input[name="inventoryType"]')?.addEventListener('change', (event) => {

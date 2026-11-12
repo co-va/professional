@@ -16,14 +16,35 @@ const page = inventory.slice(inventory.indexOf('function renderStock(root) {'), 
 assert.match(page, /root\.innerHTML = page\(\[/, 'Shared vertical page spacing');
 assert.doesNotMatch(page.slice(page.indexOf('root.innerHTML = page(['), page.indexOf('const [searchRow]')), /stockSearchField\(\)/, 'Search must never be in Z1 body');
 assert.match(page, /setV2ZHeaderRows\(root,/, 'Use canonical Z1 header rows');
-assert.match(page, /class="ui-search-field"/, 'Use shared header search field');
-assert.match(page, /class="ui-search-divider"/, 'Use shared search divider');
+assert.match(page, /class="people-search ui-search-field"/, 'Use the exact Contacts header search wrapper');
+assert.match(page, /class="people-search-divider ui-search-divider"/, 'Use the exact Contacts header divider');
 assert.match(page, /searchInput\?\.addEventListener\('input', renderManufacturers\)/, 'Header search filters Z1 cards');
 assert.doesNotMatch(page, /label: 'Поиск'/, 'Header search has no visible label');
 assert.match(page, /v: \{ data: 'data-inventory-stock-menu'/, 'Canonical V action');
 const appearanceIndex = page.indexOf("{ id: 'appearance', label: 'Вид'");
-const sortingIndex = page.indexOf("{ id: 'controls', label: 'Сортировка и фильтр'");
+const sortingIndex = page.indexOf("{ id: 'controls', label: 'Сортировка'");
 assert.ok(appearanceIndex >= 0 && sortingIndex > appearanceIndex, 'View is the first item of the menu');
+assert.doesNotMatch(page, /label: 'Фильтр'|label: 'Сортировка и фильтр'/, 'Z1 V has only View and Sort');
+const sortModal = inventory.slice(inventory.indexOf('function openStockControls('), inventory.indexOf('function bindManufacturerCards('));
+assert.match(sortModal, /level === 'items' \? select\(\{/, 'Z2 filter is unchanged');
+assert.match(sortModal, /saveInventorySortMode\(sortKey, event\.target\.value\)/, 'Sort selections persist');
+const stored = new Map();
+const localStorage = {
+  getItem: (key) => stored.has(key) ? stored.get(key) : null,
+  setItem: (key, value) => stored.set(key, value),
+};
+const stateSource = inventory.slice(inventory.indexOf('const INVENTORY_SORT_KEY ='), inventory.indexOf('const MANUFACTURER_CARD_APPEARANCE ='));
+const state = new Function('localStorage', stateSource + '\nreturn { STOCK_VIEW, saveInventorySortMode };');
+const first = state(localStorage);
+assert.equal(first.STOCK_VIEW.manufacturersSort, 'name-asc');
+first.saveInventorySortMode('manufacturersSort', 'count-desc');
+first.saveInventorySortMode('itemsSort', 'balance-asc');
+assert.equal(state(localStorage).STOCK_VIEW.manufacturersSort, 'count-desc', 'Manufacturer sort survives a fresh session');
+assert.equal(state(localStorage).STOCK_VIEW.itemsSort, 'balance-asc', 'Item sort survives independently');
+first.saveInventorySortMode('manufacturersSort', 'name-desc');
+assert.equal(state(localStorage).STOCK_VIEW.manufacturersSort, 'name-desc', 'Sort changes only when selected');
+first.saveInventorySortMode('itemsSort', 'invalid');
+assert.equal(state(localStorage).STOCK_VIEW.itemsSort, 'balance-asc', 'Invalid sort is ignored');
 assert.match(page, /openSharedProfileSettingsMenu\(/, 'Reuse existing settings action menu');
 assert.match(page, /setV2ZHeaderRows\(root,/, 'Existing header search');
 assert.match(page, /bindManufacturerCards\(root, listHost\)/, 'All brand cards remain interactive');
