@@ -782,7 +782,7 @@ function openManufacturerStock(root, manufacturer) {
         ...(canUseCapability('inventory.stocktake.access') ? [{
           id: 'inventory', label: 'Инвентаризация', variant: 'secondary',
           onSelect: () => openInventoryAuditMode(layer, {
-            manufacturer, query: searchInput?.value || '', type: STOCK_VIEW.itemsType, onSaved: renderList,
+            manufacturer, onSaved: renderList,
           }),
         }] : []),
       ],
@@ -823,12 +823,10 @@ function orderMarkup() {
 }
 
 
-function inventoryAuditScope({ manufacturer = '', query = '', type = '' } = {}) {
-  const needle = normalizedSearch(query);
+function inventoryAuditScope({ manufacturer = '' } = {}) {
+  // Z2 search and filters never restrict the independent Q1 stocktake list.
   return getInventoryItems().filter(item =>
-    (!manufacturer || manufacturerName(item) === manufacturer)
-    && matchesType(item, type)
-    && (!needle || `${manufacturerName(item)} ${itemSearchText(item)}`.toLocaleLowerCase('ru-RU').includes(needle))
+    !manufacturer || manufacturerName(item) === manufacturer
   ).map(item => item.itemId);
 }
 
@@ -853,15 +851,16 @@ function inventoryAuditFilters(items, manufacturer = '') {
   }).filter(filter => filter.options.length > 2);
 }
 
-function openInventoryAuditSelection(root, { mode, manufacturer = '', query = '', type = '', onSaved = () => {} } = {}) {
-  // Freeze the current manufacturer/search/type scope before any selection.
-  const ids = [...new Set(inventoryAuditScope({ manufacturer, query, type }))];
+function openInventoryAuditSelection(root, { manufacturer = '', onSaved = () => {} } = {}) {
+  // Contextual manufacturer only; Z2 search/type are intentionally independent.
+  const ids = [...new Set(inventoryAuditScope({ manufacturer }))];
   if (!ids.length) {
     openNotice({ title: 'Инвентаризация', message: 'В текущей выборке нет позиций.' });
     return null;
   }
   const availableFilters = inventoryAuditFilters(inventoryAuditItems(ids), manufacturer);
   const filterValues = Object.fromEntries(availableFilters.map(({ key }) => [key, '']));
+  let mode = 'stock';
   const markup = `<div class="form-grid" data-inventory-audit-selection>
     ${stockSearchField('', 'data-inventory-audit-search')}
     ${compactCheck({ label: 'Выбрать все показанные', data: 'data-inventory-audit-all' })}
@@ -871,12 +870,12 @@ function openInventoryAuditSelection(root, { mode, manufacturer = '', query = ''
   </div>`;
   const layer = mountModal(root, modal(markup, { title: 'Инвентаризация', variant: 'q' }));
   if (!layer) return null;
-  if (availableFilters.length) {
+  {
     const header = layer.querySelector('[data-v2-q-header-content]');
     if (header) {
       header.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
         <h2 class="v2-q-title">Инвентаризация</h2>
-        ${button('V', { variant: 'secondary', data: 'data-inventory-audit-v', aria: 'Фильтры инвентаризации' })}
+        ${button('V', { variant: 'secondary', data: 'data-inventory-audit-v', aria: 'Действия и фильтры инвентаризации' })}
       </div>`;
     }
   }
@@ -922,16 +921,20 @@ function openInventoryAuditSelection(root, { mode, manufacturer = '', query = ''
   search?.addEventListener('input', render);
   layer.querySelector('[data-inventory-audit-v]')?.addEventListener('click', () => {
     openSharedProfileSettingsMenu({
-      title: 'Фильтр',
+      title: 'Инвентаризация',
       content: `<div class="form-grid" data-inventory-audit-filter-fields>
         ${availableFilters.map(({ key, label, options }) => select({
           label, name: `auditFilter-${key}`, value: filterValues[key], options,
         })).join('')}
       </div>`,
-      actions: [{ id: 'reset', label: 'Сбросить', onSelect: () => {
-        availableFilters.forEach(({ key }) => { filterValues[key] = ''; });
-        render();
-      } }],
+      actions: [
+        { id: 'stock', label: 'Остатки', onSelect: () => { mode = 'stock'; } },
+        { id: 'data', label: 'Данные', onSelect: () => { mode = 'data'; } },
+        { id: 'reset', label: 'Сбросить фильтр', onSelect: () => {
+          availableFilters.forEach(({ key }) => { filterValues[key] = ''; });
+          render();
+        } },
+      ],
       onMount: filterLayer => {
         availableFilters.forEach(({ key }) => {
           filterLayer.querySelector(`input[name="auditFilter-${key}"]`)?.addEventListener('change', event => {
@@ -1179,19 +1182,8 @@ function openInventoryAuditCriteria(root, { mode, ids = [], onSaved = () => {} }
   return layer;
 }
 
-function openInventoryAuditMode(root, { manufacturer = '', query = '', type = '', onSaved = () => {} } = {}) {
-  const markup = `<div class="form-grid">
-    ${button('Данные', { variant:'secondary', data:'data-inventory-audit-mode="data"' })}
-    ${button('Остатки', { variant:'secondary', data:'data-inventory-audit-mode="stock"' })}
-  </div>`;
-  const layer = mountModal(root, modal(markup, { title:'Инвентаризация', variant:'x', xRole:'action' }));
-  layer?.querySelectorAll('[data-inventory-audit-mode]').forEach(control =>
-    control.addEventListener('click', () => {
-      const mode = control.dataset.inventoryAuditMode;
-      layer.v2Close?.();
-      openInventoryAuditSelection(root, { mode, manufacturer, query, type, onSaved });
-    }));
-  return layer;
+function openInventoryAuditMode(root, { manufacturer = '', onSaved = () => {} } = {}) {
+  return openInventoryAuditSelection(root, { manufacturer, onSaved });
 }
 
 
@@ -1226,7 +1218,7 @@ function renderStock(root) {
         ...(canUseCapability('inventory.stocktake.access') ? [{
           id: 'inventory', label: 'Инвентаризация',
           onSelect: () => openInventoryAuditMode(root, {
-            query: searchInput?.value || '', type: STOCK_VIEW.manufacturersType, onSaved: renderManufacturers,
+            onSaved: renderManufacturers,
           }),
         }] : []),
       ],
