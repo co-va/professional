@@ -227,11 +227,23 @@ function itemIdentityFields(item = {}, defaults = {}) {
     ${field({ label: 'Наименование', name: 'name', value: item.name || '', required: true, autocomplete: 'off' })}`;
 }
 
+// Core resolves the nominal package price from the selected primary supplier.
+function itemPrimaryPrice(item = {}) {
+  const price = Number(item.basePrice);
+  return item.primaryOfferId && item.basePriceSource === 'primary-offer'
+    && item.basePrice != null && Number.isFinite(price) ? price : null;
+}
+
 function itemPackageFields(item = {}) {
+  const primaryPrice = itemPrimaryPrice(item);
   return columnLayout([
     select({ label: 'Единица', name: 'unit', value: item.unit || 'шт.', options: UNIT_OPTIONS }),
     field({ label: 'Упаковка', name: 'packageQuantity', value: item.packageQuantity ?? '', type: 'number', min: '0', step: '0.001', inputmode: 'decimal' }),
-    field({ label: 'Цена', name: 'referencePrice', value: item.referencePrice ?? '', type: 'number', min: '0', step: '0.01', inputmode: 'decimal' }),
+    field({
+      label: 'Цена', name: 'referencePrice', value: primaryPrice ?? item.referencePrice ?? '',
+      type: 'number', min: '0', step: '0.0001', inputmode: 'decimal',
+      disabled: primaryPrice !== null,
+    }),
   ], { columns: 3, ariaLabel: 'Единица, упаковка и цена' });
 }
 
@@ -265,9 +277,9 @@ function advancedItemFields(item = {}) {
       { ariaLabel: 'Правила остатка' },
     )}`;
   return [
+    v2Section('Маркировка', `<div class="form-grid">${identifiers}</div>`),
     v2Section('Классификация', `<div class="form-grid">${classification}</div>`),
     v2Section('Упаковка и цена', `<div class="form-grid">${itemPackageFields(item)}${mass}</div>`),
-    v2Section('Маркировка', `<div class="form-grid">${identifiers}</div>`),
     v2Section('Хранение и запас', `<div class="form-grid">${inventory}</div>`),
   ].join('');
 }
@@ -324,6 +336,29 @@ function openItemEditor(root, itemId = '', defaults = {}, onSaved = () => {}) {
     updateNet();
   }
 
+  // A priced primary supplier controls this locked price field.
+  // Reflect an edited package size without sending derived pricing to Core.
+  const priceInput = form.elements.namedItem('referencePrice');
+  const primaryOffer = item?.supplierOffers?.find((offer) => offer.offerId === item.primaryOfferId);
+  const primaryOfferPrice = primaryOffer?.effectivePrice == null
+    ? (primaryOffer?.actualPrice ?? (
+        primaryOffer?.listPrice == null ? null
+          : Number(primaryOffer.listPrice) * (1 - Number(primaryOffer.discountPercent || 0) / 100)
+      ))
+    : primaryOffer.effectivePrice;
+  if (priceInput?.disabled && primaryOfferPrice != null) {
+    const packSize = Number(primaryOffer.unitsPerOffer) || 1;
+    const updatePrimaryPrice = () => {
+      const raw = String(form.elements.namedItem('packageQuantity')?.value ?? '').trim();
+      const units = Number(raw.replace(',', '.'));
+      const quantity = raw && Number.isFinite(units) && units > 0 ? units : 1;
+      const price = Number(primaryOfferPrice) / packSize * quantity;
+      priceInput.value = Number.isFinite(price)
+        ? String(Math.round((price + Number.EPSILON) * 10000) / 10000) : '';
+    };
+    form.elements.namedItem('packageQuantity')?.addEventListener('input', updatePrimaryPrice);
+  }
+
   syncDirty();
 
   const save = async () => {
@@ -340,7 +375,8 @@ function openItemEditor(root, itemId = '', defaults = {}, onSaved = () => {}) {
       name,
       unit: String(data.get('unit') || 'шт.'),
       packageQuantity: collectOptionalNumber(form, 'packageQuantity'),
-      referencePrice: collectOptionalNumber(form, 'referencePrice'),
+      // Never overwrite the manual fallback when the primary supplier supplies the price.
+      ...(!priceInput?.disabled ? { referencePrice: collectOptionalNumber(form, 'referencePrice') } : {}),
     };
     // The product card defines master data; only movements change stock balances.
     if (!creating) {
