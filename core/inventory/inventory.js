@@ -979,7 +979,7 @@ function openInventoryAuditCriteria(root, { mode, ids = [], onSaved = () => {} }
   </form>`;
   const layer = mountModal(root, modal(markup, {
     title: isData ? 'Инвентаризация данных' : 'Инвентаризация остатков',
-    variant: 'x', xRole: 'editor',
+    variant: 'q',
   }));
   if (!layer) return null;
   const form = layer.querySelector('[data-inventory-audit-criteria]');
