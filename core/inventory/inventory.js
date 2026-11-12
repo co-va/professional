@@ -191,7 +191,12 @@ function advancedItemFields(item = {}) {
       field({ label: 'Цель', name: 'targetStock', value: item.targetStock ?? '', type: 'number', min: '0', step: '0.001', inputmode: 'decimal' }),
       { ariaLabel: 'Правила остатка' },
     )}
-    ${field({ label: 'В упаковке', name: 'packageQuantity', value: item.packageQuantity ?? '', type: 'number', min: '0', step: '0.001', inputmode: 'decimal' })}`;
+    ${field({ label: 'В упаковке', name: 'packageQuantity', value: item.packageQuantity ?? '', type: 'number', min: '0', step: '0.001', inputmode: 'decimal' })}
+    ${twoColumnLayout(
+      field({ label: 'Масса брутто, г', name: 'grossWeight', value: item.grossWeight ?? '', type: 'number', min: '0', step: '0.001', inputmode: 'decimal' }),
+      field({ label: 'Масса тары, г', name: 'tareWeight', value: item.tareWeight ?? '', type: 'number', min: '0', step: '0.001', inputmode: 'decimal' }),
+      { ariaLabel: 'Масса упаковки и тары' },
+    )}`;
 }
 
 function openAdvancedItemModal(trigger, item = {}) {
@@ -240,6 +245,8 @@ function openItemEditor(root, itemId = '', defaults = {}) {
     minStock: item?.minStock ?? null,
     targetStock: item?.targetStock ?? null,
     packageQuantity: item?.packageQuantity ?? null,
+    grossWeight: item?.grossWeight ?? null,
+    tareWeight: item?.tareWeight ?? null,
   };
 
   layer.querySelector('[data-inventory-item-advanced]')?.addEventListener('click', (event) => {
@@ -258,6 +265,8 @@ function openItemEditor(root, itemId = '', defaults = {}) {
         minStock: collectOptionalNumber(form, 'minStock'),
         targetStock: collectOptionalNumber(form, 'targetStock'),
         packageQuantity: collectOptionalNumber(form, 'packageQuantity'),
+        grossWeight: collectOptionalNumber(form, 'grossWeight'),
+        tareWeight: collectOptionalNumber(form, 'tareWeight'),
       };
       modalRoot.v2Close?.();
     });
