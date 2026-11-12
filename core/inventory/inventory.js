@@ -574,25 +574,18 @@ function openMovementEditor(root, movementId = '', kind = 'CONSUMPTION') {
   notifyContext();
 }
 
-function openMovementKind(root, trigger) {
-  const actions = [
-    ['RECEIPT', 'Приход'],
-    ['CONSUMPTION', 'Расход'],
-    ['WRITE_OFF', 'Списание'],
-    ['RETURN', 'Возврат'],
-  ];
-  const content = actions.map(([kind, label]) => button(label, {
-    type: 'button',
-    variant: 'secondary',
-    data: `data-inventory-kind="${kind}"`,
-  })).join('');
-  const modalRoot = mountModal(trigger, modal(content, { title: 'Операция', variant: 'x' }));
-  modalRoot?.querySelectorAll('[data-inventory-kind]').forEach((control) => {
-    control.addEventListener('click', () => {
-      const selectedKind = control.dataset.inventoryKind;
-      modalRoot.v2Close?.();
-      openMovementEditor(root, '', selectedKind);
-    });
+function openMovementKind(root) {
+  openSharedProfileSettingsMenu({
+    title: 'Операция',
+    actions: [
+      { id: 'receipt', label: 'Приход', onSelect: () => openMovementEditor(root, '', 'RECEIPT') },
+      { id: 'consumption', label: 'Расход', onSelect: () => openMovementEditor(root, '', 'CONSUMPTION') },
+      { id: 'write-off', label: 'Списание', onSelect: () => openMovementEditor(root, '', 'WRITE_OFF') },
+      { id: 'return', label: 'Возврат', onSelect: () => openMovementEditor(root, '', 'RETURN') },
+      ...(canUseCapability('inventory.stocktake.access') ? [
+        { id: 'stocktake', label: 'Инвентаризация', onSelect: () => openInventoryAuditSelection(root, { onSaved: () => renderMovements(root) }) },
+      ] : []),
+    ],
   });
 }
 
@@ -832,19 +825,41 @@ function openManufacturerStock(root, manufacturer) {
 
 function movementJournalMarkup() {
   const movements = getInventoryMovements();
-  if (!movements.length) return emptyState('Движений пока нет', 'Приходы и расходы будут собираться здесь блоками.');
-  const rows = movements.map((movement, movementIndex) => {
-    const header = `<button type="button" class="ui-list__item ui-list__item--group-header${movementIndex ? ' ui-list__item--group-start' : ''}" data-inventory-movement="${escapeHtml(movement.movementId)}" aria-label="Открыть движение ${escapeHtml(movementTitle(movement))}">
-      <span class="ui-list__main"><span class="ui-list__title">${escapeHtml(movementTitle(movement))}</span>${movementSubtitle(movement) ? `<span class="ui-list__secondary">${escapeHtml(movementSubtitle(movement))}</span>` : ''}</span>
-      <span class="ui-list__right-secondary"><span>${escapeHtml(movementMoment(movement.occurredAt))}</span></span>
-    </button>`;
-    const lines = (Array.isArray(movement.lines) ? movement.lines : []).map((line) => `<div class="ui-list__item">
-      <span class="ui-list__main"><span class="ui-list__title">${escapeHtml(line.name || '')}</span></span>
-      <span class="ui-list__right-secondary"><span>${escapeHtml(`${movementSign(line)}${numberText(line.quantity)} ${line.unit || ''}`)}</span></span>
-    </div>`).join('');
-    return header + lines;
-  }).join('');
-  return `<div class="ui-list ui-list--dense" data-ui-list>${rows}</div>`;
+  if (!movements.length) return emptyState('Движений пока нет', 'Добавьте операцию через +.');
+  return v2ListEntries(movements.map(movement => v2ListEntry({
+    title: movementTitle(movement),
+    subtitle: movementSubtitle(movement) || `${(movement.lines || []).length} поз.`,
+    rightTop: movementMoment(movement.occurredAt),
+    initial: '',
+    data: `data-inventory-movement="${escapeHtml(movement.movementId)}"`,
+    aria: `Открыть движение ${movementTitle(movement)}`,
+  })));
+}
+
+function openMovementDetails(root, movementId) {
+  const movement = getInventoryMovement(movementId);
+  if (!movement) return;
+  const details = v2ListEntries((movement.lines || []).map(line => v2ListEntry({
+    title: line.name || getInventoryItem(line.itemId)?.name || 'Позиция',
+    rightTop: `${movementSign(line)}${numberText(line.quantity)} ${line.unit || getInventoryItem(line.itemId)?.unit || ''}`,
+    initial: '',
+    interactive: false,
+    omitEmptySubtitle: true,
+  })));
+  const physicalAudit = movement.kind === 'ADJUSTMENT' &&
+    movement.lines?.some(line => line.actualContainerCount != null);
+  const markup = `<div class="form-grid">
+    ${movementMoment(movement.occurredAt) ? `<p>${escapeHtml(movementMoment(movement.occurredAt))}</p>` : ''}
+    ${movement.personUei ? `<p>UEI ${escapeHtml(movement.personUei)}</p>` : ''}
+    ${movementSubtitle(movement) ? `<p>${escapeHtml(movementSubtitle(movement))}</p>` : ''}
+    ${details}
+    ${physicalAudit ? '' : actionBlock(button('Исправить', { data: 'data-inventory-movement-correct' }))}
+  </div>`;
+  const layer = mountModal(root, modal(markup, { title: movementTitle(movement), variant: 'q' }));
+  layer?.querySelector('[data-inventory-movement-correct]')?.addEventListener('click', () => {
+    layer.v2Close?.();
+    openMovementEditor(root, movementId);
+  });
 }
 
 function orderMarkup() {
@@ -1300,8 +1315,8 @@ function renderMovements(root) {
   root.innerHTML = `${context('Движения', {
     c: { label: '+', data: 'data-inventory-add-movement', aria: 'Добавить движение' },
   })}${movementJournalMarkup()}`;
-  root.querySelector('[data-inventory-add-movement]')?.addEventListener('click', (event) => openMovementKind(root, event.currentTarget));
-  root.querySelectorAll('[data-inventory-movement]').forEach((control) => control.addEventListener('click', () => openMovementEditor(root, control.dataset.inventoryMovement)));
+  root.querySelector('[data-inventory-add-movement]')?.addEventListener('click', () => openMovementKind(root));
+  root.querySelectorAll('[data-inventory-movement]').forEach((control) => control.addEventListener('click', () => openMovementDetails(root, control.dataset.inventoryMovement)));
   notifyContext();
 }
 
