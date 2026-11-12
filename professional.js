@@ -15,6 +15,16 @@ async function enterWorkspace(account) {
   }
   const { renderAuthenticated } = await workspaceModule;
   await renderAuthenticated(account);
+  // Show the already-created payment state after direct tariff registration,
+  // without sending a second order or forcing DEMO.
+  const entryUrl = new URL(location.href);
+  if (entryUrl.searchParams.get('tariff-payment') === 'pending') {
+    entryUrl.searchParams.delete('tariff-payment');
+    history.replaceState(history.state, '', entryUrl.pathname + entryUrl.search + entryUrl.hash);
+    void import('./core/commercial-flow.js')
+      .then(({ openCommercialLiveFlow }) => openCommercialLiveFlow({ manage: true }))
+      .catch(() => undefined);
+  }
   // Verification runs after the workspace has appeared. It must never delay login.
   void import('./core/profile/account-controls.js')
     .then(({ offerAccountEmailVerificationReminder }) => offerAccountEmailVerificationReminder(account))
