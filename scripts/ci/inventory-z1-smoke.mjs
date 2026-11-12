@@ -17,7 +17,8 @@ assert.match(page, /root\.innerHTML = page\(\[/, 'Shared vertical page spacing')
 assert.doesNotMatch(page.slice(page.indexOf('root.innerHTML = page(['), page.indexOf('const [searchRow]')), /stockSearchField\(\)/, 'Search must never be in Z1 body');
 assert.match(page, /setV2ZHeaderRows\(root,/, 'Use canonical Z1 header rows');
 assert.match(page, /class="people-search ui-search-field"/, 'Use the exact Contacts header search wrapper');
-assert.match(page, /class="people-search-divider ui-search-divider"/, 'Use the exact Contacts header divider');
+assert.match(page, /field\(\{ name: 'inventorySearch', type: 'search'/, 'Z1 still renders the canonical search input');
+assert.doesNotMatch(page, /people-search-divider|ui-search-divider/, 'Z1 header contains only the search field, without any separator');
 assert.match(page, /searchInput\?\.addEventListener\('input', renderManufacturers\)/, 'Header search filters Z1 cards');
 assert.doesNotMatch(page, /label: 'Поиск'/, 'Header search has no visible label');
 assert.match(page, /v: \{ data: 'data-inventory-stock-menu'/, 'Canonical V action');
