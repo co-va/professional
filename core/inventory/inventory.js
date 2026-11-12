@@ -3,11 +3,15 @@ import {
   button,
   emptyState,
   entityVisualCard,
+  entityCardStack,
   field,
   modal,
   mountModal,
   mountV2ZLayer,
   openNotice,
+  openEntityCardAppearanceQ,
+  openSharedProfileSettingsMenu,
+  page,
   searchableSelect,
   select,
   shortDateTimeParts,
@@ -18,6 +22,9 @@ import {
   workspaceHeaderContext,
 } from '../../ui/ui.js';
 import { escapeHtml } from '../../ui/utils/escape-html.js';
+import { getCardAppearanceTemplate, saveCardAppearanceTemplate } from '../card-appearance-templates.js';
+import { loadAuxiliaryState } from '../runtime/auxiliary-state.js';
+import { inventoryManufacturerCompletion } from './completeness.js';
 import {
   getInventoryItem,
   getInventoryItems,
@@ -47,7 +54,7 @@ const MANUFACTURER_CARD_APPEARANCE = {
     { field: 'manufacturer', zone: 'full', align: 'left', size: 'xl', color: 'white', bold: true },
     {},
     { field: 'count', zone: 'full', align: 'left', size: 'm', color: 'white' },
-    {},
+    { field: 'completion', zone: 'right', align: 'right', size: 'm', color: 'white' },
   ],
 };
 
@@ -157,8 +164,8 @@ function notifyContext() {
   window.dispatchEvent(new CustomEvent('va-tools:v2-context-changed'));
 }
 
-function context(title, { a = null, c = null } = {}) {
-  return workspaceHeaderContext({ title, a, c });
+function context(title, { a = null, v = null, c = null } = {}) {
+  return workspaceHeaderContext({ title, a, v, c });
 }
 
 function itemOptions() {
@@ -439,21 +446,55 @@ function stockSearchField(value = '', data = 'data-inventory-stock-search') {
   });
 }
 
+function manufacturerCardFields({ name, items } = {}) {
+  const allItems = Array.isArray(items) ? items : [];
+  const audit = inventoryManufacturerCompletion(allItems);
+  const count = allItems.length;
+  const ready = count - audit.incomplete;
+  return [
+    { value: 'manufacturer', label: 'Компания', text: name || '' },
+    { value: 'count', label: 'Позиции', text: `${count} ${count === 1 ? 'позиция' : count > 1 && count < 5 ? 'позиции' : 'позиций'}` },
+    { value: 'completion', label: 'Заполненность', text: `${audit.percentage}%` },
+    { value: 'incomplete', label: 'Не заполнено', text: String(audit.incomplete) },
+    { value: 'ready', label: 'Заполнено', text: String(ready) },
+  ];
+}
+
+function manufacturerCardAppearance() {
+  return getCardAppearanceTemplate('inventory-manufacturer')?.appearance || MANUFACTURER_CARD_APPEARANCE;
+}
+
 function stockManufacturerCardsMarkup(query = '') {
   const groups = manufacturerGroups(query);
   if (!getInventoryItems().length) return emptyState('Склад пуст', 'Добавьте первую позицию.');
   if (!groups.length) return emptyState('Ничего не найдено', 'Измените поиск или фильтр.');
-  const cards = groups.map(({ name, items }) => entityVisualCard({
-    appearance: MANUFACTURER_CARD_APPEARANCE,
-    fields: [
-      { value: 'manufacturer', label: 'Компания', text: name },
-      { value: 'count', label: 'Позиции', text: `${items.length} ${items.length === 1 ? 'позиция' : items.length > 1 && items.length < 5 ? 'позиции' : 'позиций'}` },
-    ],
+  const cards = groups.map((group) => entityVisualCard({
+    appearance: manufacturerCardAppearance(),
+    fields: manufacturerCardFields(group),
     interactive: true,
-    data: `data-inventory-manufacturer="${escapeHtml(name)}"`,
-    aria: `Открыть товары ${name}`,
+    data: `data-inventory-manufacturer="${escapeHtml(group.name)}"`,
+    aria: `Открыть товары ${group.name}`,
   }));
-  return `<div class="entity-card-rail" data-entity-card-rail>${cards.join('')}</div>`;
+  return entityCardStack(cards);
+}
+
+function openManufacturerAppearance(root, onSaved = () => {}) {
+  const samples = manufacturerGroups();
+  const sample = samples[0] || { name: EMPTY_MANUFACTURER, items: [] };
+  return openEntityCardAppearanceQ(root, {
+    title: 'Вид',
+    typeOptions: [{ value: 'inventory-manufacturer', label: 'Компания' }],
+    initialType: 'inventory-manufacturer',
+    resolve: () => ({
+      appearance: manufacturerCardAppearance(),
+      fields: manufacturerCardFields(sample),
+    }),
+    save: async ({ appearance }) => {
+      saveCardAppearanceTemplate('inventory-manufacturer', { appearance });
+    },
+    allowPhoto: false,
+    onSaved,
+  });
 }
 
 function stockListMarkup(manufacturer, query = '') {
@@ -597,20 +638,30 @@ function inventoryCountMarkup() {
 
 function renderStock(root) {
   STOCK_VIEW.manufacturersType = '';
-  root.innerHTML = `${context('Остатки', {
-    a: { kind: 'settings', data: 'data-inventory-manufacturer-controls', aria: 'Сортировка и фильтр производителей' },
-    c: { label: '+', data: 'data-inventory-add-item', aria: 'Добавить позицию' },
-  })}${stockSearchField()}<div data-inventory-manufacturer-list>${stockManufacturerCardsMarkup()}</div>`;
-
+  root.innerHTML = page([
+    context('Остатки', {
+      v: { data: 'data-inventory-stock-menu', aria: 'Настройки остатков' },
+      c: { label: '+', data: 'data-inventory-add-item', aria: 'Добавить позицию' },
+    }),
+    stockSearchField(),
+    '<div data-inventory-manufacturer-list></div>',
+  ]);
   const listHost = root.querySelector('[data-inventory-manufacturer-list]');
   const renderManufacturers = () => {
     const query = root.querySelector('[name="inventorySearch"]')?.value || '';
     if (listHost) listHost.innerHTML = stockManufacturerCardsMarkup(query);
     if (listHost) bindManufacturerCards(root, listHost);
   };
-
   root.querySelector('[name="inventorySearch"]')?.addEventListener('input', renderManufacturers);
-  root.querySelector('[data-inventory-manufacturer-controls]')?.addEventListener('click', (event) => openStockControls(event.currentTarget, 'manufacturers', '', renderManufacturers));
+  root.querySelector('[data-inventory-stock-menu]')?.addEventListener('click', () => {
+    openSharedProfileSettingsMenu({
+      title: 'Настройки остатков',
+      actions: [
+        { id: 'appearance', label: 'Вид', onSelect: () => openManufacturerAppearance(root, renderManufacturers) },
+        { id: 'controls', label: 'Сортировка и фильтр', onSelect: () => openStockControls(root, 'manufacturers', '', renderManufacturers) },
+      ],
+    });
+  });
   root.querySelector('[data-inventory-add-item]')?.addEventListener('click', () => openItemEditor(root));
   renderManufacturers();
   notifyContext();
@@ -667,7 +718,10 @@ function renderInventoryCount(root) {
 export async function renderInventory(root, section = 'stock') {
   root.innerHTML = emptyState('Склад', 'Загружаем данные…');
   try {
-    await loadInventory();
+    await Promise.all([
+      loadInventory(),
+      ...(section === 'stock' ? [loadAuxiliaryState('service')] : []),
+    ]);
   } catch (error) {
     root.innerHTML = emptyState('Склад недоступен', error instanceof Error ? error.message : 'Не удалось загрузить данные.');
     return () => {};

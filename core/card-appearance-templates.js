@@ -1,6 +1,6 @@
 import { queueAuxiliaryDataset } from './business-persistence.js';
 
-const SCOPES = new Set(['person', 'workplace', 'wallet', 'loan', 'investment', 'procedure', 'product']);
+const SCOPES = new Set(['person', 'workplace', 'wallet', 'loan', 'investment', 'procedure', 'product', 'inventory-manufacturer']);
 SCOPES.add('loyalty-deposit');
 SCOPES.add('loyalty-personal-account');
 SCOPES.add('loyalty-certificate');
