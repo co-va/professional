@@ -844,19 +844,16 @@ function openInventoryAuditSelection(root, { mode, manufacturer = '', query = ''
     openNotice({ title: 'Инвентаризация', message: 'В текущей выборке нет позиций.' });
     return null;
   }
-  const markup = page([
-    context('Инвентаризация'),
-    `<div class="form-grid" data-inventory-audit-selection>
-      ${compactCheck({ label: 'Выбрать все показанные', data: 'data-inventory-audit-all' })}
-      <p data-inventory-audit-count>Выбрано 0 из ${ids.length}</p>
-      <div data-inventory-audit-list></div>
-    </div>`,
-    actionBlock(button('Продолжить', { data: 'data-inventory-audit-next' })),
-  ]);
-  const layer = mountV2ZLayer(root, v2ZLayer(markup, { className: 'inventory-audit-z' }), { stack: true });
+  const markup = `<div class="form-grid" data-inventory-audit-selection>
+    ${stockSearchField('', 'data-inventory-audit-search')}
+    ${compactCheck({ label: 'Выбрать все показанные', data: 'data-inventory-audit-all' })}
+    <p data-inventory-audit-count>Выбрано 0 из ${ids.length}</p>
+    <div data-inventory-audit-list></div>
+    ${actionBlock(button('Продолжить', { data: 'data-inventory-audit-next' }))}
+  </div>`;
+  const layer = mountModal(root, modal(markup, { title: 'Инвентаризация', variant: 'q' }));
   if (!layer) return null;
-  const [searchRow] = setV2ZHeaderRows(layer, [stockSearchField('', 'data-inventory-audit-search')]);
-  const search = searchRow?.querySelector('[data-inventory-audit-search]');
+  const search = layer.querySelector('[data-inventory-audit-search]');
   const list = layer.querySelector('[data-inventory-audit-list]');
   const all = layer.querySelector('[data-inventory-audit-all]');
   const count = layer.querySelector('[data-inventory-audit-count]');
