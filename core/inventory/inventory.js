@@ -509,7 +509,6 @@ function openMovementEditor(root, movementId = '', kind = 'CONSUMPTION', { recor
   const recordName = String(record?.personName || '').trim();
   const recordLabel = [recordCode, recordName].filter(Boolean).join(' · ');
   const markup = `
-    ${context(title)}
     <form data-inventory-movement-form>
       ${recordLabel && !correcting ? `<p>${escapeHtml(recordLabel)}</p>` : ''}
       ${correcting && movement.personUei ? `<p>${escapeHtml(movement.personUei)}</p>` : ''}
@@ -518,7 +517,7 @@ function openMovementEditor(root, movementId = '', kind = 'CONSUMPTION', { recor
       ${field({ label: 'Примечание', name: 'note', value: movement?.note || '' })}
       ${actionBlock(button(correcting ? 'Исправить' : 'Сохранить', { type: 'button', data: 'data-inventory-movement-save' }))}
     </form>`;
-  const layer = mountV2ZLayer(root, v2ZLayer(markup, { className: 'inventory-movement-z' }), { stack: true });
+  const layer = mountModal(root, modal(markup, { title, variant: 'q' }));
   if (!layer) return;
 
   let rowIndex = initialRows.length;
