@@ -210,16 +210,6 @@ function itemOptions() {
   }));
 }
 
-function itemSummary(item) {
-  return `<div class="entity-details entity-details--split">
-    <div><span>Остаток</span><strong>${escapeHtml(`${numberText(item.balance)} ${item.unit}`)}</strong></div>
-    ${item.lastPurchasePrice == null ? '' : `<div><span>Последняя цена</span><strong>${escapeHtml(moneyText(item.lastPurchasePrice))}</strong></div>`}
-    ${item.category ? `<div><span>Категория</span><strong>${escapeHtml(item.category)}</strong></div>` : ''}
-    ${item.location ? `<div><span>Место</span><strong>${escapeHtml(item.location)}</strong></div>` : ''}
-    ${item.supplier ? `<div><span>Поставщик</span><strong>${escapeHtml(item.supplier)}</strong></div>` : ''}
-  </div>`;
-}
-
 function advancedItemFields(item = {}) {
   return `
     ${field({ label: 'Категория', name: 'category', value: item.category || '' })}
@@ -237,15 +227,8 @@ function advancedItemFields(item = {}) {
       field({ label: 'Масса брутто, г', name: 'grossWeight', value: item.grossWeight ?? '', type: 'number', min: '0', step: '0.001', inputmode: 'decimal' }),
       field({ label: 'Масса тары, г', name: 'tareWeight', value: item.tareWeight ?? '', type: 'number', min: '0', step: '0.001', inputmode: 'decimal' }),
       { ariaLabel: 'Масса упаковки и тары' },
-    )}`;
-}
-
-function openAdvancedItemModal(trigger, item = {}) {
-  const content = `<form id="inventory-advanced-form" data-inventory-advanced-form>
-    ${advancedItemFields(item)}
-    ${button('Применить', { type: 'submit' })}
-  </form>`;
-  return mountModal(trigger, modal(content, { title: 'Дополнительно', variant: 'x' }));
+    )}
+    ${field({ label: 'Масса нетто, г', name: 'netWeight', value: '', readonly: true })}`;
 }
 
 function collectOptionalNumber(form, name) {
@@ -257,9 +240,6 @@ function openItemEditor(root, itemId = '', defaults = {}, onSaved = () => {}) {
   const item = itemId ? getInventoryItem(itemId) : null;
   const creating = !item;
   const markup = `
-    ${context(creating ? 'Новая позиция' : item.name, {
-      a: { kind: 'settings', data: 'data-inventory-item-advanced', aria: 'Дополнительные настройки позиции' },
-    })}
     <form data-inventory-item-form>
       ${field({ label: 'Производитель', name: 'manufacturer', value: item?.manufacturer || defaults.manufacturer || '', autocomplete: 'off' })}
       ${field({ label: 'Наименование', name: 'name', value: item?.name || '', required: true, autocomplete: 'off' })}
@@ -271,7 +251,7 @@ function openItemEditor(root, itemId = '', defaults = {}, onSaved = () => {}) {
         { ariaLabel: 'Единица и количество' },
       )}
       ${field({ label: 'Цена закупки', name: 'purchasePrice', value: item?.lastPurchasePrice ?? '', type: 'number', min: '0', step: '0.01', inputmode: 'decimal' })}
-      ${item ? itemSummary(item) : ''}
+      ${creating ? '' : advancedItemFields(item)}
       ${actionBlock(button('Сохранить', { type: 'button', data: 'data-inventory-item-save', aria: 'Сохранить позицию' }))}
     </form>`;
   const layer = mountModal(document.body, modal(markup, {
@@ -281,41 +261,23 @@ function openItemEditor(root, itemId = '', defaults = {}, onSaved = () => {}) {
   }));
   if (!layer) return;
 
-  let advanced = {
-    category: item?.category || '',
-    supplier: item?.supplier || '',
-    location: item?.location || '',
-    sku: item?.sku || '',
-    barcode: item?.barcode || '',
-    minStock: item?.minStock ?? null,
-    targetStock: item?.targetStock ?? null,
-    packageQuantity: item?.packageQuantity ?? null,
-    grossWeight: item?.grossWeight ?? null,
-    tareWeight: item?.tareWeight ?? null,
-  };
-
-  layer.querySelector('[data-inventory-item-advanced]')?.addEventListener('click', (event) => {
-    const modalRoot = openAdvancedItemModal(event.currentTarget, advanced);
-    const form = modalRoot?.querySelector('[data-inventory-advanced-form]');
-    if (!form) return;
-    form.addEventListener('submit', (submitEvent) => {
-      submitEvent.preventDefault();
-      const data = new FormData(form);
-      advanced = {
-        category: String(data.get('category') || '').trim(),
-        supplier: String(data.get('supplier') || '').trim(),
-        location: String(data.get('location') || '').trim(),
-        sku: String(data.get('sku') || '').trim(),
-        barcode: String(data.get('barcode') || '').trim(),
-        minStock: collectOptionalNumber(form, 'minStock'),
-        targetStock: collectOptionalNumber(form, 'targetStock'),
-        packageQuantity: collectOptionalNumber(form, 'packageQuantity'),
-        grossWeight: collectOptionalNumber(form, 'grossWeight'),
-        tareWeight: collectOptionalNumber(form, 'tareWeight'),
-      };
-      modalRoot.v2Close?.();
+  // Net content is derived from gross and tare; it is not a separate API field.
+  const form = layer.querySelector('[data-inventory-item-form]');
+  const netInput = form?.querySelector('[name="netWeight"]');
+  if (netInput) {
+    const updateNet = () => {
+      const grossRaw = String(form.elements.namedItem('grossWeight')?.value ?? '').trim();
+      const tareRaw = String(form.elements.namedItem('tareWeight')?.value ?? '').trim();
+      const gross = Number(grossRaw.replace(',', '.'));
+      const tare = Number(tareRaw.replace(',', '.'));
+      netInput.value = grossRaw && tareRaw && Number.isFinite(gross) && Number.isFinite(tare) && gross >= tare && tare >= 0
+        ? numberText(gross - tare) : '';
+    };
+    form.addEventListener('input', (event) => {
+      if (event.target.matches('[name="grossWeight"], [name="tareWeight"]')) updateNet();
     });
-  });
+    updateNet();
+  }
 
   layer.querySelector('[data-inventory-item-save]')?.addEventListener('click', async () => {
     const form = layer.querySelector('[data-inventory-item-form]');
@@ -330,7 +292,16 @@ function openItemEditor(root, itemId = '', defaults = {}, onSaved = () => {}) {
       name,
       unit: String(data.get('unit') || 'шт.'),
       lastPurchasePrice: collectOptionalNumber(form, 'purchasePrice'),
-      ...advanced,
+      category: String(data.get('category') || '').trim(),
+      supplier: String(data.get('supplier') || '').trim(),
+      location: String(data.get('location') || '').trim(),
+      sku: String(data.get('sku') || '').trim(),
+      barcode: String(data.get('barcode') || '').trim(),
+      minStock: collectOptionalNumber(form, 'minStock'),
+      targetStock: collectOptionalNumber(form, 'targetStock'),
+      packageQuantity: collectOptionalNumber(form, 'packageQuantity'),
+      grossWeight: collectOptionalNumber(form, 'grossWeight'),
+      tareWeight: collectOptionalNumber(form, 'tareWeight'),
     };
     if (creating) {
       value.quantity = Math.max(0, Number(String(data.get('quantity') || '0').replace(',', '.')) || 0);
