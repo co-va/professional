@@ -83,7 +83,8 @@ function bindSelection(layer, data, finish) {
   }
   function sync() {
     const plan = plans.get(tier?.value);
-    const period = periods.get(months?.value);
+    const period = plan?.periods?.find((item) => String(item.months) === months?.value)
+      || periods.get(months?.value);
     const isStart = plan?.key === 'tariff.start';
     const ready = Boolean(plan?.purchasable && period);
     if (total) total.textContent = !ready ? 'Цена не установлена'
