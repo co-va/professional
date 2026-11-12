@@ -293,7 +293,7 @@ export function openInventoryProductOverview(itemId, { edit = () => {}, onChange
     className: 'inventory-product-overview-q',
   }));
   if (!layer) return null;
-  layer.querySelector('.modal-sheet')?.setAttribute('aria-label', initial.name || 'Продукт');
+  layer.querySelector('.modal-sheet')?.setAttribute('aria-label', 'Карточка продукта: ' + (initial.name || 'Продукт'));
 
   const render = () => {
     const item = getInventoryItem(itemId);
