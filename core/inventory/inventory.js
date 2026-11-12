@@ -20,6 +20,7 @@ import {
   twoColumnLayout,
   v2ListEntries,
   v2ListEntry,
+  v2Section,
   v2ZLayer,
   workspaceHeaderContext,
 } from '../../ui/ui.js';
@@ -220,32 +221,55 @@ function itemUsageMode(item = {}) {
   return 'track';
 }
 
-function advancedItemFields(item = {}) {
+function itemIdentityFields(item = {}, defaults = {}) {
   return `
+    ${field({ label: 'Производитель', name: 'manufacturer', value: item.manufacturer || defaults.manufacturer || '', autocomplete: 'off' })}
+    ${field({ label: 'Наименование', name: 'name', value: item.name || '', required: true, autocomplete: 'off' })}`;
+}
+
+function itemPackageFields(item = {}) {
+  return columnLayout([
+    select({ label: 'Единица', name: 'unit', value: item.unit || 'шт.', options: UNIT_OPTIONS }),
+    field({ label: 'Упаковка', name: 'packageQuantity', value: item.packageQuantity ?? '', type: 'number', min: '0', step: '0.001', inputmode: 'decimal' }),
+    field({ label: 'Цена', name: 'referencePrice', value: item.referencePrice ?? '', type: 'number', min: '0', step: '0.01', inputmode: 'decimal' }),
+  ], { columns: 3, ariaLabel: 'Единица, упаковка и цена' });
+}
+
+function advancedItemFields(item = {}) {
+  // Existing Shared sections provide hierarchy without a local UI component or geometry override.
+  // Each category stays independent, preserving category/type and stock semantics.
+  const classification = `
+    ${field({ label: 'Категория', name: 'category', value: item.category || '' })}
     ${field({ label: 'Тип продукта', name: 'productType', value: item.productType || '' })}
     ${select({ label: 'Использование', name: 'usage', value: itemUsageMode(item), options: [
       { value: 'consume', label: 'Расход' },
       { value: 'sale', label: 'Продажа' },
       { value: 'both', label: 'Расход и продажа' },
       { value: 'track', label: 'Только учёт' },
-    ] })}
-    ${field({ label: 'Категория', name: 'category', value: item.category || '' })}
+    ] })}`;
+  const mass = columnLayout([
+    field({ label: 'Брутто, г', name: 'grossWeight', value: item.grossWeight ?? '', type: 'number', min: '0', step: '0.001', inputmode: 'decimal' }),
+    field({ label: 'Нетто, г', name: 'netWeight', value: '', disabled: true }),
+    field({ label: 'Тара, г', name: 'tareWeight', value: item.tareWeight ?? '', type: 'number', min: '0', step: '0.001', inputmode: 'decimal' }),
+  ], { columns: 3, ariaLabel: 'Масса упаковки: брутто, нетто и тара' });
+  const identifiers = twoColumnLayout(
+    field({ label: 'Артикул', name: 'sku', value: item.sku || '' }),
+    field({ label: 'Штрихкод', name: 'barcode', value: item.barcode || '' }),
+    { ariaLabel: 'Артикул и штрихкод' },
+  );
+  const inventory = `
     ${field({ label: 'Место хранения', name: 'location', value: item.location || '' })}
-    ${twoColumnLayout(
-      field({ label: 'Артикул', name: 'sku', value: item.sku || '' }),
-      field({ label: 'Штрихкод', name: 'barcode', value: item.barcode || '' }),
-      { ariaLabel: 'Артикул и штрихкод' },
-    )}
     ${twoColumnLayout(
       field({ label: 'Минимум', name: 'minStock', value: item.minStock ?? '', type: 'number', min: '0', step: '0.001', inputmode: 'decimal' }),
       field({ label: 'Цель', name: 'targetStock', value: item.targetStock ?? '', type: 'number', min: '0', step: '0.001', inputmode: 'decimal' }),
       { ariaLabel: 'Правила остатка' },
-    )}
-    ${columnLayout([
-      field({ label: 'Брутто, г', name: 'grossWeight', value: item.grossWeight ?? '', type: 'number', min: '0', step: '0.001', inputmode: 'decimal' }),
-      field({ label: 'Нетто, г', name: 'netWeight', value: '', readonly: true }),
-      field({ label: 'Тара, г', name: 'tareWeight', value: item.tareWeight ?? '', type: 'number', min: '0', step: '0.001', inputmode: 'decimal' }),
-    ], { columns: 3, ariaLabel: 'Масса упаковки: брутто, нетто и тара' })}`;
+    )}`;
+  return [
+    v2Section('Классификация', `<div class="form-grid">${classification}</div>`),
+    v2Section('Упаковка и цена', `<div class="form-grid">${itemPackageFields(item)}${mass}</div>`),
+    v2Section('Маркировка', `<div class="form-grid">${identifiers}</div>`),
+    v2Section('Хранение и запас', `<div class="form-grid">${inventory}</div>`),
+  ].join('');
 }
 
 function collectOptionalNumber(form, name) {
@@ -258,14 +282,9 @@ function openItemEditor(root, itemId = '', defaults = {}, onSaved = () => {}) {
   const creating = !item;
   const markup = `
     <form data-inventory-item-form>
-      ${field({ label: 'Производитель', name: 'manufacturer', value: item?.manufacturer || defaults.manufacturer || '', autocomplete: 'off' })}
-      ${field({ label: 'Наименование', name: 'name', value: item?.name || '', required: true, autocomplete: 'off' })}
-      ${columnLayout([
-        select({ label: 'Единица', name: 'unit', value: item?.unit || 'шт.', options: UNIT_OPTIONS }),
-        field({ label: 'Упаковка', name: 'packageQuantity', value: item?.packageQuantity ?? '', type: 'number', min: '0', step: '0.001', inputmode: 'decimal' }),
-        field({ label: 'Цена', name: 'referencePrice', value: item?.referencePrice ?? '', type: 'number', min: '0', step: '0.01', inputmode: 'decimal' }),
-      ], { columns: 3, ariaLabel: 'Единица, упаковка и цена' })}
-      ${creating ? '' : advancedItemFields(item)}
+      ${creating
+        ? `${itemIdentityFields(item || {}, defaults)}${itemPackageFields(item || {})}`
+        : `${v2Section('Основное', `<div class="form-grid">${itemIdentityFields(item, defaults)}</div>`)}${advancedItemFields(item)}`}
       ${actionBlock(button(creating ? 'Применить' : 'Сохранить', { type: 'button', data: 'data-inventory-item-save', aria: creating ? 'Добавить продукт' : 'Сохранить продукт' }))}
     </form>`;
   const layer = mountModal(document.body, modal(markup, {
