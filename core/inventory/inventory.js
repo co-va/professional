@@ -573,18 +573,18 @@ function stockSortOptions(level) {
   ];
 }
 
-function openStockControls(trigger, level, manufacturer, onChange) {
+function openStockControls(trigger, level, manufacturer, onChange, mode = 'sort') {
   const sortKey = level === 'manufacturers' ? 'manufacturersSort' : 'itemsSort';
   const typeKey = level === 'manufacturers' ? 'manufacturersType' : 'itemsType';
   const content = `<div data-inventory-stock-controls>
-    ${select({
+    ${mode !== 'filter' ? select({
       label: 'Сортировка',
       name: 'inventorySort',
       value: STOCK_VIEW[sortKey],
       options: stockSortOptions(level),
       aria: 'Сортировка остатков',
-    })}
-    ${level === 'items' ? select({
+    }) : ''}
+    ${level === 'items' && mode === 'filter' ? select({
       label: 'Фильтр',
       name: 'inventoryType',
       value: STOCK_VIEW[typeKey],
@@ -593,7 +593,7 @@ function openStockControls(trigger, level, manufacturer, onChange) {
     }) : ''}
   </div>`;
   const modalRoot = mountModal(trigger, modal(content, {
-    title: level === 'manufacturers' ? 'Сортировка' : 'Сортировка и фильтр',
+    title: mode === 'filter' ? 'Фильтр' : 'Сортировка',
     variant: 'x',
   }));
   modalRoot?.querySelector('input[name="inventorySort"]')?.addEventListener('change', (event) => {
@@ -616,7 +616,7 @@ function openManufacturerStock(root, manufacturer) {
   STOCK_VIEW.itemsType = '';
   const markup = `
     ${context(manufacturer, {
-      a: { kind: 'settings', data: 'data-inventory-item-controls', aria: 'Сортировка и фильтр товаров' },
+      v: { data: 'data-inventory-item-controls', aria: 'Сортировка и фильтр товаров' },
       c: { label: '+', data: 'data-inventory-add-item', aria: 'Добавить позицию' },
     })}
     <div data-inventory-company-list>${stockListMarkup(manufacturer)}</div>`;
@@ -633,7 +633,15 @@ function openManufacturerStock(root, manufacturer) {
   };
 
   searchInput?.addEventListener('input', renderList);
-  layer.querySelector('[data-inventory-item-controls]')?.addEventListener('click', (event) => openStockControls(event.currentTarget, 'items', manufacturer, renderList));
+  layer.querySelector('[data-inventory-item-controls]')?.addEventListener('click', () => {
+    openSharedProfileSettingsMenu({
+      title: 'Настройки товаров',
+      actions: [
+        { id: 'sort', label: 'Сортировка', variant: 'secondary', onSelect: () => openStockControls(layer, 'items', manufacturer, renderList, 'sort') },
+        { id: 'filter', label: 'Фильтр', variant: 'secondary', onSelect: () => openStockControls(layer, 'items', manufacturer, renderList, 'filter') },
+      ],
+    });
+  });
   layer.querySelector('[data-inventory-add-item]')?.addEventListener('click', () => openItemEditor(root, '', { manufacturer: manufacturer === EMPTY_MANUFACTURER ? '' : manufacturer }, renderList));
   renderList();
   notifyContext();
