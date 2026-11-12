@@ -1,10 +1,25 @@
-import { setAuthToken } from '../core/auth.js';
+import { apiRequest, setAuthToken } from '../core/auth.js';
 import { API_BASE } from '../core/environment.js';
 import { documentTile, documentTiles, openDocumentViewer } from '../ui/documents/index.js';
 import { escapeHtml } from '../ui/utils/escape-html.js';
 
 const state = document.querySelector('#invite-state');
-const token = new URLSearchParams(location.search).get('token') || '';
+const entryParams = new URLSearchParams(location.search);
+const token = entryParams.get('token') || '';
+const requestedTariff = ['start', 'start-plus', 'pro'].includes(entryParams.get('tariff'))
+  ? entryParams.get('tariff') : 'demo';
+const requestedMonths = [1, 6, 12].includes(Number(entryParams.get('months')))
+  ? Number(entryParams.get('months')) : 1;
+function entryQuery(tokenValue = '') {
+  const params = new URLSearchParams();
+  if (tokenValue) params.set('token', tokenValue);
+  if (requestedTariff !== 'demo') params.set('tariff', requestedTariff);
+  if (requestedTariff !== 'demo' && requestedTariff !== 'start') {
+    params.set('months', String(requestedMonths));
+  }
+  return params.toString();
+}
+
 
 async function post(path, body) {
   const response = await fetch(`${API_BASE}${path}`, {
@@ -46,7 +61,7 @@ function renderPublicStart() {
     button.textContent = 'Открываем регистрацию…';
     try {
       const registration = await post('/tenant-invitations/public', { email });
-      location.replace(`./?token=${encodeURIComponent(registration.token)}`);
+      location.replace(`./?${entryQuery(registration.token)}`);
     } catch (startError) {
       error.textContent = startError instanceof Error ? startError.message : 'Не удалось открыть регистрацию';
       button.disabled = false;
@@ -78,13 +93,17 @@ function registrationFacts(invitation) {
 
 function renderForm(invitation) {
   const documents = Array.isArray(invitation.documents) ? invitation.documents : [];
+  const tariffTitle = requestedTariff === 'demo' ? 'DEMO · 14 дней'
+    : requestedTariff === 'start' ? 'LIVE Start · бесплатно'
+    : requestedTariff === 'start-plus' ? 'Start+ · выбор оплаты'
+    : 'Pro · выбор оплаты';
   state.innerHTML = `
     <h1>Создайте учётную запись</h1>
-    <p>Сначала подтвердите документы, затем укажите основные данные. 14 дней DEMO начнутся только после открытия вашего профиля.</p>
+    <p>Подтвердите документы и укажите основные данные. DEMO необязателен: можно сразу подключить выбранный тариф.</p>
     <div class="invite-meta">
       <strong data-name></strong>
       <span data-email></span>
-      <span>DEMO · 14 дней с первого открытия профиля</span>
+      <span>${escapeHtml(tariffTitle)}</span>
     </div>
 
     <form class="invite-form" data-form>
@@ -180,8 +199,34 @@ function renderForm(invitation) {
         documents: registrationFacts(invitation),
       });
       setAuthToken(account.accessToken);
+      // A direct paid/Start entry must transition before the first Profile open,
+      // otherwise the workspace starts an unwanted DEMO session.
+      if (requestedTariff !== 'demo') {
+        const tariffKey = 'tariff.' + requestedTariff;
+        let result;
+        try {
+          const response = await apiRequest('/saas-commercial/confirm-tariff', {
+            method: 'POST',
+            body: JSON.stringify({
+              tariffKey,
+              periodMonths: requestedTariff === 'start' ? 1 : requestedMonths,
+            }),
+          });
+          result = await response.json().catch(() => ({}));
+          if (!response.ok) throw new Error(result?.message || 'Не удалось подключить выбранный тариф');
+        } catch (error) {
+          state.innerHTML = '<h1>Учётная запись создана</h1>' +
+            '<p class="invite-error" data-connect-error></p>' +
+            '<p><a href="../">Открыть приложение</a></p>';
+          state.querySelector('[data-connect-error]').textContent =
+            error instanceof Error ? error.message : 'Не удалось подключить тариф';
+          return;
+        }
+      }
       state.innerHTML = '<h1>Учётная запись создана</h1><p class="invite-success">Открываем приложение…</p>';
-      window.setTimeout(() => location.replace('../'), 350);
+      const afterSignup = requestedTariff === 'start-plus' || requestedTariff === 'pro'
+        ? '../?tariff-payment=pending' : '../';
+      location.replace(afterSignup);
     } catch (acceptError) {
       error.textContent = acceptError instanceof Error ? acceptError.message : 'Не удалось завершить регистрацию';
       button.disabled = false;
