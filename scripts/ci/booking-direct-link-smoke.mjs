@@ -14,6 +14,7 @@ assert.match(access, /params\.set\('workplaceSlug', state\.directRoute\.workplac
 assert.match(access, /directRoute: state\.directRoute/);
 assert.match(access, /directRoute: \{ profileSlug: text\(routeProfileSlug\), workplaceSlug: text\(routeWorkplaceSlug\) \}/);
 assert.match(css, /\.booking-entry__card\{[^}]*border-radius:0\}/);
-assert.match(css, /\.booking-entry \.ui-button\{[^}]*border-radius:0\}/);
+assert.match(css, /\.booking-entry \.ui-button\{width:100%\}/);
+assert.doesNotMatch(css, /\.booking-entry \.ui-button\{[^}]*border-radius:/, 'Use the shared button shape');
 assert.doesNotMatch(css, /\.booking-entry__card\{[^}]*border-radius:24px\}/);
 console.log('PASS: rectangular entry and server-validated individual workplace link propagation');
