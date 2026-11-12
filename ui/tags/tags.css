@@ -6,3 +6,11 @@
 .tag-manager-list__name{min-width:0;font-size:16px;font-weight:500;line-height:1.3;overflow-wrap:anywhere}
 .tag-manager-list__delete{justify-self:end}
 @media(max-width:360px){.tag-manager-list__item{grid-template-columns:44px minmax(0,1fr) 36px;gap:9px;padding-left:12px;padding-right:8px}.tag-manager-list__swatch{width:44px;height:28px}.tag-manager-list__delete{width:36px}}
+
+/* Settings/Tags: use the canonical vertical V2 entries, with a rectangular
+   swatch (not a new card or a second list system). */
+.settings-tags-v2{min-width:0}
+.settings-tags-v2 .list-entry__main.has-swatch{grid-template-columns:40px minmax(0,1fr)}
+.settings-tags-v2 .list-entry__swatch{width:40px;height:26px;border-radius:0;box-shadow:none}
+.settings-tags-v2 .list-entry__text{gap:0}
+.settings-tags-v2 .list-entry__right strong{font-variant-numeric:tabular-nums}
