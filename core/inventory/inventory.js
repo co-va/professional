@@ -210,10 +210,24 @@ function itemOptions() {
   }));
 }
 
+function itemUsageMode(item = {}) {
+  if (item.canConsume !== false && item.canSell === true) return 'both';
+  if (item.canConsume !== false) return 'consume';
+  if (item.canSell === true) return 'sale';
+  return 'track';
+}
+
 function advancedItemFields(item = {}) {
   return `
+    ${field({ label: 'Тип продукта', name: 'productType', value: item.productType || '' })}
+    ${select({ label: 'Использование', name: 'usage', value: itemUsageMode(item), options: [
+      { value: 'consume', label: 'Расход' },
+      { value: 'sale', label: 'Продажа' },
+      { value: 'both', label: 'Расход и продажа' },
+      { value: 'track', label: 'Только учёт' },
+    ] })}
     ${field({ label: 'Категория', name: 'category', value: item.category || '' })}
-    ${field({ label: 'Поставщик', name: 'supplier', value: item.supplier || '' })}
+    ${field({ label: 'Основной поставщик', name: 'supplier', value: item.supplier || '' })}
     ${field({ label: 'Место хранения', name: 'location', value: item.location || '' })}
     ${field({ label: 'Артикул', name: 'sku', value: item.sku || '' })}
     ${field({ label: 'Штрихкод', name: 'barcode', value: item.barcode || '' })}
@@ -222,13 +236,34 @@ function advancedItemFields(item = {}) {
       field({ label: 'Цель', name: 'targetStock', value: item.targetStock ?? '', type: 'number', min: '0', step: '0.001', inputmode: 'decimal' }),
       { ariaLabel: 'Правила остатка' },
     )}
-    ${field({ label: 'В упаковке', name: 'packageQuantity', value: item.packageQuantity ?? '', type: 'number', min: '0', step: '0.001', inputmode: 'decimal' })}
     ${twoColumnLayout(
       field({ label: 'Масса брутто, г', name: 'grossWeight', value: item.grossWeight ?? '', type: 'number', min: '0', step: '0.001', inputmode: 'decimal' }),
       field({ label: 'Масса тары, г', name: 'tareWeight', value: item.tareWeight ?? '', type: 'number', min: '0', step: '0.001', inputmode: 'decimal' }),
       { ariaLabel: 'Масса упаковки и тары' },
     )}
     ${field({ label: 'Масса нетто, г', name: 'netWeight', value: '', readonly: true })}`;
+}
+
+function productReadouts(item = {}) {
+  const offers = Array.isArray(item.supplierOffers) ? item.supplierOffers : [];
+  const supplierRows = offers.map((offer) => {
+    const listPrice = offer.listPrice == null ? null : Number(offer.listPrice);
+    const discount = offer.discountPercent == null ? 0 : Number(offer.discountPercent);
+    const actual = offer.actualPrice == null ? null : Number(offer.actualPrice);
+    const price = actual ?? (listPrice == null ? null : listPrice * (1 - discount / 100));
+    const details = [
+      offer.listPrice == null ? '' : `Прайс ${moneyText(listPrice)}`,
+      offer.discountPercent == null ? '' : `−${numberText(discount)}%`,
+    ].filter(Boolean).join(' · ');
+    const supplier = String(offer.supplier || 'Поставщик').trim();
+    return `<div><span>${escapeHtml([supplier, details].filter(Boolean).join(' · '))}</span><strong>${escapeHtml(price == null ? 'Цена не указана' : moneyText(price))}</strong></div>`;
+  }).join('');
+  return `
+    <div class="entity-details entity-details--split">
+      <div><span>Текущий остаток</span><strong>${escapeHtml(`${numberText(item.balance)} ${item.unit}`)}</strong></div>
+      ${item.lastPurchasePrice == null ? '' : `<div><span>Последняя закупка</span><strong>${escapeHtml(moneyText(item.lastPurchasePrice))}</strong></div>`}
+    </div>
+    ${supplierRows ? `<div class="entity-details entity-details--split">${supplierRows}</div>` : ''}`;
 }
 
 function collectOptionalNumber(form, name) {
@@ -244,18 +279,16 @@ function openItemEditor(root, itemId = '', defaults = {}, onSaved = () => {}) {
       ${field({ label: 'Производитель', name: 'manufacturer', value: item?.manufacturer || defaults.manufacturer || '', autocomplete: 'off' })}
       ${field({ label: 'Наименование', name: 'name', value: item?.name || '', required: true, autocomplete: 'off' })}
       ${twoColumnLayout(
-        select({ label: 'Единица', name: 'unit', value: item?.unit || 'шт.', options: UNIT_OPTIONS }),
-        creating
-          ? field({ label: 'Количество', name: 'quantity', value: '', type: 'number', min: '0', step: '0.001', inputmode: 'decimal' })
-          : field({ label: 'Остаток', name: 'balance', value: numberText(item?.balance), readonly: true }),
-        { ariaLabel: 'Единица и количество' },
+        select({ label: 'Единица учёта и расхода', name: 'unit', value: item?.unit || 'шт.', options: UNIT_OPTIONS }),
+        field({ label: 'Номинал упаковки', name: 'packageQuantity', value: item?.packageQuantity ?? '', type: 'number', min: '0', step: '0.001', inputmode: 'decimal' }),
+        { ariaLabel: 'Учёт продукта и номинал упаковки' },
       )}
-      ${field({ label: 'Цена закупки', name: 'purchasePrice', value: item?.lastPurchasePrice ?? '', type: 'number', min: '0', step: '0.01', inputmode: 'decimal' })}
       ${creating ? '' : advancedItemFields(item)}
+      ${creating ? '' : productReadouts(item)}
       ${actionBlock(button('Сохранить', { type: 'button', data: 'data-inventory-item-save', aria: 'Сохранить позицию' }))}
     </form>`;
   const layer = mountModal(document.body, modal(markup, {
-    title: creating ? 'Новая позиция' : item.name,
+    title: creating ? 'Новый продукт' : item.name,
     variant: 'q',
     surface: 'app',
   }));
@@ -291,21 +324,25 @@ function openItemEditor(root, itemId = '', defaults = {}, onSaved = () => {}) {
       manufacturer: String(data.get('manufacturer') || '').trim(),
       name,
       unit: String(data.get('unit') || 'шт.'),
-      lastPurchasePrice: collectOptionalNumber(form, 'purchasePrice'),
-      category: String(data.get('category') || '').trim(),
-      supplier: String(data.get('supplier') || '').trim(),
-      location: String(data.get('location') || '').trim(),
-      sku: String(data.get('sku') || '').trim(),
-      barcode: String(data.get('barcode') || '').trim(),
-      minStock: collectOptionalNumber(form, 'minStock'),
-      targetStock: collectOptionalNumber(form, 'targetStock'),
       packageQuantity: collectOptionalNumber(form, 'packageQuantity'),
-      grossWeight: collectOptionalNumber(form, 'grossWeight'),
-      tareWeight: collectOptionalNumber(form, 'tareWeight'),
     };
-    if (creating) {
-      value.quantity = Math.max(0, Number(String(data.get('quantity') || '0').replace(',', '.')) || 0);
-      value.purchasePrice = value.lastPurchasePrice;
+    // The product card defines master data; only movements change stock balances.
+    if (!creating) {
+      const usage = String(data.get('usage') || 'consume');
+      Object.assign(value, {
+        productType: String(data.get('productType') || '').trim(),
+        category: String(data.get('category') || '').trim(),
+        supplier: String(data.get('supplier') || '').trim(),
+        location: String(data.get('location') || '').trim(),
+        sku: String(data.get('sku') || '').trim(),
+        barcode: String(data.get('barcode') || '').trim(),
+        minStock: collectOptionalNumber(form, 'minStock'),
+        targetStock: collectOptionalNumber(form, 'targetStock'),
+        grossWeight: collectOptionalNumber(form, 'grossWeight'),
+        tareWeight: collectOptionalNumber(form, 'tareWeight'),
+        canConsume: usage === 'consume' || usage === 'both',
+        canSell: usage === 'sale' || usage === 'both',
+      });
     }
     try {
       if (creating) await createInventoryItem(value);
