@@ -919,30 +919,64 @@ function openInventoryAuditSelection(root, { manufacturer = '', onSaved = () => 
     render();
   });
   search?.addEventListener('input', render);
+  function openAuditFilter() {
+    let applied = { ...filterValues };
+    let draft = { ...applied };
+    const hasFilters = values => Object.values(values).some(Boolean);
+    const changed = () => availableFilters.some(({ key }) => draft[key] !== applied[key]);
+    const fieldsMarkup = values => `<div class="form-grid" data-inventory-audit-filter-fields>
+      ${availableFilters.map(({ key, label, options }) => select({
+        label, name: `auditFilter-${key}`, value: values[key], options,
+      })).join('')}
+    </div>`;
+    const filterLayer = mountModal(layer, modal(`
+      <div data-inventory-audit-filter-form>${fieldsMarkup(draft)}</div>
+      <div class="modal-actions" data-inventory-audit-filter-actions hidden>
+        ${button('Применить', { data: 'data-inventory-audit-filter-action' })}
+      </div>`, { title: 'Фильтр', variant: 'x', surface: 'app' }));
+    if (!filterLayer) return;
+    const action = filterLayer.querySelector('[data-inventory-audit-filter-action]');
+    const actions = filterLayer.querySelector('[data-inventory-audit-filter-actions]');
+    const syncAction = () => {
+      const isChanged = changed();
+      const reset = !isChanged && hasFilters(applied);
+      actions.hidden = !isChanged && !reset;
+      action.textContent = isChanged ? 'Применить' : 'Сбросить';
+      action.classList.toggle('ui-button--secondary', reset);
+    };
+    filterLayer.addEventListener('change', event => {
+      const field = availableFilters.find(({ key }) => event.target?.name === `auditFilter-${key}`);
+      if (!field) return;
+      draft[field.key] = String(event.target.value || '');
+      syncAction();
+    });
+    action.addEventListener('click', () => {
+      if (changed()) {
+        applied = { ...draft };
+        Object.assign(filterValues, applied);
+        render();
+        filterLayer.v2Close?.();
+        return;
+      }
+      if (!hasFilters(applied)) return;
+      availableFilters.forEach(({ key }) => { filterValues[key] = ''; });
+      applied = { ...filterValues };
+      draft = { ...applied };
+      filterLayer.querySelector('[data-inventory-audit-filter-form]').innerHTML = fieldsMarkup(draft);
+      render();
+      syncAction();
+    });
+    syncAction();
+  }
+
   layer.querySelector('[data-inventory-audit-v]')?.addEventListener('click', () => {
     openSharedProfileSettingsMenu({
       title: 'Инвентаризация',
-      content: `<div class="form-grid" data-inventory-audit-filter-fields>
-        ${availableFilters.map(({ key, label, options }) => select({
-          label, name: `auditFilter-${key}`, value: filterValues[key], options,
-        })).join('')}
-      </div>`,
       actions: [
         { id: 'stock', label: 'Остатки', onSelect: () => { mode = 'stock'; } },
         { id: 'data', label: 'Данные', onSelect: () => { mode = 'data'; } },
-        { id: 'reset', label: 'Сбросить фильтр', onSelect: () => {
-          availableFilters.forEach(({ key }) => { filterValues[key] = ''; });
-          render();
-        } },
+        { id: 'filter', label: 'Фильтр', onSelect: openAuditFilter },
       ],
-      onMount: filterLayer => {
-        availableFilters.forEach(({ key }) => {
-          filterLayer.querySelector(`input[name="auditFilter-${key}"]`)?.addEventListener('change', event => {
-            filterValues[key] = String(event.target.value || '');
-            render();
-          });
-        });
-      },
     });
   });
   next?.addEventListener('click', () => {
