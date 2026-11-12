@@ -7,7 +7,7 @@ const hasPositive = (input) => input !== '' && input != null && Number.isFinite(
 const hasNonNegative = (input) => input !== '' && input != null && Number.isFinite(Number(input)) && Number(input) >= 0;
 
 export function isWeighedInventoryItem(item = {}) {
-  return ['г', 'гр', 'гр.', 'грамм', 'граммы'].includes(value(item.unit).toLocaleLowerCase('ru-RU'));
+  return ['г', 'гр', 'гр.', 'грамм', 'граммы'].includes(value(item?.unit).toLocaleLowerCase('ru-RU'));
 }
 
 export function inventoryItemCompletion(item = {}) {
