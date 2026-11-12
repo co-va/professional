@@ -117,21 +117,17 @@ function openAssignmentAction(tag, assignment, refresh) {
 
   const showTransfer = () => {
     const choices = getTags().filter((item) => item.id !== tag.id);
-    host.innerHTML = v2ListEntries([
-      ...choices.map((item) => v2ListEntry({
-        title: item.name,
-        leadingSwatch: item.color,
-        omitEmptySubtitle: true,
-        data: `data-tag-target="${escapeHtml(item.id)}"`,
-      })),
-    ]);
-    host.insertAdjacentHTML('beforeend', actionBlock(button('+ Создать ярлык', { data: 'data-tag-create' }) +
-      button('Отмена', { variant: 'secondary', data: 'data-tag-action-back' })));
+    // Reuse exactly the same rectangular color swatch as the Settings list.
+    host.innerHTML = `<div class="settings-tags-v2">${v2ListEntries(choices.map((item) => v2ListEntry({
+      title: item.name,
+      leadingSwatch: item.color,
+      omitEmptySubtitle: true,
+      data: `data-tag-target="${escapeHtml(item.id)}"`,
+    })))}</div>${actionBlock(button('+ Создать ярлык', { data: 'data-tag-create' }))}`;
     host.querySelectorAll('[data-tag-target]').forEach((row) => row.addEventListener('click', () => {
       void apply(row.dataset.tagTarget);
     }));
     host.querySelector('[data-tag-create]')?.addEventListener('click', startCreate);
-    host.querySelector('[data-tag-action-back]')?.addEventListener('click', showActions);
   };
   const showActions = () => {
     host.innerHTML = actionBlock(
