@@ -604,8 +604,8 @@ export function openRecordView(record, {
         String(person.uei || '').trim(),
         String(source?.person?.name || '').trim(),
         String(source?.person?.surname || '').trim(),
-      ].filter(Boolean).join('; ')
-      : [String(professionalDisplay.uei || '').trim(), professionalDisplay.name].filter(Boolean).join('; ');
+      ].filter(Boolean).join(' ')
+      : [String(professionalDisplay.uei || '').trim(), professionalDisplay.name].filter(Boolean).join(' ');
     const card = recordConfirmationMiniCard({
       viewer: true,
       serviceSettings: capabilities.procedureSettings && !payment.hasPayments && !readOnlyHistory,
