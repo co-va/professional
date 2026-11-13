@@ -264,9 +264,9 @@ export function recordConfirmationMiniCard({
         aria: 'Услуги записи',
       } : null,
     });
-    return `<div class="record-confirmation-view"><div class="record-confirmation-view__card">${card}${repeat
+    return `<div class="record-confirmation-view"><div class="record-confirmation-view__card"><div class="record-confirmation-view__paper">${card}${repeat
       ? '<button type="button" class="record-confirmation-view__repeat" data-record-view-repeat aria-label="Повторить запись">↻</button>'
-      : ''}</div></div>`;
+      : ''}</div></div></div>`;
   }
   const serviceRows = (Array.isArray(procedures) ? procedures : []).map((item = {}) => v2ListEntry({
     title: item.name || item.title || 'Услуга',
