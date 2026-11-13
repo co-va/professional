@@ -1052,7 +1052,10 @@ function openInventoryAuditSelection(root, { manufacturer = '', onSaved = () => 
   const availableFilters = inventoryAuditFilters(inventoryAuditItems(ids), manufacturer);
   const filterValues = Object.fromEntries(availableFilters.map(({ key }) => [key, '']));
   let mode = 'stock';
-  const markup = `<div class="form-grid" data-inventory-audit-selection>
+  const markup = `${workspaceHeaderContext({
+    title: 'Инвентаризация',
+    v: { data: 'data-inventory-audit-v', aria: 'Действия и фильтры инвентаризации' },
+  })}<div class="form-grid" data-inventory-audit-selection>
     ${stockSearchField('', 'data-inventory-audit-search')}
     ${compactCheck({ label: 'Выбрать все показанные', data: 'data-inventory-audit-all' })}
     <p data-inventory-audit-count>Выбрано 0 из ${ids.length}</p>
@@ -1061,15 +1064,6 @@ function openInventoryAuditSelection(root, { manufacturer = '', onSaved = () => 
   </div>`;
   const layer = mountModal(root, modal(markup, { title: 'Инвентаризация', variant: 'q' }));
   if (!layer) return null;
-  {
-    const header = layer.querySelector('[data-v2-q-header-content]');
-    if (header) {
-      header.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
-        <h2 class="v2-q-title">Инвентаризация</h2>
-        ${button('V', { variant: 'secondary', data: 'data-inventory-audit-v', aria: 'Действия и фильтры инвентаризации' })}
-      </div>`;
-    }
-  }
   const search = layer.querySelector('[data-inventory-audit-search]');
   const list = layer.querySelector('[data-inventory-audit-list]');
   const all = layer.querySelector('[data-inventory-audit-all]');
