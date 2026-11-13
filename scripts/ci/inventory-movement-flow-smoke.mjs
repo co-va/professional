@@ -25,6 +25,8 @@ assert.doesNotMatch(editorSource, /Убрано пустых тюбиков/, 'O
 assert.match(inventory, /id: 'inventory', label: 'Инвентаризация'/, 'Stocktake remains under Stock');
 assert.doesNotMatch(editorSource, /function movementEditorRow\(|searchableSelect\(/, 'No obsolete per-item dropdown forms');
 assert.ok(editorSource.indexOf('data-inventory-movement-selection') < editorSource.indexOf('data-inventory-movement-row'), 'Select items before quantities');
+assert.match(editorSource, /class="field-inline-label"/, 'Movement rows use stocktake item heading and balance');
+assert.doesNotMatch(editorSource, /<div class="two-column-layout" data-inventory-movement-row/, 'No oversized mosaic layout');
 
 for (const kind of ['RECEIPT', 'CONSUMPTION', 'WRITE_OFF', 'RETURN']) {
   const item = { itemId: 'A', name: 'Краска', manufacturer: 'CHI', balance: 100, unit: 'г', canConsume: true };
@@ -100,7 +102,8 @@ for (const kind of ['RECEIPT', 'CONSUMPTION', 'WRITE_OFF', 'RETURN']) {
     itemSearchText: value => value.name,
     numberText: String,
     escapeHtml: value => String(value || ''),
-    field: ({ label }) => '<field>' + label + '</field>',
+    field: ({ label, placeholder }) => '<field>' + (placeholder || label) + '</field>',
+    twoColumnLayout: (first, second) => '<two-columns>' + first + second + '</two-columns>',
     isWeighedInventoryItem: value => value?.unit === 'г',
     createInventoryMovement: async value => { created = value; },
     correctInventoryMovement: async () => {},
@@ -128,7 +131,10 @@ for (const kind of ['RECEIPT', 'CONSUMPTION', 'WRITE_OFF', 'RETURN']) {
   first.change({ target: { closest: () => ({ checked: true, dataset: { inventoryMovementItem: 'A' } }) } });
   assert.equal(nodes.next.disabled, false, `${kind}: selected material allows advancing`);
   nodes.next.click();
-  assert.match(quantityMarkup, /<field>г<\/field>/, `${kind}: unit next to numeric input`);
+  assert.match(quantityMarkup, /class="field-inline-label"/, `${kind}: stocktake layout for material`);
+  assert.match(quantityMarkup, /100 г/, `${kind}: balance displayed alongside material name`);
+  assert.match(quantityMarkup, /<field>(Поступило|Израсходовано|Списано|Возвращено), г<\/field>/, `${kind}: quantity input with operation and unit`);
+  if (kind === 'CONSUMPTION') assert.doesNotMatch(quantityMarkup, /<two-columns>/, 'Expense input is single and compact');
   assert.match(quantityMarkup, new RegExp(`\\[title=${kind}\\]`), `${kind}: Q2 title inherits operation`);
   assert.ok(quantityMarkup.indexOf('Основание прихода') >= 0 || kind !== 'RECEIPT');
   assert.ok(quantityMarkup.indexOf('Примечание') >= 0 || kind !== 'CONSUMPTION');
