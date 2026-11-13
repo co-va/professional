@@ -1265,17 +1265,34 @@ function inventoryAuditMeasure(item, index, data) {
   return { actual, note: '' };
 }
 
+function inventoryAuditPositionInput(item, index, includeManufacturer = false) {
+  const label = includeManufacturer ? `${manufacturerName(item)} · ${item.name}` : item.name;
+  const current = Number(item.position) > 0 ? String(item.position) : '—';
+  return `<section>
+    <div class="field-inline-label"><strong>${escapeHtml(label)}</strong><span>№ ${escapeHtml(current)}</span></div>
+    ${field({ label: '', placeholder: 'Новый №', name: `auditPosition-${index}`,
+      type: 'number', min: '1', max: '2147483647', step: '1', inputmode: 'numeric' })}
+  </section>`;
+}
+
 function openInventoryAuditCriteria(root, { mode, ids = [], onSaved = () => {} } = {}) {
   const items = inventoryAuditItems(ids);
   if (!items.length) return openNotice({ title: 'Инвентаризация', message: 'Позиции не найдены.' });
   const isData = mode === 'data';
+  const includesDifferentManufacturers = new Set(items.map(manufacturerName)).size > 1;
   const fields = isData
     ? `<div class="form-grid">
       ${select({ label: 'Что изменить', name: 'auditField', value: 'category', options: [
         { value: 'category', label: 'Категория' },
         { value: 'productType', label: 'Тип продукта' },
+        { value: 'position', label: 'Порядковый номер' },
       ] })}
-      ${field({ label: 'Новое значение', name: 'auditValue', autocomplete:'off' })}
+      <div data-inventory-audit-shared-value>
+        ${field({ label: 'Новое значение', name: 'auditValue', autocomplete: 'off' })}
+      </div>
+      <div data-inventory-audit-position-values hidden>
+        ${items.map((item, index) => inventoryAuditPositionInput(item, index, includesDifferentManufacturers)).join('')}
+      </div>
     </div>`
     : `<div class="form-grid">${items.map(inventoryAuditInput).join('')}</div>`;
   const markup = `<form data-inventory-audit-criteria>
@@ -1295,6 +1312,20 @@ function openInventoryAuditCriteria(root, { mode, ids = [], onSaved = () => {} }
   const balances = new Map(items.map(item => [item.itemId, Number(item.balance) || 0]));
   const knownContainers = new Map(items.map(item => [item.itemId, item.containerCount == null ? null : Number(item.containerCount)]));
   let saving = false;
+
+  if (isData) {
+    const selector = form.elements.namedItem('auditField');
+    const shared = form.querySelector('[data-inventory-audit-shared-value]');
+    const numbered = form.querySelector('[data-inventory-audit-position-values]');
+    const syncFields = () => {
+      const perPosition = selector?.value === 'position';
+      if (shared) shared.hidden = perPosition;
+      if (numbered) numbered.hidden = !perPosition;
+      status.textContent = '';
+    };
+    selector?.addEventListener('change', syncFields);
+    syncFields();
+  }
 
   function calculate() {
     const data = new FormData(form);
@@ -1401,6 +1432,74 @@ function openInventoryAuditCriteria(root, { mode, ids = [], onSaved = () => {} }
     }
 
     const fieldName = String(data.get('auditField') || '');
+    if (fieldName === 'position') {
+      const targets = [];
+      const uniqueNumbers = new Set();
+      for (const [index, item] of items.entries()) {
+        const raw = String(data.get(`auditPosition-${index}`) ?? '').trim();
+        if (!raw) continue;
+        const value = Number(raw);
+        if (!/^\\d+$/.test(raw) || !Number.isSafeInteger(value) || value < 1 || value > 2147483647) {
+          status.textContent = `Укажите целый положительный № для «${item.name}».`;
+          return;
+        }
+        const manufacturer = manufacturerName(item);
+        const numberKey = `${manufacturer}::${value}`;
+        if (uniqueNumbers.has(numberKey)) {
+          status.textContent = `Для производителя «${manufacturer}» номер ${value} введён несколько раз.`;
+          return;
+        }
+        uniqueNumbers.add(numberKey);
+        targets.push({ itemId: item.itemId, manufacturer, name: item.name, value });
+      }
+      if (!targets.length) {
+        status.textContent = 'Введите новый № хотя бы у одной позиции.';
+        return;
+      }
+      let pending = targets.filter(item => Number(getInventoryItem(item.itemId)?.position) !== item.value);
+      if (!pending.length) {
+        status.textContent = 'Введённые номера уже установлены.';
+        return;
+      }
+      saving = true;
+      submit.disabled = true;
+      const failed = new Set();
+      try {
+        // Core inserts into occupied numbers and shifts neighbours. Number updates
+        // must therefore be serialized and the final positions rechecked.
+        for (let pass = 0; pass < 3 && pending.length; pass++) {
+          for (const item of pending.sort((a, b) =>
+            a.manufacturer.localeCompare(b.manufacturer, 'ru', { numeric: true }) || a.value - b.value)) {
+            if (failed.has(item.itemId)) continue;
+            try {
+              await updateInventoryItem(item.itemId, { position: item.value });
+            } catch {
+              failed.add(item.itemId);
+            }
+          }
+          await loadInventory();
+          pending = targets.filter(item => !failed.has(item.itemId)
+            && Number(getInventoryItem(item.itemId)?.position) !== item.value);
+          status.textContent = `Проверено: ${targets.length - pending.length - failed.size} из ${targets.length}`;
+        }
+      } catch (error) {
+        status.textContent = error instanceof Error ? error.message : 'Не удалось проверить сохранённые номера.';
+        return;
+      } finally {
+        saving = false;
+        if (submit.isConnected) submit.disabled = false;
+      }
+      const unresolved = targets.filter(item =>
+        Number(getInventoryItem(item.itemId)?.position) !== item.value);
+      if (unresolved.length) {
+        status.textContent = `Не удалось подтвердить номера для ${unresolved.length} позиций. Проверьте значения и повторите применение.`;
+        return;
+      }
+      layer.v2Close?.();
+      onSaved();
+      openNotice({ title: 'Инвентаризация', message: `Номера сохранены для ${targets.length} позиций.` });
+      return;
+    }
     const value = String(data.get('auditValue') || '').trim();
     if (!['category', 'productType'].includes(fieldName) || !value) {
       status.textContent = 'Укажите поле и новое значение.';
