@@ -574,7 +574,6 @@ export function openRecordView(record, {
     scheduleStartRender(source);
     const person = personDisplay(source.person || {});
     const procedures = Array.isArray(source.procedures) ? source.procedures : [];
-    const products = Array.isArray(source.products) ? source.products : [];
     const payment = readOnlyHistory
       ? { hasPayments: false, fullyPaid: false, partiallyPaid: false, remaining: 0 }
       : getRecordPaymentState(source);
@@ -628,11 +627,6 @@ export function openRecordView(record, {
               : formatMoney(financeItem?.planAmount ?? item?.cost ?? 0),
           };
         }),
-        ...products.map((item) => ({
-          name: item?.name || 'Товар',
-          secondary: 'Товар',
-          right: item?.cost === '' || item?.cost == null ? '' : formatMoney(item.cost),
-        })),
       ],
     });
 
