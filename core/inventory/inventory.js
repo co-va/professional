@@ -43,7 +43,6 @@ import {
   correctInventoryMovement,
   createInventoryItem,
   createInventoryMovement,
-  moveInventoryItem,
   loadInventory,
   updateInventoryItem,
 } from './service.js';
@@ -60,11 +59,11 @@ const INVENTORY_SORT_MODES = {
 function readInventorySortModes() {
   try {
     const stored = JSON.parse(localStorage.getItem(INVENTORY_SORT_KEY) || '{}');
-    const firstPositionSort = stored?.positionSortVersion !== 1;
+    const firstPositionSort = stored?.positionSortVersion !== 2;
     const itemsSort = firstPositionSort ? 'position-asc'
       : INVENTORY_SORT_MODES.itemsSort.includes(stored?.itemsSort) ? stored.itemsSort : 'position-asc';
     if (firstPositionSort) localStorage.setItem(INVENTORY_SORT_KEY, JSON.stringify({
-      ...stored, itemsSort, positionSortVersion: 1,
+      ...stored, itemsSort, positionSortVersion: 2,
     }));
     return {
       manufacturersSort: INVENTORY_SORT_MODES.manufacturersSort.includes(stored?.manufacturersSort)
@@ -89,7 +88,7 @@ function saveInventorySortMode(key, value) {
     localStorage.setItem(INVENTORY_SORT_KEY, JSON.stringify({
       manufacturersSort: STOCK_VIEW.manufacturersSort,
       itemsSort: STOCK_VIEW.itemsSort,
-      positionSortVersion: 1,
+      positionSortVersion: 2,
     }));
   } catch {
     // Storage disabled: keep the selected order active for this session.
@@ -161,13 +160,6 @@ function inventoryPositionComparator(left, right) {
   return rank(left) - rank(right)
     || String(left.name || '').localeCompare(String(right.name || ''), 'ru', { numeric: true, sensitivity: 'base' })
     || String(left.itemId || '').localeCompare(String(right.itemId || ''));
-}
-
-function inventoryItemPosition(item) {
-  const sameManufacturer = getInventoryItems()
-    .filter(candidate => manufacturerName(candidate) === manufacturerName(item))
-    .sort(inventoryPositionComparator);
-  return sameManufacturer.findIndex(candidate => candidate.itemId === item.itemId) + 1;
 }
 
 function sortItems(items = [], mode = STOCK_VIEW.itemsSort) {
@@ -298,7 +290,7 @@ function advancedItemFields(item = {}) {
     field({ label: 'Тара, г', name: 'tareWeight', value: item.tareWeight ?? '', type: 'number', min: '0', step: '0.001', inputmode: 'decimal' }),
   ], { columns: 3, ariaLabel: 'Масса упаковки: брутто, нетто и тара' });
   const identifiers = columnLayout([
-    field({ label: '№', name: 'position', value: inventoryItemPosition(item),
+    field({ label: '№', name: 'position', value: Number(item.position) > 0 ? item.position : '',
       type: 'number', min: '1', step: '1', inputmode: 'numeric' }),
     field({ label: 'Артикул', name: 'sku', value: item.sku || '' }),
     field({ label: 'Штрихкод', name: 'barcode', value: item.barcode || '' }),
@@ -405,13 +397,9 @@ function openItemEditor(root, itemId = '', defaults = {}, onSaved = () => {}) {
       return;
     }
     const requestedPositionText = String(data.get('position') ?? '').trim();
-    const requestedPosition = Number(requestedPositionText);
-    const currentPosition = creating ? 0 : inventoryItemPosition(item);
-    const positionChanged = !creating && (requestedPosition !== currentPosition
-      || String(data.get('manufacturer') || '').trim() !== String(item.manufacturer || '').trim());
-    if (!creating && (!requestedPositionText || !Number.isSafeInteger(requestedPosition)
-      || requestedPosition < 1)) {
-      openNotice({ title: 'Порядок', message: 'Укажите целый порядковый номер от 1.' });
+    const requestedPosition = requestedPositionText === '' ? 0 : Number(requestedPositionText);
+    if (!creating && (!Number.isSafeInteger(requestedPosition) || requestedPosition < 0)) {
+      openNotice({ title: 'Порядок', message: 'Укажите целый положительный номер или оставьте поле пустым.' });
       return;
     }
     const value = {
@@ -432,6 +420,7 @@ function openItemEditor(root, itemId = '', defaults = {}, onSaved = () => {}) {
         location: String(data.get('location') || '').trim(),
         sku: String(data.get('sku') || '').trim(),
         barcode: String(data.get('barcode') || '').trim(),
+        position: requestedPosition,
         minStock: collectOptionalNumber(form, 'minStock'),
         targetStock: collectOptionalNumber(form, 'targetStock'),
         grossWeight: collectOptionalNumber(form, 'grossWeight'),
@@ -446,7 +435,6 @@ function openItemEditor(root, itemId = '', defaults = {}, onSaved = () => {}) {
         await createInventoryItem(value);
       } else {
         await updateInventoryItem(item.itemId, value);
-        if (positionChanged) await moveInventoryItem(item.itemId, requestedPosition);
       }
       layer.v2Close?.();
       onSaved();
@@ -840,15 +828,13 @@ function openManufacturerAppearance(root, onSaved = () => {}) {
 function stockListMarkup(manufacturer, query = '') {
   const needle = normalizedSearch(query);
   const group = getInventoryItems().filter(item => manufacturerName(item) === manufacturer);
-  const ordinals = new Map([...group].sort(inventoryPositionComparator)
-    .map((item, index) => [item.itemId, index + 1]));
   const items = sortItems(group.filter((item) => {
     if (!matchesType(item, STOCK_VIEW.itemsType)) return false;
     return !needle || itemSearchText(item).includes(needle);
   }), STOCK_VIEW.itemsSort);
   if (!items.length) return emptyState('Ничего не найдено', 'Измените поиск или фильтр.');
   return v2ListEntries(items.map((item) => v2ListEntry({
-    title: `${ordinals.get(item.itemId)} · ${item.name}`,
+    title: `${Number(item.position) > 0 ? `${item.position} · ` : ''}${item.name}`,
     subtitle: [productTypeText(item), item.location, tubeCountText(item)].filter(Boolean).join(' · '),
     rightTop: `${numberText(item.balance)} ${item.unit}`,
     rightBottom: item.lastPurchasePrice == null ? '' : moneyText(item.lastPurchasePrice),
