@@ -51,3 +51,16 @@
 .mini-card__record-totals{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px;min-height:22px}
 .mini-card__record-duration{font-size:12px;line-height:14px;white-space:nowrap}
 .mini-card__record-total{font-size:18px;font-weight:850;line-height:22px;white-space:nowrap;text-align:right}
+
+/* Record person-first header: high-contrast identity, visible service rows and secondary settings. */
+.mini-card--record-person .mini-card__record-main{gap:2px}
+.mini-card--record-person .mini-card__record-identity{font-size:16px;line-height:18px;font-weight:800;text-align:center;color:#111;overflow-wrap:anywhere}
+.mini-card--record-person .mini-card__record-phone{font-size:14px;line-height:17px;font-weight:550;text-align:center;color:#303030}
+.mini-card--record-person .mini-card__record-moment{font-size:13px;line-height:16px;font-weight:650;text-align:center;white-space:nowrap;color:#222}
+.mini-card--record-person .mini-card__record-head{gap:3px}
+.mini-card--record-person .mini-card__record-center .mini-card__line{font-size:15px;line-height:18px;font-weight:520;color:#171717;margin-bottom:5px}
+.mini-card--record-person .mini-card__record-center .mini-card__line--pair{align-items:baseline}
+.mini-card--record-person .mini-card__record-center .mini-card__line-right{font-size:15px;line-height:18px;font-weight:780;color:#111}
+.mini-card__record-action--secondary{background:#fff;border:1.5px solid #9b9fa2;color:#5b6064;box-shadow:none}
+.mini-card__record-action--secondary:active{background:#f2f2f2}
+.mini-card__record-action-icon{width:23px;height:23px;display:block;flex:none}
