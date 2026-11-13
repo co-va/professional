@@ -230,7 +230,44 @@ export function recordConfirmationMiniCard({
   total = '',
   programControl = '',
   procedures = [],
+  viewer = false,
+  programName = '',
+  paymentInfo = '',
+  serviceSettings = false,
+  repeat = false,
 } = {}) {
+  if (viewer) {
+    // The same Shared miniCard/line-pair contract as User record history.
+    // Keep its limited height and internal service scrolling: no external list.
+    const serviceLines = (Array.isArray(procedures) ? procedures : []).map((item) => ({
+      value: [String(item?.name || item?.title || 'Услуга'), String(item?.durationText || '')]
+        .filter(Boolean).join(' · '),
+      rightValue: String(item?.right || item?.costText || ''),
+    }));
+    const card = miniCard({
+      className: 'record-confirmation-mini-card record-confirmation-mini-card--viewer',
+      lines: [
+        { value: workplace, variant: 'primary' },
+        { value: [date, period].filter(Boolean).join(' · '), variant: 'moment' },
+        { value: identity, variant: 'title' },
+        ...(phone ? [{ value: phone, variant: 'muted' }] : []),
+        ...(programName ? [{ value: programName }] : []),
+        ...(contactDiscount ? [{ value: `Условие: ${contactDiscount}` }] : []),
+        ...serviceLines,
+        ...(discountMoney ? [{ value: `Скидка: ${discountMoney}` }] : []),
+        ...(paymentInfo ? [{ value: paymentInfo }] : []),
+      ],
+      rows: [{ label: duration, value: total }],
+      compactAction: serviceSettings ? {
+        label: '⚙',
+        data: 'data-record-view-service-settings',
+        aria: 'Услуги записи',
+      } : null,
+    });
+    return `<div class="record-confirmation-view"><div class="record-confirmation-view__card">${card}${repeat
+      ? '<button type="button" class="record-confirmation-view__repeat" data-record-view-repeat aria-label="Повторить запись">↻</button>'
+      : ''}</div></div>`;
+  }
   const serviceRows = (Array.isArray(procedures) ? procedures : []).map((item = {}) => v2ListEntry({
     title: item.name || item.title || 'Услуга',
     subtitle: item.durationText || item.secondary || '',
