@@ -43,6 +43,7 @@ import {
   correctInventoryMovement,
   createInventoryItem,
   createInventoryMovement,
+  moveInventoryItem,
   loadInventory,
   updateInventoryItem,
 } from './service.js';
@@ -52,21 +53,26 @@ const EMPTY_MANUFACTURER = 'Без производителя';
 const INVENTORY_SORT_KEY = 'professional.inventory.sort';
 const INVENTORY_SORT_MODES = {
   manufacturersSort: ['name-asc', 'name-desc', 'count-desc', 'count-asc'],
-  itemsSort: ['name-asc', 'name-desc', 'type-asc', 'balance-desc', 'balance-asc'],
+  itemsSort: ['position-asc', 'name-asc', 'name-desc', 'type-asc', 'balance-desc', 'balance-asc'],
 };
 
 // Reuse the Contacts convention for persistent local sort preferences.
 function readInventorySortModes() {
   try {
     const stored = JSON.parse(localStorage.getItem(INVENTORY_SORT_KEY) || '{}');
+    const firstPositionSort = stored?.positionSortVersion !== 1;
+    const itemsSort = firstPositionSort ? 'position-asc'
+      : INVENTORY_SORT_MODES.itemsSort.includes(stored?.itemsSort) ? stored.itemsSort : 'position-asc';
+    if (firstPositionSort) localStorage.setItem(INVENTORY_SORT_KEY, JSON.stringify({
+      ...stored, itemsSort, positionSortVersion: 1,
+    }));
     return {
       manufacturersSort: INVENTORY_SORT_MODES.manufacturersSort.includes(stored?.manufacturersSort)
         ? stored.manufacturersSort : 'name-asc',
-      itemsSort: INVENTORY_SORT_MODES.itemsSort.includes(stored?.itemsSort)
-        ? stored.itemsSort : 'name-asc',
+      itemsSort,
     };
   } catch {
-    return { manufacturersSort: 'name-asc', itemsSort: 'name-asc' };
+    return { manufacturersSort: 'name-asc', itemsSort: 'position-asc' };
   }
 }
 
@@ -83,6 +89,7 @@ function saveInventorySortMode(key, value) {
     localStorage.setItem(INVENTORY_SORT_KEY, JSON.stringify({
       manufacturersSort: STOCK_VIEW.manufacturersSort,
       itemsSort: STOCK_VIEW.itemsSort,
+      positionSortVersion: 1,
     }));
   } catch {
     // Storage disabled: keep the selected order active for this session.
@@ -146,9 +153,25 @@ function productTypeText(item = {}) {
   return String(item.productType || item.category || '').trim();
 }
 
+function inventoryPositionComparator(left, right) {
+  const byManufacturer = manufacturerName(left).localeCompare(manufacturerName(right), 'ru', { numeric: true, sensitivity: 'base' });
+  if (byManufacturer) return byManufacturer;
+  const rank = item => Number.isSafeInteger(Number(item.position)) && Number(item.position) > 0
+    ? Number(item.position) : Number.MAX_SAFE_INTEGER;
+  return rank(left) - rank(right)
+    || String(left.name || '').localeCompare(String(right.name || ''), 'ru', { numeric: true, sensitivity: 'base' })
+    || String(left.itemId || '').localeCompare(String(right.itemId || ''));
+}
+
+function inventoryItemOrdinal(item) {
+  return getInventoryItems().filter(candidate => manufacturerName(candidate) === manufacturerName(item))
+    .sort(inventoryPositionComparator).findIndex(candidate => candidate.itemId === item.itemId) + 1;
+}
+
 function sortItems(items = [], mode = STOCK_VIEW.itemsSort) {
   const rows = [...items];
   const byName = (left, right) => String(left.name || '').localeCompare(String(right.name || ''), 'ru', { numeric: true, sensitivity: 'base' });
+  if (mode === 'position-asc') return rows.sort(inventoryPositionComparator);
   if (mode === 'name-desc') return rows.sort((left, right) => byName(right, left));
   if (mode === 'balance-asc') return rows.sort((left, right) => (Number(left.balance) || 0) - (Number(right.balance) || 0) || byName(left, right));
   if (mode === 'balance-desc') return rows.sort((left, right) => (Number(right.balance) || 0) - (Number(left.balance) || 0) || byName(left, right));
@@ -547,7 +570,7 @@ function openMovementEditor(root, movementId = '', kind = 'CONSUMPTION', { recor
       .filter(item => actualKind !== 'CONSUMPTION' || item.canConsume !== false)
       .filter(item => actualKind !== 'SALE' || item.canSell === true)
       .filter(item => !query || `${manufacturerName(item)} ${itemSearchText(item)}`.toLocaleLowerCase('ru-RU').includes(query))
-      .sort((a, b) => String(a.name).localeCompare(String(b.name), 'ru', { numeric: true, sensitivity: 'base' }));
+      .sort(inventoryPositionComparator);
     choiceHost.innerHTML = items.length
       ? items.map(item => compactCheck({
           label: `${manufacturerName(item)} · ${item.name} (${numberText(item.balance)} ${item.unit})`,
@@ -600,7 +623,7 @@ function openMovementEditor(root, movementId = '', kind = 'CONSUMPTION', { recor
     const rows = [...selected].map(itemId => ({
       item: getInventoryItem(itemId),
       previous: originalLines.get(itemId) || null,
-    })).filter(row => row.item);
+    })).filter(row => row.item).sort((a, b) => inventoryPositionComparator(a.item, b.item));
     if (!rows.length) {
       openNotice({ title: 'Материалы', message: 'Выбранные позиции не найдены на складе.' });
       return;
@@ -806,7 +829,7 @@ function stockListMarkup(manufacturer, query = '') {
   }), STOCK_VIEW.itemsSort);
   if (!items.length) return emptyState('Ничего не найдено', 'Измените поиск или фильтр.');
   return v2ListEntries(items.map((item) => v2ListEntry({
-    title: item.name,
+    title: `${inventoryItemOrdinal(item)} · ${item.name}`,
     subtitle: [productTypeText(item), item.location, tubeCountText(item)].filter(Boolean).join(' · '),
     rightTop: `${numberText(item.balance)} ${item.unit}`,
     rightBottom: item.lastPurchasePrice == null ? '' : moneyText(item.lastPurchasePrice),
@@ -827,6 +850,7 @@ function stockSortOptions(level) {
     ];
   }
   return [
+    { value: 'position-asc', label: 'По порядку' },
     { value: 'name-asc', label: 'Название А—Я' },
     { value: 'name-desc', label: 'Название Я—А' },
     { value: 'type-asc', label: 'По типу' },
@@ -1009,7 +1033,7 @@ function openMovementDetails(root, movementId) {
 function orderMarkup() {
   const items = inventoryOrderSuggestions();
   if (!items.length) return emptyState('Заказывать пока нечего', 'Когда будет указан минимальный остаток, здесь появятся предложения.');
-  return v2ListEntries(items.map((item) => v2ListEntry({
+  return v2ListEntries(items.sort(inventoryPositionComparator).map((item) => v2ListEntry({
     title: item.name,
     subtitle: `Осталось ${numberText(item.balance)} ${item.unit}`,
     rightTop: `${numberText(item.suggestedQuantity)} ${item.unit}`,
@@ -1023,7 +1047,7 @@ function inventoryAuditScope({ manufacturer = '' } = {}) {
   // Z2 search and filters never restrict the independent Q1 stocktake list.
   return getInventoryItems().filter(item =>
     !manufacturer || manufacturerName(item) === manufacturer
-  ).map(item => item.itemId);
+  ).sort(inventoryPositionComparator).map(item => item.itemId);
 }
 
 function inventoryAuditItems(ids) {
@@ -1086,7 +1110,7 @@ function openInventoryAuditSelection(root, { manufacturer = '', onSaved = () => 
     const items = inventoryAuditItems(ids).filter(item =>
       (!needle || `${manufacturerName(item)} ${itemSearchText(item)}`.toLocaleLowerCase('ru-RU').includes(needle))
       && availableFilters.every(({ key }) => !filterValues[key] || String(item[key] ?? '').trim() === filterValues[key]))
-      .sort((a,b) => String(a.name).localeCompare(String(b.name), 'ru', { numeric:true }));
+      .sort(inventoryPositionComparator);
     visible = items.map(item => item.itemId);
     if (list) list.innerHTML = items.length
       ? items.map(item => compactCheck({
