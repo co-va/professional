@@ -423,6 +423,60 @@ function openItemEditor(root, itemId = '', defaults = {}, onSaved = () => {}) {
   notifyContext();
 }
 
+function openInventoryItemFilters(root, availableFilters, values, onApplied) {
+  if (!availableFilters.length) {
+    openNotice({ title: 'Фильтр', message: 'Для этих позиций пока нет доступных фильтров.' });
+    return;
+  }
+  let applied = { ...values };
+  let draft = { ...applied };
+  const hasFilters = state => Object.values(state).some(Boolean);
+  const changed = () => availableFilters.some(({ key }) => draft[key] !== applied[key]);
+  const fieldsMarkup = state => `<div class="form-grid" data-inventory-filter-fields>
+    ${availableFilters.map(({ key, label, options }) => select({
+      label, name: `inventoryFilter-${key}`, value: state[key], options,
+    })).join('')}
+  </div>`;
+  const filterLayer = mountModal(root, modal(`
+    <div data-inventory-filter-form>${fieldsMarkup(draft)}</div>
+    <div class="modal-actions" data-inventory-filter-actions hidden>
+      ${button('Применить', { data: 'data-inventory-filter-action' })}
+    </div>`, { title: 'Фильтр', variant: 'x', surface: 'app' }));
+  if (!filterLayer) return;
+  const action = filterLayer.querySelector('[data-inventory-filter-action]');
+  const actions = filterLayer.querySelector('[data-inventory-filter-actions]');
+  const syncAction = () => {
+    const isChanged = changed();
+    const reset = !isChanged && hasFilters(applied);
+    actions.hidden = !isChanged && !reset;
+    action.textContent = isChanged ? 'Применить' : 'Сбросить';
+    action.classList.toggle('ui-button--secondary', reset);
+  };
+  filterLayer.addEventListener('change', event => {
+    const option = availableFilters.find(({ key }) => event.target?.name === `inventoryFilter-${key}`);
+    if (!option) return;
+    draft[option.key] = String(event.target.value || '');
+    syncAction();
+  });
+  action.addEventListener('click', () => {
+    if (changed()) {
+      applied = { ...draft };
+      Object.assign(values, applied);
+      onApplied();
+      filterLayer.v2Close?.();
+      return;
+    }
+    if (!hasFilters(applied)) return;
+    availableFilters.forEach(({ key }) => { values[key] = ''; });
+    applied = { ...values };
+    draft = { ...applied };
+    filterLayer.querySelector('[data-inventory-filter-form]').innerHTML = fieldsMarkup(draft);
+    onApplied();
+    syncAction();
+  });
+  syncAction();
+}
+
 function movementNoteLabel(kind) {
   if (kind === 'RECEIPT') return 'Основание прихода';
   if (kind === 'WRITE_OFF') return 'Причина списания';
@@ -439,33 +493,42 @@ function openMovementEditor(root, movementId = '', kind = 'CONSUMPTION', { recor
     return;
   }
   let actualKind = movement?.kind || kind;
-  const title = correcting ? movementTitle(movement) : actualKind ? movementTitle({ kind: actualKind }) : 'Движение';
   const originalLines = new Map((movement?.lines || []).map(line => [line.itemId, line]));
   const selected = new Set(originalLines.keys());
   const recordLabel = [record?.personUei, record?.personName].map(value => String(value || '').trim()).filter(Boolean).join(' · ');
 
-  // First select the actual stock items. The quantity fields do not exist yet.
+  // Q1: the operation selector lives in the Q header, not in the scrollable body.
+  const availableFilters = inventoryAuditFilters(getInventoryItems());
+  const filterValues = Object.fromEntries(availableFilters.map(({ key }) => [key, '']));
   const selectionMarkup = `<div class="form-grid" data-inventory-movement-selection>
     ${recordLabel ? `<p>${escapeHtml(recordLabel)}</p>` : ''}
-    ${!correcting && !kind ? select({
-      label: 'Операция',
-      name: 'movementKind',
-      value: '',
-      options: [
-        { value: '', label: 'Выбрать' },
-        { value: 'RECEIPT', label: 'Приход' },
-        { value: 'CONSUMPTION', label: 'Расход' },
-        { value: 'WRITE_OFF', label: 'Списание' },
-        { value: 'RETURN', label: 'Возврат' },
-      ],
-    }) : ''}
     ${stockSearchField('', 'data-inventory-movement-search')}
     <p data-inventory-movement-count></p>
     <div data-inventory-movement-choices></div>
     ${actionBlock(button('Продолжить', { data: 'data-inventory-movement-next', disabled: !selected.size }))}
   </div>`;
-  const selectionLayer = mountModal(root, modal(selectionMarkup, { title, variant: 'q' }));
+  const selectionLayer = mountModal(root, modal(selectionMarkup, { variant: 'q' }));
   if (!selectionLayer) return;
+  const header = selectionLayer.querySelector('[data-v2-q-header-content]');
+  if (header) {
+    const operationControl = !correcting && !kind ? select({
+      name: 'movementKind',
+      value: '',
+      options: [
+        { value: '', label: 'Операция' },
+        { value: 'RECEIPT', label: 'Приход' },
+        { value: 'CONSUMPTION', label: 'Расход' },
+        { value: 'WRITE_OFF', label: 'Списание' },
+        { value: 'RETURN', label: 'Возврат' },
+        ...(canUseCapability('inventory.stocktake.access')
+          ? [{ value: 'ADJUSTMENT', label: 'Инвентаризация' }] : []),
+      ],
+    }) : `<h2 class="v2-q-title">${escapeHtml(movementTitle({ kind: actualKind }))}</h2>`;
+    header.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+      <div style="min-width:0;flex:1">${operationControl}</div>
+      ${button('V', { variant: 'secondary', data: 'data-inventory-movement-v', aria: 'Фильтр позиций' })}
+    </div>`;
+  }
   const choiceHost = selectionLayer.querySelector('[data-inventory-movement-choices]');
   const search = selectionLayer.querySelector('[data-inventory-movement-search]');
   const countHost = selectionLayer.querySelector('[data-inventory-movement-count]');
@@ -480,6 +543,7 @@ function openMovementEditor(root, movementId = '', kind = 'CONSUMPTION', { recor
     }
     const query = normalizedSearch(search?.value);
     const items = getInventoryItems()
+      .filter(item => availableFilters.every(({ key }) => !filterValues[key] || String(item[key] ?? '').trim() === filterValues[key]))
       .filter(item => actualKind !== 'CONSUMPTION' || item.canConsume !== false)
       .filter(item => actualKind !== 'SALE' || item.canSell === true)
       .filter(item => !query || `${manufacturerName(item)} ${itemSearchText(item)}`.toLocaleLowerCase('ru-RU').includes(query))
@@ -496,6 +560,11 @@ function openMovementEditor(root, movementId = '', kind = 'CONSUMPTION', { recor
   };
   selectionLayer.addEventListener('change', event => {
     if (event.target.matches?.('input[name="movementKind"]')) {
+      if (event.target.value === 'ADJUSTMENT' && canUseCapability('inventory.stocktake.access')) {
+        selectionLayer.v2Close?.();
+        openInventoryAuditSelection(root, { onSaved: () => renderMovements(root) });
+        return;
+      }
       actualKind = ['RECEIPT', 'CONSUMPTION', 'WRITE_OFF', 'RETURN'].includes(event.target.value)
         ? event.target.value : '';
       if (actualKind === 'CONSUMPTION') {
@@ -514,6 +583,16 @@ function openMovementEditor(root, movementId = '', kind = 'CONSUMPTION', { recor
     nextButton.disabled = selected.size === 0;
   });
   search?.addEventListener('input', renderChoices);
+  selectionLayer.querySelector('[data-inventory-movement-v]')?.addEventListener('click', () => {
+    openSharedProfileSettingsMenu({
+      title: 'Движение',
+      actions: [{
+        id: 'filter',
+        label: 'Фильтр',
+        onSelect: () => openInventoryItemFilters(selectionLayer, availableFilters, filterValues, renderChoices),
+      }],
+    });
+  });
 
   // Second enter amounts for the selected items only. Q2 can close back to Q1.
   nextButton.addEventListener('click', () => {
@@ -530,33 +609,38 @@ function openMovementEditor(root, movementId = '', kind = 'CONSUMPTION', { recor
       const outgoing = previous?.direction ? previous.direction === 'OUT'
         : ['CONSUMPTION', 'SALE', 'WRITE_OFF'].includes(actualKind);
       const containers = previous?.containerDelta == null ? '' : Math.abs(Number(previous.containerDelta));
-      return `<div class="form-grid" data-inventory-movement-row data-item-id="${escapeHtml(item.itemId)}"
+      // Consumption is entered in grams only; counting tubes belongs to stocktake.
+      const showContainers = isWeighedInventoryItem(item)
+        && (['RECEIPT', 'RETURN', 'WRITE_OFF'].includes(actualKind) || previous?.containerDelta != null);
+      return `<div class="two-column-layout" data-inventory-movement-row data-item-id="${escapeHtml(item.itemId)}"
           data-row-direction="${escapeHtml(previous?.direction || '')}">
-        <p><strong>${escapeHtml(item.name)}</strong> · ${numberText(item.balance)} ${escapeHtml(item.unit)} на складе</p>
-        ${field({
-          label: `Количество, ${item.unit}`,
-          name: `quantity-${item.itemId}`,
-          value: previous?.quantity ?? '',
-          type: 'number', min: '0', step: '0.001', inputmode: 'decimal',
-        })}
-        ${isWeighedInventoryItem(item) ? field({
-          label: outgoing ? 'Убрано пустых тюбиков, шт.' : 'Поступило тюбиков, шт.',
-          name: `containers-${item.itemId}`,
-          value: containers,
-          type: 'number', min: '0', step: '1', inputmode: 'numeric',
-        }) : ''}
+        <div class="two-column-layout__column"><strong>${escapeHtml(item.name)}</strong></div>
+        <div class="two-column-layout__column">
+          ${field({
+            label: item.unit,
+            name: `quantity-${item.itemId}`,
+            value: previous?.quantity ?? '',
+            type: 'number', min: '0', step: '0.001', inputmode: 'decimal',
+          })}
+          ${showContainers ? field({
+            label: outgoing ? 'Тюбиков выбыло, шт.' : 'Тюбиков поступило, шт.',
+            name: `containers-${item.itemId}`,
+            value: containers,
+            type: 'number', min: '0', step: '1', inputmode: 'numeric',
+          }) : ''}
+        </div>
       </div>`;
     }).join('');
     const editorMarkup = `<form class="form-grid" data-inventory-movement-form>
-      ${rowMarkup}
       ${actualKind === 'RECEIPT' && !correcting ? field({
         label: 'Поставщик', name: 'supplier', placeholder: 'Необязательно',
       }) : ''}
       ${field({ label: movementNoteLabel(actualKind), name: 'note', value: movement?.note || '' })}
+      ${rowMarkup}
       <div class="form-error" data-inventory-movement-error role="alert"></div>
       ${actionBlock(button(correcting ? 'Исправить' : 'Сохранить', { type: 'submit', data: 'data-inventory-movement-save' }))}
     </form>`;
-    const editorLayer = mountModal(selectionLayer, modal(editorMarkup, { title: 'Количество', variant: 'q' }));
+    const editorLayer = mountModal(selectionLayer, modal(editorMarkup, { title: movementTitle({ kind: actualKind }), variant: 'q' }));
     if (!editorLayer) return;
     const form = editorLayer.querySelector('[data-inventory-movement-form]');
     const errorHost = editorLayer.querySelector('[data-inventory-movement-error]');
