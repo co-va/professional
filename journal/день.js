@@ -7,6 +7,7 @@ import {
   initNoteReels,
   journalDayTimeline,
   noteReels,
+  openNotice,
   setV2Y,
 } from '../ui/ui.js';
 import { getWorkplaces } from '../core/workplace-time.js';
@@ -34,17 +35,32 @@ function withFinancialState(usages = []) {
 
 async function openExistingRecord(record, rerender = () => {}) {
   const { openRecordView } = await import('../core/records/view.js');
-  openRecordView(record, { onClose: rerender });
+  const source = record?.id ? record : { ...record, id: record?.sourceId };
+  if (!source?.id || !openRecordView(source, { onClose: rerender })) {
+    throw new Error('Не удалось открыть запись.');
+  }
 }
 
 async function openUsage(usage, rerender = () => {}) {
-  if (usage?.type === 'record') {
-    await openExistingRecord(usage, rerender);
-    return;
-  }
-  if (usage?.type === 'event') {
-    const { openEventView } = await import('./event-view.js');
-    openEventView(usage, { onClose: rerender });
+  try {
+    if (usage?.type === 'record') {
+      await openExistingRecord(usage, rerender);
+      return;
+    }
+    if (usage?.type === 'event') {
+      const { openEventView } = await import('./event-view.js');
+      if (!openEventView(usage, { onClose: rerender })) {
+        throw new Error('Не удалось открыть событие.');
+      }
+      return;
+    }
+    throw new Error('Не найдено действие на выбранное время.');
+  } catch (error) {
+    // Never silently swallow a failed dynamic import or a missing Record.
+    openNotice({
+      title: 'Журнал',
+      message: String(error?.message || 'Не удалось открыть запись или событие.'),
+    });
   }
 }
 
@@ -93,6 +109,12 @@ export function renderJournalDay(root, {
   // One Time-owned read for the visible day, shared by Journal timeline and V.
   // The V menu never needs to read or re-project all Record/Finance facts.
   const dayUsages = workingDayRows.length ? getTimeUsagesForScope({ date: dayDate }) : [];
+  const usageById = new Map(dayUsages.map((usage) => [
+    String(usage?.sourceId || usage?.id || ''), usage,
+  ]));
+  const openSelectedUsage = ({ usageId }) => {
+    void openUsage(usageById.get(String(usageId || '')), rerender);
+  };
   onUsageSummary({ usages: dayUsages });
   const dayNotes = getNotesForDay(dayDate);
   const visibleNotes = dayNotes.filter((note) => noteVisibleForWorkplace(note, workplaceId, { allMode }));
@@ -163,6 +185,7 @@ export function renderJournalDay(root, {
       onWorkFieldClick: ({ workplaceId: nextWorkplaceId }) => {
         if (nextWorkplaceId) onWorkplaceFieldClick(nextWorkplaceId);
       },
+      onUsageClick: openSelectedUsage,
     });
     return dispose;
   }
@@ -181,7 +204,6 @@ export function renderJournalDay(root, {
 
   const usages = withFinancialState(dayUsages.filter((usage) =>
     String(usage?.workplaceId || '') === String(workplaceId)));
-  const usageById = new Map(usages.map((usage) => [String(usage?.sourceId || usage?.id || ''), usage]));
   const timeGrid = createTimeGrid({ date: dayDate, workplaceId, plan: time, usages });
 
   timelineRoot.innerHTML = journalDayTimeline({
@@ -194,10 +216,7 @@ export function renderJournalDay(root, {
 
   initJournalDayTimeline(timelineRoot, {
     onWorkFieldClick: () => onWorkplaceFieldClick(workplaceId),
-    onUsageClick: ({ usageId }) => {
-      const usage = usageById.get(String(usageId || ''));
-      void openUsage(usage, rerender);
-    },
+    onUsageClick: openSelectedUsage,
     onSlotClick: async ({ from }) => {
       const minuteState = getTimeGridMinuteState(timeGrid, from);
       if (minuteState.state === 'occupied' && minuteState.usage) {
