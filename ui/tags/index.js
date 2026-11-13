@@ -1,4 +1,5 @@
 import { select } from '../selectors/index.js';
+import { compactRemoveButton } from '../buttons/index.js';
 import { escapeHtml } from '../utils/escape-html.js';
 
 const CREATE_TAG_VALUE = '__tags:create__';
@@ -11,14 +12,14 @@ function normalizeSelected(values = [], tags = []) {
 
 function tagChip(tag) {
   const color = escapeHtml(tag.color || '#E8E1DC');
-  return `<span class="tag" data-tag-id="${escapeHtml(tag.id)}" style="background:${color}">${escapeHtml(tag.name)}<button type="button" class="remove-button" data-remove-tag aria-label="Снять ярлык ${escapeHtml(tag.name)}">×</button></span>`;
+  return `<span class="tag" data-tag-id="${escapeHtml(tag.id)}" style="background:${color}">${escapeHtml(tag.name)}${compactRemoveButton({ data: "data-remove-tag", aria: `Снять ярлык ${tag.name}` })}</span>`;
 }
 
 function tagManagerRow(tag) {
   return `<div class="tag-manager-list__item" data-edit-tag="${escapeHtml(tag.id)}" role="button" tabindex="0" aria-label="Изменить ярлык ${escapeHtml(tag.name)}">
     <span class="tag-manager-list__swatch" style="--tag-manager-color:${escapeHtml(tag.color)}" aria-hidden="true"></span>
     <strong class="tag-manager-list__name">${escapeHtml(tag.name)}</strong>
-    <button type="button" class="remove-button tag-manager-list__delete" data-delete-tag="${escapeHtml(tag.id)}" aria-label="Удалить ярлык ${escapeHtml(tag.name)}">×</button>
+    ${compactRemoveButton({ className: "tag-manager-list__delete", data: `data-delete-tag="${escapeHtml(tag.id)}"`, aria: `Удалить ярлык ${tag.name}` })}
   </div>`;
 }
 
