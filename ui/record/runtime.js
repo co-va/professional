@@ -249,9 +249,12 @@ export function recordConfirmationMiniCard({
       phone,
       services,
       duration,
-      discount: discountMoney
-        ? `Скидка: ${contactDiscount ? `${contactDiscount} · ` : ''}${discountMoney}`
-        : (contactDiscount ? `Скидка: ${contactDiscount}` : ''),
+      footerLayout: viewer ? 'three-column' : '',
+      discount: viewer
+        ? discountMoney
+        : (discountMoney
+          ? `Скидка: ${contactDiscount ? `${contactDiscount} · ` : ''}${discountMoney}`
+          : (contactDiscount ? `Скидка: ${contactDiscount}` : '')),
       total,
       leftAction: viewer && serviceSettings ? {
         label: 'Настроить услуги',
