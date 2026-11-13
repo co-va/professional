@@ -10,7 +10,10 @@ assert.doesNotMatch(inventory, /function openMovementKind\(/, 'No obsolete actio
 assert.match(inventory, /addEventListener\('click', \(\) => openMovementEditor\(root, '', ''\)\)/, 'Plus opens one shared form');
 assert.match(editorSource, /name: 'movementKind'/, 'Operation selector in Q1');
 assert.match(editorSource, /\[data-v2-q-header-content\]/, 'Header is the operation selector owner');
-assert.match(editorSource, /data-inventory-movement-v/, 'V filter in Q1 header');
+assert.match(editorSource, /workspaceHeaderContext\(\{/, 'Movement Q1 emits workspace context');
+assert.match(editorSource, /v: \{ data: 'data-inventory-movement-v'/, 'Shared floating V owns the movement filter');
+assert.doesNotMatch(editorSource, /button\('V'/, 'No full-width imitation V button');
+assert.match(inventory, /v: \{ data: 'data-inventory-audit-v'/, 'Stocktake uses the same canonical floating V');
 assert.match(editorSource, /value: 'ADJUSTMENT', label: 'Инвентаризация'/, 'Stocktake is offered in the selector');
 assert.match(editorSource, /openInventoryAuditSelection\(root,/, 'Stocktake selector delegates to the existing stocktake flow');
 assert.match(editorSource, /selectionLayer\.v2Close\?\.\(\);[\s\S]*?openInventoryAuditSelection\(root,/, 'Old Q1 closes before stocktake opens');
@@ -55,6 +58,7 @@ for (const kind of ['RECEIPT', 'CONSUMPTION', 'WRITE_OFF', 'RETURN']) {
   const deps = {
     getInventoryMovement: () => null,
     select: () => '<operation-selector>',
+    workspaceHeaderContext: ({ v }) => '<shared-context ' + (v?.data || '') + '>',
     canUseCapability: () => true,
     inventoryAuditFilters: () => [],
     openSharedProfileSettingsMenu: data => data.actions[0].onSelect(),
@@ -112,7 +116,8 @@ for (const kind of ['RECEIPT', 'CONSUMPTION', 'WRITE_OFF', 'RETURN']) {
   headerMarkup = header.innerHTML;
   assert.match(headerMarkup, /<operation-selector>/, `${kind}: selector in Q1 header`);
   assert.doesNotMatch(selectionMarkup, /<operation-selector>/, `${kind}: operation selector never in body`);
-  assert.match(headerMarkup, /data-inventory-movement-v/, `${kind}: V filter in header`);
+  assert.match(selectionMarkup, /<shared-context data-inventory-movement-v>/, `${kind}: canonical V source in Q1 body`);
+  assert.doesNotMatch(headerMarkup, /data-inventory-movement-v/, `${kind}: no fake V button in Q header`);
   vButton.click();
   assert.equal(openedFilter, true, `${kind}: filter available in Q1`);
   assert.equal(nodes.choices.innerHTML, '', `${kind}: no items before selecting operation`);
