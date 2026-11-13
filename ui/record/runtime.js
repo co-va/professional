@@ -240,7 +240,7 @@ export function recordConfirmationMiniCard({
     // The same Shared miniCard/line-pair contract as User record history.
     // Keep its limited height and internal service scrolling: no external list.
     const serviceLines = (Array.isArray(procedures) ? procedures : []).map((item) => ({
-      value: [String(item?.name || item?.title || 'Услуга'), String(item?.durationText || '')]
+      value: [String(item?.name || item?.title || 'Услуга'), String(item?.durationText || item?.secondary || '')]
         .filter(Boolean).join(' · '),
       rightValue: String(item?.right || item?.costText || ''),
     }));
