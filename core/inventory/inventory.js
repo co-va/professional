@@ -500,7 +500,10 @@ function openMovementEditor(root, movementId = '', kind = 'CONSUMPTION', { recor
   // Q1: the operation selector lives in the Q header, not in the scrollable body.
   const availableFilters = inventoryAuditFilters(getInventoryItems());
   const filterValues = Object.fromEntries(availableFilters.map(({ key }) => [key, '']));
-  const selectionMarkup = `<div class="form-grid" data-inventory-movement-selection>
+  const selectionMarkup = `${workspaceHeaderContext({
+    title: 'Движение',
+    v: { data: 'data-inventory-movement-v', aria: 'Фильтр материалов' },
+  })}<div class="form-grid" data-inventory-movement-selection>
     ${recordLabel ? `<p>${escapeHtml(recordLabel)}</p>` : ''}
     ${stockSearchField('', 'data-inventory-movement-search')}
     <p data-inventory-movement-count></p>
@@ -524,10 +527,7 @@ function openMovementEditor(root, movementId = '', kind = 'CONSUMPTION', { recor
           ? [{ value: 'ADJUSTMENT', label: 'Инвентаризация' }] : []),
       ],
     }) : `<h2 class="v2-q-title">${escapeHtml(movementTitle({ kind: actualKind }))}</h2>`;
-    header.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
-      <div style="min-width:0;flex:1">${operationControl}</div>
-      ${button('V', { variant: 'secondary', data: 'data-inventory-movement-v', aria: 'Фильтр позиций' })}
-    </div>`;
+    header.innerHTML = operationControl;
   }
   const choiceHost = selectionLayer.querySelector('[data-inventory-movement-choices]');
   const search = selectionLayer.querySelector('[data-inventory-movement-search]');
