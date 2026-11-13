@@ -107,8 +107,8 @@ export function recordAppointmentTime(record, field = 'from') {
 
 export function recordVisualState(record, { paid = false } = {}) {
   if (record?.status === 'cancelled') return 'cancelled';
-  if (paid) return 'paid';
   if (record?.attendance === 'no-show') return 'no-show';
+  if (paid) return 'paid';
   return 'active';
 }
 
