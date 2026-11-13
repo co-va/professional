@@ -407,7 +407,8 @@ function openItemEditor(root, itemId = '', defaults = {}, onSaved = () => {}) {
     const requestedPositionText = String(data.get('position') ?? '').trim();
     const requestedPosition = Number(requestedPositionText);
     const currentPosition = creating ? 0 : inventoryItemPosition(item);
-    const positionChanged = !creating && requestedPosition !== currentPosition;
+    const positionChanged = !creating && (requestedPosition !== currentPosition
+      || String(data.get('manufacturer') || '').trim() !== String(item.manufacturer || '').trim());
     if (!creating && (!requestedPositionText || !Number.isSafeInteger(requestedPosition)
       || requestedPosition < 1)) {
       openNotice({ title: 'Порядок', message: 'Укажите целый порядковый номер от 1.' });
@@ -1070,7 +1071,7 @@ function inventoryAuditScope({ manufacturer = '' } = {}) {
 
 function inventoryAuditItems(ids) {
   const byId = new Map(getInventoryItems().map(item => [item.itemId, item]));
-  return ids.map(id => byId.get(id)).filter(Boolean);
+  return ids.map(id => byId.get(id)).filter(Boolean).sort(inventoryPositionComparator);
 }
 
 function inventoryAuditFilters(items, manufacturer = '') {
