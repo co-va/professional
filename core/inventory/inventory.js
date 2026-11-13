@@ -163,6 +163,13 @@ function inventoryPositionComparator(left, right) {
     || String(left.itemId || '').localeCompare(String(right.itemId || ''));
 }
 
+function inventoryItemPosition(item) {
+  const sameManufacturer = getInventoryItems()
+    .filter(candidate => manufacturerName(candidate) === manufacturerName(item))
+    .sort(inventoryPositionComparator);
+  return sameManufacturer.findIndex(candidate => candidate.itemId === item.itemId) + 1;
+}
+
 function sortItems(items = [], mode = STOCK_VIEW.itemsSort) {
   const rows = [...items];
   const byName = (left, right) => String(left.name || '').localeCompare(String(right.name || ''), 'ru', { numeric: true, sensitivity: 'base' });
@@ -290,11 +297,12 @@ function advancedItemFields(item = {}) {
     field({ label: 'Нетто, г', name: 'netWeight', value: '', disabled: true }),
     field({ label: 'Тара, г', name: 'tareWeight', value: item.tareWeight ?? '', type: 'number', min: '0', step: '0.001', inputmode: 'decimal' }),
   ], { columns: 3, ariaLabel: 'Масса упаковки: брутто, нетто и тара' });
-  const identifiers = twoColumnLayout(
+  const identifiers = columnLayout([
+    field({ label: '№', name: 'position', value: inventoryItemPosition(item),
+      type: 'number', min: '1', step: '1', inputmode: 'numeric' }),
     field({ label: 'Артикул', name: 'sku', value: item.sku || '' }),
     field({ label: 'Штрихкод', name: 'barcode', value: item.barcode || '' }),
-    { ariaLabel: 'Артикул и штрихкод' },
-  );
+  ], { columns: 3, ariaLabel: 'Порядок, артикул и штрихкод' });
   const inventory = `
     ${field({ label: 'Место хранения', name: 'location', value: item.location || '' })}
     ${twoColumnLayout(
@@ -396,6 +404,15 @@ function openItemEditor(root, itemId = '', defaults = {}, onSaved = () => {}) {
       openNotice({ title: 'Наименование', message: 'Укажите наименование позиции.' });
       return;
     }
+    const requestedPositionText = String(data.get('position') ?? '').trim();
+    const requestedPosition = Number(requestedPositionText);
+    const currentPosition = creating ? 0 : inventoryItemPosition(item);
+    const positionChanged = !creating && requestedPosition !== currentPosition;
+    if (!creating && (!requestedPositionText || !Number.isSafeInteger(requestedPosition)
+      || requestedPosition < 1)) {
+      openNotice({ title: 'Порядок', message: 'Укажите целый порядковый номер от 1.' });
+      return;
+    }
     const value = {
       manufacturer: String(data.get('manufacturer') || '').trim(),
       name,
@@ -424,8 +441,12 @@ function openItemEditor(root, itemId = '', defaults = {}, onSaved = () => {}) {
     }
     primary.disabled = true;
     try {
-      if (creating) await createInventoryItem(value);
-      else await updateInventoryItem(item.itemId, value);
+      if (creating) {
+        await createInventoryItem(value);
+      } else {
+        await updateInventoryItem(item.itemId, value);
+        if (positionChanged) await moveInventoryItem(item.itemId, requestedPosition);
+      }
       layer.v2Close?.();
       onSaved();
     } catch (error) {
@@ -856,53 +877,6 @@ function stockSortOptions(level) {
   ];
 }
 
-function openInventoryPositionEditor(root, manufacturer, onSaved = () => {}) {
-  const items = getInventoryItems().filter(item => manufacturerName(item) === manufacturer)
-    .sort(inventoryPositionComparator);
-  if (!items.length) return;
-  const options = [
-    { value: '', label: 'Выбрать материал' },
-    ...items.map((item, index) => ({ value: item.itemId, label: `${index + 1} · ${item.name}` })),
-  ];
-  const markup = `<form class="form-grid" data-inventory-position-form>
-    ${select({ label: 'Материал', name: 'orderItem', options, searchable: true })}
-    ${field({ label: 'Переместить на №', name: 'orderPosition', type: 'number',
-      placeholder: `1–${items.length}`, min: '1', max: String(items.length), step: '1', inputmode: 'numeric' })}
-    <p class="form-error" role="alert" data-inventory-position-error></p>
-    ${actionBlock(button('Переместить', { type: 'submit', data: 'data-inventory-position-save' }))}
-  </form>`;
-  const layer = mountModal(root, modal(markup, { title: 'Порядок', variant: 'q' }));
-  if (!layer) return;
-  const form = layer.querySelector('[data-inventory-position-form]');
-  const fieldInput = form?.querySelector('input[name="orderPosition"]');
-  const error = layer.querySelector('[data-inventory-position-error]');
-  const submit = layer.querySelector('[data-inventory-position-save]');
-  const selectInput = form?.querySelector('input[name="orderItem"]');
-  selectInput?.addEventListener('change', () => {
-    const index = items.findIndex(item => item.itemId === selectInput.value);
-    if (fieldInput) fieldInput.value = index >= 0 ? String(index + 1) : '';
-  });
-  form?.addEventListener('submit', async event => {
-    event.preventDefault();
-    const itemId = selectInput?.value || '';
-    const position = Number(fieldInput?.value);
-    if (!itemId || !Number.isSafeInteger(position) || position < 1 || position > items.length) {
-      error.textContent = 'Выберите материал и место в списке.';
-      return;
-    }
-    submit.disabled = true;
-    error.textContent = '';
-    try {
-      await moveInventoryItem(itemId, position);
-      layer.v2Close?.();
-      onSaved();
-    } catch (cause) {
-      error.textContent = cause instanceof Error ? cause.message : 'Не удалось изменить порядок.';
-      submit.disabled = false;
-    }
-  });
-}
-
 function openStockControls(trigger, level, manufacturer, onChange, mode = 'sort') {
   const sortKey = level === 'manufacturers' ? 'manufacturersSort' : 'itemsSort';
   const typeKey = level === 'manufacturers' ? 'manufacturersType' : 'itemsType';
@@ -1021,7 +995,6 @@ function openManufacturerStock(root, manufacturer) {
             if (sample) openInventoryProductAppearanceQ(sample.itemId, renderList);
           },
         },
-        { id: 'order', label: 'Порядок', variant: 'secondary', onSelect: () => openInventoryPositionEditor(layer, manufacturer, renderList) },
         { id: 'sort', label: 'Сортировка', variant: 'secondary', onSelect: () => openStockControls(layer, 'items', manufacturer, renderList, 'sort') },
         { id: 'filter', label: 'Фильтр', variant: 'secondary', onSelect: () => openStockControls(layer, 'items', manufacturer, renderList, 'filter') },
         ...(canUseCapability('inventory.stocktake.access') ? [{
