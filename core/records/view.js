@@ -23,7 +23,7 @@ import { listPersonDeposits } from '../loyalty/deposit/data.js';
 import { openPersonHistoryQ } from '../people/people.js';
 import { personDisplay } from '../people/presentation.js';
 import { getRecordPaymentState, resolveRecordSettlement } from '../finance/index.js';
-import { getRecordProgramOptions, recordProgramSelection } from '../loyalty/record-program.js';
+import { recordProgramSelection } from '../loyalty/record-program.js';
 import { normalizeWorkplaceTimeZone, zonedDateTimeParts } from '../time/index.js';
 import { openRecordPayment } from '../payment/record-payment.js';
 import { openRecordPaymentActions } from '../payment/record-payment.js';
@@ -588,8 +588,6 @@ export function openRecordView(record, {
     const contact = capabilities.contactIdentity
       ? (getAllPeople().find((item) => String(item?.key || item?.id || '').trim() === personKey) || source.person || {})
       : (source.person || {});
-    const programOptions = capabilities.loyaltyProgram ? getRecordProgramOptions(personKey) : [];
-    const selectedProgramKey = String(source?.loyaltyProgram?.key || '');
     const contactDiscountPercent = readOnlyHistory ? 0 : Math.max(0, Math.min(100,
       Number(settlement?.pricePercent) || Number(getPersonPriceCondition(contact).percent) || 0));
     const discountMoney = Math.max(0, (Number(settlement?.serviceTotal) || 0) - (Number(settlement?.planTotal) || 0));
@@ -599,31 +597,23 @@ export function openRecordView(record, {
     const appointmentMinutes = fromMinutes != null && toMinutes != null && toMinutes > fromMinutes
       ? toMinutes - fromMinutes
       : procedures.reduce((sum, item) => sum + (Number(item?.duration) || 0), 0);
+    const contactDisplay = capabilities.contactIdentity ? personDisplay(contact) : professionalDisplay;
+    const recordName = [source?.person?.name, source?.person?.surname]
+      .map((value) => String(value || '').trim()).filter(Boolean).join(' ');
     const identity = capabilities.contactIdentity
-      ? [
-        String(person.uei || '').trim(),
-        String(source?.person?.name || '').trim(),
-        String(source?.person?.surname || '').trim(),
-      ].filter(Boolean).join(' ')
+      ? [String(contactDisplay.uei || person.uei || '').trim(), recordName || contactDisplay.name]
+        .filter(Boolean).join(' ')
       : [String(professionalDisplay.uei || '').trim(), professionalDisplay.name].filter(Boolean).join(' ');
     const card = recordConfirmationMiniCard({
       viewer: true,
       serviceSettings: capabilities.procedureSettings && !payment.hasPayments && !readOnlyHistory,
       repeat: capabilities.contactIdentity && !readOnlyHistory,
-      programName: selectedProgramKey
-        ? (programOptions.find((item) => String(item.key) === selectedProgramKey)?.name || 'Программа')
-        : '',
-      paymentInfo: readOnlyHistory
-        ? ''
-        : payment.fullyPaid
-          ? 'Оплачено'
-          : `${recordHasEnded(source) ? 'Задолженность' : 'К оплате'}: ${formatMoney(payment.remaining)}`,
       workplace: workplaceName(source.workplaceId),
       contactDiscount: contactDiscountPercent > 0 ? `${contactDiscountPercent}%` : '',
       date: formatDate(source.date),
-      period: `${source.from || ''} - ${source.to || ''}`,
+      period: `${source.from || ''}–${source.to || ''}`,
       identity,
-      phone: capabilities.contactIdentity ? (person.phone || '') : professionalDisplay.phone,
+      phone: capabilities.contactIdentity ? (person.phone || contactDisplay.phone || '') : professionalDisplay.phone,
       duration: durationText(appointmentMinutes),
       discountMoney: discountMoney > 0.009 ? formatMoney(discountMoney) : '',
       total: readOnlyHistory ? '—' : formatMoney(settlement?.planTotal == null ? grossTotal : Math.max(0, Number(settlement.planTotal) || 0)),
