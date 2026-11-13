@@ -998,10 +998,21 @@ function openManufacturerStock(root, manufacturer) {
           if (item && label) label.textContent = `${item.position} · ${item.name}`;
         });
       },
-      onError: (error) => openNotice({
-        title: 'Порядок',
-        message: error instanceof Error ? error.message : 'Не удалось изменить порядок материалов.',
-      }),
+      onError: (error) => {
+        // An error inside the same Z stays readable after the transient
+        // system notice is gone. Never mount another modal or shift Z itself.
+        if (!listHost?.isConnected) return;
+        let message = listHost.querySelector('[data-inventory-reorder-error]');
+        if (!message) {
+          message = document.createElement('div');
+          message.className = 'form-error';
+          message.dataset.inventoryReorderError = '';
+          message.setAttribute('role', 'alert');
+          listHost.prepend(message);
+        }
+        message.textContent = error instanceof Error
+          ? error.message : 'Не удалось изменить порядок материалов.';
+      },
     });
   };
 
