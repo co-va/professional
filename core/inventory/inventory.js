@@ -1127,7 +1127,6 @@ function inventoryAuditFilters(items, manufacturer = '') {
 }
 
 function openInventoryAuditSelection(root, { manufacturer = '', onSaved = () => {} } = {}) {
-  // Contextual manufacturer only; Z2 search/type are intentionally independent.
   const ids = [...new Set(inventoryAuditScope({ manufacturer }))];
   if (!ids.length) {
     openNotice({ title: 'Инвентаризация', message: 'В текущей выборке нет позиций.' });
@@ -1135,30 +1134,69 @@ function openInventoryAuditSelection(root, { manufacturer = '', onSaved = () => 
   }
   const availableFilters = inventoryAuditFilters(inventoryAuditItems(ids), manufacturer);
   const filterValues = Object.fromEntries(availableFilters.map(({ key }) => [key, '']));
-  let mode = 'stock';
   const markup = `${workspaceHeaderContext({
     title: 'Инвентаризация',
-    v: { data: 'data-inventory-audit-v', aria: 'Действия и фильтры инвентаризации' },
+    v: { data: 'data-inventory-audit-v', aria: 'Фильтры инвентаризации' },
   })}<div class="form-grid" data-inventory-audit-selection>
-    ${stockSearchField('', 'data-inventory-audit-search')}
+    ${select({ label: '', name: 'auditKind', value: 'stock', options: [
+      { value: 'stock', label: 'Остатки' },
+      { value: 'data', label: 'Данные' },
+    ] })}
+    <div data-inventory-audit-data-settings hidden>
+      ${twoColumnLayout(
+        select({ label: 'Что изменить', name: 'auditField', value: 'category',
+          options: INVENTORY_AUDIT_EDIT_FIELDS.map(({ value, label }) => ({ value, label })) }),
+        `<div class="inventory-audit-value-cell">
+          <div class="inventory-audit-value-heading"><span>На что изменить</span><span>Всем</span></div>
+          <div class="inventory-audit-value-line">
+            <div data-inventory-audit-common-value></div>
+            <div class="inventory-audit-common-check">
+              ${compactCheck({ label: '', data: 'data-inventory-audit-apply-all',
+                aria: 'Применить одно значение ко всем выбранным' })}
+            </div>
+          </div>
+        </div>`,
+        { ariaLabel: 'Какие данные и на что изменить' },
+      )}
+    </div>
     ${compactCheck({ label: 'Выбрать все показанные', data: 'data-inventory-audit-all' })}
     <p data-inventory-audit-count>Выбрано 0 из ${ids.length}</p>
     <div data-inventory-audit-list></div>
+    <p class="form-error" role="status" data-inventory-audit-status></p>
     ${actionBlock(button('Продолжить', { data: 'data-inventory-audit-next' }))}
   </div>`;
-  const layer = mountModal(root, modal(markup, { title: 'Инвентаризация', variant: 'q' }));
+  // Q header owns search; V remains in the existing shared workspace context.
+  const layer = mountModal(root, modal(markup, { variant: 'q' }));
   if (!layer) return null;
+  const header = layer.querySelector('[data-v2-q-header-content]');
+  if (header) header.innerHTML = stockSearchField('', 'data-inventory-audit-search');
   const search = layer.querySelector('[data-inventory-audit-search]');
   const list = layer.querySelector('[data-inventory-audit-list]');
   const all = layer.querySelector('[data-inventory-audit-all]');
   const count = layer.querySelector('[data-inventory-audit-count]');
   const next = layer.querySelector('[data-inventory-audit-next]');
+  const kindSelector = layer.querySelector('[name="auditKind"]');
+  const fieldSelector = layer.querySelector('[name="auditField"]');
+  const settings = layer.querySelector('[data-inventory-audit-data-settings]');
+  const checkbox = layer.querySelector('[data-inventory-audit-apply-all]');
+  const valueHost = layer.querySelector('[data-inventory-audit-common-value]');
+  const status = layer.querySelector('[data-inventory-audit-status]');
   const selected = new Set();
   let visible = [];
+  let busy = false;
+
+  const isData = () => kindSelector?.value === 'data';
+  const isCommon = () => isData() && Boolean(checkbox?.checked);
   const sync = () => {
     if (count) count.textContent = `Выбрано ${selected.size} из ${ids.length}`;
-    if (next) { next.disabled = !selected.size; next.textContent = `Продолжить · ${selected.size}`; }
-    if (all) { all.checked = visible.length > 0 && visible.every(id => selected.has(id)); all.disabled = !visible.length; }
+    if (next) {
+      next.disabled = busy || !selected.size;
+      next.textContent = `${isCommon() ? 'Применить' : 'Продолжить'} · ${selected.size}`;
+    }
+    if (all) {
+      all.checked = visible.length > 0 && visible.every(id => selected.has(id));
+      all.disabled = busy || !visible.length;
+    }
   };
   const render = () => {
     const needle = normalizedSearch(search?.value);
@@ -1176,14 +1214,38 @@ function openInventoryAuditSelection(root, { manufacturer = '', onSaved = () => 
       : emptyState('Ничего не найдено', 'Измените поиск.');
     sync();
   };
+  const syncValue = () => {
+    if (!valueHost) return;
+    const enabled = isCommon();
+    valueHost.querySelectorAll('input, button').forEach(control => {
+      control.disabled = !enabled;
+    });
+    sync();
+  };
+  const renderValue = () => {
+    const definition = inventoryAuditFieldDefinition(fieldSelector?.value);
+    if (!definition || !valueHost) return;
+    valueHost.innerHTML = inventoryAuditDataControl(definition, 'auditValue');
+    syncValue();
+    if (status) status.textContent = '';
+  };
+  const syncKind = () => {
+    if (settings) settings.hidden = !isData();
+    syncValue();
+    if (status) status.textContent = '';
+  };
+  kindSelector?.addEventListener('change', syncKind);
+  fieldSelector?.addEventListener('change', renderValue);
+  checkbox?.addEventListener('change', syncValue);
   list?.addEventListener('change', event => {
     const input = event.target.closest?.('[data-inventory-audit-item]');
-    if (!input) return;
+    if (!input || busy) return;
     if (input.checked) selected.add(input.dataset.inventoryAuditItem);
     else selected.delete(input.dataset.inventoryAuditItem);
     sync();
   });
   all?.addEventListener('change', () => {
+    if (busy) return;
     visible.forEach(id => all.checked ? selected.add(id) : selected.delete(id));
     render();
   });
@@ -1191,24 +1253,41 @@ function openInventoryAuditSelection(root, { manufacturer = '', onSaved = () => 
   function openAuditFilter() {
     openInventoryItemFilters(layer, availableFilters, filterValues, render);
   }
-
   layer.querySelector('[data-inventory-audit-v]')?.addEventListener('click', () => {
     openSharedProfileSettingsMenu({
       title: 'Инвентаризация',
-      actions: [
-        { id: 'stock', label: 'Остатки', onSelect: () => { mode = 'stock'; } },
-        { id: 'data', label: 'Данные', onSelect: () => { mode = 'data'; } },
-        { id: 'filter', label: 'Фильтр', onSelect: openAuditFilter },
-      ],
+      actions: [{ id: 'filter', label: 'Фильтр', onSelect: openAuditFilter }],
     });
   });
-  next?.addEventListener('click', () => {
-    if (!selected.size) return;
-    openInventoryAuditCriteria(layer, { mode, ids: [...selected], onSaved: () => {
-      layer.v2Close?.();
-      onSaved();
-    }});
+  next?.addEventListener('click', async () => {
+    if (busy || !selected.size) return;
+    const selectedItems = inventoryAuditItems([...selected]);
+    if (isCommon()) {
+      busy = true;
+      sync();
+      try {
+        const data = new FormData();
+        data.set('auditValue', valueHost?.querySelector('[name="auditValue"]')?.value ?? '');
+        await applyInventoryAuditDataChanges(layer, {
+          items: selectedItems,
+          definition: inventoryAuditFieldDefinition(fieldSelector?.value),
+          perItem: false, data, status, submit: next, onSaved,
+        });
+      } finally {
+        busy = false;
+        sync();
+      }
+      return;
+    }
+    openInventoryAuditCriteria(layer, {
+      mode: isData() ? 'data' : 'stock',
+      ids: [...selected],
+      fieldName: fieldSelector?.value || 'category',
+      onSaved: () => { layer.v2Close?.(); onSaved(); },
+    });
   });
+  renderValue();
+  syncKind();
   render();
   notifyContext();
   return layer;
@@ -1378,22 +1457,123 @@ function inventoryAuditValueMatches(item, definition, expected) {
   return String(actual ?? '') === String(expected);
 }
 
-function openInventoryAuditCriteria(root, { mode, ids = [], onSaved = () => {} } = {}) {
+async function applyInventoryAuditDataChanges(layer, { items, definition, perItem, data, status, submit, onSaved }) {
+  if (!definition) {
+    status.textContent = 'Выберите характеристику.';
+    return false;
+  }
+    if (!perItem && definition.value === 'referencePrice') {
+      const locked = items.filter(item => itemPrimaryPrice(item) !== null);
+      if (locked.length) {
+        status.textContent = `У ${locked.length} позиций цена определяется основным поставщиком. Исключите их из выбора или измените цену у поставщика.`;
+        return;
+      }
+    }
+    const targets = [];
+    const uniqueNumbers = new Set();
+    let startingValue;
+    try {
+      if (!perItem) {
+        startingValue = inventoryAuditParseDataValue(definition, data.get('auditValue'));
+        if (startingValue === null) throw new Error('Укажите новое значение.');
+        if (definition.value === 'position' && startingValue + items.length - 1 > 2147483647)
+          throw new Error('Диапазон порядковых номеров слишком велик.');
+      }
+      for (const [index, item] of items.entries()) {
+        if (perItem && definition.value === 'referencePrice' && itemPrimaryPrice(item) !== null) continue;
+        const raw = perItem ? data.get(`auditItem-${index}`) : data.get('auditValue');
+        const value = perItem ? inventoryAuditParseDataValue(definition, raw)
+          : definition.value === 'position' ? startingValue + index : startingValue;
+        if (value === null) continue;
+        if (definition.value === 'position') {
+          const numberKey = `${manufacturerName(item)}::${value}`;
+          if (uniqueNumbers.has(numberKey))
+            throw new Error(`Номер ${value} повторяется у производителя «${manufacturerName(item)}».`);
+          uniqueNumbers.add(numberKey);
+        }
+        targets.push({ itemId: item.itemId, manufacturer: manufacturerName(item), name: item.name, value });
+      }
+    } catch (error) {
+      status.textContent = error instanceof Error ? error.message : 'Проверьте данные.';
+      return;
+    }
+    if (!targets.length) {
+      status.textContent = 'Введите значения хотя бы для одной позиции.';
+      return;
+    }
+    const changes = targets.filter(entry =>
+      !inventoryAuditValueMatches(getInventoryItem(entry.itemId), definition, entry.value));
+    if (!changes.length) {
+      status.textContent = 'У выбранных позиций уже указаны эти значения.';
+      return;
+    }
+    submit.disabled = true;
+    const failed = new Map();
+    try {
+      if (definition.value === 'position') {
+        // Core shifts occupied slots when inserting a numbered product.
+        // Serial writes plus a fresh snapshot are needed to verify final order.
+        let pending = [...changes];
+        for (let pass = 0; pass < 4 && pending.length; pass++) {
+          for (const entry of pending.sort((a, b) =>
+            a.manufacturer.localeCompare(b.manufacturer, 'ru', { numeric: true }) || a.value - b.value)) {
+            if (failed.has(entry.itemId)) continue;
+            try {
+              await updateInventoryItem(entry.itemId, inventoryAuditDataPayload(definition, entry.value));
+            } catch (error) {
+              failed.set(entry.itemId, error instanceof Error ? error.message : 'Ошибка сохранения');
+            }
+          }
+          await loadInventory();
+          pending = changes.filter(entry => !failed.has(entry.itemId)
+            && !inventoryAuditValueMatches(getInventoryItem(entry.itemId), definition, entry.value));
+          status.textContent = `Проверено: ${changes.length - pending.length - failed.size} из ${changes.length}`;
+        }
+      } else {
+        // Existing item API accepts a patch of individual master-data fields.
+        for (let index = 0; index < changes.length; index += 4) {
+          const batch = changes.slice(index, index + 4);
+          const results = await Promise.allSettled(batch.map(entry =>
+            updateInventoryItem(entry.itemId, inventoryAuditDataPayload(definition, entry.value))));
+          results.forEach((result, offset) => {
+            if (result.status === 'rejected') failed.set(batch[offset].itemId,
+              result.reason instanceof Error ? result.reason.message : 'Ошибка сохранения');
+          });
+          status.textContent = `Обработано: ${Math.min(index + 4, changes.length)} из ${changes.length}`;
+        }
+        await loadInventory();
+      }
+      const unresolved = changes.filter(entry =>
+        !inventoryAuditValueMatches(getInventoryItem(entry.itemId), definition, entry.value));
+      if (unresolved.length || failed.size) {
+        const examples = unresolved.slice(0, 2).map(entry => entry.name).join(', ');
+        const detail = [...failed.values()][0];
+        status.textContent = `Изменено ${changes.length - unresolved.length} из ${changes.length}. Не подтверждено: ${unresolved.length}.`
+          + (examples ? ` ${examples}.` : '') + (detail ? ` ${detail}` : '');
+        return;
+      }
+      layer.v2Close?.();
+      onSaved();
+      openNotice({ title: 'Инвентаризация', message: `Изменено ${changes.length} позиций.` });
+      return true;
+    } catch (error) {
+      status.textContent = error instanceof Error ? error.message : 'Не удалось сохранить данные.';
+    } finally {
+      if (submit.isConnected) submit.disabled = false;
+    }
+  return false;
+}
+
+function openInventoryAuditCriteria(root, { mode, ids = [], fieldName = 'category', onSaved = () => {} } = {}) {
   const items = inventoryAuditItems(ids);
   if (!items.length) return openNotice({ title: 'Инвентаризация', message: 'Позиции не найдены.' });
   const isData = mode === 'data';
   const includesDifferentManufacturers = new Set(items.map(manufacturerName)).size > 1;
+  const definition = inventoryAuditFieldDefinition(fieldName);
+  if (isData && !definition) return openNotice({ title: 'Данные', message: 'Выберите характеристику.' });
   const fields = isData
-    ? `<div class="form-grid">
-      ${select({ label: 'Что изменить', name: 'auditField', value: 'category',
-        options: INVENTORY_AUDIT_EDIT_FIELDS.map(({ value, label }) => ({ value, label })) })}
-      ${select({ label: 'Как изменить', name: 'auditMode', value: 'all', options: [
-        { value: 'all', label: 'Одно значение для всех' },
-        { value: 'each', label: 'Каждой позиции своё' },
-      ] })}
-      <div data-inventory-audit-shared-value></div>
-      <div data-inventory-audit-position-values hidden><div class="form-grid" data-inventory-audit-rows></div></div>
-    </div>`
+    ? `<div class="form-grid">${items.map((item, index) =>
+      inventoryAuditDataRow(item, index, definition, includesDifferentManufacturers)).join('')}</div>`
     : `<div class="form-grid">${items.map(inventoryAuditInput).join('')}</div>`;
   const markup = `<form data-inventory-audit-criteria>
     <p>Выбрано: ${items.length} позиций</p>
@@ -1413,34 +1593,6 @@ function openInventoryAuditCriteria(root, { mode, ids = [], onSaved = () => {} }
   const knownContainers = new Map(items.map(item => [item.itemId, item.containerCount == null ? null : Number(item.containerCount)]));
   let saving = false;
 
-  if (isData) {
-    const fieldSelector = form.elements.namedItem('auditField');
-    const modeSelector = form.elements.namedItem('auditMode');
-    const shared = form.querySelector('[data-inventory-audit-shared-value]');
-    const rows = form.querySelector('[data-inventory-audit-position-values]');
-    const rowBody = form.querySelector('[data-inventory-audit-rows]');
-    const renderEditor = () => {
-      const definition = inventoryAuditFieldDefinition(fieldSelector?.value);
-      const perItem = modeSelector?.value === 'each';
-      if (!definition) return;
-      shared.hidden = perItem;
-      rows.hidden = !perItem;
-      // Render only the selected field, without rebuilding the parent form
-      // while the user types or while the iOS keyboard is visible.
-      if (perItem) {
-        rowBody.innerHTML = items.map((item, index) =>
-          inventoryAuditDataRow(item, index, definition, includesDifferentManufacturers)).join('');
-        shared.replaceChildren();
-      } else {
-        shared.innerHTML = inventoryAuditDataControl(definition, 'auditValue', { shared: true });
-        rowBody.replaceChildren();
-      }
-      status.textContent = '';
-    };
-    fieldSelector?.addEventListener('change', renderEditor);
-    modeSelector?.addEventListener('change', renderEditor);
-    renderEditor();
-  }
 
   function calculate() {
     const data = new FormData(form);
@@ -1546,111 +1698,13 @@ function openInventoryAuditCriteria(root, { mode, ids = [], onSaved = () => {} }
       return;
     }
 
-    const definition = inventoryAuditFieldDefinition(String(data.get('auditField') || ''));
-    const perItem = String(data.get('auditMode') || '') === 'each';
-    if (!definition) {
-      status.textContent = 'Выберите характеристику.';
-      return;
-    }
-    if (!perItem && definition.value === 'referencePrice') {
-      const locked = items.filter(item => itemPrimaryPrice(item) !== null);
-      if (locked.length) {
-        status.textContent = `У ${locked.length} позиций цена определяется основным поставщиком. Исключите их из выбора или измените цену у поставщика.`;
-        return;
-      }
-    }
-    const targets = [];
-    const uniqueNumbers = new Set();
-    let startingValue;
-    try {
-      if (!perItem) {
-        startingValue = inventoryAuditParseDataValue(definition, data.get('auditValue'));
-        if (startingValue === null) throw new Error('Укажите новое значение.');
-        if (definition.value === 'position' && startingValue + items.length - 1 > 2147483647)
-          throw new Error('Диапазон порядковых номеров слишком велик.');
-      }
-      for (const [index, item] of items.entries()) {
-        if (perItem && definition.value === 'referencePrice' && itemPrimaryPrice(item) !== null) continue;
-        const raw = perItem ? data.get(`auditItem-${index}`) : data.get('auditValue');
-        const value = perItem ? inventoryAuditParseDataValue(definition, raw)
-          : definition.value === 'position' ? startingValue + index : startingValue;
-        if (value === null) continue;
-        if (definition.value === 'position') {
-          const numberKey = `${manufacturerName(item)}::${value}`;
-          if (uniqueNumbers.has(numberKey))
-            throw new Error(`Номер ${value} повторяется у производителя «${manufacturerName(item)}».`);
-          uniqueNumbers.add(numberKey);
-        }
-        targets.push({ itemId: item.itemId, manufacturer: manufacturerName(item), name: item.name, value });
-      }
-    } catch (error) {
-      status.textContent = error instanceof Error ? error.message : 'Проверьте данные.';
-      return;
-    }
-    if (!targets.length) {
-      status.textContent = 'Введите значения хотя бы для одной позиции.';
-      return;
-    }
-    const changes = targets.filter(entry =>
-      !inventoryAuditValueMatches(getInventoryItem(entry.itemId), definition, entry.value));
-    if (!changes.length) {
-      status.textContent = 'У выбранных позиций уже указаны эти значения.';
-      return;
-    }
     saving = true;
-    submit.disabled = true;
-    const failed = new Map();
     try {
-      if (definition.value === 'position') {
-        // Core shifts occupied slots when inserting a numbered product.
-        // Serial writes plus a fresh snapshot are needed to verify final order.
-        let pending = [...changes];
-        for (let pass = 0; pass < 4 && pending.length; pass++) {
-          for (const entry of pending.sort((a, b) =>
-            a.manufacturer.localeCompare(b.manufacturer, 'ru', { numeric: true }) || a.value - b.value)) {
-            if (failed.has(entry.itemId)) continue;
-            try {
-              await updateInventoryItem(entry.itemId, inventoryAuditDataPayload(definition, entry.value));
-            } catch (error) {
-              failed.set(entry.itemId, error instanceof Error ? error.message : 'Ошибка сохранения');
-            }
-          }
-          await loadInventory();
-          pending = changes.filter(entry => !failed.has(entry.itemId)
-            && !inventoryAuditValueMatches(getInventoryItem(entry.itemId), definition, entry.value));
-          status.textContent = `Проверено: ${changes.length - pending.length - failed.size} из ${changes.length}`;
-        }
-      } else {
-        // Existing item API accepts a patch of individual master-data fields.
-        for (let index = 0; index < changes.length; index += 4) {
-          const batch = changes.slice(index, index + 4);
-          const results = await Promise.allSettled(batch.map(entry =>
-            updateInventoryItem(entry.itemId, inventoryAuditDataPayload(definition, entry.value))));
-          results.forEach((result, offset) => {
-            if (result.status === 'rejected') failed.set(batch[offset].itemId,
-              result.reason instanceof Error ? result.reason.message : 'Ошибка сохранения');
-          });
-          status.textContent = `Обработано: ${Math.min(index + 4, changes.length)} из ${changes.length}`;
-        }
-        await loadInventory();
-      }
-      const unresolved = changes.filter(entry =>
-        !inventoryAuditValueMatches(getInventoryItem(entry.itemId), definition, entry.value));
-      if (unresolved.length || failed.size) {
-        const examples = unresolved.slice(0, 2).map(entry => entry.name).join(', ');
-        const detail = [...failed.values()][0];
-        status.textContent = `Изменено ${changes.length - unresolved.length} из ${changes.length}. Не подтверждено: ${unresolved.length}.`
-          + (examples ? ` ${examples}.` : '') + (detail ? ` ${detail}` : '');
-        return;
-      }
-      layer.v2Close?.();
-      onSaved();
-      openNotice({ title: 'Инвентаризация', message: `Изменено ${changes.length} позиций.` });
-    } catch (error) {
-      status.textContent = error instanceof Error ? error.message : 'Не удалось сохранить данные.';
+      await applyInventoryAuditDataChanges(layer, {
+        items, definition, perItem: true, data, status, submit, onSaved,
+      });
     } finally {
       saving = false;
-      if (submit.isConnected) submit.disabled = false;
     }
   });
   return layer;
