@@ -1,10 +1,5 @@
+import { rootApp } from './root-app.js';
 const menuHeaderState = new WeakMap();
-
-function rootApp(root) {
-  return root?.matches?.('[data-v2-app]')
-    ? root
-    : root?.closest?.('[data-v2-app]') || root?.querySelector?.('[data-v2-app]');
-}
 
 function captureHeader(header) {
   const title = header.querySelector('.v2-header__title');

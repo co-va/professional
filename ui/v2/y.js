@@ -1,9 +1,4 @@
-function rootApp(root) {
-  return root?.matches?.('[data-v2-app]')
-    ? root
-    : root?.closest?.('[data-v2-app]') || root?.querySelector?.('[data-v2-app]');
-}
-
+import { rootApp } from './root-app.js';
 export function setV2Y(root, content = '') {
   const app = rootApp(root);
   const host = app?.querySelector?.(':scope > [data-v2-y-host]');

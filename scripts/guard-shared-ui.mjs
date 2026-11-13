@@ -64,6 +64,8 @@ assert(v2.includes('height:72px;') && v2.includes('flex:0 0 72px'), 'Shared H he
 assert(v2.includes('padding:0 18px calc(24px + env(safe-area-inset-bottom))'), 'Shared Z padding changed');
 assert(rootSelectorCount(v2, '.v2-header') === 1, 'Shared H geometry must have one owner');
 assert(rootSelectorCount(v2, '.v2-z') === 1, 'Shared Z geometry must have one owner');
+assert(read('ui/v2/root-app.js').includes('export function rootApp(') && ['header-state.js','v-host.js','workspace-navigation.js','y.js'].every(file => read('ui/v2/' + file).includes("from './root-app.js'")), 'Shared V2 app root lookup must have one owner');
+assert(!['header-state.js','v-host.js','workspace-navigation.js','y.js'].some(file => read('ui/v2/' + file).includes('function rootApp(')), 'Per-component duplicate root helpers are forbidden');
 assert(!zStack.includes('padding-top:0'), 'Nested Z must not override Shared top padding');
 assert(zLayout.includes("const SURFACE_HEADER_SPACING = '12px'"), 'Z/Q Header must share one 12px token');
 assert(v2.includes('.v2-q-title,.v2-z-title{box-sizing:border-box;display:flex;align-items:center;width:100%;min-width:0;height:46px;min-height:46px;max-height:46px;'), 'Z/Q text header must be fixed at 46px');

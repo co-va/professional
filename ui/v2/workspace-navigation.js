@@ -1,11 +1,10 @@
 import { retainV2EdgeHost } from './lifecycle.js';
+import { rootApp } from './root-app.js';
 import { bindV2ZDismissAffordance } from './z-affordance.js';
 import { bindV2StableZFrame } from './z-stack.js';
 
 export function setV2DeckOpen(root, open) {
-  const app = root?.matches?.('[data-v2-app]')
-    ? root
-    : root?.closest?.('[data-v2-app]') || root?.querySelector?.('[data-v2-app]');
+  const app = rootApp(root);
   if (!app) return false;
   const next = Boolean(open);
   if (next) app.classList.remove('is-z-entering');
@@ -31,9 +30,7 @@ export function initV2WorkspaceInteraction(root, {
   maxDrag = 180,
   edgeWidth = 36,
 } = {}) {
-  const app = root?.matches?.('[data-v2-app]')
-    ? root
-    : root?.closest?.('[data-v2-app]') || root?.querySelector?.('[data-v2-app]');
+  const app = rootApp(root);
   if (!app) return () => {};
 
   const stage = app.querySelector('.v2-app__stage');
