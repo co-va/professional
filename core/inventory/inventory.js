@@ -163,11 +163,6 @@ function inventoryPositionComparator(left, right) {
     || String(left.itemId || '').localeCompare(String(right.itemId || ''));
 }
 
-function inventoryItemOrdinal(item) {
-  return getInventoryItems().filter(candidate => manufacturerName(candidate) === manufacturerName(item))
-    .sort(inventoryPositionComparator).findIndex(candidate => candidate.itemId === item.itemId) + 1;
-}
-
 function sortItems(items = [], mode = STOCK_VIEW.itemsSort) {
   const rows = [...items];
   const byName = (left, right) => String(left.name || '').localeCompare(String(right.name || ''), 'ru', { numeric: true, sensitivity: 'base' });
@@ -822,14 +817,16 @@ function openManufacturerAppearance(root, onSaved = () => {}) {
 
 function stockListMarkup(manufacturer, query = '') {
   const needle = normalizedSearch(query);
-  const items = sortItems(getInventoryItems().filter((item) => {
-    if (manufacturerName(item) !== manufacturer) return false;
+  const group = getInventoryItems().filter(item => manufacturerName(item) === manufacturer);
+  const ordinals = new Map([...group].sort(inventoryPositionComparator)
+    .map((item, index) => [item.itemId, index + 1]));
+  const items = sortItems(group.filter((item) => {
     if (!matchesType(item, STOCK_VIEW.itemsType)) return false;
     return !needle || itemSearchText(item).includes(needle);
   }), STOCK_VIEW.itemsSort);
   if (!items.length) return emptyState('Ничего не найдено', 'Измените поиск или фильтр.');
   return v2ListEntries(items.map((item) => v2ListEntry({
-    title: `${inventoryItemOrdinal(item)} · ${item.name}`,
+    title: `${ordinals.get(item.itemId)} · ${item.name}`,
     subtitle: [productTypeText(item), item.location, tubeCountText(item)].filter(Boolean).join(' · '),
     rightTop: `${numberText(item.balance)} ${item.unit}`,
     rightBottom: item.lastPurchasePrice == null ? '' : moneyText(item.lastPurchasePrice),
