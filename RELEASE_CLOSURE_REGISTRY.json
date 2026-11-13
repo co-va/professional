@@ -1,0 +1,698 @@
+{
+  "schemaVersion": 1,
+  "scope": "Техническое закрытие продукта, не тарифный каталог Core и не AdminToolReadiness",
+  "repository": "co-va/professional",
+  "branch": "staging",
+  "updatedAt": "2026-11-13",
+  "rules": {
+    "states": {
+      "open": "Не принято",
+      "verifying": "В проверке",
+      "locked": "Закрыто, изменение только через повторную приёмку"
+    },
+    "closedMeans": "Внешний вид, действия, бизнес-логика, данные, API и реальное устройство проверены на согласованных версиях, результат подтверждён владельцем",
+    "requireAllChildrenAndDependencies": true,
+    "lockedChange": "Любое отличие зависимых файлов от SHA заморозки требует отдельного согласования и повторной адресной проверки; изменение тестов не заменяет доказательства",
+    "releaseTrackNotEntitlement": true,
+    "noNewCI": true
+  },
+  "items": [
+    {
+      "id": "start.release",
+      "kind": "release-track",
+      "label": "Start: закрытие технического контура запуска",
+      "parent": null,
+      "paths": [],
+      "requires": [
+        "start.profile",
+        "start.service",
+        "start.contacts",
+        "start.journal",
+        "start.sale-outside",
+        "start.finance"
+      ],
+      "external": [],
+      "acceptance": {
+        "visual": "не проверено",
+        "interaction": "не проверено",
+        "data": "не проверено",
+        "regression": "не проверено"
+      },
+      "closure": {
+        "state": "open",
+        "approvedBy": null,
+        "approvedAt": null,
+        "baselineSha": null,
+        "evidence": []
+      }
+    },
+    {
+      "id": "start.profile",
+      "kind": "F",
+      "label": "Профиль и рабочее пространство",
+      "parent": "start.release",
+      "paths": [
+        "core/profile/**",
+        "core/workplace-time.js"
+      ],
+      "requires": [],
+      "external": [],
+      "acceptance": {
+        "visual": "не проверено",
+        "interaction": "не проверено",
+        "data": "не проверено",
+        "regression": "не проверено"
+      },
+      "closure": {
+        "state": "open",
+        "approvedBy": null,
+        "approvedAt": null,
+        "baselineSha": null,
+        "evidence": []
+      }
+    },
+    {
+      "id": "start.service",
+      "kind": "F",
+      "label": "Сервис: услуги и товары",
+      "parent": "start.release",
+      "paths": [
+        "core/service/**"
+      ],
+      "requires": [],
+      "external": [],
+      "acceptance": {
+        "visual": "не проверено",
+        "interaction": "не проверено",
+        "data": "не проверено",
+        "regression": "не проверено"
+      },
+      "closure": {
+        "state": "open",
+        "approvedBy": null,
+        "approvedAt": null,
+        "baselineSha": null,
+        "evidence": []
+      }
+    },
+    {
+      "id": "start.contacts",
+      "kind": "F",
+      "label": "Контакты",
+      "parent": "start.release",
+      "paths": [
+        "core/people/**"
+      ],
+      "requires": [],
+      "external": [],
+      "acceptance": {
+        "visual": "не проверено",
+        "interaction": "не проверено",
+        "data": "не проверено",
+        "regression": "не проверено"
+      },
+      "closure": {
+        "state": "open",
+        "approvedBy": null,
+        "approvedAt": null,
+        "baselineSha": null,
+        "evidence": []
+      }
+    },
+    {
+      "id": "start.journal",
+      "kind": "F",
+      "label": "Журнал целиком",
+      "parent": "start.release",
+      "paths": [
+        "journal/journal.js"
+      ],
+      "requires": [
+        "journal.day",
+        "journal.month",
+        "journal.list",
+        "journal.record",
+        "journal.event",
+        "journal.note",
+        "journal.payment"
+      ],
+      "external": [],
+      "acceptance": {
+        "visual": "не проверено",
+        "interaction": "не проверено",
+        "data": "не проверено",
+        "regression": "не проверено"
+      },
+      "closure": {
+        "state": "open",
+        "approvedBy": null,
+        "approvedAt": null,
+        "baselineSha": null,
+        "evidence": []
+      }
+    },
+    {
+      "id": "journal.day",
+      "kind": "mode",
+      "label": "Журнал → День",
+      "parent": "start.journal",
+      "paths": [
+        "journal/день.js",
+        "journal/creation-flow.js"
+      ],
+      "requires": [
+        "journal.timeline",
+        "shared.time-record",
+        "shared.modal"
+      ],
+      "external": [],
+      "acceptance": {
+        "visual": "не проверено",
+        "interaction": "не проверено",
+        "data": "не проверено",
+        "regression": "не проверено"
+      },
+      "closure": {
+        "state": "open",
+        "approvedBy": null,
+        "approvedAt": null,
+        "baselineSha": null,
+        "evidence": []
+      }
+    },
+    {
+      "id": "journal.timeline",
+      "kind": "ui-component",
+      "label": "Единая шкала времени/слоты",
+      "parent": "journal.day",
+      "paths": [
+        "ui/time/journal-day.js",
+        "ui/time/time.css"
+      ],
+      "requires": [
+        "shared.time-record"
+      ],
+      "external": [],
+      "acceptance": {
+        "visual": "не проверено",
+        "interaction": "не проверено",
+        "data": "не проверено",
+        "regression": "не проверено"
+      },
+      "closure": {
+        "state": "open",
+        "approvedBy": null,
+        "approvedAt": null,
+        "baselineSha": null,
+        "evidence": []
+      }
+    },
+    {
+      "id": "journal.month",
+      "kind": "mode",
+      "label": "Журнал → Месяц",
+      "parent": "start.journal",
+      "paths": [
+        "journal/месяц.js"
+      ],
+      "requires": [
+        "journal.graph",
+        "shared.calendar",
+        "shared.time-record"
+      ],
+      "external": [],
+      "acceptance": {
+        "visual": "не проверено",
+        "interaction": "не проверено",
+        "data": "не проверено",
+        "regression": "не проверено"
+      },
+      "closure": {
+        "state": "open",
+        "approvedBy": null,
+        "approvedAt": null,
+        "baselineSha": null,
+        "evidence": []
+      }
+    },
+    {
+      "id": "journal.graph",
+      "kind": "submode",
+      "label": "Месяц → График (не самостоятельная E)",
+      "parent": "journal.month",
+      "paths": [
+        "journal/график.js",
+        "timetable/day-editor.js"
+      ],
+      "requires": [
+        "shared.calendar",
+        "shared.time-record"
+      ],
+      "external": [],
+      "acceptance": {
+        "visual": "не проверено",
+        "interaction": "не проверено",
+        "data": "не проверено",
+        "regression": "не проверено"
+      },
+      "closure": {
+        "state": "open",
+        "approvedBy": null,
+        "approvedAt": null,
+        "baselineSha": null,
+        "evidence": []
+      }
+    },
+    {
+      "id": "journal.list",
+      "kind": "mode",
+      "label": "Журнал → Список",
+      "parent": "start.journal",
+      "paths": [
+        "journal/список.js"
+      ],
+      "requires": [
+        "shared.list",
+        "shared.settlement",
+        "journal.record"
+      ],
+      "external": [],
+      "acceptance": {
+        "visual": "не проверено",
+        "interaction": "не проверено",
+        "data": "не проверено",
+        "regression": "не проверено"
+      },
+      "closure": {
+        "state": "open",
+        "approvedBy": null,
+        "approvedAt": null,
+        "baselineSha": null,
+        "evidence": []
+      }
+    },
+    {
+      "id": "journal.record",
+      "kind": "capability",
+      "label": "Запись: создать, перенести, отменить, завершить, открыть",
+      "parent": "start.journal",
+      "paths": [
+        "core/records/records.js",
+        "core/records/view.js"
+      ],
+      "requires": [
+        "journal.record.card",
+        "shared.time-record",
+        "shared.modal"
+      ],
+      "external": [],
+      "acceptance": {
+        "visual": "не проверено",
+        "interaction": "не проверено",
+        "data": "не проверено",
+        "regression": "не проверено"
+      },
+      "closure": {
+        "state": "open",
+        "approvedBy": null,
+        "approvedAt": null,
+        "baselineSha": null,
+        "evidence": []
+      }
+    },
+    {
+      "id": "journal.record.card",
+      "kind": "ui-component",
+      "label": "Мини-карта подтверждения и просмотра записи",
+      "parent": "journal.record",
+      "paths": [
+        "ui/record/runtime.js",
+        "ui/record/record.css"
+      ],
+      "requires": [
+        "shared.mini-card",
+        "shared.modal"
+      ],
+      "external": [
+        "co-va/user:ui/cards/mini-card.css",
+        "co-va/user:ui/cards/mini-card.js"
+      ],
+      "acceptance": {
+        "visual": "не проверено",
+        "interaction": "не проверено",
+        "data": "не проверено",
+        "regression": "не проверено"
+      },
+      "closure": {
+        "state": "open",
+        "approvedBy": null,
+        "approvedAt": null,
+        "baselineSha": null,
+        "evidence": []
+      }
+    },
+    {
+      "id": "journal.event",
+      "kind": "capability",
+      "label": "Событие",
+      "parent": "start.journal",
+      "paths": [
+        "journal/event-create.js",
+        "journal/event-view.js"
+      ],
+      "requires": [
+        "shared.time-record",
+        "shared.modal"
+      ],
+      "external": [],
+      "acceptance": {
+        "visual": "не проверено",
+        "interaction": "не проверено",
+        "data": "не проверено",
+        "regression": "не проверено"
+      },
+      "closure": {
+        "state": "open",
+        "approvedBy": null,
+        "approvedAt": null,
+        "baselineSha": null,
+        "evidence": []
+      }
+    },
+    {
+      "id": "journal.note",
+      "kind": "capability",
+      "label": "Заметка",
+      "parent": "start.journal",
+      "paths": [
+        "journal/note-create.js",
+        "journal/note-editor.js",
+        "journal/note-view.js",
+        "journal/note-target.js"
+      ],
+      "requires": [
+        "shared.modal"
+      ],
+      "external": [],
+      "acceptance": {
+        "visual": "не проверено",
+        "interaction": "не проверено",
+        "data": "не проверено",
+        "regression": "не проверено"
+      },
+      "closure": {
+        "state": "open",
+        "approvedBy": null,
+        "approvedAt": null,
+        "baselineSha": null,
+        "evidence": []
+      }
+    },
+    {
+      "id": "journal.payment",
+      "kind": "capability",
+      "label": "Оплата записи, долг, корректировка, возврат",
+      "parent": "start.journal",
+      "paths": [
+        "core/payment/record-payment.js"
+      ],
+      "requires": [
+        "shared.settlement",
+        "shared.modal"
+      ],
+      "external": [
+        "co-va/core:server/src/finance/payment-settlement.service.ts"
+      ],
+      "acceptance": {
+        "visual": "не проверено",
+        "interaction": "не проверено",
+        "data": "не проверено",
+        "regression": "не проверено"
+      },
+      "closure": {
+        "state": "open",
+        "approvedBy": null,
+        "approvedAt": null,
+        "baselineSha": null,
+        "evidence": []
+      }
+    },
+    {
+      "id": "start.sale-outside",
+      "kind": "capability",
+      "label": "Продажа вне записи и её оплата",
+      "parent": "start.release",
+      "paths": [
+        "core/sale/sale.js"
+      ],
+      "requires": [
+        "shared.settlement",
+        "shared.modal"
+      ],
+      "external": [
+        "co-va/core:server/src/finance/payment-settlement.service.ts"
+      ],
+      "acceptance": {
+        "visual": "не проверено",
+        "interaction": "не проверено",
+        "data": "не проверено",
+        "regression": "не проверено"
+      },
+      "closure": {
+        "state": "open",
+        "approvedBy": null,
+        "approvedAt": null,
+        "baselineSha": null,
+        "evidence": []
+      }
+    },
+    {
+      "id": "start.finance",
+      "kind": "F",
+      "label": "Финансы: Касса, ДДС, Z-отчёт",
+      "parent": "start.release",
+      "paths": [
+        "core/finance/**"
+      ],
+      "requires": [
+        "shared.settlement"
+      ],
+      "external": [],
+      "acceptance": {
+        "visual": "не проверено",
+        "interaction": "не проверено",
+        "data": "не проверено",
+        "regression": "не проверено"
+      },
+      "closure": {
+        "state": "open",
+        "approvedBy": null,
+        "approvedAt": null,
+        "baselineSha": null,
+        "evidence": []
+      }
+    },
+    {
+      "id": "shared.modal",
+      "kind": "shared-ui",
+      "label": "Единые Z/Q/X и геометрия",
+      "parent": null,
+      "paths": [
+        "ui/v2/**",
+        "ui/modals/**"
+      ],
+      "requires": [],
+      "external": [],
+      "acceptance": {
+        "visual": "не проверено",
+        "interaction": "не проверено",
+        "data": "не проверено",
+        "regression": "не проверено"
+      },
+      "closure": {
+        "state": "open",
+        "approvedBy": null,
+        "approvedAt": null,
+        "baselineSha": null,
+        "evidence": []
+      }
+    },
+    {
+      "id": "shared.mini-card",
+      "kind": "shared-ui",
+      "label": "Единый UI miniCard",
+      "parent": null,
+      "paths": [
+        "ui/cards/mini-card.js",
+        "ui/cards/mini-card.css"
+      ],
+      "requires": [],
+      "external": [],
+      "acceptance": {
+        "visual": "не проверено",
+        "interaction": "не проверено",
+        "data": "не проверено",
+        "regression": "не проверено"
+      },
+      "closure": {
+        "state": "open",
+        "approvedBy": null,
+        "approvedAt": null,
+        "baselineSha": null,
+        "evidence": []
+      }
+    },
+    {
+      "id": "shared.calendar",
+      "kind": "shared-ui",
+      "label": "Единый UI календаря",
+      "parent": null,
+      "paths": [
+        "ui/calendar/**"
+      ],
+      "requires": [],
+      "external": [],
+      "acceptance": {
+        "visual": "не проверено",
+        "interaction": "не проверено",
+        "data": "не проверено",
+        "regression": "не проверено"
+      },
+      "closure": {
+        "state": "open",
+        "approvedBy": null,
+        "approvedAt": null,
+        "baselineSha": null,
+        "evidence": []
+      }
+    },
+    {
+      "id": "shared.list",
+      "kind": "shared-ui",
+      "label": "Единый UI списка",
+      "parent": null,
+      "paths": [
+        "ui/lists/**"
+      ],
+      "requires": [],
+      "external": [],
+      "acceptance": {
+        "visual": "не проверено",
+        "interaction": "не проверено",
+        "data": "не проверено",
+        "regression": "не проверено"
+      },
+      "closure": {
+        "state": "open",
+        "approvedBy": null,
+        "approvedAt": null,
+        "baselineSha": null,
+        "evidence": []
+      }
+    },
+    {
+      "id": "shared.time-record",
+      "kind": "shared-domain",
+      "label": "Время/слоты/единый Record",
+      "parent": null,
+      "paths": [
+        "core/time/**",
+        "core/day/**",
+        "core/record/**"
+      ],
+      "requires": [],
+      "external": [
+        "co-va/core:server/src/time/**",
+        "co-va/core:server/src/record/**"
+      ],
+      "acceptance": {
+        "visual": "не проверено",
+        "interaction": "не проверено",
+        "data": "не проверено",
+        "regression": "не проверено"
+      },
+      "closure": {
+        "state": "open",
+        "approvedBy": null,
+        "approvedAt": null,
+        "baselineSha": null,
+        "evidence": []
+      }
+    },
+    {
+      "id": "shared.settlement",
+      "kind": "shared-domain",
+      "label": "Единый Settlement и Finance",
+      "parent": null,
+      "paths": [
+        "core/finance/**",
+        "core/payment/**"
+      ],
+      "requires": [],
+      "external": [
+        "co-va/core:server/src/finance/**"
+      ],
+      "acceptance": {
+        "visual": "не проверено",
+        "interaction": "не проверено",
+        "data": "не проверено",
+        "regression": "не проверено"
+      },
+      "closure": {
+        "state": "open",
+        "approvedBy": null,
+        "approvedAt": null,
+        "baselineSha": null,
+        "evidence": []
+      }
+    },
+    {
+      "id": "start-plus.release",
+      "kind": "release-track",
+      "label": "Start+: расширение поверх закрытого Start",
+      "parent": null,
+      "paths": [],
+      "requires": [
+        "start.release"
+      ],
+      "external": [],
+      "acceptance": {
+        "visual": "не проверено",
+        "interaction": "не проверено",
+        "data": "не проверено",
+        "regression": "не проверено"
+      },
+      "closure": {
+        "state": "open",
+        "approvedBy": null,
+        "approvedAt": null,
+        "baselineSha": null,
+        "evidence": []
+      }
+    },
+    {
+      "id": "pro.release",
+      "kind": "release-track",
+      "label": "Pro: расширение поверх закрытых Start и Start+",
+      "parent": null,
+      "paths": [],
+      "requires": [
+        "start-plus.release"
+      ],
+      "external": [],
+      "acceptance": {
+        "visual": "не проверено",
+        "interaction": "не проверено",
+        "data": "не проверено",
+        "regression": "не проверено"
+      },
+      "closure": {
+        "state": "open",
+        "approvedBy": null,
+        "approvedAt": null,
+        "baselineSha": null,
+        "evidence": []
+      }
+    }
+  ]
+}
