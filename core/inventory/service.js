@@ -47,7 +47,9 @@ export async function updateInventoryItem(itemId, value = {}) {
     && expected !== (Number(previous?.position) || 0);
   return inventoryRequest(`/items/${encodeURIComponent(String(itemId || ''))}`, {
     method: 'PUT',
-    body: JSON.stringify(value),
+    // A stale phone or browser tab cannot overwrite a more recent slot number.
+    body: JSON.stringify(Object.prototype.hasOwnProperty.call(value, 'position')
+      ? { ...value, expectedPosition: Number(previous?.position) || 0 } : value),
     verifySnapshot: positionChanged ? payload => {
       const saved = snapshotItem(payload, itemId);
       if (!saved || !Object.prototype.hasOwnProperty.call(saved, 'position')
@@ -59,15 +61,24 @@ export async function updateInventoryItem(itemId, value = {}) {
 }
 
 export async function reorderInventoryItems(manufacturer, itemIds) {
+  const previousPositions = itemIds.map(id => Number(getInventoryItem(id)?.position) || 0);
   return inventoryRequest('/items/reorder', {
     method: 'POST',
-    body: JSON.stringify({ manufacturer, itemIds }),
+    body: JSON.stringify({ manufacturer, itemIds, previousPositions }),
     verifySnapshot: payload => {
-      if (!Array.isArray(payload?.items) || !itemIds.every((id, index) => {
-        const item = snapshotItem(payload, id);
-        return item && Number(item.position) === index + 1
-          && String(item.manufacturer || '').trim() === String(manufacturer || '').trim();
-      })) throw new Error(SERVER_ORDER_UNAVAILABLE);
+      if (!Array.isArray(payload?.items)) throw new Error(SERVER_ORDER_UNAVAILABLE);
+      // Confirm the physical user-defined order, including partial numbering;
+      // zeros remain unassigned instead of getting invented sequential ranks.
+      const group = payload.items.filter(item =>
+        String(item.manufacturer || '').trim() === String(manufacturer || '').trim());
+      const sorted = [...group].sort((a, b) => {
+        const rank = item => Number(item.position) > 0 ? Number(item.position) : Number.MAX_SAFE_INTEGER;
+        return rank(a) - rank(b)
+          || String(a.name || '').localeCompare(String(b.name || ''), 'ru', { numeric: true, sensitivity: 'base' })
+          || String(a.itemId || '').localeCompare(String(b.itemId || ''));
+      });
+      if (sorted.length !== itemIds.length || sorted.some((item, index) => item.itemId !== itemIds[index]))
+        throw new Error('Сервер вернул другой порядок. Обновите склад.');
     },
   });
 }
