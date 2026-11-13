@@ -26,13 +26,6 @@ export async function updateInventoryItem(itemId, value = {}) {
   });
 }
 
-export async function moveInventoryItem(itemId, position) {
-  return inventoryRequest(`/items/${encodeURIComponent(String(itemId || ''))}/move`, {
-    method: 'POST',
-    body: JSON.stringify({ position }),
-  });
-}
-
 export async function createInventoryMovement(value = {}) {
   return inventoryRequest('/movements', {
     method: 'POST',
