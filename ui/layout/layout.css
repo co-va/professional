@@ -1,1 +1,10 @@
 .two-column-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;align-items:start}.two-column-layout__column{min-width:0}.column-layout{display:grid;gap:12px;align-items:start}.column-layout--1{grid-template-columns:minmax(0,1fr)}.column-layout--2{grid-template-columns:repeat(2,minmax(0,1fr))}.column-layout--3{grid-template-columns:repeat(3,minmax(0,1fr))}.column-layout__column{min-width:0}@media(max-width:360px){.two-column-layout,.column-layout{gap:8px}}
+
+/* Shared single-line data edit layout: item label and editable field stay on the same row. */
+.data-edit-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(110px,36%);align-items:center;gap:10px;min-width:0}
+.data-edit-row__name{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;line-height:1.25}
+.data-edit-row__name strong{font-weight:650}
+.data-edit-row__name small{font-size:12px;font-weight:400;color:var(--text-secondary)}
+.data-edit-row>.field{min-width:0;margin:0}
+.data-edit-row>.field>span:empty{display:none}
+@media(max-width:360px){.data-edit-row{grid-template-columns:minmax(0,1fr) minmax(100px,38%);gap:8px}}
