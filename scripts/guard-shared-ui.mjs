@@ -189,7 +189,7 @@ assert(compactAddButton().includes('ui-compact-button--add') && compactRemoveBut
   && smallActionButton({ icon: 'info' }).includes('ui-compact-button--info')
   && smallActionButton({ icon: 'copy' }).includes('ui-compact-button--copy'), 'All legacy Compact call paths must delegate to one renderer');
 assert(miniMarkup.includes("import { compactButton } from '../buttons/index.js'") && miniMarkup.includes("return compactButton({")
-  && miniMarkup.includes("kind: 'card'") && miniMarkup.includes("kind = action.icon === 'settings'") === false,
+  && miniMarkup.includes("kind: 'card'") && miniMarkup.includes("const kind = action.icon === 'settings'"),
   'MiniCard corner and record controls must use the shared Compact factory');
 assert(miniMarkup.includes("action.icon === 'settings' ? 'settings'") && miniMarkup.includes("action.label === '↻' ? 'repeat'"),
   'MiniCard must preserve gray settings and black repeat actions');
