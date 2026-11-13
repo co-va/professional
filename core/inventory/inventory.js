@@ -20,6 +20,7 @@ import {
   twoColumnLayout,
   v2ListEntries,
   v2ListEntry,
+  initV2ListReorder,
   v2Section,
   v2ZLayer,
   workspaceHeaderContext,
@@ -45,6 +46,7 @@ import {
   createInventoryMovement,
   loadInventory,
   updateInventoryItem,
+  reorderInventoryItems,
 } from './service.js';
 
 const UNIT_OPTIONS = ['шт.', 'г', 'кг', 'мл', 'л', 'м', 'уп.'].map((value) => ({ value, label: value }));
@@ -153,12 +155,13 @@ function productTypeText(item = {}) {
 }
 
 function inventoryPositionComparator(left, right) {
-  // Numbering is global for the entire stock, not restarted for each manufacturer.
-  // Missing numbers remain blank and are displayed after explicitly numbered items.
+  // The manual position is independent for each manufacturer. Together, companies
+  // remain grouped by name, with numbered items before unnumbered items inside.
+  const company = manufacturerName(left).localeCompare(manufacturerName(right), 'ru', { numeric: true, sensitivity: 'base' });
+  if (company) return company;
   const rank = item => Number.isSafeInteger(Number(item.position)) && Number(item.position) > 0
     ? Number(item.position) : Number.MAX_SAFE_INTEGER;
   return rank(left) - rank(right)
-    || manufacturerName(left).localeCompare(manufacturerName(right), 'ru', { numeric: true, sensitivity: 'base' })
     || String(left.name || '').localeCompare(String(right.name || ''), 'ru', { numeric: true, sensitivity: 'base' })
     || String(left.itemId || '').localeCompare(String(right.itemId || ''));
 }
@@ -834,14 +837,20 @@ function stockListMarkup(manufacturer, query = '') {
     return !needle || itemSearchText(item).includes(needle);
   }), STOCK_VIEW.itemsSort);
   if (!items.length) return emptyState('Ничего не найдено', 'Измените поиск или фильтр.');
+  // Reordering a partial list would silently misplace hidden products.
+  const canReorder = STOCK_VIEW.itemsSort === 'position-asc'
+    && !needle && !STOCK_VIEW.itemsType && items.length > 1;
   return v2ListEntries(items.map((item) => v2ListEntry({
     title: `${Number(item.position) > 0 ? `${item.position} · ` : ''}${item.name}`,
+    reorderHandle: canReorder,
+    reorderAria: 'Изменить порядок материала',
+
     subtitle: [productTypeText(item), item.location, tubeCountText(item)].filter(Boolean).join(' · '),
     rightTop: `${numberText(item.balance)} ${item.unit}`,
     rightBottom: item.lastPurchasePrice == null ? '' : moneyText(item.lastPurchasePrice),
     interactive: true,
     initial: '',
-    data: `data-inventory-item="${escapeHtml(item.itemId)}"`,
+    data: `data-inventory-item="${escapeHtml(item.itemId)}" data-reorder-id="${escapeHtml(item.itemId)}"`,
     aria: `Открыть ${item.name}`,
   })));
 }
@@ -955,7 +964,9 @@ function openManufacturerStock(root, manufacturer) {
   const searchInput = searchRow?.querySelector('[data-inventory-company-search]') || null;
 
   const listHost = layer.querySelector('[data-inventory-company-list]');
+  let disposeReorder = () => {};
   const renderList = () => {
+    disposeReorder();
     const query = searchInput?.value || '';
     if (listHost) listHost.innerHTML = stockListMarkup(manufacturer, query);
     listHost?.querySelectorAll('[data-inventory-item]').forEach((control) => control.addEventListener('click', () => {
@@ -965,6 +976,23 @@ function openManufacturerStock(root, manufacturer) {
         onChanged: renderList,
       });
     }));
+    if (STOCK_VIEW.itemsSort !== 'position-asc' || STOCK_VIEW.itemsType || normalizedSearch(query)) return;
+    disposeReorder = initV2ListReorder(listHost, {
+      onReorder: async (ids) => {
+        await reorderInventoryItems(manufacturer === EMPTY_MANUFACTURER ? '' : manufacturer, ids);
+        // The list is already in the correct DOM order after drop.
+        // Refresh only visible number text; do not rebuild the Z or its rows.
+        listHost?.querySelectorAll('[data-inventory-item]').forEach(node => {
+          const item = getInventoryItem(node.dataset.inventoryItem);
+          const label = node.querySelector('.list-entry__text > strong');
+          if (item && label) label.textContent = `${item.position} · ${item.name}`;
+        });
+      },
+      onError: (error) => openNotice({
+        title: 'Порядок',
+        message: error instanceof Error ? error.message : 'Не удалось изменить порядок материалов.',
+      }),
+    });
   };
 
   searchInput?.addEventListener('input', renderList);
