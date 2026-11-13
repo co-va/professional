@@ -63,7 +63,15 @@ assert(rootSelectorCount(v2, '.v2-z') === 1, 'Shared Z geometry must have one ow
 assert(!zStack.includes('padding-top:0'), 'Nested Z must not override Shared top padding');
 assert(zLayout.includes("const SURFACE_HEADER_SPACING = '12px'"), 'Z/Q Header must share one 12px token');
 assert(v2.includes('.v2-q-title,.v2-z-title{box-sizing:border-box;display:flex;align-items:center;width:100%;min-width:0;height:46px;min-height:46px;max-height:46px;'), 'Z/Q text header must be fixed at 46px');
-assert(modalStyle.includes('.modal-sheet.modal--surface-app:not(.modal--technical){background:var(--v2-white,#fff)}'), 'Z/Q must be white independently of app background');
+assert(v2.includes('--v2-inner-surface:#F5F5F3;') && v2.includes('background:var(--v2-inner-surface);color:var(--v2-ink);box-shadow:-6px 2px 18px rgba(0,0,0,.10)'), 'Z must use one warm inner surface');
+assert(zLayout.includes("'background:var(--v2-inner-surface,#F5F5F3)'") && zHeaderCss.includes('background:var(--v2-inner-surface,#F5F5F3)!important;'), 'Z/Q Header must use warm inner surface');
+assert(v2.includes('padding-top:0;background:var(--v2-inner-surface)}'), 'Q surface must be warm with no extra top gap');
+assert(v2.includes('.v2-layer{position:absolute;box-sizing:border-box;overflow:auto;background:var(--v2-inner-surface);') &&
+       v2.includes('.v2-layer--technical{background:var(--v2-white,#fff);top:50;'.replace('top:50;','top:50%;')), 'X/S/Q base must be warm, technical modal must remain white');
+assert(modalStyle.includes('.modal-sheet.modal--surface-app:not(.modal--technical){background:var(--v2-inner-surface,#F5F5F3)}') &&
+       modalStyle.includes('background:var(--v2-inner-surface,#F5F5F3);overflow:') &&
+       !modalStyle.split('\n').filter(line=>line.includes('.modal-sheet.modal--bottom.modal--')).some(line=>line.includes('background:var(--white)')), 'X/S shells and all X sheets must be warm');
+assert(read('ui/time/time.css').includes('.time-timeline{position:relative;display:grid;gap:0;background:var(--white)'), 'White striped Journal timeline must not inherit warm Z surface');
 assert(shellStyle.includes('--ui-field-height:46px;') && shellStyle.includes('--ui-control-height:48px;'), 'Fixed fields 46px and unchanged buttons 48px require separate tokens');
 assert(inputs.includes('height:var(--ui-field-height);min-height:var(--ui-field-height);max-height:var(--ui-field-height)'), 'Shared one-line inputs must be exactly 46px');
 assert(['.ui-select__control{','.ui-selector__search{','.ui-selector__option{'].every(c=>{const q=selectorsStyle.split(c)[1]?.split('}')[0]||'';return q.includes('height:var(--ui-selector-control-height);min-height:var(--ui-selector-control-height);max-height:var(--ui-selector-control-height)')}), 'Selector rows, search and trigger must be exactly 46px');
@@ -78,7 +86,7 @@ assert(!zLayout.includes('Q_HEADER_BODY_GAP') && !zLayout.includes('topGap'), 'N
 assert(!zHeaderCss.includes('margin-bottom:8px') && !zHeaderCss.includes('padding-bottom:0!important'), 'No per-surface Header spacing overrides');
 assert(zHeaderCss.includes('.ui-search-divider{display:none!important}'), 'No separator inside any Z/Q Header');
 assert(zHeaderCss.includes('.ui-search-field{padding:0}') && zHeaderCss.includes('.segment-control{margin:0}'), 'Controls cannot own outer Header gaps');
-assert(v2.includes('bottom:0;padding-top:0}'), 'Q layer must not add a hidden top gap');
+assert(v2.includes('bottom:0;padding-top:0;background:var(--v2-inner-surface)}'), 'Q layer must not add a hidden top gap');
 assert(read('ui/v2/z-affordance.js').includes("'margin:0 0 0 18px'"), 'Header arrow has no vertical offset');
 assert(read('ui/cards/entity-card-constructor.css').includes('gap:var(--v2-surface-header-spacing)'), 'Q card selector gap is not shared');
 assert(!read('core/inventory/inventory.js').includes('people-search-divider ui-search-divider'), 'Stock Header must contain only search');
@@ -94,7 +102,7 @@ assert(keyboardRuntime.includes('let keyboardSession = false;'), 'Shared keyboar
 assert(!keyboardRuntime.includes('scrollTop') && !keyboardRuntime.includes('scrollIntoView'), 'Keyboard controller must never scroll fields on a frame or focus event');
 assert(keyboardRuntime.includes("setRootPixel('--ui-visual-left', visualLeft)"), 'Horizontal Safari viewport compensation missing');
 assert(shellStyle.includes('transform:translateX(var(--ui-visual-left,0px))'), 'Shared application root must compensate Safari horizontal pan');
-assert(keyboardStyle.includes('.v2-layer--bottom{\\n  bottom:0;'.replace('\\n', '\n')), 'X white surface must stay attached to bottom under keyboard');
+assert(keyboardStyle.includes('.v2-layer--bottom{\\n  bottom:0;'.replace('\\n', '\n')), 'X inner surface must stay attached to bottom under keyboard');
 assert(keyboardStyle.includes('padding-bottom:calc(20px + var(--ui-keyboard-inset))'), 'X contents must remain above keyboard');
 assert(!modalPortal.includes('node.contains(document.activeElement)'), 'Per-modal focus blur override is forbidden');
 
