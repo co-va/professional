@@ -245,7 +245,9 @@ export function recordConfirmationMiniCard({
       rightValue: String(item?.right || item?.costText || ''),
     }));
     const card = miniCard({
-      className: 'record-confirmation-mini-card record-confirmation-mini-card--viewer',
+      className: 'record-confirmation-mini-card record-confirmation-mini-card--viewer'
+        + (serviceSettings && repeat ? ' record-confirmation-mini-card--two-actions'
+          : serviceSettings || repeat ? ' record-confirmation-mini-card--one-action' : ''),
       lines: [
         { value: workplace, variant: 'primary' },
         { value: [date, period].filter(Boolean).join(' · '), variant: 'moment' },
@@ -265,7 +267,7 @@ export function recordConfirmationMiniCard({
       } : null,
     });
     return `<div class="record-confirmation-view"><div class="record-confirmation-view__card"><div class="record-confirmation-view__paper">${card}${repeat
-      ? '<button type="button" class="record-confirmation-view__repeat" data-record-view-repeat aria-label="Повторить запись">↻</button>'
+      ? `<button type="button" class="record-confirmation-view__repeat${serviceSettings ? '' : ' record-confirmation-view__repeat--solo'}" data-record-view-repeat aria-label="Повторить запись">↻</button>`
       : ''}</div></div></div>`;
   }
   const serviceRows = (Array.isArray(procedures) ? procedures : []).map((item = {}) => v2ListEntry({
