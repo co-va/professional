@@ -8,7 +8,14 @@ assert.ok(start >= 0 && end > start, 'One shared movement editor must exist');
 const editorSource = inventory.slice(start, end);
 assert.doesNotMatch(inventory, /function openMovementKind\(/, 'No obsolete action-button menu');
 assert.match(inventory, /addEventListener\('click', \(\) => openMovementEditor\(root, '', ''\)\)/, 'Plus opens one shared form');
-assert.match(editorSource, /name: 'movementKind'/, 'Operation is selected inside the form');
+assert.match(editorSource, /name: 'movementKind'/, 'Operation selector in Q1');
+assert.match(editorSource, /\[data-v2-q-header-content\]/, 'Header is the operation selector owner');
+assert.match(editorSource, /data-inventory-movement-v/, 'V filter in Q1 header');
+assert.match(editorSource, /value: 'ADJUSTMENT', label: 'Инвентаризация'/, 'Stocktake is offered in the selector');
+assert.match(editorSource, /title: movementTitle\(\{ kind: actualKind \}\)/, 'Q2 inherits the operation title');
+assert.match(editorSource, /openInventoryItemFilters\(selectionLayer/, 'Movement filter reuses the common stock filter');
+assert.doesNotMatch(editorSource, /title: 'Количество'/, 'No generic count heading');
+assert.doesNotMatch(editorSource, /Убрано пустых тюбиков/, 'Ordinary consumption does not demand empty tube counts');
 assert.match(inventory, /id: 'inventory', label: 'Инвентаризация'/, 'Stocktake remains under Stock');
 assert.doesNotMatch(editorSource, /function movementEditorRow\(|searchableSelect\(/, 'No obsolete per-item dropdown forms');
 assert.ok(editorSource.indexOf('data-inventory-movement-selection') < editorSource.indexOf('data-inventory-movement-row'), 'Select items before quantities');
@@ -25,12 +32,18 @@ for (const kind of ['RECEIPT', 'CONSUMPTION', 'WRITE_OFF', 'RETURN']) {
   let second;
   let created;
   let quantityMarkup = '';
+  let selectionMarkup = '';
+  let headerMarkup = '';
+  let openedFilter = false;
+  const header = { innerHTML: '' };
+  const vButton = { addEventListener(name, fn) { this[name] = fn; } };
   const form = {
     addEventListener(name, fn) { this[name] = fn; },
     querySelectorAll() {
       return [{
         dataset: { itemId: 'A', rowDirection: '' },
-        querySelector: selector => selector.includes('quantity') ? { value: '7' } : { value: '2' },
+        querySelector: selector => selector.includes('quantity') ? { value: '7' }
+          : kind === 'CONSUMPTION' ? null : { value: '2' },
       }];
     },
   };
@@ -39,17 +52,25 @@ for (const kind of ['RECEIPT', 'CONSUMPTION', 'WRITE_OFF', 'RETURN']) {
   const deps = {
     getInventoryMovement: () => null,
     select: () => '<operation-selector>',
+    canUseCapability: () => true,
+    inventoryAuditFilters: () => [],
+    openSharedProfileSettingsMenu: data => data.actions[0].onSelect(),
+    openInventoryItemFilters: () => { openedFilter = true; },
+    openInventoryAuditSelection: () => {},
     getInventoryItems: () => [item],
     getInventoryItem: () => item,
     movementTitle: value => value.kind,
     stockSearchField: () => '<search>',
     actionBlock: value => value,
     button: value => '<button>' + value + '</button>',
-    modal: value => value,
+    modal: (value, options = {}) => `[title=${options.title || ''}]${value}`,
     mountModal: (root, markup) => {
       if (!first) {
+        selectionMarkup = markup;
         first = {
-          querySelector: selector => selector.includes('choices') ? nodes.choices
+          querySelector: selector => selector.includes('q-header-content') ? header
+            : selector.includes('movement-v') ? vButton
+              : selector.includes('choices') ? nodes.choices
             : selector.includes('search') ? nodes.search
               : selector.includes('count') ? nodes.count : nodes.next,
           addEventListener(name, fn) { this[name] = fn; },
@@ -85,6 +106,12 @@ for (const kind of ['RECEIPT', 'CONSUMPTION', 'WRITE_OFF', 'RETURN']) {
     `const { ${Object.keys(deps).join(',')} } = deps; ${editorSource}; return openMovementEditor;`)(deps);
 
   open({}, '', '');
+  headerMarkup = header.innerHTML;
+  assert.match(headerMarkup, /<operation-selector>/, `${kind}: selector in Q1 header`);
+  assert.doesNotMatch(selectionMarkup, /<operation-selector>/, `${kind}: operation selector never in body`);
+  assert.match(headerMarkup, /data-inventory-movement-v/, `${kind}: V filter in header`);
+  vButton.click();
+  assert.equal(openedFilter, true, `${kind}: filter available in Q1`);
   assert.equal(nodes.choices.innerHTML, '', `${kind}: no items before selecting operation`);
   assert.equal(nodes.next.disabled, true, `${kind}: disabled without operation`);
   first.change({ target: { matches: selector => selector === 'input[name="movementKind"]', value: kind } });
@@ -93,15 +120,21 @@ for (const kind of ['RECEIPT', 'CONSUMPTION', 'WRITE_OFF', 'RETURN']) {
   first.change({ target: { closest: () => ({ checked: true, dataset: { inventoryMovementItem: 'A' } }) } });
   assert.equal(nodes.next.disabled, false, `${kind}: selected material allows advancing`);
   nodes.next.click();
-  assert.match(quantityMarkup, /Количество, г/, `${kind}: correct unit`);
+  assert.match(quantityMarkup, /<field>г<\/field>/, `${kind}: unit next to numeric input`);
+  assert.match(quantityMarkup, new RegExp(`\\[title=${kind}\\]`), `${kind}: Q2 title inherits operation`);
+  assert.ok(quantityMarkup.indexOf('Основание прихода') >= 0 || kind !== 'RECEIPT');
+  assert.ok(quantityMarkup.indexOf('Примечание') >= 0 || kind !== 'CONSUMPTION');
+  assert.ok(quantityMarkup.indexOf('<field>') < quantityMarkup.indexOf('Краска'), `${kind}: note is before material list`);
+  if (kind === 'CONSUMPTION') assert.doesNotMatch(quantityMarkup, /Тюбиков выбыло/, 'Quick consumption needs grams only');
   assert.doesNotMatch(quantityMarkup, /value="0"/, `${kind}: no invented initial quantity`);
   await form.submit({ preventDefault() {} });
   assert.equal(created?.kind, kind);
   assert.equal(created.lines.length, 1);
   assert.equal(created.lines[0].itemId, 'A');
   assert.equal(created.lines[0].quantity, 7);
-  assert.equal(created.lines[0].containerDelta,
-    ['CONSUMPTION', 'WRITE_OFF'].includes(kind) ? -2 : 2);
+  if (kind === 'CONSUMPTION') assert.equal(created.lines[0].containerDelta, undefined,
+    'Consumption should not request tube counting');
+  else assert.equal(created.lines[0].containerDelta, kind === 'WRITE_OFF' ? -2 : 2);
   if (kind === 'RECEIPT') assert.equal(created.supplier, 'Поставщик');
   assert.equal(first.closed, true, `${kind}: close selection after save`);
   assert.equal(second.closed, true, `${kind}: close quantities after save`);
