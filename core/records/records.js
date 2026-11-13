@@ -361,6 +361,7 @@ export function openRecords({
   context = 'professional',
   record = null,
   person = null,
+  initialStep = '',
   workplaceId = '',
   date = '',
   timeHint = '',
@@ -1040,7 +1041,10 @@ export function openRecords({
 
     if (state.recordId) {
       state.correcting = true;
-      renderCorrectionMenu();
+      // Gear → add service keeps existing services/prices intact; it opens
+      // the existing Record service selector instead of a second editor.
+      if (initialStep === 'procedures') renderProcedures();
+      else renderCorrectionMenu();
       return;
     }
 
