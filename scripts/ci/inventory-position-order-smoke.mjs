@@ -18,24 +18,40 @@ const rows = [
   { itemId: '3', manufacturer: 'CHI', name: '10', position: 0 },
 ];
 assert.deepEqual(rows.sort(compare).map(row => row.itemId), ['2', '3', '1'],
-  'Existing 256-product catalog receives natural automatic order');
-rows.find(row => row.itemId === '1').position = 1;
-rows.find(row => row.itemId === '2').position = 2;
-rows.find(row => row.itemId === '3').position = 3;
-assert.deepEqual(rows.sort(compare).map(row => row.itemId), ['1', '2', '3'],
-  'Explicit order is used on every subsequent load');
-assert.match(source, /itemsSort: \['position-asc'/, 'Manual order remains an available sorting mode');
-assert.match(source, /itemsSort = firstPositionSort \? 'position-asc'/, 'One-time sort preference migration');
-assert.match(source, /const ordinals = new Map\(/, 'List numbers computed without N-squared sorting');
-assert.match(source, /title: `\$\{ordinals\.get\(item\.itemId\)\} · \$\{item\.name\}`/, 'Compact ordinal displayed in stock row');
-assert.match(source, /field\(\{ label: '№', name: 'position'/, 'Compact ordinal is in the existing Marking fields');
-assert.match(source, /columns: 3, ariaLabel: 'Порядок, артикул и штрихкод'/, 'Position, SKU and barcode share one row');
-assert.doesNotMatch(source, /function openInventoryPositionEditor\(/, 'No extra position dialog');
-assert.doesNotMatch(source, /id: 'order', label: 'Порядок'/, 'No new V-menu command');
-assert.match(source, /\.sort\(inventoryPositionComparator\)/, 'Position comparator reused throughout inventory');
-assert.match(source, /inventoryAuditScope[\s\S]*?sort\(inventoryPositionComparator\)/, 'Stocktake respects ordering');
-assert.match(source, /getInventoryItems\(\)[\s\S]*?\.sort\(inventoryPositionComparator\)/, 'Material selection respects ordering');
-assert.match(source, /await moveInventoryItem\(item\.itemId, requestedPosition\)/, 'Marking field persists requested order with the atomic move endpoint');
-assert.match(service, /export async function moveInventoryItem/, 'Frontend service uses Core atomic move');
-assert.match(service, /\/items\/\$\{encodeURIComponent\(String\(itemId \|\| ''\)\)\}\/move/, 'No local-only order persistence');
-console.log('PASS: canonical inventory position order and one-step move, reused across screens');
+  'Without numbers, names are a fallback but no ordinal is assigned');
+assert.ok(rows.every(row => row.position === 0), 'Unassigned positions stay unassigned');
+rows.find(row => row.itemId === '1').position = 18;
+rows.find(row => row.itemId === '3').position = 4;
+assert.deepEqual(rows.sort(compare).map(row => row.itemId), ['3', '1', '2'],
+  'Only explicitly numbered goods lead the list');
+assert.equal(rows.find(row => row.itemId === '2').position, 0,
+  'Changing one item never changes the unnumbered item');
+assert.match(source, /itemsSort: \['position-asc'/, 'Manual order is available');
+assert.match(source, /positionSortVersion !== 2/, 'Manual order becomes default after migration');
+assert.match(source, /value: Number\(item\.position\) > 0 \? item\.position : ''/,
+  'Marking number is blank unless assigned by user');
+assert.match(source, /field\(\{ label: '№', name: 'position'/,
+  'Small number field shares Marking row');
+assert.match(source, /columns: 3, ariaLabel: 'Порядок, артикул и штрихкод'/,
+  'Marking stays in one row');
+assert.match(source, /position: requestedPosition/,
+  'Only the edited item receives the exact specified number');
+assert.match(source, /requestedPositionText === '' \? 0 : Number\(requestedPositionText\)/,
+  'Clearing the input clears the ordering number');
+assert.match(source, /await updateInventoryItem\(item\.itemId, value\)/,
+  'Number is saved with normal product update');
+assert.doesNotMatch(source, /moveInventoryItem|inventoryItemPosition\(/,
+  'No artificial numbering or automatic movement');
+assert.doesNotMatch(source, /const ordinals = new Map\(/,
+  'Stock list never generates fake sequential numbers');
+assert.match(source, /title: `\$\{Number\(item\.position\) > 0 \? `\$\{item\.position\} · ` : ''\}\$\{item\.name\}`/,
+  'Stock row displays only user-assigned number');
+assert.match(source, /inventoryAuditScope[\s\S]*?sort\(inventoryPositionComparator\)/,
+  'Inventory count follows manual order');
+assert.match(source, /getInventoryItems\(\)[\s\S]*?\.sort\(inventoryPositionComparator\)/,
+  'Movement selection follows manual order');
+assert.doesNotMatch(source, /function openInventoryPositionEditor\(/, 'No extra editor');
+assert.doesNotMatch(source, /id: 'order', label: 'Порядок'/, 'No extra V menu');
+assert.doesNotMatch(service, /moveInventoryItem|\/items\/.*\/move/,
+  'No action that renumbers hundreds of products');
+console.log('PASS: blank until assigned, explicit number sorting, no mass renumbering');
