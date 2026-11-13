@@ -15,6 +15,7 @@ import {
   miniCardRail,
   modal,
   mountModal,
+  openNotice,
   mountV2ZLayer,
   page,
   setSharedProfilePrimary,
@@ -31,7 +32,7 @@ import { setSharedActionVisible } from '../../../ui/page/page.js';
 import { productEditorSignature, rebaseWorkplaceAssignmentSignature } from '../editor-signature.js';
 import { scheduleServiceStatistics, serviceItemStatistics } from '../statistics.js';
 import { productCardAppearance, productCardFields, productCardPhoto } from '../card-presentation.js';
-import { commitDeleteProduct, getProducts, reorderProducts, commitProduct, commitProductWorkplace } from './data.js';
+import { commitDeleteProduct, getProducts, commitReorderProducts, commitProduct, commitProductWorkplace } from './data.js';
 
 const money = (value) => `${new Intl.NumberFormat('ru-RU').format(Number(value || 0))} ₽`;
 
@@ -78,9 +79,11 @@ export function renderProductCatalog(host, { root = host, onChanged = () => {} }
   });
 
   return initV2ListReorder(host, {
-    onReorder: (ids) => {
-      if (reorderProducts(ids)) onChanged();
-    },
+    onReorder: (ids) => commitReorderProducts(ids),
+    onError: (error) => openNotice({
+      title: 'Порядок',
+      message: error instanceof Error ? error.message : 'Не удалось сохранить порядок товаров.',
+    }),
   });
 }
 
