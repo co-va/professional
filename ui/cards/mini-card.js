@@ -51,9 +51,14 @@ function recordMarkup(layout = {}, { className = '', aria = '' } = {}) {
   const entries = Array.isArray(layout.services) ? layout.services : [];
   const details = Array.isArray(layout.details) ? layout.details : [];
   const personHeader = layout.headerMode === 'person';
-  return `<section class="mini-card mini-card--record${personHeader ? ' mini-card--record-person' : ''}${className ? ` ${escapeHtml(className)}` : ''}" aria-label="${escapeHtml(aria || 'Данные записи')}">
+  const showLeft = Boolean(layout.leftAction?.data && layout.leftAction?.label);
+  const showRight = Boolean(layout.rightAction?.data && layout.rightAction?.label);
+  const topLayout = personHeader
+    ? `${showLeft ? '' : ' mini-card__record-top--no-left'}${showRight ? '' : ' mini-card__record-top--no-right'}`
+    : '';
+  return `<section class="mini-card mini-card--record${personHeader ? ' mini-card--record-person' : ''}${personHeader && !showLeft ? ' mini-card--record-no-left' : ''}${className ? ` ${escapeHtml(className)}` : ''}" aria-label="${escapeHtml(aria || 'Данные записи')}">
     <div class="mini-card__record-head">
-      <div class="mini-card__record-top">
+      <div class="mini-card__record-top${topLayout}">
         ${recordActionMarkup(layout.leftAction, 'left')}
         <div class="mini-card__record-main">
           ${personHeader
@@ -67,14 +72,26 @@ function recordMarkup(layout = {}, { className = '', aria = '' } = {}) {
     <div class="mini-card__record-center" tabindex="0" role="region" aria-label="Услуги записи">
       ${[...entries, ...details].map(lineMarkup).join('')}
     </div>
-    <div class="mini-card__record-footer">
-      <div class="mini-card__record-totals">
-        <span class="mini-card__record-meta">
-          <span class="mini-card__record-duration">${escapeHtml(layout.duration || '')}</span>
-          ${layout.discount ? `<span class="mini-card__record-discount">${escapeHtml(layout.discount)}</span>` : ''}
-        </span>
-        <strong class="mini-card__record-total">${escapeHtml(layout.total || '')}</strong>
-      </div>
+    <div class="mini-card__record-footer${layout.footerLayout === 'three-column' ? ' mini-card__record-footer--triple' : ''}">
+      ${layout.footerLayout === 'three-column'
+        ? `<div class="mini-card__record-stat mini-card__record-stat--duration">
+            <span class="mini-card__record-stat-label">Время</span>
+            <strong class="mini-card__record-stat-value">${escapeHtml(layout.duration || '')}</strong>
+          </div>
+          <div class="mini-card__record-stat mini-card__record-stat--discount">
+            ${layout.discount ? `<span class="mini-card__record-stat-label">Скидка</span><strong class="mini-card__record-stat-value">${escapeHtml(layout.discount)}</strong>` : ''}
+          </div>
+          <div class="mini-card__record-stat mini-card__record-stat--total">
+            <span class="mini-card__record-stat-label">Итого</span>
+            <strong class="mini-card__record-stat-value">${escapeHtml(layout.total || '')}</strong>
+          </div>`
+        : `<div class="mini-card__record-totals">
+          <span class="mini-card__record-meta">
+            <span class="mini-card__record-duration">${escapeHtml(layout.duration || '')}</span>
+            ${layout.discount ? `<span class="mini-card__record-discount">${escapeHtml(layout.discount)}</span>` : ''}
+          </span>
+          <strong class="mini-card__record-total">${escapeHtml(layout.total || '')}</strong>
+        </div>`}
     </div>
   </section>`;
 }
