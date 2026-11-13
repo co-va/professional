@@ -166,7 +166,11 @@ for (const [rule, message] of miniGeometry) assert(rule.test(mini), message);
 // Header-level "+" controls are not full-size action buttons. Their owner is
 // the Shared repeated-fields / links layout, so they must never inherit
 // the auto margins that center primary action buttons.
-assert(buttons.includes('.array-row__add,.ui-links__add{display:block;box-sizing:border-box;'), 'Compact add controls must own styling independently');
+const compactFactory = read('ui/buttons/index.js');
+assert(buttons.includes('--ui-compact-size:28px') && buttons.includes('.ui-compact-button{box-sizing:border-box;'), 'Compact must own one fixed 28px geometry');
+assert(['add','remove','info','copy'].every(kind => compactFactory.includes("kind = '" + kind + "'") || compactFactory.includes("kind: '" + kind + "'") || compactFactory.includes("'" + kind + "'")), 'Compact must support add/remove/info/copy variants');
+assert(compactFactory.includes('export function compactButton(') && compactFactory.includes('export function compactRemoveButton('), 'Shared Compact factory missing');
+assert(!inputs.includes('.ui-links--compact .link-row .remove-button') && !inputs.includes('.array-row__add{width:40px'), 'Feature styles must not own Compact geometry');
 assert(!read('ui/repeated-fields/index.js').includes("button('+',"), 'Repeated-field add must not use the full-size action factory');
 assert(!read('ui/links/index.js').includes("button('+',"), 'Links add must not use the full-size action factory');
 assert(read('ui/buttons/index.js').includes('export function compactAddButton('), 'Compact add control factory missing');

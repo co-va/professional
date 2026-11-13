@@ -1,4 +1,4 @@
-import { compactAddButton } from '../buttons/index.js';
+import { compactAddButton, compactRemoveButton } from '../buttons/index.js';
 import { escapeHtml } from '../utils/escape-html.js';
 import { select } from '../selectors/index.js';
 
@@ -21,7 +21,7 @@ function linkRow(link = {}, { compact = false } = {}) {
     : LINK_TYPES;
   return `<div class="link-row" data-link-row>${select({
     name: 'linkType', value: type, options, aria: 'Тип ссылки',
-  })}<input class="link-row__url" name="linkUrl" value="${escapeHtml(link.url || '')}" placeholder="Ссылка"><button type="button" class="remove-button" data-remove-link aria-label="Удалить ссылку">×</button></div>`;
+  })}<input class="link-row__url" name="linkUrl" value="${escapeHtml(link.url || '')}" placeholder="Ссылка">${compactRemoveButton({ data: "data-remove-link", aria: "Удалить ссылку" })}</div>`;
 }
 
 export function links({ links: values = [], name = 'links', label = '', compact = false, addInHeader = false } = {}) {

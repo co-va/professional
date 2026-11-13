@@ -1,4 +1,4 @@
-import { compactAddButton } from '../buttons/index.js';
+import { compactAddButton, compactRemoveButton } from '../buttons/index.js';
 import { phoneInput } from '../inputs/index.js';
 import { escapeHtml } from '../utils/escape-html.js';
 
@@ -57,7 +57,7 @@ function repeatedRow({ name, type, value = '', source = '', display = null, plac
   const control = action === 'add'
     ? compactAddButton({ className:'array-row__add', data:`data-repeated-add="${escapeHtml(name)}"`, aria:addLabel })
     : action === 'remove'
-      ? `<button type="button" class="remove-button" data-repeated-remove aria-label="${escapeHtml(removeLabel)}">×</button>`
+      ? `${compactRemoveButton({ data: "data-repeated-remove", aria: removeLabel })}`
       : '';
   return `<div class="array-row${action === 'none' ? ' array-row--solo' : ''}" data-repeated-row${sourceMarkup}>${inputMarkup}${control}</div>`;
 }

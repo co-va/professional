@@ -5,11 +5,11 @@
 .v2-app .photo-field__action{border-radius:0}
 .photo-cropper{display:grid;gap:16px}.photo-cropper__preview{width:min(100%,320px);aspect-ratio:1;margin:0 auto;border-radius:50%;background-size:cover;background-position:center;background-color:var(--button-secondary);box-shadow:0 0 0 1px var(--border)}.photo-cropper input[type="range"]{width:100%}
 
-.array-row__add{width:40px;min-width:40px;min-height:40px;height:40px;padding:0;font-size:22px;line-height:1}.v2-app .array-row__add{border-radius:0}
+.array-row__add{justify-self:end}
 
 .photo-field__tools{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.photo-field__tools.is-hidden{display:none}.photo-field__crop-panel[hidden]{display:none!important}.photo-field__crop-panel{padding:12px 0 2px;border-top:1px solid var(--border)}
 
-.ui-links{display:grid;gap:8px}.ui-links [data-links-list]{display:grid;gap:8px}.link-row{display:grid;grid-template-columns:minmax(96px,.8fr) minmax(0,1.5fr) 40px;gap:7px;align-items:end}.link-row .ui-select{min-width:0}.link-row__url{width:100%;min-width:0;height:var(--ui-field-height);min-height:var(--ui-field-height);max-height:var(--ui-field-height);border:1px solid var(--border);border-radius:0;padding:10px 12px;background:var(--white);color:var(--text);outline:none}.ui-links__add{width:40px;min-width:40px;height:40px;min-height:40px;padding:0;justify-self:end;font-size:22px}.v2-app .ui-links__add{border-radius:0}@media(max-width:360px){.link-row{grid-template-columns:minmax(82px,.75fr) minmax(0,1.25fr) 40px}}
+.ui-links{display:grid;gap:8px}.ui-links [data-links-list]{display:grid;gap:8px}.link-row{display:grid;grid-template-columns:minmax(96px,.8fr) minmax(0,1.5fr) var(--ui-compact-size);gap:7px;align-items:end}.link-row .ui-select{min-width:0}.link-row__url{width:100%;min-width:0;height:var(--ui-field-height);min-height:var(--ui-field-height);max-height:var(--ui-field-height);border:1px solid var(--border);border-radius:0;padding:10px 12px;background:var(--white);color:var(--text);outline:none}.ui-links__add{justify-self:end}@media(max-width:360px){.link-row{grid-template-columns:minmax(82px,.75fr) minmax(0,1.25fr) var(--ui-compact-size)}}
 
 .field input[type="range"],.ui-range input[type="range"]{-webkit-appearance:none;appearance:none;box-sizing:border-box;width:100%;min-height:32px;height:32px;border:0!important;padding:0;background:transparent;outline:none;accent-color:#111}
 .field input[type="range"]::-webkit-slider-runnable-track,.ui-range input[type="range"]::-webkit-slider-runnable-track{height:4px;border:1px solid #111;background:#111}
@@ -29,26 +29,26 @@
 
 /* Repeated contacts: compact header add control, matching the shared User profile pattern. */
 .array-group[data-repeated-add-placement="header"] .array-group__header{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:28px}
-.array-group[data-repeated-add-placement="header"] .array-group__header .array-row__add{width:28px;min-width:28px;max-width:28px;height:28px;min-height:28px;max-height:28px;border:0;border-radius:0;padding:0;display:grid;place-items:center;background:transparent;color:#111;font-size:26px;font-weight:400;line-height:1;box-shadow:none}
-.array-group[data-repeated-add-placement="header"] .array-group__header .array-row__add:active{transform:none;opacity:.55}
+
+
 .array-group[data-repeated-add-placement="header"] [data-repeated-list]{display:grid;gap:7px;min-width:0}
 .array-group[data-repeated-add-placement="header"] .array-row--solo{grid-template-columns:minmax(0,1fr)}
-.array-group[data-repeated-add-placement="header"] .array-row:not(.array-row--solo){grid-template-columns:minmax(0,1fr) 24px}
+.array-group[data-repeated-add-placement="header"] .array-row:not(.array-row--solo){grid-template-columns:minmax(0,1fr) var(--ui-compact-size)}
 /* Workplace Q: link codes align with the 60px phone prefix; add/remove actions are plain glyphs. */
 .ui-links--compact{min-width:0}
 .ui-links--compact [data-links-list]{min-width:0}
-.ui-links--compact .link-row{grid-template-columns:60px minmax(0,1fr) 24px;gap:7px;align-items:center}
+.ui-links--compact .link-row{grid-template-columns:60px minmax(0,1fr) var(--ui-compact-size);gap:7px;align-items:center}
 .ui-links--compact .link-row .ui-select{min-width:0}
 .ui-links--compact .link-row .ui-select__control{box-sizing:border-box;padding:0 15px 0 2px}
 .ui-links--compact .link-row .ui-select__selection{gap:0}
 .ui-links--compact .link-row .ui-select__value{font-size:15px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:clip}
 .ui-links--compact .link-row .ui-select__meta{display:none}
 .ui-links--compact .link-row .ui-select__chevron{right:3px;font-size:13px}
-.ui-links--compact .link-row .remove-button,.array-group[data-repeated-add-placement="header"] .array-row .remove-button{box-sizing:border-box;min-width:24px;width:24px;height:40px;min-height:40px;padding:0;border:0;border-radius:0;background:transparent;color:#ff1111;font-size:24px;font-weight:400;line-height:1}
-.ui-links--compact .link-row .remove-button:active{opacity:.55}
+
+
 .ui-links--compact[data-repeated-add-placement="header"] .array-group__header{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:28px}
-.ui-links--compact[data-repeated-add-placement="header"] .array-group__header .array-row__add{width:28px;min-width:28px;max-width:28px;height:28px;min-height:28px;max-height:28px;border:0;border-radius:0;padding:0;display:grid;place-items:center;background:transparent;color:#111;font-size:26px;font-weight:400;line-height:1;box-shadow:none}
-.ui-links--compact[data-repeated-add-placement="header"] .array-group__header .array-row__add:active{transform:none;opacity:.55}
+
+
 
 /* Reusable two-field row: keep both date controls on one line, including narrow iPhones. */
 .form-grid--two{grid-template-columns:repeat(2,minmax(0,1fr))}

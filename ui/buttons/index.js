@@ -15,9 +15,28 @@ export function button(label, { className = '', data = '', type = 'button', aria
   return `<button type="${type}" class="ui-button ${variantClass} ${className}" ${data}${aria ? ` aria-label="${escapeHtml(aria)}"` : ''}${disabled ? ' disabled' : ''}>${label}</button>`;
 }
 
-// Compact inline add controls never inherit the full-size action button family.
-export function compactAddButton({ className = '', data = '', aria = 'Добавить' } = {}) {
-  return `<button type="button" class="${escapeHtml(className)}" ${data} aria-label="${escapeHtml(aria)}">+</button>`;
+// One Compact control for inline add, remove, info, and copy actions.
+// Visual kinds are not separate button implementations.
+export function compactButton({ kind = 'add', className = '', data = '', aria = '', disabled = false } = {}) {
+  const variant = ['add', 'remove', 'info', 'copy'].includes(kind) ? kind : 'info';
+  const labels = { add: 'Добавить', remove: 'Удалить', info: 'Информация', copy: 'Скопировать' };
+  const copyIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="11" height="11" rx="2"></rect><path d="M16 8V7a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h1"></path></svg><span class="small-action-button__done" aria-hidden="true">✓</span>';
+  const glyph = variant === 'add' ? '+' : variant === 'remove' ? '×'
+    : variant === 'info' ? '<span class="small-action-button__info" aria-hidden="true">i</span>'
+    : copyIcon;
+  const legacy = variant === 'info' || variant === 'copy'
+    ? ` small-action-button small-action-button--${variant}${variant === 'copy' ? ' copy-icon-button' : ''}`
+    : '';
+  const classes = `ui-compact-button ui-compact-button--${variant}${legacy}${className ? ' ' + escapeHtml(className) : ''}`;
+  return `<button type="button" class="${classes}"${data ? ' ' + data.trim() : ''} aria-label="${escapeHtml(aria || labels[variant])}"${disabled ? ' disabled' : ''}>${glyph}</button>`;
+}
+
+export function compactAddButton(options = {}) {
+  return compactButton({ ...options, kind: 'add' });
+}
+
+export function compactRemoveButton(options = {}) {
+  return compactButton({ ...options, kind: 'remove' });
 }
 
 export function iconButton(label, { className = '', data = '', aria = label } = {}) {
@@ -25,11 +44,7 @@ export function iconButton(label, { className = '', data = '', aria = label } = 
 }
 
 export function smallActionButton({ icon = 'info', className = '', data = '', aria = '' } = {}) {
-  const kind = icon === 'copy' ? 'copy' : 'info';
-  const content = kind === 'copy'
-    ? '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="11" height="11" rx="2"></rect><path d="M16 8V7a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h1"></path></svg><span class="small-action-button__done" aria-hidden="true">✓</span>'
-    : '<span class="small-action-button__info" aria-hidden="true">i</span>';
-  return `<button type="button" class="small-action-button small-action-button--${kind}${kind === 'copy' ? ' copy-icon-button' : ''}${className ? ` ${className}` : ''}" ${data} aria-label="${escapeHtml(aria || (kind === 'copy' ? 'Скопировать' : 'Информация'))}">${content}</button>`;
+  return compactButton({ kind: icon === 'copy' ? 'copy' : 'info', className, data, aria });
 }
 
 export function copyIconButton({ data = '', aria = 'Скопировать' } = {}) {
