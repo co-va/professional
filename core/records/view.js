@@ -39,6 +39,7 @@ import {
 import { flushBusinessPersistence } from '../business-persistence.js';
 import { getNotesForTarget, hasNotesForTarget } from '../note/index.js';
 import { openProcedureAdjustment, openRecords } from './records.js';
+import { openPersonRecordCreation } from '../people/record-creation.js';
 import { getProcedures } from '../service/procedures/data.js';
 import { proceduresForWorkplace, procedureCostForWorkplace, procedureDurationForWorkplace } from '../service/procedures/selection.js';
 import { setRecordLoyaltyProgram } from './program-selection.js';
@@ -541,14 +542,16 @@ export function openRecordView(record, {
         cost: procedureCostForWorkplace(item, source.workplaceId),
         raw: item,
       }));
-    layer.v2Close?.();
-    openRecords({
-      context: 'person',
+    void openPersonRecordCreation({
       person: source.person,
       workplaceId: source.workplaceId,
       procedures: selected,
-      professionalActions: true,
-    });
+    }).then((owner) => {
+      if (owner) layer.v2Close?.();
+    }).catch((error) => openNotice({
+      title: 'Повторить запись',
+      message: String(error?.message || 'Не удалось открыть повторную запись.'),
+    }));
   };
 
   if (capabilities.settings) bindRecordSettings(layer, openActions);
@@ -623,7 +626,7 @@ export function openRecordView(record, {
       phone: capabilities.contactIdentity ? (person.phone || '') : professionalDisplay.phone,
       duration: durationText(appointmentMinutes),
       discountMoney: discountMoney > 0.009 ? formatMoney(discountMoney) : '',
-      total: readOnlyHistory ? '—' : formatMoney(Number(settlement?.planTotal) || grossTotal),
+      total: readOnlyHistory ? '—' : formatMoney(settlement?.planTotal == null ? grossTotal : Math.max(0, Number(settlement.planTotal) || 0)),
       procedures: [
         ...procedures.map((item) => {
           const financeItem = settlementByProcedure.get(String(item?.id || ''));
