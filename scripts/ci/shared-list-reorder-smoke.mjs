@@ -115,11 +115,11 @@ function setup(onReorder = async()=>{}) {
   const t=setup();
   t.listeners.pointerdown(t.event(t.A.handle,10));
   assert.deepEqual(t.order(),['a','b','c']);
-  t.listeners.pointermove(t.event(t.A.handle,195));
+  t.listeners.pointermove(t.event(t.A.handle,215));
   assert.deepEqual(t.order(),['a','b','c'], 'Moving a captured node never mutates DOM');
   assert.equal(t.moveCount(),0,'No layout moves during pointermove');
   assert.ok(t.A.style.properties['--list-entry-drag-y'],'Dragged row gets transform only');
-  t.listeners.pointerup(t.event(t.A.handle,195));
+  t.listeners.pointerup(t.event(t.A.handle,215));
   assert.deepEqual(t.order(),['b','c','a'], 'Drop commits at pointerup');
   assert.equal(t.moveCount(),1,'Exactly one DOM move for entire gesture');
   await Promise.resolve();
@@ -141,8 +141,8 @@ function setup(onReorder = async()=>{}) {
 {
   const t=setup(async()=>{throw Error('Network failed');});
   t.listeners.pointerdown(t.event(t.A.handle,10));
-  t.listeners.pointermove(t.event(t.A.handle,195));
-  t.listeners.pointerup(t.event(t.A.handle,195));
+  t.listeners.pointermove(t.event(t.A.handle,215));
+  t.listeners.pointerup(t.event(t.A.handle,215));
   await Promise.resolve();await Promise.resolve();await Promise.resolve();await Promise.resolve();
   assert.deepEqual(t.order(),['a','b','c'], 'Failed persistence restores original DOM order');
   t.destroy();
