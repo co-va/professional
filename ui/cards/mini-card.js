@@ -40,24 +40,29 @@ function recordActionMarkup(action, side) {
   if (!action?.data || !action?.label) {
     return '<span class="mini-card__record-action-placeholder" aria-hidden="true"></span>';
   }
-  return `<button type="button" class="mini-card__record-action mini-card__record-action--${side}"${attrs(action.data, action.aria || action.label)}>${escapeHtml(action.label)}</button>`;
+  const variant = action.variant === 'secondary' ? ' mini-card__record-action--secondary' : '';
+  const content = action.icon === 'settings'
+    ? '<svg class="mini-card__record-action-icon" viewBox="0 0 24 24" width="23" height="23" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.5 2.5h3l.6 2.2 2.1.9 2-.9 2.1 2.1-.9 2 .9 2.1 2.2.6v3l-2.2.6-.9 2.1.9 2-2.1 2.1-2-.9-2.1.9-.6 2.2h-3l-.6-2.2-2.1-.9-2 .9-2.1-2.1.9-2-.9-2.1-2.2-.6v-3l2.2-.6.9-2.1-.9-2 2.1-2.1 2 .9 2.1-.9Z"/><circle cx="12" cy="12" r="3"/></svg>'
+    : escapeHtml(action.label);
+  return `<button type="button" class="mini-card__record-action mini-card__record-action--${side}${variant}"${attrs(action.data, action.aria || action.label)}>${content}</button>`;
 }
 
 function recordMarkup(layout = {}, { className = '', aria = '' } = {}) {
   const entries = Array.isArray(layout.services) ? layout.services : [];
   const details = Array.isArray(layout.details) ? layout.details : [];
-  return `<section class="mini-card mini-card--record${className ? ` ${escapeHtml(className)}` : ''}" aria-label="${escapeHtml(aria || 'Данные записи')}">
+  const personHeader = layout.headerMode === 'person';
+  return `<section class="mini-card mini-card--record${personHeader ? ' mini-card--record-person' : ''}${className ? ` ${escapeHtml(className)}` : ''}" aria-label="${escapeHtml(aria || 'Данные записи')}">
     <div class="mini-card__record-head">
       <div class="mini-card__record-top">
         ${recordActionMarkup(layout.leftAction, 'left')}
         <div class="mini-card__record-main">
-          <strong class="mini-card__record-workplace">${escapeHtml(layout.workplace || '')}</strong>
-          <div class="mini-card__record-moment">${escapeHtml(layout.moment || '')}</div>
+          ${personHeader
+            ? `${layout.identity ? `<strong class="mini-card__record-identity">${escapeHtml(layout.identity)}</strong>` : ''}${layout.phone ? `<span class="mini-card__record-phone">${escapeHtml(layout.phone)}</span>` : ''}`
+            : `<strong class="mini-card__record-workplace">${escapeHtml(layout.workplace || '')}</strong><div class="mini-card__record-moment">${escapeHtml(layout.moment || '')}</div>`}
         </div>
         ${recordActionMarkup(layout.rightAction, 'right')}
       </div>
-      ${layout.identity ? `<div class="mini-card__record-identity">${escapeHtml(layout.identity)}</div>` : ''}
-      ${layout.phone ? `<div class="mini-card__record-phone">${escapeHtml(layout.phone)}</div>` : ''}
+      ${personHeader ? `<div class="mini-card__record-moment">${escapeHtml(layout.moment || '')}</div>` : `${layout.identity ? `<div class="mini-card__record-identity">${escapeHtml(layout.identity)}</div>` : ''}${layout.phone ? `<div class="mini-card__record-phone">${escapeHtml(layout.phone)}</div>` : ''}`}
     </div>
     <div class="mini-card__record-center" tabindex="0" role="region" aria-label="Услуги записи">
       ${[...entries, ...details].map(lineMarkup).join('')}
