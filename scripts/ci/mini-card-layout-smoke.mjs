@@ -106,7 +106,7 @@ assert.ok(css.includes('.mini-card--record-person .mini-card__record-time-start{
   'Start time must be readable');
 assert.ok(css.includes('.mini-card--record-person .mini-card__record-time-end{font-size:12px;'),
   'End time must be visually secondary');
-assert.ok(css.includes('width:min(290px,100%)') && css.includes('height:200px'),
+assert.ok(css.includes('--mini-card-width:290px;--mini-card-height:200px;') && css.includes('width:min(var(--mini-card-width),100%)'),
   'Record card geometry must remain 290 × 200');
 
 console.log('PASS: one 290×200 shared MiniCard shell for Record, services, products, loyalty history and long data');
