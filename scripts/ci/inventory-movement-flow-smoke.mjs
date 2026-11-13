@@ -68,6 +68,7 @@ for (const kind of ['RECEIPT', 'CONSUMPTION', 'WRITE_OFF', 'RETURN']) {
     openInventoryAuditSelection: () => {},
     getInventoryItems: () => [item],
     getInventoryItem: () => item,
+    inventoryPositionComparator: (a, b) => String(a.name).localeCompare(String(b.name)),
     movementTitle: value => value.kind,
     stockSearchField: () => '<search>',
     actionBlock: value => value,
