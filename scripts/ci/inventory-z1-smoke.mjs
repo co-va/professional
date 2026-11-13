@@ -38,6 +38,7 @@ const stateSource = inventory.slice(inventory.indexOf('const INVENTORY_SORT_KEY 
 const state = new Function('localStorage', stateSource + '\nreturn { STOCK_VIEW, saveInventorySortMode };');
 const first = state(localStorage);
 assert.equal(first.STOCK_VIEW.manufacturersSort, 'name-asc');
+assert.equal(first.STOCK_VIEW.itemsSort, 'position-asc', 'Manual item order becomes the default');
 first.saveInventorySortMode('manufacturersSort', 'count-desc');
 first.saveInventorySortMode('itemsSort', 'balance-asc');
 assert.equal(state(localStorage).STOCK_VIEW.manufacturersSort, 'count-desc', 'Manufacturer sort survives a fresh session');
