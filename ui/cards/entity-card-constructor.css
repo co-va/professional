@@ -101,7 +101,6 @@
 .entity-card-editor__control-label{margin:0;font-size:12px;color:var(--text-secondary)}
 .entity-card-editor__data .ui-select{display:grid;gap:5px}
 .entity-card-editor__data .ui-select>span{color:var(--text-secondary);font-size:12px}
-.entity-card-editor__data .ui-select__control{min-height:44px}
 
 .entity-card-editor__tool{border:1px solid #111;background:#fff;color:#111;font:inherit;font-size:12px;display:flex;align-items:center;justify-content:center}
 .entity-card-editor__line-picker button,

@@ -152,28 +152,25 @@ button.document-tile,.document-tile__open,.document-tile__toggle{cursor:pointer}
 .document-tile__toggle.is-on{background:var(--v2-ink,#111);border-color:var(--v2-ink,#111)}
 .document-tile__toggle.is-on span{transform:translateX(18px);background:#fff}
 .document-tile__toggle:disabled{opacity:.45;cursor:default}
-.document-viewer-backdrop{background:#111!important}
-.v2-layer--technical.document-viewer-sheet{
-  width:min(calc(100% - 28px),760px);
-  height:calc(var(--visual-vh,100dvh) - 28px);
-  max-height:calc(var(--visual-vh,100dvh) - 28px);
-  padding:54px 20px 24px;
-  overflow:auto;
-  background:#fff;
-}
+/* Documents own only their typography and content formatting.
+   Technical panel bounds, H backdrop and fixed X belong to Shared UI. */
 .document-viewer__content{
   width:100%;
-  min-height:100%;
-  background:#fff;
+  min-height:0;
+  /* The shared technical body is the ONLY scroll container. */
+  overflow:visible;
+  background:transparent;
 }
 .document-page{
-  width:min(100%,680px);
-  min-height:calc(var(--visual-vh,100dvh) - 122px);
+  width:100%;
   box-sizing:border-box;
-  margin:0 auto;
-  padding:18px 16px 42px;
-  background:#fff;
+  margin:0;
+  padding:0;
+  background:transparent;
   color:#111;
+}
+.document-viewer__content:has(.document-viewer__pdf){
+  height:100%;
 }
 .document-page__version{margin-bottom:12px;font-size:12px;color:#6f7478}
 .document-page h1{margin:0 0 24px;font-size:24px;line-height:1.15;overflow-wrap:anywhere}
@@ -183,14 +180,15 @@ button.document-tile,.document-tile__open,.document-tile__toggle{cursor:pointer}
 .document-viewer__pdf{
   display:block;
   width:100%;
-  height:calc(var(--visual-vh,100dvh) - 110px);
+  height:100%;
+  min-height:0;
   border:0;
   background:#fff;
 }
 @media(max-width:360px){
   .document-tile{width:238px}
-  .v2-layer--technical.document-viewer-sheet{width:calc(100% - 20px);height:calc(var(--visual-vh,100dvh) - 20px);max-height:calc(var(--visual-vh,100dvh) - 20px)}
 }
+
 .document-tiles--rail{
   display:flex;
   justify-items:initial;

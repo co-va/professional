@@ -49,6 +49,7 @@ const vHost = read('ui/v2/v-host.js');
 const entity = read('ui/cards/entity-card-constructor.css');
 const mini = read('ui/cards/mini-card.css');
 const list = read('ui/lists/list-entry.css');
+const documentCss = read('ui/documents/document.css');
 const buttons = read('ui/buttons/buttons.css');
 const inputs = read('ui/inputs/inputs.css');
 
@@ -114,6 +115,9 @@ assert(!modalPortal.includes('node.contains(document.activeElement)'), 'Per-moda
 // Canonical Shared components keep one geometry owner.
 assert(entity.includes('width:min(338px,100%)'), 'EntityCard width changed');
 assert(entity.includes('aspect-ratio:338/213'), 'EntityCard aspect ratio changed');
+assert(!entity.includes('.entity-card-editor__data .ui-select__control{min-height:44px}'), 'Card editor must use exact Shared selector 46px height');
+assert(!documentCss.includes('.v2-layer--technical.document-viewer-sheet') && !documentCss.includes('.document-viewer-backdrop{') && documentCss.includes('.document-viewer__content:has(.document-viewer__pdf)'), 'Document viewer must inherit the one Shared technical sheet and H backdrop');
+assert(!bookingStyle.includes('.booking-technical-modal{overflow-y:auto'), 'Guest technical modal must not become a second scrolling outer sheet');
 assert(entity.includes('grid-template-rows:repeat(9,minmax(0,1fr))'), 'EntityCard row geometry changed');
 assert(rootSelectorCount(entity, '.entity-visual-card') === 1, 'EntityCard geometry must have one owner');
 
