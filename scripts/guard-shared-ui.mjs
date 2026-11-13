@@ -76,6 +76,8 @@ assert(shellStyle.includes('--ui-field-height:46px;') && shellStyle.includes('--
 assert(inputs.includes('height:var(--ui-field-height);min-height:var(--ui-field-height);max-height:var(--ui-field-height)'), 'Shared one-line inputs must be exactly 46px');
 assert(['.ui-select__control{','.ui-selector__search{','.ui-selector__option{'].every(c=>{const q=selectorsStyle.split(c)[1]?.split('}')[0]||'';return q.includes('height:var(--ui-selector-control-height);min-height:var(--ui-selector-control-height);max-height:var(--ui-selector-control-height)')}), 'Selector rows, search and trigger must be exactly 46px');
 assert(!bookingStyle.includes('min-height:52px'), 'Booking account editor cannot use 52px controls');
+assert(bookingStyle.includes('--booking-control-radius:0px'), 'Booking text controls must match Shared square fields');
+assert(count(inputs, '.password-field__control{') === 1 && count(inputs, '.password-field__toggle{') === 1, 'Repeated password field CSS must have a single owner');
 assert(zLayout.includes('const SURFACE_HEADER_STYLE = [') && !zLayout.includes('Q_HEADER_STYLE'), 'Z/Q must have one Header geometry owner');
 assert(zLayout.includes("'padding-top:var(--v2-surface-header-spacing)'")
   && zLayout.includes("'padding-bottom:var(--v2-surface-header-spacing)'"), 'Z/Q Header top and bottom gaps must be identical');

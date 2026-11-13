@@ -4,3 +4,16 @@
 .workplace-form__visibility{min-width:0;padding:8px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
 .workplace-form__visibility .app-notification-row{min-height:48px;align-items:center;padding:0;border:0}
 .workplace-form>.ui-links--compact{margin-top:0}
+
+/* Service editor layout uses shared V2 List Entries, buttons and form controls. */
+.service-workplace-price-editor{display:grid;gap:14px;padding:8px 0}
+.service-workplace-price-editor__title{font-size:16px;font-weight:750;overflow-wrap:anywhere}
+.service-workplace-price-editor__actions{display:grid;gap:8px}
+.service-workplace-price-editor [hidden]{display:none!important}
+.service-workplace-extra{display:grid;gap:10px}
+
+/* Keep the shared secondary action on one line at phone widths. */
+.service-workplace-add-button{white-space:nowrap}
+
+/* Independent controls must never visually touch the destructive action. */
+.service-workplace-add-panel{margin-top:16px;margin-bottom:16px}
