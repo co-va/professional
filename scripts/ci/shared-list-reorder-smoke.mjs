@@ -43,6 +43,9 @@ function setup(onReorder = async()=>{}) {
   const host={
     classList:new Classes(), isConnected:true, children:[], parentElement:null,
     matches:s=>s==='.list-entries',
+    setPointerCapture:id=>{host.capturedId=id;},
+    hasPointerCapture:id=>host.capturedId===id,
+    releasePointerCapture:id=>{if(host.capturedId===id)host.capturedId=null;},
     querySelectorAll:s=>s==='[data-reorder-id]'?host.children:[],
     addEventListener:(name,fn)=>{listeners[name]=fn;},
     removeEventListener:(name,fn)=>{if(listeners[name]===fn)delete listeners[name];},
@@ -114,6 +117,7 @@ function setup(onReorder = async()=>{}) {
 {
   const t=setup();
   t.listeners.pointerdown(t.event(t.A.handle,10));
+  assert.equal(t.host.hasPointerCapture(7),true,'Stable list host captures iOS pointer');
   assert.deepEqual(t.order(),['a','b','c']);
   t.listeners.pointermove(t.event(t.A.handle,215));
   assert.deepEqual(t.order(),['a','b','c'], 'Moving a captured node never mutates DOM');
