@@ -153,11 +153,12 @@ function productTypeText(item = {}) {
 }
 
 function inventoryPositionComparator(left, right) {
-  const byManufacturer = manufacturerName(left).localeCompare(manufacturerName(right), 'ru', { numeric: true, sensitivity: 'base' });
-  if (byManufacturer) return byManufacturer;
+  // Numbering is global for the entire stock, not restarted for each manufacturer.
+  // Missing numbers remain blank and are displayed after explicitly numbered items.
   const rank = item => Number.isSafeInteger(Number(item.position)) && Number(item.position) > 0
     ? Number(item.position) : Number.MAX_SAFE_INTEGER;
   return rank(left) - rank(right)
+    || manufacturerName(left).localeCompare(manufacturerName(right), 'ru', { numeric: true, sensitivity: 'base' })
     || String(left.name || '').localeCompare(String(right.name || ''), 'ru', { numeric: true, sensitivity: 'base' })
     || String(left.itemId || '').localeCompare(String(right.itemId || ''));
 }
