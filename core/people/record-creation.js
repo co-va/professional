@@ -19,7 +19,7 @@ function actionContext() {
   };
 }
 
-export async function openPersonRecordCreation({ person, onCreated = () => {} } = {}) {
+export async function openPersonRecordCreation({ person, workplaceId = '', procedures = [], onCreated = () => {} } = {}) {
   if (!person?.key) return null;
 
   try {
@@ -35,6 +35,8 @@ export async function openPersonRecordCreation({ person, onCreated = () => {} } 
   return openRecords({
     context: 'person',
     person,
+    workplaceId,
+    procedures,
     professionalActions: true,
     actionContext: actionContext(),
     stepBack: true,
