@@ -1439,7 +1439,7 @@ function openInventoryAuditCriteria(root, { mode, ids = [], onSaved = () => {} }
         const raw = String(data.get(`auditPosition-${index}`) ?? '').trim();
         if (!raw) continue;
         const value = Number(raw);
-        if (!/^\\d+$/.test(raw) || !Number.isSafeInteger(value) || value < 1 || value > 2147483647) {
+        if (!/^\d+$/.test(raw) || !Number.isSafeInteger(value) || value < 1 || value > 2147483647) {
           status.textContent = `Укажите целый положительный № для «${item.name}».`;
           return;
         }
