@@ -34,6 +34,7 @@
 .mini-card__record-action{border:0;border-radius:10px;display:grid;place-items:center;padding:0;background:#111;color:#fff;font:inherit;font-size:23px;line-height:1;cursor:pointer}
 .mini-card__record-action:active{transform:translateY(1px)}
 .mini-card__record-action:focus-visible{outline:2px solid #111;outline-offset:2px}
+.mini-card__record-main{min-width:0;display:grid;align-content:center;gap:2px}
 .mini-card__record-workplace{min-width:0;font-size:14px;font-weight:800;line-height:1.15;text-align:center;overflow-wrap:anywhere}
 .mini-card__record-moment{font-size:12px;line-height:14px;white-space:nowrap;text-align:center;font-variant-numeric:tabular-nums;letter-spacing:-.1px}
 .mini-card__record-identity{min-width:0;font-size:12px;font-weight:700;line-height:14px;overflow-wrap:anywhere}
@@ -45,7 +46,8 @@
 .mini-card__record-center .mini-card__line-text{min-width:0}
 .mini-card__record-center .mini-card__line-right{font-size:12px;font-weight:750;white-space:nowrap;text-align:right}
 .mini-card__record-footer{display:grid;gap:1px;min-width:0;border-top:1px solid #111;padding-top:4px}
-.mini-card__record-discount{font-size:11px;line-height:13px;color:#595959}
-.mini-card__record-totals{display:flex;justify-content:space-between;align-items:center;gap:8px;min-height:22px}
+.mini-card__record-meta{min-width:0;display:grid;align-content:center;gap:1px}
+.mini-card__record-discount{display:block;min-width:0;overflow-wrap:anywhere;font-size:11px;line-height:13px;color:#595959}
+.mini-card__record-totals{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px;min-height:22px}
 .mini-card__record-duration{font-size:12px;line-height:14px;white-space:nowrap}
 .mini-card__record-total{font-size:18px;font-weight:850;line-height:22px;white-space:nowrap;text-align:right}
