@@ -37,4 +37,40 @@ assert.match(paired, /mini-card__line--pair/);
 assert.match(paired, /mini-card__line--moment/);
 assert.match(paired, /mini-card__line-right/);
 assert.match(js, /const hasCompactAction = Boolean/, 'User shared compact-action semantics must be used');
+
+const paidViewerLayout = {
+  headerMode: 'person',
+  identity: '0050 Ира',
+  phone: '+7 903 000-84-37',
+  moment: '21.10.26 · 12:00–16:00',
+  services: [{value: 'Стрижка · 1 ч', rightValue: '9 000 ₽'}, {value:'Окраска · 2 ч', rightValue: '9 000 ₽'}],
+  duration: '4 ч',
+  discount: '2 000 ₽',
+  total: '25 000 ₽',
+  footerLayout: 'three-column',
+  rightAction: { label: '↻', data: 'data-record-view-repeat' },
+};
+const paidViewer = miniCard({ recordLayout: paidViewerLayout });
+const editableViewer = miniCard({ recordLayout: {
+  ...paidViewerLayout,
+  leftAction: { label: 'Услуги', icon: 'settings', variant: 'secondary', data: 'data-record-view-service-settings' },
+} });
+assert.ok(paidViewer.includes('mini-card--record-no-left'), 'Paid viewer must reclaim left action slot');
+assert.ok(paidViewer.includes('mini-card__record-top--no-left'));
+assert.ok(paidViewer.includes('mini-card__record-action-placeholder--left'));
+assert.ok(!paidViewer.includes('data-record-view-service-settings'));
+assert.ok(editableViewer.includes('mini-card__record-action--secondary'));
+assert.ok(editableViewer.includes('data-record-view-service-settings'));
+assert.ok(!editableViewer.includes('mini-card--record-no-left'));
+assert.ok(paidViewer.includes('mini-card__record-footer--triple'));
+for(const [label,value] of [['Время','4 ч'],['Скидка','2 000 ₽'],['Итого','25 000 ₽']]){
+  assert.ok(paidViewer.includes('mini-card__record-stat-label">' + label + '</span>'), 'Stat label ' + label);
+  assert.ok(paidViewer.includes('mini-card__record-stat-value">' + value + '</strong>'), 'Stat value ' + value);
+}
+assert.equal(paidViewer.split('>Скидка</span>').length - 1, 1, 'Discount label cannot duplicate');
+assert.ok(css.includes('.mini-card__record-stat-value{font-size:16px;line-height:20px;font-weight:800'));
+assert.ok(css.includes('.mini-card--record-person .mini-card__record-top--no-left{grid-template-columns:minmax(0,1fr) 44px}'));
+assert.ok(css.includes('.mini-card__record-footer--triple{grid-template-columns:'));
+assert.ok(paidViewer.includes('Стрижка · 1 ч') && paidViewer.includes('Окраска · 2 ч'));
+
 console.log('PASS: User MiniCard markup and fixed base geometry, Professional labels, rounded corners and variable-height line variant');
