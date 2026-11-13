@@ -28,12 +28,14 @@ assert.match(source, /itemsSort: \['position-asc'/, 'Manual order remains an ava
 assert.match(source, /itemsSort = firstPositionSort \? 'position-asc'/, 'One-time sort preference migration');
 assert.match(source, /const ordinals = new Map\(/, 'List numbers computed without N-squared sorting');
 assert.match(source, /title: `\$\{ordinals\.get\(item\.itemId\)\} · \$\{item\.name\}`/, 'Compact ordinal displayed in stock row');
-assert.match(source, /function openInventoryPositionEditor\(/, 'Small move-to-position editor');
-assert.match(source, /id: 'order', label: 'Порядок'/, 'Move action available in existing V menu');
+assert.match(source, /field\(\{ label: '№', name: 'position'/, 'Compact ordinal is in the existing Marking fields');
+assert.match(source, /columns: 3, ariaLabel: 'Порядок, артикул и штрихкод'/, 'Position, SKU and barcode share one row');
+assert.doesNotMatch(source, /function openInventoryPositionEditor\(/, 'No extra position dialog');
+assert.doesNotMatch(source, /id: 'order', label: 'Порядок'/, 'No new V-menu command');
 assert.match(source, /\.sort\(inventoryPositionComparator\)/, 'Position comparator reused throughout inventory');
 assert.match(source, /inventoryAuditScope[\s\S]*?sort\(inventoryPositionComparator\)/, 'Stocktake respects ordering');
 assert.match(source, /getInventoryItems\(\)[\s\S]*?\.sort\(inventoryPositionComparator\)/, 'Material selection respects ordering');
-assert.match(source, /moveInventoryItem\(itemId, position\)/, 'One move changes the whole manufacturer order');
+assert.match(source, /await moveInventoryItem\(item\.itemId, requestedPosition\)/, 'Marking field persists requested order with the atomic move endpoint');
 assert.match(service, /export async function moveInventoryItem/, 'Frontend service uses Core atomic move');
 assert.match(service, /\/items\/\$\{encodeURIComponent\(String\(itemId \|\| ''\)\)\}\/move/, 'No local-only order persistence');
 console.log('PASS: canonical inventory position order and one-step move, reused across screens');
