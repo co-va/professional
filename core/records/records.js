@@ -903,7 +903,7 @@ export function openRecords({
       ...(identityNameParts.length
         ? identityNameParts
         : [String(personInfo.name || '').trim()].filter((value) => value && value !== 'Без имени')),
-    ].filter(Boolean).join('; ');
+    ].filter(Boolean).join(' ');
     const card = recordConfirmationMiniCard({
       workplace: source.workplaceName(state.workplaceId),
       contactDiscount: contactDiscountPercent > 0 ? `${contactDiscountPercent}%` : '',
@@ -913,7 +913,7 @@ export function openRecords({
       phone: personInfo.phone || '',
       duration: durationText(totalDuration(state.procedures)),
       discountMoney: discountMoney > 0.009 ? formatMoney(discountMoney) : '',
-      total: formatMoney(grossTotal),
+      total: formatMoney(settlement?.planTotal == null ? grossTotal : Math.max(0, Number(settlement.planTotal) || 0)),
       procedures: state.procedures.map((entry) => ({
         name: entry.name,
         durationText: durationText(entry.duration),
