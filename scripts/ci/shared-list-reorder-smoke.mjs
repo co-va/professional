@@ -143,7 +143,7 @@ function setup(onReorder = async()=>{}) {
   t.listeners.pointerdown(t.event(t.A.handle,10));
   t.listeners.pointermove(t.event(t.A.handle,215));
   t.listeners.pointerup(t.event(t.A.handle,215));
-  await Promise.resolve();await Promise.resolve();await Promise.resolve();await Promise.resolve();
+  for (let attempt=0; attempt<12; attempt++) await Promise.resolve();
   assert.deepEqual(t.order(),['a','b','c'], 'Failed persistence restores original DOM order');
   t.destroy();
 }
