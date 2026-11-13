@@ -24,12 +24,24 @@ const expanded = miniCard({ title: 'Пространство', rows: Array.from(
   label: 'Строка ' + i, value: 'Значение ' + i,
 })) });
 assert.equal((expanded.match(/class="mini-card__row"/g) || []).length, 12, 'Markup retains all supplied rows; the fixed User paper height is unchanged');
-assert.match(css, /\.mini-card\{[^}]*--mini-card-width:238px;[^}]*max-width:var\(--mini-card-width\)/,
-  'Paper width must remain 238px');
-assert.match(css, /\.mini-card:has\(>\.mini-card__rows\):not\(\.mini-card--lines\)\s*\{[^}]*height:auto;[^}]*max-height:none;/,
-  'Regular MiniCard factual rows must grow vertically');
-assert.match(css, /\.mini-card--lines\{height:auto;min-height:176px;max-height:none;/,
-  'Extended line MiniCards retain their existing variable height');
+assert.match(css, /\.mini-card\{--mini-card-width:290px;--mini-card-height:200px;/, 'Every MiniCard has the approved fixed 290 × 200 geometry');
+assert.ok(css.includes('grid-template-rows:auto minmax(0,1fr) auto'), 'All MiniCards share fixed header, scroll centre, fixed footer');
+assert.ok(css.includes('.mini-card__record-center{min-height:0;min-width:0;overflow-y:auto'), 'Only the center owns vertical scroll');
+assert.doesNotMatch(css, /238px|144px|176px/, 'Alternative MiniCard dimensions must never return');
+assert.equal((css.match(/\.mini-card\{/g) || []).length, 1, 'MiniCard geometry must have one CSS owner');
+const examples = [
+  card,
+  expanded,
+  miniCard({title:'История',value:'9 000 ₽',subtitle:'21.10.26',interactive:true,data:'data-history'}),
+  miniCard({lines:[{value:'Окраска',rightValue:'9 000 ₽'}]}),
+];
+for (const html of examples) {
+  assert.equal((html.match(/data-mini-card-ui="shared"/g) || []).length, 1, 'All formats must use one mini-card renderer');
+  for (const zone of ['head','center','footer']) {
+    assert.equal((html.match(new RegExp('class="mini-card__record-' + zone + '"','g')) || []).length, 1,
+      'Every format must have exactly one shared ' + zone + ' zone');
+  }
+}
 assert.match(css, /\.mini-card\{[^}]*border-radius:16px;/, 'User-rounded card geometry must be retained');
 
 const paired = miniCard({ lines: [{ value: 'Запись', rightValue: '1 500 ₽', variant: 'moment' }] });
@@ -97,4 +109,4 @@ assert.ok(css.includes('.mini-card--record-person .mini-card__record-time-end{fo
 assert.ok(css.includes('width:min(290px,100%)') && css.includes('height:200px'),
   'Record card geometry must remain 290 × 200');
 
-console.log('PASS: User MiniCard markup and fixed base geometry, Professional labels, rounded corners and variable-height line variant');
+console.log('PASS: one 290×200 shared MiniCard shell for Record, services, products, loyalty history and long data');
