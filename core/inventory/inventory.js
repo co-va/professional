@@ -859,6 +859,53 @@ function stockSortOptions(level) {
   ];
 }
 
+function openInventoryPositionEditor(root, manufacturer, onSaved = () => {}) {
+  const items = getInventoryItems().filter(item => manufacturerName(item) === manufacturer)
+    .sort(inventoryPositionComparator);
+  if (!items.length) return;
+  const options = [
+    { value: '', label: 'Выбрать материал' },
+    ...items.map((item, index) => ({ value: item.itemId, label: `${index + 1} · ${item.name}` })),
+  ];
+  const markup = `<form class="form-grid" data-inventory-position-form>
+    ${select({ label: 'Материал', name: 'orderItem', options, searchable: true })}
+    ${field({ label: 'Переместить на №', name: 'orderPosition', type: 'number',
+      placeholder: `1–${items.length}`, min: '1', max: String(items.length), step: '1', inputmode: 'numeric' })}
+    <p class="form-error" role="alert" data-inventory-position-error></p>
+    ${actionBlock(button('Переместить', { type: 'submit', data: 'data-inventory-position-save' }))}
+  </form>`;
+  const layer = mountModal(root, modal(markup, { title: 'Порядок', variant: 'q' }));
+  if (!layer) return;
+  const form = layer.querySelector('[data-inventory-position-form]');
+  const fieldInput = form?.querySelector('input[name="orderPosition"]');
+  const error = layer.querySelector('[data-inventory-position-error]');
+  const submit = layer.querySelector('[data-inventory-position-save]');
+  const selectInput = form?.querySelector('input[name="orderItem"]');
+  selectInput?.addEventListener('change', () => {
+    const index = items.findIndex(item => item.itemId === selectInput.value);
+    if (fieldInput) fieldInput.value = index >= 0 ? String(index + 1) : '';
+  });
+  form?.addEventListener('submit', async event => {
+    event.preventDefault();
+    const itemId = selectInput?.value || '';
+    const position = Number(fieldInput?.value);
+    if (!itemId || !Number.isSafeInteger(position) || position < 1 || position > items.length) {
+      error.textContent = 'Выберите материал и место в списке.';
+      return;
+    }
+    submit.disabled = true;
+    error.textContent = '';
+    try {
+      await moveInventoryItem(itemId, position);
+      layer.v2Close?.();
+      onSaved();
+    } catch (cause) {
+      error.textContent = cause instanceof Error ? cause.message : 'Не удалось изменить порядок.';
+      submit.disabled = false;
+    }
+  });
+}
+
 function openStockControls(trigger, level, manufacturer, onChange, mode = 'sort') {
   const sortKey = level === 'manufacturers' ? 'manufacturersSort' : 'itemsSort';
   const typeKey = level === 'manufacturers' ? 'manufacturersType' : 'itemsType';
@@ -977,6 +1024,7 @@ function openManufacturerStock(root, manufacturer) {
             if (sample) openInventoryProductAppearanceQ(sample.itemId, renderList);
           },
         },
+        { id: 'order', label: 'Порядок', variant: 'secondary', onSelect: () => openInventoryPositionEditor(layer, manufacturer, renderList) },
         { id: 'sort', label: 'Сортировка', variant: 'secondary', onSelect: () => openStockControls(layer, 'items', manufacturer, renderList, 'sort') },
         { id: 'filter', label: 'Фильтр', variant: 'secondary', onSelect: () => openStockControls(layer, 'items', manufacturer, renderList, 'filter') },
         ...(canUseCapability('inventory.stocktake.access') ? [{
