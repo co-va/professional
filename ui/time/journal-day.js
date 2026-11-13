@@ -165,9 +165,9 @@ function aggregateTimeline(columns = [], { day = '', usageRenderer = usageMarkup
       if (visibleEnd <= visibleStart) return '';
       const usageTop = ((visibleStart - start) / total) * 100;
       const usageHeight = ((visibleEnd - visibleStart) / total) * 100;
-      const markup = usageRenderer === usageMarkup
-        ? usageMarkup(usage, { interactive: false })
-        : renderUsage(usage, { interactive: false }, usageRenderer);
+      // A record remains actionable in the aggregate Day, not a read-only
+      // decoration. Its click is handled by the same Time wrapper as single Day.
+      const markup = renderUsage(usage, { interactive: true }, usageRenderer);
       return `<div class="journal-work-field__usage" style="top:${usageTop}%;height:${usageHeight}%" data-time-usage="${escape(usage.sourceId || usage.id)}">${markup}</div>`;
     }).join('');
     return `<div class="journal-work-column"><div class="journal-work-field${column?.conflict ? ' is-conflict' : ''}" role="button" tabindex="0" aria-label="Изменить рабочее пространство ${escape(column?.name || '')}" style="top:${top}%;height:${height}%" data-journal-work-field="${escape(column?.workplaceId || '')}"></div>${usages}</div>`;
@@ -243,9 +243,11 @@ export function initJournalDayTimeline(root, {
     });
   }));
 
-  root.querySelectorAll('[data-journal-usage]').forEach((node) => node.addEventListener('click', (event) => {
+  // One event owner per Time usage. The wrapper is the hit target in both
+  // single and aggregate Day; the inner button remains its accessible UI.
+  root.querySelectorAll('[data-time-usage]').forEach((node) => node.addEventListener('click', (event) => {
     event.stopPropagation();
-    const usageId = String(node.dataset.journalUsage || '');
+    const usageId = String(node.dataset.timeUsage || '');
     if (usageId) onUsageClick({ usageId });
   }));
 }
