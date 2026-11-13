@@ -8,3 +8,14 @@
 .data-edit-row>.field{min-width:0;margin:0}
 .data-edit-row>.field>span:empty{display:none}
 @media(max-width:360px){.data-edit-row{grid-template-columns:minmax(0,1fr) minmax(100px,38%);gap:8px}}
+
+/* Inventory data choice: one shared two-column row, no custom selector geometry. */
+.inventory-audit-value-cell{min-width:0;display:grid;gap:6px;align-content:start}
+.inventory-audit-value-heading{display:grid;grid-template-columns:minmax(0,1fr) var(--ui-field-height);align-items:end;gap:6px;font-size:13px;line-height:1.2;color:var(--text-secondary)}
+.inventory-audit-value-heading>span:last-child{text-align:center;font-size:12px}
+.inventory-audit-value-line{display:grid;grid-template-columns:minmax(0,1fr) var(--ui-field-height);align-items:center;gap:6px;min-width:0}
+.inventory-audit-value-line>[data-inventory-audit-common-value]{min-width:0}
+.inventory-audit-value-line .field{min-width:0;gap:0}
+.inventory-audit-value-line .field>span:empty{display:none}
+.inventory-audit-common-check .ui-compact-check{min-height:var(--ui-field-height);height:var(--ui-field-height);padding:0;justify-content:center;gap:0}
+.inventory-audit-common-check .ui-compact-check__label:empty{display:none}
