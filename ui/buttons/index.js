@@ -15,15 +15,20 @@ export function button(label, { className = '', data = '', type = 'button', aria
   return `<button type="${type}" class="ui-button ${variantClass} ${className}" ${data}${aria ? ` aria-label="${escapeHtml(aria)}"` : ''}${disabled ? ' disabled' : ''}>${label}</button>`;
 }
 
-// One Compact control for inline add, remove, info, and copy actions.
-// Visual kinds are not separate button implementations.
-export function compactButton({ kind = 'add', className = '', data = '', aria = '', disabled = false } = {}) {
-  const variant = ['add', 'remove', 'info', 'copy'].includes(kind) ? kind : 'info';
-  const labels = { add: 'Добавить', remove: 'Удалить', info: 'Информация', copy: 'Скопировать' };
+// One Compact control for inline and mini-card actions, date navigation, add, remove, info and copy.
+// Kind changes presentation only; data/aria remain owned by the caller.
+const SETTINGS_ICON = '<svg class="mini-card__record-action-icon" viewBox="0 0 24 24" width="23" height="23" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.5 2.5h3l.6 2.2 2.1.9 2-.9 2.1 2.1-.9 2 .9 2.1 2.2.6v3l-2.2.6-.9 2.1.9 2-2.1 2.1-2-.9-2.1.9-.6 2.2h-3l-.6-2.2-2.1-.9-2 .9-2.1-2.1.9-2-.9-2.1-2.2-.6v-3l2.2-.6.9-2.1-.9-2 2.1-2.1 2 .9 2.1-.9Z"/><circle cx="12" cy="12" r="3"/></svg>';
+export function compactButton({ kind = 'add', symbol = '', className = '', data = '', aria = '', disabled = false } = {}) {
+  const variant = ['add', 'remove', 'info', 'copy', 'settings', 'repeat', 'card', 'previous', 'next'].includes(kind) ? kind : 'info';
+  const labels = { add: 'Добавить', remove: 'Удалить', info: 'Информация', copy: 'Скопировать', settings: 'Настроить', repeat: 'Повторить', card: 'Действие карты', previous: 'Предыдущая дата', next: 'Следующая дата' };
   const copyIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="11" height="11" rx="2"></rect><path d="M16 8V7a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h1"></path></svg><span class="small-action-button__done" aria-hidden="true">✓</span>';
   const glyph = variant === 'add' ? '+' : variant === 'remove' ? '×'
     : variant === 'info' ? '<span class="small-action-button__info" aria-hidden="true">i</span>'
-    : copyIcon;
+    : variant === 'copy' ? copyIcon
+    : variant === 'settings' ? SETTINGS_ICON
+    : variant === 'previous' ? '←' : variant === 'next' ? '→'
+    : variant === 'repeat' ? escapeHtml(symbol || '↻')
+    : escapeHtml(symbol);
   const legacy = variant === 'info' || variant === 'copy'
     ? ` small-action-button small-action-button--${variant}${variant === 'copy' ? ' copy-icon-button' : ''}`
     : '';
