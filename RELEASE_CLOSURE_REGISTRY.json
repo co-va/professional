@@ -10,11 +10,12 @@
       "verifying": "В проверке",
       "locked": "Закрыто, изменение только через повторную приёмку"
     },
-    "closedMeans": "Внешний вид, действия, бизнес-логика, данные, API и реальное устройство проверены на согласованных версиях, результат подтверждён владельцем",
+    "closedMeans": "Внешний вид, действия, бизнес-логика, архитектурная чистота (без второй реализации), данные, API и реальное устройство проверены на согласованных версиях, результат подтверждён владельцем",
     "requireAllChildrenAndDependencies": true,
     "lockedChange": "Любое отличие зависимых файлов от SHA заморозки требует отдельного согласования и повторной адресной проверки; изменение тестов не заменяет доказательства",
     "releaseTrackNotEntitlement": true,
-    "noNewCI": true
+    "noNewCI": true,
+    "codeCleanlinessGate": "Ни один рабочий контур и release-track нельзя закрыть без проверки дублей, dead code, вторых владельцев бизнес-фактов, обходов shared UI и чистоты ссылок/imports; чистка адресная, до закрытия элемента, не после релиза"
   },
   "items": [
     {
@@ -36,7 +37,8 @@
         "visual": "не проверено",
         "interaction": "не проверено",
         "data": "не проверено",
-        "regression": "не проверено"
+        "regression": "не проверено",
+        "architecture": "не проверено"
       },
       "closure": {
         "state": "open",
@@ -61,7 +63,8 @@
         "visual": "не проверено",
         "interaction": "не проверено",
         "data": "не проверено",
-        "regression": "не проверено"
+        "regression": "не проверено",
+        "architecture": "не проверено"
       },
       "closure": {
         "state": "open",
@@ -85,7 +88,8 @@
         "visual": "не проверено",
         "interaction": "не проверено",
         "data": "не проверено",
-        "regression": "не проверено"
+        "regression": "не проверено",
+        "architecture": "не проверено"
       },
       "closure": {
         "state": "open",
@@ -109,7 +113,8 @@
         "visual": "не проверено",
         "interaction": "не проверено",
         "data": "не проверено",
-        "regression": "не проверено"
+        "regression": "не проверено",
+        "architecture": "не проверено"
       },
       "closure": {
         "state": "open",
@@ -141,7 +146,8 @@
         "visual": "не проверено",
         "interaction": "не проверено",
         "data": "не проверено",
-        "regression": "не проверено"
+        "regression": "не проверено",
+        "architecture": "не проверено"
       },
       "closure": {
         "state": "open",
@@ -170,7 +176,8 @@
         "visual": "не проверено",
         "interaction": "не проверено",
         "data": "не проверено",
-        "regression": "не проверено"
+        "regression": "не проверено",
+        "architecture": "не проверено"
       },
       "closure": {
         "state": "open",
@@ -197,7 +204,8 @@
         "visual": "не проверено",
         "interaction": "не проверено",
         "data": "не проверено",
-        "regression": "не проверено"
+        "regression": "не проверено",
+        "architecture": "не проверено"
       },
       "closure": {
         "state": "open",
@@ -225,7 +233,8 @@
         "visual": "не проверено",
         "interaction": "не проверено",
         "data": "не проверено",
-        "regression": "не проверено"
+        "regression": "не проверено",
+        "architecture": "не проверено"
       },
       "closure": {
         "state": "open",
@@ -253,7 +262,8 @@
         "visual": "не проверено",
         "interaction": "не проверено",
         "data": "не проверено",
-        "regression": "не проверено"
+        "regression": "не проверено",
+        "architecture": "не проверено"
       },
       "closure": {
         "state": "open",
@@ -281,7 +291,8 @@
         "visual": "не проверено",
         "interaction": "не проверено",
         "data": "не проверено",
-        "regression": "не проверено"
+        "regression": "не проверено",
+        "architecture": "не проверено"
       },
       "closure": {
         "state": "open",
@@ -310,7 +321,8 @@
         "visual": "не проверено",
         "interaction": "не проверено",
         "data": "не проверено",
-        "regression": "не проверено"
+        "regression": "не проверено",
+        "architecture": "не проверено"
       },
       "closure": {
         "state": "open",
@@ -341,7 +353,8 @@
         "visual": "не проверено",
         "interaction": "не проверено",
         "data": "не проверено",
-        "regression": "не проверено"
+        "regression": "не проверено",
+        "architecture": "не проверено"
       },
       "closure": {
         "state": "open",
@@ -369,7 +382,8 @@
         "visual": "не проверено",
         "interaction": "не проверено",
         "data": "не проверено",
-        "regression": "не проверено"
+        "regression": "не проверено",
+        "architecture": "не проверено"
       },
       "closure": {
         "state": "open",
@@ -398,7 +412,8 @@
         "visual": "не проверено",
         "interaction": "не проверено",
         "data": "не проверено",
-        "regression": "не проверено"
+        "regression": "не проверено",
+        "architecture": "не проверено"
       },
       "closure": {
         "state": "open",
@@ -427,7 +442,8 @@
         "visual": "не проверено",
         "interaction": "не проверено",
         "data": "не проверено",
-        "regression": "не проверено"
+        "regression": "не проверено",
+        "architecture": "не проверено"
       },
       "closure": {
         "state": "open",
@@ -456,7 +472,8 @@
         "visual": "не проверено",
         "interaction": "не проверено",
         "data": "не проверено",
-        "regression": "не проверено"
+        "regression": "не проверено",
+        "architecture": "не проверено"
       },
       "closure": {
         "state": "open",
@@ -482,7 +499,8 @@
         "visual": "не проверено",
         "interaction": "не проверено",
         "data": "не проверено",
-        "regression": "не проверено"
+        "regression": "не проверено",
+        "architecture": "не проверено"
       },
       "closure": {
         "state": "open",
@@ -507,7 +525,8 @@
         "visual": "не проверено",
         "interaction": "не проверено",
         "data": "не проверено",
-        "regression": "не проверено"
+        "regression": "не проверено",
+        "architecture": "не проверено"
       },
       "closure": {
         "state": "open",
@@ -532,7 +551,8 @@
         "visual": "не проверено",
         "interaction": "не проверено",
         "data": "не проверено",
-        "regression": "не проверено"
+        "regression": "не проверено",
+        "architecture": "не проверено"
       },
       "closure": {
         "state": "open",
@@ -556,7 +576,8 @@
         "visual": "не проверено",
         "interaction": "не проверено",
         "data": "не проверено",
-        "regression": "не проверено"
+        "regression": "не проверено",
+        "architecture": "не проверено"
       },
       "closure": {
         "state": "open",
@@ -580,7 +601,8 @@
         "visual": "не проверено",
         "interaction": "не проверено",
         "data": "не проверено",
-        "regression": "не проверено"
+        "regression": "не проверено",
+        "architecture": "не проверено"
       },
       "closure": {
         "state": "open",
@@ -609,7 +631,8 @@
         "visual": "не проверено",
         "interaction": "не проверено",
         "data": "не проверено",
-        "regression": "не проверено"
+        "regression": "не проверено",
+        "architecture": "не проверено"
       },
       "closure": {
         "state": "open",
@@ -636,7 +659,8 @@
         "visual": "не проверено",
         "interaction": "не проверено",
         "data": "не проверено",
-        "regression": "не проверено"
+        "regression": "не проверено",
+        "architecture": "не проверено"
       },
       "closure": {
         "state": "open",
@@ -660,7 +684,8 @@
         "visual": "не проверено",
         "interaction": "не проверено",
         "data": "не проверено",
-        "regression": "не проверено"
+        "regression": "не проверено",
+        "architecture": "не проверено"
       },
       "closure": {
         "state": "open",
@@ -684,7 +709,8 @@
         "visual": "не проверено",
         "interaction": "не проверено",
         "data": "не проверено",
-        "regression": "не проверено"
+        "regression": "не проверено",
+        "architecture": "не проверено"
       },
       "closure": {
         "state": "open",
