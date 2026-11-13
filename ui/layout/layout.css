@@ -19,3 +19,6 @@
 .inventory-audit-value-line .field>span:empty{display:none}
 .inventory-audit-common-check .ui-compact-check{min-height:var(--ui-field-height);height:var(--ui-field-height);padding:0;justify-content:center;gap:0}
 .inventory-audit-common-check .ui-compact-check__label:empty{display:none}
+
+/* Empty selection status must not consume vertical space above the item list. */
+[data-inventory-audit-selection] [data-inventory-audit-status]:empty{display:none}
