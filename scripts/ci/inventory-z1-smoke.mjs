@@ -27,7 +27,7 @@ const sortingIndex = page.indexOf("{ id: 'controls', label: 'Сортировк�
 assert.ok(appearanceIndex >= 0 && sortingIndex > appearanceIndex, 'View is the first item of the menu');
 assert.doesNotMatch(page, /label: 'Фильтр'|label: 'Сортировка и фильтр'/, 'Z1 V has only View and Sort');
 const sortModal = inventory.slice(inventory.indexOf('function openStockControls('), inventory.indexOf('function bindManufacturerCards('));
-assert.match(sortModal, /level === 'items' \? select\(\{/, 'Z2 filter is unchanged');
+assert.match(sortModal, /const isFilter = level === 'items' && mode === 'filter'/, 'Z2 stock filters remain available');
 assert.match(sortModal, /saveInventorySortMode\(sortKey, event\.target\.value\)/, 'Sort selections persist');
 const stored = new Map();
 const localStorage = {
