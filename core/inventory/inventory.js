@@ -1392,7 +1392,7 @@ function openInventoryAuditCriteria(root, { mode, ids = [], onSaved = () => {} }
         { value: 'each', label: 'Каждой позиции своё' },
       ] })}
       <div data-inventory-audit-shared-value></div>
-      <div class="form-grid" data-inventory-audit-position-values hidden></div>
+      <div data-inventory-audit-position-values hidden><div class="form-grid" data-inventory-audit-rows></div></div>
     </div>`
     : `<div class="form-grid">${items.map(inventoryAuditInput).join('')}</div>`;
   const markup = `<form data-inventory-audit-criteria>
@@ -1418,6 +1418,7 @@ function openInventoryAuditCriteria(root, { mode, ids = [], onSaved = () => {} }
     const modeSelector = form.elements.namedItem('auditMode');
     const shared = form.querySelector('[data-inventory-audit-shared-value]');
     const rows = form.querySelector('[data-inventory-audit-position-values]');
+    const rowBody = form.querySelector('[data-inventory-audit-rows]');
     const renderEditor = () => {
       const definition = inventoryAuditFieldDefinition(fieldSelector?.value);
       const perItem = modeSelector?.value === 'each';
@@ -1427,12 +1428,12 @@ function openInventoryAuditCriteria(root, { mode, ids = [], onSaved = () => {} }
       // Render only the selected field, without rebuilding the parent form
       // while the user types or while the iOS keyboard is visible.
       if (perItem) {
-        rows.innerHTML = items.map((item, index) =>
+        rowBody.innerHTML = items.map((item, index) =>
           inventoryAuditDataRow(item, index, definition, includesDifferentManufacturers)).join('');
         shared.replaceChildren();
       } else {
         shared.innerHTML = inventoryAuditDataControl(definition, 'auditValue', { shared: true });
-        rows.replaceChildren();
+        rowBody.replaceChildren();
       }
       status.textContent = '';
     };
