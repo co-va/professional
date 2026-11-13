@@ -1,4 +1,12 @@
-const RAIL_SELECTOR = '[data-v2-horizontal-rail], [data-entity-card-rail], [data-mini-card-rail]';
+export const V2_HORIZONTAL_RAIL_SELECTOR = '[data-v2-horizontal-rail], [data-entity-card-rail], [data-mini-card-rail]';
+
+export function isV2HorizontalGestureTarget(target) {
+  // Shared gesture arbitration: a nested horizontal scroller always owns
+  // its horizontal pointer gesture, regardless of whether it lives in Z or Q.
+  return Boolean(target?.closest?.(
+    `${V2_HORIZONTAL_RAIL_SELECTOR}, [data-v2-layer-gesture-ignore]`,
+  ));
+}
 
 function affordanceMinimum(rail) {
   const value = Math.round(Number(rail?.dataset?.v2HorizontalAffordanceMin) || 2);
@@ -34,7 +42,7 @@ function positionCurrentRailItem(rail) {
 }
 
 function syncSection(section) {
-  const rails = [...section.querySelectorAll(RAIL_SELECTOR)];
+  const rails = [...section.querySelectorAll(V2_HORIZONTAL_RAIL_SELECTOR)];
   rails.forEach(positionCurrentRailItem);
   const hasMore = rails.some(isHorizontallyScrollable);
   section.classList.toggle('has-v2-horizontal-rail', hasMore);

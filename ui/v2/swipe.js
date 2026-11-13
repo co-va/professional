@@ -1,4 +1,5 @@
 import { retainV2EdgeHost } from './lifecycle.js';
+import { isV2HorizontalGestureTarget } from './horizontal-affordance.js';
 
 export function initV2Swipe(root, {
   onRight = null,
@@ -46,6 +47,7 @@ export function initV2Swipe(root, {
   };
 
   const down = (event) => {
+    if (isV2HorizontalGestureTarget(event.target)) return;
     if (app?.classList.contains('has-v2-modal')) return;
     if (!isTopmost()) return;
     if (event.pointerType === 'mouse' && event.button !== 0) return;
@@ -141,6 +143,7 @@ export function initV2StickerSwipe(root, { onRight = null, onLeft = null, thresh
     axis = 'pending';
   };
   const down = (event) => {
+    if (isV2HorizontalGestureTarget(event.target)) return;
     if (event.pointerType === 'mouse' && event.button !== 0) return;
     pointerId = event.pointerId;
     startX = event.clientX;
@@ -226,7 +229,10 @@ export function initV2LayerDismissGesture(node, {
   const down = (event) => {
     if (dismissing) return;
     if (event.pointerType === 'mouse' && event.button !== 0) return;
-    if (!vertical && event.target.closest?.('input,select,textarea,[contenteditable="true"],[data-v2-layer-gesture-ignore]')) return;
+    if (!vertical && (
+      isV2HorizontalGestureTarget(event.target)
+      || event.target.closest?.('input,select,textarea,[contenteditable="true"]')
+    )) return;
     pointerId = event.pointerId;
     startX = event.clientX;
     startY = event.clientY;

@@ -38,6 +38,9 @@ const zHeaderCss = read('ui/v2/surface-header.css');
 const geometry = read('ui/v2/geometry.js');
 const header = read('ui/v2/header.js');
 const zStack = read('ui/v2/z-stack.js');
+const sharedSwipe = read('ui/v2/swipe.js');
+const horizontalAffordance = read('ui/v2/horizontal-affordance.js');
+const miniMarkup = read('ui/cards/mini-card.js');
 const modalPortal = read('ui/v2/modal-portal.js');
 const keyboardRuntime = read('ui/inputs/keyboard-runtime.js');
 const keyboardStyle = read('ui/inputs/keyboard.css');
@@ -111,6 +114,7 @@ assert(shellStyle.includes('transform:translateX(var(--ui-visual-left,0px))'), '
 assert(keyboardStyle.includes('.v2-layer--bottom{\\n  bottom:0;'.replace('\\n', '\n')), 'X inner surface must stay attached to bottom under keyboard');
 assert(keyboardStyle.includes('padding-bottom:calc(20px + var(--ui-keyboard-inset))'), 'X contents must remain above keyboard');
 assert(!modalPortal.includes('node.contains(document.activeElement)'), 'Per-modal focus blur override is forbidden');
+assert(horizontalAffordance.includes('export function isV2HorizontalGestureTarget(') && (sharedSwipe.match(/isV2HorizontalGestureTarget\(event.target\)/g) || []).length >= 3, 'Horizontal rails must own gestures instead of triggering Z/Q dismissal');
 
 // Canonical Shared components keep one geometry owner.
 assert(entity.includes('width:min(338px,100%)'), 'EntityCard width changed');
@@ -139,6 +143,8 @@ assert(mini.includes('.mini-card{--mini-card-width:290px;--mini-card-height:200p
 assert(mini.includes('grid-template-rows:auto minmax(0,1fr) auto'), 'MiniCard must have fixed top/bottom and scrolling center');
 assert(mini.includes('.mini-card__record-center{min-height:0;min-width:0;overflow-y:auto'), 'MiniCard center must own vertical scrolling');
 assert(!/238px|144px|176px/.test(mini), 'Obsolete MiniCard geometry cannot return');
+assert(miniMarkup.includes('function cardShell(') && miniMarkup.includes('data-mini-card-ui=\\"shared\\"'.replaceAll('\\','')), 'All MiniCard variants must render through one shell');
+assert(miniMarkup.includes('return recordMarkup(recordLayout, { className, aria, interactive, data });'), 'Record MiniCard must preserve opt-in click behavior');
 assert(rootSelectorCount(mini, '.mini-card') === 1, 'MiniCard geometry must have one owner');
 assert(!mini.includes('.mini-card:has(>.mini-card__rows)'), 'Do not override User MiniCard base geometry in Professional');
 

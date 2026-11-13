@@ -61,7 +61,7 @@ function cardShell({
   </${tag}>`;
 }
 
-function recordMarkup(layout = {}, { className = '', aria = '' } = {}) {
+function recordMarkup(layout = {}, { className = '', aria = '', interactive = false, data = '' } = {}) {
   const entries = Array.isArray(layout.services) ? layout.services : [];
   const details = Array.isArray(layout.details) ? layout.details : [];
   const personHeader = layout.headerMode === 'person';
@@ -113,7 +113,9 @@ function recordMarkup(layout = {}, { className = '', aria = '' } = {}) {
   return cardShell({
     tag: 'section',
     classes: `mini-card mini-card--record${personHeader ? ' mini-card--record-person' : ''}${personHeader && !showLeft ? ' mini-card--record-no-left' : ''}${className ? ` ${className}` : ''}`,
-    attributes: ` aria-label="${escapeHtml(aria || 'Данные записи')}"`,
+    attributes: interactive && data
+      ? ` tabindex="0" role="button"${attrs(data, aria || 'Открыть запись')}`
+      : ` aria-label="${escapeHtml(aria || 'Данные записи')}"`,
     head: headMarkup,
     center: centerMarkup,
     footer: footerMarkup,
@@ -147,7 +149,7 @@ export function miniCard({
   className = '',
 } = {}) {
   if (recordLayout && typeof recordLayout === 'object') {
-    return recordMarkup(recordLayout, { className, aria });
+    return recordMarkup(recordLayout, { className, aria, interactive, data });
   }
   const resolvedCompactAction = compactAction && typeof compactAction === 'object'
     ? compactAction
