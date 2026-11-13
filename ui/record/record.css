@@ -33,8 +33,10 @@
 .record-confirmation-mini-card--viewer .mini-card__line-right{max-width:90px;font-size:11px;line-height:1.25;font-weight:700;text-align:right;white-space:nowrap}
 .record-confirmation-mini-card--viewer .mini-card__row{min-height:26px;padding:4px 0}
 .record-confirmation-mini-card--viewer .mini-card__row-value{font-size:16px}
-.record-confirmation-mini-card--viewer.mini-card--dual-action .mini-card__line:nth-child(-n+2){box-sizing:border-box;padding-right:76px}
+.record-confirmation-mini-card--viewer.record-confirmation-mini-card--two-actions .mini-card__line:nth-child(-n+2){box-sizing:border-box;padding-right:76px}
+.record-confirmation-mini-card--viewer.record-confirmation-mini-card--one-action .mini-card__line:nth-child(-n+2){box-sizing:border-box;padding-right:38px}
 .record-confirmation-view__repeat{position:absolute;top:10px;right:48px;z-index:3;width:30px;height:30px;border:0;border-radius:9px;padding:0;display:grid;place-items:center;background:#111;color:#fff;font:inherit;font-size:19px;line-height:1;cursor:pointer}
+.record-confirmation-view__repeat--solo{right:10px}
 .record-confirmation-view__repeat:active{transform:translateY(1px)}
 .record-confirmation-view__repeat:focus-visible{outline:2px solid #111;outline-offset:2px}
 
