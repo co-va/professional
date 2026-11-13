@@ -180,7 +180,7 @@
         "architecture": "не проверено"
       },
       "closure": {
-        "state": "open",
+        "state": "verifying",
         "approvedBy": null,
         "approvedAt": null,
         "baselineSha": null,
@@ -208,7 +208,7 @@
         "architecture": "не проверено"
       },
       "closure": {
-        "state": "open",
+        "state": "verifying",
         "approvedBy": null,
         "approvedAt": null,
         "baselineSha": null,
