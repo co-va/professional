@@ -1,5 +1,5 @@
 import { costField, collectCost, initCostFields } from '../cost/index.js';
-import { button } from '../buttons/index.js';
+import { button, compactRemoveButton } from '../buttons/index.js';
 import { openHeaderControl } from '../header/index.js';
 import { list } from '../lists/list.js';
 import { select } from '../selectors/index.js';
@@ -44,7 +44,7 @@ function row(name, value, options, selected = {}, withCost = false) {
     value,
     options: [{ value: '', label: 'Выбор рабочего места' }, ...options],
     data: 'data-workplace-value',
-  })}${withCost ? costField({ name: `${name}-cost-${Math.random().toString(36).slice(2, 8)}`, value: cost }) : ''}<button type="button" class="remove-button" data-remove-workplace aria-label="Удалить рабочее место">×</button></div>`;
+  })}${withCost ? costField({ name: `${name}-cost-${Math.random().toString(36).slice(2, 8)}`, value: cost }) : ''}${compactRemoveButton({ data: "data-remove-workplace", aria: "Удалить рабочее место" })}</div>`;
 }
 
 export function workplaceSelector({ name = 'workplaces', selected = [], allowMultiple = true, costPerWorkplace = false, workplaces = [] } = {}) {
