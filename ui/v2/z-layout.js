@@ -8,7 +8,7 @@ const SURFACE_HEADER_STYLE = [
   'position:relative',
   'z-index:20',
   'box-sizing:border-box',
-  'min-height:28px',
+  'min-height:36px',
   'margin:0 -18px',
   'padding:0 18px 0 0',
   `--v2-surface-header-spacing:${SURFACE_HEADER_SPACING}`,
@@ -23,6 +23,8 @@ const SURFACE_HEADER_STYLE = [
 
 const SURFACE_HEADER_CONTENT_STYLE = [
   'box-sizing:border-box',
+  'grid-column:2',
+  'min-height:12px',
   'min-width:0',
   'flex:1 1 auto',
   'padding-left:18px',

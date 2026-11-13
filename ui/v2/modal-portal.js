@@ -18,7 +18,13 @@ export function v2Layer(content = '', { kind = 'standard', title = '', className
   const gestureZone = resolved === 'top' || resolved === 'bottom'
     ? `<span class="v2-layer__gesture-zone v2-layer__gesture-zone--${resolved}" data-v2-layer-gesture-zone aria-hidden="true"></span>`
     : '';
-  return `<div class="v2-layer-backdrop" data-v2-layer data-v2-layer-kind="${resolved}"><section class="v2-layer v2-layer--${resolved} ${text(className)}" role="dialog" aria-modal="true" aria-label="${text(title)}" tabindex="-1">${closeControl}${gestureZone}${title ? `<header class="v2-layer__header"><h2>${text(title)}</h2></header>` : ''}${content}</section></div>`;
+  const inner = `${title ? `<header class="v2-layer__header"><h2>${text(title)}</h2></header>` : ''}${content}`;
+  // One technical surface contract: X is a fixed sibling, only the inner
+  // body scrolls. Every current and future technical modal gets this layout.
+  const body = resolved === 'technical'
+    ? `<div class="v2-layer__technical-body">${inner}</div>`
+    : inner;
+  return `<div class="v2-layer-backdrop" data-v2-layer data-v2-layer-kind="${resolved}"><section class="v2-layer v2-layer--${resolved} ${text(className)}" role="dialog" aria-modal="true" aria-label="${text(title)}" tabindex="-1">${closeControl}${gestureZone}${body}</section></div>`;
 }
 
 function mountV2ModalPortal(host, app = null) {

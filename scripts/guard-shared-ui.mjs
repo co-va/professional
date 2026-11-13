@@ -67,7 +67,7 @@ assert(v2.includes('--v2-inner-surface:#F5F5F3;') && v2.includes('background:var
 assert(zLayout.includes("'background:var(--v2-inner-surface,#F5F5F3)'") && zHeaderCss.includes('background:var(--v2-inner-surface,#F5F5F3)!important;'), 'Z/Q Header must use warm inner surface');
 assert(v2.includes('padding-top:0;background:var(--v2-inner-surface)}'), 'Q surface must be warm with no extra top gap');
 assert(v2.includes('.v2-layer{position:absolute;box-sizing:border-box;overflow:auto;background:var(--v2-inner-surface);') &&
-       v2.includes('.v2-layer--technical{background:var(--v2-white,#fff);top:50;'.replace('top:50;','top:50%;')), 'X/S/Q base must be warm, technical modal must remain white');
+       v2.includes('.v2-layer--technical{') && v2.includes('background:var(--v2-white,#fff);') && v2.includes('.v2-layer--technical>.v2-layer__technical-body{') && v2.includes('overflow-y:auto;overscroll-behavior:contain;') && v2.includes('.v2-layer--technical>.v2-layer__close{') && modalPortal.includes('class="v2-layer__technical-body"'), 'Technical modal must be a fixed white paper with independently scrolling content and fixed close button');
 assert(modalStyle.includes('.modal-sheet.modal--surface-app:not(.modal--technical){background:var(--v2-inner-surface,#F5F5F3)}') &&
        modalStyle.includes('background:var(--v2-inner-surface,#F5F5F3);overflow:') &&
        !modalStyle.split('\n').filter(line=>line.includes('.modal-sheet.modal--bottom.modal--')).some(line=>line.includes('background:var(--white)')), 'X/S shells and all X sheets must be warm');
@@ -87,7 +87,10 @@ assert(!zHeaderCss.includes('margin-bottom:8px') && !zHeaderCss.includes('paddin
 assert(zHeaderCss.includes('.ui-search-divider{display:none!important}'), 'No separator inside any Z/Q Header');
 assert(zHeaderCss.includes('.ui-search-field{padding:0}') && zHeaderCss.includes('.segment-control{margin:0}'), 'Controls cannot own outer Header gaps');
 assert(v2.includes('bottom:0;padding-top:0;background:var(--v2-inner-surface)}'), 'Q layer must not add a hidden top gap');
-assert(read('ui/v2/z-affordance.js').includes("'margin:0 0 0 18px'"), 'Header arrow has no vertical offset');
+const zArrow = read('ui/v2/z-affordance.js');
+assert(["'margin:0'", "'position:absolute'", "'top:50%'", "'transform:translateY(-50%)'"].every(marker => zArrow.includes(marker)), 'Z/Q arrow must use the centered Shared position');
+assert(zLayout.includes("'min-height:36px'") && zLayout.includes("'grid-column:2'") && zLayout.includes("'min-height:12px'"), 'Z/Q compact Header must match approved Shared geometry');
+assert((zHeaderCss.match(/min-height:36px!important/g) || []).length === 2, 'Empty Z/Q headers must match approved 36px floor');
 assert(read('ui/cards/entity-card-constructor.css').includes('gap:var(--v2-surface-header-spacing)'), 'Q card selector gap is not shared');
 assert(!read('core/inventory/inventory.js').includes('people-search-divider ui-search-divider'), 'Stock Header must contain only search');
 assert(!read('core/people/people.js').includes('people-search-divider ui-search-divider'), 'Contacts and History Headers must contain only search');
@@ -126,7 +129,10 @@ assert(entity.includes('grid-template-columns:repeat(3,minmax(0,1fr)) 10px repea
 assert(cardView.includes('openColorPickerAction({') && !cardView.includes('<span>Выбрать</span>'), 'Card View: one swatch-only color chooser required');
 
 
-assert(mini.includes('--mini-card-width:238px'), 'MiniCard width changed');
+assert(mini.includes('.mini-card{--mini-card-width:290px;--mini-card-height:200px;'), 'Every MiniCard must use the approved 290×200 paper');
+assert(mini.includes('grid-template-rows:auto minmax(0,1fr) auto'), 'MiniCard must have fixed top/bottom and scrolling center');
+assert(mini.includes('.mini-card__record-center{min-height:0;min-width:0;overflow-y:auto'), 'MiniCard center must own vertical scrolling');
+assert(!/238px|144px|176px/.test(mini), 'Obsolete MiniCard geometry cannot return');
 assert(rootSelectorCount(mini, '.mini-card') === 1, 'MiniCard geometry must have one owner');
 assert(!mini.includes('.mini-card:has(>.mini-card__rows)'), 'Do not override User MiniCard base geometry in Professional');
 

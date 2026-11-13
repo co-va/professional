@@ -1,6 +1,6 @@
 /* Z and Q Header geometry is owned only by ui/v2/z-layout.js. */
 [data-v2-z-header]:has(> [data-v2-z-header-content]:empty){
-  min-height:28px!important;
+  min-height:36px!important;
   background:var(--v2-inner-surface,#F5F5F3)!important;
 }
 [data-v2-q-header],
@@ -10,7 +10,7 @@
   box-shadow:none!important;
 }
 [data-v2-q-header]:has(> [data-v2-q-header-content]:empty){
-  min-height:28px!important;
+  min-height:36px!important;
   background:transparent!important;
 }
 [data-v2-q-header]:has(> [data-v2-q-header-content]:empty) > [data-v2-q-header-content]{

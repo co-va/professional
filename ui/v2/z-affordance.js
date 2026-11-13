@@ -8,7 +8,7 @@ const Z_DISMISS_STYLE = [
   'height:24px',
   'min-height:24px',
   'max-height:24px',
-  'margin:0 0 0 18px',
+  'margin:0',
   'padding:0',
   'border:0',
   'border-radius:0',
@@ -19,7 +19,10 @@ const Z_DISMISS_STYLE = [
   'line-height:1',
   'cursor:pointer',
   'touch-action:manipulation',
-  'position:relative',
+  'position:absolute',
+  'top:50%',
+  'left:18px',
+  'transform:translateY(-50%)',
   'z-index:3',
 ].join(';');
 
