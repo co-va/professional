@@ -6,11 +6,15 @@
 .list-entry__toggle{width:48px;height:40px;border:0;padding:0;display:grid;place-items:center;background:transparent;color:inherit;cursor:pointer}.list-entry__toggle:disabled{opacity:.5;cursor:default}
 
 .list-entries.is-reordering{user-select:none;-webkit-user-select:none}
-.list-entry.is-reordering{z-index:4;transform:scale(.985);box-shadow:0 10px 24px rgba(0,0,0,.16);cursor:grabbing}
+.list-entry.is-reordering{z-index:4;transform:translate3d(0,var(--list-entry-drag-y,0px),0);transition:none;box-shadow:0 10px 24px rgba(0,0,0,.16);cursor:grabbing;pointer-events:none;will-change:transform}
+.list-entry.is-reorder-target-before::before,.list-entry.is-reorder-target-after::after{content:"";position:absolute;left:0;right:0;height:2px;background:var(--text);z-index:5;pointer-events:none}
+.list-entry.is-reorder-target-before::before{top:0}
+.list-entry.is-reorder-target-after::after{bottom:0}
 
 .journal-list-mode-navigation .segment-control{margin-top:-10px;margin-bottom:6px}.journal-list-viewport{height:calc(var(--visual-vh,100dvh) - 282px - var(--nav-height) - env(safe-area-inset-bottom));min-height:220px;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none}.journal-list-viewport::-webkit-scrollbar{display:none}.journal-list-viewport>.list-entries{padding-bottom:18px}.journal-list-anchor{height:2px;margin:6px 0 10px;background:var(--text-muted);box-shadow:0 1px 0 rgba(255,255,255,.72)}
 
-.list-entry__reorder-handle{width:36px;height:48px;display:grid;place-items:center;align-self:center;margin-left:-4px;margin-right:2px;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;color:var(--text-secondary);font-size:18px;line-height:1;letter-spacing:-3px}
+.list-entry__reorder-handle{position:relative;z-index:2;width:36px;height:48px;display:grid;place-items:center;align-self:center;margin-left:-4px;margin-right:2px;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;color:var(--text-secondary);font-size:18px;line-height:1;letter-spacing:-3px}
+.list-entry__reorder-handle::before{content:"";position:absolute;inset:-4px -5px}
 .list-entry__reorder-handle:active,.list-entry.is-reordering .list-entry__reorder-handle{cursor:grabbing}
 .list-entry__content:has(.list-entry__reorder-handle){grid-template-columns:36px minmax(0,1fr) auto auto auto}
 .list-entry--columns .list-entry__content:has(.list-entry__reorder-handle){grid-template-columns:36px minmax(0,1fr) auto auto}
