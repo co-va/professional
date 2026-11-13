@@ -17,29 +17,6 @@
 .record-confirmation-view__procedures{margin-top:0;min-width:0}
 .record-confirmation-view__procedures .read-only-sheet{gap:0;padding:0}.record-confirmation-view__procedures .read-only-sheet__groups{border-top:1px solid var(--border)}.record-confirmation-view__procedures .read-only-sheet__group{padding:0}.record-confirmation-view__procedures .read-only-sheet__group+.read-only-sheet__group{margin:0;padding-top:0}.record-confirmation-view__procedures .read-only-sheet__row{min-height:44px;padding:9px 0;font-size:13px}
 
-/* Professional Record viewing uses the same 176px scrollable paper geometry as
-   the approved User recordMiniCard; do not restyle the Shared miniCard itself. */
-.record-confirmation-view__paper{position:relative;width:var(--mini-card-width);min-width:var(--mini-card-width);max-width:var(--mini-card-width)}
-.record-confirmation-mini-card--viewer.mini-card--lines{height:176px;min-height:176px;max-height:176px;grid-template-rows:minmax(0,1fr) auto;padding:14px 16px}
-.record-confirmation-mini-card--viewer .mini-card__lines{height:auto;min-height:0;display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:none;gap:4px;align-content:start;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none}
-.record-confirmation-mini-card--viewer .mini-card__lines::-webkit-scrollbar{display:none}
-.record-confirmation-mini-card--viewer .mini-card__line:nth-child(n){grid-column:auto;grid-row:auto;width:100%;font-size:12px;line-height:1.2;white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere}
-.record-confirmation-mini-card--viewer .mini-card__line--primary{font-size:14px;font-weight:850;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.record-confirmation-mini-card--viewer .mini-card__line--moment{font-size:12px;line-height:1.15;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.record-confirmation-mini-card--viewer .mini-card__line--title{font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.record-confirmation-mini-card--viewer .mini-card__line--muted{font-size:10.5px;color:#777A7D;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.record-confirmation-mini-card--viewer .mini-card__line--pair{display:grid;grid-template-columns:minmax(0,1fr) max-content;gap:7px;align-items:start;text-align:left}
-.record-confirmation-mini-card--viewer .mini-card__line-text{min-width:0;font-size:12px;line-height:1.2;overflow-wrap:anywhere}
-.record-confirmation-mini-card--viewer .mini-card__line-right{max-width:90px;font-size:11px;line-height:1.25;font-weight:700;text-align:right;white-space:nowrap}
-.record-confirmation-mini-card--viewer .mini-card__row{min-height:26px;padding:4px 0}
-.record-confirmation-mini-card--viewer .mini-card__row-value{font-size:16px}
-.record-confirmation-mini-card--viewer.record-confirmation-mini-card--two-actions .mini-card__line:nth-child(-n+2){box-sizing:border-box;padding-right:76px}
-.record-confirmation-mini-card--viewer.record-confirmation-mini-card--one-action .mini-card__line:nth-child(-n+2){box-sizing:border-box;padding-right:38px}
-.record-confirmation-view__repeat{position:absolute;top:10px;right:48px;z-index:3;width:30px;height:30px;border:0;border-radius:9px;padding:0;display:grid;place-items:center;background:#111;color:#fff;font:inherit;font-size:19px;line-height:1;cursor:pointer}
-.record-confirmation-view__repeat--solo{right:10px}
-.record-confirmation-view__repeat:active{transform:translateY(1px)}
-.record-confirmation-view__repeat:focus-visible{outline:2px solid #111;outline-offset:2px}
-
 .record-confirmation-notice{display:grid;gap:15px;min-width:0}
 .record-confirmation-notice__headline{margin:0;font-size:23px;line-height:1.15;font-weight:760}
 .record-confirmation-notice__moment{font-size:18px;line-height:1.2;font-weight:700}
