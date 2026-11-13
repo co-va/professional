@@ -611,6 +611,8 @@ export function openRecordView(record, {
       contactDiscount: contactDiscountPercent > 0 ? `${contactDiscountPercent}%` : '',
       date: formatDate(source.date),
       period: `${source.from || ''}–${source.to || ''}`,
+      startTime: String(source.from || '').trim(),
+      endTime: String(source.to || '').trim(),
       identity,
       phone: capabilities.contactIdentity ? (person.phone || contactDisplay.phone || '') : professionalDisplay.phone,
       duration: durationText(appointmentMinutes),
