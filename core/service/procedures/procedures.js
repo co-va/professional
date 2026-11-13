@@ -11,6 +11,7 @@ import {
   miniCardRail,
   modal,
   mountModal,
+  openNotice,
   mountV2ZLayer,
   page,
   v2ListEntries,
@@ -23,7 +24,7 @@ import { serviceHeaderContext, notifyServiceContext } from '../context.js';
 import { procedureCardAppearance, procedureCardFields, procedureCardPhoto } from '../card-presentation.js';
 import { bindProcedureEditor, initialProcedure, procedureEditorForm } from './form.js';
 import { serviceWorkplaceAddButton } from '../workplace-selection.js';
-import { commitDeleteProcedure, getProcedures, reorderProcedures } from './data.js';
+import { commitDeleteProcedure, getProcedures, commitReorderProcedures } from './data.js';
 import { scheduleServiceStatistics, serviceItemStatistics, serviceSpentText } from '../statistics.js';
 
 const money = (value) => `${new Intl.NumberFormat('ru-RU').format(Number(value || 0))} ₽`;
@@ -56,9 +57,11 @@ export function renderProcedureCatalog(host, { root = host, onChanged = () => {}
   });
 
   return initV2ListReorder(host, {
-    onReorder: (ids) => {
-      if (reorderProcedures(ids)) onChanged();
-    },
+    onReorder: (ids) => commitReorderProcedures(ids),
+    onError: (error) => openNotice({
+      title: 'Порядок',
+      message: error instanceof Error ? error.message : 'Не удалось сохранить порядок услуг.',
+    }),
   });
 }
 
