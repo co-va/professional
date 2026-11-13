@@ -328,6 +328,7 @@ function openItemEditor(root, itemId = '', defaults = {}, onSaved = () => {}) {
         ? `${itemIdentityFields(item || {}, defaults)}${itemPackageFields(item || {})}`
         : `${v2Section('Основное', `<div class="form-grid">${itemIdentityFields(item, defaults)}</div>`)}${advancedItemFields(item)}`}
       ${actionBlock(button(creating ? 'Применить' : 'Сохранить', { type: 'button', data: 'data-inventory-item-save', aria: creating ? 'Добавить продукт' : 'Сохранить продукт' }))}
+      <div class="form-error" data-inventory-item-save-error role="alert" hidden></div>
     </form>`;
   const layer = mountModal(document.body, modal(markup, {
     title: creating ? 'Новый продукт' : item.name,
@@ -340,6 +341,7 @@ function openItemEditor(root, itemId = '', defaults = {}, onSaved = () => {}) {
   // Net content is derived from gross and tare; it is not a separate API field.
   const form = layer.querySelector('[data-inventory-item-form]');
   const primary = layer.querySelector('[data-inventory-item-save]');
+  const saveError = layer.querySelector('[data-inventory-item-save-error]');
   const actions = primary?.closest('.modal-actions');
   const signature = () => JSON.stringify([...new FormData(form).entries()]
     .filter(([name]) => name !== 'netWeight')
@@ -348,7 +350,10 @@ function openItemEditor(root, itemId = '', defaults = {}, onSaved = () => {}) {
   const syncDirty = () => {
     if (!creating) setSharedActionVisible(actions, signature() !== initialSignature);
   };
-  form.addEventListener('input', syncDirty);
+  form.addEventListener('input', () => {
+    if (saveError) { saveError.hidden = true; saveError.textContent = ''; }
+    syncDirty();
+  });
   form.addEventListener('change', syncDirty);
   const netInput = form.querySelector('[name="netWeight"]');
   if (netInput) {
@@ -444,7 +449,12 @@ function openItemEditor(root, itemId = '', defaults = {}, onSaved = () => {}) {
       onSaved();
     } catch (error) {
       primary.disabled = false;
-      openNotice({ title: 'Не удалось сохранить', message: error instanceof Error ? error.message : 'Ошибка склада' });
+      // Keep the Q and its unsaved fields visible; never signal success for a
+      // backend that silently ignored the entered position.
+      if (saveError) {
+        saveError.textContent = error instanceof Error ? error.message : 'Ошибка склада';
+        saveError.hidden = false;
+      }
     }
   };
   primary.addEventListener('click', () => { void save(); });
