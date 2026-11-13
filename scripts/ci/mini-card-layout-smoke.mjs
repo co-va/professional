@@ -4,6 +4,7 @@ import { miniCard, miniCardRail } from '../../ui/cards/mini-card.js';
 
 const css = readFileSync('ui/cards/mini-card.css', 'utf8');
 const js = readFileSync('ui/cards/mini-card.js', 'utf8');
+const paymentStyles = readFileSync('ui/payment/payment.css', 'utf8');
 const card = miniCard({
   title: 'Рабочее пространство',
   rows: [
@@ -28,6 +29,7 @@ assert.match(css, /\.mini-card\{--mini-card-width:290px;--mini-card-height:200px
 assert.ok(css.includes('grid-template-rows:auto minmax(0,1fr) auto'), 'All MiniCards share fixed header, scroll centre, fixed footer');
 assert.ok(css.includes('.mini-card__record-center{min-height:0;min-width:0;overflow-y:auto'), 'Only the center owns vertical scroll');
 assert.doesNotMatch(css, /238px|144px|176px/, 'Alternative MiniCard dimensions must never return');
+assert.doesNotMatch(paymentStyles, /\.payment-summary-mini-card\.mini-card--lines\{/, 'Payment may change MiniCard content, never shell geometry');
 assert.equal((css.match(/(^|\n)\.mini-card\{/g) || []).length, 1, 'MiniCard geometry must have one CSS owner');
 const examples = [
   card,
