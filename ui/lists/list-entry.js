@@ -203,9 +203,9 @@ export function initV2ListReorder(root, {
     stopScroll();
     clearTarget();
     if (gesture) {
-      const { node, handle, pointerId } = gesture;
+      const { node, captureTarget, pointerId } = gesture;
       try {
-        if (handle.hasPointerCapture?.(pointerId)) handle.releasePointerCapture(pointerId);
+        if (captureTarget.hasPointerCapture?.(pointerId)) captureTarget.releasePointerCapture(pointerId);
       } catch {}
       node.style.removeProperty('--list-entry-drag-y');
       node.classList.remove('is-reordering');
@@ -246,14 +246,17 @@ export function initV2ListReorder(root, {
     event.preventDefault();
     event.stopPropagation();
     suppressClick = true;
+    // Capture on the stationary list host, not on a row that is being dragged.
+    // This is more reliable in iOS Safari even when the visual row ignores hit testing.
+    const captureTarget = typeof host.setPointerCapture === 'function' ? host : handle;
     gesture = {
-      node, handle, pointerId: event.pointerId,
+      node, captureTarget, pointerId: event.pointerId,
       startY: event.clientY, y: event.clientY, x: event.clientX,
       scroller: findScroller(host), startScrollTop: 0, dragging: false,
       originalIds: currentIds(),
     };
     gesture.startScrollTop = gesture.scroller?.scrollTop || 0;
-    try { handle.setPointerCapture?.(event.pointerId); } catch {}
+    try { captureTarget.setPointerCapture?.(event.pointerId); } catch {}
   };
 
   const onPointerMove = (event) => {
