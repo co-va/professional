@@ -82,3 +82,13 @@
 .mini-card__record-stat--total{text-align:right}
 .mini-card__record-stat-label{font-size:10px;line-height:13px;font-weight:500;color:#5b6064;white-space:nowrap}
 .mini-card__record-stat-value{font-size:16px;line-height:20px;font-weight:800;color:#111;white-space:nowrap;font-variant-numeric:tabular-nums}
+
+/* Record viewer: date and START time stay legible above an actual header/content divider. */
+.mini-card--record-person{padding-top:8px;padding-bottom:8px;row-gap:3px}
+.mini-card--record-person .mini-card__record-head{border-bottom:1px solid #c7c7c7;padding-bottom:5px;gap:3px}
+.mini-card--record-person .mini-card__record-moment--parts{display:flex;align-items:baseline;justify-content:flex-start;gap:7px;min-width:0;height:20px;line-height:20px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.mini-card--record-person .mini-card__record-date{font-size:14px;line-height:20px;font-weight:760;color:#111;white-space:nowrap}
+.mini-card--record-person .mini-card__record-time-start{font-size:16px;line-height:20px;font-weight:850;color:#111;white-space:nowrap}
+.mini-card--record-person .mini-card__record-time-end{font-size:12px;line-height:18px;font-weight:500;color:#626262;white-space:nowrap}
+.mini-card--record-person .mini-card__record-center{padding-top:4px;overflow-anchor:none}
+.mini-card--record-person .mini-card__record-center .mini-card__line{margin-bottom:4px}
