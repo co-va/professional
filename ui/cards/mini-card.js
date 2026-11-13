@@ -50,10 +50,12 @@ function recordMarkup(layout = {}, { className = '', aria = '' } = {}) {
     <div class="mini-card__record-head">
       <div class="mini-card__record-top">
         ${recordActionMarkup(layout.leftAction, 'left')}
-        <strong class="mini-card__record-workplace">${escapeHtml(layout.workplace || '')}</strong>
+        <div class="mini-card__record-main">
+          <strong class="mini-card__record-workplace">${escapeHtml(layout.workplace || '')}</strong>
+          <div class="mini-card__record-moment">${escapeHtml(layout.moment || '')}</div>
+        </div>
         ${recordActionMarkup(layout.rightAction, 'right')}
       </div>
-      <div class="mini-card__record-moment">${escapeHtml(layout.moment || '')}</div>
       ${layout.identity ? `<div class="mini-card__record-identity">${escapeHtml(layout.identity)}</div>` : ''}
       ${layout.phone ? `<div class="mini-card__record-phone">${escapeHtml(layout.phone)}</div>` : ''}
     </div>
@@ -61,9 +63,11 @@ function recordMarkup(layout = {}, { className = '', aria = '' } = {}) {
       ${[...entries, ...details].map(lineMarkup).join('')}
     </div>
     <div class="mini-card__record-footer">
-      ${layout.discount ? `<div class="mini-card__record-discount">${escapeHtml(layout.discount)}</div>` : ''}
       <div class="mini-card__record-totals">
-        <span class="mini-card__record-duration">${escapeHtml(layout.duration || '')}</span>
+        <span class="mini-card__record-meta">
+          <span class="mini-card__record-duration">${escapeHtml(layout.duration || '')}</span>
+          ${layout.discount ? `<span class="mini-card__record-discount">${escapeHtml(layout.discount)}</span>` : ''}
+        </span>
         <strong class="mini-card__record-total">${escapeHtml(layout.total || '')}</strong>
       </div>
     </div>
