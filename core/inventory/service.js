@@ -26,6 +26,13 @@ export async function updateInventoryItem(itemId, value = {}) {
   });
 }
 
+export async function reorderInventoryItems(manufacturer, itemIds) {
+  return inventoryRequest('/items/reorder', {
+    method: 'POST',
+    body: JSON.stringify({ manufacturer, itemIds }),
+  });
+}
+
 export async function createInventoryMovement(value = {}) {
   return inventoryRequest('/movements', {
     method: 'POST',
