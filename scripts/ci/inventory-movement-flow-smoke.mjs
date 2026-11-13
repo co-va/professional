@@ -62,7 +62,7 @@ for (const kind of ['RECEIPT', 'CONSUMPTION', 'WRITE_OFF', 'RETURN']) {
     movementTitle: value => value.kind,
     stockSearchField: () => '<search>',
     actionBlock: value => value,
-    button: value => '<button>' + value + '</button>',
+    button: (value, options = {}) => '<button ' + (options.data || '') + '>' + value + '</button>',
     modal: (value, options = {}) => `[title=${options.title || ''}]${value}`,
     mountModal: (root, markup) => {
       if (!first) {
