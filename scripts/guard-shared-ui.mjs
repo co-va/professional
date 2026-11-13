@@ -42,6 +42,9 @@ const modalPortal = read('ui/v2/modal-portal.js');
 const keyboardRuntime = read('ui/inputs/keyboard-runtime.js');
 const keyboardStyle = read('ui/inputs/keyboard.css');
 const shellStyle = read('css/style.css');
+const selectorsStyle = read('ui/selectors/selectors.css');
+const bookingStyle = read('ui/booking/booking.css');
+const modalStyle = read('ui/modals/modal.css');
 const vHost = read('ui/v2/v-host.js');
 const entity = read('ui/cards/entity-card-constructor.css');
 const mini = read('ui/cards/mini-card.css');
@@ -59,6 +62,12 @@ assert(rootSelectorCount(v2, '.v2-header') === 1, 'Shared H geometry must have o
 assert(rootSelectorCount(v2, '.v2-z') === 1, 'Shared Z geometry must have one owner');
 assert(!zStack.includes('padding-top:0'), 'Nested Z must not override Shared top padding');
 assert(zLayout.includes("const SURFACE_HEADER_SPACING = '12px'"), 'Z/Q Header must share one 12px token');
+assert(v2.includes('.v2-q-title,.v2-z-title{box-sizing:border-box;display:flex;align-items:center;width:100%;min-width:0;height:46px;min-height:46px;max-height:46px;'), 'Z/Q text header must be fixed at 46px');
+assert(modalStyle.includes('.modal-sheet.modal--surface-app:not(.modal--technical){background:var(--v2-white,#fff)}'), 'Z/Q must be white independently of app background');
+assert(shellStyle.includes('--ui-field-height:46px;') && shellStyle.includes('--ui-control-height:48px;'), 'Fixed fields 46px and unchanged buttons 48px require separate tokens');
+assert(inputs.includes('height:var(--ui-field-height);min-height:var(--ui-field-height);max-height:var(--ui-field-height)'), 'Shared one-line inputs must be exactly 46px');
+assert(['.ui-select__control{','.ui-selector__search{','.ui-selector__option{'].every(c=>{const q=selectorsStyle.split(c)[1]?.split('}')[0]||'';return q.includes('height:var(--ui-selector-control-height);min-height:var(--ui-selector-control-height);max-height:var(--ui-selector-control-height)')}), 'Selector rows, search and trigger must be exactly 46px');
+assert(!bookingStyle.includes('min-height:52px'), 'Booking account editor cannot use 52px controls');
 assert(zLayout.includes('const SURFACE_HEADER_STYLE = [') && !zLayout.includes('Q_HEADER_STYLE'), 'Z/Q must have one Header geometry owner');
 assert(zLayout.includes("'padding-top:var(--v2-surface-header-spacing)'")
   && zLayout.includes("'padding-bottom:var(--v2-surface-header-spacing)'"), 'Z/Q Header top and bottom gaps must be identical');

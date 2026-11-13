@@ -1,17 +1,17 @@
-:root{--ui-selector-control-height:var(--ui-control-height)}
+:root{--ui-selector-control-height:var(--ui-field-height)}
 .ui-select{min-width:0;max-width:100%}
-.ui-select__control{position:relative;width:100%;max-width:100%;min-width:0;min-height:var(--ui-selector-control-height);border:1px solid var(--border);border-radius:0;padding:0 40px 0 13px;display:flex;align-items:center;justify-content:center;gap:10px;overflow:hidden;background:var(--white);color:var(--text);font:inherit;text-align:center;cursor:pointer}
+.ui-select__control{position:relative;width:100%;max-width:100%;min-width:0;height:var(--ui-selector-control-height);min-height:var(--ui-selector-control-height);max-height:var(--ui-selector-control-height);border:1px solid var(--border);border-radius:0;padding:0 40px 0 13px;display:flex;align-items:center;justify-content:center;gap:10px;overflow:hidden;background:var(--white);color:var(--text);font:inherit;text-align:center;cursor:pointer}
 .ui-select__control:focus-visible{outline:2px solid var(--text-secondary);outline-offset:2px}
 .ui-select__value{flex:1 1 auto;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center}
 .ui-select__chevron{position:absolute;right:13px;flex:0 0 auto;color:var(--text-secondary);font-size:17px;line-height:1}
 .ui-selector{display:grid;min-width:0}
 .ui-selector__wheel{width:100%;min-width:0;border:1px solid var(--border);border-radius:0;background:var(--white);overflow:hidden}
 .ui-selector__search-wrap{padding:10px 12px;border-bottom:1px solid var(--border);background:var(--white)}
-.ui-selector__search{box-sizing:border-box;width:100%;min-height:46px;border:1px solid var(--border);border-radius:0;padding:0 12px;background:var(--white);color:var(--text);font:inherit;outline:none}
+.ui-selector__search{box-sizing:border-box;width:100%;height:var(--ui-selector-control-height);min-height:var(--ui-selector-control-height);max-height:var(--ui-selector-control-height);border:1px solid var(--border);border-radius:0;padding:0 12px;background:var(--white);color:var(--text);font:inherit;outline:none}
 .ui-selector__search:focus{border-color:var(--text-secondary)}
 .ui-selector__viewport{max-width:100%;max-height:min(260px,42vh);overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;scrollbar-width:none;padding:0 14px}
 .ui-selector__viewport::-webkit-scrollbar{display:none}
-.ui-selector__option{width:100%;min-width:0;min-height:48px;border:0;border-bottom:1px solid var(--border);padding:10px 4px;display:flex;align-items:center;justify-content:center;background:var(--white);color:var(--text);font:inherit;text-align:center;cursor:pointer;white-space:normal;overflow-wrap:anywhere}
+.ui-selector__option{width:100%;min-width:0;height:var(--ui-selector-control-height);min-height:var(--ui-selector-control-height);max-height:var(--ui-selector-control-height);border:0;border-bottom:1px solid var(--border);padding:4px 4px;line-height:1.15;display:flex;align-items:center;justify-content:center;background:var(--white);color:var(--text);font:inherit;text-align:center;cursor:pointer;white-space:normal;overflow-wrap:anywhere}
 .ui-selector__option:last-child{border-bottom:0}
 .ui-selector__option.is-current{font-weight:700}
 .ui-selector__option:active{background:var(--surface-soft)}
@@ -21,7 +21,8 @@
 .ui-select__indicator,.ui-selector__option-indicator{width:8px;height:8px;flex:0 0 8px;border:1px solid rgba(0,0,0,.18);border-radius:50%;background:var(--ui-select-indicator,#212529)}
 .ui-select__text,.ui-selector__option-main{display:grid;min-width:0;gap:2px}
 .ui-select__text{flex:0 1 auto;text-align:center}
-.ui-select__value{overflow:hidden;text-overflow:clip;white-space:normal;overflow-wrap:normal;word-break:normal;text-align:center}
+.ui-select__value{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;max-height:36px;line-height:18px;text-overflow:clip;white-space:normal;overflow-wrap:normal;word-break:normal;text-align:center}
+.ui-select__text:has(> .ui-select__meta:not([hidden])) .ui-select__value{-webkit-line-clamp:1;max-height:18px}
 .ui-select__meta,.ui-selector__option-main small{font-size:11px;line-height:1.15;color:var(--text-secondary);font-weight:400}
 .ui-selector__option{justify-content:center;gap:10px;text-align:center}
 .ui-selector__option-main{flex:0 1 auto;text-align:center}
