@@ -231,8 +231,6 @@ export function recordConfirmationMiniCard({
   programControl = '',
   procedures = [],
   viewer = false,
-  programName = '',
-  paymentInfo = '',
   serviceSettings = false,
   repeat = false,
 } = {}) {
@@ -244,22 +242,21 @@ export function recordConfirmationMiniCard({
   const card = miniCard({
     className: 'record-confirmation-mini-card',
     recordLayout: {
-      workplace,
+      workplace: viewer ? '' : workplace,
+      headerMode: viewer ? 'person' : '',
       moment: [date, period].filter(Boolean).join(' · '),
       identity,
       phone,
       services,
-      details: viewer ? [
-        ...(programName ? [{ value: `Программа: ${programName}` }] : []),
-        ...(paymentInfo ? [{ value: paymentInfo, variant: 'muted' }] : []),
-      ] : [],
       duration,
       discount: discountMoney
         ? `Скидка: ${contactDiscount ? `${contactDiscount} · ` : ''}${discountMoney}`
         : (contactDiscount ? `Скидка: ${contactDiscount}` : ''),
       total,
       leftAction: viewer && serviceSettings ? {
-        label: '⚙',
+        label: 'Настроить услуги',
+        icon: 'settings',
+        variant: 'secondary',
         data: 'data-record-view-service-settings',
         aria: 'Услуги записи',
       } : null,
