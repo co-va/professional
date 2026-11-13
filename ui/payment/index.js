@@ -1,4 +1,4 @@
-import { button } from '../buttons/index.js';
+import { button, compactRemoveButton } from '../buttons/index.js';
 import { miniCard } from '../cards/mini-card.js';
 import { select } from '../selectors/index.js';
 import { field } from '../inputs/index.js';
@@ -52,7 +52,7 @@ function paymentItemHeader(name = '') {
   const value = String(name || '');
   return `<div class="payment-item-head">
     <strong class="payment-item-head__name">${escapeHtml(value)}</strong>
-    <button type="button" class="payment-item-head__remove" data-payment-remove aria-label="Удалить ${escapeHtml(value)}">×</button>
+    ${compactRemoveButton({ className: "payment-item-head__remove", data: "data-payment-remove", aria: `Удалить ${value}` })}
   </div>`;
 }
 
