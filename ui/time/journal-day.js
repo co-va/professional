@@ -1,4 +1,5 @@
 import { timeToMinutes, minutesToTime } from '../../core/time/index.js';
+import { recordVisualState } from '../../core/record/state.js';
 
 const DAY_MINUTES = 24 * 60;
 
@@ -14,7 +15,8 @@ function recordMarkup(usage, { interactive = true } = {}) {
   const total = moneyText(usage?.financialTotal ?? usage?.finance?.planTotal ?? usage?.finance?.dueTotal ?? 0);
   const phone = person.phone ? `<span class="journal-record__phone">${escape(person.phone)}</span>` : '';
   const services = (usage.procedures || []).map((item) => `<span class="journal-record__service">${escape(item.name)}</span>`).join('');
-  const statusClass = usage?.attendance === 'no-show' ? ' journal-record--no-show' : usage?.paid ? ' journal-record--paid' : '';
+  const visualState = recordVisualState(usage, { paid: Boolean(usage?.paid) });
+  const statusClass = visualState === 'paid' || visualState === 'no-show' ? ` journal-record--${visualState}` : '';
   const content = `<span class="journal-record__head"><strong class="journal-record__identity">${identity}</strong><strong class="journal-record__total">${escape(total)}</strong></span>${phone}${services}${overlapMarkup(usage)}`;
   return interactive
     ? `<button type="button" class="journal-record${statusClass}" data-journal-usage="${escape(usage.sourceId || usage.id)}">${content}</button>`
