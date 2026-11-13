@@ -73,4 +73,28 @@ assert.ok(css.includes('.mini-card--record-person .mini-card__record-top--no-lef
 assert.ok(css.includes('.mini-card__record-footer--triple{grid-template-columns:'));
 assert.ok(paidViewer.includes('Стрижка · 1 ч') && paidViewer.includes('Окраска · 2 ч'));
 
+
+const timedViewer = miniCard({ recordLayout: {
+  ...paidViewerLayout,
+  momentParts: { date:'21.10.26', start:'12:00', end:'16:00' },
+  moment: '21.10.26 · 12:00–16:00',
+} });
+assert.ok(timedViewer.includes('mini-card__record-moment--parts'), 'Date/start must use the fixed header row');
+assert.ok(timedViewer.includes('mini-card__record-date">21.10.26</span>'), 'Date is visible and accessible');
+assert.ok(timedViewer.includes('mini-card__record-time-start">12:00</span>'), 'Start time must be prominent');
+assert.ok(timedViewer.includes('mini-card__record-time-end">–16:00</span>'), 'End time must be secondary');
+assert.ok(timedViewer.indexOf('mini-card__record-moment--parts') <
+  timedViewer.indexOf('mini-card__record-center'), 'Date and start are outside the scroll region');
+assert.ok(!timedViewer.includes('mini-card__record-workplace'), 'Person header keeps duplicate workplace absent');
+assert.ok(css.includes('.mini-card--record-person .mini-card__record-head{border-bottom:1px solid #c7c7c7;'),
+  'Fixed header must have a visible bottom separator');
+assert.ok(css.includes('.mini-card--record-person .mini-card__record-center{padding-top:4px;overflow-anchor:none}'),
+  'Services must not touch or overlap the fixed header');
+assert.ok(css.includes('.mini-card--record-person .mini-card__record-time-start{font-size:16px;'),
+  'Start time must be readable');
+assert.ok(css.includes('.mini-card--record-person .mini-card__record-time-end{font-size:12px;'),
+  'End time must be visually secondary');
+assert.ok(css.includes('width:min(290px,100%)') && css.includes('height:200px'),
+  'Record card geometry must remain 290 × 200');
+
 console.log('PASS: User MiniCard markup and fixed base geometry, Professional labels, rounded corners and variable-height line variant');
