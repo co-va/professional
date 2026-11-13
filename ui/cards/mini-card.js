@@ -35,6 +35,41 @@ function lineMarkup(line = {}) {
   return content;
 }
 
+
+function recordActionMarkup(action, side) {
+  if (!action?.data || !action?.label) {
+    return '<span class="mini-card__record-action-placeholder" aria-hidden="true"></span>';
+  }
+  return `<button type="button" class="mini-card__record-action mini-card__record-action--${side}"${attrs(action.data, action.aria || action.label)}>${escapeHtml(action.label)}</button>`;
+}
+
+function recordMarkup(layout = {}, { className = '', aria = '' } = {}) {
+  const entries = Array.isArray(layout.services) ? layout.services : [];
+  const details = Array.isArray(layout.details) ? layout.details : [];
+  return `<section class="mini-card mini-card--record${className ? ` ${escapeHtml(className)}` : ''}" aria-label="${escapeHtml(aria || 'Данные записи')}">
+    <div class="mini-card__record-head">
+      <div class="mini-card__record-top">
+        ${recordActionMarkup(layout.leftAction, 'left')}
+        <strong class="mini-card__record-workplace">${escapeHtml(layout.workplace || '')}</strong>
+        ${recordActionMarkup(layout.rightAction, 'right')}
+      </div>
+      <div class="mini-card__record-moment">${escapeHtml(layout.moment || '')}</div>
+      ${layout.identity ? `<div class="mini-card__record-identity">${escapeHtml(layout.identity)}</div>` : ''}
+      ${layout.phone ? `<div class="mini-card__record-phone">${escapeHtml(layout.phone)}</div>` : ''}
+    </div>
+    <div class="mini-card__record-center" tabindex="0" role="region" aria-label="Услуги записи">
+      ${[...entries, ...details].map(lineMarkup).join('')}
+    </div>
+    <div class="mini-card__record-footer">
+      ${layout.discount ? `<div class="mini-card__record-discount">${escapeHtml(layout.discount)}</div>` : ''}
+      <div class="mini-card__record-totals">
+        <span class="mini-card__record-duration">${escapeHtml(layout.duration || '')}</span>
+        <strong class="mini-card__record-total">${escapeHtml(layout.total || '')}</strong>
+      </div>
+    </div>
+  </section>`;
+}
+
 export function miniCard({
   title = '',
   value = '',
@@ -53,11 +88,15 @@ export function miniCard({
   surface = 'default',
   actionLabel = '',
   compactAction = null,
+  recordLayout = null,
   interactive = false,
   data = '',
   aria = '',
   className = '',
 } = {}) {
+  if (recordLayout && typeof recordLayout === 'object') {
+    return recordMarkup(recordLayout, { className, aria });
+  }
   const resolvedCompactAction = compactAction && typeof compactAction === 'object'
     ? compactAction
     : null;
