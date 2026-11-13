@@ -13,6 +13,8 @@ import {
   recordConfirmationMiniCard,
   recordZHost,
   select,
+  v2ListEntry,
+  v2ListEntries,
 } from '../../ui/ui.js';
 import { readOnlyReceipt } from '../../ui/receipt/index.js';
 import { getWorkplaces } from '../workplace-time.js';
@@ -37,6 +39,8 @@ import {
 import { flushBusinessPersistence } from '../business-persistence.js';
 import { getNotesForTarget, hasNotesForTarget } from '../note/index.js';
 import { openProcedureAdjustment, openRecords } from './records.js';
+import { getProcedures } from '../service/procedures/data.js';
+import { proceduresForWorkplace, procedureCostForWorkplace, procedureDurationForWorkplace } from '../service/procedures/selection.js';
 import { setRecordLoyaltyProgram } from './program-selection.js';
 
 function formatDate(value) {
@@ -381,11 +385,48 @@ export function openRecordView(record, {
       });
       return;
     }
+    const personKey = String(source?.person?.key || source?.person?.id || '').trim();
+    const programs = capabilities.loyaltyProgram ? getRecordProgramOptions(personKey) : [];
+    const programSelector = programs.length ? select({
+      label: 'Программа',
+      name: 'recordLoyaltyProgram',
+      value: String(source?.loyaltyProgram?.key || ''),
+      options: [
+        { value: '', label: 'Не выбрано' },
+        ...programs.map((item) => ({ value: item.key, label: item.name, meta: item.typeLabel })),
+      ],
+      data: 'data-record-view-program',
+      aria: 'Выбрать программу записи',
+    }) : '';
     const actions = mountModal(document.body, modal(
-      actionSheet({ cancelled: source.status === 'cancelled' }),
+      actionSheet({ cancelled: source.status === 'cancelled' }) + programSelector,
       { variant: 'x', surface: 'app' },
     ));
     if (!actions) return;
+
+    actions.querySelector('[data-record-view-program]')?.addEventListener('change', async (event) => {
+      const latest = syncCurrent();
+      if (getRecordPaymentState(latest).hasPayments) {
+        openNotice({ message: 'После оплаты программа записи не изменяется.' });
+        return;
+      }
+      const nextKey = String(event.currentTarget?.value || '');
+      const nextProgram = programs.find((item) => item.key === nextKey) || null;
+      const updated = setRecordLoyaltyProgram(latest, recordProgramSelection(nextProgram));
+      if (!updated) return;
+      actions.v2Close?.();
+      currentRecord = updated;
+      render();
+      try {
+        await persistAndRefresh();
+        render();
+      } catch (error) {
+        await refreshRecordsFromServer().catch(() => null);
+        syncCurrent();
+        render();
+        openNotice({ title: 'Не удалось сохранить', message: String(error?.message || 'Сервер не подтвердил выбор программы.') });
+      }
+    });
 
     actions.querySelector('[data-record-view-correct]')?.addEventListener('click', () => {
       actions.v2Close?.();
@@ -426,6 +467,90 @@ export function openRecordView(record, {
     });
   };
 
+  const onProcedureSaved = async (saved) => {
+    currentRecord = saved;
+    render();
+    try {
+      await persistAndRefresh();
+      render();
+    } catch (error) {
+      await refreshRecordsFromServer().catch(() => null);
+      syncCurrent();
+      render();
+      openNotice({ title: 'Не удалось сохранить', message: String(error?.message || 'Сервер не подтвердил изменения.') });
+    }
+  };
+
+  const openServiceMenu = () => {
+    if (!capabilities.procedureSettings) return;
+    const source = syncCurrent();
+    if (getRecordPaymentState(source).hasPayments) {
+      openNotice({ message: 'После оплаты используйте корректировку оплаты.' });
+      return;
+    }
+    const procedures = Array.isArray(source.procedures) ? source.procedures : [];
+    const settlement = resolveRecordSettlement(source);
+    const byId = new Map((Array.isArray(settlement?.items) ? settlement.items : [])
+      .filter((item) => String(item?.sourceType || 'procedure') === 'procedure')
+      .map((item) => [String(item?.sourceId || ''), item]));
+    const rows = procedures.map((procedure, index) => v2ListEntry({
+      title: String(procedure?.name || 'Услуга'),
+      subtitle: durationText(Number(procedure?.duration) || 0),
+      rightTop: formatMoney(byId.get(String(procedure?.id || ''))?.planAmount ?? procedure?.cost ?? 0),
+      initial: String(procedure?.name || 'У').slice(0, 1).toUpperCase(),
+      data: `data-record-view-service-index="${index}"`,
+      aria: `Корректировать услугу ${String(procedure?.name || 'Услуга')}`,
+    }));
+    const menu = mountModal(document.body, modal(
+      (rows.length ? v2ListEntries(rows) : emptyState('Услуги пока не выбраны'))
+        + actionBlock(button('Добавить услугу', { data: 'data-record-view-add-service' })),
+      { variant: 'x', surface: 'app', title: 'Услуги' },
+    ));
+    if (!menu) return;
+    menu.querySelectorAll('[data-record-view-service-index]').forEach((node) => node.addEventListener('click', () => {
+      const procedure = procedures[Number(node.dataset.recordViewServiceIndex)];
+      if (!procedure?.id) return;
+      menu.v2Close?.();
+      void openProcedureAdjustment(syncCurrent(), procedure.id, { onSaved: onProcedureSaved })
+        .catch((error) => openNotice({ title: 'Услуга', message: String(error?.message || 'Не удалось открыть услугу.') }));
+    }));
+    menu.querySelector('[data-record-view-add-service]')?.addEventListener('click', () => {
+      menu.v2Close?.();
+      openRecords({
+        context: 'professional',
+        record: syncCurrent(),
+        initialStep: 'procedures',
+        professionalActions: true,
+        onSaved: onProcedureSaved,
+      });
+    });
+  };
+
+  const repeatRecord = () => {
+    const source = syncCurrent();
+    const selectedIds = new Set((Array.isArray(source?.procedures) ? source.procedures : [])
+      .map((item) => String(item?.id || '')).filter(Boolean));
+    // Repeat the service selection, not an obsolete historic price snapshot.
+    // The existing Record owner resolves the current price and availability.
+    const selected = proceduresForWorkplace(getProcedures(), source.workplaceId)
+      .filter((item) => selectedIds.has(String(item?.id || '')))
+      .map((item) => ({
+        id: String(item.id),
+        name: String(item.name || ''),
+        duration: procedureDurationForWorkplace(item, source.workplaceId),
+        cost: procedureCostForWorkplace(item, source.workplaceId),
+        raw: item,
+      }));
+    layer.v2Close?.();
+    openRecords({
+      context: 'person',
+      person: source.person,
+      workplaceId: source.workplaceId,
+      procedures: selected,
+      professionalActions: true,
+    });
+  };
+
   if (capabilities.settings) bindRecordSettings(layer, openActions);
 
   const scheduleStartRender = (source) => {
@@ -462,17 +587,6 @@ export function openRecordView(record, {
       : (source.person || {});
     const programOptions = capabilities.loyaltyProgram ? getRecordProgramOptions(personKey) : [];
     const selectedProgramKey = String(source?.loyaltyProgram?.key || '');
-    const programControl = capabilities.loyaltyProgram && programOptions.length ? select({
-      label: 'Программа',
-      name: 'recordLoyaltyProgram',
-      value: selectedProgramKey,
-      options: [
-        { value: '', label: 'Не выбрано' },
-        ...programOptions.map((item) => ({ value: item.key, label: item.name, meta: item.typeLabel })),
-      ],
-      data: 'data-record-view-program',
-      aria: 'Выбрать программу записи',
-    }) : '';
     const contactDiscountPercent = readOnlyHistory ? 0 : Math.max(0, Math.min(100,
       Number(settlement?.pricePercent) || Number(getPersonPriceCondition(contact).percent) || 0));
     const discountMoney = Math.max(0, (Number(settlement?.serviceTotal) || 0) - (Number(settlement?.planTotal) || 0));
@@ -490,6 +604,17 @@ export function openRecordView(record, {
       ].filter(Boolean).join('; ')
       : [String(professionalDisplay.uei || '').trim(), professionalDisplay.name].filter(Boolean).join('; ');
     const card = recordConfirmationMiniCard({
+      viewer: true,
+      serviceSettings: capabilities.procedureSettings && !payment.hasPayments && !readOnlyHistory,
+      repeat: capabilities.contactIdentity && !readOnlyHistory,
+      programName: selectedProgramKey
+        ? (programOptions.find((item) => String(item.key) === selectedProgramKey)?.name || 'Программа')
+        : '',
+      paymentInfo: readOnlyHistory
+        ? ''
+        : payment.fullyPaid
+          ? 'Оплачено'
+          : `${recordHasEnded(source) ? 'Задолженность' : 'К оплате'}: ${formatMoney(payment.remaining)}`,
       workplace: workplaceName(source.workplaceId),
       contactDiscount: contactDiscountPercent > 0 ? `${contactDiscountPercent}%` : '',
       date: formatDate(source.date),
@@ -498,8 +623,7 @@ export function openRecordView(record, {
       phone: capabilities.contactIdentity ? (person.phone || '') : professionalDisplay.phone,
       duration: durationText(appointmentMinutes),
       discountMoney: discountMoney > 0.009 ? formatMoney(discountMoney) : '',
-      total: readOnlyHistory ? '—' : formatMoney(grossTotal),
-      programControl,
+      total: readOnlyHistory ? '—' : formatMoney(Number(settlement?.planTotal) || grossTotal),
       procedures: [
         ...procedures.map((item) => {
           const financeItem = settlementByProcedure.get(String(item?.id || ''));
@@ -509,13 +633,6 @@ export function openRecordView(record, {
             right: readOnlyHistory
               ? (item?.cost !== '' && item?.cost != null ? formatMoney(item.cost) : '—')
               : formatMoney(financeItem?.planAmount ?? item?.cost ?? 0),
-            ...(capabilities.procedureSettings && !payment.hasPayments ? {
-              action: {
-                data: 'data-record-view-procedure-settings',
-                aria: `Настроить ${item?.name || 'услугу'}`,
-                label: '⚙',
-              },
-            } : {}),
           };
         }),
         ...products.map((item) => ({
@@ -558,68 +675,28 @@ export function openRecordView(record, {
       ].filter(Boolean).join(''))}
     </div>`;
 
-    root.querySelector('[data-record-view-program]')?.addEventListener('change', async (event) => {
-      if (!capabilities.loyaltyProgram) return;
-      if (payment.hasPayments) {
-        render();
-        openNotice({ message: 'После оплаты программа записи не изменяется.' });
-        return;
-      }
-      const nextKey = String(event.currentTarget?.value || '');
-      const nextProgram = programOptions.find((item) => item.key === nextKey) || null;
-      const updated = setRecordLoyaltyProgram(source, recordProgramSelection(nextProgram));
-      if (!updated) return;
-      currentRecord = updated;
-      render();
-      try {
-        await persistAndRefresh();
-        render();
-      } catch (error) {
-        await refreshRecordsFromServer().catch(() => null);
-        syncCurrent();
-        render();
-        openNotice({ title: 'Не удалось сохранить', message: String(error?.message || 'Сервер не подтвердил выбор программы.') });
-      }
+    root.querySelector('[data-record-view-service-settings]')?.addEventListener('click', (event) => {
+      event.stopPropagation();
+      openServiceMenu();
     });
-
-    root.querySelectorAll('[data-record-view-procedure-settings]').forEach((node, index) => {
-      if (!capabilities.procedureSettings) return;
-      const procedure = procedures[index];
-      if (!procedure) return;
-      const open = (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        openProcedureAdjustment(syncCurrent(), procedure.id, {
-          onSaved: async (saved) => {
-            currentRecord = saved;
-            render();
-            try {
-              await persistAndRefresh();
-              render();
-            } catch (error) {
-              await refreshRecordsFromServer().catch(() => null);
-              syncCurrent();
-              render();
-              openNotice({ title: 'Не удалось сохранить', message: String(error?.message || 'Сервер не подтвердил изменения.') });
-            }
-          },
-        });
-      };
-      node.addEventListener('click', open);
-      node.addEventListener('keydown', (event) => {
-        if (event.key !== 'Enter' && event.key !== ' ') return;
-        open(event);
-      });
+    root.querySelector('[data-record-view-service-settings]')?.addEventListener('keydown', (event) => event.stopPropagation());
+    root.querySelector('[data-record-view-repeat]')?.addEventListener('click', (event) => {
+      event.stopPropagation();
+      repeatRecord();
     });
+    root.querySelector('[data-record-view-repeat]')?.addEventListener('keydown', (event) => event.stopPropagation());
 
     const reportCard = root.querySelector('.record-confirmation-view__card');
     if (capabilities.zReport) {
       reportCard?.setAttribute('role', 'button');
       reportCard?.setAttribute('tabindex', '0');
       reportCard?.setAttribute('aria-label', 'Z-отчёт записи');
-      reportCard?.addEventListener('click', () => openRecordZReport(syncCurrent()));
+      reportCard?.addEventListener('click', (event) => {
+        if (event.target.closest?.('button,select,input,[role="button"]')) return;
+        openRecordZReport(syncCurrent());
+      });
       reportCard?.addEventListener('keydown', (event) => {
-        if (event.key !== 'Enter' && event.key !== ' ') return;
+        if (event.target !== reportCard || (event.key !== 'Enter' && event.key !== ' ')) return;
         event.preventDefault();
         openRecordZReport(syncCurrent());
       });
