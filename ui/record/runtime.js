@@ -236,73 +236,47 @@ export function recordConfirmationMiniCard({
   serviceSettings = false,
   repeat = false,
 } = {}) {
-  if (viewer) {
-    const serviceLines = (Array.isArray(procedures) ? procedures : []).map((item) => ({
-      value: [String(item?.name || item?.title || 'Услуга'), String(item?.durationText || item?.secondary || '')]
-        .filter(Boolean).join(' · '),
-      rightValue: String(item?.right || item?.costText || ''),
-    }));
-    const card = miniCard({
-      className: 'record-confirmation-mini-card record-confirmation-mini-card--viewer',
-      recordLayout: {
-        workplace,
-        moment: [date, period].filter(Boolean).join(' · '),
-        identity,
-        phone,
-        services: serviceLines,
-        details: [
-          ...(programName ? [{ value: `Программа: ${programName}` }] : []),
-          ...(paymentInfo ? [{ value: paymentInfo, variant: 'muted' }] : []),
-        ],
-        duration,
-        discount: discountMoney
-          ? `Скидка: ${contactDiscount ? `${contactDiscount} · ` : ''}${discountMoney}`
-          : (contactDiscount ? `Скидка: ${contactDiscount}` : ''),
-        total,
-        leftAction: serviceSettings ? {
-          label: '⚙',
-          data: 'data-record-view-service-settings',
-          aria: 'Услуги записи',
-        } : null,
-        rightAction: repeat ? {
-          label: '↻',
-          data: 'data-record-view-repeat',
-          aria: 'Повторить запись',
-        } : null,
-      },
-    });
-    return `<div class="record-confirmation-view"><div class="record-confirmation-view__card">${card}</div></div>`;
-  }
-  const serviceRows = (Array.isArray(procedures) ? procedures : []).map((item = {}) => v2ListEntry({
-    title: item.name || item.title || 'Услуга',
-    subtitle: item.durationText || item.secondary || '',
-    rightTop: item.right || item.costText || '',
-    interactive: false,
-    actionData: item.action?.data || '',
-    actionAria: item.action?.aria || '',
-    actionIcon: item.action?.label || '⚙',
+  const services = (Array.isArray(procedures) ? procedures : []).map((item) => ({
+    value: [String(item?.name || item?.title || 'Услуга'), String(item?.durationText || item?.secondary || '')]
+      .filter(Boolean).join(' · '),
+    rightValue: String(item?.right || item?.costText || ''),
   }));
-  const services = serviceRows.length ? v2ListEntries(serviceRows) : '';
-
   const card = miniCard({
     className: 'record-confirmation-mini-card',
-    lines: [
-      { value: workplace, strong: true },
-      { value: contactDiscount, align: 'right', strong: true },
-      { value: date },
-      { value: period, align: 'right' },
-      { value: identity, strong: true },
-      { value: phone },
-      { value: duration, strong: true },
-      { value: discountMoney, strong: true },
-      { value: total, align: 'right', strong: true },
-    ],
+    recordLayout: {
+      workplace,
+      moment: [date, period].filter(Boolean).join(' · '),
+      identity,
+      phone,
+      services,
+      details: viewer ? [
+        ...(programName ? [{ value: `Программа: ${programName}` }] : []),
+        ...(paymentInfo ? [{ value: paymentInfo, variant: 'muted' }] : []),
+      ] : [],
+      duration,
+      discount: discountMoney
+        ? `Скидка: ${contactDiscount ? `${contactDiscount} · ` : ''}${discountMoney}`
+        : (contactDiscount ? `Скидка: ${contactDiscount}` : ''),
+      total,
+      leftAction: viewer && serviceSettings ? {
+        label: '⚙',
+        data: 'data-record-view-service-settings',
+        aria: 'Услуги записи',
+      } : null,
+      rightAction: viewer && repeat ? {
+        label: '↻',
+        data: 'data-record-view-repeat',
+        aria: 'Повторить запись',
+      } : null,
+    },
   });
 
+  if (viewer) {
+    return `<div class="record-confirmation-view"><div class="record-confirmation-view__card">${card}</div></div>`;
+  }
   return `<div class="record-confirmation-view">${v2ZBodySections([
     { kind: 'content', content: `<div class="record-confirmation-view__card">${card}</div>` },
     ...(programControl ? [{ kind: 'content', content: `<div class="record-confirmation-view__program">${programControl}</div>` }] : []),
-    { kind: 'content', content: `<div class="record-confirmation-view__procedures">${services}</div>` },
   ])}</div>`;
 }
 
