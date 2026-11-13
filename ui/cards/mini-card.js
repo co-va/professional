@@ -56,7 +56,7 @@ function recordMarkup(layout = {}, { className = '', aria = '' } = {}) {
   const topLayout = personHeader
     ? `${showLeft ? '' : ' mini-card__record-top--no-left'}${showRight ? '' : ' mini-card__record-top--no-right'}`
     : '';
-  return `<section class="mini-card mini-card--record${personHeader ? ' mini-card--record-person' : ''}${personHeader && !showLeft ? ' mini-card--record-no-left' : ''}${className ? ` ${escapeHtml(className)}` : ''}" aria-label="${escapeHtml(aria || 'Данные записи')}">
+  return `<section data-mini-card-ui="shared" class="mini-card mini-card--record${personHeader ? ' mini-card--record-person' : ''}${personHeader && !showLeft ? ' mini-card--record-no-left' : ''}${className ? ` ${escapeHtml(className)}` : ''}" aria-label="${escapeHtml(aria || 'Данные записи')}">
     <div class="mini-card__record-head">
       <div class="mini-card__record-top${topLayout}">
         ${recordActionMarkup(layout.leftAction, 'left')}
@@ -145,19 +145,15 @@ export function miniCard({
     image ? 'has-image' : '',
     className,
   ].filter(Boolean).join(' ');
-  const surfaceStyle = resolvedSurface === 'photo' && image
-    ? ` style="--mini-card-surface-image:url('${escapeHtml(image)}');--mini-card-image-position:${escapeHtml(imagePosition)}"`
-    : '';
+  const surfaceStyle = '';
   const actionAttrs = interactive && !dualAction ? ` type="button"${attrs(data, aria || title)}` : '';
   const rowItems = Array.isArray(rows) ? rows : [];
   const lineItems = Array.isArray(lines) ? lines : [];
-  const media = resolvedSurface === 'default'
-    ? (image
-      ? `<span class="mini-card__media" style="--mini-card-image:url('${escapeHtml(image)}');--mini-card-image-position:${escapeHtml(imagePosition)}" aria-hidden="true"></span>`
-      : initials
-        ? `<span class="mini-card__media mini-card__media--initials" aria-hidden="true">${escapeHtml(initials)}</span>`
-        : '')
-    : '';
+  const media = image
+    ? `<span class="mini-card__media" style="--mini-card-image:url('${escapeHtml(image)}');--mini-card-image-position:${escapeHtml(imagePosition)}" aria-hidden="true"></span>`
+    : initials
+      ? `<span class="mini-card__media mini-card__media--initials" aria-hidden="true">${escapeHtml(initials)}</span>`
+      : '';
 
   const resolvedClasses = [classes, lineItems.length ? 'mini-card--lines' : ''].filter(Boolean).join(' ');
   const surfaceAction = dualAction
@@ -167,17 +163,22 @@ export function miniCard({
     ? `<button type="button" class="mini-card__compact-action"${attrs(resolvedCompactAction.data, resolvedCompactAction.aria || resolvedCompactAction.label)}>${escapeHtml(resolvedCompactAction.label)}</button>`
     : '';
 
-  return `<${tag} class="${escapeHtml(resolvedClasses)}"${surfaceStyle}${actionAttrs}>
-    ${lineItems.length ? `<div class="mini-card__lines">${lineItems.map(lineMarkup).join('')}</div>` : `<div class="mini-card__head">
+  const headerMarkup = lineItems.length ? '' : `<div class="mini-card__head">
       <span class="mini-card__copy">
         <strong class="mini-card__title"${attrs(titleData, titleAria)}>${escapeHtml(title)}</strong>
         ${value ? `<strong class="mini-card__value"${attrs(valueData, valueAria)}>${escapeHtml(value)}</strong>` : ''}
         ${subtitle ? `<span class="mini-card__subtitle"${attrs(subtitleData, subtitleAria)}>${escapeHtml(subtitle)}</span>` : ''}
       </span>
       ${media}
-    </div>`}
-    ${actionLabel ? `<span class="mini-card__context-action">${escapeHtml(actionLabel)}</span>` : ''}
-    ${rowItems.length ? `<div class="mini-card__rows">${rowItems.map(rowMarkup).join('')}</div>` : ''}
+    </div>`;
+  const centerMarkup = `${lineItems.length ? `<div class="mini-card__lines">${lineItems.map(lineMarkup).join('')}</div>` : ''}
+    ${rowItems.length ? `<div class="mini-card__rows">${rowItems.map(rowMarkup).join('')}</div>` : ''}`;
+  const footerMarkup = actionLabel ? `<span class="mini-card__context-action">${escapeHtml(actionLabel)}</span>` : '';
+  const centerAttrs = interactive ? '' : ' tabindex="0" role="region" aria-label="Содержимое мини-карты"';
+  return `<${tag} class="${escapeHtml(resolvedClasses)}" data-mini-card-ui="shared"${surfaceStyle}${actionAttrs}>
+    <div class="mini-card__record-head">${headerMarkup}</div>
+    <div class="mini-card__record-center"${centerAttrs}>${centerMarkup}</div>
+    <div class="mini-card__record-footer">${footerMarkup}</div>
     ${surfaceAction}
     ${compactActionMarkup}
   </${tag}>`;
