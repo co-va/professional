@@ -67,7 +67,14 @@ function recordMarkup(layout = {}, { className = '', aria = '' } = {}) {
         </div>
         ${recordActionMarkup(layout.rightAction, 'right')}
       </div>
-      ${personHeader ? `<div class="mini-card__record-moment">${escapeHtml(layout.moment || '')}</div>` : `${layout.identity ? `<div class="mini-card__record-identity">${escapeHtml(layout.identity)}</div>` : ''}${layout.phone ? `<div class="mini-card__record-phone">${escapeHtml(layout.phone)}</div>` : ''}`}
+      ${personHeader && layout.momentParts?.date && layout.momentParts?.start
+        ? `<div class="mini-card__record-moment mini-card__record-moment--parts" aria-label="${escapeHtml(layout.moment || '')}">
+            <span class="mini-card__record-date">${escapeHtml(layout.momentParts.date)}</span>
+            <span class="mini-card__record-time-start">${escapeHtml(layout.momentParts.start)}</span>
+            ${layout.momentParts.end ? `<span class="mini-card__record-time-end">–${escapeHtml(layout.momentParts.end)}</span>` : ''}
+          </div>`
+        : personHeader ? `<div class="mini-card__record-moment">${escapeHtml(layout.moment || '')}</div>`
+        : `${layout.identity ? `<div class="mini-card__record-identity">${escapeHtml(layout.identity)}</div>` : ''}${layout.phone ? `<div class="mini-card__record-phone">${escapeHtml(layout.phone)}</div>` : ''}`}
     </div>
     <div class="mini-card__record-center" tabindex="0" role="region" aria-label="Услуги записи">
       ${[...entries, ...details].map(lineMarkup).join('')}
