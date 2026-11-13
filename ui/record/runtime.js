@@ -237,38 +237,41 @@ export function recordConfirmationMiniCard({
   repeat = false,
 } = {}) {
   if (viewer) {
-    // The same Shared miniCard/line-pair contract as User record history.
-    // Keep its limited height and internal service scrolling: no external list.
     const serviceLines = (Array.isArray(procedures) ? procedures : []).map((item) => ({
       value: [String(item?.name || item?.title || 'Услуга'), String(item?.durationText || item?.secondary || '')]
         .filter(Boolean).join(' · '),
       rightValue: String(item?.right || item?.costText || ''),
     }));
     const card = miniCard({
-      className: 'record-confirmation-mini-card record-confirmation-mini-card--viewer'
-        + (serviceSettings && repeat ? ' record-confirmation-mini-card--two-actions'
-          : serviceSettings || repeat ? ' record-confirmation-mini-card--one-action' : ''),
-      lines: [
-        { value: workplace, variant: 'primary' },
-        { value: [date, period].filter(Boolean).join(' · '), variant: 'moment' },
-        { value: identity, variant: 'title' },
-        ...(phone ? [{ value: phone, variant: 'muted' }] : []),
-        ...(programName ? [{ value: programName }] : []),
-        ...(contactDiscount ? [{ value: `Условие: ${contactDiscount}` }] : []),
-        ...serviceLines,
-        ...(discountMoney ? [{ value: `Скидка: ${discountMoney}` }] : []),
-        ...(paymentInfo ? [{ value: paymentInfo }] : []),
-      ],
-      rows: [{ label: duration, value: total }],
-      compactAction: serviceSettings ? {
-        label: '⚙',
-        data: 'data-record-view-service-settings',
-        aria: 'Услуги записи',
-      } : null,
+      className: 'record-confirmation-mini-card record-confirmation-mini-card--viewer',
+      recordLayout: {
+        workplace,
+        moment: [date, period].filter(Boolean).join(' · '),
+        identity,
+        phone,
+        services: serviceLines,
+        details: [
+          ...(programName ? [{ value: `Программа: ${programName}` }] : []),
+          ...(paymentInfo ? [{ value: paymentInfo, variant: 'muted' }] : []),
+        ],
+        duration,
+        discount: discountMoney
+          ? `Скидка: ${contactDiscount ? `${contactDiscount} · ` : ''}${discountMoney}`
+          : (contactDiscount ? `Скидка: ${contactDiscount}` : ''),
+        total,
+        leftAction: serviceSettings ? {
+          label: '⚙',
+          data: 'data-record-view-service-settings',
+          aria: 'Услуги записи',
+        } : null,
+        rightAction: repeat ? {
+          label: '↻',
+          data: 'data-record-view-repeat',
+          aria: 'Повторить запись',
+        } : null,
+      },
     });
-    return `<div class="record-confirmation-view"><div class="record-confirmation-view__card"><div class="record-confirmation-view__paper">${card}${repeat
-      ? `<button type="button" class="record-confirmation-view__repeat${serviceSettings ? '' : ' record-confirmation-view__repeat--solo'}" data-record-view-repeat aria-label="Повторить запись">↻</button>`
-      : ''}</div></div></div>`;
+    return `<div class="record-confirmation-view"><div class="record-confirmation-view__card">${card}</div></div>`;
   }
   const serviceRows = (Array.isArray(procedures) ? procedures : []).map((item = {}) => v2ListEntry({
     title: item.name || item.title || 'Услуга',
