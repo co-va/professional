@@ -15,12 +15,12 @@
 
 /* Shared Record mini-card: fixed head and footer, only service area scrolls. */
 .mini-card--record{
-  --mini-card-width:310px;
+  --mini-card-width:290px;
   --mini-card-height:200px;
-  flex:0 1 310px;
-  width:min(310px,100%);
+  flex:0 1 290px;
+  width:min(290px,100%);
   min-width:0;
-  max-width:310px;
+  max-width:290px;
   height:200px;
   min-height:200px;
   max-height:200px;
