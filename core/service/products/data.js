@@ -79,6 +79,25 @@ export function reorderProducts(ids = []) {
 
 // Reset all local overrides in one domain-owned write when a shared card
 // template is applied. No per-entity queue/serialization storm.
+
+export async function commitReorderProducts(ids = []) {
+  const order = (Array.isArray(ids) ? ids : []).map(id => String(id || '')).filter(Boolean);
+  await commitServiceCollection({
+    read: readRawProducts,
+    persist: (values) => queueAuxiliaryDataset('products', values),
+    hydrate: (values) => { productsState = clone(values); },
+    mutate: (values) => {
+      const active = values.filter(item => !item.deletedAt);
+      const byId = new Map(active.map(item => [String(item.id || ''), item]));
+      if (order.length !== active.length || new Set(order).size !== active.length
+        || order.some(id => !byId.has(id))) throw new Error('Список изменился. Откройте раздел повторно.');
+      if (order.every((id, i) => String(active[i].id) === id)) return values;
+      const deleted = values.filter(item => item.deletedAt);
+      return [...order.map(id => byId.get(id)), ...deleted];
+    },
+  });
+}
+
 export function resetProductCardAppearances() {
   const values = readRawProducts();
   let changed = 0;
