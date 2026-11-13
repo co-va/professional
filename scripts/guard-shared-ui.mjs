@@ -84,6 +84,7 @@ assert(['.ui-select__control{','.ui-selector__search{','.ui-selector__option{'].
 assert(!bookingStyle.includes('min-height:52px'), 'Booking account editor cannot use 52px controls');
 assert(bookingStyle.includes('--booking-control-radius:0px'), 'Booking text controls must match Shared square fields');
 assert(count(inputs, '.password-field__control{') === 1 && count(inputs, '.password-field__toggle{') === 1, 'Repeated password field CSS must have a single owner');
+assert(count(inputs, '.phone-input{') === 1, 'Shared phone field geometry must not have redundant breakpoint clones');
 assert(zLayout.includes('const SURFACE_HEADER_STYLE = [') && !zLayout.includes('Q_HEADER_STYLE'), 'Z/Q must have one Header geometry owner');
 assert(zLayout.includes("'padding-top:var(--v2-surface-header-spacing)'")
   && zLayout.includes("'padding-bottom:var(--v2-surface-header-spacing)'"), 'Z/Q Header top and bottom gaps must be identical');
