@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { compactButton, compactAddButton, compactRemoveButton, smallActionButton } from '../ui/buttons/index.js';
 
 const ROOT = process.cwd();
 const read = (file) => fs.readFileSync(path.join(ROOT, file), 'utf8');
@@ -174,6 +175,25 @@ assert(!inputs.includes('.ui-links--compact .link-row .remove-button') && !input
 assert(!read('ui/repeated-fields/index.js').includes("button('+',"), 'Repeated-field add must not use the full-size action factory');
 assert(!read('ui/links/index.js').includes("button('+',"), 'Links add must not use the full-size action factory');
 assert(read('ui/buttons/index.js').includes('export function compactAddButton('), 'Compact add control factory missing');
+const compactVariants = ['add', 'remove', 'info', 'copy'];
+for (const kind of compactVariants) {
+  const markup = compactButton({ kind, data: 'data-compact-smoke', aria: 'Тест' });
+  assert(markup.includes('class="ui-compact-button ui-compact-button--' + kind)
+    && markup.includes('data-compact-smoke')
+    && markup.includes('aria-label="Тест"')
+    && !markup.includes('class="ui-button'), 'Compact ' + kind + ' must reuse single geometry and preserve callbacks');
+}
+assert(compactAddButton().includes('ui-compact-button--add') && compactRemoveButton().includes('ui-compact-button--remove')
+  && smallActionButton({ icon: 'info' }).includes('ui-compact-button--info')
+  && smallActionButton({ icon: 'copy' }).includes('ui-compact-button--copy'), 'All legacy Compact call paths must delegate to one renderer');
+assert(count(buttons, '.ui-compact-button{') === 1
+  && !buttons.includes('.small-action-button{box-sizing:border-box')
+  && !buttons.includes('.array-row__add,.ui-links__add{display:block'), 'Compact must have exactly one geometry owner');
+assert(['repeated-fields/index.js','links/index.js','tags/index.js','workplaces/index.js','payment/index.js','receipt/index.js'].every(file => read('ui/' + file).includes('compactRemoveButton(')),
+  'All known small removal actions must use the Compact renderer');
+assert(['repeated-fields/index.js','links/index.js','tags/index.js','workplaces/index.js','payment/index.js'].every(file => !read('ui/' + file).includes('class="remove-button"')),
+  'No inline form row may create a second small delete button');
+
 assert(inputs.includes('.array-group[data-repeated-add-placement="header"] .array-group__header{display:flex;align-items:center;justify-content:space-between'), 'Repeated-field add buttons must remain right-aligned');
 assert(list.includes('min-height:78px'), 'V2 list entry geometry changed');
 assert(count(list, '.list-entry{') === 1, 'V2 list entry geometry must have one owner');
