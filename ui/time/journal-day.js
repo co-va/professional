@@ -14,7 +14,7 @@ function recordMarkup(usage, { interactive = true } = {}) {
   const total = moneyText(usage?.financialTotal ?? usage?.finance?.planTotal ?? usage?.finance?.dueTotal ?? 0);
   const phone = person.phone ? `<span class="journal-record__phone">${escape(person.phone)}</span>` : '';
   const services = (usage.procedures || []).map((item) => `<span class="journal-record__service">${escape(item.name)}</span>`).join('');
-  const statusClass = usage?.paid ? ' journal-record--paid' : usage?.attendance === 'no-show' ? ' journal-record--no-show' : '';
+  const statusClass = usage?.attendance === 'no-show' ? ' journal-record--no-show' : usage?.paid ? ' journal-record--paid' : '';
   const content = `<span class="journal-record__head"><strong class="journal-record__identity">${identity}</strong><strong class="journal-record__total">${escape(total)}</strong></span>${phone}${services}${overlapMarkup(usage)}`;
   return interactive
     ? `<button type="button" class="journal-record${statusClass}" data-journal-usage="${escape(usage.sourceId || usage.id)}">${content}</button>`
@@ -221,10 +221,6 @@ export function initJournalDayTimeline(root, {
   onUsageClick = () => {},
   onWorkFieldClick = () => {},
 } = {}) {
-  if (root.__professionalTimeUsageChangeHandler) window.removeEventListener('professional:time-usage-changed', root.__professionalTimeUsageChangeHandler);
-  root.__professionalTimeUsageChangeHandler = () => {};
-  window.addEventListener('professional:time-usage-changed', root.__professionalTimeUsageChangeHandler);
-
   root.querySelectorAll('[data-journal-work-field]').forEach((field) => {
     const open = () => {
       const workplaceId = String(field.dataset.journalWorkField || '');
