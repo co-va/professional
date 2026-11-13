@@ -38,7 +38,7 @@ function lineMarkup(line = {}) {
 
 function recordActionMarkup(action, side) {
   if (!action?.data || !action?.label) {
-    return '<span class="mini-card__record-action-placeholder" aria-hidden="true"></span>';
+    return `<span class="mini-card__record-action-placeholder mini-card__record-action-placeholder--${side}" aria-hidden="true"></span>`;
   }
   const variant = action.variant === 'secondary' ? ' mini-card__record-action--secondary' : '';
   const content = action.icon === 'settings'
