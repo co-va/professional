@@ -1,4 +1,4 @@
-import { button, iconButton } from '../buttons/index.js';
+import { button, iconButton, compactRemoveButton } from '../buttons/index.js';
 import { escapeHtml } from '../utils/escape-html.js';
 
 function text(value = '') {
@@ -7,12 +7,24 @@ function text(value = '') {
 
 function receiptRow(item = {}) {
   const value = `<strong>${text(item.value)}</strong>`;
-  const action = item?.action && typeof item.action === 'object'
-    ? `<div class="read-only-sheet__row-actions">${value}${iconButton(item.action.label || '×', {
-      className: item.action.className || 'remove-button',
-      data: item.action.data || '',
-      aria: item.action.aria || 'Действие',
-    })}</div>`
+  const itemAction = item?.action && typeof item.action === 'object' ? item.action : null;
+  const label = String(itemAction?.label || '×').trim();
+  const isRemove = label === '×' || label === '✕';
+  const icon = itemAction
+    ? isRemove
+      ? compactRemoveButton({
+          className: itemAction.className === 'remove-button' ? '' : itemAction.className || '',
+          data: itemAction.data || '',
+          aria: itemAction.aria || 'Удалить',
+        })
+      : iconButton(label, {
+          className: itemAction.className || '',
+          data: itemAction.data || '',
+          aria: itemAction.aria || 'Действие',
+        })
+    : '';
+  const action = itemAction
+    ? `<div class="read-only-sheet__row-actions">${value}${icon}</div>`
     : value;
   return `<div class="read-only-sheet__row${item.strong ? ' is-strong' : ''}"><span>${text(item.label)}</span>${action}</div>`;
 }
