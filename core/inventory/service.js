@@ -1,10 +1,30 @@
 import { apiRequest } from '../auth.js';
-import { applyInventorySnapshot } from './data.js';
+import { applyInventorySnapshot, getInventoryItem } from './data.js';
+
+const SERVER_ORDER_UNAVAILABLE = 'Сервер склада ещё не обновлён. Порядок не сохранён.';
+
+function snapshotItem(payload, itemId) {
+  return Array.isArray(payload?.items)
+    ? payload.items.find(item => String(item?.itemId || '') === String(itemId || ''))
+    : null;
+}
 
 async function inventoryRequest(path = '', options = {}) {
-  const response = await apiRequest(`/inventory${path}`, options);
+  const { verifySnapshot, ...requestOptions } = options;
+  const response = await apiRequest(`/inventory${path}`, requestOptions);
   const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(payload?.message || 'Не удалось сохранить склад');
+  if (!response.ok) {
+    if (path === '/items/reorder' && response.status === 404) {
+      throw new Error(SERVER_ORDER_UNAVAILABLE);
+    }
+    const message = Array.isArray(payload?.message)
+      ? payload.message.join('; ')
+      : typeof payload?.message === 'string' ? payload.message.trim() : '';
+    throw new Error(message || `Не удалось сохранить склад (HTTP ${response.status})`);
+  }
+  // The older server accepts arbitrary item fields but silently ignores position.
+  // Verify the actual server snapshot before treating a number edit as saved.
+  verifySnapshot?.(payload);
   return applyInventorySnapshot(payload);
 }
 
@@ -20,9 +40,21 @@ export async function createInventoryItem(value = {}) {
 }
 
 export async function updateInventoryItem(itemId, value = {}) {
+  const previous = getInventoryItem(itemId);
+  const expected = Number(value?.position);
+  const positionChanged = Object.prototype.hasOwnProperty.call(value, 'position')
+    && Number.isSafeInteger(expected)
+    && expected !== (Number(previous?.position) || 0);
   return inventoryRequest(`/items/${encodeURIComponent(String(itemId || ''))}`, {
     method: 'PUT',
     body: JSON.stringify(value),
+    verifySnapshot: positionChanged ? payload => {
+      const saved = snapshotItem(payload, itemId);
+      if (!saved || !Object.prototype.hasOwnProperty.call(saved, 'position')
+        || Number(saved.position) !== expected) {
+        throw new Error('Номер не сохранился. ' + SERVER_ORDER_UNAVAILABLE);
+      }
+    } : undefined,
   });
 }
 
@@ -30,6 +62,13 @@ export async function reorderInventoryItems(manufacturer, itemIds) {
   return inventoryRequest('/items/reorder', {
     method: 'POST',
     body: JSON.stringify({ manufacturer, itemIds }),
+    verifySnapshot: payload => {
+      if (!Array.isArray(payload?.items) || !itemIds.every((id, index) => {
+        const item = snapshotItem(payload, id);
+        return item && Number(item.position) === index + 1
+          && String(item.manufacturer || '').trim() === String(manufacturer || '').trim();
+      })) throw new Error(SERVER_ORDER_UNAVAILABLE);
+    },
   });
 }
 
