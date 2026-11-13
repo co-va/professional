@@ -47,6 +47,20 @@ function recordActionMarkup(action, side) {
   return `<button type="button" class="mini-card__record-action mini-card__record-action--${side}${variant}"${attrs(action.data, action.aria || action.label)}>${content}</button>`;
 }
 
+function cardShell({
+  tag = 'section', classes = '', style = '', attributes = '',
+  head = '', center = '', footer = '', footerClass = '', extra = '',
+  centerAria = 'Содержимое мини-карты', scrollFocus = true,
+} = {}) {
+  const focusAttrs = scrollFocus ? ` tabindex="0" role="region" aria-label="${escapeHtml(centerAria)}"` : '';
+  return `<${tag} class="${escapeHtml(classes)}" data-mini-card-ui="shared"${style}${attributes}>
+    <div class="mini-card__record-head">${head}</div>
+    <div class="mini-card__record-center"${focusAttrs}>${center}</div>
+    <div class="mini-card__record-footer${footerClass ? ` ${escapeHtml(footerClass)}` : ''}">${footer}</div>
+    ${extra}
+  </${tag}>`;
+}
+
 function recordMarkup(layout = {}, { className = '', aria = '' } = {}) {
   const entries = Array.isArray(layout.services) ? layout.services : [];
   const details = Array.isArray(layout.details) ? layout.details : [];
@@ -56,8 +70,7 @@ function recordMarkup(layout = {}, { className = '', aria = '' } = {}) {
   const topLayout = personHeader
     ? `${showLeft ? '' : ' mini-card__record-top--no-left'}${showRight ? '' : ' mini-card__record-top--no-right'}`
     : '';
-  return `<section data-mini-card-ui="shared" class="mini-card mini-card--record${personHeader ? ' mini-card--record-person' : ''}${personHeader && !showLeft ? ' mini-card--record-no-left' : ''}${className ? ` ${escapeHtml(className)}` : ''}" aria-label="${escapeHtml(aria || 'Данные записи')}">
-    <div class="mini-card__record-head">
+  const headMarkup = `
       <div class="mini-card__record-top${topLayout}">
         ${recordActionMarkup(layout.leftAction, 'left')}
         <div class="mini-card__record-main">
@@ -74,12 +87,10 @@ function recordMarkup(layout = {}, { className = '', aria = '' } = {}) {
             ${layout.momentParts.end ? `<span class="mini-card__record-time-end">–${escapeHtml(layout.momentParts.end)}</span>` : ''}
           </div>`
         : personHeader ? `<div class="mini-card__record-moment">${escapeHtml(layout.moment || '')}</div>`
-        : `${layout.identity ? `<div class="mini-card__record-identity">${escapeHtml(layout.identity)}</div>` : ''}${layout.phone ? `<div class="mini-card__record-phone">${escapeHtml(layout.phone)}</div>` : ''}`}
-    </div>
-    <div class="mini-card__record-center" tabindex="0" role="region" aria-label="Услуги записи">
-      ${[...entries, ...details].map(lineMarkup).join('')}
-    </div>
-    <div class="mini-card__record-footer${layout.footerLayout === 'three-column' ? ' mini-card__record-footer--triple' : ''}">
+        : `${layout.identity ? `<div class="mini-card__record-identity">${escapeHtml(layout.identity)}</div>` : ''}${layout.phone ? `<div class="mini-card__record-phone">${escapeHtml(layout.phone)}</div>` : ''}`}`;
+  const centerMarkup = `
+      ${[...entries, ...details].map(lineMarkup).join('')}`;
+  const footerMarkup = `
       ${layout.footerLayout === 'three-column'
         ? `<div class="mini-card__record-stat mini-card__record-stat--duration">
             <span class="mini-card__record-stat-label">Время</span>
@@ -98,9 +109,17 @@ function recordMarkup(layout = {}, { className = '', aria = '' } = {}) {
             ${layout.discount ? `<span class="mini-card__record-discount">${escapeHtml(layout.discount)}</span>` : ''}
           </span>
           <strong class="mini-card__record-total">${escapeHtml(layout.total || '')}</strong>
-        </div>`}
-    </div>
-  </section>`;
+        </div>`}`;
+  return cardShell({
+    tag: 'section',
+    classes: `mini-card mini-card--record${personHeader ? ' mini-card--record-person' : ''}${personHeader && !showLeft ? ' mini-card--record-no-left' : ''}${className ? ` ${className}` : ''}`,
+    attributes: ` aria-label="${escapeHtml(aria || 'Данные записи')}"`,
+    head: headMarkup,
+    center: centerMarkup,
+    footer: footerMarkup,
+    footerClass: layout.footerLayout === 'three-column' ? 'mini-card__record-footer--triple' : '',
+    centerAria: 'Услуги записи',
+  });
 }
 
 export function miniCard({
@@ -175,13 +194,12 @@ export function miniCard({
     ${rowItems.length ? `<div class="mini-card__rows">${rowItems.map(rowMarkup).join('')}</div>` : ''}`;
   const footerMarkup = actionLabel ? `<span class="mini-card__context-action">${escapeHtml(actionLabel)}</span>` : '';
   const centerAttrs = interactive ? '' : ' tabindex="0" role="region" aria-label="Содержимое мини-карты"';
-  return `<${tag} class="${escapeHtml(resolvedClasses)}" data-mini-card-ui="shared"${surfaceStyle}${actionAttrs}>
-    <div class="mini-card__record-head">${headerMarkup}</div>
-    <div class="mini-card__record-center"${centerAttrs}>${centerMarkup}</div>
-    <div class="mini-card__record-footer">${footerMarkup}</div>
-    ${surfaceAction}
-    ${compactActionMarkup}
-  </${tag}>`;
+  return cardShell({
+    tag, classes: resolvedClasses, style: surfaceStyle, attributes: actionAttrs,
+    head: headerMarkup, center: centerMarkup, footer: footerMarkup,
+    extra: `${surfaceAction}${compactActionMarkup}`,
+    scrollFocus: !interactive,
+  });
 }
 
 export function miniCardRail(cards = [], { className = '', affordanceMinItems = 2 } = {}) {
