@@ -1,6 +1,7 @@
 # План закрытия релизов Professional: Start → Start+ → Pro
 
 **Статус: техническая карта исполнения, не подтверждение готовности функций или утверждение состава тарифов.**
+**Единая карта по уровням F/E/режим/UI/capability и защита после приёмки:** [`RELEASE_CLOSURE_MAP.md`](./RELEASE_CLOSURE_MAP.md) → реестр [`RELEASE_CLOSURE_REGISTRY.json`](./RELEASE_CLOSURE_REGISTRY.json). Эти документы — источник статуса закрытия, не дублировать статус в новых таблицах. Без новых CI.
 **Область:** `co-va/professional` (UI), `co-va/core` (API/БД/права/деньги), `co-va/user` (потребительская сторона). Раздельные владельцы, без копий бизнес-логики.
 **Ветки:** только `staging`; `main`/Amvera — только после отдельного разрешения владельца. Пока над Core работает другой исполнитель, не вносить параллельные изменения в Core.
 **Источники договорённостей:** `co-va/core/COMMERCIAL_TARIFF_CONTRACT.md`, `BUSINESS_ARCHITECTURE.md`, `LOYALTY_FINANCE_CONTRACT.md`, `PROJECT_STATE.md`. При конфликте — уточнить, не подменять правила импровизацией.
