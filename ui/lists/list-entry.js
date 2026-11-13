@@ -111,126 +111,226 @@ export function initV2ListReorder(root, {
   idAttribute = 'reorderId',
   handleSelector = '[data-reorder-handle]',
   onReorder = () => {},
+  onError = () => {},
 } = {}) {
   const host = root?.matches?.('.list-entries') ? root : root?.querySelector?.('.list-entries');
   if (!host) return () => {};
 
-  let active = null;
-  let handle = null;
-  let pointerId = null;
-
   const entries = () => [...host.querySelectorAll(selector)];
   const valueOf = (node) => String(node?.dataset?.[idAttribute] || '');
+  const currentIds = () => entries().map(valueOf).filter(Boolean);
 
-  const finish = (commit = false) => {
-    const node = active;
-    if (handle && pointerId != null) {
-      try {
-        if (handle.hasPointerCapture?.(pointerId)) handle.releasePointerCapture(pointerId);
-      } catch {}
+  let gesture = null;
+  let target = null;
+  let beforeTarget = true;
+  let scrollFrame = 0;
+  let saving = false;
+  let suppressClick = false;
+
+  const findScroller = (node) => {
+    let parent = node?.parentElement;
+    while (parent) {
+      const css = getComputedStyle(parent);
+      if (/(auto|scroll)/.test(css.overflowY) && parent.scrollHeight > parent.clientHeight) return parent;
+      parent = parent.parentElement;
     }
-    active?.classList.remove('is-reordering');
-    host.classList.remove('is-reordering');
-    active = null;
-    handle = null;
-    pointerId = null;
-    if (commit && node) {
-      const ids = entries().map(valueOf).filter(Boolean);
-      if (ids.length) onReorder(ids);
+    return null;
+  };
+
+  const clearTarget = () => {
+    target?.classList.remove('is-reorder-target-before', 'is-reorder-target-after');
+    target = null;
+  };
+
+  // The dragged row remains in its original DOM slot until release.
+  // Moving it on every pointermove detached the captured iOS pointer and
+  // made Z scroll/paint stutter. Only the row's visual transform changes.
+  const showPosition = () => {
+    if (!gesture?.dragging) return;
+    const delta = gesture.y - gesture.startY
+      + (gesture.scroller ? gesture.scroller.scrollTop - gesture.startScrollTop : 0);
+    gesture.node.style.setProperty('--list-entry-drag-y', `${delta}px`);
+
+    const hit = document.elementFromPoint?.(gesture.x, gesture.y);
+    let nearest = hit?.closest?.(selector);
+    if (!nearest || nearest === gesture.node || !host.contains(nearest)) {
+      // Gaps between entries and list edges are legitimate drop locations.
+      let distance = Infinity;
+      nearest = null;
+      for (const candidate of entries()) {
+        if (candidate === gesture.node) continue;
+        const rect = candidate.getBoundingClientRect();
+        const gap = gesture.y < rect.top ? rect.top - gesture.y
+          : gesture.y > rect.bottom ? gesture.y - rect.bottom : 0;
+        if (gap < distance) { distance = gap; nearest = candidate; }
+      }
+    }
+    if (!nearest) { clearTarget(); return; }
+    const rect = nearest.getBoundingClientRect();
+    const nextBefore = gesture.y < rect.top + rect.height / 2;
+    if (target === nearest && beforeTarget === nextBefore) return;
+    clearTarget();
+    target = nearest;
+    beforeTarget = nextBefore;
+    target.classList.add(nextBefore ? 'is-reorder-target-before' : 'is-reorder-target-after');
+  };
+
+  const stopScroll = () => {
+    if (scrollFrame) cancelAnimationFrame(scrollFrame);
+    scrollFrame = 0;
+  };
+
+  const scrollNearEdge = () => {
+    scrollFrame = 0;
+    const scroller = gesture?.scroller;
+    if (!gesture?.dragging || !scroller) return;
+    const rect = scroller.getBoundingClientRect();
+    const edge = 54;
+    const above = Math.max(0, rect.top + edge - gesture.y);
+    const below = Math.max(0, gesture.y - (rect.bottom - edge));
+    const speed = above ? -Math.min(16, 3 + above / 4)
+      : below ? Math.min(16, 3 + below / 4) : 0;
+    if (!speed) return;
+    const previous = scroller.scrollTop;
+    scroller.scrollTop += speed;
+    if (scroller.scrollTop !== previous) {
+      showPosition();
+      scrollFrame = requestAnimationFrame(scrollNearEdge);
     }
   };
 
-  const moveActive = (clientY) => {
-    if (!active) return;
-    const candidates = entries().filter((node) => node !== active);
-    const target = candidates.find((node) => {
-      const rect = node.getBoundingClientRect();
-      return clientY >= rect.top && clientY <= rect.bottom;
-    });
-    if (!target) return;
-    const rect = target.getBoundingClientRect();
-    if (clientY < rect.top + rect.height / 2) host.insertBefore(active, target);
-    else host.insertBefore(active, target.nextSibling);
+  const resetGesture = () => {
+    stopScroll();
+    clearTarget();
+    if (gesture) {
+      const { node, handle, pointerId } = gesture;
+      try {
+        if (handle.hasPointerCapture?.(pointerId)) handle.releasePointerCapture(pointerId);
+      } catch {}
+      node.style.removeProperty('--list-entry-drag-y');
+      node.classList.remove('is-reordering');
+    }
+    host.classList.remove('is-reordering');
+    gesture = null;
+  };
+
+  const restoreOrder = (originalIds) => {
+    if (!host.isConnected) return;
+    const lookup = new Map(entries().map(node => [valueOf(node), node]));
+    for (const id of originalIds) {
+      const node = lookup.get(id);
+      if (node) host.appendChild(node);
+    }
+  };
+
+  const commit = (originalIds) => {
+    const ids = currentIds();
+    if (ids.length !== originalIds.length || ids.every((id, i) => id === originalIds[i])) return;
+    saving = true;
+    // The caller persists once after release. Never redraw an entire Z or Q.
+    Promise.resolve().then(() => onReorder(ids)).then((result) => {
+      if (result === false) throw new Error('Не удалось сохранить порядок.');
+    }).catch((error) => {
+      restoreOrder(originalIds);
+      onError(error);
+    }).finally(() => { saving = false; });
   };
 
   const onPointerDown = (event) => {
     if (event.pointerType === 'mouse' && event.button !== 0) return;
-    const nextHandle = event.target.closest?.(handleSelector);
-    if (!nextHandle || !host.contains(nextHandle)) return;
-    const node = nextHandle.closest?.(selector);
+    if (saving || gesture) return;
+    const handle = event.target.closest?.(handleSelector);
+    if (!handle || !host.contains(handle)) { suppressClick = false; return; }
+    const node = handle.closest?.(selector);
     if (!node || !host.contains(node)) return;
-
     event.preventDefault();
     event.stopPropagation();
-    active = node;
-    handle = nextHandle;
-    pointerId = event.pointerId;
-    active.classList.add('is-reordering');
-    host.classList.add('is-reordering');
-    try { handle.setPointerCapture?.(pointerId); } catch {}
+    suppressClick = true;
+    gesture = {
+      node, handle, pointerId: event.pointerId,
+      startY: event.clientY, y: event.clientY, x: event.clientX,
+      scroller: findScroller(host), startScrollTop: 0, dragging: false,
+      originalIds: currentIds(),
+    };
+    gesture.startScrollTop = gesture.scroller?.scrollTop || 0;
+    try { handle.setPointerCapture?.(event.pointerId); } catch {}
   };
 
   const onPointerMove = (event) => {
-    if (!active || event.pointerId !== pointerId) return;
+    if (!gesture || event.pointerId !== gesture.pointerId) return;
     event.preventDefault();
     event.stopPropagation();
-    moveActive(event.clientY);
+    gesture.x = event.clientX;
+    gesture.y = event.clientY;
+    if (!gesture.dragging && Math.abs(gesture.y - gesture.startY) < 4) return;
+    if (!gesture.dragging) {
+      gesture.dragging = true;
+      gesture.node.classList.add('is-reordering');
+      host.classList.add('is-reordering');
+    }
+    showPosition();
+    if (!scrollFrame) scrollFrame = requestAnimationFrame(scrollNearEdge);
   };
 
   const onPointerUp = (event) => {
-    if (!active || event.pointerId !== pointerId) return;
+    if (!gesture || event.pointerId !== gesture.pointerId) return;
     event.preventDefault();
     event.stopPropagation();
-    finish(true);
+    const { node, originalIds, dragging } = gesture;
+    const drop = target;
+    const before = beforeTarget;
+    resetGesture();
+    if (!dragging || !drop || drop === node) return;
+    host.insertBefore(node, before ? drop : drop.nextSibling);
+    commit(originalIds);
   };
 
   const onPointerCancel = (event) => {
-    if (pointerId != null && event.pointerId !== pointerId) return;
-    finish(false);
+    if (gesture && event.pointerId === gesture.pointerId) resetGesture();
   };
 
   const onClick = (event) => {
-    const nextHandle = event.target.closest?.(handleSelector);
-    if (!nextHandle || !host.contains(nextHandle)) return;
-    event.preventDefault();
-    event.stopPropagation();
+    if (suppressClick || event.target.closest?.(handleSelector)) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      suppressClick = false;
+    }
   };
 
   const onKeyDown = (event) => {
-    const nextHandle = event.target.closest?.(handleSelector);
-    if (!nextHandle || !host.contains(nextHandle)) return;
-    const node = nextHandle.closest?.(selector);
-    if (!node) return;
+    const handle = event.target.closest?.(handleSelector);
+    if (!handle || !host.contains(handle) || saving) return;
+    const node = handle.closest?.(selector);
     const all = entries();
     const index = all.indexOf(node);
-    if (index < 0) return;
-    const direction = event.key === 'ArrowUp' ? -1 : event.key === 'ArrowDown' ? 1 : 0;
-    if (!direction) return;
-    const targetIndex = Math.max(0, Math.min(all.length - 1, index + direction));
-    if (targetIndex === index) return;
+    const change = event.key === 'ArrowUp' ? -1 : event.key === 'ArrowDown' ? 1 : 0;
+    if (!change || index < 0) return;
     event.preventDefault();
     event.stopPropagation();
-    const target = all[targetIndex];
-    if (direction < 0) host.insertBefore(node, target);
-    else host.insertBefore(node, target.nextSibling);
-    const ids = entries().map(valueOf).filter(Boolean);
-    if (ids.length) onReorder(ids);
-    nextHandle.focus();
+    const next = Math.max(0, Math.min(all.length - 1, index + change));
+    if (next === index) return;
+    const originalIds = currentIds();
+    if (change < 0) host.insertBefore(node, all[next]);
+    else host.insertBefore(node, all[next].nextSibling);
+    handle.focus();
+    commit(originalIds);
   };
 
   host.addEventListener('pointerdown', onPointerDown, { passive: false });
   host.addEventListener('pointermove', onPointerMove, { passive: false });
   host.addEventListener('pointerup', onPointerUp, { passive: false });
   host.addEventListener('pointercancel', onPointerCancel);
+  host.addEventListener('lostpointercapture', onPointerCancel);
   host.addEventListener('click', onClick, true);
   host.addEventListener('keydown', onKeyDown, true);
 
   return () => {
-    finish(false);
+    resetGesture();
     host.removeEventListener('pointerdown', onPointerDown);
     host.removeEventListener('pointermove', onPointerMove);
     host.removeEventListener('pointerup', onPointerUp);
     host.removeEventListener('pointercancel', onPointerCancel);
+    host.removeEventListener('lostpointercapture', onPointerCancel);
     host.removeEventListener('click', onClick, true);
     host.removeEventListener('keydown', onKeyDown, true);
   };
