@@ -605,31 +605,36 @@ function openMovementEditor(root, movementId = '', kind = 'CONSUMPTION', { recor
       openNotice({ title: 'Материалы', message: 'Выбранные позиции не найдены на складе.' });
       return;
     }
+    // Match inventoryAuditInput: one item heading with balance, then compact inputs.
     const rowMarkup = rows.map(({ item, previous }) => {
       const outgoing = previous?.direction ? previous.direction === 'OUT'
         : ['CONSUMPTION', 'SALE', 'WRITE_OFF'].includes(actualKind);
       const containers = previous?.containerDelta == null ? '' : Math.abs(Number(previous.containerDelta));
-      // Consumption is entered in grams only; counting tubes belongs to stocktake.
       const showContainers = isWeighedInventoryItem(item)
         && (['RECEIPT', 'RETURN', 'WRITE_OFF'].includes(actualKind) || previous?.containerDelta != null);
-      return `<div class="two-column-layout" data-inventory-movement-row data-item-id="${escapeHtml(item.itemId)}"
+      const quantityPlaceholder = {
+        RECEIPT: 'Поступило', CONSUMPTION: 'Израсходовано',
+        WRITE_OFF: 'Списано', RETURN: 'Возвращено',
+      }[actualKind] || 'Количество';
+      const quantityInput = field({
+        label: '', placeholder: `${quantityPlaceholder}, ${item.unit}`,
+        name: `quantity-${item.itemId}`,
+        value: previous?.quantity ?? '',
+        type: 'number', min: '0', step: '0.001', inputmode: 'decimal',
+      });
+      const containerInput = showContainers ? field({
+        label: '', placeholder: outgoing ? 'Тюбиков выбыло, шт.' : 'Тюбиков поступило, шт.',
+        name: `containers-${item.itemId}`,
+        value: containers, type: 'number', min: '0', step: '1', inputmode: 'numeric',
+      }) : '';
+      const balance = `${numberText(item.balance)} ${item.unit}`;
+      return `<section data-inventory-movement-row data-item-id="${escapeHtml(item.itemId)}"
           data-row-direction="${escapeHtml(previous?.direction || '')}">
-        <div class="two-column-layout__column"><strong>${escapeHtml(item.name)}</strong></div>
-        <div class="two-column-layout__column">
-          ${field({
-            label: item.unit,
-            name: `quantity-${item.itemId}`,
-            value: previous?.quantity ?? '',
-            type: 'number', min: '0', step: '0.001', inputmode: 'decimal',
-          })}
-          ${showContainers ? field({
-            label: outgoing ? 'Тюбиков выбыло, шт.' : 'Тюбиков поступило, шт.',
-            name: `containers-${item.itemId}`,
-            value: containers,
-            type: 'number', min: '0', step: '1', inputmode: 'numeric',
-          }) : ''}
-        </div>
-      </div>`;
+        <div class="field-inline-label"><strong>${escapeHtml(item.name)}</strong><span>${escapeHtml(balance)}</span></div>
+        ${showContainers
+          ? twoColumnLayout(quantityInput, containerInput, { ariaLabel: `Количество и тара: ${item.name}` })
+          : quantityInput}
+      </section>`;
     }).join('');
     const editorMarkup = `<form class="form-grid" data-inventory-movement-form>
       ${actualKind === 'RECEIPT' && !correcting ? field({
