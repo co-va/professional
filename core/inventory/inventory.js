@@ -1265,14 +1265,117 @@ function inventoryAuditMeasure(item, index, data) {
   return { actual, note: '' };
 }
 
-function inventoryAuditPositionInput(item, index, includeManufacturer = false) {
-  const label = includeManufacturer ? `${manufacturerName(item)} · ${item.name}` : item.name;
-  const current = Number(item.position) > 0 ? String(item.position) : '—';
-  return `<section>
-    <div class="field-inline-label"><strong>${escapeHtml(label)}</strong><span>№ ${escapeHtml(current)}</span></div>
-    ${field({ label: '', placeholder: 'Новый №', name: `auditPosition-${index}`,
-      type: 'number', min: '1', max: '2147483647', step: '1', inputmode: 'numeric' })}
-  </section>`;
+
+const INVENTORY_AUDIT_EDIT_FIELDS = [
+  { value: 'category', label: 'Категория', kind: 'text' },
+  { value: 'productType', label: 'Тип продукта', kind: 'text' },
+  { value: 'name', label: 'Наименование', kind: 'text' },
+  { value: 'manufacturer', label: 'Производитель', kind: 'text' },
+  { value: 'position', label: 'Порядковый номер', kind: 'integer' },
+  { value: 'sku', label: 'Артикул', kind: 'text' },
+  { value: 'barcode', label: 'Штрихкод', kind: 'text' },
+  { value: 'location', label: 'Место хранения', kind: 'text' },
+  { value: 'supplier', label: 'Поставщик', kind: 'text' },
+  { value: 'referencePrice', label: 'Цена', kind: 'decimal' },
+  { value: 'unit', label: 'Единица', kind: 'unit' },
+  { value: 'packageQuantity', label: 'Упаковка', kind: 'decimal' },
+  { value: 'grossWeight', label: 'Брутто, г', kind: 'decimal' },
+  { value: 'tareWeight', label: 'Тара, г', kind: 'decimal' },
+  { value: 'minStock', label: 'Минимум', kind: 'decimal' },
+  { value: 'targetStock', label: 'Цель', kind: 'decimal' },
+  { value: 'usage', label: 'Использование', kind: 'usage' },
+];
+const INVENTORY_AUDIT_USAGE = [
+  { value: 'consume', label: 'Расход' },
+  { value: 'sale', label: 'Продажа' },
+  { value: 'both', label: 'Расход и продажа' },
+  { value: 'track', label: 'Только учёт' },
+];
+
+function inventoryAuditFieldDefinition(key) {
+  return INVENTORY_AUDIT_EDIT_FIELDS.find(option => option.value === key) || null;
+}
+
+function inventoryAuditCurrentValue(item, definition) {
+  if (definition.value === 'usage') return itemUsageMode(item);
+  if (definition.value === 'referencePrice') return itemPrimaryPrice(item) ?? item.referencePrice;
+  return item[definition.value];
+}
+
+function inventoryAuditDataControl(definition, name, { shared = false, locked = false } = {}) {
+  const label = shared
+    ? definition.value === 'position' ? 'Начальный номер (дальше по порядку)' : 'Новое значение'
+    : '';
+  if (locked) return field({ label, name, placeholder: 'Цена от поставщика', disabled: true });
+  if (definition.kind === 'unit' || definition.kind === 'usage') return select({
+    label, name, value: '',
+    options: [{ value: '', label: shared ? 'Выберите значение' : 'Без изменения' },
+      ...(definition.kind === 'unit' ? UNIT_OPTIONS : INVENTORY_AUDIT_USAGE)],
+  });
+  const integer = definition.kind === 'integer';
+  const decimal = definition.kind === 'decimal';
+  return field({
+    label, name, value: '',
+    placeholder: shared ? 'Введите значение' : 'Изменить',
+    type: integer || decimal ? 'number' : 'text',
+    ...(integer ? { min: '1', max: '2147483647', step: '1', inputmode: 'numeric' } : {}),
+    ...(decimal ? { min: '0', step: 'any', inputmode: 'decimal' } : {}),
+    autocomplete: 'off',
+  });
+}
+
+function inventoryAuditDataRow(item, index, definition, includeManufacturer = false) {
+  const name = includeManufacturer ? `${manufacturerName(item)} · ${item.name}` : item.name;
+  const current = inventoryAuditCurrentValue(item, definition);
+  const shown = definition.value === 'usage'
+    ? INVENTORY_AUDIT_USAGE.find(option => option.value === current)?.label || ''
+    : String(current ?? '');
+  const locked = definition.value === 'referencePrice' && itemPrimaryPrice(item) !== null;
+  return `<div class="data-edit-row" role="group" aria-label="${escapeHtml(definition.label + ': ' + name)}">
+    <span class="data-edit-row__name" title="${escapeHtml(name)}"><strong>${escapeHtml(name)}</strong>${shown ? ` <small>· ${escapeHtml(shown)}</small>` : ''}</span>
+    ${inventoryAuditDataControl(definition, `auditItem-${index}`, { locked })}
+  </div>`;
+}
+
+function inventoryAuditParseDataValue(definition, raw) {
+  const value = String(raw ?? '').trim();
+  if (!value) return null; // Empty input means leave that item unchanged.
+  if (definition.kind === 'unit') {
+    if (!UNIT_OPTIONS.some(option => option.value === value)) throw new Error('Выберите допустимую единицу.');
+    return value;
+  }
+  if (definition.kind === 'usage') {
+    if (!INVENTORY_AUDIT_USAGE.some(option => option.value === value)) throw new Error('Выберите способ использования.');
+    return value;
+  }
+  if (definition.kind === 'integer' || definition.kind === 'decimal') {
+    // Native number inputs already validate; Number additionally accepts 19, 20,
+    // 21, 22 without the broken regex from the previous narrow implementation.
+    const number = Number(value.replace(',', '.').replace(/\s/g, ''));
+    if (!Number.isFinite(number) || number < 0
+      || (definition.kind === 'integer' && (!Number.isSafeInteger(number) || number < 1 || number > 2147483647))) {
+      throw new Error('Укажите корректное неотрицательное число' +
+        (definition.kind === 'integer' ? ' (целый номер от 1)' : '') + '.');
+    }
+    return number;
+  }
+  return value;
+}
+
+function inventoryAuditDataPayload(definition, value) {
+  if (definition.value === 'usage') return {
+    canConsume: value === 'consume' || value === 'both',
+    canSell: value === 'sale' || value === 'both',
+  };
+  return { [definition.value]: value };
+}
+
+function inventoryAuditValueMatches(item, definition, expected) {
+  if (!item) return false;
+  const actual = inventoryAuditCurrentValue(item, definition);
+  if (definition.kind === 'decimal' || definition.kind === 'integer')
+    return actual != null && Math.abs(Number(actual) - Number(expected)) < 0.00000001;
+  return String(actual ?? '') === String(expected);
 }
 
 function openInventoryAuditCriteria(root, { mode, ids = [], onSaved = () => {} } = {}) {
@@ -1282,17 +1385,14 @@ function openInventoryAuditCriteria(root, { mode, ids = [], onSaved = () => {} }
   const includesDifferentManufacturers = new Set(items.map(manufacturerName)).size > 1;
   const fields = isData
     ? `<div class="form-grid">
-      ${select({ label: 'Что изменить', name: 'auditField', value: 'category', options: [
-        { value: 'category', label: 'Категория' },
-        { value: 'productType', label: 'Тип продукта' },
-        { value: 'position', label: 'Порядковый номер' },
+      ${select({ label: 'Что изменить', name: 'auditField', value: 'category',
+        options: INVENTORY_AUDIT_EDIT_FIELDS.map(({ value, label }) => ({ value, label })) })}
+      ${select({ label: 'Как изменить', name: 'auditMode', value: 'all', options: [
+        { value: 'all', label: 'Одно значение для всех' },
+        { value: 'each', label: 'Каждой позиции своё' },
       ] })}
-      <div data-inventory-audit-shared-value>
-        ${field({ label: 'Новое значение', name: 'auditValue', autocomplete: 'off' })}
-      </div>
-      <div data-inventory-audit-position-values hidden>
-        ${items.map((item, index) => inventoryAuditPositionInput(item, index, includesDifferentManufacturers)).join('')}
-      </div>
+      <div data-inventory-audit-shared-value></div>
+      <div class="form-grid" data-inventory-audit-position-values hidden></div>
     </div>`
     : `<div class="form-grid">${items.map(inventoryAuditInput).join('')}</div>`;
   const markup = `<form data-inventory-audit-criteria>
@@ -1314,17 +1414,31 @@ function openInventoryAuditCriteria(root, { mode, ids = [], onSaved = () => {} }
   let saving = false;
 
   if (isData) {
-    const selector = form.elements.namedItem('auditField');
+    const fieldSelector = form.elements.namedItem('auditField');
+    const modeSelector = form.elements.namedItem('auditMode');
     const shared = form.querySelector('[data-inventory-audit-shared-value]');
-    const numbered = form.querySelector('[data-inventory-audit-position-values]');
-    const syncFields = () => {
-      const perPosition = selector?.value === 'position';
-      if (shared) shared.hidden = perPosition;
-      if (numbered) numbered.hidden = !perPosition;
+    const rows = form.querySelector('[data-inventory-audit-position-values]');
+    const renderEditor = () => {
+      const definition = inventoryAuditFieldDefinition(fieldSelector?.value);
+      const perItem = modeSelector?.value === 'each';
+      if (!definition) return;
+      shared.hidden = perItem;
+      rows.hidden = !perItem;
+      // Render only the selected field, without rebuilding the parent form
+      // while the user types or while the iOS keyboard is visible.
+      if (perItem) {
+        rows.innerHTML = items.map((item, index) =>
+          inventoryAuditDataRow(item, index, definition, includesDifferentManufacturers)).join('');
+        shared.replaceChildren();
+      } else {
+        shared.innerHTML = inventoryAuditDataControl(definition, 'auditValue', { shared: true });
+        rows.replaceChildren();
+      }
       status.textContent = '';
     };
-    selector?.addEventListener('change', syncFields);
-    syncFields();
+    fieldSelector?.addEventListener('change', renderEditor);
+    modeSelector?.addEventListener('change', renderEditor);
+    renderEditor();
   }
 
   function calculate() {
@@ -1431,109 +1545,112 @@ function openInventoryAuditCriteria(root, { mode, ids = [], onSaved = () => {} }
       return;
     }
 
-    const fieldName = String(data.get('auditField') || '');
-    if (fieldName === 'position') {
-      const targets = [];
-      const uniqueNumbers = new Set();
+    const definition = inventoryAuditFieldDefinition(String(data.get('auditField') || ''));
+    const perItem = String(data.get('auditMode') || '') === 'each';
+    if (!definition) {
+      status.textContent = 'Выберите характеристику.';
+      return;
+    }
+    if (!perItem && definition.value === 'referencePrice') {
+      const locked = items.filter(item => itemPrimaryPrice(item) !== null);
+      if (locked.length) {
+        status.textContent = `У ${locked.length} позиций цена определяется основным поставщиком. Исключите их из выбора или измените цену у поставщика.`;
+        return;
+      }
+    }
+    const targets = [];
+    const uniqueNumbers = new Set();
+    let startingValue;
+    try {
+      if (!perItem) {
+        startingValue = inventoryAuditParseDataValue(definition, data.get('auditValue'));
+        if (startingValue === null) throw new Error('Укажите новое значение.');
+        if (definition.value === 'position' && startingValue + items.length - 1 > 2147483647)
+          throw new Error('Диапазон порядковых номеров слишком велик.');
+      }
       for (const [index, item] of items.entries()) {
-        const raw = String(data.get(`auditPosition-${index}`) ?? '').trim();
-        if (!raw) continue;
-        const value = Number(raw);
-        if (!/^\d+$/.test(raw) || !Number.isSafeInteger(value) || value < 1 || value > 2147483647) {
-          status.textContent = `Укажите целый положительный № для «${item.name}».`;
-          return;
+        if (perItem && definition.value === 'referencePrice' && itemPrimaryPrice(item) !== null) continue;
+        const raw = perItem ? data.get(`auditItem-${index}`) : data.get('auditValue');
+        const value = perItem ? inventoryAuditParseDataValue(definition, raw)
+          : definition.value === 'position' ? startingValue + index : startingValue;
+        if (value === null) continue;
+        if (definition.value === 'position') {
+          const numberKey = `${manufacturerName(item)}::${value}`;
+          if (uniqueNumbers.has(numberKey))
+            throw new Error(`Номер ${value} повторяется у производителя «${manufacturerName(item)}».`);
+          uniqueNumbers.add(numberKey);
         }
-        const manufacturer = manufacturerName(item);
-        const numberKey = `${manufacturer}::${value}`;
-        if (uniqueNumbers.has(numberKey)) {
-          status.textContent = `Для производителя «${manufacturer}» номер ${value} введён несколько раз.`;
-          return;
-        }
-        uniqueNumbers.add(numberKey);
-        targets.push({ itemId: item.itemId, manufacturer, name: item.name, value });
+        targets.push({ itemId: item.itemId, manufacturer: manufacturerName(item), name: item.name, value });
       }
-      if (!targets.length) {
-        status.textContent = 'Введите новый № хотя бы у одной позиции.';
-        return;
-      }
-      let pending = targets.filter(item => Number(getInventoryItem(item.itemId)?.position) !== item.value);
-      if (!pending.length) {
-        status.textContent = 'Введённые номера уже установлены.';
-        return;
-      }
-      saving = true;
-      submit.disabled = true;
-      const failed = new Set();
-      try {
-        // Core inserts into occupied numbers and shifts neighbours. Number updates
-        // must therefore be serialized and the final positions rechecked.
-        for (let pass = 0; pass < 3 && pending.length; pass++) {
-          for (const item of pending.sort((a, b) =>
-            a.manufacturer.localeCompare(b.manufacturer, 'ru', { numeric: true }) || a.value - b.value)) {
-            if (failed.has(item.itemId)) continue;
-            try {
-              await updateInventoryItem(item.itemId, { position: item.value });
-            } catch {
-              failed.add(item.itemId);
-            }
-          }
-          await loadInventory();
-          pending = targets.filter(item => !failed.has(item.itemId)
-            && Number(getInventoryItem(item.itemId)?.position) !== item.value);
-          status.textContent = `Проверено: ${targets.length - pending.length - failed.size} из ${targets.length}`;
-        }
-      } catch (error) {
-        status.textContent = error instanceof Error ? error.message : 'Не удалось проверить сохранённые номера.';
-        return;
-      } finally {
-        saving = false;
-        if (submit.isConnected) submit.disabled = false;
-      }
-      const unresolved = targets.filter(item =>
-        Number(getInventoryItem(item.itemId)?.position) !== item.value);
-      if (unresolved.length) {
-        status.textContent = `Не удалось подтвердить номера для ${unresolved.length} позиций. Проверьте значения и повторите применение.`;
-        return;
-      }
-      layer.v2Close?.();
-      onSaved();
-      openNotice({ title: 'Инвентаризация', message: `Номера сохранены для ${targets.length} позиций.` });
+    } catch (error) {
+      status.textContent = error instanceof Error ? error.message : 'Проверьте данные.';
       return;
     }
-    const value = String(data.get('auditValue') || '').trim();
-    if (!['category', 'productType'].includes(fieldName) || !value) {
-      status.textContent = 'Укажите поле и новое значение.';
+    if (!targets.length) {
+      status.textContent = 'Введите значения хотя бы для одной позиции.';
       return;
     }
-    const changes = items.filter(item => getInventoryItem(item.itemId)
-      && String(getInventoryItem(item.itemId)?.[fieldName] || '').trim() !== value);
+    const changes = targets.filter(entry =>
+      !inventoryAuditValueMatches(getInventoryItem(entry.itemId), definition, entry.value));
     if (!changes.length) {
-      status.textContent = 'У выбранных позиций уже указано это значение.';
+      status.textContent = 'У выбранных позиций уже указаны эти значения.';
       return;
     }
     saving = true;
     submit.disabled = true;
-    let saved = 0;
-    const failed = [];
-    // Existing item endpoint updates only supplied field; unchanged from data mode.
-    for (let i = 0; i < changes.length; i += 4) {
-      const batch = changes.slice(i, i + 4);
-      const results = await Promise.allSettled(batch.map(item =>
-        updateInventoryItem(item.itemId, { [fieldName]: value })));
-      results.forEach((result, j) => result.status === 'fulfilled'
-        ? saved++ : failed.push(batch[j].itemId));
-      status.textContent = `Сохранение: ${saved} из ${changes.length}`;
+    const failed = new Map();
+    try {
+      if (definition.value === 'position') {
+        // Core shifts occupied slots when inserting a numbered product.
+        // Serial writes plus a fresh snapshot are needed to verify final order.
+        let pending = [...changes];
+        for (let pass = 0; pass < 4 && pending.length; pass++) {
+          for (const entry of pending.sort((a, b) =>
+            a.manufacturer.localeCompare(b.manufacturer, 'ru', { numeric: true }) || a.value - b.value)) {
+            if (failed.has(entry.itemId)) continue;
+            try {
+              await updateInventoryItem(entry.itemId, inventoryAuditDataPayload(definition, entry.value));
+            } catch (error) {
+              failed.set(entry.itemId, error instanceof Error ? error.message : 'Ошибка сохранения');
+            }
+          }
+          await loadInventory();
+          pending = changes.filter(entry => !failed.has(entry.itemId)
+            && !inventoryAuditValueMatches(getInventoryItem(entry.itemId), definition, entry.value));
+          status.textContent = `Проверено: ${changes.length - pending.length - failed.size} из ${changes.length}`;
+        }
+      } else {
+        // Existing item API accepts a patch of individual master-data fields.
+        for (let index = 0; index < changes.length; index += 4) {
+          const batch = changes.slice(index, index + 4);
+          const results = await Promise.allSettled(batch.map(entry =>
+            updateInventoryItem(entry.itemId, inventoryAuditDataPayload(definition, entry.value))));
+          results.forEach((result, offset) => {
+            if (result.status === 'rejected') failed.set(batch[offset].itemId,
+              result.reason instanceof Error ? result.reason.message : 'Ошибка сохранения');
+          });
+          status.textContent = `Обработано: ${Math.min(index + 4, changes.length)} из ${changes.length}`;
+        }
+        await loadInventory();
+      }
+      const unresolved = changes.filter(entry =>
+        !inventoryAuditValueMatches(getInventoryItem(entry.itemId), definition, entry.value));
+      if (unresolved.length || failed.size) {
+        const examples = unresolved.slice(0, 2).map(entry => entry.name).join(', ');
+        const detail = [...failed.values()][0];
+        status.textContent = `Изменено ${changes.length - unresolved.length} из ${changes.length}. Не подтверждено: ${unresolved.length}.`
+          + (examples ? ` ${examples}.` : '') + (detail ? ` ${detail}` : '');
+        return;
+      }
+      layer.v2Close?.();
+      onSaved();
+      openNotice({ title: 'Инвентаризация', message: `Изменено ${changes.length} позиций.` });
+    } catch (error) {
+      status.textContent = error instanceof Error ? error.message : 'Не удалось сохранить данные.';
+    } finally {
+      saving = false;
+      if (submit.isConnected) submit.disabled = false;
     }
-    try { await loadInventory(); } catch(error) { failed.push('refresh'); }
-    saving = false;
-    if (submit.isConnected) submit.disabled = false;
-    if (failed.length) {
-      status.textContent = `Исправлено ${saved}. Не удалось: ${failed.length}. Повторите для оставшихся.`;
-      return;
-    }
-    layer.v2Close?.();
-    onSaved();
-    openNotice({ title: 'Инвентаризация', message: `Изменено ${saved} позиций.` });
   });
   return layer;
 }
