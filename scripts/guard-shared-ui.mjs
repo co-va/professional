@@ -42,6 +42,8 @@ const zStack = read('ui/v2/z-stack.js');
 const sharedSwipe = read('ui/v2/swipe.js');
 const horizontalAffordance = read('ui/v2/horizontal-affordance.js');
 const miniMarkup = read('ui/cards/mini-card.js');
+const dateCalendar = read('ui/calendar/calendar.js');
+const dateCalendarCss = read('ui/calendar/calendar.css');
 const modalPortal = read('ui/v2/modal-portal.js');
 const keyboardRuntime = read('ui/inputs/keyboard-runtime.js');
 const keyboardStyle = read('ui/inputs/keyboard.css');
@@ -159,7 +161,7 @@ const miniGeometry = [
   [/\.mini-card\{[^}]*border-radius:16px;/, 'MiniCard outer radius must be 16px'],
   [/\.mini-card__media\{[^}]*border-radius:10px;/, 'MiniCard media radius must be 10px'],
   [/\.mini-card__context-action\{[^}]*border-radius:10px;/, 'MiniCard context radius must be 10px'],
-  [/\.mini-card__compact-action\{[^}]*border-radius:9px;/, 'MiniCard compact action radius must be 9px'],
+  [/\.mini-card__compact-action\{[^}]*position:absolute;top:10px;right:10px;z-index:2/, 'MiniCard compact action position must remain unchanged'],
 ];
 for (const [rule, message] of miniGeometry) assert(rule.test(mini), message);
 
@@ -175,7 +177,7 @@ assert(!inputs.includes('.ui-links--compact .link-row .remove-button') && !input
 assert(!read('ui/repeated-fields/index.js').includes("button('+',"), 'Repeated-field add must not use the full-size action factory');
 assert(!read('ui/links/index.js').includes("button('+',"), 'Links add must not use the full-size action factory');
 assert(read('ui/buttons/index.js').includes('export function compactAddButton('), 'Compact add control factory missing');
-const compactVariants = ['add', 'remove', 'info', 'copy'];
+const compactVariants = ['add', 'remove', 'info', 'copy', 'settings', 'repeat', 'card', 'previous', 'next'];
 for (const kind of compactVariants) {
   const markup = compactButton({ kind, data: 'data-compact-smoke', aria: 'Тест' });
   assert(markup.includes('class="ui-compact-button ui-compact-button--' + kind)
@@ -186,6 +188,19 @@ for (const kind of compactVariants) {
 assert(compactAddButton().includes('ui-compact-button--add') && compactRemoveButton().includes('ui-compact-button--remove')
   && smallActionButton({ icon: 'info' }).includes('ui-compact-button--info')
   && smallActionButton({ icon: 'copy' }).includes('ui-compact-button--copy'), 'All legacy Compact call paths must delegate to one renderer');
+assert(miniMarkup.includes("import { compactButton } from '../buttons/index.js'") && miniMarkup.includes("return compactButton({")
+  && miniMarkup.includes("kind: 'card'") && miniMarkup.includes("kind = action.icon === 'settings'") === false,
+  'MiniCard corner and record controls must use the shared Compact factory');
+assert(miniMarkup.includes("action.icon === 'settings' ? 'settings'") && miniMarkup.includes("action.label === '↻' ? 'repeat'"),
+  'MiniCard must preserve gray settings and black repeat actions');
+assert(!mini.includes('.mini-card__compact-action{position:absolute;top:10px;right:10px;z-index:2;width:')
+  && !mini.includes('.mini-card__record-action{border:0')
+  && buttons.includes('.ui-compact-button--settings{') && buttons.includes('.ui-compact-button--repeat{'),
+  'MiniCard must not duplicate button geometry or visuals');
+assert(dateCalendar.includes("compactButton({ kind: 'previous'") && dateCalendar.includes("compactButton({ kind: 'next'")
+  && dateCalendarCss.includes('grid-template-columns:var(--ui-compact-size) minmax(0,1fr) var(--ui-compact-size)')
+  && !dateCalendarCss.includes('.calendar__month-button{box-sizing:border-box;width:36px'),
+  'Calendar month/day navigation must use single Compact 28px buttons');
 assert(count(buttons, '.ui-compact-button{') === 1
   && !buttons.includes('.small-action-button{box-sizing:border-box')
   && !buttons.includes('.array-row__add,.ui-links__add{display:block'), 'Compact must have exactly one geometry owner');

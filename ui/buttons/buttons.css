@@ -4,8 +4,15 @@
 .ui-compact-button--add{font-size:26px;font-weight:400}
 .ui-compact-button--remove{font-size:24px;font-weight:400;color:#ff1111}
 .ui-compact-button--info,.ui-compact-button--copy{border:1px solid #111;background:#fff;justify-self:end}
+/* Mini-card actions and date arrows are styles of the same 28px Compact primitive. */
+.ui-compact-button--card,.ui-compact-button--repeat{border:0;border-radius:9px;background:#111;color:#fff;font-size:18px}
+.ui-compact-button--repeat{border-radius:10px;font-size:23px}
+.ui-compact-button--settings{border:1.5px solid #9b9fa2;border-radius:10px;background:#F2F2F2;color:#5b6064}
+.ui-compact-button--settings .mini-card__record-action-icon{width:23px;height:23px;display:block;flex:none}
+.ui-compact-button--previous,.ui-compact-button--next{border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--text);font-size:18px}
 .ui-compact-button:active{opacity:.55;transform:none}
 .ui-compact-button:disabled{opacity:.4;cursor:default}
+.ui-compact-button:focus-visible{outline:2px solid #111;outline-offset:2px}
 .small-action-button__info{font-size:15px;font-weight:800;line-height:1}.small-action-button svg{width:15px;height:15px;display:block;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.small-action-button__done{position:absolute;inset:0;display:grid;place-items:center;opacity:0;font-size:15px;font-weight:800}.small-action-button--copy{position:relative;transition:transform .12s ease}.small-action-button--copy.is-copied svg{opacity:0}.small-action-button--copy.is-copied .small-action-button__done{opacity:1}.sheet-icon-button{box-sizing:border-box;width:48px;min-width:48px;max-width:48px;height:48px;min-height:48px;max-height:48px;padding:0;border-radius:14px;background:var(--button-secondary);color:var(--text);font:inherit;font-size:0;line-height:1}.sheet-icon-button{font-size:23px}.icon-button-group{display:flex;align-items:center;gap:8px}.remove-button{width:40px;height:40px;border:0;border-radius:11px;background:var(--button-secondary);color:var(--danger);font:inherit;font-size:21px}
 .app-header .ui-button.app-header__control{min-width:0;width:100%;min-height:44px;height:44px;padding:0 8px}.app-header .ui-button.app-header__control--icon{width:44px;padding:0;line-height:1}.app-header .ui-button.app-header__control--action{width:max-content;max-width:var(--shell-action-max,104px);padding:0 9px}.app-view-shell__primary-action .ui-button{width:100%;min-height:48px}.message-composer .ui-button.message-composer__send{width:46px;min-width:46px;height:44px;min-height:44px;padding:0}.app-settings-panel .ui-button.app-settings-panel__button{width:100%}.read-only-sheet__action .ui-button{width:100%}
 

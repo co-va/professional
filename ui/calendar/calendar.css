@@ -1,8 +1,7 @@
 .calendar{width:100%;margin-top:2px}
-.calendar__header{display:grid;grid-template-columns:36px minmax(0,1fr) 36px;align-items:center;gap:4px;margin:0}
+.calendar__header{display:grid;grid-template-columns:var(--ui-compact-size) minmax(0,1fr) var(--ui-compact-size);align-items:center;gap:4px;margin:0}
 .calendar>.calendar__header{margin-bottom:12px}
-.calendar__month-button{box-sizing:border-box;width:36px;height:36px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--text);font:inherit;font-size:18px;line-height:1}
-.calendar__month-button:active{background:transparent}
+.calendar__month-button{justify-self:center}
 .calendar__month{min-width:0;overflow:hidden;white-space:nowrap;text-overflow:clip;text-align:center;font-size:14px;font-weight:700;line-height:1}
 .calendar__weekdays{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));margin-bottom:4px}
 .calendar__weekdays span{min-width:0;padding:4px 2px;text-align:center;color:var(--text-secondary);font-size:12px;font-weight:650}

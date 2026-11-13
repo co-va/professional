@@ -10,16 +10,16 @@
 .mini-card-stack{display:grid;gap:10px;justify-items:center;align-content:start;max-width:100%}
 
 .mini-card--lines{}.mini-card__lines{display:grid;gap:4px;align-content:start}.mini-card__line,.mini-card__line-action{width:100%;min-width:0}.mini-card__line{display:block;font-size:12px;line-height:1.2;white-space:normal;overflow-wrap:anywhere}.mini-card__line--left{text-align:left}.mini-card__line--right{text-align:right}.mini-card__line.is-strong{font-weight:800}.mini-card__line--title{font-size:11px;line-height:1.15;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.mini-card__line--primary{font-size:16px;line-height:1.05;font-weight:850;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.mini-card__line--muted{font-size:10.5px;line-height:1.15;font-weight:450;color:#777A7D;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.mini-card__line-action{border:0;padding:0;background:transparent;color:inherit;font:inherit;text-align:inherit;cursor:pointer}.mini-card--lines .mini-card__rows{margin-top:6px}.mini-card--lines .mini-card__row{min-height:26px;padding:4px 0}.mini-card--lines .mini-card__row-value{font-size:16px}
-.mini-card--dual-action{position:relative}.mini-card--dual-action .mini-card__head{padding-right:38px}.mini-card--lines.mini-card--dual-action .mini-card__line:nth-child(-n+2){box-sizing:border-box;padding-right:38px}.mini-card__surface-action{position:absolute;inset:0;z-index:1;border:0;border-radius:inherit;padding:0;background:transparent;cursor:pointer}.mini-card__surface-action:focus-visible{outline:2px solid #111;outline-offset:-4px}.mini-card__compact-action{position:absolute;top:10px;right:10px;z-index:2;width:30px;height:30px;border:0;border-radius:9px;padding:0;display:grid;place-items:center;background:#111;color:#fff;font:inherit;font-size:18px;line-height:1;cursor:pointer}.mini-card__compact-action:active{transform:translateY(1px)}.mini-card__compact-action:focus-visible{outline:2px solid #111;outline-offset:2px}
+.mini-card--dual-action{position:relative}.mini-card--dual-action .mini-card__head{padding-right:38px}.mini-card--lines.mini-card--dual-action .mini-card__line:nth-child(-n+2){box-sizing:border-box;padding-right:38px}.mini-card__surface-action{position:absolute;inset:0;z-index:1;border:0;border-radius:inherit;padding:0;background:transparent;cursor:pointer}.mini-card__surface-action:focus-visible{outline:2px solid #111;outline-offset:-4px}.mini-card__compact-action{position:absolute;top:10px;right:10px;z-index:2}
 
 
 /* Shared MiniCard: all usages use the exact same 290×200 shell and three fixed/scroll regions. */
 .mini-card__record-head{display:grid;gap:3px;min-width:0;align-content:start;border-bottom:1px solid #c7c7c7;padding-bottom:5px}
 .mini-card__record-top{display:grid;grid-template-columns:44px minmax(0,1fr) 44px;gap:4px;align-items:center;min-height:44px}
-.mini-card__record-action,.mini-card__record-action-placeholder{width:44px;height:44px;min-width:44px}
-.mini-card__record-action{border:0;border-radius:10px;display:grid;place-items:center;padding:0;background:#111;color:#fff;font:inherit;font-size:23px;line-height:1;cursor:pointer}
-.mini-card__record-action:active{transform:translateY(1px)}
-.mini-card__record-action:focus-visible{outline:2px solid #111;outline-offset:2px}
+.mini-card__record-action-placeholder{width:44px;height:44px;min-width:44px}
+.mini-card__record-action{justify-self:center;align-self:center}
+
+
 .mini-card__record-main{min-width:0;display:grid;align-content:center;gap:2px}
 .mini-card__record-workplace{min-width:0;font-size:14px;font-weight:800;line-height:1.15;text-align:center;overflow-wrap:anywhere}
 .mini-card__record-moment{font-size:12px;line-height:14px;white-space:nowrap;text-align:center;font-variant-numeric:tabular-nums;letter-spacing:-.1px}
@@ -47,9 +47,9 @@
 .mini-card--record-person .mini-card__record-center .mini-card__line{font-size:15px;line-height:18px;font-weight:520;color:#171717;margin-bottom:5px}
 .mini-card--record-person .mini-card__record-center .mini-card__line--pair{align-items:baseline}
 .mini-card--record-person .mini-card__record-center .mini-card__line-right{font-size:15px;line-height:18px;font-weight:780;color:#111}
-.mini-card__record-action--secondary{background:#fff;border:1.5px solid #9b9fa2;color:#5b6064;box-shadow:none}
-.mini-card__record-action--secondary:active{background:#f2f2f2}
-.mini-card__record-action-icon{width:23px;height:23px;display:block;flex:none}
+
+
+
 
 /* Record viewer only: once settings are unavailable, reclaim the empty button slot. */
 .mini-card--record-person .mini-card__record-top--no-left{grid-template-columns:minmax(0,1fr) 44px}
