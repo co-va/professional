@@ -695,7 +695,8 @@ export function openRecordView(record, {
       reportCard?.setAttribute('tabindex', '0');
       reportCard?.setAttribute('aria-label', 'Z-отчёт записи');
       reportCard?.addEventListener('click', (event) => {
-        if (event.target.closest?.('button,select,input,[role="button"]')) return;
+        const action = event.target.closest?.('button,select,input,[role="button"]');
+        if (action && action !== reportCard && reportCard.contains(action)) return;
         openRecordZReport(syncCurrent());
       });
       reportCard?.addEventListener('keydown', (event) => {
