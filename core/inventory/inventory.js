@@ -1113,6 +1113,13 @@ function inventoryAuditItems(ids) {
   return ids.map(id => byId.get(id)).filter(Boolean).sort(inventoryPositionComparator);
 }
 
+function inventoryAuditItemLabel(item, includeManufacturer = false) {
+  const number = Number(item.position);
+  const prefix = Number.isSafeInteger(number) && number > 0 ? `№ ${number}` : 'Без №';
+  const name = includeManufacturer ? `${manufacturerName(item)} · ${item.name}` : item.name;
+  return `${prefix} · ${name}`;
+}
+
 function inventoryAuditFilters(items, manufacturer = '') {
   const definitions = [
     ['manufacturer', 'Производитель'],
@@ -1210,7 +1217,7 @@ function openInventoryAuditSelection(root, { manufacturer = '', onSaved = () => 
     visible = items.map(item => item.itemId);
     if (list) list.innerHTML = items.length
       ? items.map(item => compactCheck({
-        label: manufacturer ? item.name : `${manufacturerName(item)} · ${item.name}`,
+        label: inventoryAuditItemLabel(item, !manufacturer),
         checked: selected.has(item.itemId),
         data: `data-inventory-audit-item="${escapeHtml(item.itemId)}"`,
       })).join('')
@@ -1301,7 +1308,7 @@ function inventoryAuditInput(item, index) {
   const previous = isWeighedInventoryItem(item)
     ? `${item.containerCount == null ? '— тюб.' : `${numberText(item.containerCount)} тюб.`} · ${numberText(item.balance)} ${item.unit}`
     : `${numberText(item.balance)} ${item.unit}`;
-  const heading = `<div class="field-inline-label"><strong>${escapeHtml(item.name)}</strong><span>${escapeHtml(previous)}</span></div>`;
+  const heading = `<div class="field-inline-label"><strong>${escapeHtml(inventoryAuditItemLabel(item))}</strong><span>${escapeHtml(previous)}</span></div>`;
   if (isWeighedInventoryItem(item)) {
     return `<section>
       ${heading}
@@ -1407,7 +1414,7 @@ function inventoryAuditDataControl(definition, name, { shared = false, locked = 
 }
 
 function inventoryAuditDataRow(item, index, definition, includeManufacturer = false) {
-  const name = includeManufacturer ? `${manufacturerName(item)} · ${item.name}` : item.name;
+  const name = inventoryAuditItemLabel(item, includeManufacturer);
   const current = inventoryAuditCurrentValue(item, definition);
   const shown = definition.value === 'usage'
     ? INVENTORY_AUDIT_USAGE.find(option => option.value === current)?.label || ''
