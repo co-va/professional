@@ -1308,10 +1308,17 @@ function inventoryAuditInput(item, index) {
   const previous = isWeighedInventoryItem(item)
     ? `${item.containerCount == null ? '— тюб.' : `${numberText(item.containerCount)} тюб.`} · ${numberText(item.balance)} ${item.unit}`
     : `${numberText(item.balance)} ${item.unit}`;
-  const heading = `<div class="field-inline-label"><strong>${escapeHtml(inventoryAuditItemLabel(item))}</strong><span>${escapeHtml(previous)}</span></div>`;
+  // One existing Shared compactCheck in the title line; no new button variant.
+  const heading = `<div class="field-inline-label" data-inventory-audit-heading="${index}">
+    ${compactCheck({ label: '', checked: true, data: `data-inventory-audit-include="${index}"`,
+      aria: `Учитывать при инвентаризации: ${inventoryAuditItemLabel(item)}` })}
+    <strong title="${escapeHtml(inventoryAuditItemLabel(item))}">${escapeHtml(inventoryAuditItemLabel(item))}</strong>
+    <span data-inventory-audit-result="${index}" data-inventory-audit-previous="${escapeHtml(previous)}">${escapeHtml(previous)}</span>
+  </div>`;
   if (isWeighedInventoryItem(item)) {
-    return `<section>
+    return `<section data-inventory-audit-row="${index}">
       ${heading}
+      <div data-inventory-audit-fields>
       ${twoColumnLayout(
         field({ label: '', placeholder: 'Тюбиков, шт.', name: `auditTubes-${index}`, type: 'number', min: '0',
           step: '1', inputmode: 'numeric' }),
@@ -1319,14 +1326,15 @@ function inventoryAuditInput(item, index) {
           step: '0.001', inputmode: 'decimal' }),
         { ariaLabel: `Количество и вес: ${item.name}` },
       )}
-      <p data-inventory-audit-result="${index}"></p>
+      </div>
     </section>`;
   }
-  return `<section>
+  return `<section data-inventory-audit-row="${index}">
     ${heading}
+    <div data-inventory-audit-fields>
     ${field({ label: '', placeholder: `Фактически, ${item.unit}`, name: `auditActual-${index}`,
       type: 'number', min: '0', step: '0.001', inputmode: 'decimal' })}
-    <p data-inventory-audit-result="${index}"></p>
+    </div>
   </section>`;
 }
 function inventoryAuditMeasure(item, index, data) {
@@ -1334,9 +1342,16 @@ function inventoryAuditMeasure(item, index, data) {
     const tubeText = String(data.get(`auditTubes-${index}`) ?? '').trim();
     const grossText = String(data.get(`auditGross-${index}`) ?? '').trim();
     if (!tubeText && !grossText) return null;
-    if (!tubeText || !grossText) throw new Error('Введите и количество тюбиков, и общий вес.');
-    const tubes = Number(tubeText.replace(',', '.'));
-    const gross = Number(grossText.replace(',', '.'));
+    const tubes = tubeText ? Number(tubeText.replace(',', '.')) : NaN;
+    const gross = grossText ? Number(grossText.replace(',', '.')) : NaN;
+    // Either zero field means an empty shelf: zero tubes and zero gross grams.
+    // A nonzero companion is a conflict, never a silent stock adjustment.
+    if ((tubeText && tubes === 0) || (grossText && gross === 0)) {
+      if ((tubeText && tubes !== 0) || (grossText && gross !== 0))
+        throw new Error('Ноль тюбиков и ненулевой вес несовместимы.');
+      return { actual: 0, containers: 0, note: 'Тюбиков: 0; общий вес: 0 г' };
+    }
+    if (!tubeText || !grossText) throw new Error('Укажите тюбики и общий вес.');
     const actual = netStocktakeGrams({ gross, containers: tubes, tareWeight: item.tareWeight });
     const capacity = Number(item.packageQuantity);
     if (Number.isFinite(capacity) && capacity > 0 && actual > tubes * capacity + 0.001)
@@ -1584,9 +1599,13 @@ function openInventoryAuditCriteria(root, { mode, ids = [], fieldName = 'categor
   const fields = isData
     ? `<div class="form-grid">${items.map((item, index) =>
       inventoryAuditDataRow(item, index, definition, includesDifferentManufacturers)).join('')}</div>`
-    : `<div class="form-grid">${items.map(inventoryAuditInput).join('')}</div>`;
+    : `<div class="form-grid" data-inventory-audit-active>${items.map(inventoryAuditInput).join('')}</div>
+       <details data-inventory-audit-excluded hidden>
+         <summary data-inventory-audit-excluded-count>Исключено: 0</summary>
+         <div class="form-grid" data-inventory-audit-excluded-list></div>
+       </details>`;
   const markup = `<form data-inventory-audit-criteria>
-    <p>Выбрано: ${items.length} позиций</p>
+    <p data-inventory-audit-included-count>${isData ? 'Выбрано' : 'В инвентаризации'}: ${items.length} позиций</p>
     ${fields}
     <p class="form-error" role="status" data-inventory-audit-status></p>
     ${actionBlock(button(isData ? 'Применить' : 'Сохранить', { type:'submit', data:'data-inventory-audit-apply' }))}
@@ -1602,7 +1621,50 @@ function openInventoryAuditCriteria(root, { mode, ids = [], fieldName = 'categor
   const balances = new Map(items.map(item => [item.itemId, Number(item.balance) || 0]));
   const knownContainers = new Map(items.map(item => [item.itemId, item.containerCount == null ? null : Number(item.containerCount)]));
   let saving = false;
+  const includedIds = new Set(items.map(item => item.itemId));
+  const activeList = form.querySelector('[data-inventory-audit-active]');
+  const excludedGroup = form.querySelector('[data-inventory-audit-excluded]');
+  const excludedList = form.querySelector('[data-inventory-audit-excluded-list]');
+  const excludedCount = form.querySelector('[data-inventory-audit-excluded-count]');
+  const includedCount = form.querySelector('[data-inventory-audit-included-count]');
 
+  // Move existing nodes, not re-rendered fields. Typed measurements survive
+  // exclude/restore, and excluded rows never participate in saving.
+  function setStocktakeIncluded(index, included) {
+    const row = form.querySelector(`[data-inventory-audit-row="${index}"]`);
+    const item = items[index];
+    if (!row || !item || !activeList || !excludedList || saving) return;
+    if (included) includedIds.add(item.itemId);
+    else includedIds.delete(item.itemId);
+    const fields = row.querySelector('[data-inventory-audit-fields]');
+    if (fields) {
+      fields.hidden = !included;
+      fields.querySelectorAll('input, select, textarea').forEach(control => {
+        control.disabled = !included;
+      });
+    }
+    (included ? activeList : excludedList).append(row);
+    for (const host of [activeList, excludedList]) {
+      [...host.children].sort((a, b) =>
+        Number(a.dataset.inventoryAuditRow) - Number(b.dataset.inventoryAuditRow))
+        .forEach(node => host.append(node));
+    }
+    const excluded = items.length - includedIds.size;
+    excludedGroup.hidden = excluded === 0;
+    if (!excluded) excludedGroup.open = false;
+    excludedCount.textContent = `Исключено: ${excluded}`;
+    includedCount.textContent = `В инвентаризации: ${includedIds.size} из ${items.length}`;
+    const preview = calculate();
+    status.textContent = preview.invalid ? 'Проверьте введённые значения.' : '';
+  }
+
+  if (!isData) {
+    form.addEventListener('change', event => {
+      const check = event.target.closest?.('[data-inventory-audit-include]');
+      if (!check || saving) return;
+      setStocktakeIncluded(Number(check.dataset.inventoryAuditInclude), check.checked);
+    });
+  }
 
   function calculate() {
     const data = new FormData(form);
@@ -1611,12 +1673,15 @@ function openInventoryAuditCriteria(root, { mode, ids = [], fieldName = 'categor
     let invalid = 0;
     for (const [index, item] of items.entries()) {
       const result = form.querySelector(`[data-inventory-audit-result="${index}"]`);
+      if (result) {
+        result.textContent = result.dataset.inventoryAuditPrevious || '';
+        result.classList.remove('form-error');
+        result.removeAttribute('title');
+      }
+      if (!isData && !includedIds.has(item.itemId)) continue;
       try {
         const measurement = inventoryAuditMeasure(item, index, data);
-        if (!measurement) {
-          if (result) result.textContent = '';
-          continue;
-        }
+        if (!measurement) continue;
         measured++;
         const expected = balances.get(item.itemId);
         const diff = Math.round((measurement.actual - expected) * 1000) / 1000;
@@ -1635,7 +1700,11 @@ function openInventoryAuditCriteria(root, { mode, ids = [], fieldName = 'categor
         });
       } catch (error) {
         invalid++;
-        if (result) result.textContent = error instanceof Error ? error.message : 'Проверьте измерения.';
+        if (result) {
+          result.textContent = 'Ошибка';
+          result.classList.add('form-error');
+          result.title = error instanceof Error ? error.message : 'Проверьте измерения.';
+        }
       }
     }
     return { lines, measured, invalid };
@@ -1643,8 +1712,28 @@ function openInventoryAuditCriteria(root, { mode, ids = [], fieldName = 'categor
 
   if (!isData) {
     // The form is never rebuilt while iOS keyboard is open.
-    form.addEventListener('input', () => {
+    form.addEventListener('input', event => {
       if (saving) return;
+      const input = event.target;
+      const match = /^(auditTubes|auditGross)-(\\d+)$/.exec(String(input?.name || ''));
+      if (match) {
+        const partnerName = `${match[1] === 'auditTubes' ? 'auditGross' : 'auditTubes'}-${match[2]}`;
+        const partner = form.elements.namedItem(partnerName);
+        const raw = String(input.value || '').trim();
+        const value = raw ? Number(raw.replace(',', '.')) : NaN;
+        if (value === 0) {
+          // A zero in either field explicitly counts zero tubes and zero grams.
+          if (partner && partner.value !== '0') {
+            partner.value = '0';
+            partner.dataset.inventoryAuditAutoZero = 'true';
+          }
+        } else if (partner && (partner.dataset.inventoryAuditAutoZero === 'true'
+          || Number.isFinite(value) && value > 0 && partner.value === '0')) {
+          partner.value = '';
+          delete partner.dataset.inventoryAuditAutoZero;
+        }
+        delete input.dataset.inventoryAuditAutoZero;
+      }
       const result = calculate();
       status.textContent = result.invalid ? 'Проверьте введённые значения.' : '';
     });
@@ -1660,6 +1749,10 @@ function openInventoryAuditCriteria(root, { mode, ids = [], fieldName = 'categor
         status.textContent = `Проверьте ошибки измерений: ${review.invalid}.`;
         return;
       }
+      if (!includedIds.size) {
+        status.textContent = 'Верните хотя бы одну позицию в инвентаризацию.';
+        return;
+      }
       if (!review.measured) {
         status.textContent = 'Введите данные хотя бы по одной позиции.';
         return;
@@ -1670,7 +1763,7 @@ function openInventoryAuditCriteria(root, { mode, ids = [], fieldName = 'categor
         return;
       }
       // Prevent silently losing counts if an older Core instance is still live.
-      if (items.some(item => isWeighedInventoryItem(item)
+      if (items.some(item => includedIds.has(item.itemId) && isWeighedInventoryItem(item)
         && !Object.prototype.hasOwnProperty.call(getInventoryItem(item.itemId) || {}, 'containerCount'))) {
         status.textContent = 'Сервер склада ещё не поддерживает учёт тюбиков. Сохранение отменено.';
         return;
@@ -1681,6 +1774,7 @@ function openInventoryAuditCriteria(root, { mode, ids = [], fieldName = 'categor
       try {
         await loadInventory();
         if (items.some(item => {
+          if (!includedIds.has(item.itemId)) return false;
           const actualItem = getInventoryItem(item.itemId);
           return !actualItem
             || Math.abs((Number(actualItem.balance) || 0) - balances.get(item.itemId)) > 0.000001
