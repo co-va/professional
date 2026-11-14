@@ -28,3 +28,7 @@
 [data-record-creation-step="date"] .record-creation-flow__body{overflow:hidden}
 [data-record-creation-step="person"] .record-screen--people{height:100%;min-height:0;padding:0}[data-record-creation-step="person"] .record-person-list{min-height:0;overflow:auto}
 .record-creation-flow .record-screen{padding-left:0;padding-right:0;padding-bottom:0}
+
+/* The existing payment button indicates available Tips without showing the amount. */
+.record-payment-button--has-tips{position:relative}
+.record-payment-button--has-tips::after{content:'';position:absolute;right:14px;top:50%;width:6px;height:6px;border-radius:50%;background:currentColor;transform:translateY(-50%);pointer-events:none}
