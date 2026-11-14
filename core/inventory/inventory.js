@@ -1599,11 +1599,11 @@ function openInventoryAuditCriteria(root, { mode, ids = [], fieldName = 'categor
   const fields = isData
     ? `<div class="form-grid">${items.map((item, index) =>
       inventoryAuditDataRow(item, index, definition, includesDifferentManufacturers)).join('')}</div>`
-    : `<div class="form-grid" data-inventory-audit-active>${items.map(inventoryAuditInput).join('')}</div>
-       <details data-inventory-audit-excluded hidden>
+    : `<details data-inventory-audit-excluded hidden>
          <summary data-inventory-audit-excluded-count>Исключено: 0</summary>
          <div class="form-grid" data-inventory-audit-excluded-list></div>
-       </details>`;
+       </details>
+       <div class="form-grid" data-inventory-audit-active>${items.map(inventoryAuditInput).join('')}</div>`;
   const markup = `<form data-inventory-audit-criteria>
     <p data-inventory-audit-included-count>${isData ? 'Выбрано' : 'В инвентаризации'}: ${items.length} позиций</p>
     ${fields}
