@@ -1715,7 +1715,7 @@ function openInventoryAuditCriteria(root, { mode, ids = [], fieldName = 'categor
     form.addEventListener('input', event => {
       if (saving) return;
       const input = event.target;
-      const match = /^(auditTubes|auditGross)-(\\d+)$/.exec(String(input?.name || ''));
+      const match = /^(auditTubes|auditGross)-(\d+)$/.exec(String(input?.name || ''));
       if (match) {
         const partnerName = `${match[1] === 'auditTubes' ? 'auditGross' : 'auditTubes'}-${match[2]}`;
         const partner = form.elements.namedItem(partnerName);
