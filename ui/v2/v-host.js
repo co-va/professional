@@ -124,34 +124,24 @@ export function bindV2VContext(root) {
     }
 
     if (!nextSource || nextSource.hidden) {
-      // Keep a touched button alive during Z/Q refresh: replacing the node
-      // between touchstart and click cancels the native iOS click.
-      if (control?.isConnected && hostControl() === control) {
-        if (!control.disabled) control.disabled = true;
-        const host = hostNode();
-        if (host && !host.hidden) host.hidden = true;
-      } else if (control?.isConnected) clearV2V(app);
+      if (control?.isConnected) clearV2V(app);
       source = nextSource;
+      control = null;
+      return;
+    }
+
+    if (nextSource === source && control?.isConnected) {
+      syncControlState(control, source);
       return;
     }
 
     source = nextSource;
-    if (control?.isConnected && hostControl() === control) {
-      // Reuse the same physical control while a record is re-rendered.
-      const host = hostNode();
-      if (host?.hidden) host.hidden = false;
-      syncControlState(control, source);
-      return;
-    }
-
     control = setV2V(app, { aria: source.getAttribute('aria-label') || 'Действия раздела' });
     if (control) {
       syncControlState(control, source);
       control.addEventListener('click', () => {
-        // The active record can change before a MutationObserver callback.
-        const current = activeWorkspaceSurface(app)?.querySelector?.('[data-workspace-v-action]') || null;
-        if (!current?.isConnected || current.hidden || current.disabled) return;
-        current.click();
+        if (!source?.isConnected || source.disabled) return;
+        source.click();
       });
     }
   };
