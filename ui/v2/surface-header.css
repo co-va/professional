@@ -1,0 +1,25 @@
+/* Z and Q Header geometry is owned only by ui/v2/z-layout.js. */
+[data-v2-z-header]:has(> [data-v2-z-header-content]:empty){
+  min-height:36px!important;
+  background:var(--v2-inner-surface,#F5F5F3)!important;
+}
+[data-v2-q-header],
+[data-v2-q-header] > [data-v2-q-header-content]{
+  background:transparent!important;
+  border:0!important;
+  box-shadow:none!important;
+}
+[data-v2-q-header]:has(> [data-v2-q-header-content]:empty){
+  min-height:36px!important;
+  background:transparent!important;
+}
+[data-v2-q-header]:has(> [data-v2-q-header-content]:empty) > [data-v2-q-header-content]{
+  display:none!important;
+}
+[data-v2-q-body] > .workspace-header-context + .entity-details{
+  margin-top:0;
+}
+/* Controls retain their geometry, but only their Shared Header owns outer gaps. */
+:is([data-v2-z-header-content],[data-v2-q-header-content]) .ui-search-field{padding:0}
+:is([data-v2-z-header-content],[data-v2-q-header-content]) .ui-search-divider{display:none!important}
+:is([data-v2-z-header-content],[data-v2-q-header-content]) .segment-control{margin:0}

@@ -1,0 +1,19 @@
+.workplace-form__color{display:grid;gap:6px}.work-time-row{display:grid;gap:6px}.work-time-row__label{color:var(--text-secondary);font-size:13px}.work-time-row__fields{display:grid;grid-template-columns:1fr 1fr;gap:8px}.work-time-row__fields .field{grid-template-columns:auto 1fr;align-items:center;gap:7px}.work-time-row__fields .field>span{font-size:13px}.workplace-content{width:100%;min-width:0;display:grid;justify-items:center;gap:3px}.workplace-content__name{width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;line-height:1.15;font-weight:700}.workplace-content__primary,.workplace-content__secondary{font-size:12px;line-height:1.15;white-space:nowrap}.workplace-content__primary{font-weight:600}.workplace-content__secondary{font-weight:500;color:var(--text-secondary)}.workplace-control-list{display:grid;gap:0}.workplace-control-actions{display:grid;gap:8px;margin-top:12px}.workplace-control-time{display:grid;gap:10px}.workplace-selector{display:grid;gap:8px}.workplace-select-row{display:grid;grid-template-columns:minmax(0,1fr) var(--ui-compact-size);gap:8px;align-items:end}.workplace-select-row>.cost-field{grid-column:1/-1}.workplace-selector .cost-field{margin-top:4px}@media(max-width:360px){.work-time-row__fields{gap:6px}.workplace-select-row{grid-template-columns:minmax(0,1fr) 36px}}
+
+/* Workplace Q visibility section: steady rhythm between color and links. */
+.workplace-form__visibility{min-width:0;padding:8px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+.workplace-form__visibility .app-notification-row{min-height:48px;align-items:center;padding:0;border:0}
+.workplace-form>.ui-links--compact{margin-top:0}
+
+/* Service editor layout uses shared V2 List Entries, buttons and form controls. */
+.service-workplace-price-editor{display:grid;gap:14px;padding:8px 0}
+.service-workplace-price-editor__title{font-size:16px;font-weight:750;overflow-wrap:anywhere}
+.service-workplace-price-editor__actions{display:grid;gap:8px}
+.service-workplace-price-editor [hidden]{display:none!important}
+.service-workplace-extra{display:grid;gap:10px}
+
+/* Keep the shared secondary action on one line at phone widths. */
+.service-workplace-add-button{white-space:nowrap}
+
+/* Independent controls must never visually touch the destructive action. */
+.service-workplace-add-panel{margin-top:16px;margin-bottom:16px}

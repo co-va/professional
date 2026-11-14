@@ -1,0 +1,121 @@
+import { actionBlock } from '../page/page.js';
+import { button } from '../buttons/index.js';
+import { modal, mountModal } from '../modals/index.js';
+import { select } from '../selectors/index.js';
+import { mountEntityCardConstructor } from './entity-card-constructor.js';
+
+function optionValue(options = [], preferred = '') {
+  const values = (Array.isArray(options) ? options : []).map((item) => String(item?.value ?? ''));
+  const candidate = String(preferred || '');
+  return values.includes(candidate) ? candidate : (values[0] || '');
+}
+
+export function openEntityCardAppearanceQ(root, {
+  title = 'Вид',
+  typeLabel = 'Тип карты',
+  typeOptions = [],
+  initialType = '',
+  targetLabel = 'Карта',
+  initialTarget = 'all',
+  defaultTarget = () => 'all',
+  targetOptions = () => [],
+  resolve = () => ({}),
+  save = async () => {},
+  onSaved = () => {},
+  allowPhoto = true,
+} = {}) {
+  const types = Array.isArray(typeOptions) ? typeOptions.filter(Boolean) : [];
+  if (!types.length) return null;
+
+  let type = optionValue(types, initialType);
+  let target = String(initialTarget || 'all');
+  const layer = mountModal(root, modal('<div data-entity-card-appearance-q></div>', {
+    // The title is for accessibility only: the header is reserved for actual selectors.
+    title: '',
+    variant: 'q',
+    className: 'entity-card-appearance-q',
+  }));
+  layer?.querySelector('.modal-sheet')?.setAttribute('aria-label', title);
+  const host = layer?.querySelector('[data-entity-card-appearance-q]');
+  const headerHost = layer?.querySelector('[data-v2-q-header-content]');
+  if (!host || !headerHost) return layer;
+
+  const render = () => {
+    const targets = Array.isArray(targetOptions(type)) ? targetOptions(type).filter(Boolean) : [];
+    target = targets.length ? optionValue(targets, target) : '';
+    const editor = resolve(type, target) || {};
+    const canEditPhoto = typeof allowPhoto === 'function' ? Boolean(allowPhoto(type, target)) : Boolean(allowPhoto);
+    const typeSelector = types.length > 1 ? select({
+      name: 'entityCardAppearanceType',
+      label: '',
+      aria: typeLabel,
+      placeholder: typeLabel,
+      value: type,
+      options: types,
+      data: 'data-entity-card-appearance-type',
+    }) : '';
+    const targetSelector = targets.length > 1 ? select({
+      name: 'entityCardAppearanceTarget',
+      label: '',
+      aria: targetLabel,
+      placeholder: targetLabel,
+      value: target,
+      options: targets,
+      data: 'data-entity-card-appearance-target',
+    }) : '';
+
+    // The Q Header owns the card-type controls; the Q Body owns the sole preview.
+    // No duplicate preview is mounted into the Header.
+    headerHost.innerHTML = typeSelector || targetSelector
+      ? `<div class="entity-card-appearance-q__selectors">${typeSelector}${targetSelector}</div>`
+      : '';
+    host.innerHTML = `<div data-entity-card-appearance-constructor></div>
+      ${actionBlock(button('Сохранить', {
+        data: 'data-card-q-save',
+        aria: 'Сохранить вид карты',
+      }))}`;
+
+    headerHost.querySelector('[name="entityCardAppearanceType"]')?.addEventListener('change', (event) => {
+      type = String(event.target.value || '');
+      target = String(defaultTarget(type) || 'all');
+      render();
+    });
+    headerHost.querySelector('[name="entityCardAppearanceTarget"]')?.addEventListener('change', (event) => {
+      target = String(event.target.value || '');
+      render();
+    });
+
+    const constructor = host.querySelector('[data-entity-card-appearance-constructor]');
+    const saveButton = host.querySelector('[data-card-q-save]');
+    const saveActions = saveButton?.closest('.modal-actions');
+    let controller = null;
+    const syncSaveButton = ({ dirty = false, saving = false } = {}) => {
+      if (!saveButton) return;
+      saveButton.disabled = Boolean(saving);
+      if (saveActions) saveActions.hidden = !dirty;
+    };
+    controller = mountEntityCardConstructor(constructor, {
+      appearance: editor.appearance || {},
+      fields: editor.fields || [],
+      photo: editor.photo || '',
+      photoPosition: editor.photoPosition || '50% 50%',
+      allowPhoto: canEditPhoto,
+      onSave: async ({ appearance, photo }) => {
+        await save({ type, target, appearance, photo, editor });
+        layer.v2Close?.();
+        onSaved({ type, target });
+      },
+      onStateChange: syncSaveButton,
+    });
+    saveButton?.addEventListener('click', () => {
+      void controller?.save?.();
+    });
+    syncSaveButton({
+      dirty: controller?.isDirty?.() || false,
+      saving: controller?.isSaving?.() || false,
+    });
+  };
+
+  render();
+  return layer;
+}

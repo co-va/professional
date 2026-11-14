@@ -1,0 +1,33 @@
+/* One Shared viewport and keyboard controller for every Z, Q and X. */
+:root{
+  --visual-vh:var(--app-stable-vh,100dvh)!important;
+  --ui-visual-top:0px;
+  --ui-visual-left:0px;
+  --ui-keyboard-inset:0px;
+  --ui-bottom-safe:env(safe-area-inset-bottom);
+}
+html.keyboard-open{--ui-bottom-safe:0px}
+
+/* Keyboard reduces only Z/Q scrollable content. The white Z/Q surfaces
+   remain attached to the application's physical right and bottom edges. */
+:is([data-v2-z-body],[data-v2-q-body]){margin-bottom:var(--ui-keyboard-inset)}
+
+/* X is one white surface down to the application bottom, INCLUDING the
+   area covered by the keyboard. Raise its contents, not the whole surface.
+   Scrolling ends at the final action; it cannot expose the dark H background. */
+.v2-layer--bottom{
+  bottom:0;
+  max-height:min(calc(52% + var(--ui-keyboard-inset)),calc(100% - 12px));
+  overflow-y:auto;
+  overscroll-behavior:none;
+}
+html.keyboard-open .v2-layer--bottom{
+  padding-bottom:calc(20px + var(--ui-keyboard-inset));
+}
+/* X variants may define their own height and padding; one shared keyboard
+   override maintains the same lower anchor and top stop for every variant. */
+html.keyboard-open .modal-sheet.v2-layer--bottom{
+  min-height:0;
+  max-height:min(calc(52% + var(--ui-keyboard-inset)),calc(100% - 12px));
+  padding-bottom:calc(20px + var(--ui-keyboard-inset));
+}

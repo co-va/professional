@@ -1,0 +1,40 @@
+.two-column-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;align-items:start}.two-column-layout__column{min-width:0}.column-layout{display:grid;gap:12px;align-items:start}.column-layout--1{grid-template-columns:minmax(0,1fr)}.column-layout--2{grid-template-columns:repeat(2,minmax(0,1fr))}.column-layout--3{grid-template-columns:repeat(3,minmax(0,1fr))}.column-layout__column{min-width:0}@media(max-width:360px){.two-column-layout,.column-layout{gap:8px}}
+
+/* Shared single-line data edit layout: item label and editable field stay on the same row. */
+.data-edit-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(110px,36%);align-items:center;gap:10px;min-width:0}
+.data-edit-row__name{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;line-height:1.25}
+.data-edit-row__name strong{font-weight:650}
+.data-edit-row__name small{font-size:12px;font-weight:400;color:var(--text-secondary)}
+.data-edit-row>.field{min-width:0;margin:0}
+.data-edit-row>.field>span:empty{display:none}
+@media(max-width:360px){.data-edit-row{grid-template-columns:minmax(0,1fr) minmax(100px,38%);gap:8px}}
+
+/* Inventory data choice: one shared two-column row, no custom selector geometry. */
+.inventory-audit-value-cell{min-width:0;display:grid;gap:6px;align-content:start}
+.inventory-audit-value-heading{display:grid;grid-template-columns:minmax(0,1fr) var(--ui-field-height);align-items:end;gap:6px;font-size:13px;line-height:1.2;color:var(--text-secondary)}
+.inventory-audit-value-heading>span:last-child{text-align:center;font-size:12px}
+.inventory-audit-value-line{display:grid;grid-template-columns:minmax(0,1fr) var(--ui-field-height);align-items:center;gap:6px;min-width:0}
+.inventory-audit-value-line>[data-inventory-audit-common-value]{min-width:0}
+.inventory-audit-value-line .field{min-width:0;gap:0}
+.inventory-audit-value-line .field>span:empty{display:none}
+.inventory-audit-common-check .ui-compact-check{min-height:var(--ui-field-height);height:var(--ui-field-height);padding:0;justify-content:center;gap:0}
+.inventory-audit-common-check .ui-compact-check__label:empty{display:none}
+
+/* Empty selection status must not consume vertical space above the item list. */
+[data-inventory-audit-selection] [data-inventory-audit-status]:empty{display:none}
+
+/* Stocktake: existing compactCheck and the current balance share one heading.
+   Only arrange existing controls; do not define another compact control. */
+[data-inventory-audit-criteria] .field-inline-label{min-width:0}
+[data-inventory-audit-criteria] .field-inline-label>.ui-compact-check{position:relative;box-sizing:border-box;flex:0 0 var(--ui-compact-size);width:var(--ui-compact-size);height:var(--ui-compact-size);min-width:var(--ui-compact-size);min-height:var(--ui-compact-size);padding:0;border:0;background:transparent;gap:0;align-items:center;justify-content:center}
+[data-inventory-audit-criteria] .field-inline-label>.ui-compact-check .ui-compact-check__mark{box-sizing:border-box;width:22px;height:22px;flex:0 0 22px;border:0;background:#dedede}
+[data-inventory-audit-criteria] .field-inline-label>.ui-compact-check input:checked+.ui-compact-check__mark{border:0;background:#dedede}
+[data-inventory-audit-criteria] .field-inline-label>.ui-compact-check input:checked+.ui-compact-check__mark::after{color:#1a1a1a;font-size:14px;font-weight:800}
+[data-inventory-audit-criteria] .field-inline-label>.ui-compact-check .ui-compact-check__label:empty{display:none}
+[data-inventory-audit-criteria] .field-inline-label>strong{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+[data-inventory-audit-criteria] .field-inline-label>[data-inventory-audit-result]{flex:0 1 auto;min-width:0;max-width:42%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right}
+
+/* Stocktake: keep the excluded summary and its expanded rows visibly
+   separated from the numbered working list without changing shared controls. */
+[data-inventory-audit-criteria] [data-inventory-audit-excluded]:not([hidden]){margin-bottom:16px}
+[data-inventory-audit-criteria] [data-inventory-audit-excluded][open] [data-inventory-audit-excluded-list]{margin-top:10px;padding-bottom:4px}

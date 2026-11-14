@@ -1,0 +1,86 @@
+.mini-card{--mini-card-width:290px;--mini-card-height:200px;box-sizing:border-box;flex:0 0 var(--mini-card-width);width:min(var(--mini-card-width),100%);min-width:0;max-width:var(--mini-card-width);height:var(--mini-card-height);min-height:var(--mini-card-height);max-height:var(--mini-card-height);overflow:hidden;border:2px solid #111;border-radius:16px;padding:8px 12px;display:grid;grid-template-rows:auto minmax(0,1fr) auto;align-content:stretch;gap:3px;background:#fff;color:#111;text-align:left;box-shadow:-8px 7px 12px -10px rgba(0,0,0,.28),8px 7px 12px -10px rgba(0,0,0,.28),0 1px 2px rgba(0,0,0,.07)}
+.mini-card--interactive{appearance:none;-webkit-appearance:none;font:inherit;cursor:pointer;transform:translateY(-1px)}
+.mini-card--interactive:active{transform:translateY(0);box-shadow:-5px 4px 8px -9px rgba(0,0,0,.22),5px 4px 8px -9px rgba(0,0,0,.22)}
+.mini-card__head{min-width:0;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:start}.mini-card__copy{min-width:0;display:grid;gap:5px;align-content:start}.mini-card__title,.mini-card__value,.mini-card__subtitle,.mini-card__row-label{min-width:0;white-space:normal;word-break:normal;overflow-wrap:normal;hyphens:none}.mini-card__title{font-size:13px;line-height:1.2;font-weight:400;color:#111}.mini-card__value{font-size:20px;line-height:1.05;font-weight:800;letter-spacing:0;color:#111}.mini-card__subtitle{font-size:12px;line-height:1.2;font-weight:400;color:#777A7D}
+.mini-card__media{width:44px;height:44px;flex:0 0 44px;border:1px solid #111;border-radius:10px;background:#F2F2F2 var(--mini-card-image) center/cover no-repeat;background-position:var(--mini-card-image-position,50% 50%)}.mini-card__media--initials{display:grid;place-items:center;background:#F2F2F2;font-size:15px;font-weight:800}
+.mini-card__context-action{box-sizing:border-box;justify-self:start;max-width:100%;min-height:30px;padding:5px 10px;border:1px solid #111;border-radius:10px;display:inline-flex;align-items:center;background:rgba(255,255,255,.78);color:#111;font-size:12px;line-height:1;font-weight:650;white-space:nowrap}
+.mini-card--surface-photo,.mini-card--surface-photo.has-image{background:#fff;background-image:none}
+.mini-card__rows{display:grid;border-top:1px solid #111}.mini-card__row{width:100%;min-width:0;min-height:28px;padding:5px 0;border:0;border-bottom:1px solid #D7D7D7;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;background:transparent;color:#111;font:inherit;text-align:left}.mini-card__row:last-child{border-bottom:0}.mini-card__row-label{font-size:11px;line-height:1.15}.mini-card__row-value{font-size:14px;line-height:1;font-weight:850;text-align:right}.mini-card__row--action{cursor:pointer}.mini-card__row--action:active{background:#F2F2F2}
+.mini-card-rail{--mini-card-width:290px;display:flex;align-items:stretch;gap:10px;width:100%;max-width:100%;box-sizing:border-box;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;scroll-snap-type:x proximity;scroll-padding-inline:max(0px,calc((100% - var(--mini-card-width))/2));scrollbar-width:none;padding:3px max(0px,calc((100% - var(--mini-card-width))/2)) 10px;margin:0}.mini-card-rail::-webkit-scrollbar{display:none}.mini-card-rail>.mini-card{scroll-snap-align:center}
+.mini-card-stack{display:grid;gap:10px;justify-items:center;align-content:start;max-width:100%}
+
+.mini-card--lines{}.mini-card__lines{display:grid;gap:4px;align-content:start}.mini-card__line,.mini-card__line-action{width:100%;min-width:0}.mini-card__line{display:block;font-size:12px;line-height:1.2;white-space:normal;overflow-wrap:anywhere}.mini-card__line--left{text-align:left}.mini-card__line--right{text-align:right}.mini-card__line.is-strong{font-weight:800}.mini-card__line--title{font-size:11px;line-height:1.15;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.mini-card__line--primary{font-size:16px;line-height:1.05;font-weight:850;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.mini-card__line--muted{font-size:10.5px;line-height:1.15;font-weight:450;color:#777A7D;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.mini-card__line-action{border:0;padding:0;background:transparent;color:inherit;font:inherit;text-align:inherit;cursor:pointer}.mini-card--lines .mini-card__rows{margin-top:6px}.mini-card--lines .mini-card__row{min-height:26px;padding:4px 0}.mini-card--lines .mini-card__row-value{font-size:16px}
+.mini-card--dual-action{position:relative}.mini-card--dual-action .mini-card__head{padding-right:38px}.mini-card--lines.mini-card--dual-action .mini-card__line:nth-child(-n+2){box-sizing:border-box;padding-right:38px}.mini-card__surface-action{position:absolute;inset:0;z-index:1;border:0;border-radius:inherit;padding:0;background:transparent;cursor:pointer}.mini-card__surface-action:focus-visible{outline:2px solid #111;outline-offset:-4px}.mini-card__compact-action{position:absolute;top:10px;right:10px;z-index:2}
+
+
+/* Shared MiniCard: all usages use the exact same 290×200 shell and three fixed/scroll regions. */
+.mini-card__record-head{display:grid;gap:3px;min-width:0;align-content:start;border-bottom:1px solid #c7c7c7;padding-bottom:5px}
+.mini-card__record-top{display:grid;grid-template-columns:44px minmax(0,1fr) 44px;gap:4px;align-items:center;min-height:44px}
+.mini-card__record-action-placeholder{width:44px;height:44px;min-width:44px}
+.mini-card__record-action{justify-self:center;align-self:center}
+
+
+.mini-card__record-main{min-width:0;display:grid;align-content:center;gap:2px}
+.mini-card__record-workplace{min-width:0;font-size:14px;font-weight:800;line-height:1.15;text-align:center;overflow-wrap:anywhere}
+.mini-card__record-moment{font-size:12px;line-height:14px;white-space:nowrap;text-align:center;font-variant-numeric:tabular-nums;letter-spacing:-.1px}
+.mini-card__record-identity{min-width:0;font-size:12px;font-weight:700;line-height:14px;overflow-wrap:anywhere}
+.mini-card__record-phone{min-width:0;font-size:12px;line-height:14px;white-space:nowrap;color:#595959}
+.mini-card__record-center{min-height:0;min-width:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;touch-action:pan-y;scrollbar-width:none;padding:4px 0 3px;overflow-anchor:none}
+.mini-card__record-center::-webkit-scrollbar{display:none}
+.mini-card__record-center .mini-card__line{font-size:12px;line-height:15px;white-space:normal;overflow-wrap:anywhere;margin-bottom:4px}
+.mini-card__record-center .mini-card__line--pair{display:grid;grid-template-columns:minmax(0,1fr) max-content;gap:7px;align-items:start;text-align:left}
+.mini-card__record-center .mini-card__line-text{min-width:0}
+.mini-card__record-center .mini-card__line-right{font-size:12px;font-weight:750;white-space:nowrap;text-align:right}
+.mini-card__record-footer{display:grid;gap:1px;min-width:0;border-top:1px solid #111;padding-top:4px}
+.mini-card__record-meta{min-width:0;display:grid;align-content:center;gap:1px}
+.mini-card__record-discount{display:block;min-width:0;overflow-wrap:anywhere;font-size:11px;line-height:13px;color:#595959}
+.mini-card__record-totals{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px;min-height:22px}
+.mini-card__record-duration{font-size:12px;line-height:14px;white-space:nowrap}
+.mini-card__record-total{font-size:18px;font-weight:850;line-height:22px;white-space:nowrap;text-align:right}
+
+/* Record person-first header: high-contrast identity, visible service rows and secondary settings. */
+.mini-card--record-person .mini-card__record-main{gap:2px}
+.mini-card--record-person .mini-card__record-identity{font-size:16px;line-height:18px;font-weight:800;text-align:center;color:#111;overflow-wrap:anywhere}
+.mini-card--record-person .mini-card__record-phone{font-size:14px;line-height:17px;font-weight:550;text-align:center;color:#303030}
+.mini-card--record-person .mini-card__record-moment{font-size:13px;line-height:16px;font-weight:650;text-align:center;white-space:nowrap;color:#222}
+.mini-card--record-person .mini-card__record-head{gap:3px}
+.mini-card--record-person .mini-card__record-center .mini-card__line{font-size:15px;line-height:18px;font-weight:520;color:#171717;margin-bottom:5px}
+.mini-card--record-person .mini-card__record-center .mini-card__line--pair{align-items:baseline}
+.mini-card--record-person .mini-card__record-center .mini-card__line-right{font-size:15px;line-height:18px;font-weight:780;color:#111}
+
+
+
+
+/* Record viewer only: once settings are unavailable, reclaim the empty button slot. */
+.mini-card--record-person .mini-card__record-top--no-left{grid-template-columns:minmax(0,1fr) 44px}
+.mini-card--record-person .mini-card__record-top--no-left>.mini-card__record-action-placeholder--left{display:none}
+.mini-card--record-person .mini-card__record-top--no-left.mini-card__record-top--no-right{grid-template-columns:minmax(0,1fr)}
+.mini-card--record-person .mini-card__record-top--no-left.mini-card__record-top--no-right>.mini-card__record-action-placeholder--right{display:none}
+.mini-card--record-person.mini-card--record-no-left .mini-card__record-identity,
+.mini-card--record-person.mini-card--record-no-left .mini-card__record-phone,
+.mini-card--record-person.mini-card--record-no-left .mini-card__record-moment{text-align:left}
+
+/* One 2-row, 3-column financial summary in Record viewer only. */
+.mini-card__record-footer--triple{grid-template-columns:minmax(0,.85fr) minmax(0,.95fr) minmax(0,1.2fr);column-gap:4px;align-items:start}
+.mini-card__record-stat{min-width:0;display:grid;grid-template-rows:13px 20px;align-content:start;gap:2px}
+.mini-card__record-stat--duration{text-align:left}
+.mini-card__record-stat--discount{text-align:center}
+.mini-card__record-stat--total{text-align:right}
+.mini-card__record-stat-label{font-size:10px;line-height:13px;font-weight:500;color:#5b6064;white-space:nowrap}
+.mini-card__record-stat-value{font-size:16px;line-height:20px;font-weight:800;color:#111;white-space:nowrap;font-variant-numeric:tabular-nums}
+
+/* Record viewer: date and START time stay legible above an actual header/content divider. */
+.mini-card--record-person{padding-top:8px;padding-bottom:8px;row-gap:3px}
+.mini-card--record-person .mini-card__record-head{border-bottom:1px solid #c7c7c7;padding-bottom:5px;gap:3px}
+.mini-card--record-person .mini-card__record-moment--parts{display:flex;align-items:baseline;justify-content:flex-start;gap:7px;min-width:0;height:20px;line-height:20px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.mini-card--record-person .mini-card__record-date{font-size:14px;line-height:20px;font-weight:760;color:#111;white-space:nowrap}
+.mini-card--record-person .mini-card__record-time-start{font-size:16px;line-height:20px;font-weight:850;color:#111;white-space:nowrap}
+.mini-card--record-person .mini-card__record-time-end{font-size:12px;line-height:18px;font-weight:500;color:#626262;white-space:nowrap}
+.mini-card--record-person .mini-card__record-center{padding-top:4px;overflow-anchor:none}
+.mini-card--record-person .mini-card__record-center .mini-card__line{margin-bottom:4px}
+
+/* Empty zones do not introduce duplicate separators; populated rows use the same paper geometry. */
+.mini-card__record-head:empty,.mini-card__record-footer:empty{display:none}
+.mini-card__record-center>.mini-card__rows{margin-top:0}
+.mini-card__record-center>.mini-card__lines{min-width:0}
+.mini-card .mini-card__head{min-width:0}

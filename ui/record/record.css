@@ -1,0 +1,30 @@
+.record-screen{width:100%;min-height:100%;padding:0 18px 28px}.record-screen--state-view{padding-top:8px;display:grid;gap:8px}.record-screen--record-view{display:flex;flex-direction:column;gap:8px}.record-screen--time{display:flex;flex-direction:column;justify-content:flex-start}.record-screen--procedures,.record-screen--people{display:flex;flex-direction:column}.record-time-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}.record-time-toolbar strong{font-size:23px}.record-person-list{display:grid;gap:10px}@media (max-width:360px){.record-screen{padding-left:14px;padding-right:14px}}
+
+.record-confirmation-view{display:grid;gap:20px;width:100%;min-width:0}
+.record-confirmation-view__card{display:flex;justify-content:center;width:100%;min-width:0}
+.record-confirmation-notice{display:grid;gap:15px;min-width:0}
+.record-confirmation-notice__headline{margin:0;font-size:23px;line-height:1.15;font-weight:760}
+.record-confirmation-notice__moment{font-size:18px;line-height:1.2;font-weight:700}
+.record-confirmation-notice__procedures{display:grid;gap:9px;min-width:0}
+.record-confirmation-notice__row,.record-confirmation-notice__total{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px;align-items:baseline;min-width:0}
+.record-confirmation-notice__row span,.record-confirmation-notice__total span{min-width:0;overflow-wrap:anywhere}
+.record-confirmation-notice__row strong,.record-confirmation-notice__total strong{white-space:nowrap;text-align:right}
+.record-confirmation-notice__total{font-size:16px;font-weight:760}
+.record-confirmation-notice__status{font-size:16px;line-height:1.2;font-weight:800}
+
+.list-entry--record-person{background:#fff}
+.list-entry--record-person .list-entry__background{background:#fff;background-image:none}
+.list-entry--record-person .list-entry__background>span{display:none}
+.list-entry--record-person .list-entry__content{background:#fff}
+.list-entry--record-person .list-entry__text{grid-template-rows:repeat(3,minmax(0,auto));gap:4px}
+
+.record-status-controls .segment-control--one button.is-active,.record-status-controls .segment-control--one button.is-active:disabled{background:var(--active);color:var(--text);font-weight:650}
+
+.record-status-controls{display:grid;gap:8px}.record-status-controls .segment-control{margin-bottom:0}
+
+.record-creation-flow{height:100%;min-height:0;display:grid;grid-template-rows:minmax(0,1fr) auto;gap:12px}
+.record-creation-flow__body{min-height:0;overflow:auto;overscroll-behavior:contain}.record-creation-flow__action:empty{display:none}
+.record-creation-time-rows{display:grid;gap:14px}.record-creation-time-row{display:grid;gap:8px}
+[data-record-creation-step="date"] .record-creation-flow__body{overflow:hidden}
+[data-record-creation-step="person"] .record-screen--people{height:100%;min-height:0;padding:0}[data-record-creation-step="person"] .record-person-list{min-height:0;overflow:auto}
+.record-creation-flow .record-screen{padding-left:0;padding-right:0;padding-bottom:0}
