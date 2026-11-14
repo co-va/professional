@@ -138,6 +138,7 @@ function openRecordZReport(record) {
       { label: 'Средний чек часа', value: formatReportRubles(averageHour) },
     ],
     recordReportStatusRows(current, state),
+    [{ label: 'Чаевые', value: formatReportRubles(Math.max(0, Number(state?.tipsTotal) || 0)) }],
     [{ label: 'Сумма', value: formatReportRubles(total), strong: true }],
   ];
   return mountModal(document.body, modal(readOnlyReceipt({
@@ -648,7 +649,7 @@ export function openRecordView(record, {
 
     const tipsOnlyAvailable = !readOnlyHistory && canAcceptRecordTips(source, payment);
     const paymentStateLabel = payment.fullyPaid
-      ? 'Оплачено'
+      ? `Оплачено: ${formatMoney(payment.paidTotal)}`
       : `${recordHasEnded(source) ? 'Задолженность' : 'К оплате'}: ${formatMoney(payment.remaining)}`;
     root.innerHTML = `<div class="record-screen record-screen--state-view record-screen--record-view">
       ${card}
@@ -658,7 +659,7 @@ export function openRecordView(record, {
           ? button('Заметки', { variant: 'secondary', data: 'data-record-view-notes' })
           : '',
         payment.fullyPaid && !tipsOnlyAvailable
-          ? button('Оплачено', { disabled: true })
+          ? button(paymentStateLabel, { disabled: true })
           : capabilities.payment
             ? button(tipsOnlyAvailable ? 'Tips' : `К оплате: ${formatMoney(payment.remaining)}`, { data: 'data-record-view-payment' })
             : button(paymentStateLabel, { disabled: true }),
