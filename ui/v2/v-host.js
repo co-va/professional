@@ -127,8 +127,9 @@ export function bindV2VContext(root) {
       // Keep a touched button alive during Z/Q refresh: replacing the node
       // between touchstart and click cancels the native iOS click.
       if (control?.isConnected && hostControl() === control) {
-        control.disabled = true;
-        hostNode().hidden = true;
+        if (!control.disabled) control.disabled = true;
+        const host = hostNode();
+        if (host && !host.hidden) host.hidden = true;
       } else if (control?.isConnected) clearV2V(app);
       source = nextSource;
       return;
@@ -137,7 +138,8 @@ export function bindV2VContext(root) {
     source = nextSource;
     if (control?.isConnected && hostControl() === control) {
       // Reuse the same physical control while a record is re-rendered.
-      hostNode().hidden = false;
+      const host = hostNode();
+      if (host?.hidden) host.hidden = false;
       syncControlState(control, source);
       return;
     }
