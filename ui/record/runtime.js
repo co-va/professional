@@ -428,60 +428,7 @@ export function setRecordPrimaryAction(layerRoot, {
 
 export function bindRecordSettings(layerRoot, onOpen) {
   if (typeof onOpen !== 'function') return;
-  const source = layerRoot?.querySelector('[data-record-owner-settings]');
-  source?.addEventListener('click', onOpen);
-
-  // A Record shown in Journal Z or Contact History Q owns its floating V
-  // while this exact Record surface is frontmost. A cached shared V source
-  // can become detached during a Journal refresh before the iOS click arrives.
-  // All non-Record surfaces retain the existing Shared V routing.
-  const recordQ = layerRoot?.dataset?.v2Q === 'true';
-  const recordZ = layerRoot?.matches?.('[data-v2-z-layer]');
-  if (!source || (!recordQ && !recordZ)) return;
-  const app = layerRoot.closest('[data-v2-app]');
-  const vHost = app?.querySelector(':scope > [data-v2-v-host]');
-  if (!vHost) return;
-
-  const onRecordVClick = (event) => {
-    if (!event.target.closest?.('[data-v2-v]')) return;
-    if (!layerRoot.isConnected) {
-      vHost.removeEventListener('click', onRecordVClick, true);
-      return;
-    }
-    const applicationLayers = [...document.querySelectorAll(
-      '[data-v2-layer]:not([data-v2-layer-kind="technical"])',
-    )];
-    if (recordQ) {
-      if (applicationLayers.at(-1) !== layerRoot) return;
-    } else {
-      // Any Q/X/S above Journal Z owns the interaction until it closes.
-      if (applicationLayers.length) return;
-      const zLayers = [...app.querySelectorAll('[data-v2-z-layer]')];
-      if (zLayers.at(-1) !== layerRoot) return;
-    }
-    const activeAction = layerRoot.querySelector('[data-record-owner-settings]');
-    if (!activeAction?.isConnected || activeAction.disabled || activeAction.hidden) return;
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    onOpen();
-  };
-
-  vHost.addEventListener('click', onRecordVClick, true);
-  const releaseRecordV = () => vHost.removeEventListener('click', onRecordVClick, true);
-  const close = layerRoot.v2Close;
-  if (typeof close === 'function') {
-    layerRoot.v2Close = (...args) => {
-      releaseRecordV();
-      return close.apply(layerRoot, args);
-    };
-  }
-  const remove = layerRoot.remove;
-  if (typeof remove === 'function') {
-    layerRoot.remove = (...args) => {
-      releaseRecordV();
-      return remove.apply(layerRoot, args);
-    };
-  }
+  layerRoot?.querySelector('[data-record-owner-settings]')?.addEventListener('click', onOpen);
 }
 
 export function closeRecordZStack(className = 'record-flow-z') {

@@ -23,7 +23,7 @@ import { listPersonDeposits } from '../loyalty/deposit/data.js';
 import { openPersonHistoryQ } from '../people/people.js';
 import { personDisplay } from '../people/presentation.js';
 import { getRecordPaymentState, resolveRecordSettlement } from '../finance/index.js';
-import { recordProgramSelection } from '../loyalty/record-program.js';
+import { getRecordProgramOptions, recordProgramSelection } from '../loyalty/record-program.js';
 import { normalizeWorkplaceTimeZone, zonedDateTimeParts } from '../time/index.js';
 import { openRecordPayment } from '../payment/record-payment.js';
 import { openRecordPaymentActions } from '../payment/record-payment.js';
