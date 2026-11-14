@@ -18,7 +18,7 @@ import {
 } from '../../ui/ui.js';
 import { readOnlyReceipt } from '../../ui/receipt/index.js';
 import { getWorkplaces } from '../workplace-time.js';
-import { getAllPeople, getPersonPriceCondition } from '../people/data.js';
+import { getAllPeople } from '../people/data.js';
 import { listPersonDeposits } from '../loyalty/deposit/data.js';
 import { openPersonHistoryQ } from '../people/people.js';
 import { personDisplay } from '../people/presentation.js';
