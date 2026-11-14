@@ -138,7 +138,7 @@ function openRecordZReport(record) {
       { label: 'Средний чек часа', value: formatReportRubles(averageHour) },
     ],
     recordReportStatusRows(current, state),
-    [{ label: 'Чаевые', value: formatReportRubles(Math.max(0, Number(state?.tipsTotal) || 0)) }],
+    [{ label: 'Tips', value: formatReportRubles(Math.max(0, Number(state?.tipsTotal) || 0)) }],
     [{ label: 'Сумма', value: formatReportRubles(total), strong: true }],
   ];
   return mountModal(document.body, modal(readOnlyReceipt({

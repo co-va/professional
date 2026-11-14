@@ -378,6 +378,7 @@ export function renderJournal(root, options = {}) {
     const averageWorkingDay = workingDayCount ? total / workingDayCount : 0;
     const paymentStates = records.map((record) => ({ record, state: getRecordPaymentState(record) }));
     const paidTotal = paymentStates.reduce((sum, item) => sum + Math.max(0, Number(item.state?.paidTotal) || 0), 0);
+    const tipsTotal = paymentStates.reduce((sum, item) => sum + Math.max(0, Number(item.state?.tipsTotal) || 0), 0);
     const outstanding = paymentStates.filter((item) => Math.max(0, Number(item.state?.remaining) || 0) > 0.009);
     const dueTotal = outstanding
       .filter((item) => !recordHasEnded(item.record))
@@ -412,6 +413,7 @@ export function renderJournal(root, options = {}) {
     const groups = [
       summaryRows,
       statusRows,
+      [{ label: 'Tips', value: formatRubles(tipsTotal) }],
       [{ label: 'Сумма', value: formatRubles(total), strong: true }],
     ];
     mountModal(document.body, modal(readOnlyReceipt({
