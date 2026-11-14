@@ -431,11 +431,13 @@ export function bindRecordSettings(layerRoot, onOpen) {
   const source = layerRoot?.querySelector('[data-record-owner-settings]');
   source?.addEventListener('click', onOpen);
 
-  // A Record shown in Q owns the existing floating V action while its Q is
-  // frontmost. Do not rely on a source node cached by the shared V dispatcher:
-  // Journal refreshes can replace that node before the iOS click is delivered.
-  // Other sections and Z controls continue using the existing Shared routing.
-  if (!source || layerRoot?.dataset?.v2Q !== 'true') return;
+  // A Record shown in Journal Z or Contact History Q owns its floating V
+  // while this exact Record surface is frontmost. A cached shared V source
+  // can become detached during a Journal refresh before the iOS click arrives.
+  // All non-Record surfaces retain the existing Shared V routing.
+  const recordQ = layerRoot?.dataset?.v2Q === 'true';
+  const recordZ = layerRoot?.matches?.('[data-v2-z-layer]');
+  if (!source || (!recordQ && !recordZ)) return;
   const app = layerRoot.closest('[data-v2-app]');
   const vHost = app?.querySelector(':scope > [data-v2-v-host]');
   if (!vHost) return;
@@ -449,7 +451,14 @@ export function bindRecordSettings(layerRoot, onOpen) {
     const applicationLayers = [...document.querySelectorAll(
       '[data-v2-layer]:not([data-v2-layer-kind="technical"])',
     )];
-    if (applicationLayers.at(-1) !== layerRoot) return;
+    if (recordQ) {
+      if (applicationLayers.at(-1) !== layerRoot) return;
+    } else {
+      // Any Q/X/S above Journal Z owns the interaction until it closes.
+      if (applicationLayers.length) return;
+      const zLayers = [...app.querySelectorAll('[data-v2-z-layer]')];
+      if (zLayers.at(-1) !== layerRoot) return;
+    }
     const activeAction = layerRoot.querySelector('[data-record-owner-settings]');
     if (!activeAction?.isConnected || activeAction.disabled || activeAction.hidden) return;
     event.preventDefault();
