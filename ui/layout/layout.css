@@ -22,3 +22,10 @@
 
 /* Empty selection status must not consume vertical space above the item list. */
 [data-inventory-audit-selection] [data-inventory-audit-status]:empty{display:none}
+
+/* Stocktake: existing compactCheck and the current balance share one heading.
+   Only arrange existing controls; do not define another compact control. */
+[data-inventory-audit-criteria] .field-inline-label{min-width:0}
+[data-inventory-audit-criteria] .field-inline-label>.ui-compact-check{flex:0 0 auto}
+[data-inventory-audit-criteria] .field-inline-label>strong{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+[data-inventory-audit-criteria] .field-inline-label>[data-inventory-audit-result]{flex:0 1 auto;min-width:0;max-width:42%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right}
