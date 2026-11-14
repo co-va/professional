@@ -961,6 +961,9 @@ function bindManufacturerCards(root, host) {
 }
 
 function openManufacturerStock(root, manufacturer) {
+  // Each visit to a physical shelf opens in the explicit numerical order.
+  // A remembered name/price filter must not silently replace shelf sequence.
+  saveInventorySortMode('itemsSort', 'position-asc');
   STOCK_VIEW.itemsType = '';
   const markup = `
     ${context(manufacturer, {
