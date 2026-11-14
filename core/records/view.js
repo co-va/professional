@@ -25,7 +25,7 @@ import { personDisplay } from '../people/presentation.js';
 import { getRecordPaymentState, resolveRecordSettlement } from '../finance/index.js';
 import { getRecordProgramOptions, recordProgramSelection } from '../loyalty/record-program.js';
 import { normalizeWorkplaceTimeZone, zonedDateTimeParts } from '../time/index.js';
-import { openRecordPayment } from '../payment/record-payment.js';
+import { canAcceptRecordTips, openRecordPayment } from '../payment/record-payment.js';
 import { openRecordPaymentActions } from '../payment/record-payment.js';
 import { openRecordSale } from '../sale/sale.js';
 import {
@@ -646,6 +646,7 @@ export function openRecordView(record, {
       capabilities.attendance ? attendanceControl : '',
     ].filter(Boolean));
 
+    const tipsOnlyAvailable = !readOnlyHistory && canAcceptRecordTips(source, payment);
     const paymentStateLabel = payment.fullyPaid
       ? 'Оплачено'
       : `${recordHasEnded(source) ? 'Задолженность' : 'К оплате'}: ${formatMoney(payment.remaining)}`;
@@ -656,10 +657,10 @@ export function openRecordView(record, {
         capabilities.notes && hasNotesForTarget('record', source.id)
           ? button('Заметки', { variant: 'secondary', data: 'data-record-view-notes' })
           : '',
-        payment.fullyPaid
+        payment.fullyPaid && !tipsOnlyAvailable
           ? button('Оплачено', { disabled: true })
           : capabilities.payment
-            ? button(`К оплате: ${formatMoney(payment.remaining)}`, { data: 'data-record-view-payment' })
+            ? button(tipsOnlyAvailable ? 'Tips' : `К оплате: ${formatMoney(payment.remaining)}`, { data: 'data-record-view-payment' })
             : button(paymentStateLabel, { disabled: true }),
       ].filter(Boolean).join(''))}
     </div>`;

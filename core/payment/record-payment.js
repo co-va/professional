@@ -56,6 +56,15 @@ function paymentStateForRecord(record) {
   return getRecordPaymentState(record);
 }
 
+// A fully discounted service is settled at 0 ₽, but may still receive tips.
+// Never reopen an already posted payment or change the settled service amount.
+export function canAcceptRecordTips(record, state = paymentStateForRecord(record)) {
+  if (!record?.id || state?.hasPayments) return false;
+  const settlement = settlementForRecord(record);
+  return Number(settlement?.serviceTotal || 0) > 0.009
+    && Number(settlement?.planTotal || 0) <= 0.009;
+}
+
 async function persistRecordCompletion(record) {
   const current = getRecord(record?.id) || record;
   const completed = completeRecord(current?.id);
@@ -224,6 +233,24 @@ async function personalAccountForRecord(record, settlement, due) {
   return { ...account, personKey: key, balance, spendLimitPercent, availableAmount };
 }
 
+// Retry only transient read aborts; never pay from unverified cached prices.
+async function loadVerifiedPaymentSource(read, label) {
+  try {
+    return await read();
+  } catch (error) {
+    const message = String(error?.message || error || '');
+    const aborted = error?.name === 'AbortError'
+      || error?.name === 'TimeoutError'
+      || /fetch is aborted|aborted|timed out|timeout/i.test(message);
+    if (!aborted) throw new Error(`${label}: ${message}`);
+    try {
+      return await read();
+    } catch (retryError) {
+      throw new Error(`${label}: ${String(retryError?.message || retryError || '')}`);
+    }
+  }
+}
+
 async function openPaymentEntry(record, onCompleted = () => {}) {
   const current = getRecord(record?.id) || record;
   if (!current?.id) return null;
@@ -257,13 +284,13 @@ async function openPaymentEntry(record, onCompleted = () => {}) {
     // A cold Journal/Record route may not have loaded Finance/Cash.
     // Resolve the actual wallet catalog before rendering any source picker.
     [wallets] = await Promise.all([
-      loadWalletCatalog(),
-      key ? listPersonDeposits(key) : Promise.resolve(),
+      loadVerifiedPaymentSource(() => loadWalletCatalog(), 'Кошельки'),
+      key ? loadVerifiedPaymentSource(() => listPersonDeposits(key), 'Условия скидки') : Promise.resolve(),
     ]);
     const verifiedRecord = getRecord(recordId) || current;
     settlement = settlementForRecord(verifiedRecord);
     state = paymentStateForRecord(verifiedRecord);
-    if (state.fullyPaid) {
+    if (state.fullyPaid && !canAcceptRecordTips(verifiedRecord, state)) {
       layer.v2Close?.();
       return layer;
     }
@@ -298,20 +325,22 @@ async function openPaymentEntry(record, onCompleted = () => {}) {
   const syncPrimary = () => {
     if (!submit) return;
     const hasMoney = Number(allocationState?.received || 0) > 0.009;
-    const label = gratuityOnly && !hasMoney ? 'Завершить' : 'Оплатить';
+    const canCompleteWithoutMoney = gratuityOnly && !state.fullyPaid;
+    const label = canCompleteWithoutMoney && !hasMoney ? 'Завершить' : 'Оплатить';
     submit.textContent = label;
     submit.setAttribute('aria-label', label);
     submit.removeAttribute('aria-busy');
-    submit.disabled = hasMoney ? !allocationState?.valid : !gratuityOnly;
+    submit.disabled = hasMoney ? !allocationState?.valid : !canCompleteWithoutMoney;
   };
 
   submit?.addEventListener('click', async () => {
     const hasMoney = Number(allocationState?.received || 0) > 0.009;
     if (hasMoney && !allocationState?.valid) return;
-    if (!hasMoney && !gratuityOnly) return;
+    if (!hasMoney && (!gratuityOnly || state.fullyPaid)) return;
     const latest = getRecord(recordId) || current;
     const latestState = paymentStateForRecord(latest);
-    if (latestState.fullyPaid || paymentInFlightRecords.has(recordId)) {
+    if ((latestState.fullyPaid && !canAcceptRecordTips(latest, latestState))
+      || paymentInFlightRecords.has(recordId)) {
       layer.v2Close?.();
       onCompleted?.();
       return;
@@ -326,14 +355,14 @@ async function openPaymentEntry(record, onCompleted = () => {}) {
       // The payment X may stay open across a program expiry or a second-device
       // edit. Recheck before committing an irreversible financial operation.
       const personKey = String(personForRecord(latest)?.key || personForRecord(latest)?.id || '').trim();
-      if (personKey) await listPersonDeposits(personKey);
+      if (personKey) await loadVerifiedPaymentSource(() => listPersonDeposits(personKey), 'Условия скидки');
       const checkedRecord = getRecord(recordId) || latest;
       const checkedSettlement = settlementForRecord(checkedRecord);
       const checkedPayment = paymentStateForRecord(checkedRecord);
       const changed = Math.abs(Number(checkedSettlement?.planTotal || 0) - Number(settlement?.planTotal || 0)) > 0.009
         || Math.abs(Number(checkedSettlement?.pricePercent || 0) - Number(settlement?.pricePercent || 0)) > 0.009
         || Math.abs(Number(checkedPayment?.paidTotal || 0) - Number(state?.paidTotal || 0)) > 0.009
-        || checkedPayment.fullyPaid;
+        || (checkedPayment.fullyPaid && !canAcceptRecordTips(checkedRecord, checkedPayment));
       if (changed) throw new Error('Скидка или сумма оплаты изменилась. Закройте оплату и откройте её заново.');
       if (!hasMoney) {
         const saved = await saveSettlementSnapshot({ source: { type: 'record', id: latest.id }, settlement });
