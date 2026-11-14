@@ -33,3 +33,8 @@
 [data-inventory-audit-criteria] .field-inline-label>.ui-compact-check .ui-compact-check__label:empty{display:none}
 [data-inventory-audit-criteria] .field-inline-label>strong{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 [data-inventory-audit-criteria] .field-inline-label>[data-inventory-audit-result]{flex:0 1 auto;min-width:0;max-width:42%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right}
+
+/* Stocktake: keep the excluded summary and its expanded rows visibly
+   separated from the numbered working list without changing shared controls. */
+[data-inventory-audit-criteria] [data-inventory-audit-excluded]:not([hidden]){margin-bottom:16px}
+[data-inventory-audit-criteria] [data-inventory-audit-excluded][open] [data-inventory-audit-excluded-list]{margin-top:10px;padding-bottom:4px}
