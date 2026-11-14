@@ -26,8 +26,8 @@
 /* Stocktake: existing compactCheck and the current balance share one heading.
    Only arrange existing controls; do not define another compact control. */
 [data-inventory-audit-criteria] .field-inline-label{min-width:0}
-[data-inventory-audit-criteria] .field-inline-label>.ui-compact-check{position:relative;box-sizing:border-box;flex:0 0 18px;width:18px;height:18px;min-width:18px;min-height:18px;padding:0;border:0;background:transparent;gap:0;align-items:center;justify-content:center}
-[data-inventory-audit-criteria] .field-inline-label>.ui-compact-check .ui-compact-check__mark{box-sizing:border-box;width:16px;height:16px;flex:0 0 16px;border:0;background:#dedede}
+[data-inventory-audit-criteria] .field-inline-label>.ui-compact-check{position:relative;box-sizing:border-box;flex:0 0 var(--ui-compact-size);width:var(--ui-compact-size);height:var(--ui-compact-size);min-width:var(--ui-compact-size);min-height:var(--ui-compact-size);padding:0;border:0;background:transparent;gap:0;align-items:center;justify-content:center}
+[data-inventory-audit-criteria] .field-inline-label>.ui-compact-check .ui-compact-check__mark{box-sizing:border-box;width:22px;height:22px;flex:0 0 22px;border:0;background:#dedede}
 [data-inventory-audit-criteria] .field-inline-label>.ui-compact-check input:checked+.ui-compact-check__mark{border:0;background:#dedede}
 [data-inventory-audit-criteria] .field-inline-label>.ui-compact-check input:checked+.ui-compact-check__mark::after{color:#1a1a1a;font-size:14px;font-weight:800}
 [data-inventory-audit-criteria] .field-inline-label>.ui-compact-check .ui-compact-check__label:empty{display:none}
