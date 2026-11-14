@@ -63,8 +63,8 @@ function workplaceName(id) {
 }
 
 function formatReportRubles(value = 0) {
-  const amount = Math.max(0, Math.round(Number(value) || 0));
-  return `${amount.toLocaleString('ru-RU').replaceAll('\u00a0', ' ')} р.`;
+  const amount = Math.max(0, Number(value) || 0);
+  return `${new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(amount).replaceAll('\u00a0', ' ')} р.`;
 }
 
 function formatReportNumber(value = 0) {
@@ -102,10 +102,42 @@ function recordHasEnded(record = null, now = new Date()) {
   return `${current.date}T${current.time}` >= `${date}T${to}`;
 }
 
+// Read the discount type and the already calculated amount from Settlement items.
+// No percentage or payable amount is recalculated in the Record view.
+function settlementItemDiscount(item = {}) {
+  if (Number(item?.pricePercent) > 0.009) {
+    return { kind: 'percent', label: `${formatReportNumber(item.pricePercent)}%`, amount: Number(item.pricePercentMoney) || 0 };
+  }
+  if (item?.correctionMode === 'percent' && Number(item.correctionPercent) > 0.009) {
+    return { kind: 'percent', label: `${formatReportNumber(item.correctionPercent)}%`, amount: Number(item.correctionMoney) || 0 };
+  }
+  if (item?.correctionMode === 'money' && Number(item.correctionMoney) > 0.009) {
+    return { kind: 'money', label: '', amount: Number(item.correctionMoney) || 0 };
+  }
+  return null;
+}
+
+function settlementDiscountLabel(settlement = null) {
+  const items = Array.isArray(settlement?.items) ? settlement.items : [];
+  const discounts = items.map((item) => settlementItemDiscount(item));
+  if (!discounts.some(Boolean)) return '';
+  const singlePercent = discounts[0]?.kind === 'percent'
+    && discounts.every((discount) => discount?.kind === 'percent' && discount.label === discounts[0].label);
+  if (singlePercent) return discounts[0].label;
+  if (discounts.every((discount) => !discount || discount.kind === 'money')) {
+    return formatMoney(settlement?.correctionTotal);
+  }
+  return 'Разные';
+}
+
 function recordReportStatusRows(record, state) {
   const paidTotal = Math.max(0, Number(state?.paidTotal) || 0);
   const remaining = Math.max(0, Number(state?.remaining) || 0);
-  if (remaining <= 0.009) return [{ label: 'Статус', value: 'Оплачено' }];
+  if (remaining <= 0.009) {
+    return paidTotal > 0.009
+      ? [{ label: 'Оплачено', value: formatReportRubles(paidTotal) }]
+      : [{ label: 'К оплате', value: formatReportRubles(0) }];
+  }
   const outstandingLabel = recordHasEnded(record) ? 'Задолженность' : 'К оплате';
   if (paidTotal > 0.009) {
     return [
@@ -113,7 +145,7 @@ function recordReportStatusRows(record, state) {
       { label: outstandingLabel, value: formatReportRubles(remaining) },
     ];
   }
-  return [{ label: 'Статус', value: outstandingLabel }];
+  return [{ label: outstandingLabel, value: formatReportRubles(remaining) }];
 }
 
 function openRecordZReport(record) {
@@ -129,6 +161,18 @@ function openRecordZReport(record) {
   const averageHour = hours ? total / hours : 0;
   const date = String(current?.date || '').slice(0, 10);
   const dateLabel = date ? new Date(`${date}T12:00:00`).toLocaleDateString('ru-RU') : '';
+  const items = Array.isArray(settlement?.items) ? settlement.items : [];
+  const breakdown = items.flatMap((item) => {
+    const discount = settlementItemDiscount(item);
+    const title = String(item?.name || (item?.sourceType === 'product' ? 'Товар' : 'Услуга'));
+    return [
+      { label: item?.sourceType === 'product' ? `Товар: ${title}` : title, value: formatReportRubles(item.price) },
+      ...(discount ? [{
+        label: discount.kind === 'percent' ? `Скидка ${discount.label}` : 'Скидка',
+        value: formatReportRubles(discount.amount),
+      }] : []),
+    ];
+  });
   const groups = [
     [
       { label: workplaceName(current?.workplaceId), value: dateLabel },
@@ -137,9 +181,17 @@ function openRecordZReport(record) {
       { label: 'Средний чек услуги', value: formatReportRubles(averageProcedure) },
       { label: 'Средний чек часа', value: formatReportRubles(averageHour) },
     ],
+    [
+      ...breakdown,
+      ...(items.length > 1 ? [{
+        label: items.some((item) => item?.sourceType === 'product') ? 'Стоимость услуг и товаров' : 'Стоимость услуг',
+        value: formatReportRubles(settlement?.serviceTotal),
+        strong: true,
+      }] : []),
+    ],
+    [{ label: 'Итого', value: formatReportRubles(total), strong: true }],
     recordReportStatusRows(current, state),
-    [{ label: 'Tips', value: formatReportRubles(Math.max(0, Number(state?.tipsTotal) || 0)) }],
-    [{ label: 'Сумма', value: formatReportRubles(total), strong: true }],
+    [{ label: 'Tips', value: formatReportRubles(state?.tipsTotal) }],
   ];
   return mountModal(document.body, modal(readOnlyReceipt({
     title: 'Z - Отчет',
@@ -588,10 +640,7 @@ export function openRecordView(record, {
     const contact = capabilities.contactIdentity
       ? (getAllPeople().find((item) => String(item?.key || item?.id || '').trim() === personKey) || source.person || {})
       : (source.person || {});
-    const contactDiscountPercent = readOnlyHistory ? 0 : Math.max(0, Math.min(100,
-      Number(settlement?.pricePercent) || Number(getPersonPriceCondition(contact).percent) || 0));
-    const discountMoney = Math.max(0, (Number(settlement?.serviceTotal) || 0) - (Number(settlement?.planTotal) || 0));
-    const grossTotal = Math.max(0, Number(settlement?.serviceTotal) || 0);
+    const discountLabel = readOnlyHistory ? '' : settlementDiscountLabel(settlement);
     const fromMinutes = timeMinutes(source.from);
     const toMinutes = timeMinutes(source.to);
     const appointmentMinutes = fromMinutes != null && toMinutes != null && toMinutes > fromMinutes
@@ -609,7 +658,7 @@ export function openRecordView(record, {
       serviceSettings: capabilities.procedureSettings && !payment.hasPayments && !readOnlyHistory,
       repeat: capabilities.contactIdentity && !readOnlyHistory,
       workplace: workplaceName(source.workplaceId),
-      contactDiscount: contactDiscountPercent > 0 ? `${contactDiscountPercent}%` : '',
+      contactDiscount: '',
       date: formatDate(source.date),
       period: `${source.from || ''}–${source.to || ''}`,
       startTime: String(source.from || '').trim(),
@@ -617,8 +666,8 @@ export function openRecordView(record, {
       identity,
       phone: capabilities.contactIdentity ? (person.phone || contactDisplay.phone || '') : professionalDisplay.phone,
       duration: durationText(appointmentMinutes),
-      discountMoney: discountMoney > 0.009 ? formatMoney(discountMoney) : '',
-      total: readOnlyHistory ? '—' : formatMoney(settlement?.planTotal == null ? grossTotal : Math.max(0, Number(settlement.planTotal) || 0)),
+      discountMoney: discountLabel,
+      total: readOnlyHistory ? '—' : formatMoney(settlement?.planTotal),
       procedures: [
         ...procedures.map((item) => {
           const financeItem = settlementByProcedure.get(String(item?.id || ''));
@@ -627,7 +676,7 @@ export function openRecordView(record, {
             durationText: durationText(Number(item?.duration) || 0),
             right: readOnlyHistory
               ? (item?.cost !== '' && item?.cost != null ? formatMoney(item.cost) : '—')
-              : formatMoney(financeItem?.planAmount ?? item?.cost ?? 0),
+              : formatMoney(financeItem?.price ?? item?.cost ?? 0),
           };
         }),
       ],
@@ -659,10 +708,21 @@ export function openRecordView(record, {
           ? button('Заметки', { variant: 'secondary', data: 'data-record-view-notes' })
           : '',
         payment.fullyPaid && !tipsOnlyAvailable
-          ? button(paymentStateLabel, { disabled: true })
+          ? button(paymentStateLabel, {
+            disabled: true,
+            className: payment.tipsTotal > 0.009 ? 'record-payment-button--has-tips' : '',
+            aria: payment.tipsTotal > 0.009 ? `${paymentStateLabel}, есть Tips` : paymentStateLabel,
+          })
           : capabilities.payment
-            ? button(tipsOnlyAvailable ? 'Tips' : `К оплате: ${formatMoney(payment.remaining)}`, { data: 'data-record-view-payment' })
-            : button(paymentStateLabel, { disabled: true }),
+            ? button(tipsOnlyAvailable ? 'Tips' : `К оплате: ${formatMoney(payment.remaining)}`, {
+              data: 'data-record-view-payment',
+              className: payment.tipsTotal > 0.009 ? 'record-payment-button--has-tips' : '',
+              aria: payment.tipsTotal > 0.009 ? 'Оплата записи, есть Tips' : 'Оплата записи',
+            })
+            : button(paymentStateLabel, {
+              disabled: true,
+              className: payment.tipsTotal > 0.009 ? 'record-payment-button--has-tips' : '',
+            }),
       ].filter(Boolean).join(''))}
     </div>`;
 
