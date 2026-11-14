@@ -428,7 +428,51 @@ export function setRecordPrimaryAction(layerRoot, {
 
 export function bindRecordSettings(layerRoot, onOpen) {
   if (typeof onOpen !== 'function') return;
-  layerRoot?.querySelector('[data-record-owner-settings]')?.addEventListener('click', onOpen);
+  const source = layerRoot?.querySelector('[data-record-owner-settings]');
+  source?.addEventListener('click', onOpen);
+
+  // A Record shown in Q owns the existing floating V action while its Q is
+  // frontmost. Do not rely on a source node cached by the shared V dispatcher:
+  // Journal refreshes can replace that node before the iOS click is delivered.
+  // Other sections and Z controls continue using the existing Shared routing.
+  if (!source || layerRoot?.dataset?.v2Q !== 'true') return;
+  const app = layerRoot.closest('[data-v2-app]');
+  const vHost = app?.querySelector(':scope > [data-v2-v-host]');
+  if (!vHost) return;
+
+  const onRecordVClick = (event) => {
+    if (!event.target.closest?.('[data-v2-v]')) return;
+    if (!layerRoot.isConnected) {
+      vHost.removeEventListener('click', onRecordVClick, true);
+      return;
+    }
+    const applicationLayers = [...document.querySelectorAll(
+      '[data-v2-layer]:not([data-v2-layer-kind="technical"])',
+    )];
+    if (applicationLayers.at(-1) !== layerRoot) return;
+    const activeAction = layerRoot.querySelector('[data-record-owner-settings]');
+    if (!activeAction?.isConnected || activeAction.disabled || activeAction.hidden) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    onOpen();
+  };
+
+  vHost.addEventListener('click', onRecordVClick, true);
+  const releaseRecordV = () => vHost.removeEventListener('click', onRecordVClick, true);
+  const close = layerRoot.v2Close;
+  if (typeof close === 'function') {
+    layerRoot.v2Close = (...args) => {
+      releaseRecordV();
+      return close.apply(layerRoot, args);
+    };
+  }
+  const remove = layerRoot.remove;
+  if (typeof remove === 'function') {
+    layerRoot.remove = (...args) => {
+      releaseRecordV();
+      return remove.apply(layerRoot, args);
+    };
+  }
 }
 
 export function closeRecordZStack(className = 'record-flow-z') {
