@@ -145,7 +145,10 @@ function openInventoryOrderSelection(root, existing = null, onSaved = () => {}) 
       (scope === 'all' || recommended.has(row.itemId))
       && (!company || manufacturer(row) === company)
       && (!needle || searchText(row).includes(needle))
-    ).map(row => ({ ...row, suggestedQuantity: recommended.get(row.itemId)?.suggestedQuantity || 0 }));
+    ).map(row => ({ ...row,
+      suggestedQuantity: recommended.get(row.itemId)?.suggestedQuantity || 0,
+      urgency: recommended.get(row.itemId)?.urgency || '',
+    }));
     return sortedItems(rows, value('orderSort'));
   };
   const render = () => {
