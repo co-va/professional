@@ -289,7 +289,7 @@ function stockDisposalFields(item = {}, purpose = 'consume') {
 function parseSaleMarkup(raw) {
   const input = String(raw ?? '').trim().replace(',', '.');
   if (!input) return { mode: 'percent', value: null };
-  const matched = input.match(/^(\\d+(?:\\.\\d+)?)\\s*(%|₽|руб\\.?)?$/i);
+  const matched = input.match(/^(\d+(?:\.\d+)?)\s*(%|₽|руб\.?)?$/i);
   if (!matched) throw new Error('Наценка: укажите 20% или 200 ₽.');
   const value = Number(matched[1]);
   if (!Number.isFinite(value) || value < 0) throw new Error('Неверная наценка.');
