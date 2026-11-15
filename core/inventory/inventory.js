@@ -38,6 +38,10 @@ import {
 import { openInventoryProductAppearanceQ, openInventoryProductOverview } from './product-overview.js';
 import { renderInventoryOrders } from './orders.js';
 import {
+  emptyStockFilters, hasStockFilters, matchesStockFilters,
+  stockFilterOptions, stockSupplierNames,
+} from './stock-filters.js';
+import {
   getInventoryItem,
   getInventoryItems,
   getInventoryMovement,
@@ -84,6 +88,7 @@ const STOCK_VIEW = {
   ...readInventorySortModes(),
   manufacturersType: '',
   itemsType: '',
+  itemsFilters: emptyStockFilters(),
 };
 
 function saveInventorySortMode(key, value) {
@@ -865,13 +870,14 @@ function stockListMarkup(manufacturer, query = '') {
   const needle = normalizedSearch(query);
   const group = getInventoryItems().filter(item => manufacturerName(item) === manufacturer);
   const items = sortItems(group.filter((item) => {
-    if (!matchesType(item, STOCK_VIEW.itemsType)) return false;
+    if (!matchesType(item, STOCK_VIEW.itemsType)
+      || !matchesStockFilters(item, STOCK_VIEW.itemsFilters)) return false;
     return !needle || itemSearchText(item).includes(needle);
   }), STOCK_VIEW.itemsSort);
   if (!items.length) return emptyState('Ничего не найдено', 'Измените поиск или фильтр.');
   // Reordering a partial list would silently misplace hidden products.
   const canReorder = STOCK_VIEW.itemsSort === 'position-asc'
-    && !needle && !STOCK_VIEW.itemsType && items.length > 1;
+    && !needle && !hasStockFilters(STOCK_VIEW.itemsFilters) && items.length > 1;
   return v2ListEntries(items.map((item) => v2ListEntry({
     title: `${Number(item.position) > 0 ? `${item.position} · ` : ''}${item.name}`,
     reorderHandle: canReorder,
@@ -908,71 +914,108 @@ function stockSortOptions(level) {
 
 function openStockControls(trigger, level, manufacturer, onChange, mode = 'sort') {
   const sortKey = level === 'manufacturers' ? 'manufacturersSort' : 'itemsSort';
-  const typeKey = level === 'manufacturers' ? 'manufacturersType' : 'itemsType';
   const isFilter = level === 'items' && mode === 'filter';
-  let applied = STOCK_VIEW[typeKey];
-  let draft = applied;
-  const content = `<div data-inventory-stock-controls>
-    ${mode !== 'filter' ? select({
-      label: 'Сортировка',
-      name: 'inventorySort',
-      value: STOCK_VIEW[sortKey],
-      options: stockSortOptions(level),
-      aria: 'Сортировка остатков',
-    }) : ''}
-    ${isFilter ? select({
-      label: 'Фильтр',
-      name: 'inventoryType',
-      value: draft,
-      options: stockTypeOptions(manufacturer),
-      aria: 'Фильтр по типу продукта',
-    }) : ''}
-    ${isFilter ? `<div class="modal-actions" data-inventory-stock-filter-actions hidden>
-      ${button('Применить', { data: 'data-inventory-stock-filter-action' })}
-    </div>` : ''}
-  </div>`;
+  const currentItems = getInventoryItems().filter(item => manufacturerName(item) === manufacturer);
+  const options = (label, key, extract) => [
+    { value: '', label },
+    ...stockFilterOptions(currentItems, extract).map(value => ({ value, label: value })),
+  ];
+  const supplierValues = item => stockSupplierNames(item);
+  let applied = { ...STOCK_VIEW.itemsFilters };
+  let draft = { ...applied };
+  const fields = isFilter ? [
+    select({label:'Тип продукта', name:'inventoryType', value:draft.type, options:stockTypeOptions(manufacturer)}),
+    select({label:'Категория', name:'inventoryFilterCategory', value:draft.category,
+      options:options('Все категории','category', item=>item.category)}),
+    select({label:'Место хранения', name:'inventoryFilterLocation', value:draft.location,
+      options:options('Все места','location', item=>item.location)}),
+    select({label:'Единица', name:'inventoryFilterUnit', value:draft.unit,
+      options:options('Все единицы','unit', item=>item.unit)}),
+    select({label:'Использование', name:'inventoryFilterUsage', value:draft.usage, options:[
+      {value:'',label:'Любое'}, {value:'consume',label:'Расход'},
+      {value:'sale',label:'Продажа'}, {value:'both',label:'Расход и продажа'},
+      {value:'track',label:'Только учёт'},
+    ]}),
+    select({label:'Поставщик', name:'inventoryFilterSupplier', value:draft.supplier,
+      options:options('Все поставщики','supplier',supplierValues)}),
+    select({label:'Наличие', name:'inventoryFilterAvailability', value:draft.availability, options:[
+      {value:'',label:'Любое'}, {value:'zero',label:'Нет на складе'},
+      {value:'positive',label:'Есть на складе'},
+      {value:'minimum',label:'На минимуме / ниже'},
+      {value:'target',label:'На цели / ниже'},
+    ]}),
+    select({label:'Цена', name:'inventoryFilterPrice', value:draft.price, options:[
+      {value:'',label:'Любая'}, {value:'known',label:'Указана'},
+      {value:'missing',label:'Не указана'},
+    ]}),
+    select({label:'Тара', name:'inventoryFilterTare', value:draft.tare, options:[
+      {value:'',label:'Любая'}, {value:'known',label:'Указана'},
+      {value:'missing',label:'Не указана'},
+    ]}),
+    field({label:'Наименование', name:'inventoryFilterName', value:draft.name}),
+    field({label:'Артикул', name:'inventoryFilterSku', value:draft.sku}),
+    field({label:'Штрихкод', name:'inventoryFilterBarcode', value:draft.barcode}),
+    field({label:'Порядковый №', name:'inventoryFilterPosition', value:draft.position,
+      type:'number',min:'1',step:'1',inputmode:'numeric'}),
+    field({label:'Минимум', name:'inventoryFilterMinStock', value:draft.minStock,
+      type:'number',min:'0',step:'0.001',inputmode:'decimal'}),
+    field({label:'Цель', name:'inventoryFilterTargetStock', value:draft.targetStock,
+      type:'number',min:'0',step:'0.001',inputmode:'decimal'}),
+    field({label:'Упаковка', name:'inventoryFilterPackageQuantity', value:draft.packageQuantity,
+      type:'number',min:'0',step:'0.001',inputmode:'decimal'}),
+    field({label:'Брутто, г', name:'inventoryFilterGrossWeight', value:draft.grossWeight,
+      type:'number',min:'0',step:'0.001',inputmode:'decimal'}),
+    field({label:'Тара, г', name:'inventoryFilterTareWeight', value:draft.tareWeight,
+      type:'number',min:'0',step:'0.001',inputmode:'decimal'}),
+  ].join('') : '';
+  const content = '<div data-inventory-stock-controls>'
+    + (mode !== 'filter' ? select({
+      label:'Сортировка', name:'inventorySort',
+      value:STOCK_VIEW[sortKey], options:stockSortOptions(level),
+    }) : '')
+    + (isFilter ? '<div class="form-grid">' + fields
+      + '<div class="modal-actions" data-inventory-stock-filter-actions hidden>'
+      + button('Применить', {data:'data-inventory-stock-filter-action'})
+      + '</div></div>' : '')
+    + '</div>';
   const modalRoot = mountModal(trigger, modal(content, {
-    title: mode === 'filter' ? 'Фильтр' : 'Сортировка',
-    variant: 'x',
+    title:mode === 'filter' ? 'Фильтр' : 'Сортировка',
+    variant:'x',
   }));
-  modalRoot?.querySelector('input[name="inventorySort"]')?.addEventListener('change', (event) => {
-    saveInventorySortMode(sortKey, event.target.value);
+  modalRoot?.querySelector('input[name="inventorySort"]')?.addEventListener('change', event => {
+    saveInventorySortMode(sortKey,event.target.value);
     onChange?.();
   });
   if (!isFilter || !modalRoot) return;
   const action = modalRoot.querySelector('[data-inventory-stock-filter-action]');
   const actions = modalRoot.querySelector('[data-inventory-stock-filter-actions]');
+  const formKeys = Object.keys(emptyStockFilters());
+  const inputName = key => key === 'type' ? 'inventoryType'
+    : 'inventoryFilter' + key.charAt(0).toUpperCase() + key.slice(1);
+  const readDraft = () => Object.fromEntries(formKeys.map(key => [
+    key, String(modalRoot.querySelector('[name="' + inputName(key) + '"]')?.value ?? ''),
+  ]));
   const syncAction = () => {
-    const changed = draft !== applied;
-    const reset = !changed && Boolean(applied);
-    actions.hidden = !changed && !reset;
-    action.textContent = changed ? 'Применить' : 'Сбросить';
+    const dirty = JSON.stringify(draft) !== JSON.stringify(applied);
+    const reset = !dirty && hasStockFilters(applied);
+    actions.hidden = !dirty && !reset;
+    action.textContent = dirty ? 'Применить' : 'Сбросить';
     action.classList.toggle('ui-button--secondary', reset);
   };
-  modalRoot.querySelector('input[name="inventoryType"]')?.addEventListener('change', event => {
-    draft = String(event.target.value || '');
+  const onInput = event => {
+    if (!formKeys.some(key => event.target?.name === inputName(key))) return;
+    draft = readDraft();
     syncAction();
-  });
-  action.addEventListener('click', () => {
-    if (draft !== applied) {
-      applied = draft;
-      STOCK_VIEW[typeKey] = applied;
-      onChange?.();
-      modalRoot.v2Close?.();
-      return;
-    }
-    if (!applied) return;
-    applied = '';
-    draft = '';
-    STOCK_VIEW[typeKey] = '';
-    const input = modalRoot.querySelector('input[name="inventoryType"]');
-    if (input) {
-      input.value = '';
-      const label = input.closest('.ui-select')?.querySelector('.ui-select__value');
-      if (label) label.textContent = 'Все типы';
-    }
+  };
+  modalRoot.addEventListener('change',onInput);
+  modalRoot.addEventListener('input',onInput);
+  action.addEventListener('click',() => {
+    const dirty = JSON.stringify(draft) !== JSON.stringify(applied);
+    applied = dirty ? { ...draft } : emptyStockFilters();
+    STOCK_VIEW.itemsFilters = { ...applied };
+    STOCK_VIEW.itemsType = applied.type;
     onChange?.();
-    syncAction();
+    modalRoot.v2Close?.();
   });
   syncAction();
 }
@@ -987,6 +1030,7 @@ function openManufacturerStock(root, manufacturer) {
   // A remembered name/price filter must not silently replace shelf sequence.
   saveInventorySortMode('itemsSort', 'position-asc');
   STOCK_VIEW.itemsType = '';
+  STOCK_VIEW.itemsFilters = emptyStockFilters();
   const markup = `
     ${context(manufacturer, {
       v: { data: 'data-inventory-item-controls', aria: 'Сортировка и фильтр товаров' },
@@ -1011,7 +1055,8 @@ function openManufacturerStock(root, manufacturer) {
         onChanged: renderList,
       });
     }));
-    if (STOCK_VIEW.itemsSort !== 'position-asc' || STOCK_VIEW.itemsType || normalizedSearch(query)) return;
+    if (STOCK_VIEW.itemsSort !== 'position-asc'
+      || hasStockFilters(STOCK_VIEW.itemsFilters) || normalizedSearch(query)) return;
     disposeReorder = initV2ListReorder(listHost, {
       onReorder: async (ids) => {
         await reorderInventoryItems(manufacturer === EMPTY_MANUFACTURER ? '' : manufacturer, ids);
