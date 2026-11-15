@@ -42,6 +42,41 @@ assert.equal((aggregate.match(/data-time-usage="event-1"/g) || []).length, 1);
 assert.match(aggregate, /data-journal-work-field="w1"/);
 assert.match(aggregate, /data-journal-work-field="w2"/);
 
+// A changed/removed WorkPlan must not conceal an existing Record or Event.
+const offPlanRecord = { ...record, from: '18:00', to: '19:00' };
+const offPlanEvent = { ...event, from: '07:00', to: '08:00' };
+const shifted = journalDayTimeline({
+  day: '2026-11-15', from: '09:00', to: '18:00',
+  usages: [offPlanRecord, offPlanEvent],
+});
+assert.match(shifted, /data-time-usage="record-1"/);
+assert.match(shifted, /data-time-usage="event-1"/);
+assert.match(shifted, /data-time-to="19:00"/);
+assert.match(shifted, /data-time-from="07:00"/);
+
+const unplanned = journalDayTimeline({
+  day: '2026-11-15', from: '07:00', to: '08:00',
+  usages: [offPlanEvent], interactiveSlots: false,
+});
+assert.match(unplanned, /data-time-usage="event-1"/);
+assert.doesNotMatch(unplanned, /data-time-slot-from=/, 'A non-working day must have no creation buttons');
+
+const formerWorkplace = journalDayTimeline({ day: '2026-11-15', columns: [
+  { workplaceId: 'w1', name: 'One', from: '09:00', to: '18:00', usages: [offPlanRecord] },
+  { workplaceId: 'w2', name: 'Two', from: '07:00', to: '08:00', usages: [offPlanEvent], hasWorkPlan: false },
+] });
+assert.match(formerWorkplace, /data-time-usage="event-1"/);
+assert.match(formerWorkplace, /data-time-usage="record-1"/);
+assert.match(formerWorkplace, /data-journal-work-field="w1"/);
+assert.doesNotMatch(formerWorkplace, /data-journal-work-field="w2"/,
+  'Existing events outside an active WorkPlan do not create a fictional work field');
+
+const daySource = readFileSync('journal/день.js', 'utf8');
+assert.match(daySource, /const dayUsages = getTimeUsagesForScope\(\{ date: dayDate \}\);/,
+  'Time usage may not depend on a current working-day row');
+assert.match(daySource, /interactiveSlots: false/,
+  'Records on days without a WorkPlan must remain accessible without allowing new slots');
+
 const timeSource = readFileSync('ui/time/journal-day.js', 'utf8');
 const css = readFileSync('ui/time/time.css', 'utf8');
 assert.equal((timeSource.match(/querySelectorAll\('\[data-time-usage\]'\)/g) || []).length, 1,
