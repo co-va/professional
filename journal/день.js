@@ -12,7 +12,7 @@ import {
 } from '../ui/ui.js';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { getDays, getDay, getDayTime, getDaysForDate, getScheduleConflicts } from '../core/day/index.js';
-import { createTimeGrid, getTimeGridMinuteState, getTimeUsagesForScope } from '../core/time/index.js';
+import { createTimeGrid, getTimeGridMinuteState, getTimeUsagesForScope, timeToMinutes, minutesToTime } from '../core/time/index.js';
 import { getRecordPaymentState } from '../core/finance/index.js';
 import { getNotesForDay } from '../core/note/index.js';
 import { noteTargetLabel, noteVisibleForWorkplace } from './note-target.js';
@@ -23,6 +23,23 @@ import { openJournalCreation } from './creation-flow.js';
 
 function dateKey(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+// Visible range only; availability and conflicts remain owned by Time.
+function usageDisplayRange(usages = []) {
+  const starts = [];
+  const ends = [];
+  for (const usage of usages) {
+    const from = timeToMinutes(usage?.from);
+    const to = timeToMinutes(usage?.to);
+    if (from == null || to == null || from === to) continue;
+    starts.push(from);
+    ends.push(to > from ? to : 1439);
+  }
+  if (!starts.length) return null;
+  const start = Math.min(...starts);
+  const end = Math.min(1439, Math.max(...ends));
+  return end > start ? { from: minutesToTime(start), to: minutesToTime(end) } : null;
 }
 
 function withFinancialState(usages = []) {
@@ -114,7 +131,7 @@ export function renderJournalDay(root, {
   const workingDayRows = getDaysForDate(getDays(), dayDate);
   // One Time-owned read for the visible day, shared by Journal timeline and V.
   // The V menu never needs to read or re-project all Record/Finance facts.
-  const dayUsages = workingDayRows.length ? getTimeUsagesForScope({ date: dayDate }) : [];
+  const dayUsages = getTimeUsagesForScope({ date: dayDate });
   const usageById = new Map(dayUsages.map((usage) => [
     String(usage?.sourceId || usage?.id || ''), usage,
   ]));
@@ -122,6 +139,15 @@ export function renderJournalDay(root, {
     void openUsage(usageById.get(String(usageId || '')), rerender);
   };
   onUsageSummary({ usages: dayUsages });
+  const renderReadOnlyUsages = (usages) => {
+    const range = usageDisplayRange(usages);
+    if (!range) return false;
+    timelineRoot.innerHTML = journalDayTimeline({
+      ...range, usages, day: dayDate, interactiveSlots: false,
+    });
+    initJournalDayTimeline(timelineRoot, { onUsageClick: openSelectedUsage });
+    return true;
+  };
   const dayNotes = getNotesForDay(dayDate);
   const visibleNotes = dayNotes.filter((note) => noteVisibleForWorkplace(note, workplaceId, { allMode }));
   const relatedIds = focusTarget?.targetType && focusTarget?.targetId
@@ -156,11 +182,6 @@ export function renderJournalDay(root, {
 
   if (allMode) {
     const days = workingDayRows;
-    if (!days.length) {
-      timelineRoot.innerHTML = '<div class="time-day-state" aria-disabled="true">Выходной день</div>';
-      return dispose;
-    }
-
     const columns = days.map((day) => {
       const currentId = String(day?.workplaceId || '');
       const workplace = workplaces.find((item) => String(item?.key || '') === currentId) || null;
@@ -181,8 +202,29 @@ export function renderJournalDay(root, {
       };
     }).filter(Boolean);
 
+    // A schedule correction/removal must never make a historical Record/Event
+    // disappear from aggregate Day. Add a readonly column for that workplace,
+    // without inventing a WorkPlan or an editable working-time field.
+    const scheduledIds = new Set(columns.map((column) => column.workplaceId));
+    const missingIds = [...new Set(dayUsages.map((usage) => String(usage?.workplaceId || '')))]
+      .filter((id) => id && !scheduledIds.has(id));
+    missingIds.forEach((id) => {
+      const usages = withFinancialState(dayUsages.filter((usage) => String(usage?.workplaceId || '') === id));
+      const range = usageDisplayRange(usages);
+      if (!range) return;
+      const workplace = workplaces.find((item) => String(item?.key || '') === id);
+      columns.push({
+        workplaceId: id,
+        name: workplace?.name || 'Рабочее место',
+        ...range,
+        usages,
+        hasWorkPlan: false,
+        conflict: false,
+      });
+    });
+
     if (!columns.length) {
-      timelineRoot.innerHTML = '<div class="time-day-state" aria-disabled="true">Не задано рабочее время</div>';
+      timelineRoot.innerHTML = `<div class="time-day-state" aria-disabled="true">${days.length ? 'Не задано рабочее время' : 'Выходной день'}</div>`;
       return dispose;
     }
 
@@ -197,19 +239,24 @@ export function renderJournalDay(root, {
   }
 
   const workingDay = getDay(getDays(), workplaceId, dayDate);
+  const workplaceUsages = withFinancialState(dayUsages.filter((usage) =>
+    String(usage?.workplaceId || '') === String(workplaceId)));
   if (!workingDay) {
-    timelineRoot.innerHTML = '<div class="time-day-state" aria-disabled="true">Выходной день</div>';
+    if (!renderReadOnlyUsages(workplaceUsages)) {
+      timelineRoot.innerHTML = '<div class="time-day-state" aria-disabled="true">Выходной день</div>';
+    }
     return dispose;
   }
 
   const time = getDayTime(workingDay, workplaces);
   if (!time) {
-    timelineRoot.innerHTML = '<div class="time-day-state" aria-disabled="true">Не задано рабочее время</div>';
+    if (!renderReadOnlyUsages(workplaceUsages)) {
+      timelineRoot.innerHTML = '<div class="time-day-state" aria-disabled="true">Не задано рабочее время</div>';
+    }
     return dispose;
   }
 
-  const usages = withFinancialState(dayUsages.filter((usage) =>
-    String(usage?.workplaceId || '') === String(workplaceId)));
+  const usages = workplaceUsages;
   const timeGrid = createTimeGrid({ date: dayDate, workplaceId, plan: time, usages });
 
   timelineRoot.innerHTML = journalDayTimeline({
@@ -217,7 +264,7 @@ export function renderJournalDay(root, {
     to: time.to,
     usages,
     day: dayDate,
-    clipUsagesToWorkRange: true,
+    clipUsagesToWorkRange: false,
   });
 
   initJournalDayTimeline(timelineRoot, {
