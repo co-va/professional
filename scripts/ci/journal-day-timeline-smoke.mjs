@@ -92,6 +92,17 @@ assert.match(journalSource, /label: 'Сумма', value: formatRubles\(total\), 
   'Day/Month Z-report keeps its existing receipt layout');
 assert.doesNotMatch(journalSource, /label: 'Стоимость услуг и товаров'/,
   'No unapproved receipt group may be introduced');
+assert.match(journalSource, /actions: isDayOff && !hasUsage \? \[\] : \[/,
+  'Historical records on a day without a WorkPlan must keep the Day report action');
+assert.match(journalSource, /dayViewState\.busyWorkplaces\.has\(String\(selectedWorkplaceId \|\| ''\)\)/,
+  'A single-workplace report must use its own occupancy, not other workplaces');
+
+const recordFlowSource = readFileSync('core/records/records.js', 'utf8');
+assert.match(recordFlowSource, /const unchangedSchedule = existing/,
+  'The Record confirmation must allow editing unchanged appointments');
+assert.match(recordFlowSource, /source\.kind === 'professional' && !unchangedSchedule/,
+  'New and rescheduled Record confirmations must still validate availability');
+
 
 
 // A previous-day overnight Record is still visible on today's readonly Day.
