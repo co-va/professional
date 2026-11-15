@@ -34,8 +34,17 @@ export function openJournalCreation({
   let selectedTime = '';
   let requestVersion = 0;
 
-  const hour = Math.floor((timeToMinutes(timeHint) ?? 0) / 60) * 60;
-  const timeChoices = [hour, hour + 30]
+  const tappedMinute = timeToMinutes(timeHint);
+  const hour = Math.floor((tappedMinute ?? 0) / 60) * 60;
+  // A tap on a partial slot must preserve its exact minute. The regular
+  // :00/:30 chooser remains unchanged for standard half-hour slots.
+  const halfHour = hour + 30;
+  const choiceMinutes = tappedMinute != null
+    && tappedMinute !== hour
+    && tappedMinute !== halfHour
+    ? [tappedMinute, Math.ceil(tappedMinute / 30) * 30]
+    : [hour, halfHour];
+  const timeChoices = [...new Set(choiceMinutes)]
     .map((minute) => minutesToTime(minute))
     .filter(Boolean)
     .map((value) => {
