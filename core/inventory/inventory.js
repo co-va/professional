@@ -434,10 +434,17 @@ function openItemEditor(root, itemId = '', defaults = {}, onSaved = () => {}) {
         if (minimum != null && target != null && target <= minimum) {
           throw new Error('Цель должна быть больше порога «Срочно».');
         }
-        // Convert tube fractions into the gram values owned by Core/Inventory.
-        // A package-size edit changes this conversion but never adjusts stock.
-        minimum = inventoryStockThresholdStored(value, minimum);
-        target = inventoryStockThresholdStored(value, target);
+        // Keep the exact stored threshold when its displayed tube fraction was
+        // not edited and the package size stayed unchanged. This avoids turning
+        // legacy 0.5 g into 0.49998 g while editing an unrelated product field.
+        const samePackage = value.unit === item.unit
+          && Number(value.packageQuantity) === Number(item.packageQuantity);
+        const toCanonical = (key, input) => samePackage
+            && input === inventoryStockThresholdInput(item, item[key])
+          ? (item[key] ?? null)
+          : inventoryStockThresholdStored(value, input);
+        minimum = toCanonical('minStock', minimum);
+        target = toCanonical('targetStock', target);
       } catch (error) {
         openNotice({ title: 'Правила остатка', message: error.message });
         return;
