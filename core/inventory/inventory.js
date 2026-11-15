@@ -33,12 +33,12 @@ import { getCardAppearanceTemplate, saveCardAppearanceTemplate } from '../card-a
 import { loadAuxiliaryState } from '../runtime/auxiliary-state.js';
 import { inventoryManufacturerCompletion, isWeighedInventoryItem, netStocktakeGrams } from './completeness.js';
 import { openInventoryProductAppearanceQ, openInventoryProductOverview } from './product-overview.js';
+import { renderInventoryOrders } from './orders.js';
 import {
   getInventoryItem,
   getInventoryItems,
   getInventoryMovement,
   getInventoryMovements,
-  inventoryOrderSuggestions,
 } from './data.js';
 import {
   correctInventoryMovement,
@@ -1082,31 +1082,6 @@ function openMovementDetails(root, movementId) {
   });
 }
 
-function orderSuggestedQuantityText(item = {}) {
-  // Stock is counted in grams, but sealed colour tubes are purchased whole.
-  // Do not confuse the observed number of partly used tubes with the number
-  // of NEW full tubes required to reach the target stock.
-  const required = Math.max(0, Number(item.suggestedQuantity) || 0);
-  const packageQuantity = Number(item.packageQuantity);
-  if (isWeighedInventoryItem(item) && Number.isFinite(packageQuantity) && packageQuantity > 0) {
-    return `${numberText(Math.ceil(required / packageQuantity), 0)} тюб.`;
-  }
-  return `${numberText(required)} ${item.unit || ''}`.trim();
-}
-
-function orderMarkup() {
-  const items = inventoryOrderSuggestions();
-  if (!items.length) return emptyState('Заказывать пока нечего', 'Когда будет указан минимальный остаток, здесь появятся предложения.');
-  return v2ListEntries(items.sort(inventoryPositionComparator).map((item) => v2ListEntry({
-    title: item.name,
-    subtitle: `Осталось ${numberText(item.balance)} ${item.unit}`,
-    rightTop: orderSuggestedQuantityText(item),
-    rightBottom: 'Рекомендация',
-    initial: '',
-  })));
-}
-
-
 function inventoryAuditScope({ manufacturer = '' } = {}) {
   // Z2 search and filters never restrict the independent Q1 stocktake list.
   return getInventoryItems().filter(item =>
@@ -1867,7 +1842,7 @@ function renderMovements(root) {
 }
 
 function renderOrders(root) {
-  root.innerHTML = `${context('Заказ')}${orderMarkup()}`;
+  renderInventoryOrders(root);
   notifyContext();
 }
 
