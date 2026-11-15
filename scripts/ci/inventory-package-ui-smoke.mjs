@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+const stock = readFileSync('core/inventory/inventory.js', 'utf8');
+const sale = readFileSync('core/sale/sale.js', 'utf8');
+const options = stock.match(/const UNIT_OPTIONS = \[[\s\S]*?\n\];/);
+assert.ok(options);
+const source = options[0]+'\nconst STOCK_DISPOSAL_UNITS = UNIT_OPTIONS;\nreturn STOCK_DISPOSAL_UNITS;';
+const dropdown = new Function(source)();
+assert.deepEqual(dropdown.map(x => x.label), ['г', 'мл', 'шт.', 'уп.']);
+assert.match(stock,/const STOCK_DISPOSAL_UNITS = UNIT_OPTIONS;/);
+assert.match(stock,/\['шт\.', 'уп\.'\]\.includes\(inputUnit\)/);
+assert.match(stock,/quantityUnit: inputUnit/);
+assert.match(sale,/\['шт\.', 'уп\.'\]\.includes\(product\.unit\)/);
+console.log('PASS: packaging option in consumption and sale, integer quantities, canonical stock conversion');

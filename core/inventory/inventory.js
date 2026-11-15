@@ -60,7 +60,7 @@ const UNIT_OPTIONS = [
   { value: 'г', label: 'г' },
   { value: 'мл', label: 'мл' },
   { value: 'шт.', label: 'шт.' },
-  { value: 'уп.', label: 'Упаковка' },
+  { value: 'уп.', label: 'уп.' },
 ];
 const EMPTY_MANUFACTURER = 'Без производителя';
 const INVENTORY_SORT_KEY = 'professional.inventory.sort';
@@ -276,7 +276,7 @@ function itemPrimaryPrice(item = {}) {
     && item.basePrice != null && Number.isFinite(price) ? price : null;
 }
 
-const STOCK_DISPOSAL_UNITS = UNIT_OPTIONS.filter(option => option.value !== 'уп.');
+const STOCK_DISPOSAL_UNITS = UNIT_OPTIONS;
 
 function stockDisposalFields(item = {}, purpose = 'consume') {
   const sale = purpose === 'sale';
@@ -924,9 +924,9 @@ function openMovementEditor(root, movementId = '', kind = 'CONSUMPTION', { recor
           : ['CONSUMPTION', 'SALE', 'WRITE_OFF'].includes(actualKind);
         const inputUnit = element.dataset.quantityUnit || item.unit;
         const consume = actualKind === 'CONSUMPTION' && !correcting;
-        const wholeContainer = consume && inputUnit === 'шт.' && ['г', 'мл'].includes(item.unit);
-        if (wholeContainer && !Number.isSafeInteger(quantity)) {
-          errorHost.textContent = 'Укажите целое количество штук: ' + item.name;
+        const wholeContainer = consume && ['шт.', 'уп.'].includes(inputUnit) && ['г', 'мл'].includes(item.unit);
+        if (consume && (inputUnit === 'уп.' || wholeContainer) && !Number.isSafeInteger(quantity)) {
+          errorHost.textContent = 'Укажите целое количество упаковок или штук: ' + item.name;
           return;
         }
         lines.push({

@@ -153,7 +153,7 @@ export function openSale({
       const existing = currentById.get(id);
       const raw = String(amountDraft.get(id) ?? amountsRoot.querySelector('[data-sale-quantity="' + id + '"]')?.value ?? '').trim();
       const quantity = Number(raw.replace(',', '.'));
-      if (!raw || !Number.isFinite(quantity) || quantity <= 0 || (product.unit === 'шт.' && !Number.isSafeInteger(quantity))) {
+      if (!raw || !Number.isFinite(quantity) || quantity <= 0 || (['шт.', 'уп.'].includes(product.unit) && !Number.isSafeInteger(quantity))) {
         errorHost.textContent = 'Проверьте количество: ' + product.name;
         return;
       }
