@@ -215,6 +215,9 @@ async function openPersonHistoryItemQ(root, person, item, options = {}) {
     return openRecordView(record, {
       presentation: 'q',
       readOnlyHistory: !current,
+      // History Q1 remains mounted underneath Record Q2. Refresh it after
+      // a persisted cancellation/payment before it is visible again.
+      onClose: () => { if (typeof options.refreshHistory === 'function') void options.refreshHistory(); },
     });
   }
   // Financial events have their own information, not a Record preview.
@@ -246,6 +249,21 @@ export async function openPersonHistoryQ(root, person, options = {}) {
   const search = layer.querySelector('[data-person-history-search]');
   // Show existing Journal records immediately; audit History enriches the list.
   let sourceItems = getCurrentPersonHistory(person.key);
+  const refreshHistory = async () => {
+    if (!layer.isConnected) return;
+    try {
+      const current = await getPersonHistory(person.key);
+      if (layer.isConnected) {
+        sourceItems = current;
+        render();
+      }
+    } catch (_) {
+      if (layer.isConnected) {
+        sourceItems = getCurrentPersonHistory(person.key);
+        render();
+      }
+    }
+  };
   const render = () => {
     const query = String(search?.value || '').trim();
     const items = historyItems(sourceItems, query);
@@ -253,7 +271,7 @@ export async function openPersonHistoryQ(root, person, options = {}) {
     host?.querySelectorAll('[data-person-history-item]').forEach((node) => {
       node.addEventListener('click', () => {
         const item = items[Number(node.dataset.personHistoryItem)];
-        if (item) void openPersonHistoryItemQ(layer, person, item, options);
+        if (item) void openPersonHistoryItemQ(layer, person, item, { ...options, refreshHistory });
       });
     });
   };
