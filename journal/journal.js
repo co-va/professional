@@ -8,7 +8,7 @@ import { getActiveDayWorkplaces, getAvailableDayWorkplaces } from '../core/day/i
 import { getRecordPaymentState } from '../core/finance/index.js';
 import { hasZonedIntervalEnded } from '../core/time/index.js';
 import { applyTimetableWorkingDays, makeTimetableDayOff, openTimetableDayTimeEditor } from '../timetable/day-editor.js';
-import { getRecords, getRecordsForDay } from '../core/record/index.js';
+import { getRecordsInRange, getRecordsForDay } from '../core/record/index.js';
 import { journalWorkplaceSelect, openJournalWorkplaceControl, updateJournalWorkplaceMetas } from './workplace-control.js';
 import { renderJournalDay } from './день.js';
 import { renderJournalMonth } from './месяц.js';
@@ -356,9 +356,10 @@ export function renderJournal(root, options = {}) {
     const allMode = selectedWorkplaceId === ALL_WORKPLACES_ID;
     const isMonth = activeView === 'month';
     const records = (isMonth
-      ? getRecords().filter((record) => {
-        if (!String(record?.date || '').startsWith(monthPrefix(selectedDate))) return false;
-        return allMode || String(record?.workplaceId || '') === String(selectedWorkplaceId || '');
+      ? getRecordsInRange({
+        from: `${monthPrefix(selectedDate)}01`,
+        to: `${monthPrefix(selectedDate)}${String(new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0).getDate()).padStart(2, '0')}`,
+        workplaceId: allMode ? '' : selectedWorkplaceId,
       })
       : getRecordsForDay(dateKey(selectedDate), allMode ? '' : selectedWorkplaceId))
       .filter((record) => record?.status !== 'cancelled');
