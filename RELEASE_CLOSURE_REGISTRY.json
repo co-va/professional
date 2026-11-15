@@ -146,15 +146,21 @@
         "visual": "не проверено",
         "interaction": "не проверено",
         "data": "не проверено",
-        "regression": "не проверено",
-        "architecture": "не проверено"
+        "regression": "Изолированные smoke-тесты и сквозная модель PASS; реальное приложение требует проверки",
+        "architecture": "Источники правды: Record, Time, Finance, Note, Event, Deposit; UI Журнала не хранит отдельные бизнес-факты; основные импорты проверены"
       },
       "closure": {
-        "state": "open",
+        "state": "verifying",
         "approvedBy": null,
         "approvedAt": null,
         "baselineSha": null,
-        "evidence": []
+        "evidence": [
+          "Изолированная регрессия Журнала: 40 assert День/Time, 32 assert депозиты/скидки, 30 assert источники оплаты, 7 групп Month, 8 Graph, 11 List; PASS",
+          "Сквозной доменный маршрут Record → Deposit → Note → Attendance → Complete → Payment+Tips → Refund: 12/12 PASS",
+          "Event и Note lifecycle + Finance settlement/refund: 12/12 PASS; корректировка оплаты не закрывается без подтверждения сервера",
+          "Проверена компиляция и относительные импорты модулей Journal, Time, Event, Note, Record, Finance и UI Record. Неподдерживаемые программы лояльности не используются в Record",
+          "Внимание: сервер Amvera, реальное сохранение в PostgreSQL и iPhone не проверены в этом окружении. Для закрытия locked нужна приёмка владельца"
+        ]
       }
     },
     {
