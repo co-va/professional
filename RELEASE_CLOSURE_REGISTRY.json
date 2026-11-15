@@ -233,15 +233,17 @@
         "visual": "не проверено",
         "interaction": "не проверено",
         "data": "не проверено",
-        "regression": "не проверено",
-        "architecture": "не проверено"
+        "regression": "Изолированные сценарии PASS; живой интерфейс не проверен",
+        "architecture": "Использован Time/Record/Event/Finance owner, без собственного хранилища фактов в режиме"
       },
       "closure": {
-        "state": "open",
+        "state": "verifying",
         "approvedBy": null,
         "approvedAt": null,
         "baselineSha": null,
-        "evidence": []
+        "evidence": [
+          "Изолированная проверка реальной функции Month: 7 групп сценариев, включая оплаченные, будущие, неявки, отмены, границы месяца, отсутствие рабочего графика и выбор пространства; PASS"
+        ]
       }
     },
     {
@@ -262,15 +264,17 @@
         "visual": "не проверено",
         "interaction": "не проверено",
         "data": "не проверено",
-        "regression": "не проверено",
-        "architecture": "не проверено"
+        "regression": "Изолированные сценарии PASS; живой интерфейс не проверен",
+        "architecture": "Использован Time/Record/Event/Finance owner, без собственного хранилища фактов в режиме"
       },
       "closure": {
-        "state": "open",
+        "state": "verifying",
         "approvedBy": null,
         "approvedAt": null,
         "baselineSha": null,
-        "evidence": []
+        "evidence": [
+          "Функция occupancyForDate Graph: 8 сценариев отмен, межмесячного переноса, отдельных пространств и Event/Record; PASS"
+        ]
       }
     },
     {
@@ -291,15 +295,17 @@
         "visual": "не проверено",
         "interaction": "не проверено",
         "data": "не проверено",
-        "regression": "не проверено",
-        "architecture": "не проверено"
+        "regression": "Изолированные сценарии PASS; живой интерфейс не проверен",
+        "architecture": "Использован Time/Record/Event/Finance owner, без собственного хранилища фактов в режиме"
       },
       "closure": {
-        "state": "open",
+        "state": "verifying",
         "approvedBy": null,
         "approvedAt": null,
         "baselineSha": null,
-        "evidence": []
+        "evidence": [
+          "Оба режима List, 30-дневная граница, будущие записи, деньги через единый PaymentState, один расчёт на строку: 11 сценариев PASS"
+        ]
       }
     },
     {
