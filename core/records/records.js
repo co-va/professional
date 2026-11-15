@@ -34,7 +34,6 @@ import {
   buildNaturalBookingTimeRows,
   checkTimeAvailability,
   getAvailabilityGrid,
-  getTimeGridMinuteState,
   minutesToTime,
   timeToMinutes,
 } from '../time/index.js';
@@ -159,27 +158,6 @@ function normalizeProvider(provider = {}) {
   return { ...professionalProvider(), ...provider };
 }
 
-function defaultJournalTimeRows({ date, workplaceId, hint }) {
-  const anchor = timeToMinutes(hint);
-  if (anchor == null) return [];
-  const hour = Math.floor(anchor / 60) * 60;
-  const grid = getAvailabilityGrid({ date, workplaceId });
-  return [hour, hour + 30]
-    .map((minute) => minutesToTime(minute))
-    .filter(Boolean)
-    .map((value) => {
-      const availability = getTimeGridMinuteState(grid, value);
-      return {
-        value,
-        label: value,
-        from: value,
-        available: availability?.state === 'free',
-        occupied: availability?.state === 'occupied',
-        state: availability?.state || 'unavailable',
-      };
-    });
-}
-
 function selectionEntry(provider, raw, workplaceId) {
   return {
     id: provider.procedureId(raw),
@@ -301,12 +279,13 @@ export async function openProcedureAdjustment(record, procedureId, { onSaved = (
 
     submit.disabled = true;
     try {
-      await saveRecordProcedurePaymentAdjustment(latest, procedureId, {
+      const savedSettlement = await saveRecordProcedurePaymentAdjustment(latest, procedureId, {
         price: numeric(priceInput),
         correctionMode,
         discountPercent: numeric(percentInput),
         discountMoney: numeric(moneyInput),
       });
+      if (!savedSettlement) throw new Error('Сервер не подтвердил стоимость услуги.');
       const updated = updateRecord(latest.id, { procedures: nextProcedures, to: nextTo });
       if (!updated) throw new Error('Не удалось сохранить длительность услуги.');
       await onSaved(updated);
@@ -346,7 +325,8 @@ export async function openProcedureAdjustment(record, procedureId, { onSaved = (
 
     submit.disabled = true;
     try {
-      await deleteRecordProcedurePaymentAdjustment(latest, procedureId);
+      const savedSettlement = await deleteRecordProcedurePaymentAdjustment(latest, procedureId);
+      if (!savedSettlement) throw new Error('Сервер не подтвердил удаление услуги из расчёта.');
       const updated = updateRecord(latest.id, { procedures: nextProcedures, to: nextTo });
       if (!updated) throw new Error('Не удалось удалить услугу из записи.');
       await onSaved(updated);
@@ -716,12 +696,12 @@ export function openRecords({
 
   const renderTimes = () => {
     enterStep('time', renderTimes);
-    let rows;
-    if (context === 'journal' && state.timeHint && !state.correcting) {
-      rows = defaultJournalTimeRows({ date: state.date, workplaceId: state.workplaceId, hint: state.timeHint });
-    } else {
-      rows = source.timeRows({ workplaceId: state.workplaceId, date: state.date, procedures: state.procedures, state });
-    }
+    // Every Record time choice comes from the existing Time provider.
+    // Journal's first Q already owns its start-time selection.
+    const rows = source.timeRows({
+      workplaceId: state.workplaceId, date: state.date,
+      procedures: state.procedures, state,
+    });
     const view = owner.render({
       step: 'time',
       body: `<div class="record-screen record-screen--time">${rows.length
