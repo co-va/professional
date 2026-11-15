@@ -39,7 +39,7 @@ import { openInventoryProductAppearanceQ, openInventoryProductOverview } from '.
 import { renderInventoryOrders } from './orders.js';
 import {
   emptyStockFilters, hasStockFilters, matchesStockFilters,
-  stockFilterOptions, stockSupplierNames,
+  stockFilterOptions, stockSupplierNames, STOCK_FILLED, STOCK_EMPTY,
 } from './stock-filters.js';
 import {
   getInventoryItem,
@@ -916,28 +916,36 @@ function openStockControls(trigger, level, manufacturer, onChange, mode = 'sort'
   const sortKey = level === 'manufacturers' ? 'manufacturersSort' : 'itemsSort';
   const isFilter = level === 'items' && mode === 'filter';
   const currentItems = getInventoryItems().filter(item => manufacturerName(item) === manufacturer);
-  const options = (label, key, extract) => [
+  const presence = [
+    { value: STOCK_FILLED, label: 'Заполнено' },
+    { value: STOCK_EMPTY, label: 'Не заполнено' },
+  ];
+  const presenceOptions = [{ value: '', label: 'Все' }, ...presence];
+  const options = (label, extract) => [
     { value: '', label },
+    ...presence,
     ...stockFilterOptions(currentItems, extract).map(value => ({ value, label: value })),
   ];
   const supplierValues = item => stockSupplierNames(item);
   let applied = { ...STOCK_VIEW.itemsFilters };
   let draft = { ...applied };
   const fields = isFilter ? [
-    select({label:'Тип продукта', name:'inventoryType', value:draft.type, options:stockTypeOptions(manufacturer)}),
+    select({label:'Тип продукта', name:'inventoryType', value:draft.type,
+      options:[...stockTypeOptions(manufacturer).slice(0, 1), ...presence,
+        ...stockTypeOptions(manufacturer).slice(1)]}),
     select({label:'Категория', name:'inventoryFilterCategory', value:draft.category,
-      options:options('Все категории','category', item=>item.category)}),
+      options:options('Все категории', item=>item.category)}),
     select({label:'Место хранения', name:'inventoryFilterLocation', value:draft.location,
-      options:options('Все места','location', item=>item.location)}),
+      options:options('Все места', item=>item.location)}),
     select({label:'Единица', name:'inventoryFilterUnit', value:draft.unit,
-      options:options('Все единицы','unit', item=>item.unit)}),
+      options:options('Все единицы', item=>item.unit)}),
     select({label:'Использование', name:'inventoryFilterUsage', value:draft.usage, options:[
       {value:'',label:'Любое'}, {value:'consume',label:'Расход'},
       {value:'sale',label:'Продажа'}, {value:'both',label:'Расход и продажа'},
       {value:'track',label:'Только учёт'},
     ]}),
     select({label:'Поставщик', name:'inventoryFilterSupplier', value:draft.supplier,
-      options:options('Все поставщики','supplier',supplierValues)}),
+      options:options('Все поставщики', supplierValues)}),
     select({label:'Наличие', name:'inventoryFilterAvailability', value:draft.availability, options:[
       {value:'',label:'Любое'}, {value:'zero',label:'Нет на складе'},
       {value:'positive',label:'Есть на складе'},
@@ -945,28 +953,21 @@ function openStockControls(trigger, level, manufacturer, onChange, mode = 'sort'
       {value:'target',label:'На цели / ниже'},
     ]}),
     select({label:'Цена', name:'inventoryFilterPrice', value:draft.price, options:[
-      {value:'',label:'Любая'}, {value:'known',label:'Указана'},
-      {value:'missing',label:'Не указана'},
+      {value:'',label:'Все'}, {value:'known',label:'Заполнено'},
+      {value:'missing',label:'Не заполнено'},
     ]}),
     select({label:'Тара', name:'inventoryFilterTare', value:draft.tare, options:[
-      {value:'',label:'Любая'}, {value:'known',label:'Указана'},
-      {value:'missing',label:'Не указана'},
+      {value:'',label:'Все'}, {value:'known',label:'Заполнено'},
+      {value:'missing',label:'Не заполнено'},
     ]}),
-    field({label:'Наименование', name:'inventoryFilterName', value:draft.name}),
-    field({label:'Артикул', name:'inventoryFilterSku', value:draft.sku}),
-    field({label:'Штрихкод', name:'inventoryFilterBarcode', value:draft.barcode}),
-    field({label:'Порядковый №', name:'inventoryFilterPosition', value:draft.position,
-      type:'number',min:'1',step:'1',inputmode:'numeric'}),
-    field({label:'Минимум', name:'inventoryFilterMinStock', value:draft.minStock,
-      type:'number',min:'0',step:'0.001',inputmode:'decimal'}),
-    field({label:'Цель', name:'inventoryFilterTargetStock', value:draft.targetStock,
-      type:'number',min:'0',step:'0.001',inputmode:'decimal'}),
-    field({label:'Упаковка', name:'inventoryFilterPackageQuantity', value:draft.packageQuantity,
-      type:'number',min:'0',step:'0.001',inputmode:'decimal'}),
-    field({label:'Брутто, г', name:'inventoryFilterGrossWeight', value:draft.grossWeight,
-      type:'number',min:'0',step:'0.001',inputmode:'decimal'}),
-    field({label:'Тара, г', name:'inventoryFilterTareWeight', value:draft.tareWeight,
-      type:'number',min:'0',step:'0.001',inputmode:'decimal'}),
+    select({label:'Наименование', name:'inventoryFilterName', value:draft.name, options:presenceOptions}),
+    select({label:'Артикул', name:'inventoryFilterSku', value:draft.sku, options:presenceOptions}),
+    select({label:'Штрихкод', name:'inventoryFilterBarcode', value:draft.barcode, options:presenceOptions}),
+    select({label:'Порядковый №', name:'inventoryFilterPosition', value:draft.position, options:presenceOptions}),
+    select({label:'Минимум', name:'inventoryFilterMinStock', value:draft.minStock, options:presenceOptions}),
+    select({label:'Цель', name:'inventoryFilterTargetStock', value:draft.targetStock, options:presenceOptions}),
+    select({label:'Упаковка', name:'inventoryFilterPackageQuantity', value:draft.packageQuantity, options:presenceOptions}),
+    select({label:'Брутто, г', name:'inventoryFilterGrossWeight', value:draft.grossWeight, options:presenceOptions}),
   ].join('') : '';
   const content = '<div data-inventory-stock-controls>'
     + (mode !== 'filter' ? select({

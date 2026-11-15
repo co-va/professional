@@ -6,16 +6,22 @@ export const EMPTY_STOCK_FILTERS = Object.freeze({
   type: '', category: '', location: '', unit: '', usage: '',
   supplier: '', availability: '', price: '', tare: '',
   name: '', sku: '', barcode: '', position: '', minStock: '',
-  targetStock: '', packageQuantity: '', grossWeight: '', tareWeight: '',
+  targetStock: '', packageQuantity: '', grossWeight: '',
 });
 export const emptyStockFilters = () => ({ ...EMPTY_STOCK_FILTERS });
 export const hasStockFilters = filters =>
   Object.keys(EMPTY_STOCK_FILTERS).some(key => String(filters?.[key] ?? '').trim() !== '');
 
+export const STOCK_FILLED = '__filled__';
+export const STOCK_EMPTY = '__empty__';
 const norm = value => String(value ?? '').trim().toLocaleLowerCase('ru-RU');
-const numberMatches = (value, criterion) =>
-  !String(criterion ?? '').trim() || (value != null
-    && value !== '' && Number(value) === Number(String(criterion).replace(',', '.')));
+const hasValue = value => value != null && String(value).trim() !== '';
+const isPresence = value => value === STOCK_FILLED || value === STOCK_EMPTY;
+const matchesPresence = (value, criterion) => !criterion
+  || (criterion === STOCK_FILLED && hasValue(value))
+  || (criterion === STOCK_EMPTY && !hasValue(value));
+const matchesChoice = (value, criterion) => !criterion
+  || (isPresence(criterion) ? matchesPresence(value, criterion) : norm(value) === norm(criterion));
 const supplierNames = item => [
   item.supplier, item.primarySupplier,
   ...(Array.isArray(item.supplierOffers)
@@ -25,15 +31,19 @@ const usageCode = item => item.canConsume !== false && item.canSell === true ? '
   : item.canConsume !== false ? 'consume' : item.canSell === true ? 'sale' : 'track';
 
 export function matchesStockFilters(item = {}, filters = {}) {
-  if (filters.type && norm(item.productType || item.category) !== norm(filters.type)) return false;
-  if (filters.category && norm(item.category) !== norm(filters.category)) return false;
-  if (filters.location && norm(item.location) !== norm(filters.location)) return false;
-  if (filters.unit && norm(item.unit) !== norm(filters.unit)) return false;
+  const typeValue = isPresence(filters.type) ? item.productType : item.productType || item.category;
+  if (!matchesChoice(typeValue, filters.type)) return false;
+  if (!matchesChoice(item.category, filters.category)) return false;
+  if (!matchesChoice(item.location, filters.location)) return false;
+  if (!matchesChoice(item.unit, filters.unit)) return false;
   if (filters.usage && usageCode(item) !== filters.usage) return false;
-  if (filters.supplier && !supplierNames(item).some(x => norm(x) === norm(filters.supplier))) return false;
-  if (filters.name && !norm(item.name).includes(norm(filters.name))) return false;
-  if (filters.sku && !norm(item.sku).includes(norm(filters.sku))) return false;
-  if (filters.barcode && !norm(item.barcode).includes(norm(filters.barcode))) return false;
+  const suppliers = supplierNames(item);
+  if (isPresence(filters.supplier)) {
+    if (!matchesPresence(suppliers.length ? suppliers.join(', ') : '', filters.supplier)) return false;
+  } else if (filters.supplier && !suppliers.some(x => norm(x) === norm(filters.supplier))) return false;
+  if (!matchesPresence(item.name, filters.name)) return false;
+  if (!matchesPresence(item.sku, filters.sku)) return false;
+  if (!matchesPresence(item.barcode, filters.barcode)) return false;
   if (filters.price) {
     const known = [item.basePrice, item.referencePrice, item.lastPurchasePrice]
       .some(x => x != null && x !== '' && Number.isFinite(Number(x)));
@@ -55,11 +65,13 @@ export function matchesStockFilters(item = {}, filters = {}) {
         || actual > Number(threshold) + 1e-9) return false;
     }
   }
+  const position = Number.isSafeInteger(Number(item.position)) && Number(item.position) > 0
+    ? item.position : null;
   return [
-    ['position', item.position], ['minStock', item.minStock],
+    ['position', position], ['minStock', item.minStock],
     ['targetStock', item.targetStock], ['packageQuantity', item.packageQuantity],
-    ['grossWeight', item.grossWeight], ['tareWeight', item.tareWeight],
-  ].every(([key, value]) => numberMatches(value, filters[key]));
+    ['grossWeight', item.grossWeight],
+  ].every(([key, value]) => matchesPresence(value, filters[key]));
 }
 
 export function stockFilterOptions(items = [], extract = item => '') {
