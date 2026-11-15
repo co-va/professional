@@ -289,7 +289,10 @@ export async function openProcedureAdjustment(record, procedureId, { onSaved = (
       if (!savedSettlement) throw new Error('Сервер не подтвердил стоимость услуги.');
       const updated = updateRecord(latest.id, { procedures: nextProcedures, to: nextTo });
       if (!updated) throw new Error('Не удалось сохранить длительность услуги.');
-      await onSaved(updated);
+      if (await onSaved(updated) === false) {
+        if (submit.isConnected) submit.disabled = false;
+        return;
+      }
       editor.v2Close?.();
     } catch (error) {
       openNotice({ title: 'Не удалось сохранить', message: String(error?.message || 'Не удалось скорректировать услугу.') });
@@ -330,7 +333,10 @@ export async function openProcedureAdjustment(record, procedureId, { onSaved = (
       if (!savedSettlement) throw new Error('Сервер не подтвердил удаление услуги из расчёта.');
       const updated = updateRecord(latest.id, { procedures: nextProcedures, to: nextTo });
       if (!updated) throw new Error('Не удалось удалить услугу из записи.');
-      await onSaved(updated);
+      if (await onSaved(updated) === false) {
+        if (submit.isConnected) submit.disabled = false;
+        return;
+      }
       editor.v2Close?.();
     } catch (error) {
       openNotice({ title: 'Не удалось удалить', message: String(error?.message || 'Не удалось удалить услугу.') });

@@ -529,7 +529,9 @@ export function openRecordView(record, {
       syncCurrent();
       render();
       openNotice({ title: 'Не удалось сохранить', message: String(error?.message || 'Сервер не подтвердил изменения.') });
+      return false;
     }
+    return true;
   };
 
   const openServiceMenu = () => {
