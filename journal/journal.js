@@ -486,8 +486,9 @@ export function renderJournal(root, options = {}) {
     const isDayOff = !active.length;
     // Occupancy is read from the already rendered Day timeline, never on V.
     // Unknown occupancy conservatively offers Z, not a destructive Day-off.
-    const hasUsage = !dayViewState || active.some((item) =>
-      dayViewState.busyWorkplaces.has(String(item.workplaceId || '')));
+    const hasUsage = !dayViewState || (allMode
+      ? dayViewState.busyWorkplaces.size > 0
+      : dayViewState.busyWorkplaces.has(String(selectedWorkplaceId || '')));
     const activeIds = active.map((item) => item.workplaceId);
     const selectedActive = !allMode && activeIds.includes(selectedWorkplaceId);
     const applyDayOff = () => {
@@ -513,13 +514,13 @@ export function renderJournal(root, options = {}) {
       content: field.content,
       footer: field.footer,
       onMount: field.onMount,
-      actions: isDayOff ? [] : [
+      actions: isDayOff && !hasUsage ? [] : [
         selectedActive ? {
           id: 'working-time',
           label: 'Рабочее время',
           onSelect: () => openDayTime(selectedWorkplaceId),
         } : null,
-        !hasUsage ? {
+        !isDayOff && !hasUsage ? {
           id: 'day-off',
           label: 'Применить выходной',
           variant: 'danger',
