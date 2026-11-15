@@ -81,7 +81,7 @@ export function inventoryOrderSuggestions(mode = 'target') {
       const weighed = ['г', 'гр', 'гр.', 'грамм', 'граммы']
         .includes(String(item.unit || '').toLocaleLowerCase('ru-RU'));
       const packageSize = Number(item.packageQuantity);
-      const suggestedQuantity = Number((needed * (weighed ? packageSize : 1)).toFixed(6));
+      const suggestedQuantity = Number((needed * (weighed && Number.isFinite(packageSize) && packageSize > 0 ? packageSize : 1)).toFixed(6));
       return { ...item, urgency: urgent ? 'urgent' : 'normal', suggestedQuantity };
     })
     .filter(Boolean);

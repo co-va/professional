@@ -101,6 +101,10 @@ export function inventoryStockBalanceInThresholdUnits(item = {}) {
   if (!Number.isFinite(balance) || balance < 0) return null;
   if (!isWeighedInventoryItem(item)) return balance;
   const size = Number(item.packageQuantity);
+  // Zero grams is zero tubes even when package capacity is not configured.
+  // Do not discard empty-shelf recommendations; validation still forbids
+  // purchasing weighed items with an unknown package size.
+  if (balance === 0) return 0;
   if (!Number.isFinite(size) || size <= 0) return null;
   return balance / size;
 }

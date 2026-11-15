@@ -38,6 +38,7 @@ assert.equal(threshold.inventoryStockThresholdInput(colour, 1), 1);
 assert.equal(threshold.inventoryStockThresholdStored({ unit: 'шт.', packageQuantity: 1 }, 3), 3);
 assert.equal(threshold.inventoryStockThresholdStored({unit:'г'}, 0.5), 0.5);
 assert.equal(threshold.inventoryStockBalanceInThresholdUnits({unit:'г',balance:30,packageQuantity:60}), 0.5);
+assert.equal(threshold.inventoryStockBalanceInThresholdUnits({unit:'г',balance:0,packageQuantity:null}), 0);
 
 // 0.5 tube is already urgent; above 0.5 but below 1 is recommended;
 // every suggestion replenishes to target and buys whole packages.
@@ -46,10 +47,11 @@ data.applyInventorySnapshot({ items: [
   { itemId:'three-quarter',unit:'г',packageQuantity:60,balance:45,minStock:0.5,targetStock:1 },
   { itemId:'full-tube',unit:'г',packageQuantity:60,balance:60,minStock:0.5,targetStock:1 },
   { itemId:'no-threshold',unit:'г',packageQuantity:60,balance:0,minStock:0,targetStock:0 },
+  { itemId:'zero-without-size',unit:'г',packageQuantity:null,balance:0,minStock:0.5,targetStock:1 },
   { itemId:'large-stock',unit:'г',packageQuantity:60,balance:90,minStock:1.5,targetStock:3 },
 ] });
-assert.deepEqual(data.inventoryOrderSuggestions('minimum').map(x=>x.itemId), ['half-tube','large-stock']);
-assert.deepEqual(data.inventoryOrderSuggestions('target').map(x=>x.itemId), ['half-tube','three-quarter','large-stock']);
+assert.deepEqual(data.inventoryOrderSuggestions('minimum').map(x=>x.itemId), ['half-tube','zero-without-size','large-stock']);
+assert.deepEqual(data.inventoryOrderSuggestions('target').map(x=>x.itemId), ['half-tube','three-quarter','zero-without-size','large-stock']);
 assert.equal(data.inventoryOrderSuggestions('minimum')[0].suggestedQuantity, 30);
 assert.equal(data.inventoryOrderSuggestions('target')[1].urgency, 'normal');
 assert.equal(data.inventoryOrderSuggestions('target')[0].urgency, 'urgent');
@@ -88,6 +90,33 @@ assert.match(orderDocument, /data-inventory-order/);
 assert.doesNotMatch(orderDocument, /Осталось 0/);
 assert.match(orderSource, /c:\s*\{\s*label:\s*'\+'/,
   'Orders Z1 must have an actual + action for creation');
+
+// Q1 is only criteria; Q2 immediately shows checked lines and the collapsed
+// full catalog. No third selection step and no filtering to recommended-only.
+assert.match(orderSource, /title: 'Критерии'/);
+assert.match(orderSource, /title: mode === 'minimum' \? 'Срочно' : 'К заказу'/);
+assert.match(orderSource, /data-inventory-order-active/);
+assert.match(orderSource, /data-inventory-order-excluded-list/);
+assert.match(orderSource, /data-inventory-order-include/);
+assert.doesNotMatch(orderSource, /name: 'orderScope'/);
+const planStart = orderSource.indexOf('function initialOrderLines(');
+const planEnd = orderSource.indexOf('function openInventoryOrderReview(', planStart);
+const plan = new Function('manufacturer', 'suggestedPacks',
+  orderSource.slice(planStart, planEnd) + '\nreturn initialOrderLines;')(
+  row => row.manufacturer || 'Без производителя',
+  row => Math.max(1, Math.ceil(row.suggestedQuantity / (row.packageQuantity || 1))),
+);
+const planCatalog = [
+  {itemId:'colour',manufacturer:'CHI',name:'57R',unit:'г',packageQuantity:60},
+  {itemId:'lacquer',manufacturer:'Other',name:'Лак',unit:'шт.',packageQuantity:1},
+];
+const chosen = plan(planCatalog, [{itemId:'colour',suggestedQuantity:30,packageQuantity:60}], '', null);
+assert.equal(chosen.selected.get('colour'), 1);
+assert.equal(chosen.selected.has('lacquer'), false);
+assert.equal(planCatalog.length, 2, 'Hidden catalog must retain all nonrecommended products');
+const existingPlan = plan(planCatalog, [], '', {lines:[{itemId:'lacquer',packages:2}]});
+assert.equal(existingPlan.selected.get('lacquer'), 2);
+assert.equal(existingPlan.selected.has('colour'), false);
 
 const before = orderSource.indexOf('const packSize =');
 const after = orderSource.indexOf('// The same Q selection pattern', before);

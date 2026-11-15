@@ -87,122 +87,236 @@ function suggestedPacks(row) {
   return Math.max(1, Math.ceil(needed / packSize(row)));
 }
 
-// The same Q selection pattern is used by Movements/Inventory.
-// Selected items survive switching Target/Minimum, manufacturer and full catalog.
-function openInventoryOrderSelection(root, existing = null, onSaved = () => {}) {
-  const selected = new Map((existing?.lines || []).map(line => [line.itemId, Number(line.packages) || 1]));
+// Q1 owns selection criteria; Q2 owns the ready-to-fill order. The second Q
+// uses the same shared compactCheck and included/excluded row pattern as
+// Stocktake. A purchase order is persisted only on the Q2 confirmation.
+function initialOrderLines(catalog, recommendations, manufacturerFilter = '', existing = null) {
+  const suggestionById = new Map(recommendations.map(row => [row.itemId, row]));
+  const selected = new Map();
+  if (existing) {
+    for (const line of existing.lines || []) {
+      selected.set(line.itemId, Number(line.packages) || 1);
+    }
+  } else {
+    for (const item of catalog) {
+      const suggestion = suggestionById.get(item.itemId);
+      if (suggestion && (!manufacturerFilter || manufacturer(item) === manufacturerFilter)) {
+        selected.set(item.itemId, suggestedPacks(suggestion));
+      }
+    }
+  }
+  return { suggestionById, selected };
+}
+
+function openInventoryOrderReview(root, { mode = 'target', supplier = '', manufacturerFilter = '', sorting = 'position' } = {}, existing = null, onSaved = () => {}) {
   const catalog = getInventoryItems();
-  const manufacturers = [...new Set(catalog.map(manufacturer))].sort((a, b) => a.localeCompare(b, 'ru'));
-  const markup = `${workspaceHeaderContext({
-    title: existing ? 'Добавить товары' : 'Сформировать заказ',
-  })}<div class="form-grid" data-inventory-order-selection>
-    ${select({ label: 'Расчёт', name: 'orderThreshold', value: 'target', options: [
-      { value: 'target', label: 'К заказу' },
-      { value: 'minimum', label: 'Срочно' },
-    ] })}
-    ${select({ label: 'Показать', name: 'orderScope', value: 'suggested', options: [
-      { value: 'suggested', label: 'Рекомендовано' },
-      { value: 'all', label: 'Весь каталог' },
-    ] })}
-    ${field({ label: 'Поставщик / место покупки', name: 'orderSupplier',
-      value: existing?.supplier || '', autocomplete: 'off' })}
-    ${select({ label: 'Производитель', name: 'orderManufacturer', value: '', options: [
-      { value: '', label: 'Все производители' },
-      ...manufacturers.map(value => ({ value, label: value })),
-    ] })}
-    ${select({ label: 'Сортировка', name: 'orderSort', value: 'position', options: [
-      { value: 'position', label: 'По порядку' },
-      { value: 'name', label: 'По названию' },
-      { value: 'quantity', label: 'По количеству' },
-    ] })}
-    <p data-inventory-order-selection-count></p>
-    <div data-inventory-order-selection-list></div>
-    <p class="form-error" role="status" data-inventory-order-selection-error></p>
-    ${actionBlock(button(existing ? 'Сохранить заказ' : 'Сформировать', {
+  const recommendations = inventoryOrderSuggestions(mode);
+  const { suggestionById, selected } = initialOrderLines(catalog, recommendations, manufacturerFilter, existing);
+  const rows = sortedItems(catalog.map(item => ({
+    ...item,
+    suggestedQuantity: suggestionById.get(item.itemId)?.suggestedQuantity || 0,
+    urgency: suggestionById.get(item.itemId)?.urgency || '',
+  })), sorting);
+  const indexByItem = new Map(rows.map((item, index) => [item.itemId, index]));
+  const existingByItem = new Map((existing?.lines || []).map(line => [line.itemId, line]));
+  const rowMarkup = (item, index) => {
+    const included = selected.has(item.itemId);
+    const packageReady = !isTube(item) || Number(item.packageQuantity) > 0;
+    const quantity = selected.get(item.itemId) || (item.suggestedQuantity > 0 ? suggestedPacks(item) : 1);
+    const recommendation = suggestionById.has(item.itemId)
+      ? (item.urgency === 'urgent' ? 'Срочно · ' : '') + 'Купить ' + suggestedPacks(item) + ' ' + packageLabel(item)
+      : 'Добавить вручную';
+    const warning = packageReady ? '' : ' · Упаковка не указана';
+    return '<section data-inventory-order-row="' + index + '">' +
+      '<div class="field-inline-label">' +
+      compactCheck({
+        label: '', checked: included, data: 'data-inventory-order-include="' + index + '"',
+        aria: 'Включить в заказ ' + manufacturer(item) + ' ' + item.name,
+      }) +
+      '<strong title="' + escapeHtml(item.name) + '">' + escapeHtml(item.name) + '</strong>' +
+      '<span>' + escapeHtml(recommendation + warning) + '</span>' +
+      '</div>' +
+      '<div data-inventory-order-fields' + (included ? '' : ' hidden') + '>' +
+      field({
+        label: 'Количество, ' + packageLabel(item), name: 'orderPackages-' + index,
+        type: 'number', min: '1', step: '1', inputmode: 'numeric', value: String(quantity),
+        disabled: !included,
+      }) +
+      '</div>' +
+      '</section>';
+  };
+  const includedRows = rows.map((item, index) => selected.has(item.itemId) ? rowMarkup(item, index) : '').join('');
+  const excludedRows = rows.map((item, index) => !selected.has(item.itemId) ? rowMarkup(item, index) : '').join('');
+  const markup = '<div class="form-grid" data-inventory-order-review>' +
+    '<p data-inventory-order-selection-count></p>' +
+    '<p data-inventory-order-empty' + (selected.size ? ' hidden' : '') + '>Нет автоматически выбранных позиций. Добавьте нужные товары из каталога ниже.</p>' +
+    '<div data-inventory-order-active>' + includedRows + '</div>' +
+    '<details data-inventory-order-excluded>' +
+      '<summary data-inventory-order-excluded-count></summary>' +
+      headSearch('data-inventory-order-catalog-search') +
+      '<div data-inventory-order-excluded-list>' + excludedRows + '</div>' +
+    '</details>' +
+    '<p class="form-error" role="status" data-inventory-order-selection-error></p>' +
+    actionBlock(button(existing ? 'Сохранить заказ' : 'Сформировать', {
       data: 'data-inventory-order-create',
-    }))}
-  </div>`;
-  const layer = mountModal(root, modal(markup, { variant: 'q' }));
+    })) +
+    '</div>';
+  const layer = mountModal(root, modal(markup, {
+    variant: 'q', title: mode === 'minimum' ? 'Срочно' : 'К заказу',
+  }));
   if (!layer) return null;
-  const header = layer.querySelector('[data-v2-q-header-content]');
-  if (header) header.innerHTML = headSearch('data-inventory-order-choose-search');
-  const search = layer.querySelector('[data-inventory-order-choose-search]');
-  const form = layer.querySelector('[data-inventory-order-selection]');
-  const list = layer.querySelector('[data-inventory-order-selection-list]');
-  const count = layer.querySelector('[data-inventory-order-selection-count]');
-  const buttonNode = layer.querySelector('[data-inventory-order-create]');
+  const activeList = layer.querySelector('[data-inventory-order-active]');
+  const excludedList = layer.querySelector('[data-inventory-order-excluded-list]');
+  const excludedGroup = layer.querySelector('[data-inventory-order-excluded]');
+  const excludedCount = layer.querySelector('[data-inventory-order-excluded-count]');
+  const includedCount = layer.querySelector('[data-inventory-order-selection-count]');
+  const empty = layer.querySelector('[data-inventory-order-empty]');
+  const search = layer.querySelector('[data-inventory-order-catalog-search]');
+  const submit = layer.querySelector('[data-inventory-order-create]');
   const errorHost = layer.querySelector('[data-inventory-order-selection-error]');
   let saving = false;
-  let visible = [];
-  const value = name => String(layer.querySelector(`[name="${name}"]`)?.value || '');
-  const choices = () => {
-    const recommendations = inventoryOrderSuggestions(value('orderThreshold'));
-    const recommended = new Map(recommendations.map(row => [row.itemId, row]));
-    const scope = value('orderScope');
-    const company = value('orderManufacturer');
-    const needle = String(search?.value || '').trim().toLocaleLowerCase('ru-RU');
-    const rows = catalog.filter(row =>
-      (scope === 'all' || recommended.has(row.itemId))
-      && (!company || manufacturer(row) === company)
-      && (!needle || searchText(row).includes(needle))
-    ).map(row => ({ ...row,
-      suggestedQuantity: recommended.get(row.itemId)?.suggestedQuantity || 0,
-      urgency: recommended.get(row.itemId)?.urgency || '',
-    }));
-    return sortedItems(rows, value('orderSort'));
+
+  // Moving existing nodes preserves any edited quantities and iOS focus.
+  // No local row renderer, UI toolkit copy, or extra selection dialog.
+  const sync = () => {
+    const total = selected.size;
+    includedCount.textContent = 'В заказе: ' + total;
+    excludedCount.textContent = 'Добавить из каталога: ' + (rows.length - total);
+    empty.hidden = total !== 0;
+    submit.disabled = saving || total === 0;
   };
-  const render = () => {
-    const rows = choices();
-    visible = rows.map(row => row.itemId);
-    list.innerHTML = rows.length
-      ? rows.map(row => compactCheck({
-        label: `${manufacturer(row)} · ${row.name} · ${row.urgency === 'urgent' ? 'Срочно · ' : ''}${row.suggestedQuantity > 0
-          ? `Купить ${suggestedPacks(row)} ${packageLabel(row)}` : 'Добавить вручную'}`,
-        checked: selected.has(row.itemId),
-        data: `data-inventory-order-pick="${escapeHtml(row.itemId)}"`,
-      })).join('')
-      : emptyState('Позиций нет', 'Измените расчёт, фильтр или включите весь каталог.');
-    count.textContent = `Выбрано ${selected.size}`;
-    buttonNode.disabled = saving || selected.size === 0;
-  };
-  form.addEventListener('change', event => {
-    const check = event.target.closest?.('[data-inventory-order-pick]');
-    if (check && !saving) {
-      if (check.checked) {
-        const item = catalog.find(row => row.itemId === check.dataset.inventoryOrderPick);
-        const suggested = inventoryOrderSuggestions(value('orderThreshold')).find(row => row.itemId === item?.itemId);
-        selected.set(check.dataset.inventoryOrderPick, suggested ? suggestedPacks(suggested) : 1);
-      } else selected.delete(check.dataset.inventoryOrderPick);
-      render();
-      return;
+  const updateSearch = () => {
+    const term = String(search?.value || '').trim().toLocaleLowerCase('ru-RU');
+    for (const node of excludedList.children) {
+      const item = rows[Number(node.dataset.inventoryOrderRow)];
+      node.hidden = !!term && (!item || !searchText(item).includes(term));
     }
-    if (!saving) render();
+  };
+  const keepOrder = (list) => {
+    for (const node of [...list.children].sort((a, b) =>
+      Number(a.dataset.inventoryOrderRow) - Number(b.dataset.inventoryOrderRow))) {
+      list.append(node);
+    }
+  };
+  layer.querySelector('[data-inventory-order-review]')?.addEventListener('change', event => {
+    const check = event.target.closest?.('[data-inventory-order-include]');
+    if (!check || saving) return;
+    const index = Number(check.dataset.inventoryOrderInclude);
+    const item = rows[index];
+    const node = layer.querySelector('[data-inventory-order-row="' + index + '"]');
+    if (!item || !node) return;
+    const quantity = node.querySelector('[name="orderPackages-' + index + '"]');
+    if (check.checked) {
+      selected.set(item.itemId, Number(quantity?.value) || 1);
+    } else {
+      selected.delete(item.itemId);
+    }
+    const fields = node.querySelector('[data-inventory-order-fields]');
+    if (fields) {
+      fields.hidden = !check.checked;
+      fields.querySelectorAll('input').forEach(input => { input.disabled = !check.checked; });
+    }
+    const destination = check.checked ? activeList : excludedList;
+    destination.append(node);
+    keepOrder(destination);
+    if (check.checked) {
+      node.hidden = false;
+    } else {
+      updateSearch();
+    }
+    if (!excludedList.children.length) excludedGroup.open = false;
+    sync();
   });
-  search?.addEventListener('input', render);
-  buttonNode.addEventListener('click', async () => {
+  search?.addEventListener('input', updateSearch);
+  submit?.addEventListener('click', async () => {
     if (saving || !selected.size) return;
-    saving = true;
-    render();
+    const lines = [];
     errorHost.textContent = '';
-    try {
-      const lines = [...selected].map(([itemId, packages]) => {
-        const old = existing?.lines?.find(row => row.itemId === itemId);
-        return { itemId, packages, ...(old ? { packPrice: old.packPrice, offerId: old.offerId } : {}) };
+    for (const item of rows) {
+      if (!selected.has(item.itemId)) continue;
+      const index = indexByItem.get(item.itemId);
+      const input = layer.querySelector('[name="orderPackages-' + index + '"]');
+      const quantity = Number(String(input?.value || '').replace(',', '.'));
+      if (!Number.isSafeInteger(quantity) || quantity < 1 || quantity > 100000) {
+        errorHost.textContent = 'Укажите целое число упаковок: ' + item.name;
+        return;
+      }
+      if (isTube(item) && !(Number(item.packageQuantity) > 0)) {
+        errorHost.textContent = 'Для покупки тюбиков не указан объём упаковки: ' + item.name;
+        return;
+      }
+      const old = existingByItem.get(item.itemId);
+      lines.push({
+        itemId: item.itemId, packages: quantity,
+        ...(old ? { packPrice: old.packPrice, offerId: old.offerId } : {}),
       });
-      const payload = { supplier: value('orderSupplier').trim(), note: existing?.note || '', lines };
+    }
+    saving = true;
+    sync();
+    try {
+      const payload = { supplier, note: existing?.note || '', lines };
+      const previousIds = new Set(getInventoryOrders().map(order => order.orderId));
       if (existing) await updateInventoryPurchaseOrder(existing.orderId, payload);
       else await createInventoryPurchaseOrder(payload);
+      const created = existing ? null
+        : getInventoryOrders().find(order => !previousIds.has(order.orderId));
       layer.v2Close?.();
-      onSaved();
+      onSaved(created?.orderId || '');
     } catch (error) {
       errorHost.textContent = error instanceof Error ? error.message : 'Не удалось сохранить заказ.';
     } finally {
       saving = false;
-      if (layer.isConnected) render();
+      if (layer.isConnected) sync();
     }
   });
-  render();
+  sync();
   return layer;
+}
+
+function openInventoryOrderSelection(root, existing = null, onSaved = () => {}) {
+  const catalog = getInventoryItems();
+  const manufacturers = [...new Set(catalog.map(manufacturer))].sort((a, b) => a.localeCompare(b, 'ru'));
+  const markup = '<div class="form-grid" data-inventory-order-criteria>' +
+    select({
+      label: 'Расчёт', name: 'orderThreshold', value: 'target', options: [
+        { value: 'target', label: 'К заказу' },
+        { value: 'minimum', label: 'Срочно' },
+      ],
+    }) +
+    field({
+      label: 'Поставщик / место покупки', name: 'orderSupplier',
+      value: existing?.supplier || '', autocomplete: 'off',
+    }) +
+    select({
+      label: 'Производитель', name: 'orderManufacturer', value: '', options: [
+        { value: '', label: 'Все производители' },
+        ...manufacturers.map(value => ({ value, label: value })),
+      ],
+    }) +
+    select({
+      label: 'Сортировка', name: 'orderSort', value: 'position', options: [
+        { value: 'position', label: 'По порядку' },
+        { value: 'name', label: 'По названию' },
+        { value: 'quantity', label: 'По количеству' },
+      ],
+    }) +
+    actionBlock(button('Продолжить', { data: 'data-inventory-order-next' })) +
+    '</div>';
+  const criteria = mountModal(root, modal(markup, { variant: 'q', title: 'Критерии' }));
+  if (!criteria) return null;
+  criteria.querySelector('[data-inventory-order-next]')?.addEventListener('click', () => {
+    const read = name => String(criteria.querySelector('[name="' + name + '"]')?.value || '');
+    openInventoryOrderReview(criteria, {
+      mode: read('orderThreshold'),
+      supplier: read('orderSupplier').trim(),
+      manufacturerFilter: read('orderManufacturer'),
+      sorting: read('orderSort'),
+    }, existing, createdOrderId => {
+      criteria.v2Close?.();
+      onSaved(createdOrderId);
+    });
+  });
+  return criteria;
 }
 
 function openInventoryOrderZ(root, orderId) {
@@ -486,6 +600,9 @@ export function renderInventoryOrders(root) {
       { id: 'filter', label: 'Фильтр', onSelect: () => openControls('filter') },
     ] }));
   root.querySelector('[data-inventory-add-order]')?.addEventListener('click', () =>
-    openInventoryOrderSelection(root, null, () => refreshOrderList(root)));
+    openInventoryOrderSelection(root, null, createdOrderId => {
+      refreshOrderList(root);
+      if (createdOrderId) openInventoryOrderZ(root, createdOrderId);
+    }));
   refreshOrderList(root);
 }
