@@ -98,7 +98,7 @@ assert.match(journalSource, /dayViewState\.busyWorkplaces\.has\(String\(selected
   'A single-workplace report must use its own occupancy, not other workplaces');
 
 const recordFlowSource = readFileSync('core/records/records.js', 'utf8');
-assert.match(recordFlowSource, /const unchangedSchedule = existing/,
+assert.match(recordFlowSource, /const unchangedSchedule = currentRecord && !recordScheduleChanged\(currentRecord, state\)/,
   'The Record confirmation must allow editing unchanged appointments');
 assert.match(recordFlowSource, /source\.kind === 'professional' && !unchangedSchedule/,
   'New and rescheduled Record confirmations must still validate availability');
