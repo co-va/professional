@@ -22,7 +22,10 @@ const amount = n => Number(n || 0).toLocaleString('ru-RU', { maximumFractionDigi
 const rubles = n => `${amount(n)} ₽`;
 const manufacturer = row => String(row.manufacturer || '').trim() || 'Без производителя';
 const searchText = row => [row.name, manufacturer(row), row.sku, row.barcode, row.productType, row.category].join(' ').toLocaleLowerCase('ru-RU');
-const packSize = row => Math.max(1, Number(row.packageSize || row.packageQuantity) || 1);
+const packSize = row => {
+  const size = Number(row.packageSize ?? row.packageQuantity);
+  return Number.isFinite(size) && size > 0 ? size : 1;
+};
 const isTube = row => ['г', 'гр', 'гр.', 'грамм', 'граммы'].includes(String(row.unit || '').toLocaleLowerCase('ru-RU'));
 const packageLabel = row => isTube(row) ? 'тюб.' : 'шт.';
 const dateLabel = value => value ? new Date(value).toLocaleDateString('ru-RU') : '';
