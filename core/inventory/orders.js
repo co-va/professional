@@ -28,6 +28,18 @@ const packSize = row => {
 };
 const isTube = row => ['г', 'гр', 'гр.', 'грамм', 'граммы'].includes(String(row.unit || '').toLocaleLowerCase('ru-RU'));
 const packageLabel = row => isTube(row) ? 'тюб.' : 'шт.';
+// Match Stocktake's numbered title and actual balance, not the recommendation.
+const orderItemLabel = item => {
+  const number = Number(item.position);
+  const prefix = Number.isSafeInteger(number) && number > 0 ? `№ ${number}` : 'Без №';
+  return `${prefix} · ${item.name}`;
+};
+const stockQuantity = value => (Number(value) || 0).toLocaleString('ru-RU', {
+  maximumFractionDigits: 3,
+}).replaceAll('\u00a0', ' ');
+const orderItemBalance = item => isTube(item)
+  ? `${item.containerCount == null ? '— тюб.' : `${stockQuantity(item.containerCount)} тюб.`} · ${stockQuantity(item.balance)} ${item.unit}`
+  : `${stockQuantity(item.balance)} ${item.unit}`;
 const dateLabel = value => value ? new Date(value).toLocaleDateString('ru-RU') : '';
 const statusLabel = status => ({ formed: 'Сформирован', paid: 'Оплачен', received: 'Получен' }[status] || status);
 const headSearch = data => `<div class="ui-search-field">${field({
@@ -121,25 +133,23 @@ function openInventoryOrderReview(root, { mode = 'target', supplier = '', manufa
   const existingByItem = new Map((existing?.lines || []).map(line => [line.itemId, line]));
   const rowMarkup = (item, index) => {
     const included = selected.has(item.itemId);
-    const packageReady = !isTube(item) || Number(item.packageQuantity) > 0;
     const quantity = selected.get(item.itemId) || (item.suggestedQuantity > 0 ? suggestedPacks(item) : 1);
-    const recommendation = suggestionById.has(item.itemId)
-      ? (item.urgency === 'urgent' ? 'Срочно · ' : '') + 'Купить ' + suggestedPacks(item) + ' ' + packageLabel(item)
-      : 'Добавить вручную';
-    const warning = packageReady ? '' : ' · Упаковка не указана';
+    const label = orderItemLabel(item);
+    // Exact Stocktake heading: compactCheck, numbered item, actual stock.
     return '<section data-inventory-order-row="' + index + '">' +
       '<div class="field-inline-label">' +
       compactCheck({
         label: '', checked: included, data: 'data-inventory-order-include="' + index + '"',
-        aria: 'Включить в заказ ' + manufacturer(item) + ' ' + item.name,
+        aria: 'Включить в заказ ' + label,
       }) +
-      '<strong title="' + escapeHtml(item.name) + '">' + escapeHtml(item.name) + '</strong>' +
-      '<span>' + escapeHtml(recommendation + warning) + '</span>' +
+      '<strong title="' + escapeHtml(label) + '">' + escapeHtml(label) + '</strong>' +
+      '<span data-inventory-order-balance>' + escapeHtml(orderItemBalance(item)) + '</span>' +
       '</div>' +
       '<div data-inventory-order-fields' + (included ? '' : ' hidden') + '>' +
       field({
-        label: 'Количество, ' + packageLabel(item), name: 'orderPackages-' + index,
-        type: 'number', min: '1', step: '1', inputmode: 'numeric', value: String(quantity),
+        label: '', placeholder: isTube(item) ? 'Тюбиков, шт.' : 'Количество, шт.',
+        name: 'orderPackages-' + index, type: 'number',
+        min: '1', step: '1', inputmode: 'numeric', value: String(quantity),
         disabled: !included,
       }) +
       '</div>' +
@@ -149,7 +159,7 @@ function openInventoryOrderReview(root, { mode = 'target', supplier = '', manufa
   const excludedRows = rows.map((item, index) => !selected.has(item.itemId) ? rowMarkup(item, index) : '').join('');
   const markup = '<div class="form-grid" data-inventory-order-review>' +
     '<p data-inventory-order-selection-count></p>' +
-    '<p data-inventory-order-empty' + (selected.size ? ' hidden' : '') + '>Нет автоматически выбранных позиций. Добавьте нужные товары из каталога ниже.</p>' +
+    '<p data-inventory-order-empty' + (selected.size ? ' hidden' : '') + '>Позиций нет. Добавьте из каталога.</p>' +
     '<div data-inventory-order-active>' + includedRows + '</div>' +
     '<details data-inventory-order-excluded>' +
       '<summary data-inventory-order-excluded-count></summary>' +

@@ -8,6 +8,7 @@ const service = readFileSync('core/inventory/service.js', 'utf8');
 const excel = readFileSync('core/inventory/excel-v2.js', 'utf8');
 const inventoryEntrypoint = readFileSync('core/inventory/index.js', 'utf8');
 const thresholdHelpers = readFileSync('core/inventory/completeness.js', 'utf8');
+const layoutCss = readFileSync('ui/layout/layout.css', 'utf8');
 const strip = value => value.replace(/^export /gm, '');
 const data = new Function('window', 'CustomEvent',
   strip(thresholdHelpers) + strip(dataSource.replace(/^import[^\n]+\n/gm, ''))
@@ -99,6 +100,24 @@ assert.match(orderSource, /data-inventory-order-active/);
 assert.match(orderSource, /data-inventory-order-excluded-list/);
 assert.match(orderSource, /data-inventory-order-include/);
 assert.doesNotMatch(orderSource, /name: 'orderScope'/);
+assert.match(layoutCss, /:is\(\[data-inventory-audit-criteria\],\[data-inventory-order-review\]\) \.field-inline-label>\.ui-compact-check/);
+assert.match(layoutCss, /:is\(\[data-inventory-audit-result\],\[data-inventory-order-balance\]\)/);
+assert.match(orderSource, /data-inventory-order-balance/);
+assert.match(orderSource, /const orderItemLabel =/);
+assert.match(orderSource, /const orderItemBalance =/);
+assert.match(orderSource, /placeholder: isTube\(item\) \? 'Тюбиков, шт\.'/);
+assert.doesNotMatch(orderSource, /'Купить ' \+ suggestedPacks\(item\)/);
+const headingStart = orderSource.indexOf('const orderItemLabel =');
+const headingEnd = orderSource.indexOf('const dateLabel =', headingStart);
+assert.ok(headingStart >= 0 && headingEnd > headingStart);
+const presentation = new Function('isTube',
+  orderSource.slice(headingStart, headingEnd)
+  + '\nreturn { orderItemLabel, orderItemBalance };')(
+  row => ['г', 'гр', 'гр.', 'грамм', 'граммы'].includes(String(row.unit || '').toLocaleLowerCase('ru-RU')),
+);
+assert.equal(presentation.orderItemLabel({position:7,name:'Кр–5N'}), '№ 7 · Кр–5N');
+assert.equal(presentation.orderItemBalance({unit:'Гр',balance:0,containerCount:null}), '— тюб. · 0 Гр');
+assert.equal(presentation.orderItemBalance({unit:'Гр',balance:88,containerCount:2}), '2 тюб. · 88 Гр');
 const planStart = orderSource.indexOf('function initialOrderLines(');
 const planEnd = orderSource.indexOf('function openInventoryOrderReview(', planStart);
 const plan = new Function('manufacturer', 'suggestedPacks',
