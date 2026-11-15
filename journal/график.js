@@ -4,6 +4,7 @@ import { getDays, getDay, getDayTime } from '../core/day/index.js';
 import { isValidRange } from '../core/time/index.js';
 import { getRecordsInRange } from '../core/record/index.js';
 import { getEvents } from '../core/event/index.js';
+import { shiftTimeDateKey, timeToMinutes } from '../core/time/index.js';
 import { applyTimetableWorkingDays, applyTimetableDaysOff, applyTimetableTimeCorrection } from '../timetable/day-editor.js';
 
 function datesForWorkplace(days, workplaceId) { return days.filter((item) => item?.workplaceId === workplaceId).map((item) => item.date).filter(Boolean); }
@@ -111,22 +112,34 @@ export function renderJournalGraphMode({
         const [year, number] = prefix.split('-').map(Number);
         const lastDay = new Date(year, number, 0).getDate();
         const occupied = new Map();
+        const firstDate = `${prefix}-01`;
+        const previousDate = shiftTimeDateKey(firstDate, -1);
         const flag = (date, kind) => {
           const current = occupied.get(date) || { record: false, event: false };
           current[kind] = true;
           occupied.set(date, current);
         };
+        const flagUsage = (item, kind) => {
+          const date = String(item?.date || '').slice(0, 10);
+          if (date.startsWith(prefix)) flag(date, kind);
+          const start = timeToMinutes(item?.from), end = timeToMinutes(item?.to);
+          if (start != null && end != null && end < start) {
+            const following = shiftTimeDateKey(date, 1);
+            if (following.startsWith(prefix)) flag(following, kind);
+          }
+        };
         getRecordsInRange({
-          from: `${prefix}-01`,
+          from: previousDate,
           to: `${prefix}-${String(lastDay).padStart(2, '0')}`,
           workplaceId: allMode ? '' : selectedWorkplaceId,
         }).forEach((record) => {
-          if (record?.status !== 'cancelled') flag(String(record?.date || '').slice(0, 10), 'record');
+          if (record?.status !== 'cancelled') flagUsage(record, 'record');
         });
         getEvents().forEach((event) => {
           const date = String(event?.date || '').slice(0, 10);
-          if (date.startsWith(prefix) && (allMode || String(event?.workplaceId || '') === String(selectedWorkplaceId))) {
-            flag(date, 'event');
+          if ((date.startsWith(prefix) || date === previousDate)
+            && (allMode || String(event?.workplaceId || '') === String(selectedWorkplaceId))) {
+            flagUsage(event, 'event');
           }
         });
         occupancyByMonth.set(prefix, occupied);
