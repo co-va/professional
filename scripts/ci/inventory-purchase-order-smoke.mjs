@@ -22,6 +22,39 @@ assert.deepEqual(data.inventoryOrderSuggestions('minimum').map(x => x.itemId), [
 assert.ok(!data.inventoryOrderSuggestions('target').some(x => x.itemId === 'irrelevant'));
 assert.deepEqual(data.getInventoryOrders(), []);
 
+// Z1 must be a list of persisted order documents, not the automatic
+// replenishment suggestions from InventoryItem. Test the rendered result.
+const listStart = orderSource.indexOf('function orderListMarkup(');
+const listEnd = orderSource.indexOf('function refreshOrderList(', listStart);
+assert.ok(listStart >= 0 && listEnd > listStart, 'Missing Orders Z1 document list');
+const makeOrderList = (orders) => new Function(
+  'getInventoryOrders', 'emptyState', 'v2ListEntries', 'v2ListEntry',
+  'dateLabel', 'statusLabel', 'rubles', 'escapeHtml',
+  orderSource.slice(listStart, listEnd) + '\nreturn orderListMarkup;',
+)(
+  () => orders,
+  (title, description) => `EMPTY: ${title} | ${description}`,
+  items => items.join('\n'),
+  row => JSON.stringify(row),
+  value => String(value || ''),
+  value => ({ formed:'Сформирован', paid:'Оплачен', received:'Получен' })[value] || value,
+  value => String(value) + ' ₽',
+  value => String(value),
+);
+const emptyOrderList = makeOrderList([])({dataset:{}});
+assert.match(emptyOrderList, /Заказов пока нет/);
+assert.doesNotMatch(emptyOrderList, /Осталось|Жид–8C|Купить/);
+const orderDocument = makeOrderList([{
+  orderId:'test-order-1',supplier:'Поставщик',status:'formed',
+  createdAt:'2026-11-15T10:00:00Z',lines:[{itemId:'colour-1'}],total:2500,
+}])({dataset:{}});
+assert.match(orderDocument, /Поставщик/);
+assert.match(orderDocument, /Сформирован/);
+assert.match(orderDocument, /data-inventory-order/);
+assert.doesNotMatch(orderDocument, /Осталось 0/);
+assert.match(orderSource, /c:\s*\{\s*label:\s*'\+'/,
+  'Orders Z1 must have an actual + action for creation');
+
 const before = orderSource.indexOf('const packSize =');
 const after = orderSource.indexOf('// The same Q selection pattern', before);
 assert.ok(before > 0 && after > before);

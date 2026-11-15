@@ -4,6 +4,46 @@ import { v2Sticker } from './ui/v2/sticker.js';
 import { setThemeColor } from './ui/viewport/index.js';
 
 const app = document.querySelector('#app');
+
+// iOS standalone apps can retain an old in-memory JS graph after an Amvera
+// deployment. Immutable asset revisions change between builds; compare the
+// loaded revision with the no-store entry HTML when the app is foregrounded.
+// Never interrupt a form, Q/X dialog or focused input to upgrade.
+const loadedAssetRevision = (() => {
+  const script = document.querySelector('script[type="module"][src*="/assets/"]');
+  return script?.src.match(/\/assets\/([a-f0-9]{20})\//i)?.[1] || '';
+})();
+let lastRevisionCheck = 0;
+let revisionCheckPending = false;
+async function refreshStaleProfessionalRelease() {
+  if (!loadedAssetRevision || document.visibilityState !== 'visible' || revisionCheckPending) return;
+  const now = Date.now();
+  if (now - lastRevisionCheck < 30000) return;
+  lastRevisionCheck = now;
+  revisionCheckPending = true;
+  try {
+    const response = await fetch('/?asset-revision-check=' + now, {
+      cache: 'no-store',
+      credentials: 'same-origin',
+    });
+    if (!response.ok) return;
+    const entryHtml = await response.text();
+    const currentRevision = entryHtml.match(/\/assets\/([a-f0-9]{20})\//i)?.[1] || '';
+    if (!currentRevision || currentRevision === loadedAssetRevision) return;
+    if (document.querySelector('[data-modal], [role="dialog"]')) return;
+    if (document.activeElement?.matches?.('input, textarea, select, [contenteditable="true"]')) return;
+    location.reload();
+  } catch {
+    // No network: continue running the current working session.
+  } finally {
+    revisionCheckPending = false;
+  }
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') void refreshStaleProfessionalRelease();
+});
+window.addEventListener('pageshow', () => { void refreshStaleProfessionalRelease(); });
+
 let workspaceModule = null;
 
 async function enterWorkspace(account) {
