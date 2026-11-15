@@ -152,7 +152,7 @@ function aggregateTimeline(columns = [], { day = '', usageRenderer = usageMarkup
 
   const { start, end } = timelineRange({
     workRanges: prepared.map((column) => ({ from: column.from, to: column.to })),
-    usages: [],
+    usages: prepared.flatMap((column) => column.usages),
     day,
     neutralBaseline,
   });
@@ -166,8 +166,10 @@ function aggregateTimeline(columns = [], { day = '', usageRenderer = usageMarkup
     const usages = column.usages.map((usage) => {
       const segment = usageSegment(usage, day);
       if (!segment) return '';
-      const visibleStart = Math.max(segment.start, column.start);
-      const visibleEnd = Math.min(segment.end, column.end);
+      // WorkPlan may have been shortened after a Record/Event was created.
+      // The actual source stays visible outside its later work interval.
+      const visibleStart = Math.max(segment.start, start);
+      const visibleEnd = Math.min(segment.end, end);
       if (visibleEnd <= visibleStart) return '';
       const usageTop = ((visibleStart - start) / total) * 100;
       const usageHeight = ((visibleEnd - visibleStart) / total) * 100;
@@ -176,7 +178,7 @@ function aggregateTimeline(columns = [], { day = '', usageRenderer = usageMarkup
       const markup = renderUsage(usage, { interactive: true }, usageRenderer);
       return `<div class="journal-work-field__usage" style="top:${usageTop}%;height:${usageHeight}%" data-time-usage="${escape(usage.sourceId || usage.id)}">${markup}</div>`;
     }).join('');
-    return `<div class="journal-work-column"><div class="journal-work-field${column?.conflict ? ' is-conflict' : ''}" role="button" tabindex="0" aria-label="Изменить рабочее пространство ${escape(column?.name || '')}" style="top:${top}%;height:${height}%" data-journal-work-field="${escape(column?.workplaceId || '')}"></div>${usages}</div>`;
+    return `<div class="journal-work-column">${column?.hasWorkPlan === false ? '' : `<div class="journal-work-field${column?.conflict ? ' is-conflict' : ''}" role="button" tabindex="0" aria-label="Изменить рабочее пространство ${escape(column?.name || '')}" style="top:${top}%;height:${height}%" data-journal-work-field="${escape(column?.workplaceId || '')}"></div>`}${usages}</div>`;
   }).join('');
 
   return `<div class="journal-day-columns" data-journal-day-columns><div class="journal-day-columns__inner" style="min-width:${minWidth}px;--journal-column-count:${prepared.length}"><div class="journal-day-columns__headings"><span aria-hidden="true"></span>${headings}</div><section class="time-timeline time-timeline--columns" data-time-timeline data-time-from="${escape(minutesToTime(start))}" data-time-to="${escape(minutesToTime(end))}" style="--time-total-minutes:${total}">${slotsMarkup(start, end, { interactive: false })}<div class="journal-work-columns">${fields}</div></section></div></div>`;
@@ -191,6 +193,7 @@ export function journalDayTimeline({
   renderUsage: usageRenderer = usageMarkup,
   neutralBaseline = null,
   clipUsagesToWorkRange = false,
+  interactiveSlots = true,
 } = {}) {
   if (Array.isArray(columns) && columns.length) return aggregateTimeline(columns, { day, usageRenderer, neutralBaseline });
   const workStart = timeToMinutes(from), workEnd = timeToMinutes(to);
@@ -221,7 +224,7 @@ const overlays = values.map((usage, index) => {
   return `<div class="time-timeline__usage" style="top:${top}%;height:${height}%${horizontal}" data-time-usage="${escape(usage.sourceId || usage.id)}">${renderUsage(usage, { interactive: true }, usageRenderer)}</div>`;
 }).join('');
 
-  return `<section class="time-timeline" data-time-timeline data-time-from="${escape(minutesToTime(start))}" data-time-to="${escape(minutesToTime(end))}" style="--time-total-minutes:${total}">${slotsMarkup(start, end, { workStart, workEnd })}<div class="time-timeline__usages">${overlays}</div></section>`;
+  return `<section class="time-timeline" data-time-timeline data-time-from="${escape(minutesToTime(start))}" data-time-to="${escape(minutesToTime(end))}" style="--time-total-minutes:${total}">${slotsMarkup(start, end, { interactive: interactiveSlots, workStart, workEnd })}<div class="time-timeline__usages">${overlays}</div></section>`;
 }
 
 export function initJournalDayTimeline(root, {
