@@ -286,6 +286,16 @@ function stockDisposalFields(item = {}, purpose = 'consume') {
     ))}</div>`;
 }
 
+function parseSaleMarkup(raw) {
+  const input = String(raw ?? '').trim().replace(',', '.');
+  if (!input) return { mode: 'percent', value: null };
+  const matched = input.match(/^(\\d+(?:\\.\\d+)?)\\s*(%|₽|руб\\.?)?$/i);
+  if (!matched) throw new Error('Наценка: укажите 20% или 200 ₽.');
+  const value = Number(matched[1]);
+  if (!Number.isFinite(value) || value < 0) throw new Error('Неверная наценка.');
+  return { mode: /^(₽|руб)/i.test(matched[2] || '') ? 'amount' : 'percent', value };
+}
+
 function itemPackageFields(item = {}) {
   const primaryPrice = itemPrimaryPrice(item);
   const price = primaryPrice ?? item.referencePrice ?? '';
@@ -314,8 +324,10 @@ function itemPackageFields(item = {}) {
     <div data-inventory-sale-price-row>
       ${columnLayout([
         purchase('referencePrice'),
-        field({ label: 'Наценка, %', name: 'saleMarkupValue', value: item.saleMarkupValue ?? '',
-          type: 'number', min: '0', step: 'any', inputmode: 'decimal' }),
+        field({ label: 'Наценка', name: 'saleMarkup',
+          value: item.saleMarkupValue == null ? ''
+            : String(item.saleMarkupValue) + (item.saleMarkupMode === 'amount' ? ' ₽' : '%'),
+          placeholder: '20% / 200 ₽' }),
         field({ label: 'Цена продажи, ₽', name: 'salePrice', value: item.salePrice ?? '',
           type: 'number', min: '0', step: 'any', inputmode: 'decimal' }),
       ], { columns: 3, ariaLabel: 'Закупочная цена, наценка, цена продажи' })}
@@ -419,7 +431,7 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
   // Reflect an edited package size without sending derived pricing to Core.
   const priceInput = form.elements.namedItem('referencePrice');
   const purchaseInput = form.elements.namedItem('purchasePrice');
-  const markupInput = form.elements.namedItem('saleMarkupValue');
+  const markupInput = form.elements.namedItem('saleMarkup');
   const sellingInput = form.elements.namedItem('salePrice');
   const primaryOffer = item?.supplierOffers?.find((offer) => offer.offerId === item.primaryOfferId);
   const primaryOfferPrice = primaryOffer?.effectivePrice == null
@@ -475,9 +487,12 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
   priceInput?.addEventListener('input', () => copyPurchasePrice(priceInput, purchaseInput));
   const deriveSellingPrice = () => {
     const purchase = Number(priceInput?.value || purchaseInput?.value);
-    const markup = Number(markupInput?.value);
-    if (!sellingInput || !markupInput?.value.trim() || !Number.isFinite(purchase) || !Number.isFinite(markup)) return;
-    sellingInput.value = String(Math.round(purchase * (1 + markup / 100) * 100) / 100);
+    if (!sellingInput || !markupInput?.value.trim() || !Number.isFinite(purchase)) return;
+    let markup;
+    try { markup = parseSaleMarkup(markupInput.value); }
+    catch { return; }
+    const price = markup.mode === 'amount' ? purchase + markup.value : purchase * (1 + markup.value / 100);
+    sellingInput.value = String(Math.round(price * 100) / 100);
   };
   markupInput?.addEventListener('input', deriveSellingPrice);
   priceInput?.addEventListener('input', deriveSellingPrice);
@@ -518,11 +533,16 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
       : unit === 'шт.' && content === 1 ? null : content;
     const referencePrice = sale
       ? collectOptionalNumber(form, 'referencePrice') : collectOptionalNumber(form, 'purchasePrice');
-    const markup = sale ? collectOptionalNumber(form, 'saleMarkupValue') : null;
+    let markup = { mode: 'percent', value: null };
+    try { if (sale) markup = parseSaleMarkup(data.get('saleMarkup')); }
+    catch (error) {
+      openNotice({ title: 'Наценка', message: error.message });
+      return;
+    }
     const enteredPrice = sale ? collectOptionalNumber(form, 'salePrice') : null;
     const basePrice = priceInput?.disabled
       ? itemPrimaryPrice(item || {}) : referencePrice;
-    if (sale && enteredPrice == null && (markup == null || basePrice == null)) {
+    if (sale && enteredPrice == null && (markup.value == null || basePrice == null)) {
       openNotice({ title: 'Продажа', message: 'Укажите цену продажи или наценку к закупочной цене.' });
       return;
     }
@@ -545,10 +565,11 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
       consumeQuantity: usage === 'consume' || usage === 'both' ? collectOptionalNumber(form, 'consumeQuantity') : null,
       saleUnit: sale ? String(data.get('saleUnit') || unit) : null,
       saleQuantity: sale ? collectOptionalNumber(form, 'saleQuantity') : null,
-      saleMarkupMode: 'percent',
-      saleMarkupValue: markup,
-      salePrice: sale ? enteredPrice ?? (markup == null || basePrice == null
-        ? null : Math.round(basePrice * (1 + markup / 100) * 100) / 100) : null,
+      saleMarkupMode: markup.mode,
+      saleMarkupValue: markup.value,
+      salePrice: sale ? enteredPrice ?? (markup.value == null || basePrice == null
+        ? null : Math.round((markup.mode === 'amount' ? basePrice + markup.value
+          : basePrice * (1 + markup.value / 100)) * 100) / 100) : null,
     };
     if (!creating) {
       try {

@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+const s=readFileSync('core/inventory/inventory.js','utf8');
+const match=s.match(/function parseSaleMarkup\(raw\) \{[\s\S]*?\n\}/);
+assert.ok(match);
+const helper=new Function(match[0]+';return parseSaleMarkup;')();
+assert.deepEqual(helper('20%'),{mode:'percent',value:20});
+assert.deepEqual(helper('200 ₽'),{mode:'amount',value:200});
+assert.deepEqual(helper('0%'),{mode:'percent',value:0});
+assert.deepEqual(helper(''),{mode:'percent',value:null});
+assert.throws(()=>helper('abc'));
+assert.match(s,/Критический остаток/);
+assert.match(s,/Желаемый остаток/);
+console.log('PASS: Inventory Q markup and stock threshold labels');
