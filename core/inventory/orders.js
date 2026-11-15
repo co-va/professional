@@ -45,9 +45,19 @@ function sortedItems(items, mode = 'position') {
   });
 }
 
-function orderListMarkup() {
-  const orders = getInventoryOrders();
-  if (!orders.length) return emptyState('Заказов пока нет', 'Нажмите +, чтобы сформировать заказ.');
+function orderListMarkup(root) {
+  const status = String(root.dataset.inventoryOrdersStatus || '');
+  const supplier = String(root.dataset.inventoryOrdersSupplier || '');
+  const sorting = String(root.dataset.inventoryOrdersSort || 'recent');
+  const orders = getInventoryOrders().filter(order =>
+    (!status || order.status === status) && (!supplier || order.supplier === supplier));
+  if (!orders.length) return emptyState(
+    getInventoryOrders().length ? 'Заказы не найдены' : 'Заказов пока нет',
+    getInventoryOrders().length ? 'Измените фильтр.' : 'Нажмите +, чтобы сформировать заказ.',
+  );
+  if (sorting === 'oldest') orders.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+  else if (sorting === 'price') orders.sort((a, b) => Number(b.total) - Number(a.total));
+  else orders.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   return v2ListEntries(orders.map(order => v2ListEntry({
     title: order.supplier || 'Закупочный заказ',
     subtitle: `${dateLabel(order.createdAt)} · ${(order.lines || []).length} поз.`,
@@ -63,7 +73,7 @@ function orderListMarkup() {
 function refreshOrderList(root) {
   const host = root.querySelector('[data-inventory-orders-list]');
   if (!host) return;
-  host.innerHTML = orderListMarkup();
+  host.innerHTML = orderListMarkup(root);
   host.querySelectorAll('[data-inventory-order]').forEach(node => {
     node.addEventListener('click', () => openInventoryOrderZ(root, node.dataset.inventoryOrder));
   });
@@ -91,6 +101,8 @@ function openInventoryOrderSelection(root, existing = null, onSaved = () => {}) 
       { value: 'suggested', label: 'Рекомендовано' },
       { value: 'all', label: 'Весь каталог' },
     ] })}
+    ${field({ label: 'Поставщик / место покупки', name: 'orderSupplier',
+      value: existing?.supplier || '', autocomplete: 'off' })}
     ${select({ label: 'Производитель', name: 'orderManufacturer', value: '', options: [
       { value: '', label: 'Все производители' },
       ...manufacturers.map(value => ({ value, label: value })),
@@ -171,7 +183,7 @@ function openInventoryOrderSelection(root, existing = null, onSaved = () => {}) 
         const old = existing?.lines?.find(row => row.itemId === itemId);
         return { itemId, packages, ...(old ? { packPrice: old.packPrice, offerId: old.offerId } : {}) };
       });
-      const payload = { supplier: existing?.supplier || '', note: existing?.note || '', lines };
+      const payload = { supplier: value('orderSupplier').trim(), note: existing?.note || '', lines };
       if (existing) await updateInventoryPurchaseOrder(existing.orderId, payload);
       else await createInventoryPurchaseOrder(payload);
       layer.v2Close?.();
@@ -419,8 +431,50 @@ function openInventoryOrderZ(root, orderId) {
 export function renderInventoryOrders(root) {
   root.innerHTML = `${workspaceHeaderContext({
     title: 'Заказы',
+    v: { data: 'data-inventory-orders-menu', aria: 'Сортировка и фильтр заказов' },
     c: { label: '+', data: 'data-inventory-add-order', aria: 'Сформировать заказ' },
   })}<div data-inventory-orders-list></div>`;
+  const openControls = (kind) => {
+    const suppliers = [...new Set(getInventoryOrders().map(order => order.supplier).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b, 'ru'));
+    const html = `<div class="form-grid">${kind === 'sort'
+      ? select({ label: 'Сортировка', name: 'ordersZ1Sort',
+        value: root.dataset.inventoryOrdersSort || 'recent',
+        options: [{ value: 'recent', label: 'Сначала новые' },
+          { value: 'oldest', label: 'Сначала старые' },
+          { value: 'price', label: 'По сумме' }] })
+      : [
+        select({ label: 'Статус', name: 'ordersZ1Status',
+          value: root.dataset.inventoryOrdersStatus || '',
+          options: [{ value: '', label: 'Все' },
+            { value: 'formed', label: 'Сформирован' },
+            { value: 'paid', label: 'Оплачен' },
+            { value: 'received', label: 'Получен' }] }),
+        select({ label: 'Поставщик', name: 'ordersZ1Supplier',
+          value: root.dataset.inventoryOrdersSupplier || '',
+          options: [{ value: '', label: 'Все' },
+            ...suppliers.map(value => ({ value, label: value }))] }),
+      ].join('')}
+      ${actionBlock(button('Применить', { data: 'data-inventory-orders-apply' }))}</div>`;
+    const popup = mountModal(root, modal(html, {
+      variant: 'q', title: kind === 'sort' ? 'Сортировка' : 'Фильтр',
+    }));
+    popup?.querySelector('[data-inventory-orders-apply]')?.addEventListener('click', () => {
+      if (kind === 'sort') {
+        root.dataset.inventoryOrdersSort = popup.querySelector('[name="ordersZ1Sort"]')?.value || 'recent';
+      } else {
+        root.dataset.inventoryOrdersStatus = popup.querySelector('[name="ordersZ1Status"]')?.value || '';
+        root.dataset.inventoryOrdersSupplier = popup.querySelector('[name="ordersZ1Supplier"]')?.value || '';
+      }
+      popup.v2Close?.();
+      refreshOrderList(root);
+    });
+  };
+  root.querySelector('[data-inventory-orders-menu]')?.addEventListener('click', () =>
+    openSharedProfileSettingsMenu({ title: 'Заказы', actions: [
+      { id: 'sort', label: 'Сортировка', onSelect: () => openControls('sort') },
+      { id: 'filter', label: 'Фильтр', onSelect: () => openControls('filter') },
+    ] }));
   root.querySelector('[data-inventory-add-order]')?.addEventListener('click', () =>
     openInventoryOrderSelection(root, null, () => refreshOrderList(root)));
   refreshOrderList(root);
