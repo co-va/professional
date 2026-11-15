@@ -7,6 +7,7 @@ import {
 } from '../../ui/ui.js';
 import { loadOperationalState } from '../runtime/operational-state.js';
 import { hasCurrentProceduresSnapshot } from './procedures/data.js';
+import { loadInventory } from '../inventory/service.js';
 import { serviceHeaderContext, notifyServiceContext } from './context.js';
 
 const views = [
@@ -92,7 +93,8 @@ export function renderService(root, navigateBack = () => {}) {
     const catalog = root.querySelector('[data-service-catalog]');
     if (catalog) {
       const modulePromise = view === 'products' ? loadProductsModule() : loadProceduresModule();
-      void modulePromise.then((module) => {
+      void modulePromise.then(async (module) => {
+        if (view === 'products') await loadInventory();
         if (version !== renderVersion || !catalog.isConnected) return;
         disposeCatalog = view === 'products'
           ? module.renderProductCatalog(catalog, { root, onChanged: renderCurrent })
@@ -105,7 +107,7 @@ export function renderService(root, navigateBack = () => {}) {
     root.querySelector('[data-service-add]')?.addEventListener('click', async () => {
       const module = view === 'products' ? await loadProductsModule() : await loadProceduresModule();
       if (!root?.isConnected || version !== renderVersion) return;
-      if (view === 'products') module.openProductEditor(root, null, { onChanged: renderCurrent });
+      if (view === 'products') void module.openStockSalePicker(root, { onChanged: renderCurrent });
       else module.openProcedureEditor(root, null, { onChanged: renderCurrent });
     });
 

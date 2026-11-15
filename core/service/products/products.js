@@ -33,6 +33,8 @@ import { productEditorSignature, rebaseWorkplaceAssignmentSignature } from '../e
 import { scheduleServiceStatistics, serviceItemStatistics } from '../statistics.js';
 import { productCardAppearance, productCardFields, productCardPhoto } from '../card-presentation.js';
 import { commitDeleteProduct, getProducts, commitReorderProducts, commitProduct, commitProductWorkplace } from './data.js';
+import { getInventoryItems } from '../../inventory/data.js';
+import { updateInventoryItem } from '../../inventory/service.js';
 
 const money = (value) => `${new Intl.NumberFormat('ru-RU').format(Number(value || 0))} ₽`;
 
@@ -75,7 +77,22 @@ export function renderProductCatalog(host, { root = host, onChanged = () => {} }
     : emptyState('Товаров пока нет', 'Добавьте первый товар кнопкой «+».');
 
   host.querySelectorAll('[data-product]').forEach((node) => {
-    node.addEventListener('click', () => openProductOverview(root, node.dataset.product, { onChanged }));
+    node.addEventListener('click', async () => {
+      const id = node.dataset.product;
+      if (id?.startsWith('inventory:')) {
+        const itemId = id.slice('inventory:'.length);
+        const [{ openInventoryProductOverview }, { openItemEditor }] = await Promise.all([
+          import('../../inventory/product-overview.js'),
+          import('../../inventory/inventory.js'),
+        ]);
+        openInventoryProductOverview(itemId, {
+          edit: (onSaved) => openItemEditor(root, itemId, {}, onSaved),
+          onChanged,
+        });
+        return;
+      }
+      openProductOverview(root, id, { onChanged });
+    });
   });
 
   return initV2ListReorder(host, {
@@ -153,13 +170,55 @@ function productEditorForm(product) {
   </form>`;
 }
 
-// One editor for create, update, workplace assignments, and delete.
+// Stock catalog owns new products. A Service product must never create a
+// second inventory entity or overwrite inventory data through auxiliary-state.
+export async function openStockSalePicker(root, { onChanged = () => {} } = {}) {
+  const { loadInventory } = await import('../../inventory/service.js');
+  try { await loadInventory(); }
+  catch (error) {
+    openNotice({ title: 'Остатки', message: error instanceof Error ? error.message : 'Не удалось загрузить склад.' });
+    return null;
+  }
+  const items = getInventoryItems();
+  const options = items.length ? v2ListEntries(items.map(item => v2ListEntry({
+    title: item.name,
+    subtitle: item.manufacturer || '',
+    rightTop: item.canSell ? 'В продаже' : '',
+    interactive: true,
+    data: `data-inventory-sale-choice="${escapeHtml(item.itemId)}"`,
+    aria: 'Выбрать со склада: ' + item.name,
+  }))) : emptyState('Нет товаров на складе', 'Создайте товар в Остатках.');
+  const layer = mountModal(document.body, modal(
+    `<div data-inventory-sale-choices>${options}</div>` +
+    actionBlock(button('Новый товар', { data: 'data-inventory-sale-new' })),
+    { title: 'Товары', variant: 'q', surface: 'app' },
+  ));
+  if (!layer) return null;
+  const { openItemEditor } = await import('../../inventory/inventory.js');
+  layer.querySelectorAll('[data-inventory-sale-choice]').forEach(control => control.addEventListener('click', () => {
+    const id = control.dataset.inventorySaleChoice;
+    layer.v2Close?.();
+    openItemEditor(root, id, {}, () => onChanged());
+  }));
+  layer.querySelector('[data-inventory-sale-new]')?.addEventListener('click', () => {
+    layer.v2Close?.();
+    openItemEditor(root, '', { usage: 'sale' }, () => onChanged());
+  });
+  return layer;
+}
+
+// One editor for legacy Service data; stocked items always open Inventory.
 // The service card opens Q directly; there is no V button menu or Z editor.
 export function openProductEditor(root, existing = null, {
   onChanged = () => {},
   onSaved = () => {},
   onDeleted = () => {},
 } = {}) {
+  if (existing?.inventoryItemId) {
+    void import('../../inventory/inventory.js').then(({ openItemEditor }) =>
+      openItemEditor(root, existing.inventoryItemId, {}, () => { onSaved(existing); onChanged(); }));
+    return null;
+  }
   const draft = initialProduct(existing);
   const body = [
     productEditorForm(draft),

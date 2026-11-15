@@ -1,5 +1,6 @@
 import { queueAuxiliaryDataset, isBusinessServerReady } from '../../../core/business-persistence.js';
 import { commitServiceCollection, replaceServiceItem, changeServiceItemWorkplace } from '../workplace-assignment.js';
+import { getInventoryItems } from '../../inventory/data.js';
 
 let productsState = [];
 let historyState = [];
@@ -39,8 +40,30 @@ export function hydrateProductsFromServer({ products = [], productHistory = [] }
   return { products: clone(productsState), productHistory: clone(historyState) };
 }
 
+// Inventory is the only source for stocked sale products. The legacy Service
+// catalog is retained read-only to preserve records made before this migration.
+export function inventorySaleProduct(item) {
+  const unitPrice = item.salePrice == null
+    ? Number(item.basePrice ?? item.referencePrice ?? 0) * (1 + Number(item.saleMarkupValue || 0) / 100)
+    : Number(item.salePrice);
+  return {
+    id: 'inventory:' + item.itemId,
+    inventoryItemId: item.itemId,
+    name: item.name,
+    manufacturer: item.manufacturer,
+    unit: item.saleUnit || item.unit,
+    quantity: item.saleQuantity == null ? null : Number(item.saleQuantity),
+    cost: { mode: 'amount', amount: Number.isFinite(unitPrice) ? Math.round(unitPrice * 100) / 100 : 0, free: false },
+    about: '', workplaces: [], inventoryOwned: true,
+  };
+}
+
 export function getProducts() {
-  return readRawProducts().filter((item) => !item.deletedAt);
+  const stock = getInventoryItems().filter(item => item.canSell === true).map(inventorySaleProduct);
+  const linked = new Set(stock.map(item => String(item.inventoryItemId)));
+  const legacy = readRawProducts()
+    .filter(item => !item.deletedAt && (!item.inventoryItemId || !linked.has(String(item.inventoryItemId))));
+  return [...stock, ...legacy];
 }
 
 export function saveProduct(item) {

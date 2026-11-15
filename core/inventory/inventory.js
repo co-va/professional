@@ -330,7 +330,7 @@ function collectOptionalNumber(form, name) {
   return raw === '' ? null : Number(raw.replace(',', '.'));
 }
 
-function openItemEditor(root, itemId = '', defaults = {}, onSaved = () => {}) {
+export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () => {}) {
   const item = itemId ? getInventoryItem(itemId) : null;
   const creating = !item;
   const markup = `
@@ -448,7 +448,7 @@ function openItemEditor(root, itemId = '', defaults = {}, onSaved = () => {}) {
         openNotice({ title: 'Правила остатка', message: error.message });
         return;
       }
-      const usage = String(data.get('usage') || 'consume');
+      const usage = String(data.get('usage') || defaults.usage || 'consume');
       Object.assign(value, {
         productType: String(data.get('productType') || '').trim(),
         category: String(data.get('category') || '').trim(),
