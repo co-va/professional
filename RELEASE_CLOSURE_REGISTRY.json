@@ -3,7 +3,7 @@
   "scope": "Техническое закрытие продукта, не тарифный каталог Core и не AdminToolReadiness",
   "repository": "co-va/professional",
   "branch": "staging",
-  "updatedAt": "2026-11-13",
+  "updatedAt": "2026-11-15",
   "rules": {
     "states": {
       "open": "Не принято",
@@ -382,15 +382,17 @@
         "visual": "не проверено",
         "interaction": "не проверено",
         "data": "не проверено",
-        "regression": "не проверено",
-        "architecture": "не проверено"
+        "regression": "Изолированные сценарии прошли; требуется проверка в работающем приложении",
+        "architecture": "Проверено использование действующих владельцев Event/Note/Finance и отсутствие дополнительного маршрута в Journal"
       },
       "closure": {
-        "state": "open",
+        "state": "verifying",
         "approvedBy": null,
         "approvedAt": null,
         "baselineSha": null,
-        "evidence": []
+        "evidence": [
+          "Создание, изменение, удаление Event через единственного владельца core/event; 3 изолированных сценария PASS; live Amvera/iPhone ещё не проверены"
+        ]
       }
     },
     {
@@ -412,15 +414,17 @@
         "visual": "не проверено",
         "interaction": "не проверено",
         "data": "не проверено",
-        "regression": "не проверено",
-        "architecture": "не проверено"
+        "regression": "Изолированные сценарии прошли; требуется проверка в работающем приложении",
+        "architecture": "Проверено использование действующих владельцев Event/Note/Finance и отсутствие дополнительного маршрута в Journal"
       },
       "closure": {
-        "state": "open",
+        "state": "verifying",
         "approvedBy": null,
         "approvedAt": null,
         "baselineSha": null,
-        "evidence": []
+        "evidence": [
+          "Создание, изменение, удаление Note и сохранение заметки при удалении Record; 4 изолированных сценария PASS; live Amvera/iPhone ещё не проверены"
+        ]
       }
     },
     {
@@ -442,15 +446,17 @@
         "visual": "не проверено",
         "interaction": "не проверено",
         "data": "не проверено",
-        "regression": "не проверено",
-        "architecture": "не проверено"
+        "regression": "Изолированные сценарии прошли; требуется проверка в работающем приложении",
+        "architecture": "Проверено использование действующих владельцев Event/Note/Finance и отсутствие дополнительного маршрута в Journal"
       },
       "closure": {
-        "state": "open",
+        "state": "verifying",
         "approvedBy": null,
         "approvedAt": null,
         "baselineSha": null,
-        "evidence": []
+        "evidence": [
+          "Finance: цена 5000, скидка 20%, частичная оплата, Tips, частичный возврат и полный расчёт; 5 сценариев PASS; кошельки/идентичности 30 проверок PASS; фактический сервер/iPhone ещё не проверены"
+        ]
       }
     },
     {
