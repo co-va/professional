@@ -144,6 +144,10 @@ assert.deepEqual(programOptions('p1').map((item) => [item.type, item.assignmentI
 assert.equal(programOptions('p2')[0].assignmentId, 'other-person');
 assert.deepEqual(programOptions('nonexistent'), []);
 const mockSelected = { ...record, loyaltyProgram: { type: 'referral', key: 'referral:demo', pricePercent: 35 } };
+// The preceding historical-payment scenario intentionally left a snapshot.
+// These cases must inspect an unpaid Record.
+stored = null;
+recordedPayments = [];
 active = true;
 assert.equal(settlement.resolveRecordSettlement(mockSelected).planTotal, 40000,
   'Old demo selections cannot grant or suppress the real 20% Deposit discount');
