@@ -43,8 +43,10 @@ export function hydrateProductsFromServer({ products = [], productHistory = [] }
 // Inventory is the only source for stocked sale products. The legacy Service
 // catalog is retained read-only to preserve records made before this migration.
 export function inventorySaleProduct(item) {
+  const purchase = Number(item.basePrice ?? item.referencePrice ?? 0);
+  const markup = Number(item.saleMarkupValue || 0);
   const unitPrice = item.salePrice == null
-    ? Number(item.basePrice ?? item.referencePrice ?? 0) * (1 + Number(item.saleMarkupValue || 0) / 100)
+    ? item.saleMarkupMode === 'amount' ? purchase + markup : purchase * (1 + markup / 100)
     : Number(item.salePrice);
   return {
     id: 'inventory:' + item.itemId,
