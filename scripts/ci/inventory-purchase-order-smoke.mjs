@@ -119,7 +119,7 @@ assert.equal(existingPlan.selected.get('lacquer'), 2);
 assert.equal(existingPlan.selected.has('colour'), false);
 
 const before = orderSource.indexOf('const packSize =');
-const after = orderSource.indexOf('// The same Q selection pattern', before);
+const after = orderSource.indexOf('// Q1 owns selection criteria', before);
 assert.ok(before > 0 && after > before);
 const packs = new Function(orderSource.slice(before, after)
   + '\nreturn suggestedPacks;')();
