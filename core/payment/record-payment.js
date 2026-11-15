@@ -454,13 +454,14 @@ async function openPaymentCorrection(record, payment, onSaved) {
       submit.disabled = true;
       const dateValue = String(host.querySelector('input[name="recordPaymentCorrectionDate"]')?.value || '');
       try {
-        await correctFinanceOperation(payment.id, {
+        const corrected = await correctFinanceOperation(payment.id, {
           allocations: allocationState.allocations,
           depositAllocations: allocationState.depositAllocations,
           serviceAmount: allocationState.applied,
           tips: allocationState.tips,
           occurredAt: occurredAtForDate(dateValue, record, payment.occurredAt || payment.paidAt || new Date()),
         });
+        if (!corrected) throw new Error('Сервер не подтвердил корректировку оплаты.');
         layer.v2Close?.();
         onSaved?.();
       } catch (error) {
