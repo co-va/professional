@@ -324,15 +324,7 @@ function openInventoryOrderReview(root, { mode = 'target', supplier = '', manufa
         errorHost.textContent = 'Укажите целое число упаковок: ' + item.name;
         return;
       }
-      // Purchasing two tubes is independent from their net weight in grams.
-      // An already known gross/tare-derived net weight is reconciled by the
-      // inventory service before saving; no user card edits are required.
-      if (isTube(item) && !(Number(item.packageQuantity) > 0)
-        && !(Number(item.netPackageWeight) > 0)) {
-        errorHost.textContent = 'Для ' + item.name
-          + ' не указан вес содержимого одного тюбика (г).';
-        return;
-      }
+      // Orders are counted in whole packages; no tare/net weight at order time.
       const old = existingByItem.get(item.itemId);
       lines.push({
         itemId: item.itemId, packages: quantity,

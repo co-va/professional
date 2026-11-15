@@ -189,7 +189,11 @@ const z2Code = orderSource.slice(orderSource.indexOf('function openInventoryOrde
 assert.match(z2Code, /supplierOrderLine\(item\)/);
 assert.doesNotMatch(z2Code, /rightBottom: rubles\(item.packages \* item.packPrice\)/);
 assert.match(z2Code, /deleteInventoryPurchaseOrder\(orderId\)/);
-assert.match(service, /completeKnownPurchaseSizes\(value\?\.lines\)/);
+assert.doesNotMatch(orderSource, /не указан вес содержимого одного тюбика/);
+assert.doesNotMatch(orderSource, /не указан объём упаковки/);
+assert.doesNotMatch(service, /completeKnownPurchaseSizes|updateInventoryItem\(id, \{ packageQuantity:/,
+  'Forming an order must never mutate inventory master data');
+assert.match(service, /body: JSON\.stringify\(value\)/);
 assert.match(orderSource, /data-inventory-order-receive-save/);
 assert.match(inventoryUI, /renderInventoryOrders\(root\)/);
 assert.doesNotMatch(inventoryUI, /function orderMarkup\(/, 'Old flat suggestion screen is removed');
