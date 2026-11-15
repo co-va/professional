@@ -147,23 +147,21 @@ export function recordSettlementPriceCondition(record = null) {
     : null;
   const selectedPercent = clampFinancialPercent(selected?.pricePercent || 0);
   const effective = getPersonPriceCondition(currentPerson(record?.person));
-  if (selected && selectedPercent > 0) {
+  if (selected && selectedPercent > 0 && String(selected.type || '') === 'deposit') {
     // Selected deposits cannot keep applying a frozen 20% after their term
     // ends or the assignment is cancelled. This is re-evaluated against the
     // same canonical active-deposit source as the Person editor.
-    if (String(selected.type || '') === 'deposit') {
-      const assignmentId = String(selected.assignmentId || '').trim();
-      const programId = String(selected.programId || '').trim();
-      const matched = effective.sources.find((source) => source.type === 'program'
-        && source.programType === 'deposit'
-        && ((assignmentId && String(source.depositId || '') === assignmentId)
-          || (programId && String(source.programId || '') === programId)));
-      return resolvePersonPriceCondition(null, matched ? [matched] : []);
-    }
-    // Unimplemented program families have no canonical server-owned
-    // entitlement yet. Never trust a stored demo percentage for pricing.
-    return resolvePersonPriceCondition(null, []);
+    const assignmentId = String(selected.assignmentId || '').trim();
+    const programId = String(selected.programId || '').trim();
+    const matched = effective.sources.find((source) => source.type === 'program'
+      && source.programType === 'deposit'
+      && ((assignmentId && String(source.depositId || '') === assignmentId)
+        || (programId && String(source.programId || '') === programId)));
+    return resolvePersonPriceCondition(null, matched ? [matched] : []);
   }
+
+  // Ignore legacy selections from unimplemented families. Their demo percent
+  // must not block the real, automatically assigned deposit condition.
 
   // A person-scoped discount program is already assigned, and must apply to
   // unpaid records automatically. Do not require a SECOND program selection
