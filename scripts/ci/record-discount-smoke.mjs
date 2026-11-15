@@ -30,6 +30,7 @@ const settlement = runInNewContext(strip(read('core/finance/settlement.js'))
   resolvePersonPriceCondition: price.resolvePersonPriceCondition,
   getAllPeople: () => [person],
   getPersonPriceCondition,
+  getWorkplaces: () => [],
   ...rules,
 });
 const record = {
@@ -98,7 +99,7 @@ const creation = read('core/people/record-creation.js');
 const editor = read('core/records/records.js');
 const payment = read('core/payment/record-payment.js');
 const entryStart = payment.indexOf('async function openPaymentEntry(');
-const fetchIndex = payment.indexOf('await listPersonDeposits(key)', entryStart);
+const fetchIndex = payment.indexOf('loadVerifiedPaymentSource(() => listPersonDeposits(key)', entryStart);
 const priceIndex = payment.indexOf('settlement = settlementForRecord(verifiedRecord)', entryStart);
 assert.ok(fetchIndex > entryStart && priceIndex > fetchIndex,
   'Payment must fetch current deposit conditions before calculating due');
