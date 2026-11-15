@@ -5,7 +5,7 @@ import { readOnlyReceipt } from '../ui/receipt/index.js';
 import { canUseCapability } from '../core/access.js';
 import { getAllWorkplacesMonthStats, getWorkplaceMonthStats, getWorkplaceMonthStatsMap, getWorkingDays, getWorkplaces } from '../core/workplace-time.js';
 import { getActiveDayWorkplaces, getAvailableDayWorkplaces } from '../core/day/index.js';
-import { getRecordPaymentState, recordAmountDue } from '../core/finance/index.js';
+import { getRecordPaymentState } from '../core/finance/index.js';
 import { applyTimetableWorkingDays, makeTimetableDayOff, openTimetableDayTimeEditor } from '../timetable/day-editor.js';
 import { getRecords, getRecordsForDay } from '../core/record/index.js';
 import { journalWorkplaceSelect, openJournalWorkplaceControl, updateJournalWorkplaceMetas } from './workplace-control.js';
@@ -43,8 +43,8 @@ function monthPrefix(date) {
 }
 
 function formatRubles(value = 0) {
-  const amount = Math.max(0, Math.round(Number(value) || 0));
-  return `${amount.toLocaleString('ru-RU').replaceAll('\u00a0', ' ')} р.`;
+  const amount = Math.max(0, Number(value) || 0);
+  return `${new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(amount).replaceAll('\u00a0', ' ')} р.`;
 }
 
 function formatNumber(value = 0) {
@@ -363,9 +363,16 @@ export function renderJournal(root, options = {}) {
       })
       : getRecordsForDay(dateKey(selectedDate), allMode ? '' : selectedWorkplaceId))
       .filter((record) => record?.status !== 'cancelled');
+    // PaymentState already includes the canonical Settlement. Resolve once
+    // per Record; aggregate stored projections rather than recalculating prices.
+    const paymentStates = records.map((record) => ({ record, state: getRecordPaymentState(record) }));
     const procedureCount = records.reduce((sum, record) => sum + (Array.isArray(record?.procedures) ? record.procedures.length : 0), 0);
     const hours = records.reduce((sum, record) => sum + recordDurationHours(record), 0);
-    const total = records.reduce((sum, record) => sum + recordAmountDue(record), 0);
+    const total = paymentStates.reduce((sum, { state }) => sum + Math.max(0, Number(state?.planTotal) || 0), 0);
+    const grossTotal = paymentStates.reduce((sum, { state }) => sum + Math.max(0, Number(state?.serviceTotal) || 0), 0);
+    const discountTotal = paymentStates.reduce((sum, { state }) =>
+      sum + Math.max(0, Number(state?.pricePercentTotal) || 0)
+          + Math.max(0, Number(state?.correctionTotal) || 0), 0);
     const averageRecord = records.length ? total / records.length : 0;
     const averageProcedure = procedureCount ? total / procedureCount : 0;
     const averageHour = hours ? total / hours : 0;
@@ -376,7 +383,6 @@ export function renderJournal(root, options = {}) {
       : null;
     const workingDayCount = Math.max(0, Number(workingDayStats?.days || 0));
     const averageWorkingDay = workingDayCount ? total / workingDayCount : 0;
-    const paymentStates = records.map((record) => ({ record, state: getRecordPaymentState(record) }));
     const paidTotal = paymentStates.reduce((sum, item) => sum + Math.max(0, Number(item.state?.paidTotal) || 0), 0);
     const tipsTotal = paymentStates.reduce((sum, item) => sum + Math.max(0, Number(item.state?.tipsTotal) || 0), 0);
     const outstanding = paymentStates.filter((item) => Math.max(0, Number(item.state?.remaining) || 0) > 0.009);
@@ -390,15 +396,13 @@ export function renderJournal(root, options = {}) {
       ? selectedDate.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })
       : selectedDate.toLocaleDateString('ru-RU');
     const workplaceLabel = allMode ? 'Все пространства' : journalTitle();
-    const statusRows = records.length
-      ? (outstanding.length === 0
-        ? [{ label: 'Статус', value: 'Оплачено' }]
-        : [
-          { label: 'Оплачено', value: formatRubles(paidTotal) },
-          dueTotal > 0.009 ? { label: 'К оплате', value: formatRubles(dueTotal) } : null,
-          debtTotal > 0.009 ? { label: 'Задолженность', value: formatRubles(debtTotal) } : null,
-        ].filter(Boolean))
-      : [];
+    const statusRows = records.length ? [
+      paidTotal > 0.009 ? { label: 'Оплачено', value: formatRubles(paidTotal) } : null,
+      dueTotal > 0.009 ? { label: 'К оплате', value: formatRubles(dueTotal) } : null,
+      debtTotal > 0.009 ? { label: 'Задолженность', value: formatRubles(debtTotal) } : null,
+      paidTotal <= 0.009 && dueTotal <= 0.009 && debtTotal <= 0.009
+        ? { label: 'К оплате', value: formatRubles(0) } : null,
+    ].filter(Boolean) : [];
     const summaryRows = [
       { label: workplaceLabel, value: periodLabel },
       { label: 'Кол-во записей', value: String(records.length) },
@@ -412,9 +416,14 @@ export function renderJournal(root, options = {}) {
     ].filter(Boolean);
     const groups = [
       summaryRows,
+      [
+        { label: records.some((record) => Array.isArray(record?.products) && record.products.length)
+          ? 'Стоимость услуг и товаров' : 'Стоимость услуг', value: formatRubles(grossTotal) },
+        discountTotal > 0.009 ? { label: 'Скидки', value: formatRubles(discountTotal) } : null,
+        { label: 'Итого', value: formatRubles(total), strong: true },
+      ].filter(Boolean),
       statusRows,
       [{ label: 'Tips', value: formatRubles(tipsTotal) }],
-      [{ label: 'Сумма', value: formatRubles(total), strong: true }],
     ];
     mountModal(document.body, modal(readOnlyReceipt({
       title: 'Z - Отчет',
