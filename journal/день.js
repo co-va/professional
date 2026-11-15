@@ -13,7 +13,7 @@ import {
 import { getWorkplaces } from '../core/workplace-time.js';
 import { getDays, getDay, getDayTime, getDaysForDate, getScheduleConflicts } from '../core/day/index.js';
 import { createTimeGrid, getTimeGridMinuteState, getTimeUsagesForScope } from '../core/time/index.js';
-import { getRecordPaymentState, recordAmountDue } from '../core/finance/index.js';
+import { getRecordPaymentState } from '../core/finance/index.js';
 import { getNotesForDay } from '../core/note/index.js';
 import { noteTargetLabel, noteVisibleForWorkplace } from './note-target.js';
 
@@ -26,11 +26,17 @@ function dateKey(date) {
 }
 
 function withFinancialState(usages = []) {
-  return (Array.isArray(usages) ? usages : []).map((usage) => usage?.type === 'record' ? {
-    ...usage,
-    paid: Boolean(getRecordPaymentState(usage).fullyPaid),
-    financialTotal: recordAmountDue(usage),
-  } : usage);
+  return (Array.isArray(usages) ? usages : []).map((usage) => {
+    if (usage?.type !== 'record') return usage;
+    // PaymentState already carries the canonical Settlement planTotal.
+    // Reuse it instead of resolving the same Settlement again for the price.
+    const payment = getRecordPaymentState(usage);
+    return {
+      ...usage,
+      paid: Boolean(payment.fullyPaid),
+      financialTotal: payment.planTotal,
+    };
+  });
 }
 
 async function openExistingRecord(record, rerender = () => {}) {
