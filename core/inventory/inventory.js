@@ -1037,12 +1037,6 @@ function openManufacturerStock(root, manufacturer) {
         },
         { id: 'sort', label: 'Сортировка', variant: 'secondary', onSelect: () => openStockControls(layer, 'items', manufacturer, renderList, 'sort') },
         { id: 'filter', label: 'Фильтр', variant: 'secondary', onSelect: () => openStockControls(layer, 'items', manufacturer, renderList, 'filter') },
-        ...(canUseCapability('inventory.stocktake.access') ? [{
-          id: 'inventory', label: 'Инвентаризация', variant: 'secondary',
-          onSelect: () => openInventoryAuditSelection(layer, {
-            manufacturer, onSaved: renderList,
-          }),
-        }] : []),
       ],
     });
   });
@@ -1855,12 +1849,6 @@ function renderStock(root) {
       actions: [
         { id: 'appearance', label: 'Вид', onSelect: () => openManufacturerAppearance(root, renderManufacturers) },
         { id: 'controls', label: 'Сортировка', onSelect: () => openStockControls(root, 'manufacturers', '', renderManufacturers) },
-        ...(canUseCapability('inventory.stocktake.access') ? [{
-          id: 'inventory', label: 'Инвентаризация',
-          onSelect: () => openInventoryAuditSelection(root, {
-            onSaved: renderManufacturers,
-          }),
-        }] : []),
       ],
     });
   });
