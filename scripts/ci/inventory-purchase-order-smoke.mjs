@@ -70,7 +70,7 @@ const listEnd = orderSource.indexOf('function refreshOrderList(', listStart);
 assert.ok(listStart >= 0 && listEnd > listStart, 'Missing Orders Z1 document list');
 const makeOrderList = (orders) => new Function(
   'getInventoryOrders', 'emptyState', 'v2ListEntries', 'v2ListEntry',
-  'dateLabel', 'statusLabel', 'rubles', 'escapeHtml',
+  'dateLabel', 'statusLabel', 'orderNumber', 'escapeHtml',
   orderSource.slice(listStart, listEnd) + '\nreturn orderListMarkup;',
 )(
   () => orders,
@@ -79,7 +79,7 @@ const makeOrderList = (orders) => new Function(
   row => JSON.stringify(row),
   value => String(value || ''),
   value => ({ formed:'Сформирован', paid:'Оплачен', received:'Получен' })[value] || value,
-  value => String(value) + ' ₽',
+  value => String(value || '').replaceAll('-', '').slice(0, 12).toUpperCase(),
   value => String(value),
 );
 const emptyOrderList = makeOrderList([])({dataset:{}});
@@ -91,6 +91,8 @@ const orderDocument = makeOrderList([{
 }])({dataset:{}});
 assert.match(orderDocument, /Поставщик/);
 assert.match(orderDocument, /Сформирован/);
+assert.match(orderDocument, /Заказ № TESTORDER1/);
+assert.doesNotMatch(orderDocument, /2500 ₽/);
 assert.match(orderDocument, /data-inventory-order/);
 assert.doesNotMatch(orderDocument, /Осталось 0/);
 assert.match(orderSource, /c:\s*\{\s*label:\s*'\+'/,
@@ -167,6 +169,27 @@ assert.doesNotMatch(orderSource, /<style|\.css'|\.css"/, 'Orders must not invent
 assert.match(orderSource, /title: 'Заказы'/);
 assert.match(orderSource, /variant: 'q'/);
 assert.match(orderSource, /status === 'formed'/);
+const supplierStart = orderSource.indexOf('const orderNumber =');
+const supplierEnd = orderSource.indexOf('const headSearch =', supplierStart);
+assert.ok(supplierStart >= 0 && supplierEnd > supplierStart);
+const supplierFormat = new Function('getInventoryItem',
+  orderSource.slice(supplierStart, supplierEnd)
+  + '\nreturn {orderNumber,supplierOrderLine};')(
+  id => id === 'colour' ? {sku:'57-R',barcode:'123456789'} : null,
+);
+assert.equal(supplierFormat.orderNumber('11db0e0a-dc41-4cc0-aa77-bc99aa001122'), '11DB0E0ADC41');
+assert.deepEqual(supplierFormat.supplierOrderLine({itemId:'colour',name:'Кр–57R',packages:2}), {
+  title:'Кр–57R',subtitle:'Арт. 57-R',rightTop:'2 шт.',
+});
+assert.deepEqual(supplierFormat.supplierOrderLine({itemId:'removed',name:'8A',packages:1}), {
+  title:'8A',subtitle:'',rightTop:'1 шт.',
+});
+const z2Code = orderSource.slice(orderSource.indexOf('function openInventoryOrderZ('),
+  orderSource.indexOf('export function renderInventoryOrders'));
+assert.match(z2Code, /supplierOrderLine\(item\)/);
+assert.doesNotMatch(z2Code, /rightBottom: rubles\(item.packages \* item.packPrice\)/);
+assert.match(z2Code, /deleteInventoryPurchaseOrder\(orderId\)/);
+assert.match(service, /completeKnownPurchaseSizes\(value\?\.lines\)/);
 assert.match(orderSource, /data-inventory-order-receive-save/);
 assert.match(inventoryUI, /renderInventoryOrders\(root\)/);
 assert.doesNotMatch(inventoryUI, /function orderMarkup\(/, 'Old flat suggestion screen is removed');

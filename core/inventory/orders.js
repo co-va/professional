@@ -47,6 +47,21 @@ const orderItemBalance = item => isTube(item)
   : `${stockQuantity(item.balance)} ${item.unit}`;
 const dateLabel = value => value ? new Date(value).toLocaleDateString('ru-RU') : '';
 const statusLabel = status => ({ formed: 'Сформирован', paid: 'Оплачен', received: 'Получен' }[status] || status);
+const orderNumber = id => String(id || '').replaceAll('-', '').slice(0, 12).toUpperCase();
+// Order lines retain their name in Core. Use available catalog article/barcode
+// only as secondary supplier information: never show internal warehouse rank.
+const supplierOrderLine = line => {
+  const catalog = getInventoryItem(line.itemId);
+  const name = String(line.name || catalog?.name || '').trim();
+  const sku = String(catalog?.sku || '').trim();
+  const barcode = String(catalog?.barcode || '').trim();
+  return {
+    title: name || sku || barcode || 'Без названия',
+    subtitle: sku && sku !== name ? 'Арт. ' + sku
+      : !sku && barcode && barcode !== name ? 'Штрихкод ' + barcode : '',
+    rightTop: String(line.packages) + ' шт.',
+  };
+};
 const headSearch = data => `<div class="ui-search-field">${field({
   name: 'inventoryOrderSearch', type: 'search', autocomplete: 'off',
   placeholder: 'Название, производитель, артикул…', data,
@@ -79,10 +94,10 @@ function orderListMarkup(root) {
   else if (sorting === 'price') orders.sort((a, b) => Number(b.total) - Number(a.total));
   else orders.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   return v2ListEntries(orders.map(order => v2ListEntry({
-    title: order.supplier || 'Закупочный заказ',
-    subtitle: `${dateLabel(order.createdAt)} · ${(order.lines || []).length} поз.`,
+    title: 'Заказ № ' + orderNumber(order.orderId),
+    subtitle: [dateLabel(order.createdAt), order.supplier].filter(Boolean).join(' · '),
     rightTop: statusLabel(order.status),
-    rightBottom: rubles(order.total),
+    rightBottom: (order.lines || []).length + ' поз.',
     interactive: true,
     data: `data-inventory-order="${escapeHtml(order.orderId)}"`,
     aria: 'Открыть заказ',
@@ -307,8 +322,13 @@ function openInventoryOrderReview(root, { mode = 'target', supplier = '', manufa
         errorHost.textContent = 'Укажите целое число упаковок: ' + item.name;
         return;
       }
-      if (isTube(item) && !(Number(item.packageQuantity) > 0)) {
-        errorHost.textContent = 'Для покупки тюбиков не указан объём упаковки: ' + item.name;
+      // Purchasing two tubes is independent from their net weight in grams.
+      // An already known gross/tare-derived net weight is reconciled by the
+      // inventory service before saving; no user card edits are required.
+      if (isTube(item) && !(Number(item.packageQuantity) > 0)
+        && !(Number(item.netPackageWeight) > 0)) {
+        errorHost.textContent = 'Для ' + item.name
+          + ' не указан вес содержимого одного тюбика (г).';
         return;
       }
       const old = existingByItem.get(item.itemId);
@@ -541,7 +561,7 @@ function openInventoryOrderZ(root, orderId) {
 
   const openDeleteQ = () => {
     const popup = mountModal(layer, modal(`<div class="form-grid">
-      <p>Удалить неоплаченный заказ?</p>
+      <p>Удалить сформированный заказ? Позиции исчезнут из заказов, складские остатки не изменятся.</p>
       <p class="form-error" role="status" data-inventory-order-delete-error></p>
       ${actionBlock(button('Удалить', { variant: 'critical', data: 'data-inventory-order-delete-confirm' }))}
     </div>`, { variant: 'q', title: 'Удаление заказа' }));
@@ -568,17 +588,18 @@ function openInventoryOrderZ(root, orderId) {
     if (addAction) addAction.hidden = order.status !== 'formed';
     const query = String(search?.value || '').trim().toLocaleLowerCase('ru-RU');
     summary.innerHTML = `<div class="form-grid">
-      <p>${statusLabel(order.status)} · ${dateLabel(order.createdAt)} · ${order.lines.length} поз.</p>
-      <p>Всего: <strong>${rubles(order.total)}</strong></p>
+      <p><strong>Заказ № ${escapeHtml(orderNumber(order.orderId))}</strong></p>
+      <p>${escapeHtml([dateLabel(order.createdAt), order.supplier].filter(Boolean).join(' · '))}</p>
     </div>`;
-    const rows = sortedItems(order.lines.filter(item =>
+    const originalRows = order.lines.filter(item =>
       (!manufacturerFilter || manufacturer(item) === manufacturerFilter)
-      && (!query || searchText(item).includes(query))), sorting);
+      && (!query || searchText({ ...getInventoryItem(item.itemId), ...item }).includes(query)));
+    // Preserve the saved purchase sequence; do not display or invent warehouse
+    // position numbers in a document intended for a supplier.
+    const rows = sorting === 'position' ? originalRows : sortedItems(originalRows, sorting);
     list.innerHTML = rows.length ? v2ListEntries(rows.map(item => v2ListEntry({
-      title: item.name,
-      subtitle: `${manufacturer(item)} · ${rubles(item.packPrice)} / ${packageLabel(item)}`,
-      rightTop: `${item.packages} ${packageLabel(item)}`,
-      rightBottom: rubles(item.packages * item.packPrice),
+      ...supplierOrderLine(item),
+      omitEmptySubtitle: true,
       interactive: order.status === 'formed',
       data: `data-inventory-order-line="${escapeHtml(item.itemId)}"`,
       aria: 'Изменить количество ' + item.name,

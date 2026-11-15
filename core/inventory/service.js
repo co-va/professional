@@ -99,6 +99,27 @@ export async function correctInventoryMovement(movementId, value = {}) {
 
 // Purchase orders have no browser-side shadow store: Core returns the
 // persisted order snapshot after every accepted mutation.
+// Fill only demonstrably known missing tube content (net gross-tare weight).
+// No fallback 1 g/60 g guesses, no balance or stock-movement writes.
+const isWeighedPurchaseItem = item => ['г','гр','гр.','грамм','граммы']
+  .includes(String(item?.unit || '').toLocaleLowerCase('ru-RU'));
+async function completeKnownPurchaseSizes(lines = []) {
+  const visited = new Set();
+  for (const line of lines) {
+    const id = String(line?.itemId || '');
+    if (!id || visited.has(id)) continue;
+    visited.add(id);
+    const item = getInventoryItem(id);
+    if (!item || !isWeighedPurchaseItem(item) || Number(item.packageQuantity) > 0) continue;
+    const knownNet = Number(item.netPackageWeight);
+    if (!(Number.isFinite(knownNet) && knownNet > 0)) {
+      throw new Error('Для ' + String(item.name || 'красителя')
+        + ' не указан вес содержимого одного тюбика (г).');
+    }
+    await updateInventoryItem(id, { packageQuantity: knownNet });
+  }
+}
+
 const purchaseOrderPath = (orderId) => `/orders/${encodeURIComponent(String(orderId || ''))}`;
 
 function requireOrderResponse(payload) {
@@ -118,6 +139,7 @@ function verifyOrderState(payload, orderId, statuses = []) {
 }
 
 export async function createInventoryPurchaseOrder(value) {
+  await completeKnownPurchaseSizes(value?.lines);
   const previousIds = new Set((getInventorySnapshot()?.orders || []).map(order => order.orderId));
   return inventoryRequest('/orders', {
     method: 'POST', body: JSON.stringify(value),
@@ -130,6 +152,7 @@ export async function createInventoryPurchaseOrder(value) {
 }
 
 export async function updateInventoryPurchaseOrder(orderId, value) {
+  await completeKnownPurchaseSizes(value?.lines);
   return inventoryRequest(purchaseOrderPath(orderId), {
     method: 'PUT', body: JSON.stringify(value),
     verifySnapshot: payload => verifyOrderState(payload, orderId, ['formed']),
