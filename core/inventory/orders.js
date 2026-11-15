@@ -16,6 +16,7 @@ import {
   receiveInventoryPurchaseOrder,
 } from './service.js';
 import { loadWalletCatalog } from '../runtime/auxiliary-state.js';
+import { openInventoryOrderExport } from './order-export.js';
 
 // Only existing SHAD UI: shared Q, Z2, header, form fields, V and V2 list.
 const amount = n => Number(n || 0).toLocaleString('ru-RU', { maximumFractionDigits: 2 }).replaceAll('\u00a0', ' ');
@@ -405,9 +406,7 @@ function openInventoryOrderZ(root, orderId) {
   if (!order) return;
   const markup = `${workspaceHeaderContext({
     title: 'Заказ № ' + orderNumber(orderId),
-    ...(order.status !== 'received' ? {
-      v: { data: 'data-inventory-order-z-menu', aria: 'Действия заказа' },
-    } : {}),
+    v: { data: 'data-inventory-order-z-menu', aria: 'Действия заказа' },
   })}<div data-inventory-order-z-summary></div>
     <div data-inventory-order-z-lines></div>`;
   const layer = mountV2ZLayer(root, v2ZLayer(markup), { stack: true });
@@ -483,7 +482,7 @@ function openInventoryOrderZ(root, orderId) {
     const popup = mountModal(layer, modal(`<div class="form-grid">
       <p>Удалить сформированный заказ? Позиции исчезнут из заказов, складские остатки не изменятся.</p>
       <p class="form-error" role="status" data-inventory-order-delete-error></p>
-      ${actionBlock(button('Удалить', { variant: 'critical', data: 'data-inventory-order-delete-confirm' }))}
+      ${actionBlock(button('Удалить', { variant: 'danger', data: 'data-inventory-order-delete-confirm' }))}
     </div>`, { variant: 'q', title: 'Удаление заказа' }));
     const submit = popup?.querySelector('[data-inventory-order-delete-confirm]');
     submit?.addEventListener('click', async () => {
@@ -512,14 +511,14 @@ function openInventoryOrderZ(root, orderId) {
       className: 'ui-list--dense',
       items: order.lines.map(supplierOrderLine),
     });
-    // Hide the V action after receiving; there are no further order actions.
-    const menu = layer.querySelector('[data-inventory-order-z-menu]');
-    if (menu) menu.hidden = order.status === 'received';
+    // Supplier exports remain available after payment or receipt.
   };
 
   layer.querySelector('[data-inventory-order-z-menu]')?.addEventListener('click', () => {
     const fresh = current();
-    if (!fresh || fresh.status === 'received') return;
+    if (!fresh) return;
+    const exportAction = { id: 'export', label: 'Выгрузить / поделиться',
+      onSelect: () => openInventoryOrderExport(layer, orderId, orderNumber(orderId)) };
     const actions = fresh.status === 'formed'
       ? [
           { id: 'edit', label: 'Корректировать заказ', onSelect: () =>
@@ -527,9 +526,12 @@ function openInventoryOrderZ(root, orderId) {
               mode: 'target', supplier: fresh.supplier || '', sorting: 'position',
             }, fresh, saveAndRefresh) },
           { id: 'pay', label: 'Оплатить', onSelect: openPayQ },
-          { id: 'delete', label: 'Удалить заказ', onSelect: openDeleteQ },
+          exportAction,
+          { id: 'delete', label: 'Удалить заказ', variant: 'danger', onSelect: openDeleteQ },
         ]
-      : [{ id: 'receive', label: 'Получен', onSelect: openReceiveQ }];
+      : fresh.status === 'paid'
+        ? [{ id: 'receive', label: 'Получен', onSelect: openReceiveQ }, exportAction]
+        : [exportAction];
     openSharedProfileSettingsMenu({
       title: 'Заказ № ' + orderNumber(orderId),
       actions,
