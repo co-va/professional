@@ -122,15 +122,21 @@ function timelineRange({ workRanges = [], usages = [], day = '', neutralBaseline
 
 function slotsMarkup(start, end, { interactive = true, workStart = start, workEnd = end } = {}) {
   const slots = [];
-  for (let minutes = Math.ceil(start / 30) * 30; minutes < end; minutes += 30) {
-    const next = Math.min(minutes + 30, end);
+  // Render even the first/last partial half-hour: WorkPlan accepts minute-
+  // precision starts and ends. A missing edge slot would hide workable minutes
+  // and shift the Record overlays relative to the Time scale.
+  for (let minutes = start; minutes < end;) {
+    const next = Math.min(Math.floor(minutes / 30) * 30 + 30, end);
     const label = minutesToTime(minutes);
     const nextLabel = minutesToTime(next);
     const inner = `<span class="time-timeline__hour">${label}</span><span class="time-timeline__line"></span>`;
     const insideWork = interactive && minutes >= workStart && minutes < workEnd;
+    const duration = next - minutes;
+    const partialSize = duration < 30 ? ` style="height:${duration}px;min-height:${duration}px"` : '';
     slots.push(insideWork
-      ? `<button type="button" class="time-timeline__slot" data-time-slot-from="${label}" data-time-slot-to="${nextLabel}" aria-label="${label}–${nextLabel}">${inner}</button>`
-      : `<div class="time-timeline__slot time-timeline__slot--readonly${interactive ? ' time-timeline__slot--outside-work' : ''}" aria-hidden="true">${inner}</div>`);
+      ? `<button type="button" class="time-timeline__slot"${partialSize} data-time-slot-from="${label}" data-time-slot-to="${nextLabel}" aria-label="${label}–${nextLabel}">${inner}</button>`
+      : `<div class="time-timeline__slot time-timeline__slot--readonly${interactive ? ' time-timeline__slot--outside-work' : ''}"${partialSize} aria-hidden="true">${inner}</div>`);
+    minutes = next;
   }
   return slots.join('');
 }
