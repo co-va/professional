@@ -22,6 +22,7 @@ import {
   v2ListEntry,
 } from '../../ui/ui.js';
 import { createRecord, getRecord, recordScheduleChanged, updateRecord } from '../record/index.js';
+import { flushBusinessPersistence } from '../business-persistence.js';
 import { getPeople, getPersonPriceCondition } from '../people/data.js';
 import { listPersonDeposits } from '../loyalty/deposit/data.js';
 import { openPersonCreate } from '../people/create.js';
@@ -993,6 +994,9 @@ export function openRecords({
             releaseSubmit();
             return;
           }
+          // Record writes and lifecycle events must reach the server before
+          // Journal closes the Q and reports success.
+          if (source.kind === 'professional') await flushBusinessPersistence();
           owner.commit();
           const callback = typeof onSaved === 'function' ? onSaved : onCreated;
           callback(saved, stateSnapshot());
