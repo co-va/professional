@@ -490,10 +490,23 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
 
   const syncFields = () => {
     const usage = String(form.elements.namedItem('usage')?.value || 'consume');
-    const choice = String(form.elements.namedItem('calculationUnit')?.value || 'шт.');
+    let choice = String(form.elements.namedItem('calculationUnit')?.value || 'шт.');
     const consumeUnit = String(form.elements.namedItem('consumeUnit')?.value || 'шт.');
+    const saleUnit = String(form.elements.namedItem('saleUnit')?.value || 'шт.');
     const hasConsume = usage === 'consume' || usage === 'both';
     const sale = usage === 'sale' || usage === 'both';
+    // A pack of pieces must declare its contents. Opening pack-based sale
+    // or consumption automatically exposes that existing quantity field.
+    // For measured products, the existing net mass or volume is the capacity.
+    const usesPack = (hasConsume && consumeUnit === 'уп.') || (sale && saleUnit === 'уп.');
+    const measured = hasConsume && (consumeUnit === 'г' || consumeUnit === 'мл');
+    if (usesPack && choice === 'шт.' && !measured) {
+      const input = form.elements.namedItem('calculationUnit');
+      input.value = 'уп.';
+      const caption = input.closest('.ui-select')?.querySelector('.ui-select__value');
+      if (caption) caption.textContent = 'уп.';
+      choice = 'уп.';
+    }
     for (const purpose of ['sale', 'consume']) {
       const node = form.querySelector('[data-inventory-use="' + purpose + '"]');
       if (node) node.hidden = purpose === 'sale' ? !sale : !hasConsume;
