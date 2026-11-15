@@ -804,10 +804,16 @@ function openMovementEditor(root, movementId = '', kind = 'CONSUMPTION', { recor
         RECEIPT: 'Поступило', CONSUMPTION: 'Израсходовано',
         WRITE_OFF: 'Списано', RETURN: 'Возвращено',
       }[actualKind] || 'Количество';
+      const consume = !correcting && actualKind === 'CONSUMPTION';
+      const inputUnit = consume ? (item.consumeUnit || item.unit) : item.unit;
+      // An empty preference stays empty. A stored preference is merely an
+      // editable default, not a fixed deduction.
+      const initialQuantity = previous?.quantity
+        ?? (consume ? item.consumeQuantity ?? '' : '');
       const quantityInput = field({
-        label: '', placeholder: `${quantityPlaceholder}, ${item.unit}`,
+        label: '', placeholder: `${quantityPlaceholder}, ${inputUnit}`,
         name: `quantity-${item.itemId}`,
-        value: previous?.quantity ?? '',
+        value: initialQuantity,
         type: 'number', min: '0', step: '0.001', inputmode: 'decimal',
       });
       const containerInput = showContainers ? field({
@@ -817,7 +823,8 @@ function openMovementEditor(root, movementId = '', kind = 'CONSUMPTION', { recor
       }) : '';
       const balance = `${numberText(item.balance)} ${item.unit}`;
       return `<section data-inventory-movement-row data-item-id="${escapeHtml(item.itemId)}"
-          data-row-direction="${escapeHtml(previous?.direction || '')}">
+          data-row-direction="${escapeHtml(previous?.direction || '')}"
+          data-quantity-unit="${escapeHtml(inputUnit)}">
         <div class="field-inline-label"><strong>${escapeHtml(item.name)}</strong><span>${escapeHtml(balance)}</span></div>
         ${showContainers
           ? twoColumnLayout(quantityInput, containerInput, { ariaLabel: `Количество и тара: ${item.name}` })
@@ -863,10 +870,20 @@ function openMovementEditor(root, movementId = '', kind = 'CONSUMPTION', { recor
         const direction = element.dataset.rowDirection;
         const outgoing = direction ? direction === 'OUT'
           : ['CONSUMPTION', 'SALE', 'WRITE_OFF'].includes(actualKind);
+        const inputUnit = element.dataset.quantityUnit || item.unit;
+        const consume = actualKind === 'CONSUMPTION' && !correcting;
+        const wholeContainer = consume && inputUnit === 'шт.' && ['г', 'мл'].includes(item.unit);
+        if (wholeContainer && !Number.isSafeInteger(quantity)) {
+          errorHost.textContent = 'Укажите целое количество штук: ' + item.name;
+          return;
+        }
         lines.push({
           itemId, quantity,
+          // Core translates an explicitly different unit only once.
+          ...(consume && inputUnit !== item.unit ? { quantityUnit: inputUnit } : {}),
+          ...(tubeCount != null ? { containerDelta: outgoing ? -tubeCount : tubeCount }
+            : wholeContainer ? { containerDelta: -quantity } : {}),
           ...(direction ? { direction } : {}),
-          ...(tubeCount != null ? { containerDelta: outgoing ? -tubeCount : tubeCount } : {}),
         });
       }
       if (!lines.length) { errorHost.textContent = 'Выберите материалы.'; return; }
