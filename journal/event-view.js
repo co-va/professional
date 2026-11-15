@@ -138,14 +138,18 @@ export function openEventView(eventOrId, { onClose = () => {} } = {}) {
       if (!title) return openNotice({ title: 'Событие', message: 'Укажите наименование события.' });
       if (!timeRangeValid(from, to)) return openNotice({ title: 'Событие', message: 'Проверьте время события.' });
 
-      const availability = checkTimeAvailability({
-        date: current.date,
-        workplaceId: current.workplaceId,
-        from,
-        to,
-        excludeId: eventId,
-      });
-      if (!availability.ok) return openNotice({ title: 'Событие', message: unavailable(availability.reason) });
+      // Changing an event's title/color is not a Time mutation.
+      // A later WorkPlan change must not prevent editing those fields.
+      if (from !== current.from || to !== current.to) {
+        const availability = checkTimeAvailability({
+          date: current.date,
+          workplaceId: current.workplaceId,
+          from,
+          to,
+          excludeId: eventId,
+        });
+        if (!availability.ok) return openNotice({ title: 'Событие', message: unavailable(availability.reason) });
+      }
 
       const before = { ...current };
       const patch = {
