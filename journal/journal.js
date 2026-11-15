@@ -369,10 +369,6 @@ export function renderJournal(root, options = {}) {
     const procedureCount = records.reduce((sum, record) => sum + (Array.isArray(record?.procedures) ? record.procedures.length : 0), 0);
     const hours = records.reduce((sum, record) => sum + recordDurationHours(record), 0);
     const total = paymentStates.reduce((sum, { state }) => sum + Math.max(0, Number(state?.planTotal) || 0), 0);
-    const grossTotal = paymentStates.reduce((sum, { state }) => sum + Math.max(0, Number(state?.serviceTotal) || 0), 0);
-    const discountTotal = paymentStates.reduce((sum, { state }) =>
-      sum + Math.max(0, Number(state?.pricePercentTotal) || 0)
-          + Math.max(0, Number(state?.correctionTotal) || 0), 0);
     const averageRecord = records.length ? total / records.length : 0;
     const averageProcedure = procedureCount ? total / procedureCount : 0;
     const averageHour = hours ? total / hours : 0;
@@ -396,13 +392,15 @@ export function renderJournal(root, options = {}) {
       ? selectedDate.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })
       : selectedDate.toLocaleDateString('ru-RU');
     const workplaceLabel = allMode ? 'Все пространства' : journalTitle();
-    const statusRows = records.length ? [
-      paidTotal > 0.009 ? { label: 'Оплачено', value: formatRubles(paidTotal) } : null,
-      dueTotal > 0.009 ? { label: 'К оплате', value: formatRubles(dueTotal) } : null,
-      debtTotal > 0.009 ? { label: 'Задолженность', value: formatRubles(debtTotal) } : null,
-      paidTotal <= 0.009 && dueTotal <= 0.009 && debtTotal <= 0.009
-        ? { label: 'К оплате', value: formatRubles(0) } : null,
-    ].filter(Boolean) : [];
+    const statusRows = records.length
+      ? (outstanding.length === 0
+        ? [{ label: 'Статус', value: 'Оплачено' }]
+        : [
+          { label: 'Оплачено', value: formatRubles(paidTotal) },
+          dueTotal > 0.009 ? { label: 'К оплате', value: formatRubles(dueTotal) } : null,
+          debtTotal > 0.009 ? { label: 'Задолженность', value: formatRubles(debtTotal) } : null,
+        ].filter(Boolean))
+      : [];
     const summaryRows = [
       { label: workplaceLabel, value: periodLabel },
       { label: 'Кол-во записей', value: String(records.length) },
@@ -416,14 +414,9 @@ export function renderJournal(root, options = {}) {
     ].filter(Boolean);
     const groups = [
       summaryRows,
-      [
-        { label: records.some((record) => Array.isArray(record?.products) && record.products.length)
-          ? 'Стоимость услуг и товаров' : 'Стоимость услуг', value: formatRubles(grossTotal) },
-        discountTotal > 0.009 ? { label: 'Скидки', value: formatRubles(discountTotal) } : null,
-        { label: 'Итого', value: formatRubles(total), strong: true },
-      ].filter(Boolean),
       statusRows,
       [{ label: 'Tips', value: formatRubles(tipsTotal) }],
+      [{ label: 'Сумма', value: formatRubles(total), strong: true }],
     ];
     mountModal(document.body, modal(readOnlyReceipt({
       title: 'Z - Отчет',
