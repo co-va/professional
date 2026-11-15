@@ -43,6 +43,11 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') void refreshStaleProfessionalRelease();
 });
 window.addEventListener('pageshow', () => { void refreshStaleProfessionalRelease(); });
+// SPA navigation does not fire pageshow. Check when a new section is shown,
+// so a running iOS PWA does not keep the previous release's Order screen.
+window.addEventListener('focus', () => { void refreshStaleProfessionalRelease(); });
+window.addEventListener('hashchange', () => { void refreshStaleProfessionalRelease(); });
+window.addEventListener('va-tools:v2-context-changed', () => { void refreshStaleProfessionalRelease(); });
 
 let workspaceModule = null;
 
