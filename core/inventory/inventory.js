@@ -57,9 +57,9 @@ import {
 } from './service.js';
 
 const UNIT_OPTIONS = [
-  { value: 'г', label: 'GR' },
-  { value: 'мл', label: 'ML' },
-  { value: 'шт.', label: 'ШТ' },
+  { value: 'г', label: 'г' },
+  { value: 'мл', label: 'мл' },
+  { value: 'шт.', label: 'шт.' },
   { value: 'уп.', label: 'Упаковка' },
 ];
 const EMPTY_MANUFACTURER = 'Без производителя';
@@ -325,19 +325,19 @@ function itemPackageFields(item = {}) {
         field({ label: 'Количество в упаковке', name: 'packageQuantity',
           value: calculationUnit === 'уп.' ? item.packageQuantity ?? '' : '',
           type: 'number', min: '1', step: '1', inputmode: 'numeric' }),
-      ], { columns: 2, ariaLabel: 'Расчётная единица и количество' })}
+      ], { columns: 2, ariaLabel: 'Единица учёта и количество' })}
     </div>
     <div data-inventory-volume-fields>
-      ${field({ label: 'Объём единицы, ML', name: 'capacityMl',
+      ${field({ label: 'Объём единицы, мл', name: 'capacityMl',
         value: item.unit === 'мл' ? item.packageQuantity ?? '' : '',
         type: 'number', min: '0.001', step: 'any', inputmode: 'decimal' })}
     </div>
     <div data-inventory-gross-net-tare>
       ${columnLayout([
-        field({ label: 'Брутто, GR', name: 'grossWeight', value: item.grossWeight ?? '',
+        field({ label: 'Брутто, г', name: 'grossWeight', value: item.grossWeight ?? '',
           type: 'number', min: '0', step: 'any', inputmode: 'decimal' }),
-        field({ label: 'Нетто, GR', name: 'netWeight', value: item.netPackageWeight ?? '', disabled: true }),
-        field({ label: 'Тара, GR', name: 'tareWeight', value: item.tareWeight ?? '',
+        field({ label: 'Нетто, г', name: 'netWeight', value: item.netPackageWeight ?? '', disabled: true }),
+        field({ label: 'Тара, г', name: 'tareWeight', value: item.tareWeight ?? '',
           type: 'number', min: '0', step: 'any', inputmode: 'decimal' }),
       ], { columns: 3, ariaLabel: 'Брутто, нетто, тара' })}
     </div>
@@ -578,7 +578,7 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
       return;
     }
     if (unit === 'мл' && (volume == null || volume <= 0)) {
-      openNotice({ title: 'Объём', message: 'Укажите объём одной единицы в ML.' });
+      openNotice({ title: 'Объём', message: 'Укажите объём одной единицы в мл.' });
       return;
     }
     const packageQuantity = unit === 'г' ? (gross != null ? gross - tare : item?.packageQuantity ?? null)
