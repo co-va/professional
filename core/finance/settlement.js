@@ -160,14 +160,9 @@ export function recordSettlementPriceCondition(record = null) {
           || (programId && String(source.programId || '') === programId)));
       return resolvePersonPriceCondition(null, matched ? [matched] : []);
     }
-    return resolvePersonPriceCondition(null, [{
-      type: 'program',
-      programType: String(selected?.type || ''),
-      programId: String(selected?.programId || ''),
-      assignmentId: String(selected?.assignmentId || ''),
-      name: String(selected?.name || 'Программа'),
-      percent: selectedPercent,
-    }]);
+    // Unimplemented program families have no canonical server-owned
+    // entitlement yet. Never trust a stored demo percentage for pricing.
+    return resolvePersonPriceCondition(null, []);
   }
 
   // A person-scoped discount program is already assigned, and must apply to
