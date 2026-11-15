@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+const source = readFileSync('core/inventory/inventory.js', 'utf8');
+assert.match(source, /export function openItemEditor/);
+for (const field of ['Критический остаток', 'Желаемый остаток', 'Ед. списания', 'Количество', 'Брутто, г', 'Нетто, г', 'Тара, г', 'Цена продажи, ₽']) assert.ok(source.includes(field), field);
+assert.match(source, /canSell: sale/);
+assert.match(source, /saleQuantity: sale/);
+assert.match(source, /purchasePrice/);
+assert.match(source, /syncFields\(\)/);
+console.log('PASS: Inventory Q conditional sale and consumption fields');

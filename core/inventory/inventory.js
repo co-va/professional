@@ -271,22 +271,58 @@ function itemPrimaryPrice(item = {}) {
     && item.basePrice != null && Number.isFinite(price) ? price : null;
 }
 
+const STOCK_DISPOSAL_UNITS = ['г', 'мл', 'шт.'].map(value => ({ value, label: value }));
+
+function stockDisposalFields(item = {}, purpose = 'consume') {
+  const sale = purpose === 'sale';
+  const key = sale ? 'sale' : 'consume';
+  const kind = item[key + 'Unit'] || (STOCK_DISPOSAL_UNITS.some(option => option.value === item.unit) ? item.unit : 'шт.');
+  return `<div data-inventory-use="${key}">${v2Section(sale ? 'Продажа' : 'Расход',
+    twoColumnLayout(
+      select({ label: 'Ед. списания', name: key + 'Unit', value: kind, options: STOCK_DISPOSAL_UNITS }),
+      field({ label: 'Количество', name: key + 'Quantity', value: item[key + 'Quantity'] ?? '',
+        type: 'number', min: '0.001', step: 'any', inputmode: 'decimal' }),
+      { ariaLabel: 'Ед. списания и количество' },
+    ))}</div>`;
+}
+
 function itemPackageFields(item = {}) {
   const primaryPrice = itemPrimaryPrice(item);
-  return columnLayout([
-    select({ label: 'Единица', name: 'unit', value: item.unit || 'шт.', options: UNIT_OPTIONS }),
-    field({ label: 'Упаковка', name: 'packageQuantity', value: item.packageQuantity ?? '', type: 'number', min: '0', step: '0.001', inputmode: 'decimal' }),
-    field({
-      label: 'Цена', name: 'referencePrice', value: primaryPrice ?? item.referencePrice ?? '',
-      type: 'number', min: '0', step: '0.0001', inputmode: 'decimal',
-      disabled: primaryPrice !== null,
-    }),
-  ], { columns: 3, ariaLabel: 'Единица, упаковка и цена' });
+  const price = primaryPrice ?? item.referencePrice ?? '';
+  const weighted = ['г', 'гр', 'гр.', 'грамм'].includes(String(item.unit || ''));
+  const initialSize = item.unit === 'шт.' && Number(item.packageQuantity) === 1 ? '' : item.packageQuantity ?? '';
+  const purchase = (name) => field({
+    label: 'Закупочная, ₽', name, value: price, type: 'number',
+    min: '0', step: 'any', inputmode: 'decimal', disabled: primaryPrice !== null,
+  });
+  return `
+    ${twoColumnLayout(
+      select({ label: 'Ед. учёта', name: 'unit', value: item.unit || 'шт.', options: UNIT_OPTIONS }),
+      `<div data-inventory-content-size>${field({ label: item.unit === 'мл' ? 'Объём, мл' : 'Штук в упаковке',
+        name: 'packageQuantity', value: initialSize, type: 'number',
+        min: '0.001', step: 'any', inputmode: 'decimal' })}</div>`,
+      { ariaLabel: 'Единица учёта и содержимое' },
+    )}
+    <div data-inventory-gross-net-tare>
+      ${columnLayout([
+        field({ label: 'Брутто, г', name: 'grossWeight', value: item.grossWeight ?? '', type: 'number', min: '0', step: 'any', inputmode: 'decimal' }),
+        field({ label: 'Нетто, г', name: 'netWeight', value: item.netPackageWeight ?? '', disabled: true }),
+        field({ label: 'Тара, г', name: 'tareWeight', value: item.tareWeight ?? '', type: 'number', min: '0', step: 'any', inputmode: 'decimal' }),
+      ], { columns: 3, ariaLabel: 'Брутто, нетто и тара' })}
+    </div>
+    <div data-inventory-purchase-row>${purchase('purchasePrice')}</div>
+    <div data-inventory-sale-price-row>
+      ${columnLayout([
+        purchase('referencePrice'),
+        field({ label: 'Наценка, %', name: 'saleMarkupValue', value: item.saleMarkupValue ?? '',
+          type: 'number', min: '0', step: 'any', inputmode: 'decimal' }),
+        field({ label: 'Цена продажи, ₽', name: 'salePrice', value: item.salePrice ?? '',
+          type: 'number', min: '0', step: 'any', inputmode: 'decimal' }),
+      ], { columns: 3, ariaLabel: 'Закупочная цена, наценка, цена продажи' })}
+    </div>`;
 }
 
 function advancedItemFields(item = {}) {
-  // Existing Shared sections provide hierarchy without a local UI component or geometry override.
-  // Each category stays independent, preserving category/type and stock semantics.
   const classification = `
     ${field({ label: 'Категория', name: 'category', value: item.category || '' })}
     ${field({ label: 'Тип продукта', name: 'productType', value: item.productType || '' })}
@@ -296,31 +332,29 @@ function advancedItemFields(item = {}) {
       { value: 'both', label: 'Расход и продажа' },
       { value: 'track', label: 'Только учёт' },
     ] })}`;
-  const mass = columnLayout([
-    field({ label: 'Брутто, г', name: 'grossWeight', value: item.grossWeight ?? '', type: 'number', min: '0', step: '0.001', inputmode: 'decimal' }),
-    field({ label: 'Нетто, г', name: 'netWeight', value: '', disabled: true }),
-    field({ label: 'Тара, г', name: 'tareWeight', value: item.tareWeight ?? '', type: 'number', min: '0', step: '0.001', inputmode: 'decimal' }),
-  ], { columns: 3, ariaLabel: 'Масса упаковки: брутто, нетто и тара' });
   const identifiers = columnLayout([
     field({ label: '№', name: 'position', value: Number(item.position) > 0 ? item.position : '',
       type: 'number', min: '1', step: '1', inputmode: 'numeric' }),
     field({ label: 'Артикул', name: 'sku', value: item.sku || '' }),
     field({ label: 'Штрихкод', name: 'barcode', value: item.barcode || '' }),
-  ], { columns: 3, ariaLabel: 'Порядок, артикул и штрихкод' });
-  const thresholdUnit = inventoryStockThresholdUnit(item);
+  ], { columns: 3, ariaLabel: 'Номер, артикул и штрихкод' });
   const inventory = `
     ${field({ label: 'Место хранения', name: 'location', value: item.location || '' })}
     ${twoColumnLayout(
-      field({ label: 'Срочно при, ' + thresholdUnit, name: 'minStock',
-        value: inventoryStockThresholdInput(item, item.minStock), type: 'number', min: '0', step: '0.001', inputmode: 'decimal' }),
-      field({ label: 'Цель, ' + thresholdUnit, name: 'targetStock',
-        value: inventoryStockThresholdInput(item, item.targetStock), type: 'number', min: '0', step: '0.001', inputmode: 'decimal' }),
-      { ariaLabel: 'Правила остатка' },
+      field({ label: 'Критический остаток', name: 'minStock',
+        value: inventoryStockThresholdInput(item, item.minStock),
+        type: 'number', min: '0', step: 'any', inputmode: 'decimal' }),
+      field({ label: 'Желаемый остаток', name: 'targetStock',
+        value: inventoryStockThresholdInput(item, item.targetStock),
+        type: 'number', min: '0', step: 'any', inputmode: 'decimal' }),
+      { ariaLabel: 'Пороги запаса' },
     )}`;
   return [
     v2Section('Маркировка', `<div class="form-grid">${identifiers}</div>`),
     v2Section('Классификация', `<div class="form-grid">${classification}</div>`),
-    v2Section('Упаковка и цена', `<div class="form-grid">${itemPackageFields(item)}${mass}</div>`),
+    stockDisposalFields(item, 'consume'),
+    stockDisposalFields(item, 'sale'),
+    v2Section('Упаковка и цена', `<div class="form-grid">${itemPackageFields(item)}</div>`),
     v2Section('Хранение и запас', `<div class="form-grid">${inventory}</div>`),
   ].join('');
 }
@@ -333,19 +367,18 @@ function collectOptionalNumber(form, name) {
 export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () => {}) {
   const item = itemId ? getInventoryItem(itemId) : null;
   const creating = !item;
+  const draft = item || { unit: 'шт.', canConsume: defaults.usage !== 'sale', canSell: defaults.usage === 'sale' };
   const markup = `
     <form data-inventory-item-form>
-      ${creating
-        ? `${itemIdentityFields(item || {}, defaults)}${itemPackageFields(item || {})}`
-        : `${v2Section('Основное', `<div class="form-grid">${itemIdentityFields(item, defaults)}</div>`)}${advancedItemFields(item)}`}
+      ${v2Section('Основное', `<div class="form-grid">${itemIdentityFields(draft, defaults)}</div>`)}
+      ${advancedItemFields(draft)}
       ${actionBlock(button(creating ? 'Применить' : 'Сохранить', { type: 'button', data: 'data-inventory-item-save', aria: creating ? 'Добавить продукт' : 'Сохранить продукт' }))}
       <div class="form-error" data-inventory-item-save-error role="alert" hidden></div>
     </form>`;
   const layer = mountModal(document.body, modal(markup, {
     title: creating ? 'Новый продукт' : item.name,
-    variant: creating ? 'x' : 'q',
-    surface: creating ? '' : 'app',
-    xRole: creating ? 'editor' : '',
+    variant: 'q',
+    surface: 'app',
   }));
   if (!layer) return;
 
@@ -385,6 +418,9 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
   // A priced primary supplier controls this locked price field.
   // Reflect an edited package size without sending derived pricing to Core.
   const priceInput = form.elements.namedItem('referencePrice');
+  const purchaseInput = form.elements.namedItem('purchasePrice');
+  const markupInput = form.elements.namedItem('saleMarkupValue');
+  const sellingInput = form.elements.namedItem('salePrice');
   const primaryOffer = item?.supplierOffers?.find((offer) => offer.offerId === item.primaryOfferId);
   const primaryOfferPrice = primaryOffer?.effectivePrice == null
     ? (primaryOffer?.actualPrice ?? (
@@ -396,15 +432,60 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
     const packSize = Number(primaryOffer.unitsPerOffer) || 1;
     const updatePrimaryPrice = () => {
       const raw = String(form.elements.namedItem('packageQuantity')?.value ?? '').trim();
-      const units = Number(raw.replace(',', '.'));
+      const units = String(form.elements.namedItem('unit')?.value) === 'г'
+        ? Number(form.elements.namedItem('grossWeight')?.value) - Number(form.elements.namedItem('tareWeight')?.value)
+        : Number(raw.replace(',', '.'));
       const quantity = raw && Number.isFinite(units) && units > 0 ? units : 1;
       const price = Number(primaryOfferPrice) / packSize * quantity;
       priceInput.value = Number.isFinite(price)
         ? String(Math.round((price + Number.EPSILON) * 10000) / 10000) : '';
     };
     form.elements.namedItem('packageQuantity')?.addEventListener('input', updatePrimaryPrice);
+    form.elements.namedItem('grossWeight')?.addEventListener('input', updatePrimaryPrice);
+    form.elements.namedItem('tareWeight')?.addEventListener('input', updatePrimaryPrice);
   }
 
+  const syncFields = () => {
+    const usage = String(form.elements.namedItem('usage')?.value || 'consume');
+    const unit = String(form.elements.namedItem('unit')?.value || 'шт.');
+    const sale = usage === 'sale' || usage === 'both';
+    for (const purpose of ['sale', 'consume']) {
+      const node = form.querySelector('[data-inventory-use="' + purpose + '"]');
+      if (node) node.hidden = purpose === 'sale' ? !sale : !(usage === 'consume' || usage === 'both');
+    }
+    const mass = form.querySelector('[data-inventory-gross-net-tare]');
+    const content = form.querySelector('[data-inventory-content-size]');
+    if (mass) mass.hidden = unit !== 'г';
+    if (content) content.hidden = unit === 'г';
+    if (content) {
+      const label = content.querySelector('.field > span');
+      if (label) label.textContent = unit === 'шт.' ? 'Штук в упаковке'
+        : unit === 'мл' ? 'Объём, мл' : 'Содержимое, ' + unit;
+    }
+    const prices = form.querySelector('[data-inventory-sale-price-row]');
+    const purchase = form.querySelector('[data-inventory-purchase-row]');
+    if (prices) prices.hidden = !sale;
+    if (purchase) purchase.hidden = sale;
+  };
+  // The purchase price has one meaning in both conditional layouts.
+  const copyPurchasePrice = (source, target) => {
+    if (source && target && !target.disabled) target.value = source.value;
+  };
+  purchaseInput?.addEventListener('input', () => copyPurchasePrice(purchaseInput, priceInput));
+  priceInput?.addEventListener('input', () => copyPurchasePrice(priceInput, purchaseInput));
+  const deriveSellingPrice = () => {
+    const purchase = Number(priceInput?.value || purchaseInput?.value);
+    const markup = Number(markupInput?.value);
+    if (!sellingInput || !markupInput?.value.trim() || !Number.isFinite(purchase) || !Number.isFinite(markup)) return;
+    sellingInput.value = String(Math.round(purchase * (1 + markup / 100) * 100) / 100);
+  };
+  markupInput?.addEventListener('input', deriveSellingPrice);
+  priceInput?.addEventListener('input', deriveSellingPrice);
+  purchaseInput?.addEventListener('input', deriveSellingPrice);
+  form.addEventListener('change', event => {
+    if (event.target?.name === 'usage' || event.target?.name === 'unit') syncFields();
+  });
+  syncFields();
   syncDirty();
 
   const save = async () => {
@@ -422,48 +503,65 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
       openNotice({ title: 'Порядок', message: 'Укажите целый положительный номер или оставьте поле пустым.' });
       return;
     }
+    const unit = String(data.get('unit') || 'шт.');
+    const usage = String(data.get('usage') || 'consume');
+    const sale = usage === 'sale' || usage === 'both';
+    const gross = collectOptionalNumber(form, 'grossWeight');
+    const tare = collectOptionalNumber(form, 'tareWeight');
+    const content = collectOptionalNumber(form, 'packageQuantity');
+    if (unit === 'г' && ((gross == null) !== (tare == null) || gross != null && gross <= tare)) {
+      openNotice({ title: 'Масса продукта', message: 'Укажите брутто и тару. Брутто должно быть больше тары.' });
+      return;
+    }
+    const packageQuantity = unit === 'г'
+      ? gross != null ? gross - tare : item?.packageQuantity ?? null
+      : unit === 'шт.' && content === 1 ? null : content;
+    const referencePrice = sale
+      ? collectOptionalNumber(form, 'referencePrice') : collectOptionalNumber(form, 'purchasePrice');
+    const markup = sale ? collectOptionalNumber(form, 'saleMarkupValue') : null;
+    const enteredPrice = sale ? collectOptionalNumber(form, 'salePrice') : null;
+    const basePrice = priceInput?.disabled
+      ? itemPrimaryPrice(item || {}) : referencePrice;
+    if (sale && enteredPrice == null && (markup == null || basePrice == null)) {
+      openNotice({ title: 'Продажа', message: 'Укажите цену продажи или наценку к закупочной цене.' });
+      return;
+    }
     const value = {
       manufacturer: String(data.get('manufacturer') || '').trim(),
-      name,
-      unit: String(data.get('unit') || 'шт.'),
-      packageQuantity: collectOptionalNumber(form, 'packageQuantity'),
-      // Never overwrite the manual fallback when the primary supplier supplies the price.
-      ...(!priceInput?.disabled ? { referencePrice: collectOptionalNumber(form, 'referencePrice') } : {}),
+      name, unit, packageQuantity,
+      ...(!(sale ? priceInput : purchaseInput)?.disabled ? { referencePrice } : {}),
+      category: String(data.get('category') || '').trim(),
+      productType: String(data.get('productType') || '').trim(),
+      supplier: String(data.get('supplier') || '').trim(),
+      location: String(data.get('location') || '').trim(),
+      sku: String(data.get('sku') || '').trim(),
+      barcode: String(data.get('barcode') || '').trim(),
+      ...(!creating ? { position: requestedPosition } : {}),
+      grossWeight: unit === 'г' ? gross : null,
+      tareWeight: unit === 'г' ? tare : null,
+      canConsume: usage === 'consume' || usage === 'both',
+      canSell: sale,
+      consumeUnit: usage === 'consume' || usage === 'both' ? String(data.get('consumeUnit') || unit) : null,
+      consumeQuantity: usage === 'consume' || usage === 'both' ? collectOptionalNumber(form, 'consumeQuantity') : null,
+      saleUnit: sale ? String(data.get('saleUnit') || unit) : null,
+      saleQuantity: sale ? collectOptionalNumber(form, 'saleQuantity') : null,
+      saleMarkupMode: 'percent',
+      saleMarkupValue: markup,
+      salePrice: sale ? enteredPrice ?? (markup == null || basePrice == null
+        ? null : Math.round(basePrice * (1 + markup / 100) * 100) / 100) : null,
     };
-    // The product card defines master data; only movements change stock balances.
     if (!creating) {
-      let minimum, target;
       try {
-        minimum = collectOptionalNumber(form, 'minStock');
-        target = collectOptionalNumber(form, 'targetStock');
-        if (minimum != null && target != null && target <= minimum) {
-          throw new Error('Цель должна быть больше порога «Срочно».');
-        }
-        // Existing 0.5 / 1 values already mean tube fractions, not grams.
-        // Save the same numeric thresholds; only the actual balance is
-        // converted to tube equivalents when computing suggestions.
-        minimum = inventoryStockThresholdStored(value, minimum);
-        target = inventoryStockThresholdStored(value, target);
+        const minimum = collectOptionalNumber(form, 'minStock');
+        const target = collectOptionalNumber(form, 'targetStock');
+        if (minimum != null && target != null && target <= minimum)
+          throw new Error('Желаемый остаток должен быть больше критического.');
+        value.minStock = inventoryStockThresholdStored(value, minimum);
+        value.targetStock = inventoryStockThresholdStored(value, target);
       } catch (error) {
         openNotice({ title: 'Правила остатка', message: error.message });
         return;
       }
-      const usage = String(data.get('usage') || defaults.usage || 'consume');
-      Object.assign(value, {
-        productType: String(data.get('productType') || '').trim(),
-        category: String(data.get('category') || '').trim(),
-        supplier: String(data.get('supplier') || '').trim(),
-        location: String(data.get('location') || '').trim(),
-        sku: String(data.get('sku') || '').trim(),
-        barcode: String(data.get('barcode') || '').trim(),
-        position: requestedPosition,
-        minStock: minimum,
-        targetStock: target,
-        grossWeight: collectOptionalNumber(form, 'grossWeight'),
-        tareWeight: collectOptionalNumber(form, 'tareWeight'),
-        canConsume: usage === 'consume' || usage === 'both',
-        canSell: usage === 'sale' || usage === 'both',
-      });
     }
     primary.disabled = true;
     try {
