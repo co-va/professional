@@ -163,7 +163,7 @@ assert.equal(packs({ suggestedQuantity: 4, unit: 'шт.' }), 4);
 
 for (const name of [
   'workspaceHeaderContext', 'modal', 'mountModal', 'v2ZLayer', 'mountV2ZLayer',
-  'v2ListEntries', 'v2ListEntry', 'compactCheck', 'openSharedProfileSettingsMenu',
+  'v2ListEntries', 'v2ListEntry', 'list', 'compactCheck', 'openSharedProfileSettingsMenu',
 ]) assert.ok(orderSource.includes(name), 'Shared UI missing: ' + name);
 assert.doesNotMatch(orderSource, /<style|\.css'|\.css"/, 'Orders must not invent styles');
 assert.match(orderSource, /title: 'Заказы'/);
@@ -179,14 +179,27 @@ const supplierFormat = new Function('getInventoryItem',
 );
 assert.equal(supplierFormat.orderNumber('11db0e0a-dc41-4cc0-aa77-bc99aa001122'), '11DB0E0ADC41');
 assert.deepEqual(supplierFormat.supplierOrderLine({itemId:'colour',name:'Кр–57R',packages:2}), {
-  title:'Кр–57R',subtitle:'Арт. 57-R',rightTop:'2 шт.',
+  title:'Арт. 57-R',secondary:'Кр–57R',right:['2 шт.'],interactive:false,
 });
 assert.deepEqual(supplierFormat.supplierOrderLine({itemId:'removed',name:'8A',packages:1}), {
-  title:'8A',subtitle:'',rightTop:'1 шт.',
+  title:'8A',secondary:'',right:['1 шт.'],interactive:false,
 });
 const z2Code = orderSource.slice(orderSource.indexOf('function openInventoryOrderZ('),
   orderSource.indexOf('export function renderInventoryOrders'));
-assert.match(z2Code, /supplierOrderLine\(item\)/);
+assert.match(z2Code, /order.lines.map\(supplierOrderLine\)/);
+assert.match(z2Code, /className: 'ui-list--dense'/);
+assert.match(z2Code, /title: 'Заказ № ' \+ orderNumber\(orderId\)/);
+assert.match(z2Code, /Всего .* шт\./);
+assert.match(z2Code, /id: 'edit', label: 'Корректировать заказ'/);
+assert.match(z2Code, /openInventoryOrderReview\(layer, \{/);
+assert.match(z2Code, /}, fresh, saveAndRefresh\)/);
+assert.match(z2Code, /id: 'pay', label: 'Оплатить'/);
+assert.match(z2Code, /id: 'delete', label: 'Удалить заказ'/);
+assert.match(z2Code, /id: 'receive', label: 'Получен'/);
+assert.doesNotMatch(z2Code, /data-inventory-order-z-add|data-inventory-order-z-actions|data-inventory-order-z-search/);
+assert.doesNotMatch(z2Code, /actionBlock\(\[/);
+assert.doesNotMatch(z2Code, /v2ListEntry\(/);
+assert.doesNotMatch(z2Code, /rubles\(/);
 assert.doesNotMatch(z2Code, /rightBottom: rubles\(item.packages \* item.packPrice\)/);
 assert.match(z2Code, /deleteInventoryPurchaseOrder\(orderId\)/);
 assert.doesNotMatch(orderSource, /не указан вес содержимого одного тюбика/);

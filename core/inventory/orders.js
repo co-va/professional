@@ -1,7 +1,7 @@
 import {
   actionBlock, button, datePicker, emptyState, field, initDatePickers,
   modal, mountModal, mountV2ZLayer, openNotice, openSharedProfileSettingsMenu,
-  select, setV2ZHeaderRows, v2ListEntries, v2ListEntry, v2ZLayer,
+  select, list, v2ListEntries, v2ListEntry, v2ZLayer,
   workspaceHeaderContext,
 } from '../../ui/ui.js';
 import { compactCheck } from '../../ui/selection/check-list.js';
@@ -50,16 +50,18 @@ const statusLabel = status => ({ formed: 'Сформирован', paid: 'Опл
 const orderNumber = id => String(id || '').replaceAll('-', '').slice(0, 12).toUpperCase();
 // Order lines retain their name in Core. Use available catalog article/barcode
 // only as secondary supplier information: never show internal warehouse rank.
+// Canonical dense List rows for a supplier document, not V2 entity cards.
 const supplierOrderLine = line => {
   const catalog = getInventoryItem(line.itemId);
   const name = String(line.name || catalog?.name || '').trim();
   const sku = String(catalog?.sku || '').trim();
   const barcode = String(catalog?.barcode || '').trim();
+  const article = sku ? 'Арт. ' + sku : barcode ? 'Штрихкод ' + barcode : '';
   return {
-    title: name || sku || barcode || 'Без названия',
-    subtitle: sku && sku !== name ? 'Арт. ' + sku
-      : !sku && barcode && barcode !== name ? 'Штрихкод ' + barcode : '',
-    rightTop: String(line.packages) + ' шт.',
+    title: article || name || 'Без названия',
+    secondary: article && name ? name : '',
+    right: [String(line.packages) + ' шт.'],
+    interactive: false,
   };
 };
 const headSearch = data => `<div class="ui-search-field">${field({
@@ -401,95 +403,19 @@ function openInventoryOrderSelection(root, existing = null, onSaved = () => {}) 
 function openInventoryOrderZ(root, orderId) {
   let order = getInventoryOrder(orderId);
   if (!order) return;
-  let manufacturerFilter = '';
-  let sorting = 'position';
   const markup = `${workspaceHeaderContext({
-    title: 'Заказ',
-    v: { data: 'data-inventory-order-z-menu', aria: 'Фильтр и сортировка заказа' },
-    ...(order.status === 'formed'
-      ? { c: { label: '+', data: 'data-inventory-order-z-add', aria: 'Добавить позиции' } } : {}),
+    title: 'Заказ № ' + orderNumber(orderId),
+    ...(order.status !== 'received' ? {
+      v: { data: 'data-inventory-order-z-menu', aria: 'Действия заказа' },
+    } : {}),
   })}<div data-inventory-order-z-summary></div>
-    <div data-inventory-order-z-lines></div>
-    <div data-inventory-order-z-actions></div>`;
+    <div data-inventory-order-z-lines></div>`;
   const layer = mountV2ZLayer(root, v2ZLayer(markup), { stack: true });
   if (!layer) return;
-  const [row] = setV2ZHeaderRows(layer, [headSearch('data-inventory-order-z-search')]);
-  const search = row?.querySelector('[data-inventory-order-z-search]');
   const summary = layer.querySelector('[data-inventory-order-z-summary]');
-  const list = layer.querySelector('[data-inventory-order-z-lines]');
-  const actions = layer.querySelector('[data-inventory-order-z-actions]');
-
+  const itemsList = layer.querySelector('[data-inventory-order-z-lines]');
   const current = () => getInventoryOrder(orderId);
   const saveAndRefresh = () => { order = current(); refreshOrderList(root); render(); };
-  const openControlQ = (kind) => {
-    const companies = [...new Set((current()?.lines || []).map(manufacturer))]
-      .sort((a, b) => a.localeCompare(b, 'ru'));
-    const markup = `<div class="form-grid">${
-      kind === 'sort'
-        ? select({ label: 'Сортировка', name: 'orderZSort', value: sorting, options: [
-          { value: 'position', label: 'По порядку' },
-          { value: 'name', label: 'По названию' },
-          { value: 'quantity', label: 'По количеству' },
-        ] })
-        : select({ label: 'Производитель', name: 'orderZManufacturer',
-          value: manufacturerFilter,
-          options: [{ value: '', label: 'Все производители' },
-            ...companies.map(value => ({ value, label: value }))] })
-    }${actionBlock(button('Применить', { data: 'data-inventory-order-control-apply' }))}</div>`;
-    const popup = mountModal(layer, modal(markup, {
-      variant: 'q', title: kind === 'sort' ? 'Сортировка' : 'Фильтр',
-    }));
-    popup?.querySelector('[data-inventory-order-control-apply]')?.addEventListener('click', () => {
-      if (kind === 'sort') sorting = popup.querySelector('[name="orderZSort"]')?.value || 'position';
-      else manufacturerFilter = popup.querySelector('[name="orderZManufacturer"]')?.value || '';
-      popup.v2Close?.();
-      render();
-    });
-  };
-
-  const openLineQ = line => {
-    if (current()?.status !== 'formed') return;
-    const markup = `<div class="form-grid">
-      ${field({ label: 'Количество, ' + packageLabel(line), name: 'orderPackages',
-        type: 'number', min: '1', step: '1', inputmode: 'numeric', value: String(line.packages) })}
-      ${field({ label: 'Цена за упаковку, ₽', name: 'orderPackPrice',
-        type: 'number', min: '0', step: '0.01', inputmode: 'decimal', value: String(line.packPrice) })}
-      <p class="form-error" role="status" data-inventory-order-line-error></p>
-      ${actionBlock([
-        button('Сохранить', { data: 'data-inventory-order-line-save' }),
-        button('Убрать позицию', { variant: 'critical', data: 'data-inventory-order-line-remove' }),
-      ].join(''))}
-    </div>`;
-    const popup = mountModal(layer, modal(markup, { variant: 'q', title: line.name }));
-    if (!popup) return;
-    const save = async remove => {
-      const fresh = current();
-      if (fresh?.status !== 'formed') return;
-      const packages = Number(popup.querySelector('[name="orderPackages"]')?.value);
-      const price = Number(String(popup.querySelector('[name="orderPackPrice"]')?.value || '0').replace(',', '.'));
-      const feedback = popup.querySelector('[data-inventory-order-line-error]');
-      if (!remove && (!Number.isSafeInteger(packages) || packages < 1 || !Number.isFinite(price) || price < 0)) {
-        feedback.textContent = 'Укажите целое число упаковок и корректную цену.';
-        return;
-      }
-      const updated = fresh.lines.filter(item => !remove || item.itemId !== line.itemId).map(item =>
-        item.itemId === line.itemId && !remove ? { ...item, packages, packPrice: price } : item);
-      if (!updated.length) { feedback.textContent = 'В заказе должна остаться хотя бы одна позиция.'; return; }
-      popup.querySelectorAll('button').forEach(button => { button.disabled = true; });
-      try {
-        await updateInventoryPurchaseOrder(orderId, {
-          supplier: fresh.supplier, note: fresh.note, lines: updated,
-        });
-        popup.v2Close?.();
-        saveAndRefresh();
-      } catch (error) {
-        feedback.textContent = error instanceof Error ? error.message : 'Не удалось сохранить.';
-        popup.querySelectorAll('button').forEach(button => { button.disabled = false; });
-      }
-    };
-    popup.querySelector('[data-inventory-order-line-save]')?.addEventListener('click', () => save(false));
-    popup.querySelector('[data-inventory-order-line-remove]')?.addEventListener('click', () => save(true));
-  };
 
   const openPayQ = async () => {
     let wallets = [];
@@ -577,57 +503,37 @@ function openInventoryOrderZ(root, orderId) {
   const render = () => {
     order = current();
     if (!order) return;
-    // A draft turns paid without remounting Z2. The inherited + must disappear.
-    const addAction = layer.querySelector('[data-inventory-order-z-add]');
-    if (addAction) addAction.hidden = order.status !== 'formed';
-    const query = String(search?.value || '').trim().toLocaleLowerCase('ru-RU');
-    summary.innerHTML = `<div class="form-grid">
-      <p><strong>Заказ № ${escapeHtml(orderNumber(order.orderId))}</strong></p>
-      <p>${escapeHtml([dateLabel(order.createdAt), order.supplier].filter(Boolean).join(' · '))}</p>
-    </div>`;
-    const originalRows = order.lines.filter(item =>
-      (!manufacturerFilter || manufacturer(item) === manufacturerFilter)
-      && (!query || searchText({ ...getInventoryItem(item.itemId), ...item }).includes(query)));
-    // Preserve the saved purchase sequence; do not display or invent warehouse
-    // position numbers in a document intended for a supplier.
-    const rows = sorting === 'position' ? originalRows : sortedItems(originalRows, sorting);
-    list.innerHTML = rows.length ? v2ListEntries(rows.map(item => v2ListEntry({
-      ...supplierOrderLine(item),
-      omitEmptySubtitle: true,
-      interactive: order.status === 'formed',
-      data: `data-inventory-order-line="${escapeHtml(item.itemId)}"`,
-      aria: 'Изменить количество ' + item.name,
-      initial: '',
-    }))) : emptyState('Товары не найдены', 'Измените фильтр.');
-    if (order.status === 'formed') {
-      actions.innerHTML = actionBlock([
-        button('Оплатить', { data: 'data-inventory-order-pay' }),
-        button('Удалить заказ', { variant: 'critical', data: 'data-inventory-order-delete' }),
-      ].join(''));
-    } else if (order.status === 'paid') {
-      actions.innerHTML = actionBlock(button('Получен', { data: 'data-inventory-order-receive' }));
-    } else {
-      actions.innerHTML = `<p>${dateLabel(order.receivedAt)} · Поступление проведено</p>`;
-    }
-    list.querySelectorAll('[data-inventory-order-line]').forEach(node =>
-      node.addEventListener('click', () => {
-        const line = order.lines.find(item => item.itemId === node.dataset.inventoryOrderLine);
-        if (line) openLineQ(line);
-      }));
-    actions.querySelector('[data-inventory-order-pay]')?.addEventListener('click', openPayQ);
-    actions.querySelector('[data-inventory-order-delete]')?.addEventListener('click', openDeleteQ);
-    actions.querySelector('[data-inventory-order-receive]')?.addEventListener('click', openReceiveQ);
+    // An order document includes ALL saved lines in canonical purchase order.
+    // Filtering them would make a supplier screenshot incomplete.
+    const units = order.lines.reduce((total, line) => total + Number(line.packages || 0), 0);
+    summary.innerHTML = '<p>' + escapeHtml(dateLabel(order.createdAt))
+      + ' · Всего ' + escapeHtml(String(units)) + ' шт.</p>';
+    itemsList.innerHTML = list({
+      className: 'ui-list--dense',
+      items: order.lines.map(supplierOrderLine),
+    });
+    // Hide the V action after receiving; there are no further order actions.
+    const menu = layer.querySelector('[data-inventory-order-z-menu]');
+    if (menu) menu.hidden = order.status === 'received';
   };
 
-  search?.addEventListener('input', render);
   layer.querySelector('[data-inventory-order-z-menu]')?.addEventListener('click', () => {
-    openSharedProfileSettingsMenu({ title: 'Заказ', actions: [
-      { id: 'sort', label: 'Сортировка', onSelect: () => openControlQ('sort') },
-      { id: 'filter', label: 'Фильтр', onSelect: () => openControlQ('filter') },
-    ] });
-  });
-  layer.querySelector('[data-inventory-order-z-add]')?.addEventListener('click', () => {
-    if (current()?.status === 'formed') openInventoryOrderSelection(layer, current(), saveAndRefresh);
+    const fresh = current();
+    if (!fresh || fresh.status === 'received') return;
+    const actions = fresh.status === 'formed'
+      ? [
+          { id: 'edit', label: 'Корректировать заказ', onSelect: () =>
+            openInventoryOrderReview(layer, {
+              mode: 'target', supplier: fresh.supplier || '', sorting: 'position',
+            }, fresh, saveAndRefresh) },
+          { id: 'pay', label: 'Оплатить', onSelect: openPayQ },
+          { id: 'delete', label: 'Удалить заказ', onSelect: openDeleteQ },
+        ]
+      : [{ id: 'receive', label: 'Получен', onSelect: openReceiveQ }];
+    openSharedProfileSettingsMenu({
+      title: 'Заказ № ' + orderNumber(orderId),
+      actions,
+    });
   });
   render();
 }
