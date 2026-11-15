@@ -387,7 +387,7 @@ function advancedItemFields(item = {}) {
     v2Section('Классификация', `<div class="form-grid">${classification}</div>`),
     stockDisposalFields(item, 'consume'),
     stockDisposalFields(item, 'sale'),
-    v2Section('Расчётная единица', `<div class="form-grid">${itemPackageFields(item)}</div>`),
+    v2Section('Учёт и цены', `<div class="form-grid">${itemPackageFields(item)}</div>`),
     v2Section('Хранение и запас', `<div class="form-grid">${inventory}</div>`),
   ].join('');
 }
