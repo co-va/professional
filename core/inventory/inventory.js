@@ -1088,13 +1088,25 @@ function openMovementDetails(root, movementId) {
   });
 }
 
+function orderSuggestedQuantityText(item = {}) {
+  // Stock is counted in grams, but sealed colour tubes are purchased whole.
+  // Do not confuse the observed number of partly used tubes with the number
+  // of NEW full tubes required to reach the target stock.
+  const required = Math.max(0, Number(item.suggestedQuantity) || 0);
+  const packageQuantity = Number(item.packageQuantity);
+  if (isWeighedInventoryItem(item) && Number.isFinite(packageQuantity) && packageQuantity > 0) {
+    return `${numberText(Math.ceil(required / packageQuantity), 0)} тюб.`;
+  }
+  return `${numberText(required)} ${item.unit || ''}`.trim();
+}
+
 function orderMarkup() {
   const items = inventoryOrderSuggestions();
   if (!items.length) return emptyState('Заказывать пока нечего', 'Когда будет указан минимальный остаток, здесь появятся предложения.');
   return v2ListEntries(items.sort(inventoryPositionComparator).map((item) => v2ListEntry({
     title: item.name,
     subtitle: `Осталось ${numberText(item.balance)} ${item.unit}`,
-    rightTop: `${numberText(item.suggestedQuantity)} ${item.unit}`,
+    rightTop: orderSuggestedQuantityText(item),
     rightBottom: 'Рекомендация',
     initial: '',
   })));
