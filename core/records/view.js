@@ -24,7 +24,7 @@ import { openPersonHistoryQ } from '../people/people.js';
 import { personDisplay } from '../people/presentation.js';
 import { getRecordPaymentState, resolveRecordSettlement } from '../finance/index.js';
 import { getRecordProgramOptions, recordProgramSelection } from '../loyalty/record-program.js';
-import { normalizeWorkplaceTimeZone, zonedDateTimeParts, hasZonedIntervalEnded } from '../time/index.js';
+import { normalizeWorkplaceTimeZone, zonedIntervalMoment, hasZonedIntervalEnded } from '../time/index.js';
 import { canAcceptRecordTips, openRecordPayment } from '../payment/record-payment.js';
 import { openRecordPaymentActions } from '../payment/record-payment.js';
 import { openRecordSale } from '../sale/sale.js';
@@ -199,11 +199,7 @@ function normalizedAttendance(value) {
 }
 
 function appointmentStart(record = {}) {
-  const date = String(record?.date || '').slice(0, 10);
-  const time = String(record?.from || '');
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}$/.test(time)) return null;
-  const value = new Date(`${date}T${time}:00`);
-  return Number.isNaN(value.getTime()) ? null : value;
+  return zonedIntervalMoment(record, 'from', recordWorkplaceTimeZone(record));
 }
 
 function hasAppointmentStarted(record = {}) {
