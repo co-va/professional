@@ -378,6 +378,9 @@ function openInventoryOrderZ(root, orderId) {
   const render = () => {
     order = current();
     if (!order) return;
+    // A draft turns paid without remounting Z2. The inherited + must disappear.
+    const addAction = layer.querySelector('[data-inventory-order-z-add]');
+    if (addAction) addAction.hidden = order.status !== 'formed';
     const query = String(search?.value || '').trim().toLocaleLowerCase('ru-RU');
     summary.innerHTML = `<div class="form-grid">
       <p>${statusLabel(order.status)} · ${dateLabel(order.createdAt)} · ${order.lines.length} поз.</p>
@@ -423,8 +426,9 @@ function openInventoryOrderZ(root, orderId) {
       { id: 'filter', label: 'Фильтр', onSelect: () => openControlQ('filter') },
     ] });
   });
-  layer.querySelector('[data-inventory-order-z-add]')?.addEventListener('click', () =>
-    openInventoryOrderSelection(layer, current(), saveAndRefresh));
+  layer.querySelector('[data-inventory-order-z-add]')?.addEventListener('click', () => {
+    if (current()?.status === 'formed') openInventoryOrderSelection(layer, current(), saveAndRefresh);
+  });
   render();
 }
 
