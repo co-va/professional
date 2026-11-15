@@ -29,6 +29,7 @@ const packs = new Function(orderSource.slice(before, after)
   + '\nreturn suggestedPacks;')();
 assert.equal(packs({ suggestedQuantity: 5, packageQuantity: 60, unit: 'г' }), 1);
 assert.equal(packs({ suggestedQuantity: 61, packageQuantity: 60, unit: 'г' }), 2);
+assert.equal(packs({ suggestedQuantity: 0.8, packageQuantity: 0.5, unit: 'г' }), 2);
 assert.equal(packs({ suggestedQuantity: 4, unit: 'шт.' }), 4);
 
 for (const name of [
