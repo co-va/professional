@@ -21,7 +21,7 @@ import {
   v2ListEntries,
   v2ListEntry,
 } from '../../ui/ui.js';
-import { createRecord, getRecord, updateRecord } from '../record/index.js';
+import { createRecord, getRecord, recordScheduleChanged, updateRecord } from '../record/index.js';
 import { getPeople, getPersonPriceCondition } from '../people/data.js';
 import { listPersonDeposits } from '../loyalty/deposit/data.js';
 import { openPersonCreate } from '../people/create.js';
@@ -283,15 +283,18 @@ export async function openProcedureAdjustment(record, procedureId, { onSaved = (
     const duration = Math.max(1, Math.round(numeric(editor.querySelector('[data-record-procedure-duration]'))));
     const nextProcedures = (Array.isArray(latest.procedures) ? latest.procedures : []).map((item) =>
       String(item?.id || '') === String(procedureId || '') ? { ...item, duration } : { ...item });
+    const oldDuration = totalDuration(latest.procedures);
+    const newDuration = totalDuration(nextProcedures);
     const start = timeToMinutes(latest.from);
-    const nextTo = start == null ? '' : minutesToTime(start + totalDuration(nextProcedures));
-    if (!nextTo || !checkTimeAvailability({
+    const nextTo = newDuration === oldDuration ? String(latest.to || '')
+      : start == null ? '' : minutesToTime(start + newDuration);
+    if (!nextTo || (nextTo !== latest.to && !checkTimeAvailability({
       date: latest.date,
       workplaceId: latest.workplaceId,
       from: latest.from,
       to: nextTo,
       excludeId: latest.id,
-    }).ok) {
+    }).ok)) {
       openNotice({ title: 'Время услуги', message: 'Новая длительность пересекается с занятым или недоступным временем.' });
       return;
     }
@@ -330,13 +333,13 @@ export async function openProcedureAdjustment(record, procedureId, { onSaved = (
     const minutes = totalDuration(nextProcedures);
     const calculatedTo = start == null ? '' : minutesToTime(start + minutes);
     const nextTo = minutes > 0 ? calculatedTo : String(latest.to || '');
-    if (!nextTo || !checkTimeAvailability({
+    if (!nextTo || (nextTo !== latest.to && !checkTimeAvailability({
       date: latest.date,
       workplaceId: latest.workplaceId,
       from: latest.from,
       to: nextTo,
       excludeId: latest.id,
-    }).ok) {
+    }).ok)) {
       openNotice({ title: 'Удаление услуги', message: 'После удаления не удалось сохранить время записи.' });
       return;
     }
@@ -452,15 +455,20 @@ export function openRecords({
 
   const nextAfterProcedures = () => {
     if (state.from) {
+      const currentRecord = state.recordId ? getRecord(state.recordId) : null;
+      const sameServiceDuration = currentRecord
+        && totalDuration(currentRecord.procedures) === totalDuration(state.procedures);
       const start = timeToMinutes(state.from);
-      const end = start == null ? '' : minutesToTime(start + totalDuration(state.procedures));
-      const availability = end ? checkTimeAvailability({
-        date: state.date,
-        workplaceId: state.workplaceId,
-        from: state.from,
-        to: end,
-        excludeId: state.recordId,
-      }) : { ok: false, reason: 'invalid-time', conflicts: [] };
+      const end = sameServiceDuration ? (state.to || currentRecord.to)
+        : start == null ? '' : minutesToTime(start + totalDuration(state.procedures));
+      const changedSchedule = !currentRecord || recordScheduleChanged(currentRecord, {
+        date: state.date, workplaceId: state.workplaceId, from: state.from, to: end,
+      });
+      const availability = !end ? { ok: false, reason: 'invalid-time', conflicts: [] }
+        : changedSchedule ? checkTimeAvailability({
+          date: state.date, workplaceId: state.workplaceId,
+          from: state.from, to: end, excludeId: state.recordId,
+        }) : { ok: true };
       if (availability.ok) {
         state.to = end;
         if (!state.person && source.kind === 'professional') renderPerson();
@@ -940,11 +948,8 @@ export function openRecords({
         // Editing people/services on an existing Record does not move it.
         // An updated WorkPlan must not block those unrelated changes.
         // The Time owner still checks every new or moved appointment.
-        const unchangedSchedule = existing
-          && state.date === String(existing.date || '').slice(0, 10)
-          && state.workplaceId === String(existing.workplaceId || '')
-          && state.from === String(existing.from || '')
-          && state.to === String(existing.to || '');
+        const currentRecord = state.recordId ? getRecord(state.recordId) : null;
+        const unchangedSchedule = currentRecord && !recordScheduleChanged(currentRecord, state);
         const availability = source.kind === 'professional' && !unchangedSchedule
           ? checkTimeAvailability({
             date: state.date,

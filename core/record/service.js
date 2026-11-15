@@ -100,7 +100,7 @@ function scheduleSnapshot(record = {}) {
   };
 }
 
-function scheduleChanged(before = {}, after = {}) {
+export function recordScheduleChanged(before = {}, after = {}) {
   const left = scheduleSnapshot(before);
   const right = scheduleSnapshot(after);
   return ['date', 'workplaceId', 'from', 'to'].some((key) => left[key] !== right[key]);
@@ -230,7 +230,7 @@ export function updateRecord(id, patch = {}, { actionContext = null } = {}) {
   // Non-time edits (attendance, confirmation, services without time change)
   // must not be blocked by a later WorkPlan change to an existing Record.
   // Time still validates every actual move or duration change.
-  if (scheduleChanged(current, next) && !checkRecordTime({
+  if (recordScheduleChanged(current, next) && !checkRecordTime({
     date: next.date,
     workplaceId: next.workplaceId,
     from: next.from,
@@ -244,7 +244,7 @@ export function updateRecord(id, patch = {}, { actionContext = null } = {}) {
   }
 
   const updatedData = getRecord(id);
-  if (scheduleChanged(current, updatedData)) {
+  if (recordScheduleChanged(current, updatedData)) {
     appendRecordEvent(id, RECORD_EVENT_TYPES.RESCHEDULED, {
       ...eventContext(updatedData, actionContext),
       payload: {
@@ -256,7 +256,7 @@ export function updateRecord(id, patch = {}, { actionContext = null } = {}) {
   appendLifecyclePatch(current, updatedData, patch, actionContext);
   const updated = getRecord(id);
   notify('professional:records-changed', { action: 'update', recordId: id });
-  if (scheduleChanged(current, updated)) {
+  if (recordScheduleChanged(current, updated)) {
     notify('professional:time-usage-changed', {
       action: 'change', usageId: id, sourceId: id,
       date: updated?.date, workplaceId: updated?.workplaceId,

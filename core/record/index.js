@@ -18,6 +18,7 @@ export {
   moveRecord,
   removeRecord,
   refreshRecordsFromServer,
+  recordScheduleChanged,
   setRecordAttendance,
   setRecordConfirmed,
   updateRecord,
