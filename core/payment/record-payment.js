@@ -23,7 +23,7 @@ import {
   resolveRecordSettlement,
   saveSettlementSnapshot,
 } from '../finance/index.js';
-import { listPersonDeposits } from '../loyalty/deposit/data.js';
+import { isActiveDepositAssignment, listPersonDeposits } from '../loyalty/deposit/data.js';
 import { selectedRecordDepositId } from '../loyalty/record-program.js';
 import { loadPersonalAccount } from '../loyalty/personal-account/data.js';
 import { getWorkplaces } from '../workplace-time.js';
@@ -196,14 +196,22 @@ async function depositsForRecord(record, payment = null) {
   const selectedDepositId = selectedRecordDepositId(record);
   const current = paymentDepositAllocations(payment);
   const currentIds = new Set(current.map((item) => String(item?.depositId || '')).filter(Boolean));
-  if (!selectedDepositId && !currentIds.size) return [];
 
   const person = personForRecord(record);
   const key = String(person?.key || person?.id || '');
   if (!key) return [];
-  const deposits = await listPersonDeposits(key).catch(() => []);
-  const allowedIds = new Set([...currentIds, ...(selectedDepositId ? [selectedDepositId] : [])]);
-  const scoped = deposits.filter((item) => allowedIds.has(String(item?.depositId || item?.id || '')));
+  const deposits = await listPersonDeposits(key);
+  // A person's server-backed deposit is an available source of money even when
+  // the Record has no explicit loyaltyProgram selection. Price rules remain in
+  // the server-owned Settlement, never in this source picker.
+  const allowedIds = new Set([
+    ...currentIds,
+    ...deposits.filter((item) => isActiveDepositAssignment(item) && Number(item?.balance || 0) > 0.009)
+      .map((item) => String(item?.depositId || item?.id || '')),
+  ]);
+  const scoped = deposits.filter((item) => allowedIds.has(String(item?.depositId || item?.id || '')))
+    .sort((left, right) => Number(String(right?.depositId || right?.id || '') === selectedDepositId)
+      - Number(String(left?.depositId || left?.id || '') === selectedDepositId));
   if (!current.length) return scoped;
   const used = new Map(current.map((item) => [String(item.depositId || ''), Number(item.amount || 0)]));
   return scoped.map((item) => ({
@@ -312,9 +320,16 @@ async function openPaymentEntry(record, onCompleted = () => {}) {
   if (!layer.isConnected) return layer;
   const host = layer.querySelector('[data-record-payment-entry-host]');
   if (!host) return layer;
+  const selectedDepositId = selectedRecordDepositId(getRecord(recordId) || current);
+  const defaultDeposit = deposits.find((item) => String(item?.depositId || item?.id || '') === selectedDepositId)
+    || (deposits.length === 1 ? deposits[0] : null);
+  const defaultDepositAmount = Math.min(Math.max(0, total), Math.max(0, Number(defaultDeposit?.balance || 0)));
+  const initialDepositAllocations = defaultDeposit && defaultDepositAmount > 0.009
+    ? [{ depositId: String(defaultDeposit.depositId || defaultDeposit.id), amount: defaultDepositAmount }]
+    : [];
   host.innerHTML = `
     ${readOnlyReceipt({ totals: [{ label: 'К оплате', value: money(total), strong: true }] })}
-    ${paymentMethods({ wallets, deposits, personalAccount, total, showAction: false, showTotal: false })}
+    ${paymentMethods({ wallets, deposits, personalAccount, total, showAction: false, showTotal: false, initialDepositAllocations })}
     ${actionBlock(button(gratuityOnly ? 'Завершить' : 'Оплатить', { data: 'data-record-payment-entry-submit', disabled: !gratuityOnly }))}`;
 
   const submit = host.querySelector('[data-record-payment-entry-submit]');

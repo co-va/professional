@@ -430,54 +430,11 @@ export function openRecordView(record, {
       });
       return;
     }
-    const personKey = String(source?.person?.key || source?.person?.id || '').trim();
-    const programs = capabilities.loyaltyProgram ? getRecordProgramOptions(personKey) : [];
-    const programSelector = programs.length ? select({
-      label: 'Программа',
-      name: 'recordLoyaltyProgram',
-      value: String(source?.loyaltyProgram?.key || ''),
-      options: [
-        { value: '', label: 'Не выбрано' },
-        ...programs.map((item) => ({ value: item.key, label: item.name, meta: item.typeLabel })),
-      ],
-      data: 'data-record-view-program',
-      aria: 'Выбрать программу записи',
-    }) : '';
     const actions = mountModal(document.body, modal(
-      actionSheet({ cancelled: source.status === 'cancelled' }) + programSelector,
+      actionSheet({ cancelled: source.status === 'cancelled' }),
       { variant: 'x', surface: 'app' },
     ));
     if (!actions) return;
-
-    actions.querySelector('[data-record-view-program]')?.addEventListener('change', async (event) => {
-      const selector = event.currentTarget;
-      if (selector.disabled) return;
-      const latest = syncCurrent();
-      if (getRecordPaymentState(latest).hasPayments) {
-        openNotice({ message: 'После оплаты программа записи не изменяется.' });
-        return;
-      }
-      const nextKey = String(selector.value || '');
-      const nextProgram = programs.find((item) => item.key === nextKey) || null;
-      selector.disabled = true;
-      try {
-        const updated = setRecordLoyaltyProgram(latest, recordProgramSelection(nextProgram));
-        if (!updated) throw new Error('Не удалось изменить программу записи.');
-        await persistAndRefresh();
-        currentRecord = getRecord(updated.id) || updated;
-        actions.v2Close?.();
-        render();
-      } catch (error) {
-        // Never close the selector or claim success before the Record owner
-        // and Finance projection have acknowledged server persistence.
-        await refreshRecordsFromServer().catch(() => null);
-        syncCurrent();
-        render();
-        openNotice({ title: 'Не удалось сохранить', message: String(error?.message || 'Сервер не подтвердил выбор программы.') });
-      } finally {
-        if (selector.isConnected) selector.disabled = false;
-      }
-    });
 
     actions.querySelector('[data-record-view-correct]')?.addEventListener('click', () => {
       actions.v2Close?.();
@@ -636,6 +593,20 @@ export function openRecordView(record, {
       .filter((item) => String(item?.sourceType || 'procedure') === 'procedure')
       .map((item) => [String(item?.sourceId || ''), item]));
     const personKey = String(source?.person?.key || source?.person?.id || '').trim();
+    const programs = capabilities.loyaltyProgram && !readOnlyHistory
+      ? getRecordProgramOptions(personKey).sort((left, right) => Number(right.type === 'deposit') - Number(left.type === 'deposit'))
+      : [];
+    const storedProgramKey = String(source?.loyaltyProgram?.key || '');
+    const selectedProgramKey = programs.find((item) => item.key === storedProgramKey)?.key || programs[0]?.key || '';
+    const programSelector = programs.length ? select({
+      label: 'Программа',
+      name: 'recordLoyaltyProgram',
+      value: selectedProgramKey,
+      options: programs.map((item) => ({ value: item.key, label: item.name, meta: item.typeLabel })),
+      data: 'data-record-view-program',
+      aria: 'Выбрать программу записи',
+      disabled: payment.hasPayments || source.status === 'cancelled',
+    }) : '';
     const contact = capabilities.contactIdentity
       ? (getAllPeople().find((item) => String(item?.key || item?.id || '').trim() === personKey) || source.person || {})
       : (source.person || {});
@@ -701,6 +672,7 @@ export function openRecordView(record, {
       : `${recordHasEnded(source) ? 'Задолженность' : 'К оплате'}: ${formatMoney(payment.remaining)}`;
     root.innerHTML = `<div class="record-screen record-screen--state-view record-screen--record-view">
       ${card}
+      ${programSelector}
       ${readOnlyHistory ? '' : actionBlock([
         capabilities.sale && !payment.hasPayments ? button('Продажа', { variant: 'secondary', data: 'data-record-view-sale' }) : '',
         capabilities.notes && hasNotesForTarget('record', source.id)
@@ -724,6 +696,34 @@ export function openRecordView(record, {
             }),
       ].filter(Boolean).join(''))}
     </div>`;
+
+    root.querySelector('[data-record-view-program]')?.addEventListener('change', async (event) => {
+      const selector = event.currentTarget;
+      if (selector.disabled) return;
+      const latest = syncCurrent();
+      if (getRecordPaymentState(latest).hasPayments || latest.status === 'cancelled') {
+        openNotice({ message: 'Программу оплаченной или отменённой записи изменять нельзя.' });
+        render();
+        return;
+      }
+      const nextProgram = programs.find((item) => item.key === String(selector.value || '')) || null;
+      if (!nextProgram) return;
+      selector.disabled = true;
+      try {
+        const updated = setRecordLoyaltyProgram(latest, recordProgramSelection(nextProgram));
+        if (!updated) throw new Error('Не удалось изменить программу записи.');
+        await persistAndRefresh();
+        currentRecord = getRecord(updated.id) || updated;
+        render();
+      } catch (error) {
+        await refreshRecordsFromServer().catch(() => null);
+        syncCurrent();
+        render();
+        openNotice({ title: 'Не удалось сохранить', message: String(error?.message || 'Сервер не подтвердил выбор программы.') });
+      } finally {
+        if (selector.isConnected) selector.disabled = false;
+      }
+    });
 
     root.querySelector('[data-record-view-service-settings]')?.addEventListener('click', (event) => {
       event.stopPropagation();
