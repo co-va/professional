@@ -437,6 +437,7 @@ export function openRecords({
     if (state.from) {
       const currentRecord = state.recordId ? getRecord(state.recordId) : null;
       const sameServiceDuration = currentRecord
+        && state.from === currentRecord.from
         && totalDuration(currentRecord.procedures) === totalDuration(state.procedures);
       const start = timeToMinutes(state.from);
       const end = sameServiceDuration ? (state.to || currentRecord.to)
