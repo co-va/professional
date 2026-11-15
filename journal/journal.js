@@ -393,7 +393,7 @@ export function renderJournal(root, options = {}) {
     const workplaceLabel = allMode ? 'Все пространства' : journalTitle();
     const statusRows = records.length
       ? (outstanding.length === 0
-        ? [{ label: 'Статус', value: 'Оплачено' }]
+        ? [{ label: 'Статус', value: paymentStates.every(({ state }) => state?.fullyPaid) ? 'Оплачено' : 'К оплате' }]
         : [
           { label: 'Оплачено', value: formatRubles(paidTotal) },
           dueTotal > 0.009 ? { label: 'К оплате', value: formatRubles(dueTotal) } : null,

@@ -129,7 +129,7 @@ function recordReportStatusRows(record, state) {
   const paidTotal = Math.max(0, Number(state?.paidTotal) || 0);
   const remaining = Math.max(0, Number(state?.remaining) || 0);
   if (remaining <= 0.009) {
-    return paidTotal > 0.009
+    return paidTotal > 0.009 || state?.fullyPaid
       ? [{ label: 'Оплачено', value: formatReportRubles(paidTotal) }]
       : [{ label: 'К оплате', value: formatReportRubles(0) }];
   }
