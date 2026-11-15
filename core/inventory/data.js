@@ -39,13 +39,23 @@ export function getInventoryMovement(movementId) {
 }
 
 export function inventoryOrderSuggestions() {
+  // The price catalog is not a purchase list. Only an explicitly configured
+  // stock threshold with a positive replenishment gap creates a suggestion.
   return snapshot.items
     .map((item) => {
-      const balance = Number(item?.balance) || 0;
-      const minimum = item?.minStock == null ? null : Number(item.minStock);
-      const target = item?.targetStock == null ? null : Number(item.targetStock);
-      if (minimum == null || balance > minimum) return null;
-      const desired = target != null && target > balance ? target - balance : Math.max(0, minimum - balance);
+      const balance = Number(item?.balance ?? 0);
+      const rawMinimum = item?.minStock;
+      const minimum = rawMinimum == null || rawMinimum === '' ? null : Number(rawMinimum);
+      const rawTarget = item?.targetStock;
+      const target = rawTarget == null || rawTarget === '' ? null : Number(rawTarget);
+      if (!Number.isFinite(balance) || minimum == null || !Number.isFinite(minimum)
+        || minimum < 0 || balance > minimum) return null;
+      const replenishmentLevel = target != null && Number.isFinite(target) && target > minimum
+        ? target : minimum;
+      const desired = Math.max(0, replenishmentLevel - balance);
+      // A zero-threshold product at zero stock is NOT a purchase unless
+      // a positive target was explicitly configured.
+      if (desired <= 0) return null;
       return { ...item, suggestedQuantity: desired };
     })
     .filter(Boolean);
