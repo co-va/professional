@@ -100,11 +100,15 @@ export function inventoryStockBalanceInThresholdUnits(item = {}) {
   const balance = Number(item.balance);
   if (!Number.isFinite(balance) || balance < 0) return null;
   if (!isWeighedInventoryItem(item)) return balance;
-  const size = Number(item.packageQuantity);
+  const configured = Number(item.packageQuantity);
   // Zero grams is zero tubes even when package capacity is not configured.
-  // Do not discard empty-shelf recommendations; validation still forbids
-  // purchasing weighed items with an unknown package size.
   if (balance === 0) return 0;
-  if (!Number.isFinite(size) || size <= 0) return null;
+  // Core exposes netPackageWeight from grossWeight minus tareWeight. This is
+  // an actual known net weight of one tube, not a guessed physical count.
+  const knownNetWeight = Number(item.netPackageWeight);
+  const size = Number.isFinite(configured) && configured > 0 ? configured
+    : Number.isFinite(knownNetWeight) && knownNetWeight > 0 ? knownNetWeight
+    : null;
+  if (size == null) return null;
   return balance / size;
 }

@@ -71,7 +71,11 @@ export function inventoryOrderSuggestions(mode = 'target') {
         && (rawTarget == null || rawTarget === '');
       const absentColour = balance === 0 && isWeighedInventoryItem(item)
         && missingThresholds;
-      if (!(hasTarget || (hasMinimum && minimum > 0) || absentColour)) return null;
+      // Respect the deliberate 0/0 setting: it means this item has no
+      // configured replenishment quantity. A lone minimum 0 still triggers at
+      // zero stock, because the threshold is inclusive.
+      if (hasMinimum && minimum === 0 && rawTarget != null && target === 0) return null;
+      if (!(hasTarget || hasMinimum || absentColour)) return null;
       const urgent = (hasMinimum && balance <= minimum + 1e-9) || absentColour;
       const recommended = (hasTarget && balance < target - 1e-9) || absentColour;
       if (mode === 'minimum' ? !urgent : !(urgent || recommended)) return null;

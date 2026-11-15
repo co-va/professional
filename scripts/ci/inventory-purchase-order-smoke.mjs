@@ -40,6 +40,7 @@ assert.equal(threshold.inventoryStockThresholdStored({ unit: 'шт.', packageQua
 assert.equal(threshold.inventoryStockThresholdStored({unit:'г'}, 0.5), 0.5);
 assert.equal(threshold.inventoryStockBalanceInThresholdUnits({unit:'г',balance:30,packageQuantity:60}), 0.5);
 assert.equal(threshold.inventoryStockBalanceInThresholdUnits({unit:'г',balance:0,packageQuantity:null}), 0);
+assert.equal(threshold.inventoryStockBalanceInThresholdUnits({unit:'г',balance:20,packageQuantity:null,netPackageWeight:50}), 0.4);
 
 // 0.5 tube is already urgent; above 0.5 but below 1 is recommended;
 // every suggestion replenishes to target and buys whole packages.
@@ -49,11 +50,13 @@ data.applyInventorySnapshot({ items: [
   { itemId:'full-tube',unit:'г',packageQuantity:60,balance:60,minStock:0.5,targetStock:1 },
   { itemId:'no-threshold',unit:'г',packageQuantity:60,balance:0,minStock:0,targetStock:0 },
   { itemId:'never-configured-absent-colour',unit:'г',packageQuantity:60,balance:0,minStock:null,targetStock:null },
+  { itemId:'one-sided-min-zero',unit:'г',packageQuantity:60,balance:0,minStock:0,targetStock:null },
+  { itemId:'known-net-weight',unit:'г',packageQuantity:null,netPackageWeight:50,balance:20,minStock:0.5,targetStock:1 },
   { itemId:'zero-without-size',unit:'г',packageQuantity:null,balance:0,minStock:0.5,targetStock:1 },
   { itemId:'large-stock',unit:'г',packageQuantity:60,balance:90,minStock:1.5,targetStock:3 },
 ] });
-assert.deepEqual(data.inventoryOrderSuggestions('minimum').map(x=>x.itemId), ['half-tube','never-configured-absent-colour','zero-without-size','large-stock']);
-assert.deepEqual(data.inventoryOrderSuggestions('target').map(x=>x.itemId), ['half-tube','three-quarter','never-configured-absent-colour','zero-without-size','large-stock']);
+assert.deepEqual(data.inventoryOrderSuggestions('minimum').map(x=>x.itemId), ['half-tube','never-configured-absent-colour','one-sided-min-zero','known-net-weight','zero-without-size','large-stock']);
+assert.deepEqual(data.inventoryOrderSuggestions('target').map(x=>x.itemId), ['half-tube','three-quarter','never-configured-absent-colour','one-sided-min-zero','known-net-weight','zero-without-size','large-stock']);
 assert.equal(data.inventoryOrderSuggestions('minimum')[0].suggestedQuantity, 30);
 assert.equal(data.inventoryOrderSuggestions('target')[1].urgency, 'normal');
 assert.equal(data.inventoryOrderSuggestions('target')[0].urgency, 'urgent');
