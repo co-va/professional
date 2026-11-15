@@ -115,7 +115,14 @@ export function openSale({
   });
   void loadInventory().then(() => {
     if (!layer.isConnected) return;
-    available = getProducts().filter(item => productAvailable(item, workplaceId));
+    const fresh = getProducts().filter(item => productAvailable(item, workplaceId));
+    const shown = new Set(fresh.map(item => String(item.id)));
+    // Historical sale rows stay visible even if the stock product was later
+    // archived or its sale flag was disabled. They must remain removable.
+    const saved = current.filter(item => !shown.has(String(item.id)))
+      .map(item => ({ ...item, inventoryOwned: Boolean(item.inventoryItemId),
+        pricePerUnit: Number(item.unitPrice ?? (Number(costValue(item.cost)) / (Number(item.quantity) || 1))) || 0 }));
+    available = [...fresh, ...saved];
     listRoot.innerHTML = available.length
       ? v2ListEntries(productRows(available, selected, currentById, workplaceId))
       : emptyState('Товаров пока нет', 'Создайте товар на складе и включите «Продажа».');
@@ -150,8 +157,15 @@ export function openSale({
         errorHost.textContent = 'Проверьте количество: ' + product.name;
         return;
       }
-      const unitPrice = Number(product.inventoryItemId
-        ? product.pricePerUnit : productCost(product, workplaceId)) || 0;
+      const savedUnitPrice = Number(existing?.unitPrice);
+      const previousTotal = Number(costValue(existing?.cost));
+      const previousQuantity = Number(existing?.quantity);
+      const unitPrice = existing
+        ? Number.isFinite(savedUnitPrice) && savedUnitPrice >= 0
+          ? savedUnitPrice : Number.isFinite(previousTotal) && previousQuantity > 0
+            ? previousTotal / previousQuantity : 0
+        : Number(product.inventoryItemId ? product.pricePerUnit
+          : productCost(product, workplaceId)) || 0;
       nextProducts.push({
         ...(existing || {}),
         id: product.id,
