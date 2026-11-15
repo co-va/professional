@@ -1,5 +1,5 @@
 import { apiRequest } from '../auth.js';
-import { applyInventorySnapshot, getInventoryItem } from './data.js';
+import { applyInventorySnapshot, getInventoryItem, getInventorySnapshot } from './data.js';
 
 const SERVER_ORDER_UNAVAILABLE = 'Сервер склада ещё не обновлён. Порядок не сохранён.';
 
@@ -105,35 +105,65 @@ function requireOrderResponse(payload) {
   if (!Array.isArray(payload?.orders)) {
     throw new Error('Сервер ещё не поддерживает закупочные заказы. Заказ не сохранён.');
   }
+  return payload.orders;
+}
+
+function verifyOrderState(payload, orderId, statuses = []) {
+  const order = requireOrderResponse(payload).find(item =>
+    String(item?.orderId || '') === String(orderId || ''));
+  if (!order || statuses.length && !statuses.includes(order.status)) {
+    throw new Error('Сервер не подтвердил состояние закупочного заказа.');
+  }
+  return order;
 }
 
 export async function createInventoryPurchaseOrder(value) {
+  const previousIds = new Set((getInventorySnapshot()?.orders || []).map(order => order.orderId));
   return inventoryRequest('/orders', {
-    method: 'POST', body: JSON.stringify(value), verifySnapshot: requireOrderResponse,
+    method: 'POST', body: JSON.stringify(value),
+    verifySnapshot: payload => {
+      if (!requireOrderResponse(payload).some(order => !previousIds.has(order.orderId))) {
+        throw new Error('Сервер не подтвердил создание заказа.');
+      }
+    },
   });
 }
 
 export async function updateInventoryPurchaseOrder(orderId, value) {
   return inventoryRequest(purchaseOrderPath(orderId), {
-    method: 'PUT', body: JSON.stringify(value), verifySnapshot: requireOrderResponse,
+    method: 'PUT', body: JSON.stringify(value),
+    verifySnapshot: payload => verifyOrderState(payload, orderId, ['formed']),
   });
 }
 
 export async function deleteInventoryPurchaseOrder(orderId) {
   return inventoryRequest(purchaseOrderPath(orderId), {
-    method: 'DELETE', verifySnapshot: requireOrderResponse,
+    method: 'DELETE',
+    verifySnapshot: payload => {
+      if (requireOrderResponse(payload).some(order => order.orderId === orderId)) {
+        throw new Error('Сервер не подтвердил удаление заказа.');
+      }
+    },
   });
 }
 
 export async function payInventoryPurchaseOrder(orderId, value) {
   return inventoryRequest(`${purchaseOrderPath(orderId)}/pay`, {
-    method: 'POST', body: JSON.stringify(value), verifySnapshot: requireOrderResponse,
+    method: 'POST', body: JSON.stringify(value),
+    verifySnapshot: payload => {
+      const order = verifyOrderState(payload, orderId, ['paid', 'received']);
+      if (!order.financeOperationId) throw new Error('Сервер не подтвердил финансовую операцию.');
+    },
   });
 }
 
 export async function receiveInventoryPurchaseOrder(orderId, receivedAt) {
   return inventoryRequest(`${purchaseOrderPath(orderId)}/receive`, {
-    method: 'POST', body: JSON.stringify({ receivedAt }), verifySnapshot: requireOrderResponse,
+    method: 'POST', body: JSON.stringify({ receivedAt }),
+    verifySnapshot: payload => {
+      const order = verifyOrderState(payload, orderId, ['received']);
+      if (!order.receiptMovementId) throw new Error('Сервер не подтвердил приход.');
+    },
   });
 }
 
