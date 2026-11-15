@@ -612,7 +612,13 @@ export function openRecordView(record, {
           label: 'Программа',
           name: 'recordLoyaltyProgram',
           value: selectedProgramKey,
-          options: programs.map((item) => ({ value: item.key, label: programLabel(item), meta: item.typeLabel })),
+          options: programs.map((item) => {
+            const label = programLabel(item);
+            const amount = item.type === 'deposit' && item.balance != null ? formatMoney(item.balance) : '';
+            const name = String(item.name || 'Депозит');
+            const split = Boolean(amount) && label.length > 25;
+            return { value: item.key, label: split ? `${name}:` : label, meta: split ? amount : item.typeLabel };
+          }),
           data: 'data-record-view-program',
           aria: 'Выбрать программу записи',
         });

@@ -36,10 +36,16 @@ function paymentSourceOptions(wallets = [], deposits = [], personalAccount = nul
       value: sourceKey('wallet', wallet?.id),
       label: String(wallet?.name || 'Кошелёк'),
     })),
-    ...(Array.isArray(deposits) ? deposits : []).map((deposit) => ({
-      value: sourceKey('deposit', deposit?.depositId || deposit?.id),
-      label: `${String(deposit?.programName || deposit?.name || 'Депозит')}: ${moneyDisplay(deposit?.balance)}`,
-    })),
+    ...(Array.isArray(deposits) ? deposits : []).map((deposit) => {
+      const name = String(deposit?.programName || deposit?.name || 'Депозит');
+      const amount = moneyDisplay(deposit?.balance);
+      const split = `${name}: ${amount}`.length > 25;
+      return {
+        value: sourceKey('deposit', deposit?.depositId || deposit?.id),
+        label: split ? `${name}:` : `${name}: ${amount}`,
+        meta: split ? amount : '',
+      };
+    }),
     ...(accountAvailable > 0.009 ? [{
       value: sourceKey('personal-account', personalAccount?.personKey || 'account'),
       label: `Личный счёт · доступно ${moneyDisplay(accountAvailable)}`,
