@@ -1,6 +1,6 @@
 import { ALL_WORKPLACES_ID, emptyState, escapeHtml, v2ListEntries, v2ListEntry, shortDate } from '../ui/ui.js';
 import { getWorkplaces } from '../core/workplace-time.js';
-import { getRecordPaymentState, recordAmountDue } from '../core/finance/index.js';
+import { getRecordPaymentState } from '../core/finance/index.js';
 import { getRecordsInRange } from '../core/record/index.js';
 import { isRecordCompletedSide, recordActivityTime, recordAppointmentTime, recordListStatusClass } from '../core/record/index.js';
 
@@ -11,8 +11,8 @@ function loadRecordViewModule() {
 }
 
 function formatMoney(value = 0) {
-  const amount = Math.max(0, Math.round(Number(value) || 0));
-  return `${amount.toLocaleString('ru-RU').replaceAll('\u00a0', ' ')} ₽`;
+  const amount = Math.max(0, Number(value) || 0);
+  return `${new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(amount).replaceAll('\u00a0', ' ')} ₽`;
 }
 
 function personName(person = {}, fallback = 'Человек') {
@@ -30,16 +30,18 @@ function recordPresentation(record, workplaces) {
 
 function paymentFor(record) {
   const state = getRecordPaymentState(record);
-  return { paid: Boolean(state.fullyPaid), activity: state.fullyPaid ? state.latestPayment : null };
+  return {
+    paid: Boolean(state.fullyPaid),
+    activity: state.fullyPaid ? state.latestPayment : null,
+    total: state.planTotal,
+  };
 }
-
-function displayAmountDue(record = null) { return recordAmountDue(record); }
 
 function recordId(record) {
   return String(record?.id || record?.sourceId || '');
 }
 
-function recordEntry(record, workplaces, { focus = false, paid = false } = {}) {
+function recordEntry(record, workplaces, { focus = false, paid = false, amountDue = 0 } = {}) {
   const presentation = recordPresentation(record, workplaces);
   const name = personName(presentation.person, 'Человек');
   const classes = [recordListStatusClass(record, { paid }), focus ? 'journal-list-focus' : ''].filter(Boolean).join(' ');
@@ -49,7 +51,7 @@ function recordEntry(record, workplaces, { focus = false, paid = false } = {}) {
     title: name,
     subtitle: record?.person?.phone || '',
     rightTop: [shortDate(record?.date), String(record?.from || '')].filter(Boolean).join(' · '),
-    rightBottom: formatMoney(displayAmountDue(record)),
+    rightBottom: formatMoney(amountDue),
     interactive: Boolean(id),
     data: id ? `data-journal-list-record="${escapeHtml(id)}"` : '',
     aria: id ? `Открыть запись ${name}` : '',
@@ -90,7 +92,9 @@ function renderTimeMode(root, records, workplaces) {
   const splitIndex = focusIndex >= 0 ? focusIndex : ordered.length;
   const entries = ordered.flatMap((record, index) => {
     const payment = paymentFor(record);
-    const row = recordEntry(record, workplaces, { focus: index === splitIndex, paid: payment.paid });
+    const row = recordEntry(record, workplaces, {
+      focus: index === splitIndex, paid: payment.paid, amountDue: payment.total,
+    });
     return index === splitIndex ? [anchorEntry(), row] : [row];
   });
   if (splitIndex === ordered.length) entries.push(anchorEntry());
@@ -108,9 +112,9 @@ function renderFlowMode(root, records, workplaces) {
   const completed = prepared.filter((item) => item.completed).sort((a, b) => recordActivityTime(a.record, a.payment.activity, { completed: true }) - recordActivityTime(b.record, b.payment.activity, { completed: true }));
   const pending = prepared.filter((item) => !item.completed).sort((a, b) => recordActivityTime(b.record, b.payment.activity) - recordActivityTime(a.record, a.payment.activity));
   const entries = [
-    ...completed.map(({ record, payment }) => recordEntry(record, workplaces, { paid: payment.paid })),
+    ...completed.map(({ record, payment }) => recordEntry(record, workplaces, { paid: payment.paid, amountDue: payment.total })),
     anchorEntry(),
-    ...pending.map(({ record, payment }) => recordEntry(record, workplaces, { paid: payment.paid })),
+    ...pending.map(({ record, payment }) => recordEntry(record, workplaces, { paid: payment.paid, amountDue: payment.total })),
   ];
   root.innerHTML = v2ListEntries(entries);
   bindRecordClicks(root, records);
