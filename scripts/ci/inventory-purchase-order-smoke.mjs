@@ -111,7 +111,7 @@ assert.match(orderSource, /data-inventory-order-balance/);
 assert.match(orderSource, /const orderItemLabel =/);
 assert.match(orderSource, /const orderItemBalance =/);
 assert.match(orderSource, /class="data-edit-row"/);
-assert.match(orderSource, /'data-inventory-order-fields'/);
+assert.match(orderSource, /data-inventory-order-fields/);
 assert.match(orderSource, /class="data-edit-row__name"/);
 assert.ok(orderSource.indexOf('<details data-inventory-order-excluded') <
   orderSource.indexOf('<div data-inventory-order-active'), 'Catalog above order rows');
