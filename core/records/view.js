@@ -357,8 +357,8 @@ export function openRecordView(record, {
   const confirmCancel = (source) => {
     const confirm = mountModal(document.body, modal(
       `<div class="modal-title"><h2>Отменить?</h2><p>Запись останется в истории, время освободится.</p></div>${actionBlock([
-        button('Нет', { variant: 'secondary', data: 'data-record-view-cancel-no' }),
-        button('Отмена', { variant: 'danger', data: 'data-record-view-cancel-yes' }),
+        button('Назад', { variant: 'secondary', data: 'data-record-view-cancel-no' }),
+        button('Отменить без удержания', { variant: 'danger', data: 'data-record-view-cancel-yes' }),
       ].join(''))}`,
       { variant: 'x', surface: 'app', title: 'Отмена' },
     ));
@@ -597,16 +597,22 @@ export function openRecordView(record, {
     const programs = capabilities.loyaltyProgram && !readOnlyHistory
       ? getRecordProgramOptions(personKey).sort((left, right) => Number(right.type === 'deposit') - Number(left.type === 'deposit'))
       : [];
+    const programLabel = (program) => {
+      const name = String(program?.name || 'Депозит');
+      return program?.type === 'deposit' && program.balance != null
+        ? `${name}: ${formatMoney(program.balance)}`
+        : name;
+    };
     const storedProgramKey = String(source?.loyaltyProgram?.key || '');
     const selectedProgramKey = programs.find((item) => item.key === storedProgramKey)?.key || programs[0]?.key || '';
     const programSelector = !programs.length ? ''
       : payment.hasPayments || source.status === 'cancelled'
-        ? field({ label: 'Программа', value: programs.find((item) => item.key === selectedProgramKey)?.name || '', readonly: true })
+        ? field({ label: 'Программа', value: programLabel(programs.find((item) => item.key === selectedProgramKey)), readonly: true })
         : select({
           label: 'Программа',
           name: 'recordLoyaltyProgram',
           value: selectedProgramKey,
-          options: programs.map((item) => ({ value: item.key, label: item.name, meta: item.typeLabel })),
+          options: programs.map((item) => ({ value: item.key, label: programLabel(item), meta: item.typeLabel })),
           data: 'data-record-view-program',
           aria: 'Выбрать программу записи',
         });
@@ -669,7 +675,8 @@ export function openRecordView(record, {
       capabilities.attendance ? attendanceControl : '',
     ].filter(Boolean));
 
-    const tipsOnlyAvailable = !readOnlyHistory && canAcceptRecordTips(source, payment);
+    const cancelled = source.status === 'cancelled';
+    const tipsOnlyAvailable = !cancelled && !readOnlyHistory && canAcceptRecordTips(source, payment);
     const paymentStateLabel = payment.fullyPaid
       ? `Оплачено: ${formatMoney(payment.paidTotal)}`
       : `${recordHasEnded(source) ? 'Задолженность' : 'К оплате'}: ${formatMoney(payment.remaining)}`;
@@ -681,7 +688,9 @@ export function openRecordView(record, {
         capabilities.notes && hasNotesForTarget('record', source.id)
           ? button('Заметки', { variant: 'secondary', data: 'data-record-view-notes' })
           : '',
-        payment.fullyPaid && !tipsOnlyAvailable
+        cancelled
+          ? button('Отменена', { disabled: true })
+          : payment.fullyPaid && !tipsOnlyAvailable
           ? button(paymentStateLabel, {
             disabled: true,
             className: payment.tipsTotal > 0.009 ? 'record-payment-button--has-tips' : '',

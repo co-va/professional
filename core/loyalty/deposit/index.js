@@ -1069,7 +1069,7 @@ function personDepositCard(deposit) {
     appearance: depositCardAppearance(),
     fields: depositCardFields({
       uei: getUEI('loyalty-deposit-program', deposit?.programId) || '',
-      title: deposit?.programName || 'Депозит',
+      title: `${String(deposit?.programName || 'Депозит')}: ${money(deposit?.balance)}`,
       subtitle: terms.termRule || 'Бессрочно',
       status: depositCardStatusLabel(deposit?.status),
       benefit: terms.benefit || 'Депозит',

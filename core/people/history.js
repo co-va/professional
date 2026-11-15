@@ -237,10 +237,28 @@ function mergePersonHistory(audit = [], current = [], deletedIds = new Set()) {
   const currentById = new Map(current.filter(item => item.kind === 'record')
     .map(item => [text(item.recordId), item]));
   const auditedRecords = new Set(audit.filter((item) => item.kind === 'record').map((item) => text(item.recordId)));
-  // Audit supplies the details; live Record/Finance supplies the current color.
-  const enrichedAudit = audit.map(item => item.kind === 'record'
-    ? { ...item, visualClass: currentById.get(text(item.recordId))?.visualClass || item.visualClass }
-    : item);
+  // The audit owns persisted payment/refund facts; a cold Journal Finance
+  // projection must not overwrite its paid status with the default active color.
+  // The live Record retains priority for a subsequent cancellation/no-show.
+  const enrichedAudit = audit.map((item) => {
+    if (item.kind !== 'record') return item;
+    const live = currentById.get(text(item.recordId));
+    const cancelled = item.status === 'cancelled' || live?.status === 'cancelled';
+    const noShow = !cancelled && (item.attendance === 'no-show' || live?.attendance === 'no-show');
+    const paid = item.paymentState === 'paid'
+      || (!item.paymentState && live?.visualClass === 'journal-list-record--paid');
+    const current = {
+      ...(item.recordSnapshot || {}),
+      status: cancelled ? 'cancelled' : (live?.status || item.status),
+      attendance: noShow ? 'no-show' : (live?.attendance || item.attendance),
+    };
+    return {
+      ...item,
+      status: current.status,
+      ...(cancelled ? { subtitle: 'Отменена' } : {}),
+      visualClass: recordListStatusClass(current, { paid }),
+    };
+  });
   return [...enrichedAudit, ...current.filter((item) => !deletedIds.has(text(item.recordId))
     && !auditedRecords.has(text(item.recordId)))]
     .sort((a, b) => text(b.occurredAt).localeCompare(text(a.occurredAt)));

@@ -206,7 +206,7 @@ async function depositsForRecord(record, payment = null, verifiedPersonDeposits 
   // the server-owned Settlement, never in this source picker.
   const allowedIds = new Set([
     ...currentIds,
-    ...deposits.filter((item) => isActiveDepositAssignment(item) && Number(item?.balance || 0) > 0.009)
+    ...deposits.filter((item) => isActiveDepositAssignment(item))
       .map((item) => String(item?.depositId || item?.id || '')),
   ]);
   const scoped = deposits.filter((item) => allowedIds.has(String(item?.depositId || item?.id || '')))

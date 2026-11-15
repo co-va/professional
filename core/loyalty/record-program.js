@@ -10,7 +10,7 @@ function personKeyOf(personOrKey = '') {
   return text(personOrKey);
 }
 
-function option({ type, typeLabel, assignmentId = '', programId = '', name = '', pricePercent = 0 } = {}) {
+function option({ type, typeLabel, assignmentId = '', programId = '', name = '', pricePercent = 0, balance = null } = {}) {
   const normalizedType = text(type);
   const normalizedAssignmentId = text(assignmentId);
   const normalizedProgramId = text(programId);
@@ -24,6 +24,7 @@ function option({ type, typeLabel, assignmentId = '', programId = '', name = '',
     programId: normalizedProgramId,
     name: text(name) || 'Программа',
     pricePercent: percent(pricePercent),
+    balance: balance == null ? null : Math.max(0, Number(balance) || 0),
   };
 }
 
@@ -37,6 +38,7 @@ function depositOptions(personKey) {
       programId: deposit?.programId,
       name: deposit?.programName || 'Депозит',
       pricePercent: deposit?.discountPercent,
+      balance: deposit?.balance ?? 0,
     }))
     .filter(Boolean);
 }

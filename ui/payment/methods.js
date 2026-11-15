@@ -36,12 +36,10 @@ function paymentSourceOptions(wallets = [], deposits = [], personalAccount = nul
       value: sourceKey('wallet', wallet?.id),
       label: String(wallet?.name || 'Кошелёк'),
     })),
-    ...(Array.isArray(deposits) ? deposits : [])
-      .filter((deposit) => Number(deposit?.balance || 0) > 0.009)
-      .map((deposit) => ({
-        value: sourceKey('deposit', deposit?.depositId || deposit?.id),
-        label: `${String(deposit?.programName || deposit?.name || 'Депозит')} · остаток ${moneyDisplay(deposit?.balance)}`,
-      })),
+    ...(Array.isArray(deposits) ? deposits : []).map((deposit) => ({
+      value: sourceKey('deposit', deposit?.depositId || deposit?.id),
+      label: `${String(deposit?.programName || deposit?.name || 'Депозит')}: ${moneyDisplay(deposit?.balance)}`,
+    })),
     ...(accountAvailable > 0.009 ? [{
       value: sourceKey('personal-account', personalAccount?.personKey || 'account'),
       label: `Личный счёт · доступно ${moneyDisplay(accountAvailable)}`,
