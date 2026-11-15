@@ -76,6 +76,32 @@ assert.match(daySource, /const dayUsages = getTimeUsagesForScope\(\{ date: dayDa
   'Time usage may not depend on a current working-day row');
 assert.match(daySource, /interactiveSlots: false/,
   'Records on days without a WorkPlan must remain accessible without allowing new slots');
+assert.match(daySource, /createTimeGrid\(\{ date, usages \}\)/,
+  'Use canonical Time normalization for overnight records, not raw clock arithmetic');
+
+const recordServiceSource = readFileSync('core/record/service.js', 'utf8');
+assert.match(recordServiceSource, /if \(scheduleChanged\(current, next\) && !checkRecordTime\(/,
+  'Only moving a Record may recheck availability; attendance must remain editable');
+
+const eventViewerSource = readFileSync('journal/event-view.js', 'utf8');
+assert.match(eventViewerSource, /if \(from !== current\.from \|\| to !== current\.to\)/,
+  'Editing event text must not recheck its original time');
+
+const journalSource = readFileSync('journal/journal.js', 'utf8');
+assert.match(journalSource, /label: 'Сумма', value: formatRubles\(total\), strong: true/,
+  'Day/Month Z-report keeps its existing receipt layout');
+assert.doesNotMatch(journalSource, /label: 'Стоимость услуг и товаров'/,
+  'No unapproved receipt group may be introduced');
+
+
+// A previous-day overnight Record is still visible on today's readonly Day.
+const carriedRecord = { ...record, date: '2026-11-14', from: '23:30', to: '00:30' };
+const carried = journalDayTimeline({
+  day: '2026-11-15', from: '00:00', to: '01:00',
+  usages: [carriedRecord], interactiveSlots: false,
+});
+assert.match(carried, /data-time-usage="record-1"/);
+assert.doesNotMatch(carried, /data-time-slot-from=/);
 
 const timeSource = readFileSync('ui/time/journal-day.js', 'utf8');
 const css = readFileSync('ui/time/time.css', 'utf8');
