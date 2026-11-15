@@ -38,3 +38,12 @@
    separated from the numbered working list without changing shared controls. */
 [data-inventory-audit-criteria] [data-inventory-audit-excluded]:not([hidden]){margin-bottom:16px}
 [data-inventory-audit-criteria] [data-inventory-audit-excluded][open] [data-inventory-audit-excluded-list]{margin-top:10px;padding-bottom:4px}
+
+/* Shared data-edit-row geometry; Order lines keep the Stocktake checkbox
+   and compact numeric control on the same horizontal row. */
+[data-inventory-order-review] .data-edit-row>.field-inline-label{justify-content:flex-start}
+[data-inventory-order-review] .data-edit-row__name{white-space:normal;min-width:0;display:grid;gap:2px}
+[data-inventory-order-review] .data-edit-row__name strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+[data-inventory-order-review] .data-edit-row__name small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+[data-inventory-order-review] [data-inventory-order-excluded] {margin-bottom:16px}
+[data-inventory-order-review] [data-inventory-order-excluded][open] [data-inventory-order-excluded-list]{margin-top:10px;padding-bottom:4px}

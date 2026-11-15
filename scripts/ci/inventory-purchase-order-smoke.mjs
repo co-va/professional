@@ -48,11 +48,12 @@ data.applyInventorySnapshot({ items: [
   { itemId:'three-quarter',unit:'г',packageQuantity:60,balance:45,minStock:0.5,targetStock:1 },
   { itemId:'full-tube',unit:'г',packageQuantity:60,balance:60,minStock:0.5,targetStock:1 },
   { itemId:'no-threshold',unit:'г',packageQuantity:60,balance:0,minStock:0,targetStock:0 },
+  { itemId:'never-configured-absent-colour',unit:'г',packageQuantity:60,balance:0,minStock:null,targetStock:null },
   { itemId:'zero-without-size',unit:'г',packageQuantity:null,balance:0,minStock:0.5,targetStock:1 },
   { itemId:'large-stock',unit:'г',packageQuantity:60,balance:90,minStock:1.5,targetStock:3 },
 ] });
-assert.deepEqual(data.inventoryOrderSuggestions('minimum').map(x=>x.itemId), ['half-tube','zero-without-size','large-stock']);
-assert.deepEqual(data.inventoryOrderSuggestions('target').map(x=>x.itemId), ['half-tube','three-quarter','zero-without-size','large-stock']);
+assert.deepEqual(data.inventoryOrderSuggestions('minimum').map(x=>x.itemId), ['half-tube','zero-without-size','large-stock','never-configured-absent-colour']);
+assert.deepEqual(data.inventoryOrderSuggestions('target').map(x=>x.itemId), ['half-tube','three-quarter','zero-without-size','large-stock','never-configured-absent-colour']);
 assert.equal(data.inventoryOrderSuggestions('minimum')[0].suggestedQuantity, 30);
 assert.equal(data.inventoryOrderSuggestions('target')[1].urgency, 'normal');
 assert.equal(data.inventoryOrderSuggestions('target')[0].urgency, 'urgent');
@@ -95,7 +96,11 @@ assert.match(orderSource, /c:\s*\{\s*label:\s*'\+'/,
 // Q1 is only criteria; Q2 immediately shows checked lines and the collapsed
 // full catalog. No third selection step and no filtering to recommended-only.
 assert.match(orderSource, /title: 'Критерии'/);
-assert.match(orderSource, /title: mode === 'minimum' \? 'Срочно' : 'К заказу'/);
+assert.match(orderSource, /name: 'orderReviewMode'/);
+assert.match(orderSource, /const ORDER_MODES = \[/);
+assert.match(orderSource, /\{ value: 'minimum', label: 'Минимум' \}/);
+assert.match(orderSource, /\{ value: 'all', label: 'Весь каталог' \}/);
+assert.doesNotMatch(orderSource, /label: 'Срочно'/);
 assert.match(orderSource, /data-inventory-order-active/);
 assert.match(orderSource, /data-inventory-order-excluded-list/);
 assert.match(orderSource, /data-inventory-order-include/);
@@ -105,7 +110,11 @@ assert.match(layoutCss, /:is\(\[data-inventory-audit-result\],\[data-inventory-o
 assert.match(orderSource, /data-inventory-order-balance/);
 assert.match(orderSource, /const orderItemLabel =/);
 assert.match(orderSource, /const orderItemBalance =/);
-assert.match(orderSource, /placeholder: isTube\(item\) \? 'Тюбиков, шт\.'/);
+assert.match(orderSource, /class="data-edit-row"/);
+assert.match(orderSource, /'data-inventory-order-fields'/);
+assert.match(orderSource, /class="data-edit-row__name"/);
+assert.ok(orderSource.indexOf('<details data-inventory-order-excluded') <
+  orderSource.indexOf('<div data-inventory-order-active'), 'Catalog above order rows');
 assert.doesNotMatch(orderSource, /'Купить ' \+ suggestedPacks\(item\)/);
 const headingStart = orderSource.indexOf('const orderItemLabel =');
 const headingEnd = orderSource.indexOf('const dateLabel =', headingStart);

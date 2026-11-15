@@ -28,6 +28,11 @@ const packSize = row => {
 };
 const isTube = row => ['г', 'гр', 'гр.', 'грамм', 'граммы'].includes(String(row.unit || '').toLocaleLowerCase('ru-RU'));
 const packageLabel = row => isTube(row) ? 'тюб.' : 'шт.';
+const ORDER_MODES = [
+  { value: 'target', label: 'К заказу' },
+  { value: 'minimum', label: 'Минимум' },
+  { value: 'all', label: 'Весь каталог' },
+];
 // Match Stocktake's numbered title and actual balance, not the recommendation.
 const orderItemLabel = item => {
   const number = Number(item.position);
@@ -122,8 +127,10 @@ function initialOrderLines(catalog, recommendations, manufacturerFilter = '', ex
 
 function openInventoryOrderReview(root, { mode = 'target', supplier = '', manufacturerFilter = '', sorting = 'position' } = {}, existing = null, onSaved = () => {}) {
   const catalog = getInventoryItems();
-  const recommendations = inventoryOrderSuggestions(mode);
+  let currentMode = mode;
+  const recommendations = currentMode === 'all' ? [] : inventoryOrderSuggestions(currentMode);
   const { suggestionById, selected } = initialOrderLines(catalog, recommendations, manufacturerFilter, existing);
+  const manuallyChanged = new Set((existing?.lines || []).map(line => line.itemId));
   const rows = sortedItems(catalog.map(item => ({
     ...item,
     suggestedQuantity: suggestionById.get(item.itemId)?.suggestedQuantity || 0,
@@ -135,23 +142,27 @@ function openInventoryOrderReview(root, { mode = 'target', supplier = '', manufa
     const included = selected.has(item.itemId);
     const quantity = selected.get(item.itemId) || (item.suggestedQuantity > 0 ? suggestedPacks(item) : 1);
     const label = orderItemLabel(item);
-    // Exact Stocktake heading: compactCheck, numbered item, actual stock.
+    // The shared data-edit-row already places a compact numeric field beside
+    // the product, not under a separate full-width input.
+    const quantityField = field({
+      label: '', placeholder: '', name: 'orderPackages-' + index,
+      type: 'number', min: '1', step: '1', inputmode: 'numeric',
+      value: String(quantity), disabled: !included,
+    }).replace('<label class="field">',
+      '<label class="field" data-inventory-order-fields' + (included ? '' : ' hidden') + '>');
     return '<section data-inventory-order-row="' + index + '">' +
-      '<div class="field-inline-label">' +
-      compactCheck({
-        label: '', checked: included, data: 'data-inventory-order-include="' + index + '"',
-        aria: 'Включить в заказ ' + label,
-      }) +
-      '<strong title="' + escapeHtml(label) + '">' + escapeHtml(label) + '</strong>' +
-      '<span data-inventory-order-balance>' + escapeHtml(orderItemBalance(item)) + '</span>' +
-      '</div>' +
-      '<div data-inventory-order-fields' + (included ? '' : ' hidden') + '>' +
-      field({
-        label: '', placeholder: isTube(item) ? 'Тюбиков, шт.' : 'Количество, шт.',
-        name: 'orderPackages-' + index, type: 'number',
-        min: '1', step: '1', inputmode: 'numeric', value: String(quantity),
-        disabled: !included,
-      }) +
+      '<div class="data-edit-row">' +
+        '<div class="field-inline-label">' +
+          compactCheck({
+            label: '', checked: included, data: 'data-inventory-order-include="' + index + '"',
+            aria: 'Включить в заказ ' + label,
+          }) +
+          '<span class="data-edit-row__name">' +
+            '<strong title="' + escapeHtml(label) + '">' + escapeHtml(label) + '</strong>' +
+            '<small data-inventory-order-balance>' + escapeHtml(orderItemBalance(item)) + '</small>' +
+          '</span>' +
+        '</div>' +
+        quantityField +
       '</div>' +
       '</section>';
   };
@@ -160,21 +171,25 @@ function openInventoryOrderReview(root, { mode = 'target', supplier = '', manufa
   const markup = '<div class="form-grid" data-inventory-order-review>' +
     '<p data-inventory-order-selection-count></p>' +
     '<p data-inventory-order-empty' + (selected.size ? ' hidden' : '') + '>Позиций нет. Добавьте из каталога.</p>' +
-    '<div data-inventory-order-active>' + includedRows + '</div>' +
-    '<details data-inventory-order-excluded>' +
+    '<details data-inventory-order-excluded' + (currentMode === 'all' ? ' open' : '') + '>' +
       '<summary data-inventory-order-excluded-count></summary>' +
       headSearch('data-inventory-order-catalog-search') +
       '<div data-inventory-order-excluded-list>' + excludedRows + '</div>' +
     '</details>' +
+    '<div data-inventory-order-active>' + includedRows + '</div>' +
     '<p class="form-error" role="status" data-inventory-order-selection-error></p>' +
     actionBlock(button(existing ? 'Сохранить заказ' : 'Сформировать', {
       data: 'data-inventory-order-create',
     })) +
     '</div>';
-  const layer = mountModal(root, modal(markup, {
-    variant: 'q', title: mode === 'minimum' ? 'Срочно' : 'К заказу',
-  }));
+  const layer = mountModal(root, modal(markup, { variant: 'q' }));
   if (!layer) return null;
+  // Q header owns one existing shared Select: switch category in place,
+  // without closing or reopening Q2 or discarding typed quantities.
+  const header = layer.querySelector('[data-v2-q-header-content]');
+  if (header) header.innerHTML = select({
+    label: '', name: 'orderReviewMode', value: currentMode, options: ORDER_MODES,
+  });
   const activeList = layer.querySelector('[data-inventory-order-active]');
   const excludedList = layer.querySelector('[data-inventory-order-excluded-list]');
   const excludedGroup = layer.querySelector('[data-inventory-order-excluded]');
@@ -191,7 +206,7 @@ function openInventoryOrderReview(root, { mode = 'target', supplier = '', manufa
   const sync = () => {
     const total = selected.size;
     includedCount.textContent = 'В заказе: ' + total;
-    excludedCount.textContent = 'Добавить из каталога: ' + (rows.length - total);
+    excludedCount.textContent = 'Исключено: ' + (rows.length - total);
     empty.hidden = total !== 0;
     submit.disabled = saving || total === 0;
   };
@@ -226,6 +241,7 @@ function openInventoryOrderReview(root, { mode = 'target', supplier = '', manufa
       fields.hidden = !check.checked;
       fields.querySelectorAll('input').forEach(input => { input.disabled = !check.checked; });
     }
+    manuallyChanged.add(item.itemId);
     const destination = check.checked ? activeList : excludedList;
     destination.append(node);
     keepOrder(destination);
@@ -235,6 +251,46 @@ function openInventoryOrderReview(root, { mode = 'target', supplier = '', manufa
       updateSearch();
     }
     if (!excludedList.children.length) excludedGroup.open = false;
+    sync();
+  });
+  // A changed number belongs to this selected line and survives mode switches.
+  layer.querySelector('[data-inventory-order-review]')?.addEventListener('input', event => {
+    const match = /^orderPackages-(\\d+)$/.exec(String(event.target?.name || ''));
+    if (match && rows[Number(match[1])]) manuallyChanged.add(rows[Number(match[1])].itemId);
+  });
+  layer.querySelector('[name="orderReviewMode"]')?.addEventListener('change', event => {
+    if (saving) return;
+    const requested = String(event.target.value || 'target');
+    if (!ORDER_MODES.some(option => option.value === requested)) return;
+    currentMode = requested;
+    const recommended = new Map((requested === 'all' ? [] : inventoryOrderSuggestions(requested))
+      .map(item => [item.itemId, item]));
+    for (const [index, item] of rows.entries()) {
+      if (manuallyChanged.has(item.itemId)) continue;
+      const entry = recommended.get(item.itemId);
+      const include = Boolean(entry) && (!manufacturerFilter || manufacturer(item) === manufacturerFilter);
+      const node = layer.querySelector('[data-inventory-order-row="' + index + '"]');
+      if (!node) continue;
+      const check = node.querySelector('[data-inventory-order-include]');
+      const fields = node.querySelector('[data-inventory-order-fields]');
+      if (include) {
+        const packages = suggestedPacks(entry);
+        selected.set(item.itemId, packages);
+        const input = fields?.querySelector('input');
+        if (input) input.value = String(packages);
+      } else selected.delete(item.itemId);
+      if (check) check.checked = include;
+      if (fields) {
+        fields.hidden = !include;
+        fields.querySelectorAll('input').forEach(input => { input.disabled = !include; });
+      }
+      (include ? activeList : excludedList).append(node);
+      if (include) node.hidden = false;
+    }
+    keepOrder(activeList);
+    keepOrder(excludedList);
+    excludedGroup.open = requested === 'all';
+    updateSearch();
     sync();
   });
   search?.addEventListener('input', updateSearch);
@@ -289,8 +345,7 @@ function openInventoryOrderSelection(root, existing = null, onSaved = () => {}) 
   const markup = '<div class="form-grid" data-inventory-order-criteria>' +
     select({
       label: 'Расчёт', name: 'orderThreshold', value: 'target', options: [
-        { value: 'target', label: 'К заказу' },
-        { value: 'minimum', label: 'Срочно' },
+        ...ORDER_MODES,
       ],
     }) +
     field({
