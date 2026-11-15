@@ -227,7 +227,10 @@ export function updateRecord(id, patch = {}, { actionContext = null } = {}) {
 
   const next = { ...current, ...nextDataPatch };
   if (next.group?.participants?.length) next.person = next.group.participants[0];
-  if (!checkRecordTime({
+  // Non-time edits (attendance, confirmation, services without time change)
+  // must not be blocked by a later WorkPlan change to an existing Record.
+  // Time still validates every actual move or duration change.
+  if (scheduleChanged(current, next) && !checkRecordTime({
     date: next.date,
     workplaceId: next.workplaceId,
     from: next.from,
