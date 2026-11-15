@@ -53,6 +53,9 @@ export function inventorySaleProduct(item) {
     manufacturer: item.manufacturer,
     unit: item.saleUnit || item.unit,
     quantity: item.saleQuantity == null ? null : Number(item.saleQuantity),
+    // The catalog price is for the default sale quantity (e.g. 100 gloves).
+    // The price per base sale unit is used only to calculate the final bill.
+    pricePerUnit: Number.isFinite(unitPrice) ? unitPrice / (Number(item.saleQuantity) > 0 ? Number(item.saleQuantity) : 1) : 0,
     cost: { mode: 'amount', amount: Number.isFinite(unitPrice) ? Math.round(unitPrice * 100) / 100 : 0, free: false },
     about: '', workplaces: [], inventoryOwned: true,
   };

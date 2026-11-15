@@ -150,7 +150,8 @@ export function openSale({
         errorHost.textContent = 'Проверьте количество: ' + product.name;
         return;
       }
-      const unitPrice = Number(productCost(product, workplaceId)) || 0;
+      const unitPrice = Number(product.inventoryItemId
+        ? product.pricePerUnit : productCost(product, workplaceId)) || 0;
       nextProducts.push({
         ...(existing || {}),
         id: product.id,
@@ -159,7 +160,8 @@ export function openSale({
         unit: product.unit || 'шт.',
         quantity,
         unitPrice,
-        cost: { mode: 'amount', amount: Math.round(unitPrice * quantity * 100) / 100, free: false },
+        // Record/Finance requires a numeric immutable price snapshot.
+        cost: Math.round(unitPrice * quantity * 100) / 100,
       });
     }
     saveButton.disabled = true;

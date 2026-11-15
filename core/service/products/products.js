@@ -63,7 +63,7 @@ function productRow(product) {
     rightTop: price.rightTop || '',
     rightBottom: price.rightBottom || '',
     interactive: true,
-    reorderHandle: true,
+    reorderHandle: !product.inventoryOwned,
     reorderAria: 'Изменить порядок',
     data: `data-product="${escapeHtml(product.id)}" data-reorder-id="${escapeHtml(product.id)}"`,
     aria: `Открыть товар ${product.name || ''}`,
@@ -95,6 +95,9 @@ export function renderProductCatalog(host, { root = host, onChanged = () => {} }
     });
   });
 
+  // Stock items follow Inventory ordering; the auxiliary Service ordering
+  // cannot reorder a combined catalog without dropping inventory identities.
+  if (items.some(item => item.inventoryOwned)) return () => {};
   return initV2ListReorder(host, {
     onReorder: (ids) => commitReorderProducts(ids),
     onError: (error) => openNotice({
