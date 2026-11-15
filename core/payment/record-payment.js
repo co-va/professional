@@ -192,7 +192,7 @@ function mountPaymentQ(record, {
   return layer;
 }
 
-async function depositsForRecord(record, payment = null) {
+async function depositsForRecord(record, payment = null, verifiedPersonDeposits = null) {
   const selectedDepositId = selectedRecordDepositId(record);
   const current = paymentDepositAllocations(payment);
   const currentIds = new Set(current.map((item) => String(item?.depositId || '')).filter(Boolean));
@@ -200,7 +200,7 @@ async function depositsForRecord(record, payment = null) {
   const person = personForRecord(record);
   const key = String(person?.key || person?.id || '');
   if (!key) return [];
-  const deposits = await listPersonDeposits(key);
+  const deposits = Array.isArray(verifiedPersonDeposits) ? verifiedPersonDeposits : await listPersonDeposits(key);
   // A person's server-backed deposit is an available source of money even when
   // the Record has no explicit loyaltyProgram selection. Price rules remain in
   // the server-owned Settlement, never in this source picker.
@@ -283,15 +283,16 @@ async function openPaymentEntry(record, onCompleted = () => {}) {
   let total = 0;
   let gratuityOnly = false;
   let deposits = [];
+  let verifiedPersonDeposits = [];
   let personalAccount = null;
   let wallets = [];
   try {
     const key = String(personForRecord(current)?.key || personForRecord(current)?.id || '').trim();
     // A cold Journal/Record route may not have loaded Finance/Cash.
     // Resolve the actual wallet catalog before rendering any source picker.
-    [wallets] = await Promise.all([
+    [wallets, verifiedPersonDeposits] = await Promise.all([
       loadVerifiedPaymentSource(() => loadWalletCatalog(), 'Кошельки'),
-      key ? loadVerifiedPaymentSource(() => listPersonDeposits(key), 'Условия скидки') : Promise.resolve(),
+      key ? loadVerifiedPaymentSource(() => listPersonDeposits(key), 'Условия скидки') : Promise.resolve([]),
     ]);
     const verifiedRecord = getRecord(recordId) || current;
     settlement = settlementForRecord(verifiedRecord);
@@ -305,7 +306,7 @@ async function openPaymentEntry(record, onCompleted = () => {}) {
     [deposits, personalAccount] = gratuityOnly
       ? [[], null]
       : await Promise.all([
-        depositsForRecord(verifiedRecord),
+        depositsForRecord(verifiedRecord, null, verifiedPersonDeposits),
         personalAccountForRecord(verifiedRecord, settlement, total),
       ]);
   } catch (error) {

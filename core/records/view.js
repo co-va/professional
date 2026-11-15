@@ -1,6 +1,7 @@
 import {
   actionBlock,
   emptyState,
+  field,
   bindRecordSettings,
   button,
   durationText,
@@ -598,15 +599,17 @@ export function openRecordView(record, {
       : [];
     const storedProgramKey = String(source?.loyaltyProgram?.key || '');
     const selectedProgramKey = programs.find((item) => item.key === storedProgramKey)?.key || programs[0]?.key || '';
-    const programSelector = programs.length ? select({
-      label: 'Программа',
-      name: 'recordLoyaltyProgram',
-      value: selectedProgramKey,
-      options: programs.map((item) => ({ value: item.key, label: item.name, meta: item.typeLabel })),
-      data: 'data-record-view-program',
-      aria: 'Выбрать программу записи',
-      disabled: payment.hasPayments || source.status === 'cancelled',
-    }) : '';
+    const programSelector = !programs.length ? ''
+      : payment.hasPayments || source.status === 'cancelled'
+        ? field({ label: 'Программа', value: programs.find((item) => item.key === selectedProgramKey)?.name || '', readonly: true })
+        : select({
+          label: 'Программа',
+          name: 'recordLoyaltyProgram',
+          value: selectedProgramKey,
+          options: programs.map((item) => ({ value: item.key, label: item.name, meta: item.typeLabel })),
+          data: 'data-record-view-program',
+          aria: 'Выбрать программу записи',
+        });
     const contact = capabilities.contactIdentity
       ? (getAllPeople().find((item) => String(item?.key || item?.id || '').trim() === personKey) || source.person || {})
       : (source.person || {});
