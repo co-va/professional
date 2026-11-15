@@ -442,13 +442,16 @@ async function openPaymentCorrection(record, payment, onSaved) {
   initDatePickers(host);
 
   let allocationState = null;
+  let savingCorrection = false;
   const primaryHost = host.querySelector('[data-record-payment-correction-primary]');
   const syncPrimary = () => {
-    if (!primaryHost) return;
+    if (!primaryHost || savingCorrection) return;
     primaryHost.innerHTML = allocationState?.valid
       ? button('Сохранить', { variant: 'secondary', data: 'data-record-payment-correction-submit' })
       : '';
     primaryHost.querySelector('[data-record-payment-correction-submit]')?.addEventListener('click', async (event) => {
+      if (savingCorrection) return;
+      savingCorrection = true;
       const submit = event.currentTarget;
       submit.disabled = true;
       const dateValue = String(host.querySelector('input[name="recordPaymentCorrectionDate"]')?.value || '');
@@ -464,6 +467,7 @@ async function openPaymentCorrection(record, payment, onSaved) {
         onSaved?.();
       } catch (error) {
         openNotice({ message: String(error?.message || 'Не удалось скорректировать оплату') });
+        savingCorrection = false;
         if (submit.isConnected) submit.disabled = false;
       }
     });
@@ -508,18 +512,22 @@ async function openPaymentRefund(record, payment, onSaved) {
   const amountInput = layer.querySelector('input[name="recordPaymentRefundAmount"]');
   const walletInput = layer.querySelector('input[name="recordPaymentRefundWallet"]');
   const submit = layer.querySelector('[data-record-payment-refund-confirm]');
+  let refundInFlight = false;
   const hasCash = allocations.reduce((sum, item) => sum + Number(item.amount || 0), 0) > 0.009;
   const sync = () => {
     const amount = Math.max(0, Math.min(remaining, Number(String(amountInput?.value || '0').replace(',', '.')) || 0));
-    if (submit) submit.disabled = amount <= 0 || (hasCash && !walletInput?.value);
+    if (submit) submit.disabled = refundInFlight || amount <= 0 || (hasCash && !walletInput?.value);
   };
   amountInput?.addEventListener('input', sync);
   walletInput?.addEventListener('change', sync);
   submit?.addEventListener('click', async () => {
+    if (refundInFlight) return;
     const amount = Math.max(0, Math.min(remaining, Number(String(amountInput?.value || '0').replace(',', '.')) || 0));
     const wallet = wallets.find((item) => String(item?.id || '') === String(walletInput?.value || ''));
     const dateValue = String(layer.querySelector('input[name="recordPaymentRefundDate"]')?.value || '');
     if (!amount || !dateValue || (hasCash && !wallet)) return;
+    refundInFlight = true;
+    sync();
     try {
       const refund = await recordRefundExpense(payment.id, {
         amount,
@@ -532,6 +540,9 @@ async function openPaymentRefund(record, payment, onSaved) {
       onSaved?.();
     } catch (error) {
       openNotice({ message: String(error?.message || 'Не удалось выполнить возврат') });
+    } finally {
+      refundInFlight = false;
+      if (layer.isConnected) sync();
     }
   });
   sync();
@@ -545,13 +556,17 @@ function openPaymentDeletion(payment, onSaved) {
     <div class="modal-actions">${button('Удалить оплату', { variant: 'critical', data: 'data-record-payment-delete-confirm' })}</div>`,
     { variant: 'x', surface: 'app', title: 'Удаление оплаты', className: 'modal--form-sheet' },
   ));
-  layer?.querySelector('[data-record-payment-delete-confirm]')?.addEventListener('click', async () => {
+  layer?.querySelector('[data-record-payment-delete-confirm]')?.addEventListener('click', async (event) => {
+    const submit = event.currentTarget;
+    if (submit.disabled) return;
+    submit.disabled = true;
     try {
       await hardDeleteFinanceOperation(payment.id);
       layer.v2Close?.();
       onSaved?.();
     } catch (error) {
       openNotice({ message: String(error?.message || 'Не удалось удалить оплату') });
+      if (submit.isConnected) submit.disabled = false;
     }
   });
   return layer;

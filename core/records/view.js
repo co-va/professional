@@ -550,7 +550,7 @@ export function openRecordView(record, {
     const rows = procedures.map((procedure, index) => v2ListEntry({
       title: String(procedure?.name || 'Услуга'),
       subtitle: durationText(Number(procedure?.duration) || 0),
-      rightTop: formatMoney(byId.get(String(procedure?.id || ''))?.planAmount ?? procedure?.cost ?? 0),
+      rightTop: formatMoney(byId.get(String(procedure?.id || ''))?.price ?? procedure?.cost ?? 0),
       initial: String(procedure?.name || 'У').slice(0, 1).toUpperCase(),
       data: `data-record-view-service-index="${index}"`,
       aria: `Корректировать услугу ${String(procedure?.name || 'Услуга')}`,
