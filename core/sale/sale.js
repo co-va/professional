@@ -3,6 +3,7 @@ import {
   button,
   emptyState,
   escapeHtml,
+  field,
   initMultiSelect,
   modal,
   mountModal,
@@ -15,6 +16,7 @@ import {
 import { flushBusinessPersistence } from '../business-persistence.js';
 import { getRecord, refreshRecordsFromServer, updateRecord } from '../record/index.js';
 import { getProducts } from '../service/products/data.js';
+import { loadInventory } from '../inventory/service.js';
 
 function workplaceAssignment(item, workplaceId) {
   const id = String(workplaceId || '');
@@ -68,62 +70,110 @@ export function openSale({
   selectedProducts = [],
   onSave = async () => true,
 } = {}) {
-  const available = getProducts().filter((product) => productAvailable(product, workplaceId));
   const current = Array.isArray(selectedProducts) ? selectedProducts : [];
-  const selected = new Set(current.map((item) => String(item?.id || '')).filter(Boolean));
-  const currentById = new Map(current.map((item) => [String(item?.id || ''), item]));
-  const list = available.length
-    ? v2ListEntries(productRows(available, selected, currentById, workplaceId))
-    : emptyState('Товаров пока нет', 'Добавьте товары в Сервисе.');
+  const selected = new Set(current.map(item => String(item?.id || '')).filter(Boolean));
+  const currentById = new Map(current.map(item => [String(item?.id || ''), item]));
+  const amountDraft = new Map();
+  for (const item of current) if (item?.quantity != null) amountDraft.set(String(item.id), String(item.quantity));
+  let available = [], controller = null, ready = false;
 
   const layer = mountModal(document.body, modal(
     `${workspaceHeaderContext({ title: 'Продажа' })}${page([
-      `<div data-sale-products>${list}</div>`,
-      actionBlock(button('Добавить', { data: 'data-sale-save' })),
+      '<div data-sale-products></div>',
+      '<div data-sale-amounts></div>',
+      '<div class="form-error" role="alert" data-sale-error></div>',
+      actionBlock(button('Добавить', { data: 'data-sale-save', disabled: true })),
     ])}`,
     { variant: 'q', surface: 'app', title: 'Продажа', className: 'sale-q' },
   ));
   if (!layer) return null;
-
   const listRoot = layer.querySelector('[data-sale-products]');
-  const controller = listRoot && available.length ? initMultiSelect(listRoot, {
-    selectedValues: [...selected],
-    selector: '[data-sale-product]',
-    valueAttribute: 'saleProduct',
-    onChange: (values) => {
-      selected.clear();
-      values.forEach((value) => selected.add(String(value)));
-    },
-  }) : null;
+  const amountsRoot = layer.querySelector('[data-sale-amounts]');
+  const saveButton = layer.querySelector('[data-sale-save]');
+  const errorHost = layer.querySelector('[data-sale-error]');
+  listRoot.innerHTML = emptyState('Загрузка', 'Загружаем товары со склада.');
 
-  layer.querySelector('[data-sale-save]')?.addEventListener('click', async (event) => {
-    const submit = event.currentTarget;
-    submit.disabled = true;
-    const nextProducts = available
-      .filter((product) => selected.has(String(product?.id || '')))
-      .map((product) => {
-        const id = String(product?.id || '');
-        const existing = currentById.get(id);
-        return existing ? { ...existing } : {
-          id: product?.id || '',
-          name: product?.name || '',
-          cost: productCost(product, workplaceId),
-        };
+  const syncAmounts = () => {
+    amountsRoot.innerHTML = available.filter(item => selected.has(String(item.id))).map(item => {
+      const id = String(item.id);
+      const existing = currentById.get(id);
+      const defaultQuantity = item.inventoryItemId
+        ? (item.quantity == null ? '' : String(item.quantity))
+        : '1';
+      const value = amountDraft.get(id) ?? (existing?.quantity == null ? defaultQuantity : String(existing.quantity));
+      return field({
+        label: 'Количество · ' + item.name + ' (' + (item.unit || 'шт.') + ')',
+        name: 'quantity-' + id, value,
+        type: 'number', min: '0.001', step: 'any', inputmode: 'decimal',
+        data: `data-sale-quantity="${escapeHtml(id)}"`,
       });
-    try {
-      const result = await onSave(nextProducts);
-      if (result === false) {
-        submit.disabled = false;
+    }).join('');
+  };
+  amountsRoot?.addEventListener('input', event => {
+    if (!event.target.matches('[data-sale-quantity]')) return;
+    amountDraft.set(event.target.dataset.saleQuantity, event.target.value);
+  });
+  void loadInventory().then(() => {
+    if (!layer.isConnected) return;
+    available = getProducts().filter(item => productAvailable(item, workplaceId));
+    listRoot.innerHTML = available.length
+      ? v2ListEntries(productRows(available, selected, currentById, workplaceId))
+      : emptyState('Товаров пока нет', 'Создайте товар на складе и включите «Продажа».');
+    if (available.length) controller = initMultiSelect(listRoot, {
+      selectedValues: [...selected],
+      selector: '[data-sale-product]',
+      valueAttribute: 'saleProduct',
+      onChange: values => {
+        selected.clear();
+        values.forEach(value => selected.add(String(value)));
+        syncAmounts();
+      },
+    });
+    syncAmounts();
+    ready = true;
+    saveButton.disabled = false;
+  }).catch(error => {
+    if (!layer.isConnected) return;
+    listRoot.innerHTML = '';
+    errorHost.textContent = error instanceof Error ? error.message : 'Не удалось загрузить склад.';
+  });
+
+  saveButton?.addEventListener('click', async () => {
+    if (!ready || saveButton.disabled) return;
+    const nextProducts = [];
+    for (const product of available.filter(item => selected.has(String(item.id)))) {
+      const id = String(product.id);
+      const existing = currentById.get(id);
+      const raw = String(amountDraft.get(id) ?? amountsRoot.querySelector('[data-sale-quantity="' + id + '"]')?.value ?? '').trim();
+      const quantity = Number(raw.replace(',', '.'));
+      if (!raw || !Number.isFinite(quantity) || quantity <= 0 || (product.unit === 'шт.' && !Number.isSafeInteger(quantity))) {
+        errorHost.textContent = 'Проверьте количество: ' + product.name;
         return;
       }
+      const unitPrice = Number(productCost(product, workplaceId)) || 0;
+      nextProducts.push({
+        ...(existing || {}),
+        id: product.id,
+        name: product.name,
+        ...(product.inventoryItemId ? { inventoryItemId: product.inventoryItemId } : {}),
+        unit: product.unit || 'шт.',
+        quantity,
+        unitPrice,
+        cost: { mode: 'amount', amount: Math.round(unitPrice * quantity * 100) / 100, free: false },
+      });
+    }
+    saveButton.disabled = true;
+    errorHost.textContent = '';
+    try {
+      const result = await onSave(nextProducts);
+      if (result === false) { saveButton.disabled = false; return; }
       controller?.destroy();
       layer.v2Close?.();
     } catch (error) {
-      openNotice({ title: 'Не удалось сохранить', message: String(error?.message || 'Не удалось добавить товары.') });
-      if (submit.isConnected) submit.disabled = false;
+      errorHost.textContent = error instanceof Error ? error.message : 'Не удалось добавить товары.';
+      saveButton.disabled = false;
     }
   });
-
   return layer;
 }
 
