@@ -12,7 +12,7 @@ import {
 } from '../ui/ui.js';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { getDays, getDay, getDayTime, getDaysForDate, getScheduleConflicts } from '../core/day/index.js';
-import { createTimeGrid, getTimeGridMinuteState, getTimeUsagesForScope, timeToMinutes, minutesToTime } from '../core/time/index.js';
+import { createTimeGrid, getTimeGridMinuteState, getTimeUsagesForScope, minutesToTime } from '../core/time/index.js';
 import { getRecordPaymentState } from '../core/finance/index.js';
 import { getNotesForDay } from '../core/note/index.js';
 import { noteTargetLabel, noteVisibleForWorkplace } from './note-target.js';
@@ -26,19 +26,13 @@ function dateKey(date) {
 }
 
 // Visible range only; availability and conflicts remain owned by Time.
-function usageDisplayRange(usages = []) {
-  const starts = [];
-  const ends = [];
-  for (const usage of usages) {
-    const from = timeToMinutes(usage?.from);
-    const to = timeToMinutes(usage?.to);
-    if (from == null || to == null || from === to) continue;
-    starts.push(from);
-    ends.push(to > from ? to : 1439);
-  }
-  if (!starts.length) return null;
-  const start = Math.min(...starts);
-  const end = Math.min(1439, Math.max(...ends));
+function usageDisplayRange(date, usages = []) {
+  // Use Time's existing visible-day normalization. It also clips a Record
+  // carried over from yesterday at midnight; raw from/to cannot do that.
+  const grid = createTimeGrid({ date, usages });
+  if (!grid.usages.length) return null;
+  const start = Math.min(...grid.usages.map((usage) => usage.gridStart));
+  const end = Math.min(1439, Math.max(...grid.usages.map((usage) => usage.gridEnd)));
   return end > start ? { from: minutesToTime(start), to: minutesToTime(end) } : null;
 }
 
@@ -140,7 +134,7 @@ export function renderJournalDay(root, {
   };
   onUsageSummary({ usages: dayUsages });
   const renderReadOnlyUsages = (usages) => {
-    const range = usageDisplayRange(usages);
+    const range = usageDisplayRange(dayDate, usages);
     if (!range) return false;
     timelineRoot.innerHTML = journalDayTimeline({
       ...range, usages, day: dayDate, interactiveSlots: false,
@@ -210,7 +204,7 @@ export function renderJournalDay(root, {
       .filter((id) => id && !scheduledIds.has(id));
     missingIds.forEach((id) => {
       const usages = withFinancialState(dayUsages.filter((usage) => String(usage?.workplaceId || '') === id));
-      const range = usageDisplayRange(usages);
+      const range = usageDisplayRange(dayDate, usages);
       if (!range) return;
       const workplace = workplaces.find((item) => String(item?.key || '') === id);
       columns.push({
