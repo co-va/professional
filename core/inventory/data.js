@@ -1,3 +1,5 @@
+import { inventoryStockBalanceInThresholdUnits } from './completeness.js';
+
 let snapshot = {
   items: [],
   lots: [],
@@ -48,18 +50,18 @@ export function getInventoryOrder(orderId) {
   return snapshot.orders.find(order => String(order?.orderId || '') === String(orderId || '')) || null;
 }
 
-// Minimum is the urgent threshold (inclusive). Target is the stock level we
-// replenish TO. Both values remain in canonical InventoryItem units: grams for
-// weighed colour; tube fractions are converted at the Professional input edge.
+// Thresholds in InventoryItem are already tube quantities for weighed items.
+// Compare them with the actual balance converted from grams to tube equivalents.
+// Purchase amounts still use the original stock unit so order packaging works.
 export function inventoryOrderSuggestions(mode = 'target') {
   return snapshot.items
     .map(item => {
-      const balance = Number(item?.balance);
+      const balance = inventoryStockBalanceInThresholdUnits(item);
       const rawMinimum = item?.minStock;
       const rawTarget = item?.targetStock;
       const minimum = rawMinimum == null || rawMinimum === '' ? null : Number(rawMinimum);
       const target = rawTarget == null || rawTarget === '' ? null : Number(rawTarget);
-      if (!Number.isFinite(balance) || balance < 0) return null;
+      if (balance == null || !Number.isFinite(balance) || balance < 0) return null;
       const hasMinimum = minimum != null && Number.isFinite(minimum) && minimum >= 0;
       const hasTarget = target != null && Number.isFinite(target) && target > 0;
       // A blank/zero configuration must never fill the Order UI with every item.
@@ -67,15 +69,19 @@ export function inventoryOrderSuggestions(mode = 'target') {
       const urgent = hasMinimum && balance <= minimum + 1e-9;
       const recommended = hasTarget && balance < target - 1e-9;
       if (mode === 'minimum' ? !urgent : !(urgent || recommended)) return null;
-      // When urgent, always replenish to the target, not merely to the minimum.
-      // Without a configured target, lift the minimum by one physical package.
-      const pack = Number(item.packageQuantity);
-      const packageUnits = Number.isFinite(pack) && pack > 0 ? pack : 1;
-      const desired = hasTarget && target > minimum
+      // Planning is in full-tube equivalents. The order editor already rounds
+      // the final purchase to whole packs via ceil(quantity / packageSize).
+      const desired = hasTarget && target > (minimum ?? -1)
         ? target
-        : urgent ? (hasMinimum ? minimum : 0) + packageUnits : target;
-      const suggestedQuantity = Math.max(0, desired - balance);
-      if (suggestedQuantity <= 1e-9) return null;
+        : urgent ? (hasMinimum ? minimum : 0) + 1 : target;
+      const needed = Math.max(0, desired - balance);
+      if (needed <= 1e-9) return null;
+      // Preserve the existing suggestedPacks(row) contract: grams for
+      // weighed stock, units for other stock. 0.5 tube short -> buy one tube.
+      const weighed = ['г', 'гр', 'гр.', 'грамм', 'граммы']
+        .includes(String(item.unit || '').toLocaleLowerCase('ru-RU'));
+      const packageSize = Number(item.packageQuantity);
+      const suggestedQuantity = Number((needed * (weighed ? packageSize : 1)).toFixed(6));
       return { ...item, urgency: urgent ? 'urgent' : 'normal', suggestedQuantity };
     })
     .filter(Boolean);

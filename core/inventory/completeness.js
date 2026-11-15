@@ -73,31 +73,34 @@ export function netStocktakeGrams({ gross, containers, tareWeight } = {}) {
   return Math.max(0, Math.round(content * 1000) / 1000);
 }
 
-// Order thresholds are kept in the InventoryItem's canonical accounting unit
-// (grams for colour). Operators configure them as fractions of a full tube.
-// A tube is packageQuantity grams, never containerCount (physical tubes).
+// InventoryItem.minStock/targetStock already store whole-tube equivalents
+// (0.5 = half a tube). Never migrate, divide, or multiply these saved values.
 export function inventoryStockThresholdUnit(item = {}) {
   return isWeighedInventoryItem(item) ? 'тюб.' : String(item.unit || 'шт.');
 }
 
-export function inventoryStockThresholdInput(item = {}, value = null) {
+export function inventoryStockThresholdInput(_item = {}, value = null) {
   if (value == null || value === '') return '';
-  const raw = Number(value);
-  if (!Number.isFinite(raw)) return '';
-  const size = Number(item.packageQuantity);
-  const perUnit = isWeighedInventoryItem(item) && Number.isFinite(size) && size > 0
-    ? raw / size : raw;
-  return Number(perUnit.toFixed(6));
+  const number = Number(value);
+  return Number.isFinite(number) ? number : '';
 }
 
-export function inventoryStockThresholdStored(item = {}, value = null) {
+export function inventoryStockThresholdStored(_item = {}, value = null) {
   if (value == null || value === '') return null;
-  const units = Number(value);
-  if (!Number.isFinite(units) || units < 0) throw new Error('Укажите неотрицательный минимум и цель.');
-  if (!isWeighedInventoryItem(item)) return units;
+  const number = Number(value);
+  if (!Number.isFinite(number) || number < 0)
+    throw new Error('Укажите неотрицательный минимум и цель.');
+  return number;
+}
+
+// Actual balance is stored in grams, while thresholds are set in tubes.
+// Convert balance only for recommendation comparisons. Physical containerCount
+// is a separate measurement and must not be used as remaining content.
+export function inventoryStockBalanceInThresholdUnits(item = {}) {
+  const balance = Number(item.balance);
+  if (!Number.isFinite(balance) || balance < 0) return null;
+  if (!isWeighedInventoryItem(item)) return balance;
   const size = Number(item.packageQuantity);
-  if (!Number.isFinite(size) || size <= 0) {
-    throw new Error('Сначала укажите содержимое одного тюбика в поле «Упаковка».');
-  }
-  return Number((units * size).toFixed(6));
+  if (!Number.isFinite(size) || size <= 0) return null;
+  return balance / size;
 }

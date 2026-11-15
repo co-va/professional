@@ -10,13 +10,14 @@ const inventoryEntrypoint = readFileSync('core/inventory/index.js', 'utf8');
 const thresholdHelpers = readFileSync('core/inventory/completeness.js', 'utf8');
 const strip = value => value.replace(/^export /gm, '');
 const data = new Function('window', 'CustomEvent',
-  strip(dataSource) + 'return {applyInventorySnapshot,inventoryOrderSuggestions,getInventoryOrders};')(
+  strip(thresholdHelpers) + strip(dataSource.replace(/^import[^\n]+\n/gm, ''))
+    + 'return {applyInventorySnapshot,inventoryOrderSuggestions,getInventoryOrders};')(
     { dispatchEvent: () => {} }, class CustomEvent {},
   );
 
 data.applyInventorySnapshot({ items: [
-  { itemId: 'target-only', balance: 100, minStock: 90, targetStock: 220, unit: 'г', packageQuantity: 60 },
-  { itemId: 'needed', balance: 50, minStock: 70, targetStock: 170, unit: 'г', packageQuantity: 60 },
+  { itemId: 'target-only', balance: 100, minStock: 1.5, targetStock: 4, unit: 'г', packageQuantity: 60 },
+  { itemId: 'needed', balance: 50, minStock: 1, targetStock: 3, unit: 'г', packageQuantity: 60 },
   { itemId: 'irrelevant', balance: 0, minStock: 0, targetStock: 0, unit: 'г', packageQuantity: 60 },
   { itemId: 'manual', balance: 300, minStock: 30, targetStock: 100, unit: 'шт.' },
 ] });
@@ -27,24 +28,25 @@ assert.deepEqual(data.getInventoryOrders(), []);
 
 // People enter whole tubes and fractions, not grams of minimum/target stock.
 const threshold = new Function(thresholdHelpers.replace(/^export /gm, '')
-  + '\nreturn { inventoryStockThresholdInput, inventoryStockThresholdStored };')();
+  + '\nreturn { inventoryStockThresholdInput, inventoryStockThresholdStored, inventoryStockBalanceInThresholdUnits };')();
 const colour = { unit: 'г', packageQuantity: 60 };
-assert.equal(threshold.inventoryStockThresholdStored(colour, 0.5), 30);
-assert.equal(threshold.inventoryStockThresholdStored(colour, 1), 60);
-assert.equal(threshold.inventoryStockThresholdStored(colour, 1.5), 90);
-assert.equal(threshold.inventoryStockThresholdInput(colour, 30), 0.5);
-assert.equal(threshold.inventoryStockThresholdInput(colour, 60), 1);
+assert.equal(threshold.inventoryStockThresholdStored(colour, 0.5), 0.5);
+assert.equal(threshold.inventoryStockThresholdStored(colour, 1), 1);
+assert.equal(threshold.inventoryStockThresholdStored(colour, 1.5), 1.5);
+assert.equal(threshold.inventoryStockThresholdInput(colour, 0.5), 0.5);
+assert.equal(threshold.inventoryStockThresholdInput(colour, 1), 1);
 assert.equal(threshold.inventoryStockThresholdStored({ unit: 'шт.', packageQuantity: 1 }, 3), 3);
-assert.throws(() => threshold.inventoryStockThresholdStored({unit:'г'}, 0.5), /Упаковка/);
+assert.equal(threshold.inventoryStockThresholdStored({unit:'г'}, 0.5), 0.5);
+assert.equal(threshold.inventoryStockBalanceInThresholdUnits({unit:'г',balance:30,packageQuantity:60}), 0.5);
 
 // 0.5 tube is already urgent; above 0.5 but below 1 is recommended;
 // every suggestion replenishes to target and buys whole packages.
 data.applyInventorySnapshot({ items: [
-  { itemId:'half-tube',unit:'г',packageQuantity:60,balance:30,minStock:30,targetStock:60 },
-  { itemId:'three-quarter',unit:'г',packageQuantity:60,balance:45,minStock:30,targetStock:60 },
-  { itemId:'full-tube',unit:'г',packageQuantity:60,balance:60,minStock:30,targetStock:60 },
+  { itemId:'half-tube',unit:'г',packageQuantity:60,balance:30,minStock:0.5,targetStock:1 },
+  { itemId:'three-quarter',unit:'г',packageQuantity:60,balance:45,minStock:0.5,targetStock:1 },
+  { itemId:'full-tube',unit:'г',packageQuantity:60,balance:60,minStock:0.5,targetStock:1 },
   { itemId:'no-threshold',unit:'г',packageQuantity:60,balance:0,minStock:0,targetStock:0 },
-  { itemId:'large-stock',unit:'г',packageQuantity:60,balance:90,minStock:90,targetStock:180 },
+  { itemId:'large-stock',unit:'г',packageQuantity:60,balance:90,minStock:1.5,targetStock:3 },
 ] });
 assert.deepEqual(data.inventoryOrderSuggestions('minimum').map(x=>x.itemId), ['half-tube','large-stock']);
 assert.deepEqual(data.inventoryOrderSuggestions('target').map(x=>x.itemId), ['half-tube','three-quarter','large-stock']);
