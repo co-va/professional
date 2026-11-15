@@ -7,6 +7,7 @@ const inventoryUI = readFileSync('core/inventory/inventory.js', 'utf8');
 const service = readFileSync('core/inventory/service.js', 'utf8');
 const excel = readFileSync('core/inventory/excel-v2.js', 'utf8');
 const inventoryEntrypoint = readFileSync('core/inventory/index.js', 'utf8');
+const thresholdHelpers = readFileSync('core/inventory/completeness.js', 'utf8');
 const strip = value => value.replace(/^export /gm, '');
 const data = new Function('window', 'CustomEvent',
   strip(dataSource) + 'return {applyInventorySnapshot,inventoryOrderSuggestions,getInventoryOrders};')(
@@ -23,6 +24,35 @@ assert.deepEqual(data.inventoryOrderSuggestions('target').map(x => x.itemId), ['
 assert.deepEqual(data.inventoryOrderSuggestions('minimum').map(x => x.itemId), ['needed']);
 assert.ok(!data.inventoryOrderSuggestions('target').some(x => x.itemId === 'irrelevant'));
 assert.deepEqual(data.getInventoryOrders(), []);
+
+// People enter whole tubes and fractions, not grams of minimum/target stock.
+const threshold = new Function(thresholdHelpers.replace(/^export /gm, '')
+  + '\nreturn { inventoryStockThresholdInput, inventoryStockThresholdStored };')();
+const colour = { unit: 'г', packageQuantity: 60 };
+assert.equal(threshold.inventoryStockThresholdStored(colour, 0.5), 30);
+assert.equal(threshold.inventoryStockThresholdStored(colour, 1), 60);
+assert.equal(threshold.inventoryStockThresholdStored(colour, 1.5), 90);
+assert.equal(threshold.inventoryStockThresholdInput(colour, 30), 0.5);
+assert.equal(threshold.inventoryStockThresholdInput(colour, 60), 1);
+assert.equal(threshold.inventoryStockThresholdStored({ unit: 'шт.', packageQuantity: 1 }, 3), 3);
+assert.throws(() => threshold.inventoryStockThresholdStored({unit:'г'}, 0.5), /Упаковка/);
+
+// 0.5 tube is already urgent; above 0.5 but below 1 is recommended;
+// every suggestion replenishes to target and buys whole packages.
+data.applyInventorySnapshot({ items: [
+  { itemId:'half-tube',unit:'г',packageQuantity:60,balance:30,minStock:30,targetStock:60 },
+  { itemId:'three-quarter',unit:'г',packageQuantity:60,balance:45,minStock:30,targetStock:60 },
+  { itemId:'full-tube',unit:'г',packageQuantity:60,balance:60,minStock:30,targetStock:60 },
+  { itemId:'no-threshold',unit:'г',packageQuantity:60,balance:0,minStock:0,targetStock:0 },
+  { itemId:'large-stock',unit:'г',packageQuantity:60,balance:90,minStock:90,targetStock:180 },
+] });
+assert.deepEqual(data.inventoryOrderSuggestions('minimum').map(x=>x.itemId), ['half-tube','large-stock']);
+assert.deepEqual(data.inventoryOrderSuggestions('target').map(x=>x.itemId), ['half-tube','three-quarter','large-stock']);
+assert.equal(data.inventoryOrderSuggestions('minimum')[0].suggestedQuantity, 30);
+assert.equal(data.inventoryOrderSuggestions('target')[1].urgency, 'normal');
+assert.equal(data.inventoryOrderSuggestions('target')[0].urgency, 'urgent');
+assert.deepEqual(data.getInventoryOrders(), []);
+
 
 // Z1 must be a list of persisted order documents, not the automatic
 // replenishment suggestions from InventoryItem. Test the rendered result.

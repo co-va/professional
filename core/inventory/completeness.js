@@ -72,3 +72,32 @@ export function netStocktakeGrams({ gross, containers, tareWeight } = {}) {
   if (content < -0.000001) throw new Error('Масса тары превышает общий вес.');
   return Math.max(0, Math.round(content * 1000) / 1000);
 }
+
+// Order thresholds are kept in the InventoryItem's canonical accounting unit
+// (grams for colour). Operators configure them as fractions of a full tube.
+// A tube is packageQuantity grams, never containerCount (physical tubes).
+export function inventoryStockThresholdUnit(item = {}) {
+  return isWeighedInventoryItem(item) ? 'тюб.' : String(item.unit || 'шт.');
+}
+
+export function inventoryStockThresholdInput(item = {}, value = null) {
+  if (value == null || value === '') return '';
+  const raw = Number(value);
+  if (!Number.isFinite(raw)) return '';
+  const size = Number(item.packageQuantity);
+  const perUnit = isWeighedInventoryItem(item) && Number.isFinite(size) && size > 0
+    ? raw / size : raw;
+  return Number(perUnit.toFixed(6));
+}
+
+export function inventoryStockThresholdStored(item = {}, value = null) {
+  if (value == null || value === '') return null;
+  const units = Number(value);
+  if (!Number.isFinite(units) || units < 0) throw new Error('Укажите неотрицательный минимум и цель.');
+  if (!isWeighedInventoryItem(item)) return units;
+  const size = Number(item.packageQuantity);
+  if (!Number.isFinite(size) || size <= 0) {
+    throw new Error('Сначала укажите содержимое одного тюбика в поле «Упаковка».');
+  }
+  return Number((units * size).toFixed(6));
+}

@@ -48,20 +48,35 @@ export function getInventoryOrder(orderId) {
   return snapshot.orders.find(order => String(order?.orderId || '') === String(orderId || '')) || null;
 }
 
+// Minimum is the urgent threshold (inclusive). Target is the stock level we
+// replenish TO. Both values remain in canonical InventoryItem units: grams for
+// weighed colour; tube fractions are converted at the Professional input edge.
 export function inventoryOrderSuggestions(mode = 'target') {
-  // A threshold is a configured business requirement, not every product with
-  // a zero balance. The target list may include goods above their minimum.
-  const field = mode === 'minimum' ? 'minStock' : 'targetStock';
   return snapshot.items
     .map(item => {
-      const balance = Number(item?.balance ?? 0);
-      const raw = item?.[field];
-      const threshold = raw == null || raw === '' ? null : Number(raw);
-      if (!Number.isFinite(balance) || threshold == null || !Number.isFinite(threshold)
-        || threshold <= 0 || balance >= threshold) return null;
-      const suggestedQuantity = Math.max(0, threshold - balance);
-      if (suggestedQuantity <= 0) return null;
-      return { ...item, suggestedQuantity };
+      const balance = Number(item?.balance);
+      const rawMinimum = item?.minStock;
+      const rawTarget = item?.targetStock;
+      const minimum = rawMinimum == null || rawMinimum === '' ? null : Number(rawMinimum);
+      const target = rawTarget == null || rawTarget === '' ? null : Number(rawTarget);
+      if (!Number.isFinite(balance) || balance < 0) return null;
+      const hasMinimum = minimum != null && Number.isFinite(minimum) && minimum >= 0;
+      const hasTarget = target != null && Number.isFinite(target) && target > 0;
+      // A blank/zero configuration must never fill the Order UI with every item.
+      if (!(hasTarget || (hasMinimum && minimum > 0))) return null;
+      const urgent = hasMinimum && balance <= minimum + 1e-9;
+      const recommended = hasTarget && balance < target - 1e-9;
+      if (mode === 'minimum' ? !urgent : !(urgent || recommended)) return null;
+      // When urgent, always replenish to the target, not merely to the minimum.
+      // Without a configured target, lift the minimum by one physical package.
+      const pack = Number(item.packageQuantity);
+      const packageUnits = Number.isFinite(pack) && pack > 0 ? pack : 1;
+      const desired = hasTarget && target > minimum
+        ? target
+        : urgent ? (hasMinimum ? minimum : 0) + packageUnits : target;
+      const suggestedQuantity = Math.max(0, desired - balance);
+      if (suggestedQuantity <= 1e-9) return null;
+      return { ...item, urgency: urgent ? 'urgent' : 'normal', suggestedQuantity };
     })
     .filter(Boolean);
 }

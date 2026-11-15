@@ -97,8 +97,8 @@ function openInventoryOrderSelection(root, existing = null, onSaved = () => {}) 
     title: existing ? 'Добавить товары' : 'Сформировать заказ',
   })}<div class="form-grid" data-inventory-order-selection>
     ${select({ label: 'Расчёт', name: 'orderThreshold', value: 'target', options: [
-      { value: 'target', label: 'Цель' },
-      { value: 'minimum', label: 'Минимум' },
+      { value: 'target', label: 'К заказу' },
+      { value: 'minimum', label: 'Срочно' },
     ] })}
     ${select({ label: 'Показать', name: 'orderScope', value: 'suggested', options: [
       { value: 'suggested', label: 'Рекомендовано' },
@@ -153,7 +153,7 @@ function openInventoryOrderSelection(root, existing = null, onSaved = () => {}) 
     visible = rows.map(row => row.itemId);
     list.innerHTML = rows.length
       ? rows.map(row => compactCheck({
-        label: `${manufacturer(row)} · ${row.name} · ${row.suggestedQuantity > 0
+        label: `${manufacturer(row)} · ${row.name} · ${row.urgency === 'urgent' ? 'Срочно · ' : ''}${row.suggestedQuantity > 0
           ? `Купить ${suggestedPacks(row)} ${packageLabel(row)}` : 'Добавить вручную'}`,
         checked: selected.has(row.itemId),
         data: `data-inventory-order-pick="${escapeHtml(row.itemId)}"`,

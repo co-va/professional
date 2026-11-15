@@ -31,7 +31,10 @@ import { canUseCapability } from '../access.js';
 import { setSharedActionVisible } from '../../ui/page/page.js';
 import { getCardAppearanceTemplate, saveCardAppearanceTemplate } from '../card-appearance-templates.js';
 import { loadAuxiliaryState } from '../runtime/auxiliary-state.js';
-import { inventoryManufacturerCompletion, isWeighedInventoryItem, netStocktakeGrams } from './completeness.js';
+import {
+  inventoryManufacturerCompletion, isWeighedInventoryItem, netStocktakeGrams,
+  inventoryStockThresholdInput, inventoryStockThresholdStored, inventoryStockThresholdUnit,
+} from './completeness.js';
 import { openInventoryProductAppearanceQ, openInventoryProductOverview } from './product-overview.js';
 import { renderInventoryOrders } from './orders.js';
 import {
@@ -299,11 +302,14 @@ function advancedItemFields(item = {}) {
     field({ label: 'Артикул', name: 'sku', value: item.sku || '' }),
     field({ label: 'Штрихкод', name: 'barcode', value: item.barcode || '' }),
   ], { columns: 3, ariaLabel: 'Порядок, артикул и штрихкод' });
+  const thresholdUnit = inventoryStockThresholdUnit(item);
   const inventory = `
     ${field({ label: 'Место хранения', name: 'location', value: item.location || '' })}
     ${twoColumnLayout(
-      field({ label: 'Минимум', name: 'minStock', value: item.minStock ?? '', type: 'number', min: '0', step: '0.001', inputmode: 'decimal' }),
-      field({ label: 'Цель', name: 'targetStock', value: item.targetStock ?? '', type: 'number', min: '0', step: '0.001', inputmode: 'decimal' }),
+      field({ label: 'Срочно при, ' + thresholdUnit, name: 'minStock',
+        value: inventoryStockThresholdInput(item, item.minStock), type: 'number', min: '0', step: '0.001', inputmode: 'decimal' }),
+      field({ label: 'Цель, ' + thresholdUnit, name: 'targetStock',
+        value: inventoryStockThresholdInput(item, item.targetStock), type: 'number', min: '0', step: '0.001', inputmode: 'decimal' }),
       { ariaLabel: 'Правила остатка' },
     )}`;
   return [
@@ -421,6 +427,21 @@ function openItemEditor(root, itemId = '', defaults = {}, onSaved = () => {}) {
     };
     // The product card defines master data; only movements change stock balances.
     if (!creating) {
+      let minimum, target;
+      try {
+        minimum = collectOptionalNumber(form, 'minStock');
+        target = collectOptionalNumber(form, 'targetStock');
+        if (minimum != null && target != null && target <= minimum) {
+          throw new Error('Цель должна быть больше порога «Срочно».');
+        }
+        // Convert tube fractions into the gram values owned by Core/Inventory.
+        // A package-size edit changes this conversion but never adjusts stock.
+        minimum = inventoryStockThresholdStored(value, minimum);
+        target = inventoryStockThresholdStored(value, target);
+      } catch (error) {
+        openNotice({ title: 'Правила остатка', message: error.message });
+        return;
+      }
       const usage = String(data.get('usage') || 'consume');
       Object.assign(value, {
         productType: String(data.get('productType') || '').trim(),
@@ -430,8 +451,8 @@ function openItemEditor(root, itemId = '', defaults = {}, onSaved = () => {}) {
         sku: String(data.get('sku') || '').trim(),
         barcode: String(data.get('barcode') || '').trim(),
         position: requestedPosition,
-        minStock: collectOptionalNumber(form, 'minStock'),
-        targetStock: collectOptionalNumber(form, 'targetStock'),
+        minStock: minimum,
+        targetStock: target,
         grossWeight: collectOptionalNumber(form, 'grossWeight'),
         tareWeight: collectOptionalNumber(form, 'tareWeight'),
         canConsume: usage === 'consume' || usage === 'both',
@@ -1366,8 +1387,8 @@ const INVENTORY_AUDIT_EDIT_FIELDS = [
   { value: 'packageQuantity', label: 'Упаковка', kind: 'decimal' },
   { value: 'grossWeight', label: 'Брутто, г', kind: 'decimal' },
   { value: 'tareWeight', label: 'Тара, г', kind: 'decimal' },
-  { value: 'minStock', label: 'Минимум', kind: 'decimal' },
-  { value: 'targetStock', label: 'Цель', kind: 'decimal' },
+  { value: 'minStock', label: 'Срочно при (тюб./шт.)', kind: 'decimal' },
+  { value: 'targetStock', label: 'Цель (тюб./шт.)', kind: 'decimal' },
   { value: 'usage', label: 'Использование', kind: 'usage' },
 ];
 const INVENTORY_AUDIT_USAGE = [
@@ -1384,6 +1405,8 @@ function inventoryAuditFieldDefinition(key) {
 function inventoryAuditCurrentValue(item, definition) {
   if (definition.value === 'usage') return itemUsageMode(item);
   if (definition.value === 'referencePrice') return itemPrimaryPrice(item) ?? item.referencePrice;
+  if (definition.value === 'minStock' || definition.value === 'targetStock')
+    return inventoryStockThresholdInput(item, item[definition.value]);
   return item[definition.value];
 }
 
@@ -1410,7 +1433,9 @@ function inventoryAuditDataControl(definition, name, { shared = false, locked = 
 }
 
 function inventoryAuditDataRow(item, index, definition, includeManufacturer = false) {
-  const name = inventoryAuditItemLabel(item, includeManufacturer);
+  const thresholdField = definition.value === 'minStock' || definition.value === 'targetStock';
+  const name = inventoryAuditItemLabel(item, includeManufacturer)
+    + (thresholdField ? ' · ' + inventoryStockThresholdUnit(item) : '');
   const current = inventoryAuditCurrentValue(item, definition);
   const shown = definition.value === 'usage'
     ? INVENTORY_AUDIT_USAGE.find(option => option.value === current)?.label || ''
@@ -1447,11 +1472,13 @@ function inventoryAuditParseDataValue(definition, raw) {
   return value;
 }
 
-function inventoryAuditDataPayload(definition, value) {
+function inventoryAuditDataPayload(definition, value, item = {}) {
   if (definition.value === 'usage') return {
     canConsume: value === 'consume' || value === 'both',
     canSell: value === 'sale' || value === 'both',
   };
+  if (definition.value === 'minStock' || definition.value === 'targetStock')
+    return { [definition.value]: inventoryStockThresholdStored(item, value) };
   return { [definition.value]: value };
 }
 
@@ -1497,6 +1524,9 @@ async function applyInventoryAuditDataChanges(layer, { items, definition, perIte
             throw new Error(`Номер ${value} повторяется у производителя «${manufacturerName(item)}».`);
           uniqueNumbers.add(numberKey);
         }
+        if (definition.value === 'minStock' || definition.value === 'targetStock') {
+          inventoryStockThresholdStored(item, value); // fail before any writes if tube size is absent
+        }
         targets.push({ itemId: item.itemId, manufacturer: manufacturerName(item), name: item.name, value });
       }
     } catch (error) {
@@ -1525,7 +1555,7 @@ async function applyInventoryAuditDataChanges(layer, { items, definition, perIte
             a.manufacturer.localeCompare(b.manufacturer, 'ru', { numeric: true }) || a.value - b.value)) {
             if (failed.has(entry.itemId)) continue;
             try {
-              await updateInventoryItem(entry.itemId, inventoryAuditDataPayload(definition, entry.value));
+              await updateInventoryItem(entry.itemId, inventoryAuditDataPayload(definition, entry.value, getInventoryItem(entry.itemId)));
             } catch (error) {
               failed.set(entry.itemId, error instanceof Error ? error.message : 'Ошибка сохранения');
             }
@@ -1540,7 +1570,7 @@ async function applyInventoryAuditDataChanges(layer, { items, definition, perIte
         for (let index = 0; index < changes.length; index += 4) {
           const batch = changes.slice(index, index + 4);
           const results = await Promise.allSettled(batch.map(entry =>
-            updateInventoryItem(entry.itemId, inventoryAuditDataPayload(definition, entry.value))));
+            updateInventoryItem(entry.itemId, inventoryAuditDataPayload(definition, entry.value, getInventoryItem(entry.itemId)))));
           results.forEach((result, offset) => {
             if (result.status === 'rejected') failed.set(batch[offset].itemId,
               result.reason instanceof Error ? result.reason.message : 'Ошибка сохранения');
