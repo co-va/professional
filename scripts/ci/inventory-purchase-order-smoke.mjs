@@ -52,8 +52,8 @@ data.applyInventorySnapshot({ items: [
   { itemId:'zero-without-size',unit:'г',packageQuantity:null,balance:0,minStock:0.5,targetStock:1 },
   { itemId:'large-stock',unit:'г',packageQuantity:60,balance:90,minStock:1.5,targetStock:3 },
 ] });
-assert.deepEqual(data.inventoryOrderSuggestions('minimum').map(x=>x.itemId), ['half-tube','zero-without-size','large-stock','never-configured-absent-colour']);
-assert.deepEqual(data.inventoryOrderSuggestions('target').map(x=>x.itemId), ['half-tube','three-quarter','zero-without-size','large-stock','never-configured-absent-colour']);
+assert.deepEqual(data.inventoryOrderSuggestions('minimum').map(x=>x.itemId), ['half-tube','never-configured-absent-colour','zero-without-size','large-stock']);
+assert.deepEqual(data.inventoryOrderSuggestions('target').map(x=>x.itemId), ['half-tube','three-quarter','never-configured-absent-colour','zero-without-size','large-stock']);
 assert.equal(data.inventoryOrderSuggestions('minimum')[0].suggestedQuantity, 30);
 assert.equal(data.inventoryOrderSuggestions('target')[1].urgency, 'normal');
 assert.equal(data.inventoryOrderSuggestions('target')[0].urgency, 'urgent');
