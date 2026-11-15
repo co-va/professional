@@ -5,6 +5,8 @@ const dataSource = readFileSync('core/inventory/data.js', 'utf8');
 const orderSource = readFileSync('core/inventory/orders.js', 'utf8');
 const inventoryUI = readFileSync('core/inventory/inventory.js', 'utf8');
 const service = readFileSync('core/inventory/service.js', 'utf8');
+const excel = readFileSync('core/inventory/excel-v2.js', 'utf8');
+const inventoryEntrypoint = readFileSync('core/inventory/index.js', 'utf8');
 const strip = value => value.replace(/^export /gm, '');
 const data = new Function('window', 'CustomEvent',
   strip(dataSource) + 'return {applyInventorySnapshot,inventoryOrderSuggestions,getInventoryOrders};')(
@@ -76,6 +78,14 @@ assert.match(orderSource, /status === 'formed'/);
 assert.match(orderSource, /data-inventory-order-receive-save/);
 assert.match(inventoryUI, /renderInventoryOrders\(root\)/);
 assert.doesNotMatch(inventoryUI, /function orderMarkup\(/, 'Old flat suggestion screen is removed');
+// Regression: Excel used to overwrite real Orders Z1 with a flat list of
+// InventoryItem suggestions, destroying the creation + and saved documents.
+assert.doesNotMatch(excel, /function enhanceOrders\(|function orderListMarkup\(/,
+  'Obsolete Excel Order renderer must not return');
+assert.doesNotMatch(excel, /inventoryOrderSuggestions/,
+  'Excel extensions must never treat stock suggestions as saved Orders');
+assert.match(inventoryEntrypoint, /if \(target !== 'orders'\)/,
+  'Orders must bypass the Excel extender completely');
 assert.equal(inventoryUI.split('openInventoryAuditSelection(').length - 1, 2,
   'Only one stocktake action remains in Movement and one implementation');
 assert.match(inventoryUI, /\{ value: 'ADJUSTMENT', label: 'Инвентаризация' \}/);

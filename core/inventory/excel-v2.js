@@ -4,8 +4,6 @@ import {
   modal,
   mountModal,
   openNotice,
-  v2ListEntries,
-  v2ListEntry,
   workspaceHeaderContext,
 } from '../../ui/ui.js';
 import { apiRequest } from '../auth.js';
@@ -13,7 +11,6 @@ import { escapeHtml } from '../../ui/utils/escape-html.js';
 import {
   getInventoryMovement,
   getInventoryMovements,
-  inventoryOrderSuggestions,
 } from './data.js';
 import {
   correctInventoryMovement,
@@ -24,11 +21,6 @@ import { renderInventory } from './inventory.js';
 let activeMovementId = '';
 let activeMovementKind = 'CONSUMPTION';
 let movementKindListenerReady = false;
-
-function numberText(value, maximum = 3) {
-  const number = Number(value) || 0;
-  return number.toLocaleString('ru-RU', { maximumFractionDigits: maximum }).replaceAll('\u00a0', ' ');
-}
 
 function notifyContext() {
   window.dispatchEvent(new CustomEvent('va-tools:v2-context-changed'));
@@ -108,20 +100,6 @@ function replaceContextAction(root, action, onClick) {
   const holder = document.createElement('div');
   holder.innerHTML = workspaceHeaderContext({ title: '', a: action });
   const control = holder.querySelector('[data-workspace-context-action]');
-  if (!control) return null;
-  contextRoot.appendChild(control);
-  control.addEventListener('click', onClick);
-  notifyContext();
-  return control;
-}
-
-function replacePrimaryAction(root, action, onClick) {
-  const contextRoot = root.querySelector('[data-workspace-header-context]');
-  if (!contextRoot) return null;
-  contextRoot.querySelector('[data-v2-primary-action]')?.remove();
-  const holder = document.createElement('div');
-  holder.innerHTML = workspaceHeaderContext({ title: '', c: action });
-  const control = holder.querySelector('[data-v2-primary-action]');
   if (!control) return null;
   contextRoot.appendChild(control);
   control.addEventListener('click', onClick);
@@ -257,50 +235,6 @@ function enhanceMovements(root) {
   }, true);
 }
 
-function orderListMarkup() {
-  return v2ListEntries(inventoryOrderSuggestions().map((item) => v2ListEntry({
-    title: item.name,
-    subtitle: `Осталось ${numberText(item.balance)} ${item.unit}`,
-    rightTop: `${numberText(item.suggestedQuantity)} ${item.unit}`,
-    rightBottom: item.supplier || '',
-    initial: '',
-    selected: true,
-    interactive: true,
-    data: `data-inventory-order-item="${escapeHtml(item.itemId)}" data-order-quantity="${escapeHtml(item.suggestedQuantity)}"`,
-    aria: `Выбрать ${item.name} для заказа`,
-  })));
-}
-
-function enhanceOrders(root) {
-  const contextRoot = root.querySelector('[data-workspace-header-context]');
-  const items = inventoryOrderSuggestions();
-  if (!contextRoot || !items.length) return;
-  [...root.children].filter((node) => node !== contextRoot).forEach((node) => node.remove());
-  contextRoot.insertAdjacentHTML('afterend', orderListMarkup());
-  root.querySelectorAll('[data-inventory-order-item]').forEach((control) => {
-    control.addEventListener('click', () => {
-      const selected = !control.classList.contains('is-selected');
-      control.classList.toggle('is-selected', selected);
-      control.setAttribute('aria-pressed', selected ? 'true' : 'false');
-    });
-  });
-  replacePrimaryAction(root, { label: 'Выгрузить', aria: 'Выгрузить выбранный заказ' }, async () => {
-    const selections = [...root.querySelectorAll('[data-inventory-order-item].is-selected')].map((control) => ({
-      itemId: control.dataset.inventoryOrderItem,
-      quantity: Number(control.dataset.orderQuantity) || 0,
-    })).filter((row) => row.itemId && row.quantity > 0);
-    if (!selections.length) {
-      openNotice({ title: 'Заказ', message: 'Выберите позиции для заказа.' });
-      return;
-    }
-    try {
-      await downloadWorkbook('/orders/export', { method: 'POST', body: { selections }, fallback: 'zakaz.xlsx' });
-    } catch (error) {
-      openNotice({ title: 'Excel', message: errorMessage(error) });
-    }
-  });
-}
-
 function ensureMovementKindListener() {
   if (movementKindListenerReady) return;
   movementKindListenerReady = true;
@@ -312,9 +246,10 @@ function ensureMovementKindListener() {
 }
 
 export function enhanceInventoryExcel(root, section = 'stock') {
-  if (!root) return;
+  // Purchase Orders own their complete Z1/Q/Z2 interface in orders.js.
+  // Excel may extend Stock and Movements, but must never replace an Order screen.
+  if (!root || (section !== 'stock' && section !== 'movements')) return;
   ensureMovementKindListener();
   if (section === 'stock') enhanceStock(root);
-  else if (section === 'movements') enhanceMovements(root);
-  else if (section === 'orders') enhanceOrders(root);
+  else enhanceMovements(root);
 }

@@ -16,7 +16,12 @@ export async function renderInventorySection(root, section = 'stock') {
   if (!target) { root.replaceChildren(); return; }
   const { renderInventory } = await import('./inventory.js');
   const cleanup = await renderInventory(root, target);
-  const { enhanceInventoryExcel } = await import('./excel-v2.js');
-  enhanceInventoryExcel(root, target);
+  // The Excel extension owns only Stock and Movements. The saved purchase
+  // order Z1/Q/Z2 belongs exclusively to ./orders.js via renderInventory().
+  // Applying the old Order Excel extension erased the Z1 and its + button.
+  if (target !== 'orders') {
+    const { enhanceInventoryExcel } = await import('./excel-v2.js');
+    enhanceInventoryExcel(root, target);
+  }
   return cleanup;
 }
