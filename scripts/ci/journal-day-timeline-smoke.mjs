@@ -80,7 +80,7 @@ assert.match(daySource, /createTimeGrid\(\{ date, usages \}\)/,
   'Use canonical Time normalization for overnight records, not raw clock arithmetic');
 
 const recordServiceSource = readFileSync('core/record/service.js', 'utf8');
-assert.match(recordServiceSource, /if \(scheduleChanged\(current, next\) && !checkRecordTime\(/,
+assert.match(recordServiceSource, /if \(recordScheduleChanged\(current, next\) && !checkRecordTime\(/,
   'Only moving a Record may recheck availability; attendance must remain editable');
 
 const eventViewerSource = readFileSync('journal/event-view.js', 'utf8');
