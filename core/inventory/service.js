@@ -97,6 +97,46 @@ export async function correctInventoryMovement(movementId, value = {}) {
   });
 }
 
+// Purchase orders have no browser-side shadow store: Core returns the
+// persisted order snapshot after every accepted mutation.
+const purchaseOrderPath = (orderId) => `/orders/${encodeURIComponent(String(orderId || ''))}`;
+
+function requireOrderResponse(payload) {
+  if (!Array.isArray(payload?.orders)) {
+    throw new Error('Сервер ещё не поддерживает закупочные заказы. Заказ не сохранён.');
+  }
+}
+
+export async function createInventoryPurchaseOrder(value) {
+  return inventoryRequest('/orders', {
+    method: 'POST', body: JSON.stringify(value), verifySnapshot: requireOrderResponse,
+  });
+}
+
+export async function updateInventoryPurchaseOrder(orderId, value) {
+  return inventoryRequest(purchaseOrderPath(orderId), {
+    method: 'PUT', body: JSON.stringify(value), verifySnapshot: requireOrderResponse,
+  });
+}
+
+export async function deleteInventoryPurchaseOrder(orderId) {
+  return inventoryRequest(purchaseOrderPath(orderId), {
+    method: 'DELETE', verifySnapshot: requireOrderResponse,
+  });
+}
+
+export async function payInventoryPurchaseOrder(orderId, value) {
+  return inventoryRequest(`${purchaseOrderPath(orderId)}/pay`, {
+    method: 'POST', body: JSON.stringify(value), verifySnapshot: requireOrderResponse,
+  });
+}
+
+export async function receiveInventoryPurchaseOrder(orderId, receivedAt) {
+  return inventoryRequest(`${purchaseOrderPath(orderId)}/receive`, {
+    method: 'POST', body: JSON.stringify({ receivedAt }), verifySnapshot: requireOrderResponse,
+  });
+}
+
 // Offers are persisted only by Core. A successful response refreshes the same inventory snapshot.
 const itemOffersPath = (itemId) => `/items/${encodeURIComponent(String(itemId || ''))}/offers`;
 
