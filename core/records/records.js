@@ -937,13 +937,23 @@ export function openRecords({
       '[data-records-confirm]': async (event) => {
         const submit = event.currentTarget;
         if (!submit || submit.dataset.recordsBusy === 'true') return;
-        const availability = source.kind === 'professional' ? checkTimeAvailability({
-          date: state.date,
-          workplaceId: state.workplaceId,
-          from: state.from,
-          to: state.to,
-          excludeId: state.recordId,
-        }) : { ok: true };
+        // Editing people/services on an existing Record does not move it.
+        // An updated WorkPlan must not block those unrelated changes.
+        // The Time owner still checks every new or moved appointment.
+        const unchangedSchedule = existing
+          && state.date === String(existing.date || '').slice(0, 10)
+          && state.workplaceId === String(existing.workplaceId || '')
+          && state.from === String(existing.from || '')
+          && state.to === String(existing.to || '');
+        const availability = source.kind === 'professional' && !unchangedSchedule
+          ? checkTimeAvailability({
+            date: state.date,
+            workplaceId: state.workplaceId,
+            from: state.from,
+            to: state.to,
+            excludeId: state.recordId,
+          })
+          : { ok: true };
         if (!availability.ok) {
           let message = view?.body?.querySelector('[data-record-confirmation-error]');
           if (!message) {
