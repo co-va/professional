@@ -10,6 +10,18 @@ export function normalizeTime(value, fallback = '00:00') {
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
 }
 
+// Central calendar-day arithmetic for the Time domain.
+export function shiftTimeDateKey(value, days = 0) {
+  const match = String(value || '').slice(0, 10).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match || !Number.isInteger(days)) return '';
+  const [year, month, day] = match.slice(1).map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return '';
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.getUTCFullYear() + '-' + String(date.getUTCMonth() + 1).padStart(2, '0')
+    + '-' + String(date.getUTCDate()).padStart(2, '0');
+}
+
 export function timeToMinutes(value) {
   const normalized = normalizeTime(value, '');
   if (!normalized) return null;

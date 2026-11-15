@@ -1,13 +1,8 @@
 import { getEventsForDay } from '../core/event/index.js';
 import { getRecordsForDay } from '../core/record/index.js';
-import { timeToMinutes } from '../core/time/index.js';
+import { shiftTimeDateKey, timeToMinutes } from '../core/time/index.js';
 
-function previousDateKey(value = '') {
-  const match = String(value || '').slice(0, 10).match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (!match) return '';
-  const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]) - 1));
-  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`;
-}
+
 
 function crossesMidnight(item = null) {
   const from = timeToMinutes(item?.from);
@@ -18,7 +13,7 @@ function crossesMidnight(item = null) {
 export function getJournalTimeUsages({ date, workplaceId } = {}) {
   const day = String(date || '').slice(0, 10);
   const workplace = String(workplaceId || '');
-  const previousDay = previousDateKey(day);
+  const previousDay = shiftTimeDateKey(day, -1);
   const records = [
     ...getRecordsForDay(day, workplace),
     ...(previousDay ? getRecordsForDay(previousDay, workplace).filter(crossesMidnight) : []),

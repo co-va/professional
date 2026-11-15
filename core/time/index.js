@@ -8,6 +8,7 @@ export {
   minutesToTime,
   normalizeTime,
   rangesOverlap,
+  shiftTimeDateKey,
   timeToMinutes,
 } from './math.js';
 export {

@@ -2,7 +2,7 @@ import { initCalendar, ALL_WORKPLACES_ID } from '../ui/ui.js';
 import { renderJournalGraphMode } from './график.js';
 import { bindCalendarHeaderHost } from '../ui/calendar/index.js';
 import { getRecordPaymentState } from '../core/finance/index.js';
-import { timeToMinutes } from '../core/time/index.js';
+import { createTimeGrid, shiftTimeDateKey, timeToMinutes } from '../core/time/index.js';
 import { getWorkplaces, getWorkingDays, getWorkingDayIndicators, resolveWorkingDayTime } from '../core/workplace-time.js';
 import { getRecordsInRange, recordVisualState } from '../core/record/index.js';
 import { getEvents } from '../core/event/index.js';
@@ -29,6 +29,11 @@ function recordsByDate(records, workplaceId, allMode) {
     const bucket = index.get(key) || [];
     bucket.push(record);
     index.set(key, bucket);
+    const start = timeToMinutes(record.from), end = timeToMinutes(record.to);
+    if (start != null && end != null && end < start) {
+      const nextDate = shiftTimeDateKey(key, 1);
+      if (nextDate) index.set(nextDate, [...(index.get(nextDate) || []), record]);
+    }
   });
   return index;
 }
@@ -37,11 +42,16 @@ function eventsByDate(events, workplaceId, allMode, prefix) {
   const index = new Map();
   (Array.isArray(events) ? events : []).forEach((event) => {
     const key = String(event?.date || '').slice(0, 10);
-    if (!key.startsWith(prefix)) return;
+    if (!key.startsWith(prefix) && key !== shiftTimeDateKey(`${prefix}-01`, -1)) return;
     if (!allMode && String(event?.workplaceId || '') !== String(workplaceId || '')) return;
     const bucket = index.get(key) || [];
     bucket.push(event);
     index.set(key, bucket);
+    const start = timeToMinutes(event.from), end = timeToMinutes(event.to);
+    if (start != null && end != null && end < start) {
+      const nextDate = shiftTimeDateKey(key, 1);
+      if (nextDate) index.set(nextDate, [...(index.get(nextDate) || []), event]);
+    }
   });
   return index;
 }
@@ -80,8 +90,10 @@ function dayRecordData({ dateKey, workplaceId, allMode, workingDays, workplaces,
   const occupy = (item, rank) => {
     const id = String(item?.workplaceId || '');
     if (!inScope(id)) return;
-    const range = bounds(item);
-    if (!range) return;
+    // Time owns overnight clipping. Month paints that same interval.
+    const segment = createTimeGrid({ date: dateKey, usages: [item] }).usages[0];
+    if (!segment) return;
+    const range = { from: segment.gridStart, to: segment.gridEnd };
     const slots = timeline(id).occupied;
     for (let minute = range.from; minute < range.to; minute += 1) {
       if (rank > slots[minute]) slots[minute] = rank;
@@ -109,7 +121,10 @@ function dayRecordData({ dateKey, workplaceId, allMode, workingDays, workplaces,
     }
   }
   const busy = minutes.paid + minutes.active + minutes.noShow + minutes.event;
-  return { count: records.length, capacity, minutes, busy };
+  return {
+    count: records.filter((record) => String(record?.date || '').slice(0, 10) === dateKey).length,
+    capacity, minutes, busy,
+  };
 }
 
 function usageGradient({ capacity, minutes }) {
@@ -203,7 +218,7 @@ export function renderJournalMonth(root, {
       const [year, number] = prefix.split('-').map(Number);
       const lastDay = new Date(year, number, 0).getDate();
       const records = getRecordsInRange({
-        from: `${prefix}-01`,
+        from: shiftTimeDateKey(`${prefix}-01`, -1),
         to: `${prefix}-${String(lastDay).padStart(2, '0')}`,
         workplaceId: allMode ? '' : workplaceId,
       });

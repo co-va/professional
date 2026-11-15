@@ -3,16 +3,11 @@
 import { getDay, getDayTime, getDays } from '../day/index.js';
 import { getWorkplaces } from '../workplace-time.js';
 import { getTimeUsagesForScope } from './usage.js';
-import { minutesToTime, timeToMinutes } from './math.js';
+import { minutesToTime, shiftTimeDateKey, timeToMinutes } from './math.js';
 import { createTimeGrid, getTimeGridMinuteState, getTimeGridRangeState, listTimeGridAvailableEnds, listTimeGridAvailableStarts } from './grid.js';
 
 function dateKey(value) { return String(value || '').slice(0, 10); }
-function nextDateKey(value) {
-  const match = dateKey(value).match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (!match) return '';
-  const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]) + 1));
-  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`;
-}
+
 
 export function getAvailabilityGrid({ date, workplaceId } = {}) {
   const day = dateKey(date), workplace = String(workplaceId || '');
@@ -26,7 +21,7 @@ function crossMidnightAvailability({ date, workplaceId, from, to, excludeId = ''
   const start = timeToMinutes(from), end = timeToMinutes(to);
   if (start == null || end == null || end >= start) return null;
   const first = getAvailabilityGrid({ date, workplaceId });
-  const second = getAvailabilityGrid({ date: nextDateKey(date), workplaceId });
+  const second = getAvailabilityGrid({ date: shiftTimeDateKey(date, 1), workplaceId });
   const conflicts = [];
   const inspect = (grid, begin, finish, allow2359AsEnd = false) => {
     const effectiveFinish = allow2359AsEnd && timeToMinutes(grid?.plan?.to) === 1439 ? Math.min(finish, 1439) : finish;
