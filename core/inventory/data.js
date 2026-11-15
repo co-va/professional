@@ -2,6 +2,7 @@ let snapshot = {
   items: [],
   lots: [],
   movements: [],
+  orders: [],
 };
 
 function asArray(value) {
@@ -13,6 +14,7 @@ export function applyInventorySnapshot(value = {}) {
     items: asArray(value?.items),
     lots: asArray(value?.lots),
     movements: asArray(value?.movements),
+    orders: asArray(value?.orders),
   };
   window.dispatchEvent(new CustomEvent('professional:inventory-changed'));
   return snapshot;
@@ -38,25 +40,28 @@ export function getInventoryMovement(movementId) {
   return snapshot.movements.find((item) => String(item?.movementId || '') === String(movementId || '')) || null;
 }
 
-export function inventoryOrderSuggestions() {
-  // The price catalog is not a purchase list. Only an explicitly configured
-  // stock threshold with a positive replenishment gap creates a suggestion.
+export function getInventoryOrders() {
+  return snapshot.orders;
+}
+
+export function getInventoryOrder(orderId) {
+  return snapshot.orders.find(order => String(order?.orderId || '') === String(orderId || '')) || null;
+}
+
+export function inventoryOrderSuggestions(mode = 'target') {
+  // A threshold is a configured business requirement, not every product with
+  // a zero balance. The target list may include goods above their minimum.
+  const field = mode === 'minimum' ? 'minStock' : 'targetStock';
   return snapshot.items
-    .map((item) => {
+    .map(item => {
       const balance = Number(item?.balance ?? 0);
-      const rawMinimum = item?.minStock;
-      const minimum = rawMinimum == null || rawMinimum === '' ? null : Number(rawMinimum);
-      const rawTarget = item?.targetStock;
-      const target = rawTarget == null || rawTarget === '' ? null : Number(rawTarget);
-      if (!Number.isFinite(balance) || minimum == null || !Number.isFinite(minimum)
-        || minimum < 0 || balance > minimum) return null;
-      const replenishmentLevel = target != null && Number.isFinite(target) && target > minimum
-        ? target : minimum;
-      const desired = Math.max(0, replenishmentLevel - balance);
-      // A zero-threshold product at zero stock is NOT a purchase unless
-      // a positive target was explicitly configured.
-      if (desired <= 0) return null;
-      return { ...item, suggestedQuantity: desired };
+      const raw = item?.[field];
+      const threshold = raw == null || raw === '' ? null : Number(raw);
+      if (!Number.isFinite(balance) || threshold == null || !Number.isFinite(threshold)
+        || threshold <= 0 || balance >= threshold) return null;
+      const suggestedQuantity = Math.max(0, threshold - balance);
+      if (suggestedQuantity <= 0) return null;
+      return { ...item, suggestedQuantity };
     })
     .filter(Boolean);
 }
