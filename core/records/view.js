@@ -450,26 +450,32 @@ export function openRecordView(record, {
     if (!actions) return;
 
     actions.querySelector('[data-record-view-program]')?.addEventListener('change', async (event) => {
+      const selector = event.currentTarget;
+      if (selector.disabled) return;
       const latest = syncCurrent();
       if (getRecordPaymentState(latest).hasPayments) {
         openNotice({ message: 'После оплаты программа записи не изменяется.' });
         return;
       }
-      const nextKey = String(event.currentTarget?.value || '');
+      const nextKey = String(selector.value || '');
       const nextProgram = programs.find((item) => item.key === nextKey) || null;
-      const updated = setRecordLoyaltyProgram(latest, recordProgramSelection(nextProgram));
-      if (!updated) return;
-      actions.v2Close?.();
-      currentRecord = updated;
-      render();
+      selector.disabled = true;
       try {
+        const updated = setRecordLoyaltyProgram(latest, recordProgramSelection(nextProgram));
+        if (!updated) throw new Error('Не удалось изменить программу записи.');
         await persistAndRefresh();
+        currentRecord = getRecord(updated.id) || updated;
+        actions.v2Close?.();
         render();
       } catch (error) {
+        // Never close the selector or claim success before the Record owner
+        // and Finance projection have acknowledged server persistence.
         await refreshRecordsFromServer().catch(() => null);
         syncCurrent();
         render();
         openNotice({ title: 'Не удалось сохранить', message: String(error?.message || 'Сервер не подтвердил выбор программы.') });
+      } finally {
+        if (selector.isConnected) selector.disabled = false;
       }
     });
 
