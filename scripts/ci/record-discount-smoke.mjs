@@ -121,4 +121,34 @@ assert.match(editor, /disabled: adjustment\.programDiscount/,
   'Program discount percent stays disabled in price editor');
 assert.match(editor, /getPersonPriceCondition\(contact\)/,
   'Record confirmation shows effective discount rather than the manual field only');
+// Journal may select only active server-backed Deposit instances. The other
+// loyalty families have not been implemented and their demo lists must not
+// become real Record discounts.
+const selectionSource = read('core/loyalty/record-program.js');
+assert.doesNotMatch(selectionSource, /get(?:Certificate|Subscription|Referral|Bonus)AssignmentsForPerson/,
+  'Incomplete program modules may not be loaded by Journal');
+assert.match(selectionSource, /isActiveDepositAssignment\(deposit\)/,
+  'Journal and the Person price condition share one Deposit active check');
+const depositFixtures = [
+  { depositId: 'live', programId: 'p1', person: { key: 'p1' }, status: 'active', discountPercent: 20 },
+  { depositId: 'expired', programId: 'p2', person: { key: 'p1' }, status: 'expired', discountPercent: 50 },
+  { depositId: 'other-person', programId: 'p3', person: { key: 'p2' }, status: 'active', discountPercent: 30 },
+];
+const programOptions = runInNewContext(strip(selectionSource) + '\ngetRecordProgramOptions', {
+  getDepositInstances: () => depositFixtures,
+  isActiveDepositAssignment: (item) => item.status === 'active',
+});
+assert.deepEqual(programOptions('p1').map((item) => [item.type, item.assignmentId, item.pricePercent]),
+  [['deposit', 'live', 20]],
+  'Only the assigned active Deposit is selectable in the Journal');
+assert.equal(programOptions('p2')[0].assignmentId, 'other-person');
+assert.deepEqual(programOptions('nonexistent'), []);
+const mockSelected = { ...record, loyaltyProgram: { type: 'referral', key: 'referral:demo', pricePercent: 35 } };
+active = true;
+assert.equal(settlement.resolveRecordSettlement(mockSelected).planTotal, 40000,
+  'Old demo selections cannot grant or suppress the real 20% Deposit discount');
+active = false;
+assert.equal(settlement.resolveRecordSettlement(mockSelected).planTotal, 50000,
+  'An expired Deposit and a demo selection both grant zero discount');
+
 console.log('Record discount: automatic program, manual edit, expiry, paid history and payment gates PASS');
