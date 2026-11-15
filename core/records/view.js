@@ -24,7 +24,7 @@ import { openPersonHistoryQ } from '../people/people.js';
 import { personDisplay } from '../people/presentation.js';
 import { getRecordPaymentState, resolveRecordSettlement } from '../finance/index.js';
 import { getRecordProgramOptions, recordProgramSelection } from '../loyalty/record-program.js';
-import { normalizeWorkplaceTimeZone, zonedDateTimeParts } from '../time/index.js';
+import { normalizeWorkplaceTimeZone, zonedDateTimeParts, hasZonedIntervalEnded } from '../time/index.js';
 import { canAcceptRecordTips, openRecordPayment } from '../payment/record-payment.js';
 import { openRecordPaymentActions } from '../payment/record-payment.js';
 import { openRecordSale } from '../sale/sale.js';
@@ -94,12 +94,7 @@ function recordWorkplaceTimeZone(record = null) {
 }
 
 function recordHasEnded(record = null, now = new Date()) {
-  const date = String(record?.date || '').slice(0, 10);
-  const to = String(record?.to || record?.from || '').slice(0, 5);
-  if (!date || !/^\d{2}:\d{2}$/.test(to)) return false;
-  const current = zonedDateTimeParts(now, recordWorkplaceTimeZone(record));
-  if (!current?.date || !/^\d{2}:\d{2}$/.test(current?.time || '')) return false;
-  return `${current.date}T${current.time}` >= `${date}T${to}`;
+  return hasZonedIntervalEnded(record, recordWorkplaceTimeZone(record), now);
 }
 
 // Read the discount type and the already calculated amount from Settlement items.

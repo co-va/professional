@@ -24,6 +24,11 @@ function workplaceName(workplaces, workplaceId) {
   return workplace?.name || 'Рабочее место';
 }
 
+function recordZone(record, workplaces) {
+  const workplace = workplaces.find((item) => String(item?.key || '') === String(record?.workplaceId || ''));
+  return String(workplace?.timeZone || '');
+}
+
 function recordPresentation(record, workplaces) {
   return { workplace: workplaceName(workplaces, record?.workplaceId), person: record?.person || {} };
 }
@@ -87,8 +92,11 @@ function bindRecordClicks(root, records) {
 
 function renderTimeMode(root, records, workplaces) {
   const now = Date.now();
-  const ordered = [...records].sort((a, b) => recordAppointmentTime(a, 'from') - recordAppointmentTime(b, 'from'));
-  const focusIndex = ordered.findIndex((record) => recordAppointmentTime(record, 'to') > now);
+  const ordered = [...records].sort((a, b) =>
+    recordAppointmentTime(a, 'from', recordZone(a, workplaces))
+      - recordAppointmentTime(b, 'from', recordZone(b, workplaces)));
+  const focusIndex = ordered.findIndex((record) =>
+    recordAppointmentTime(record, 'to', recordZone(record, workplaces)) > now);
   const splitIndex = focusIndex >= 0 ? focusIndex : ordered.length;
   const entries = ordered.flatMap((record, index) => {
     const payment = paymentFor(record);
@@ -107,10 +115,16 @@ function renderFlowMode(root, records, workplaces) {
   const now = Date.now();
   const prepared = records.map((record) => {
     const payment = paymentFor(record);
-    return { record, payment, completed: isRecordCompletedSide(record, { paid: payment.paid, now }) };
+    const timeZone = recordZone(record, workplaces);
+    return { record, payment, timeZone,
+      completed: isRecordCompletedSide(record, { paid: payment.paid, now, timeZone }) };
   });
-  const completed = prepared.filter((item) => item.completed).sort((a, b) => recordActivityTime(a.record, a.payment.activity, { completed: true }) - recordActivityTime(b.record, b.payment.activity, { completed: true }));
-  const pending = prepared.filter((item) => !item.completed).sort((a, b) => recordActivityTime(b.record, b.payment.activity) - recordActivityTime(a.record, a.payment.activity));
+  const completed = prepared.filter((item) => item.completed).sort((a, b) =>
+    recordActivityTime(a.record, a.payment.activity, { completed: true, timeZone: a.timeZone })
+      - recordActivityTime(b.record, b.payment.activity, { completed: true, timeZone: b.timeZone }));
+  const pending = prepared.filter((item) => !item.completed).sort((a, b) =>
+    recordActivityTime(b.record, b.payment.activity, { timeZone: b.timeZone })
+      - recordActivityTime(a.record, a.payment.activity, { timeZone: a.timeZone }));
   const entries = [
     ...completed.map(({ record, payment }) => recordEntry(record, workplaces, { paid: payment.paid, amountDue: payment.total })),
     anchorEntry(),

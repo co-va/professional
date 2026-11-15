@@ -1,3 +1,5 @@
+import { shiftTimeDateKey } from './math.js';
+
 const DEFAULT_WORKPLACE_TIME_ZONE = 'Europe/Moscow';
 
 function validTimeZone(value) {
@@ -86,4 +88,22 @@ export function zonedDateTimeToDate(value, timeZone = DEFAULT_WORKPLACE_TIME_ZON
     candidate = new Date(candidate.getTime() - delta);
   }
   return candidate;
+}
+
+// Neutral Time contract for an appointment-like interval in a workplace zone.
+// The end may belong to the following date when a source crosses midnight.
+export function zonedIntervalMoment(interval = {}, field = 'to', timeZone = '') {
+  const date = String(interval?.date || '').slice(0, 10);
+  const from = String(interval?.from || '').slice(0, 5);
+  const to = String(interval?.to || from).slice(0, 5);
+  const clock = field === 'from' ? from : to;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}$/.test(clock)) return null;
+  const day = field !== 'from' && from && to && to < from
+    ? shiftTimeDateKey(date, 1) : date;
+  return day ? zonedDateTimeToDate(day + 'T' + clock + ':00', timeZone) : null;
+}
+
+export function hasZonedIntervalEnded(interval = {}, timeZone = '', now = new Date()) {
+  const end = zonedIntervalMoment(interval, 'to', timeZone);
+  return Boolean(end && Number.isFinite(end.getTime()) && now.getTime() >= end.getTime());
 }

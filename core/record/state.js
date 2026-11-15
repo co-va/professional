@@ -1,4 +1,5 @@
 import { RECORD_EVENT_TYPES } from './events.js';
+import { zonedIntervalMoment } from '../time/zone.js';
 
 function orderedEvents(events = []) {
   return (Array.isArray(events) ? events : [])
@@ -98,11 +99,9 @@ export function projectRecordStatuses(record = {}, events = [], payment = {}) {
   };
 }
 
-export function recordAppointmentTime(record, field = 'from') {
-  const date = String(record?.date || '').slice(0, 10);
-  const time = String(record?.[field] || '');
-  const value = Date.parse(`${date}T${time}:00`);
-  return Number.isFinite(value) ? value : 0;
+export function recordAppointmentTime(record, field = 'from', timeZone = '') {
+  const moment = zonedIntervalMoment(record, field, timeZone);
+  return moment && Number.isFinite(moment.getTime()) ? moment.getTime() : 0;
 }
 
 export function recordVisualState(record, { paid = false } = {}) {
@@ -117,15 +116,15 @@ export function recordListStatusClass(record, { paid = false } = {}) {
   return `journal-list-record--${recordVisualState(record, { paid })}`;
 }
 
-export function isRecordCompletedSide(record, { paid = false, now = Date.now() } = {}) {
+export function isRecordCompletedSide(record, { paid = false, now = Date.now(), timeZone = '' } = {}) {
   return record?.status === 'cancelled'
     || record?.attendance === 'no-show'
     || record?.completed === true
     || paid
-    || recordAppointmentTime(record, 'to') <= now;
+    || recordAppointmentTime(record, 'to', timeZone) <= now;
 }
 
-export function recordActivityTime(record, payment = null, { completed = false } = {}) {
+export function recordActivityTime(record, payment = null, { completed = false, timeZone = '' } = {}) {
   if (record?.status === 'cancelled') {
     const cancelledAt = Date.parse(String(record?.cancelledAt || record?.lifecycleUpdatedAt || record?.updatedAt || ''));
     if (Number.isFinite(cancelledAt)) return cancelledAt;
@@ -142,8 +141,8 @@ export function recordActivityTime(record, payment = null, { completed = false }
     const completedAt = Date.parse(String(record?.completedAt || record?.lifecycleUpdatedAt || ''));
     if (Number.isFinite(completedAt)) return completedAt;
   }
-  if (completed) return recordAppointmentTime(record, 'to') || recordAppointmentTime(record, 'from');
+  if (completed) return recordAppointmentTime(record, 'to', timeZone) || recordAppointmentTime(record, 'from', timeZone);
   const updatedAt = Date.parse(String(record?.lifecycleUpdatedAt || record?.updatedAt || record?.createdAt || ''));
   if (Number.isFinite(updatedAt)) return updatedAt;
-  return recordAppointmentTime(record, 'from') || recordAppointmentTime(record, 'to');
+  return recordAppointmentTime(record, 'from', timeZone) || recordAppointmentTime(record, 'to', timeZone);
 }

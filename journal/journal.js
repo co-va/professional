@@ -6,6 +6,7 @@ import { canUseCapability } from '../core/access.js';
 import { getAllWorkplacesMonthStats, getWorkplaceMonthStats, getWorkplaceMonthStatsMap, getWorkingDays, getWorkplaces } from '../core/workplace-time.js';
 import { getActiveDayWorkplaces, getAvailableDayWorkplaces } from '../core/day/index.js';
 import { getRecordPaymentState } from '../core/finance/index.js';
+import { hasZonedIntervalEnded } from '../core/time/index.js';
 import { applyTimetableWorkingDays, makeTimetableDayOff, openTimetableDayTimeEditor } from '../timetable/day-editor.js';
 import { getRecords, getRecordsForDay } from '../core/record/index.js';
 import { journalWorkplaceSelect, openJournalWorkplaceControl, updateJournalWorkplaceMetas } from './workplace-control.js';
@@ -69,11 +70,9 @@ function recordDurationHours(record = null) {
 }
 
 function recordHasEnded(record = null, now = new Date()) {
-  const date = String(record?.date || '').slice(0, 10);
-  const to = String(record?.to || record?.from || '').slice(0, 5);
-  if (!date || !/^\d{2}:\d{2}$/.test(to)) return false;
-  const end = new Date(`${date}T${to}:00`);
-  return Number.isFinite(end.getTime()) && now.getTime() >= end.getTime();
+  const workplace = getWorkplaces().find((entry) =>
+    String(entry?.key || '') === String(record?.workplaceId || ''));
+  return hasZonedIntervalEnded(record, workplace?.timeZone || '', now);
 }
 
 export function renderJournal(root, options = {}) {

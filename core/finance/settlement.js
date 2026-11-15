@@ -5,6 +5,8 @@ import { getStoredSettlement } from './data.js';
 import { getActiveDDSMovements, getActiveDDSMovementsForSource } from './read.js';
 import { personalPricePercentSource, resolvePersonPriceCondition } from '../loyalty/price-condition.js';
 import { getAllPeople, getPersonPriceCondition } from '../people/data.js';
+import { getWorkplaces } from '../workplace-time.js';
+import { hasZonedIntervalEnded } from '../time/zone.js';
 import {
   calculateSettlementTotals,
   calculateSettlementItemTotals,
@@ -100,10 +102,9 @@ export function getRecordPaymentState(record = null, { pricePercent = null } = {
   const settlement = resolveRecordSettlement(record, { pricePercent });
   const movements = record?.id ? getActiveDDSMovementsForSource('record', record.id) : [];
   const state = calculateSettlementPaymentState(settlement, movements);
-  const date = String(record?.date || '').slice(0, 10);
-  const to = String(record?.to || record?.from || '').slice(0, 5);
-  const end = date && /^\d{2}:\d{2}$/.test(to) ? new Date(`${date}T${to}:00`) : null;
-  const ended = Boolean(end && Number.isFinite(end.getTime()) && Date.now() >= end.getTime());
+  const workplace = getWorkplaces().find((entry) =>
+    String(entry?.key || '') === String(record?.workplaceId || ''));
+  const ended = hasZonedIntervalEnded(record, workplace?.timeZone || '');
   const zeroPrice = Number(settlement?.serviceTotal || 0) > 0.009 && Number(settlement?.planTotal || 0) <= 0.009;
   const settledByPriceRules = zeroPrice
     && (record?.completed === true || ended || state.hasPayments)
