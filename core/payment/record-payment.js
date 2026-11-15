@@ -27,7 +27,7 @@ import { listPersonDeposits } from '../loyalty/deposit/data.js';
 import { selectedRecordDepositId } from '../loyalty/record-program.js';
 import { loadPersonalAccount } from '../loyalty/personal-account/data.js';
 import { getWorkplaces } from '../workplace-time.js';
-import { normalizeWorkplaceTimeZone, zonedDateTimeParts, zonedDateTimeToDate } from '../time/index.js';
+import { normalizeWorkplaceTimeZone, zonedDateTimeParts, zonedDateTimeToDate, zonedIntervalMoment } from '../time/index.js';
 import { getAllPeople } from '../people/data.js';
 import { personDisplay } from '../people/presentation.js';
 import { completeRecord, getRecord, refreshRecordsFromServer } from '../record/index.js';
@@ -108,11 +108,9 @@ function paymentDateValue(paymentOrRecord = null, reference = null) {
 }
 
 function recordServiceOccurredAt(record) {
-  const date = String(record?.date || '').slice(0, 10);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
-  const rawTime = String(record?.to || record?.from || '').slice(0, 5);
-  const time = /^\d{2}:\d{2}$/.test(rawTime) ? rawTime : '12:00';
-  return zonedDateTimeToDate(`${date}T${time}`, paymentWorkplaceTimeZone(record));
+  // A Record ending after midnight belongs to the following calendar day.
+  // Use the same Time-owned interval instant as Day, List and Finance.
+  return zonedIntervalMoment(record, 'to', paymentWorkplaceTimeZone(record));
 }
 
 function recordPerson(record) {
