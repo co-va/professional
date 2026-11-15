@@ -270,7 +270,7 @@ function openInventoryOrderReview(root, { mode = 'target', supplier = '', manufa
   });
   // A changed number belongs to this selected line and survives mode switches.
   layer.querySelector('[data-inventory-order-review]')?.addEventListener('input', event => {
-    const match = /^orderPackages-(\\d+)$/.exec(String(event.target?.name || ''));
+    const match = /^orderPackages-(\d+)$/.exec(String(event.target?.name || ''));
     if (match && rows[Number(match[1])]) manuallyChanged.add(rows[Number(match[1])].itemId);
   });
   layer.querySelector('[name="orderReviewMode"]')?.addEventListener('change', event => {
@@ -280,27 +280,29 @@ function openInventoryOrderReview(root, { mode = 'target', supplier = '', manufa
     currentMode = requested;
     const recommended = new Map((requested === 'all' ? [] : inventoryOrderSuggestions(requested))
       .map(item => [item.itemId, item]));
+    // A mode selector is a VIEW of the current order, not permission to
+    // delete checked lines or overwrite package counts already shown to the
+    // professional. It may add new recommendations, but never removes
+    // existing selections or modifies a previously entered number.
     for (const [index, item] of rows.entries()) {
-      if (manuallyChanged.has(item.itemId)) continue;
+      if (selected.has(item.itemId) || manuallyChanged.has(item.itemId)) continue;
       const entry = recommended.get(item.itemId);
-      const include = Boolean(entry) && (!manufacturerFilter || manufacturer(item) === manufacturerFilter);
+      if (!entry || (manufacturerFilter && manufacturer(item) !== manufacturerFilter)) continue;
       const node = layer.querySelector('[data-inventory-order-row="' + index + '"]');
       if (!node) continue;
+      const packages = suggestedPacks(entry);
+      selected.set(item.itemId, packages);
       const check = node.querySelector('[data-inventory-order-include]');
+      if (check) check.checked = true;
       const fields = node.querySelector('[data-inventory-order-fields]');
-      if (include) {
-        const packages = suggestedPacks(entry);
-        selected.set(item.itemId, packages);
-        const input = fields?.querySelector('input');
-        if (input) input.value = String(packages);
-      } else selected.delete(item.itemId);
-      if (check) check.checked = include;
       if (fields) {
-        fields.hidden = !include;
-        fields.querySelectorAll('input').forEach(input => { input.disabled = !include; });
+        fields.hidden = false;
+        fields.querySelectorAll('input').forEach(input => { input.disabled = false; });
+        const input = fields.querySelector('input');
+        if (input) input.value = String(packages);
       }
-      (include ? activeList : excludedList).append(node);
-      if (include) node.hidden = false;
+      activeList.append(node);
+      node.hidden = false;
     }
     keepOrder(activeList);
     keepOrder(excludedList);
