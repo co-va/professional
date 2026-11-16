@@ -20,6 +20,17 @@ const kindLabel = kind => TYPES.find(row => row.value === kind)?.label || 'Др�
 const money = amount => amount == null ? '—'
   : Number(amount).toLocaleString('ru-RU', { maximumFractionDigits: 2 }).replaceAll('\u00a0', ' ') + ' ₽';
 const urlId = value => encodeURIComponent(String(value || ''));
+const supplierAvailability = value => value === true ? 'Есть у поставщика'
+  : value === false ? 'Нет у поставщика' : 'Наличие не указано';
+function discountLabel(base, paid, given) {
+  const list = Number(base), actual = Number(paid);
+  if (base != null && paid != null && Number.isFinite(list) && list > 0 && Number.isFinite(actual) && actual >= 0) {
+    const difference = Math.round((1 - actual / list) * 10000) / 100;
+    return difference >= 0 ? 'Расчётная скидка: ' + difference.toLocaleString('ru-RU') + '%'
+      : 'Цена выше прайса на ' + Math.abs(difference).toLocaleString('ru-RU') + '%';
+  }
+  return given == null ? 'Скидка не указана' : 'Скидка поставщика: ' + Number(given).toLocaleString('ru-RU') + '%';
+}
 const errText = (error, fallback = 'Не удалось загрузить данные') => error instanceof Error ? error.message : fallback;
 function message(payload, status) {
   const server = Array.isArray(payload?.message) ? payload.message.join('; ') : payload?.message;
@@ -120,9 +131,10 @@ async function openCatalog(company, { itemId = '', onLinked = () => {} } = {}) {
       results.innerHTML = entries.length
         ? v2ListEntries(entries.map(row => v2ListEntry({
             title: row.name,
-            subtitle: [row.supplierSku && 'Арт. ' + row.supplierSku, row.manufacturer].filter(Boolean).join(' · '),
-            rightTop: money(row.actualPrice ?? row.listPrice),
-            rightBottom: row.unit || '',
+            subtitle: [row.supplierSku && 'Арт. ' + row.supplierSku,
+              row.brand || row.manufacturer, row.supplierNote].filter(Boolean).join(' · '),
+            rightTop: money(row.listPrice),
+            rightBottom: supplierAvailability(row.supplierAvailable),
             interactive: true, initial: '',
             data: 'data-counterparty-catalog-row="' + escapeHtml(row.id) + '"',
             aria: 'Выбрать позицию ' + row.name,
@@ -161,7 +173,12 @@ async function openCatalogRow(company, row, { itemId = '', onLinked = () => {} }
   const layer = mountModal(document.body, modal(`<div>
     <p><strong>${escapeHtml(row.name)}</strong></p>
     <p>${escapeHtml([row.manufacturer, row.supplierSku && 'Арт. ' + row.supplierSku].filter(Boolean).join(' · '))}</p>
-    <p>Прайс: ${money(row.listPrice)}</p>
+    <p>Наличие: ${supplierAvailability(row.supplierAvailable)}</p>
+    ${row.supplierNote ? '<p>' + escapeHtml(row.supplierNote) + '</p>' : ''}
+    <p>Цена поставщика: ${money(row.listPrice)}</p>
+    <p>РРЦ: ${money(row.retailPrice)}</p>
+    <p>Моя закупочная цена: ${money(row.actualPrice)}</p>
+    <p>${escapeHtml(discountLabel(row.listPrice, row.actualPrice, row.discountPercent))}</p>
     ${select({ label: 'Моя рабочая карточка', name: 'itemId', value: itemId,
       options: [{ value: '', label: 'Выбрать товар' },
         ...items.map(item => ({ value: item.itemId, label: [item.manufacturer, item.name].filter(Boolean).join(' · ') }))],
@@ -229,8 +246,9 @@ function openImport(company, onSaved) {
           '<p>Автоматически распознать весь прайс нельзя. Оригинал сохранится, а для переноса товаров используйте шаблон Excel.</p>') +
         (result.errors || []).map(value => '<p>' + escapeHtml(value) + '</p>').join('') +
         (rows.length ? v2ListEntries(rows.map(row => v2ListEntry({
-          title: row.name, subtitle: row.supplierSku || '', rightTop: money(row.actualPrice ?? row.listPrice),
-          interactive: false,
+          title: row.name,
+          subtitle: [row.supplierSku, supplierAvailability(row.supplierAvailable)].filter(Boolean).join(' · '),
+          rightTop: money(row.listPrice), interactive: false,
         }))) : '');
       save.disabled = false;
       save.textContent = result.status === 'READY' ? 'Сохранить прайс' : 'Сохранить оригинал';
