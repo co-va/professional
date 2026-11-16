@@ -969,6 +969,9 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
       setConversion('шт.', perPiece);
       if (nominalUnit && nominalQuantity > 0)
         setConversion(nominalUnit, perPiece / nominalQuantity);
+      // A real later net measurement makes measured consumption possible
+      // without changing an existing product's stored stock unit.
+      if (net > 0) setConversion('г', perPiece / net);
     }
     // A missing conversion is an incomplete optional measurement, not a
     // reason to prevent product creation. Conversion-dependent movements
