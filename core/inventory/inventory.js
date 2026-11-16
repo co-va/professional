@@ -326,7 +326,7 @@ function stockDisposalFields(item = {}, purpose = 'consume') {
   const key = sale ? 'sale' : 'consume';
   const unit = item[key + 'Unit'] || item.unit || 'шт.';
   return '<div class="inventory-editor-disposal" data-inventory-use="' + key + '">' +
-    '<div class="inventory-editor-row">' +
+    '<div class="inventory-editor-row" data-inventory-disposal-row="' + key + '">' +
       select({ label: sale ? 'Ед. продажи' : 'Ед. списания', name: key + 'Unit', value: unit, options: INVENTORY_CARD_UNITS }) +
       editorNumber({ label: 'Количество', name: key + 'Quantity', value: item[key + 'Quantity'] ?? '', unit }) +
     '</div></div>';
@@ -349,8 +349,9 @@ function itemNetOnlyFields(item = {}) {
 }
 
 function itemPackageFields(item = {}) {
-  return '<div data-inventory-package-fields>' +
-    editorNumber({ label: 'Содержимое', name: 'packageQuantity', value: item.packageQuantity ?? '', unit: item.unit || 'шт.' }) +
+  return '<div data-inventory-package-fields hidden>' +
+    editorNumber({ label: 'В упаковке', name: 'packageQuantity', value: item.packageQuantity ?? '', unit: item.unit || 'шт.',
+      data: 'aria-label="Содержимое единицы прихода"' }) +
     '</div>';
 }
 
@@ -423,10 +424,8 @@ function advancedItemFields(item = {}, defaults = {}) {
     '<div class="inventory-editor-row">' +
       field({ label: 'Производитель', name: 'manufacturer', value: item.manufacturer || defaults.manufacturer || '' }) +
       field({ label: 'Категория', name: 'category', value: item.category || '' }) +
-    '</div><div class="inventory-editor-row">' +
-      field({ label: 'Тип', name: 'productType', value: item.productType || '' }) +
-      field({ label: 'Поставщик', name: 'supplier', value: item.supplier || '' }) +
     '</div>' +
+    field({ label: 'Тип', name: 'productType', value: item.productType || '' }) +
     columnLayout([
       field({ label: '№', name: 'position', value: Number(item.position) > 0 ? item.position : '',
         type: 'number', min: '1', step: '1', inputmode: 'numeric' }),
@@ -581,22 +580,30 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
     const fromNominal = nominal === stock && nominalQuantity > 0 ? nominalQuantity : null;
     const fromWeight = stock === 'г' && net != null ? net : null;
     const derived = fromWeight ?? fromNominal;
-    const needsContent = Boolean(
-      receipt && receipt !== stock ||
-      consume && consumeUnit !== stock ||
-      sale && saleUnit !== stock ||
-      item?.packageQuantity
-    );
+    // Contents of a receipt unit belong beside consumption unit/quantity.
+    const needsContent = Boolean(receipt && receipt !== stock ||
+      consume && consumeUnit !== stock || sale && saleUnit !== stock ||
+      item?.packageQuantity);
     const pack = form.querySelector('[data-inventory-package-fields]');
-    // A new product's content is supplied by its nominal or net mass.
-    // Existing contents remain visible: never reinterpret historical stock.
-    pack.hidden = !needsContent || creating && (
-      derived != null || needsPhysicalMass
-    );
+    const consumeRow = form.querySelector('[data-inventory-disposal-row="consume"]');
+    const saleRow = form.querySelector('[data-inventory-disposal-row="sale"]');
+    const contentRow = consume ? consumeRow : sale ? saleRow : null;
+    if (contentRow && pack.parentElement !== contentRow) contentRow.appendChild(pack);
+    for (const row of [consumeRow, saleRow])
+      row?.classList.toggle('inventory-editor-row--three', row === contentRow && needsContent);
+    pack.hidden = !contentRow || !needsContent;
     const packLabel = pack.querySelector('label.field > span');
-    if (packLabel) packLabel.textContent = 'Содержимое, ' + stock;
-    if (creating && !contentEdited && derived != null)
-      input('packageQuantity').value = numberText(derived);
+    if (packLabel) packLabel.textContent = receipt === 'уп.' ? 'В упаковке'
+      : receipt === 'шт.' ? 'В 1 шт.' : receipt ? 'В 1 ' + receipt : 'Содержимое';
+    const packageInput = input('packageQuantity');
+    const stored = Number(item?.packageQuantity);
+    const autoDerived = derived != null && derived > 0 &&
+      (creating && !contentEdited || !creating && Number.isFinite(stored)
+       && Math.abs(stored - derived) < 0.0005);
+    if (autoDerived) packageInput.value = numberText(derived);
+    // Calculated contents are visible but cannot be edited twice.
+    packageInput.readOnly = Boolean(autoDerived || creating && needsPhysicalMass);
+    pack.classList.toggle('inventory-editor-derived', packageInput.readOnly);
     // Resource and time are optional characteristics of any physical item.
     // They are not an exclusive item "type".
     form.querySelector('[data-inventory-extra-toggles]').hidden = false;
@@ -620,7 +627,7 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
   }
   form.addEventListener('input', (event) => {
     if (saveError) { saveError.hidden = true; saveError.textContent = ''; }
-    if (event.target.name === 'packageQuantity') contentEdited = true;
+    if (event.target.name === 'packageQuantity' && !event.target.readOnly) contentEdited = true;
     if (['grossWeight', 'tareWeight', 'netOnlyWeight', 'nominalQuantity', 'packageQuantity', 'purchasePrice'].includes(event.target?.name)) {
       syncFields();
       deriveSellingPrice();
@@ -715,6 +722,12 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
     // and never assume that ml has the same numerical mass in grams.
     const metric = new Set(['кг>г','г>кг','л>мл','мл>л','м>см','см>м']);
     const rules = Array.isArray(item?.conversionRules) ? [...item.conversionRules] : [];
+    if (receiptUnit && receiptUnit !== unit &&
+        !metric.has(receiptUnit + '>' + unit) && !(packageQuantity > 0) &&
+        !rules.some(rule => rule.unit === receiptUnit && Number(rule.stockPerUnit) > 0)) {
+      openNotice({ title: 'Содержимое', message: 'Укажите содержимое единицы прихода в ' + unit + '.' });
+      return;
+    }
     // For legacy whole-piece stock, weighed consumption is a fraction of
     // the physical unit. Never ask the user to type "1 g = ? pcs".
     if (consumptionUnit === 'г' && ['шт.','уп.'].includes(unit) && net > 0) {
@@ -766,7 +779,6 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
       ...(!purchaseInput?.disabled ? { referencePrice } : {}),
       manufacturer: String(data.get('manufacturer') || '').trim(),
       category: String(data.get('category') || '').trim(),
-      supplier: String(data.get('supplier') || '').trim(),
       productType: String(data.get('productType') || '').trim(),
       sku: String(data.get('sku') || '').trim(),
       barcode: String(data.get('barcode') || '').trim(),

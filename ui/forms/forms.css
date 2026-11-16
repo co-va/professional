@@ -35,14 +35,14 @@
 .inventory-editor-row--three .inventory-editor-number .field input{padding-left:7px;padding-right:24px}
 .inventory-editor-row--three .inventory-editor-number__suffix{right:6px}
 .inventory-editor-extra-toggles{display:flex;gap:16px;align-items:center}
-.inventory-editor-number:has([name="netWeight"]) input[readonly]{background:transparent;border-color:transparent;color:var(--text);font-weight:700;cursor:default;opacity:1}
+.inventory-editor-number:has([name="netWeight"]) input[readonly],
+.inventory-editor-number:has([name="packageQuantity"]) input[readonly]{background:transparent;border-color:transparent;color:var(--text);font-weight:700;cursor:default;opacity:1}
 @media(max-width:380px){
  .inventory-editor-row{gap:6px}
  .inventory-editor-row--three{gap:5px}
 }
 
 .inventory-editor-disposal{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;min-width:0}
-.inventory-editor-disposal [data-inventory-conversion] .inventory-editor-number{max-width:48%}
 
 .inventory-editor-group .column-layout--3{gap:6px}
 .inventory-editor-group .column-layout--3 > .column-layout__column{min-width:0}
