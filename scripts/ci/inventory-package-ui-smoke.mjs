@@ -131,4 +131,17 @@ assert.match(stock, /const physicalPieceCount = item\.receiptUnit === 'шт\.'/)
 console.log('PASS: receipt in pieces or packs, no physical count for bulk contents');
 console.log('PASS: dated arrival and completion, optional knowledge, late measured conversion');
 
+// New product Q uses shared compact checks for exclusive receipt selection,
+// and the shared Q calendar instead of native, tall iOS date inputs.
+assert.match(stock, /compactCheck\(\{ label: 'Шт\.', checked: receipt === 'шт\.'/);
+assert.match(stock, /compactCheck\(\{ label: 'Уп\.', checked: receipt === 'уп\.'/);
+assert.match(stock, /name="receiptUnit"/);
+assert.match(stock, /checkbox\.checked = checkbox\.dataset\.inventoryReceiptChoice === chosen/);
+assert.match(stock, /initDatePickers\(form\)/);
+assert.match(stock, /datePicker\(\{ label: 'Дата с', name: 'serviceStartAt'/);
+assert.match(stock, /datePicker\(\{ label: 'Дата по', name: 'serviceEndAt'/);
+assert.doesNotMatch(stock, /field\(\{ label: 'Начало', name: 'serviceStartAt'/);
+assert.doesNotMatch(stock, /field\(\{ label: 'Окончание', name: 'serviceEndAt'/);
+console.log('PASS: receipt checks and shared calendar controls instead of oversized selectors');
+
 console.log('PASS: 12 inventory types, unknown measurements, bulk packaging, threshold 1.05 and sale costs');
