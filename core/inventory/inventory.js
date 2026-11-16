@@ -368,6 +368,21 @@ function itemPrimaryPrice(item = {}) {
 function editorDate(value) {
   return value ? String(value).slice(0, 10) : '';
 }
+function inventoryToday() {
+  const now = new Date();
+  return [String(now.getFullYear()), String(now.getMonth() + 1).padStart(2, '0'),
+    String(now.getDate()).padStart(2, '0')].join('-');
+}
+function inventoryOccurredAt(value) {
+  const raw = String(value || '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return null;
+  const date = new Date(raw + 'T12:00:00');
+  return !Number.isNaN(date.getTime()) && inventoryTodayForDate(date) === raw ? date.toISOString() : null;
+}
+function inventoryTodayForDate(date) {
+  return [String(date.getFullYear()), String(date.getMonth() + 1).padStart(2, '0'),
+    String(date.getDate()).padStart(2, '0')].join('-');
+}
 
 // Shared input and selector owners supply the controls. Only their placement is local.
 function editorNumber({ label, name, value = '', unit = '', ...opts } = {}) {
@@ -1272,6 +1287,11 @@ function openMovementEditor(root, movementId = '', kind = 'CONSUMPTION', { recor
       ${actualKind === 'RECEIPT' && !correcting ? field({
         label: 'Поставщик', name: 'supplier', placeholder: 'Необязательно',
       }) : ''}
+      ${!correcting ? field({
+        label: actualKind === 'RECEIPT' ? 'Дата прихода'
+          : actualKind === 'WRITE_OFF' ? 'Дата окончания' : 'Дата операции',
+        name: 'occurredDate', type: 'date', value: inventoryToday(),
+      }) : ''}
       ${field({ label: movementNoteLabel(actualKind), name: 'note', value: movement?.note || '' })}
       ${rowMarkup}
       <div class="form-error" data-inventory-movement-error role="alert"></div>
@@ -1326,6 +1346,11 @@ function openMovementEditor(root, movementId = '', kind = 'CONSUMPTION', { recor
       if (!lines.length) { errorHost.textContent = 'Выберите материалы.'; return; }
       const values = new FormData(form);
       const note = String(values.get('note') || '').trim();
+      const occurredAt = !correcting ? inventoryOccurredAt(values.get('occurredDate')) : null;
+      if (!correcting && !occurredAt) {
+        errorHost.textContent = 'Укажите корректную дату операции.';
+        return;
+      }
       saveButton.disabled = true;
       try {
         if (correcting) {
@@ -1333,6 +1358,7 @@ function openMovementEditor(root, movementId = '', kind = 'CONSUMPTION', { recor
         } else {
           await createInventoryMovement({
             kind: actualKind,
+            occurredAt,
             sourceType: record?.recordId ? 'record' : 'manual',
             ...(record?.recordId ? { recordId: String(record.recordId) } : {}),
             ...(record?.personKey ? { personKey: String(record.personKey) } : {}),
