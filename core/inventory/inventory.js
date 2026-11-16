@@ -634,7 +634,11 @@ function collectOptionalNumber(form, name) {
 export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () => {}) {
   const item = itemId ? getInventoryItem(itemId) : null;
   const creating = !item;
-  const draft = item || { unit: 'шт.', canConsume: defaults.usage !== 'sale', canSell: defaults.usage === 'sale' };
+  const draft = item || {
+    unit: 'шт.', name: defaults.name || '', manufacturer: defaults.manufacturer || '',
+    sku: defaults.sku || '', barcode: defaults.barcode || '',
+    canConsume: defaults.usage !== 'sale', canSell: defaults.usage === 'sale',
+  };
   const markup = `
     <form data-inventory-item-form>
       ${advancedItemFields(draft, defaults)}
@@ -1069,10 +1073,12 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
     }
     primary.disabled = true;
     try {
+      const priorIds = creating ? new Set(getInventoryItems().map(row => row.itemId)) : null;
       if (creating) await createInventoryItem(value);
       else await updateInventoryItem(item.itemId, value);
+      const savedId = creating ? getInventoryItems().find(row => !priorIds.has(row.itemId))?.itemId : item.itemId;
       layer.v2Close?.();
-      onSaved();
+      onSaved(savedId);
     } catch (error) {
       primary.disabled = false;
       if (saveError) {

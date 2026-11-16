@@ -136,7 +136,7 @@ async function openCatalog(company, { itemId = '', onLinked = () => {} } = {}) {
         });
       });
       pages.innerHTML = `<p>${offset + (entries.length ? 1 : 0)}–${offset + entries.length} из ${data.count}</p>` +
-        actionBlock((offset ? button('Назад', { data: 'data-catalog-prev', variant: 'secondary' }) : '') +
+        actionBlock((offset ? button('Предыдущие', { data: 'data-catalog-prev', variant: 'secondary' }) : '') +
           (offset + entries.length < data.count
             ? button('Далее', { data: 'data-catalog-next', variant: 'secondary' }) : ''));
       pages.querySelector('[data-catalog-prev]')?.addEventListener('click', () => { offset = Math.max(0, offset - 100); void show(); });

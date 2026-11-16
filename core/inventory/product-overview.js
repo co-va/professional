@@ -87,7 +87,7 @@ function productCard(item) {
 
 function supplierRows(item) {
   const offers = Array.isArray(item.supplierOffers) ? item.supplierOffers : [];
-  if (!offers.length) return emptyState('Поставщиков пока нет', 'Добавьте место покупки и его цену.');
+  if (!offers.length) return emptyState('Поставщиков пока нет', 'Выберите компанию из раздела «Контрагенты».');
   return v2ListEntries(offers.map((offer) => {
     const primary = item.primaryOfferId === offer.offerId;
     const amount = candidatePrice(offer);
@@ -310,7 +310,7 @@ export function openInventoryProductOverview(itemId, { edit = () => {}, onChange
       v2Section('Поставщики', supplierRows(item)),
       actionBlock(
         button('Добавить', {
-          variant: 'secondary', data: 'data-inventory-supplier-add', aria: 'Добавить место покупки',
+          variant: 'secondary', data: 'data-inventory-supplier-add', aria: 'Связать с контрагентом',
         }) + button('Удалить продукт', {
           variant: 'critical', data: 'data-inventory-product-delete',
         }),
@@ -322,10 +322,10 @@ export function openInventoryProductOverview(itemId, { edit = () => {}, onChange
         onChanged();
       });
     });
-    host.querySelector('[data-inventory-supplier-add]')?.addEventListener('click', () => openSupplierEditor(itemId, '', () => {
-      render();
-      onChanged();
-    }));
+    host.querySelector('[data-inventory-supplier-add]')?.addEventListener('click', async () => {
+      const { openSupplierAssociation } = await import('./counterparties.js');
+      openSupplierAssociation(itemId, () => { render(); onChanged(); });
+    });
     host.querySelectorAll('[data-inventory-supplier-offer]').forEach((row) => row.addEventListener('click', () => {
       openSupplierEditor(itemId, row.dataset.inventorySupplierOffer, () => {
         render();
