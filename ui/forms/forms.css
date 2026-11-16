@@ -34,7 +34,7 @@
 .inventory-editor-row--three .inventory-editor-number .field>span,.inventory-editor-row--three .ui-select.field>span{font-size:12px}
 .inventory-editor-row--three .inventory-editor-number .field input{padding-left:7px;padding-right:24px}
 .inventory-editor-row--three .inventory-editor-number__suffix{right:6px}
-.inventory-editor-extra-toggles{display:flex;gap:16px;align-items:center}
+.inventory-editor-extra-toggles{display:flex;flex-wrap:nowrap;gap:8px;align-items:center;white-space:nowrap}
 .inventory-editor-number:has([name="netWeight"]) input[readonly],
 .inventory-editor-number:has([name="packageQuantity"]) input[readonly]{background:transparent;border-color:transparent;color:var(--text);font-weight:700;cursor:default;opacity:1}
 @media(max-width:380px){
