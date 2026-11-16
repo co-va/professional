@@ -301,9 +301,7 @@ function parseSaleMarkup(raw) {
 }
 
 function inventoryCalculationUnit(item = {}) {
-  if (item.unit === 'шт.' && Number(item.packageQuantity) > 1) return 'уп.';
-  if ((item.unit === 'г' || item.unit === 'мл')
-      && item.canSell === true && item.saleUnit === 'шт.') return 'шт.';
+  // Use the actual stock unit, not a guess based on package contents.
   return UNIT_OPTIONS.some(option => option.value === item.unit) ? item.unit : 'шт.';
 }
 
@@ -317,18 +315,19 @@ function itemPackageFields(item = {}) {
     placeholder: '₽',
   });
   return `
-    <div data-inventory-calculation-layout>
-      ${columnLayout([
-        select({ label: 'Ед. учёта', name: 'calculationUnit',
-          value: calculationUnit, options: UNIT_OPTIONS }),
-        field({ label: 'Количество в упаковке', name: 'packageQuantity',
-          value: calculationUnit === 'уп.' ? item.packageQuantity ?? '' : '',
-          type: 'number', min: '1', step: '1', inputmode: 'numeric' }),
-      ], { columns: 2, ariaLabel: 'Единица учёта и количество' })}
+    <div data-inventory-account-switch>
+      ${button('Другая единица учёта', { variant: 'secondary', data: 'data-inventory-account-switch' })}
     </div>
-    <div data-inventory-volume-fields>
-      ${field({ label: 'Объём единицы, мл', name: 'capacityMl',
-        value: item.unit === 'мл' ? item.packageQuantity ?? '' : '',
+    <div data-inventory-calculation-layout>
+      ${select({ label: 'Единица учёта', name: 'calculationUnit',
+        value: calculationUnit, options: UNIT_OPTIONS })}
+    </div>
+    <div data-inventory-package-switch>
+      ${button('Указать содержимое упаковки', { variant: 'secondary', data: 'data-inventory-package-switch' })}
+    </div>
+    <div data-inventory-package-fields>
+      ${field({ label: 'Содержимое упаковки', name: 'packageQuantity',
+        value: item.packageQuantity ?? '',
         type: 'number', min: '0.001', step: 'any', inputmode: 'decimal' })}
     </div>
     <div data-inventory-gross-net-tare>
@@ -462,73 +461,97 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
   if (priceInput?.disabled && primaryOfferPrice != null) {
     const packSize = Number(primaryOffer.unitsPerOffer) || 1;
     const updatePrimaryPrice = () => {
-      const choice = String(form.elements.namedItem('calculationUnit')?.value || 'шт.');
       const packRaw = String(form.elements.namedItem('packageQuantity')?.value ?? '').trim();
-      const volumeRaw = String(form.elements.namedItem('capacityMl')?.value ?? '').trim();
       const grossRaw = String(form.elements.namedItem('grossWeight')?.value ?? '').trim();
       const tareRaw = String(form.elements.namedItem('tareWeight')?.value ?? '').trim();
-      const usage = String(form.elements.namedItem('consumeUnit')?.value || '');
-      const weighed = choice === 'г' || choice === 'шт.' && usage === 'г';
-      const measured = weighed && grossRaw && tareRaw
-        ? Number(grossRaw.replace(',', '.')) - Number(tareRaw.replace(',', '.'))
-        : choice === 'мл' || choice === 'шт.' && usage === 'мл'
-          ? Number(volumeRaw.replace(',', '.')) : Number(packRaw.replace(',', '.'));
-      const complete = weighed ? Boolean(grossRaw && tareRaw)
-        : choice === 'мл' || choice === 'шт.' && usage === 'мл'
-          ? Boolean(volumeRaw) : choice === 'уп.' ? Boolean(packRaw) : false;
-      const quantity = complete && Number.isFinite(measured) && measured > 0 ? measured : 1;
+      const entered = Number(packRaw.replace(',', '.'));
+      const net = grossRaw && tareRaw
+        ? Number(grossRaw.replace(',', '.')) - Number(tareRaw.replace(',', '.')) : NaN;
+      const quantity = Number.isFinite(entered) && entered > 0 ? entered
+        : Number.isFinite(net) && net > 0 ? net : 1;
       const price = Number(primaryOfferPrice) / packSize * quantity;
       priceInput.value = Number.isFinite(price)
         ? String(Math.round((price + Number.EPSILON) * 10000) / 10000) : '';
     };
-    for (const name of ['packageQuantity', 'capacityMl', 'grossWeight', 'tareWeight', 'calculationUnit', 'consumeUnit']) {
+    for (const name of ['packageQuantity', 'grossWeight', 'tareWeight', 'calculationUnit', 'consumeUnit', 'saleUnit']) {
       form.elements.namedItem(name)?.addEventListener('input', updatePrimaryPrice);
     }
   }
 
+
+  const getNaturalUnit = () => {
+    const usage = String(form.elements.namedItem('usage')?.value || 'consume');
+    if (usage === 'consume' || usage === 'both')
+      return String(form.elements.namedItem('consumeUnit')?.value || 'шт.');
+    if (usage === 'sale') return String(form.elements.namedItem('saleUnit')?.value || 'шт.');
+    return String(form.elements.namedItem('calculationUnit')?.value || 'шт.');
+  };
+  let separateAccounting = !creating && inventoryCalculationUnit(draft) !== getNaturalUnit();
+  let packageExpanded = false;
+  const setUnitChoice = (unit) => {
+    const input = form.elements.namedItem('calculationUnit');
+    if (!input || input.value === unit) return;
+    input.value = unit;
+    const caption = input.closest('.ui-select')?.querySelector('.ui-select__value');
+    if (caption) caption.textContent = UNIT_OPTIONS.find(option => option.value === unit)?.label || unit;
+  };
   const syncFields = () => {
     const usage = String(form.elements.namedItem('usage')?.value || 'consume');
-    let choice = String(form.elements.namedItem('calculationUnit')?.value || 'шт.');
     const consumeUnit = String(form.elements.namedItem('consumeUnit')?.value || 'шт.');
     const saleUnit = String(form.elements.namedItem('saleUnit')?.value || 'шт.');
     const hasConsume = usage === 'consume' || usage === 'both';
     const sale = usage === 'sale' || usage === 'both';
-    // A pack of pieces must declare its contents. Opening pack-based sale
-    // or consumption automatically exposes that existing quantity field.
-    // For measured products, the existing net mass or volume is the capacity.
-    const usesPack = (hasConsume && consumeUnit === 'уп.') || (sale && saleUnit === 'уп.');
-    const measured = hasConsume && (consumeUnit === 'г' || consumeUnit === 'мл');
-    if (usesPack && choice === 'шт.' && !measured) {
-      const input = form.elements.namedItem('calculationUnit');
-      input.value = 'уп.';
-      const caption = input.closest('.ui-select')?.querySelector('.ui-select__value');
-      if (caption) caption.textContent = 'уп.';
-      choice = 'уп.';
-    }
     for (const purpose of ['sale', 'consume']) {
       const node = form.querySelector('[data-inventory-use="' + purpose + '"]');
       if (node) node.hidden = purpose === 'sale' ? !sale : !hasConsume;
     }
-    // Only the explicit "Упаковка" option permits a pack-size input.
-    // One selector occupies the entire row; two inputs share the row.
-    const layout = form.querySelector('[data-inventory-calculation-layout] .column-layout');
-    const packColumn = layout?.querySelectorAll(':scope > .column-layout__column')[1];
-    if (layout) {
-      layout.classList.toggle('column-layout--1', choice !== 'уп.');
-      layout.classList.toggle('column-layout--2', choice === 'уп.');
+    const naturalUnit = getNaturalUnit();
+    // Never silently change the unit of an existing item with stock history.
+    if (!creating && !separateAccounting && draft.unit !== naturalUnit) separateAccounting = true;
+    if (!separateAccounting && (hasConsume || sale)) setUnitChoice(naturalUnit);
+    const stockUnit = String(form.elements.namedItem('calculationUnit')?.value || 'шт.');
+    const accountRow = form.querySelector('[data-inventory-calculation-layout]');
+    const accountAction = form.querySelector('[data-inventory-account-switch]');
+    const accountButton = form.querySelector('[data-inventory-account-switch] button');
+    if (accountRow) accountRow.hidden = !separateAccounting && (hasConsume || sale);
+    if (accountAction) accountAction.hidden = !hasConsume && !sale;
+    if (accountButton) accountButton.textContent = separateAccounting
+      ? 'Использовать единицу ' + (hasConsume ? 'расхода' : 'продажи')
+      : 'Другая единица учёта';
+    const units = [hasConsume ? consumeUnit : null, sale ? saleUnit : null].filter(Boolean);
+    const needsContent = units.some(unit => unit !== stockUnit
+      && (unit === 'уп.' && ['шт.', 'г', 'мл'].includes(stockUnit)
+        || unit === 'шт.' && ['г', 'мл'].includes(stockUnit)));
+    const packRow = form.querySelector('[data-inventory-package-fields]');
+    const packAction = form.querySelector('[data-inventory-package-switch]');
+    const packButton = form.querySelector('[data-inventory-package-switch] button');
+    if (packRow) packRow.hidden = !needsContent && !packageExpanded;
+    if (packAction) packAction.hidden = stockUnit === 'уп.' || needsContent;
+    if (packButton) packButton.textContent = packageExpanded ? 'Скрыть содержимое упаковки' : 'Указать содержимое упаковки';
+    const packLabel = packRow?.querySelector('label.field > span');
+    if (packLabel) {
+      const onePiece = units.includes('шт.') && ['г', 'мл'].includes(stockUnit);
+      packLabel.textContent = 'Содержимое 1 ' + (onePiece ? 'шт.' : 'уп.') + ', ' + stockUnit;
     }
-    if (packColumn) packColumn.hidden = choice !== 'уп.';
-    const countedInGrams = choice === 'г' || (choice === 'шт.' && hasConsume && consumeUnit === 'г');
-    const countedInMl = choice === 'мл' || (choice === 'шт.' && hasConsume && consumeUnit === 'мл');
     const mass = form.querySelector('[data-inventory-gross-net-tare]');
-    const volume = form.querySelector('[data-inventory-volume-fields]');
-    if (mass) mass.hidden = !countedInGrams;
-    if (volume) volume.hidden = !countedInMl;
+    const hasMass = item && (item.grossWeight != null || item.tareWeight != null);
+    if (mass) mass.hidden = stockUnit !== 'г' || !hasMass;
     const prices = form.querySelector('[data-inventory-sale-price-row]');
     const purchase = form.querySelector('[data-inventory-purchase-row]');
     if (prices) prices.hidden = !sale;
     if (purchase) purchase.hidden = sale;
   };
+  form.querySelector('[data-inventory-account-switch] button')?.addEventListener('click', () => {
+    separateAccounting = !separateAccounting;
+    if (!separateAccounting) setUnitChoice(getNaturalUnit());
+    syncFields();
+    syncDirty();
+  });
+  form.querySelector('[data-inventory-package-switch] button')?.addEventListener('click', () => {
+    packageExpanded = !packageExpanded;
+    syncFields();
+    syncDirty();
+  });
   // The purchase price has one meaning in both conditional layouts.
   const copyPurchasePrice = (source, target) => {
     if (source && target && !target.disabled) target.value = source.value;
@@ -573,27 +596,38 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
     const sale = usage === 'sale' || usage === 'both';
     const consumption = usage === 'consume' || usage === 'both';
     const consumptionUnit = String(data.get('consumeUnit') || 'шт.');
-    const unit = choice === 'уп.' ? 'шт.'
-      : choice === 'шт.' && consumption && (consumptionUnit === 'г' || consumptionUnit === 'мл')
-        ? consumptionUnit : choice;
+    // A whole pack is a valid stock unit. Its contents are not required
+    // when the item is both counted and used by packs.
+    const unit = choice;
     const gross = collectOptionalNumber(form, 'grossWeight');
     const tare = collectOptionalNumber(form, 'tareWeight');
     const packedCount = collectOptionalNumber(form, 'packageQuantity');
-    const volume = collectOptionalNumber(form, 'capacityMl');
-    if (choice === 'уп.' && (!Number.isSafeInteger(packedCount) || packedCount <= 0)) {
-      openNotice({ title: 'Количество', message: 'Укажите количество штук в упаковке.' });
+    if (packedCount != null && (!Number.isFinite(packedCount) || packedCount <= 0)) {
+      openNotice({ title: 'Содержимое', message: 'Укажите положительное количество.' });
       return;
     }
     if (unit === 'г' && ((gross == null) !== (tare == null) || gross != null && gross <= tare)) {
-      openNotice({ title: 'Масса продукта', message: 'Укажите брутто и тару. Брутто должно быть больше тары.' });
+      openNotice({ title: 'Масса продукта', message: 'Брутто должно быть больше тары.' });
       return;
     }
-    if (unit === 'мл' && (volume == null || volume <= 0)) {
-      openNotice({ title: 'Объём', message: 'Укажите объём одной единицы в мл.' });
-      return;
+    const net = gross != null && tare != null ? gross - tare : null;
+    const packageQuantity = unit === 'уп.' ? null
+      : packedCount ?? net ?? (creating ? null : item?.packageQuantity ?? null);
+    const saleUnit = sale ? String(data.get('saleUnit') || unit) : null;
+    const requestedUnits = [consumption ? consumptionUnit : null, saleUnit].filter(Boolean);
+    for (const requested of requestedUnits) {
+      if (requested === unit) continue;
+      const convertible = requested === 'уп.' && ['шт.', 'г', 'мл'].includes(unit)
+        || requested === 'шт.' && ['г', 'мл'].includes(unit);
+      if (!convertible) {
+        openNotice({ title: 'Единицы', message: 'Нельзя пересчитать ' + unit + ' в ' + requested + ' без отдельного правила пересчёта.' });
+        return;
+      }
+      if (!(packageQuantity > 0)) {
+        openNotice({ title: 'Содержимое', message: 'Укажите количество в 1 ' + requested + ' для списания в ' + unit + '.' });
+        return;
+      }
     }
-    const packageQuantity = unit === 'г' ? (gross != null ? gross - tare : item?.packageQuantity ?? null)
-      : unit === 'мл' ? volume : choice === 'уп.' ? packedCount : null;
     const referencePrice = sale
       ? collectOptionalNumber(form, 'referencePrice') : collectOptionalNumber(form, 'purchasePrice');
     let markup = { mode: 'percent', value: null };
@@ -625,7 +659,7 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
       canSell: sale,
       consumeUnit: consumption ? consumptionUnit : null,
       consumeQuantity: usage === 'consume' || usage === 'both' ? collectOptionalNumber(form, 'consumeQuantity') : null,
-      saleUnit: sale ? String(data.get('saleUnit') || unit) : null,
+      saleUnit,
       saleQuantity: sale ? collectOptionalNumber(form, 'saleQuantity') : null,
       saleMarkupMode: markup.mode,
       saleMarkupValue: markup.value,
