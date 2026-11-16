@@ -84,18 +84,21 @@ const orderSupplierQuote = (item, supplier = '') => {
   const rawSize = Number(item.packageQuantity ?? item.netPackageWeight);
   const stockPerPack = Number.isFinite(rawSize) && rawSize > 0 ? rawSize
     : stockUnit === 'шт.' && receiptUnit === 'шт.' ? 1 : null;
-  const unitCost = offer.unitPrice == null ? null : Number(offer.unitPrice);
+  const offeredSize = Number(offer.unitsPerOffer);
+  const pricePerPack = sourcePrice => {
+    const amount = sourcePrice == null ? null : Number(sourcePrice);
+    if (stockPerPack == null || !Number.isFinite(offeredSize) || offeredSize <= 0
+      || amount == null || !Number.isFinite(amount) || amount < 0) return null;
+    return Math.round((amount / offeredSize * stockPerPack + Number.EPSILON) * 100) / 100;
+  };
+  // Base price and previously negotiated purchase price are different facts.
+  // Invoice edits never update the supplier's base price.
+  const price = pricePerPack(offer.listPrice);
   const offeredPrice = offer.effectivePrice ?? offer.actualPrice
     ?? (offer.listPrice == null ? null
       : Number(offer.listPrice) * (1 - Number(offer.discountPercent || 0) / 100));
-  const offeredSize = Number(offer.unitsPerOffer);
-  const price = stockPerPack != null && Number.isFinite(unitCost) && unitCost >= 0
-    ? unitCost * stockPerPack
-    : stockPerPack != null && Number.isFinite(offeredSize) && offeredSize > 0
-        && offeredPrice != null && Number.isFinite(Number(offeredPrice))
-        ? Number(offeredPrice) / offeredSize * stockPerPack : null;
-  return { offerId: offer.offerId || '', price: price == null ? null
-    : Math.round((price + Number.EPSILON) * 100) / 100 };
+  const expectedPrice = pricePerPack(offeredPrice);
+  return { offerId: offer.offerId || '', price, expectedPrice };
 };
 const orderPriceInput = (raw) => {
   const text = String(raw ?? '').trim().replace(',', '.');
@@ -203,7 +206,7 @@ function openInventoryOrderReview(root, { mode = 'target', supplier = '', manufa
     const quote = orderSupplierQuote(item, supplier);
     const oldPrice = oldLine?.packPrice == null ? null : Number(oldLine.packPrice);
     const suggestedPrice = oldPrice != null && Number.isFinite(oldPrice) && oldPrice > 0
-      ? oldPrice : quote?.price;
+      ? oldPrice : quote?.price ?? quote?.expectedPrice;
     // The shared data-edit-row already places a compact numeric field beside
     // the product, not under a separate full-width input.
     const quantityField = field({
@@ -294,9 +297,14 @@ function openInventoryOrderReview(root, { mode = 'target', supplier = '', manufa
       if (difference) {
         const delta = value == null || !Number.isFinite(value) || quote?.price == null
           ? null : Math.round((value - quote.price) * 100) / 100;
+        const discount = delta == null || !(quote.price > 0) ? null
+          : Math.round((1 - value / quote.price) * 10000) / 100;
         difference.textContent = delta == null ? 'Нет цены для сравнения'
           : delta === 0 ? 'Совпадает с прайсом'
-          : 'Отличие от прайса: ' + (delta > 0 ? '+' : '') + rubles(delta);
+          : delta < 0
+            ? 'Скидка к прайсу: ' + (discount == null ? '—' : discount.toLocaleString('ru-RU') + '%')
+              + ' (' + rubles(-delta) + ')'
+            : 'Дороже прайса: +' + rubles(delta);
       }
       if (!selected.has(item.itemId)) continue;
       const inputQty = priceHost?.querySelector('[name="orderPackages-' + index + '"]');
