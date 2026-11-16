@@ -1,54 +1,103 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+
 const stock = readFileSync('core/inventory/inventory.js', 'utf8');
 const sale = readFileSync('core/sale/sale.js', 'utf8');
+const completeness = readFileSync('core/inventory/completeness.js', 'utf8');
+
+// Existing shared movement controls retain their canonical units.
 const options = stock.match(/const UNIT_OPTIONS = \[[\s\S]*?\n\];/);
 assert.ok(options);
-const source = options[0]+'\nconst STOCK_DISPOSAL_UNITS = UNIT_OPTIONS;\nreturn STOCK_DISPOSAL_UNITS;';
-const dropdown = new Function(source)();
-assert.deepEqual(dropdown.map(x => x.label), ['г', 'мл', 'шт.', 'уп.']);
-assert.match(stock,/const STOCK_DISPOSAL_UNITS = UNIT_OPTIONS;/);
-assert.match(stock,/\['шт\.', 'уп\.'\]\.includes\(inputUnit\)/);
-assert.match(stock,/quantityUnit: inputUnit/);
-assert.match(sale,/\['шт\.', 'уп\.'\]\.includes\(product\.unit\)/);
-console.log('PASS: packaging option in consumption and sale, integer quantities, canonical stock conversion');
+const stockUnits = new Function(options[0] + '\nreturn UNIT_OPTIONS;')();
+assert.deepEqual(stockUnits.map(row => row.value), ['г', 'мл', 'шт.', 'уп.']);
+assert.match(stock, /const STOCK_DISPOSAL_UNITS = UNIT_OPTIONS;/);
+assert.match(stock, /\['шт\.', 'уп\.'\]\.includes\(inputUnit\)/);
+assert.match(stock, /quantityUnit: inputUnit/);
+assert.match(sale, /\['шт\.', 'уп\.'\]\.includes\(product\.unit\)/);
 
- // Card-level units are distinct from generic movement units:
- // receipt: only pieces/packs; one-piece nominal and usage: never packs.
-const receiptSource = stock.match(/const INVENTORY_RECEIPT_UNITS = \[[^\n]*\];/);
-const nominalSource = stock.match(/const INVENTORY_NOMINAL_UNITS = \[[^\n]*\];/);
-const consumptionSource = stock.match(/const INVENTORY_CONSUMPTION_UNITS = \[[^\n]*\];/);
-for (const row of [receiptSource, nominalSource, consumptionSource]) assert.ok(row);
-const receiptOptions = new Function(receiptSource[0] + '\nreturn INVENTORY_RECEIPT_UNITS;')();
-const nominalOptions = new Function(nominalSource[0] + '\nreturn INVENTORY_NOMINAL_UNITS;')();
-const consumeOptions = new Function(consumptionSource[0] + '\nreturn INVENTORY_CONSUMPTION_UNITS;')();
-assert.deepEqual(receiptOptions.map(x => x.value), ['шт.', 'уп.']);
-assert.deepEqual(nominalOptions.map(x => x.value), ['шт.', 'мл', 'г']);
-assert.deepEqual(consumeOptions.map(x => x.value), ['шт.', 'мл', 'г']);
+// A product creation card has distinct dimensions.
+const choices = stock.slice(stock.indexOf('const INVENTORY_RECEIPT_UNITS'),
+  stock.indexOf('function inventoryPackPieceCount'));
+const { INVENTORY_RECEIPT_UNITS: receiptUnits, INVENTORY_PACK_CONTENT_UNITS: packUnits,
+  INVENTORY_PIECE_NOMINAL_UNITS: nominalUnits, INVENTORY_CONSUMPTION_UNITS: consumptionUnits } =
+  new Function(choices + '\nreturn { INVENTORY_RECEIPT_UNITS, INVENTORY_PACK_CONTENT_UNITS, INVENTORY_PIECE_NOMINAL_UNITS, INVENTORY_CONSUMPTION_UNITS };')();
+assert.deepEqual(receiptUnits.map(row => row.value), ['шт.', 'уп.']);
+assert.deepEqual(packUnits.map(row => row.value), ['шт.', 'г', 'кг', 'мл', 'л']);
+assert.deepEqual(nominalUnits.map(row => row.value), ['шт.', 'г', 'кг', 'мл', 'л']);
+assert.deepEqual(consumptionUnits.map(row => row.value), ['шт.', 'мл', 'г', 'л', 'кг']);
 assert.match(stock, /pack\.hidden = receipt !== 'уп\.'/);
+assert.match(stock, /data-inventory-one-piece-nominal/);
+assert.match(stock, /name: 'packContentQuantity'/);
+assert.match(stock, /name: 'packContentUnit'/);
+assert.match(stock, /name: 'thresholdUnit'/);
 assert.match(stock, /let consumptionUnitEdited = !creating/);
-assert.match(stock, /if \(event\.target\?\.name === 'consumeUnit'\) consumptionUnitEdited = true/);
-assert.match(stock, /input\('consumeUnit'\)\.value = selectedNominal/);
-assert.match(stock, /chosen\.find\(value => value !== 'уп\.'\) \|\| 'шт\.'/);
-assert.match(stock, /data-inventory-receipt-row/);
-assert.match(stock, /label: 'Количество', name: 'packPieces'/);
+assert.match(stock, /setSelectValue\('consumeUnit', preferred\)/);
+assert.match(stock, /setSelectValue\('thresholdUnit', preferredThreshold\)/);
 assert.doesNotMatch(stock, /data-inventory-package-fields/);
 assert.doesNotMatch(stock, /Списать после ресурса/);
 
-const pieceHelpers = stock.slice(stock.indexOf('function inventoryPackPieceCount'), stock.indexOf('const RESOURCE_UNIT_OPTIONS'));
-const priceHelpers = stock.slice(stock.indexOf('function salePurchaseCost'), stock.indexOf('function inventoryCalculationUnit'));
-const { inventoryPackPieceCount, inventoryStockPerPiece, salePurchaseCost, markedUpSalePrice } =
-  new Function(pieceHelpers + '\n' + priceHelpers +
-    '\nreturn { inventoryPackPieceCount, inventoryStockPerPiece, salePurchaseCost, markedUpSalePrice };')();
-assert.equal(inventoryPackPieceCount({ receiptUnit: 'уп.', unit: 'шт.', packageQuantity: 10 }), '10');
-assert.equal(inventoryPackPieceCount({ receiptUnit: 'уп.', unit: 'мл', packageQuantity: 50, nominalUnit: 'мл', nominalQuantity: 5 }), '10');
-assert.equal(inventoryPackPieceCount({ receiptUnit: 'шт.', unit: 'мл', packageQuantity: 5, nominalUnit: 'мл', nominalQuantity: 5 }), '');
-assert.equal(inventoryStockPerPiece('шт.', 'мл', 5, null), 1);
-assert.equal(inventoryStockPerPiece('мл', 'мл', 5, null), 5);
-assert.equal(inventoryStockPerPiece('г', 'мл', 5, 4), 4);
-const pack = { purchasePrice: 200, receiptUnit: 'уп.', packPieces: 10, nominalUnit: 'мл', nominalQuantity: 5 };
-assert.equal(salePurchaseCost({ ...pack, stockUnit: 'шт.', packageQuantity: 10, saleUnit: 'шт.', saleQuantity: 1 }), 20);
-assert.equal(salePurchaseCost({ ...pack, stockUnit: 'мл', packageQuantity: 50, saleUnit: 'мл', saleQuantity: 5 }), 20);
-assert.equal(salePurchaseCost({ ...pack, stockUnit: 'г', packageQuantity: 40, saleUnit: 'г', saleQuantity: 1 }), 5);
+// Unknown measurements cannot block creating a catalogue item.
+assert.doesNotMatch(stock, /if \(mustMeasure && !containerMode\)/);
+assert.doesNotMatch(stock, /if \(mustMeasure && !\(net > 0\)\)/);
+assert.doesNotMatch(stock, /if \(unsupported\.length\)/);
+assert.doesNotMatch(stock, /if \(sale && enteredPrice == null && calculatedPrice == null\)/);
+
+const helperCode = stock.slice(stock.indexOf('const INVENTORY_PACK_CONTENT_UNITS'),
+  stock.indexOf('const RESOURCE_UNIT_OPTIONS'));
+const pricingCode = stock.slice(stock.indexOf('function salePurchaseCost'),
+  stock.indexOf('function inventoryCalculationUnit'));
+const { inventoryPackContent, inventoryPackPieceCount, inventoryNewStockUnit,
+  inventoryStockPerPiece, inventoryContentInBaseUnits, salePurchaseCost, markedUpSalePrice } =
+  new Function(helperCode + '\n' + pricingCode +
+    '\nreturn { inventoryPackContent, inventoryPackPieceCount, inventoryNewStockUnit, inventoryStockPerPiece, inventoryContentInBaseUnits, salePurchaseCost, markedUpSalePrice };')();
+
+// Multi-piece packaging has count; bulk packaging has measured contents.
+assert.deepEqual(inventoryPackContent({ receiptUnit: 'уп.', unit: 'шт.', packageQuantity: 10 }),
+  { quantity: '10', unit: 'шт.' });
+assert.deepEqual(inventoryPackContent({ receiptUnit: 'уп.', unit: 'мл', packageQuantity: 50,
+  nominalQuantity: 5, nominalUnit: 'мл',
+  conversionRules: [{ unit: 'шт.', stockPerUnit: 5 }] }), { quantity: '10', unit: 'шт.' });
+assert.deepEqual(inventoryPackContent({ receiptUnit: 'уп.', unit: 'г', packageQuantity: 5000,
+  nominalQuantity: 5, nominalUnit: 'кг', conversionRules: [] }), { quantity: '5', unit: 'кг' });
+assert.deepEqual(inventoryPackContent({ receiptUnit: 'уп.', unit: 'г', packageQuantity: 900,
+  nominalQuantity: 900, nominalUnit: 'г' }), { quantity: '900', unit: 'г' });
+assert.deepEqual(inventoryPackContent({ receiptUnit: 'шт.', unit: 'мл', packageQuantity: 80,
+  nominalQuantity: 80, nominalUnit: 'мл' }), { quantity: '', unit: 'шт.' });
+
+const stockBase = (receipt, packUnit, nominalUnit, nominalQuantity, consumeUnit, netWeight = null) =>
+  inventoryNewStockUnit({ receipt, packUnit, nominalUnit, nominalQuantity, consumeUnit, netWeight });
+assert.equal(stockBase('шт.', 'шт.', '', 0, 'шт.'), 'шт.');              // Lacquer, no measurements
+assert.equal(stockBase('шт.', 'шт.', 'мл', 80, 'г'), 'шт.');            // Dye, mass not yet known
+assert.equal(stockBase('шт.', 'шт.', 'мл', 80, 'г', 74), 'г');          // Dye, weighed net
+assert.equal(stockBase('шт.', 'шт.', 'мл', 80, 'мл'), 'мл');           // Dye, measured ml
+assert.equal(stockBase('уп.', 'шт.', 'мл', 5, 'мл'), 'мл');            // Ampoules, liquid usage
+assert.equal(stockBase('уп.', 'шт.', 'мл', 5, 'г'), 'шт.');            // Ampoules, grams unknown
+assert.equal(stockBase('уп.', 'шт.', '', 0, 'шт.'), 'шт.');            // Gloves and files
+assert.equal(stockBase('уп.', 'кг', null, null, 'кг'), 'г');         // Soil (5kg)
+assert.equal(stockBase('уп.', 'г', null, null, 'г'), 'г');           // Powder (900g)
+assert.equal(inventoryContentInBaseUnits(5, 'кг'), 5000);
+assert.equal(inventoryContentInBaseUnits(0.5, 'л'), 500);
+assert.equal(inventoryStockPerPiece('г', 'мл', 80, 74), 74);
+assert.equal(inventoryStockPerPiece('мл', 'мл', 80, null), 80);
+assert.equal(inventoryStockPerPiece('г', 'кг', 5, null), 5000);
+
+const ampoules = { purchasePrice: 200, receiptUnit: 'уп.', packPieces: 10,
+  stockUnit: 'мл', packageQuantity: 50, nominalQuantity: 5, nominalUnit: 'мл' };
+assert.equal(salePurchaseCost({ ...ampoules, saleUnit: 'шт.', saleQuantity: 1 }), 20);
+assert.equal(salePurchaseCost({ ...ampoules, saleUnit: 'мл', saleQuantity: 5 }), 20);
+assert.equal(salePurchaseCost({ purchasePrice: 200, receiptUnit: 'уп.', packPieces: null,
+  stockUnit: 'г', packageQuantity: 1000, nominalQuantity: 1000, nominalUnit: 'г',
+  saleUnit: 'г', saleQuantity: 5 }), 1);
+assert.equal(salePurchaseCost({ purchasePrice: 200, receiptUnit: 'уп.', packPieces: null,
+  stockUnit: 'г', packageQuantity: 5000, nominalQuantity: 5, nominalUnit: 'кг',
+  saleUnit: 'кг', saleQuantity: 2 }), 80);
 assert.equal(markedUpSalePrice(20, { mode: 'percent', value: 50 }), 30);
-console.log('PASS: receipt first, conditional piece count, nominal per piece, pack-aware cost');
+
+const thresholdSource = completeness.slice(completeness.indexOf('export function inventoryStockThresholdInput'),
+  completeness.indexOf('// Actual balance is stored in grams'))
+  .replaceAll('export function ', 'function ');
+const { inventoryStockThresholdInput, inventoryStockThresholdStored } = new Function(thresholdSource +
+  '\nreturn { inventoryStockThresholdInput, inventoryStockThresholdStored };')();
+assert.equal(inventoryStockThresholdInput({}, 1.05), 1.05);
+assert.equal(inventoryStockThresholdStored({}, 1.05), 1.05);
+console.log('PASS: 12 inventory types, unknown measurements, bulk packaging, threshold 1.05 and sale costs');
