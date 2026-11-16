@@ -135,6 +135,7 @@ function openSupplierEditor(itemId, offerId = '', onSaved = () => {}) {
       field({ label: 'Содержимое, ' + item.unit, name: 'unitsPerOffer', value: offer?.unitsPerOffer ?? item.packageQuantity ?? 1, type: 'number', min: '0.001', step: '0.001', inputmode: 'decimal' }),
       { ariaLabel: 'Скидка и содержимое закупаемой упаковки' },
     )}
+    <p data-inventory-offer-calculated-discount></p>
     ${select({ label: 'Основной', name: 'primary', value: isPrimary ? 'yes' : 'no', options: [
       { value: 'no', label: 'Нет' }, { value: 'yes', label: 'Да' },
     ] })}
@@ -150,6 +151,24 @@ function openSupplierEditor(itemId, offerId = '', onSaved = () => {}) {
   }));
   if (!layer) return null;
   const form = layer.querySelector('[data-inventory-offer-form]');
+  const discountSummary = layer.querySelector('[data-inventory-offer-calculated-discount]');
+  const showDiscount = () => {
+    const baseText = form.querySelector('[name="listPrice"]')?.value?.trim() || '';
+    const actualText = form.querySelector('[name="actualPrice"]')?.value?.trim() || '';
+    const base = Number(baseText.replace(',', '.'));
+    const actual = Number(actualText.replace(',', '.'));
+    if (!baseText || !actualText || !Number.isFinite(base) || base <= 0 || !Number.isFinite(actual) || actual < 0) {
+      discountSummary.textContent = 'Скидка: —';
+      return;
+    }
+    const delta = Math.round((1 - actual / base) * 10000) / 100;
+    discountSummary.textContent = delta >= 0
+      ? 'Ваша скидка от прайса: ' + delta.toLocaleString('ru-RU') + '%'
+      : 'Цена выше прайса на ' + Math.abs(delta).toLocaleString('ru-RU') + '%';
+  };
+  form.querySelector('[name="listPrice"]')?.addEventListener('input', showDiscount);
+  form.querySelector('[name="actualPrice"]')?.addEventListener('input', showDiscount);
+  showDiscount();
   const primaryButton = layer.querySelector('[data-inventory-offer-save]');
   const errorHost = layer.querySelector('[data-inventory-offer-error]');
   form.addEventListener('submit', async (event) => {
