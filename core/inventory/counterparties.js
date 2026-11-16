@@ -225,12 +225,13 @@ async function openCatalogRow(company, row, { itemId = '', onLinked = () => {} }
 
 function openImport(company, onSaved) {
   const layer = mountModal(document.body, modal(`
-    <p>Загрузите полный прайс. Товары не добавятся в склад автоматически.</p>
+    <p>Сначала скачайте шаблон Excel через V-меню контрагента. Заполните строки товарами и загрузите готовый файл: позиции появятся в каталоге контрагента, не в вашем складе.</p>
+    <p>PDF — дополнительный вариант: если позиции не распознаются полностью, исходный файл сохранится без создания товаров.</p>
     <input type="file" accept=".xlsx,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" data-counterparty-file>
     <div data-counterparty-preview></div>
     <p class="form-error" data-counterparty-import-error role="alert"></p>
-    ${actionBlock(button('Сохранить прайс', { data: 'data-counterparty-import-save', disabled: true }))}
-    `, { title: 'Загрузка прайса', variant: 'q', surface: 'app' }));
+    ${actionBlock(button('Загрузить товары', { data: 'data-counterparty-import-save', disabled: true }))}
+    `, { title: 'Загрузка каталога', variant: 'q', surface: 'app' }));
   if (!layer) return;
   const input = layer.querySelector('[data-counterparty-file]');
   const preview = layer.querySelector('[data-counterparty-preview]');
@@ -240,14 +241,14 @@ function openImport(company, onSaved) {
   input.addEventListener('change', async () => {
     file = input.files?.[0] || null; result = null; save.disabled = true;
     if (!file) return;
-    preview.innerHTML = 'Читаем прайс…';
+    preview.innerHTML = 'Проверяем файл…';
     try {
       result = await upload(company.id, '/pricelists/preview', file);
       if (!layer.isConnected) return;
       const rows = result.sample || [];
       preview.innerHTML = `<p>${escapeHtml(file.name)} · ${result.count} поз.</p>` +
-        (result.status === 'READY' ? '<p>Проверьте названия и цены перед сохранением.</p>' :
-          '<p>Автоматически распознать весь прайс нельзя. Оригинал сохранится, а для переноса товаров используйте шаблон Excel.</p>') +
+        (result.status === 'READY' ? '<p>Проверьте распознанные позиции и цены перед загрузкой.</p>' :
+          '<p>Этот файл нельзя надёжно импортировать как каталог. Исходный файл можно сохранить, а товары загрузить через стандартный шаблон Excel.</p>') +
         (result.errors || []).map(value => '<p>' + escapeHtml(value) + '</p>').join('') +
         (rows.length ? v2ListEntries(rows.map(row => v2ListEntry({
           title: row.name,
@@ -255,7 +256,7 @@ function openImport(company, onSaved) {
           rightTop: money(row.listPrice), interactive: false,
         }))) : '');
       save.disabled = false;
-      save.textContent = result.status === 'READY' ? 'Сохранить прайс' : 'Сохранить оригинал';
+      save.textContent = result.status === 'READY' ? 'Загрузить товары' : 'Сохранить файл';
       errorHost.textContent = '';
     } catch (cause) {
       preview.innerHTML = '';
