@@ -316,10 +316,14 @@ function inventoryPackContent(item = {}) {
   const factor = nominalUnit === stock ? 1
     : nominalUnit === 'кг' && stock === 'г' || nominalUnit === 'л' && stock === 'мл' ? 1000
     : nominalUnit === 'г' && stock === 'кг' || nominalUnit === 'мл' && stock === 'л' ? 0.001 : null;
-  if (nominal > 0 && stored > 0 && factor != null
-      && Math.abs(nominal * factor - stored) < 0.001
-      && INVENTORY_PACK_CONTENT_UNITS.some(row => row.value === nominalUnit))
-    return { quantity: String(nominal), unit: nominalUnit };
+  if (nominal > 0 && stored > 0 && factor != null) {
+    if (Math.abs(nominal * factor - stored) < 0.001
+        && INVENTORY_PACK_CONTENT_UNITS.some(row => row.value === nominalUnit))
+      return { quantity: String(nominal), unit: nominalUnit };
+    // Old records may be N separate nominal pieces without an explicit
+    // piece conversion. Never re-label their total volume as a bulk pack.
+    return { quantity: '', unit: 'шт.' };
+  }
   if (stored > 0 && ['г', 'мл'].includes(stock)) return { quantity: String(stored), unit: stock };
   return { quantity: '', unit: 'шт.' };
 }
