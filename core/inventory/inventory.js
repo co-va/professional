@@ -530,8 +530,8 @@ function advancedItemFields(item = {}, defaults = {}) {
   const isPeriod = Boolean(item.serviceStartAt || item.serviceEndAt);
   const identity = '<div class="inventory-editor-group">' +
     field({ label: 'Наименование', name: 'name', value: item.name || '', required: true, autocomplete: 'off' }) +
-    '<div class="inventory-editor-row" data-inventory-receipt-row>' +
-      '<div class="inventory-editor-measure" data-inventory-receipt-choices>' +
+    '<div class="inventory-editor-row inventory-editor-row--receipt" data-inventory-receipt-row>' +
+      '<div class="inventory-editor-measure inventory-editor-measure--receipt" data-inventory-receipt-choices>' +
         '<span class="inventory-editor-label">Ед. прихода</span>' +
         '<div class="inventory-editor-extra-toggles">' +
           compactCheck({ label: 'Шт.', checked: receipt === 'шт.', data: 'data-inventory-receipt-choice="шт."' }) +
@@ -541,9 +541,9 @@ function advancedItemFields(item = {}, defaults = {}) {
       '</div>' +
       itemPackageFields(item) +
     '</div>' +
-    '<div class="inventory-editor-row">' +
+    '<div class="inventory-editor-row inventory-editor-row--nominal">' +
       '<div class="inventory-editor-measure" data-inventory-one-piece-nominal>' +
-        '<span class="inventory-editor-label" data-inventory-nominal-label>Номинал · если известен</span>' +
+        '<span class="inventory-editor-label" data-inventory-nominal-label>Номинал</span>' +
         '<div class="inventory-editor-measure__control">' +
           field({ name: 'nominalQuantity', value: item.nominalQuantity ?? '', type: 'number', min: '0.001', step: 'any', inputmode: 'decimal' }) +
           select({ name: 'nominalUnit', aria: 'Единица номинала', value: item.nominalUnit || '', options: [{ value: '', label: '—' }, ...retainLegacyUnit(INVENTORY_PIECE_NOMINAL_UNITS, item.nominalUnit)] }) +
@@ -768,7 +768,7 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
     form.querySelector('[data-inventory-one-piece-nominal]').hidden = bulk;
     const nominalLabel = form.querySelector('[data-inventory-nominal-label]');
     if (nominalLabel) nominalLabel.textContent = receipt === 'уп.'
-      ? 'Номинал 1 шт. · необязательно' : 'Номинал · необязательно';
+      ? 'Номинал 1 шт.' : 'Номинал';
     // Prefer entered units, never demand a conversion from a newcomer.
     if (creating && !consumptionUnitEdited) {
       const preferred = bulk ? contentUnit : nominal;

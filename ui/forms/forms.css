@@ -37,6 +37,22 @@
 .inventory-editor-row--three .inventory-editor-number .field input{padding-left:7px;padding-right:24px}
 .inventory-editor-row--three .inventory-editor-number__suffix{right:6px}
 .inventory-editor-extra-toggles{display:flex;flex-wrap:nowrap;gap:8px;align-items:center;white-space:nowrap}
+/* Stock editor only: receipt choices share the label's horizontal axis.
+   Shared 28 px compact checks and 46 px fields/selectors remain unchanged. */
+.inventory-editor-row--receipt{grid-template-columns:minmax(0,1fr)}
+.inventory-editor-measure--receipt{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:var(--ui-compact-size,28px)}
+.inventory-editor-measure--receipt>.inventory-editor-label{flex:0 0 auto}
+.inventory-editor-measure--receipt>.inventory-editor-extra-toggles{margin-left:auto;gap:8px;justify-content:flex-end}
+.inventory-editor-row--receipt>[data-inventory-pack-count]{grid-template-columns:minmax(0,1fr) minmax(0,2fr);gap:8px;align-items:center}
+.inventory-editor-row--receipt>[data-inventory-pack-count]>.inventory-editor-label{min-width:0}
+.inventory-editor-row--receipt>[data-inventory-pack-count]>.inventory-editor-measure__control{min-width:0}
+/* Same label track and baseline for quantity+unit and purchase-price fields. */
+.inventory-editor-row--nominal [data-inventory-one-piece-nominal],
+.inventory-editor-row--nominal>.inventory-editor-number>.field{grid-template-rows:18px var(--ui-field-height);gap:6px}
+.inventory-editor-row--nominal [data-inventory-nominal-label],
+.inventory-editor-row--nominal>.inventory-editor-number>.field>span{display:flex;align-items:center;min-height:18px;line-height:18px;white-space:nowrap}
+.inventory-editor-row--nominal .inventory-editor-measure__control{height:var(--ui-field-height)}
+
 .inventory-editor-number:has([name="netWeight"]) input[readonly],
 .inventory-editor-number:has([name="packageQuantity"]) input[readonly]{background:transparent;border-color:transparent;color:var(--text);font-weight:700;cursor:default;opacity:1}
 @media(max-width:380px){
