@@ -28,7 +28,6 @@ import {
 } from '../../ui/ui.js';
 import { escapeHtml } from '../../ui/utils/escape-html.js';
 import { compactCheck } from '../../ui/selection/check-list.js';
-import { settingToggle } from '../../ui/settings/index.js';
 import { canUseCapability } from '../access.js';
 import { setSharedActionVisible } from '../../ui/page/page.js';
 import { getCardAppearanceTemplate, saveCardAppearanceTemplate } from '../card-appearance-templates.js';
@@ -367,13 +366,15 @@ function advancedItemFields(item = {}, defaults = {}) {
         '</div></div></div>' +
     '<div class="inventory-editor-row">' +
       select({ label: 'Ед. прихода', name: 'receiptUnit', value: receipt,
-        options: [{ value: '', label: 'Не задана' }, ...INVENTORY_CARD_UNITS.map(option => ({ value: option.value, label: '1 ' + option.label }))] }) +
+        options: [{ value: '', label: 'Не задана' }, ...INVENTORY_CARD_UNITS.map(option => ({ value: option.value, label: option.label }))] }) +
       editorNumber({ label: 'Закупка', name: 'purchasePrice', value: price, unit: '₽', disabled: primaryPrice !== null }) +
     '</div></div>';
 
-  const switches =
-    settingToggle({ label: 'Расход', checked: item.canConsume !== false, data: 'data-inventory-usage-toggle="consume"' }) +
-    settingToggle({ label: 'Продажа', checked: item.canSell === true, data: 'data-inventory-usage-toggle="sale"' });
+  // One existing AV compact checkbox in the section heading, as agreed.
+  const switches = compactCheck({
+    label: 'Продаю', checked: item.canSell === true,
+    data: 'data-inventory-usage-check="sale"',
+  });
   const usage = '<div class="inventory-editor-group">' +
     '<input type="hidden" name="usage" value="' + escapeHtml(itemUsageMode(item)) + '">' +
     '<input type="hidden" name="calculationUnit" value="' + escapeHtml(inventoryCalculationUnit(item)) + '">' +
@@ -392,8 +393,8 @@ function advancedItemFields(item = {}, defaults = {}) {
     '</div>' +
     itemMassFields(item) +
     '<div class="inventory-editor-extra-toggles">' +
-      settingToggle({ label: 'Ресурс', checked: Boolean(isResource), data: 'data-inventory-extra-toggle="resource"' }) +
-      settingToggle({ label: 'Срок', checked: isPeriod, data: 'data-inventory-extra-toggle="period"' }) +
+      compactCheck({ label: 'Ресурс', checked: Boolean(isResource), data: 'data-inventory-extra-check="resource"' }) +
+      compactCheck({ label: 'Срок', checked: isPeriod, data: 'data-inventory-extra-check="period"' }) +
     '</div>' +
     '<input type="hidden" name="resourceEnabled" value="' + (isResource ? '1' : '0') + '">' +
     '<input type="hidden" name="periodEnabled" value="' + (isPeriod ? '1' : '0') + '">' +
@@ -468,8 +469,10 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
   const actions = primary?.closest('.modal-actions');
   initAccordions(form);
   const input = (name) => form.elements.namedItem(name);
-  const pressed = (kind) => form.querySelector('[data-inventory-usage-toggle="' + kind + '"]')?.getAttribute('aria-pressed') === 'true';
-  const extraOn = (kind) => form.querySelector('[data-inventory-extra-toggle="' + kind + '"]')?.getAttribute('aria-pressed') === 'true';
+  const pressed = (kind) => kind === 'consume'
+    ? draft.canConsume !== false
+    : Boolean(form.querySelector('[data-inventory-usage-check="sale"]')?.checked);
+  const extraOn = (kind) => Boolean(form.querySelector('[data-inventory-extra-check="' + kind + '"]')?.checked);
   const signature = () => JSON.stringify([...new FormData(form).entries()]
     .filter(([name]) => name !== 'netWeight')
     .map(([name, value]) => [name, typeof value === 'string' ? value : '']));
@@ -598,11 +601,8 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
     updatePrimaryPrice();
   };
 
-  for (const toggle of form.querySelectorAll('[data-inventory-usage-toggle], [data-inventory-extra-toggle]')) {
-    toggle.addEventListener('click', () => {
-      const on = toggle.getAttribute('aria-pressed') !== 'true';
-      toggle.setAttribute('aria-pressed', String(on));
-      toggle.classList.toggle('is-on', on);
+  for (const checkbox of form.querySelectorAll('[data-inventory-usage-check], [data-inventory-extra-check]')) {
+    checkbox.addEventListener('change', () => {
       syncFields();
       syncDirty();
     });
