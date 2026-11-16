@@ -90,4 +90,56 @@ const selected = choose(catalog,[], '',success.orders[1]);
 assert.deepEqual([...selected.selected.keys()],['b','c']);
 assert.ok(catalog.some(item=>item.itemId==='additional'),
   'The new order must still allow additions from the full catalog');
+// Execute the real open-order Z2 V click handler, not just a text search:
+// the list's V belongs to sorting/filtering; the document's V owns transfer.
+const zStart = code.indexOf('function openInventoryOrderZ(');
+const zEnd = code.indexOf('export function renderInventoryOrders(', zStart);
+assert.ok(zStart > 0 && zEnd > zStart);
+const zSource = code.slice(zStart,zEnd);
+for (const status of ['formed', 'paid', 'received']) {
+  let menuClick = null;
+  let actions = null;
+  let transferQOpened = false;
+  const order = { orderId:'source', status, createdAt:'2026-11-17',
+    lines:[{itemId:'a',packages:2,packPrice:1389.75}] };
+  const summary = {innerHTML:''}, listBody = {innerHTML:''};
+  const layer = {querySelector(selector) {
+    if (selector === '[data-inventory-order-z-summary]') return summary;
+    if (selector === '[data-inventory-order-z-lines]') return listBody;
+    if (selector === '[data-inventory-order-z-menu]') return {addEventListener(type, listener) {
+      if (type === 'click') menuClick = listener;
+    }};
+    return null;
+  }};
+  const mocks = {
+    getInventoryOrder: () => order,
+    workspaceHeaderContext: context => {
+      assert.equal(context.v.data,'data-inventory-order-z-menu');
+      return '<button data-inventory-order-z-menu></button>';
+    },
+    v2ZLayer: x => x, mountV2ZLayer: () => layer,
+    refreshOrderList: () => {}, dateLabel: x => x,
+    escapeHtml: x => String(x), rubles: x => x+' ₽',
+    list: () => '<div></div>', supplierOrderLine: x => x,
+    openSharedProfileSettingsMenu: options => { actions = options.actions; },
+    openInventoryOrderReview: () => {}, openInventoryOrderInvoice: () => {},
+    openInventoryOrderCarryOver: () => { transferQOpened = true; },
+    orderNumber: () => '001',
+  };
+  const openDocument = new Function(...Object.keys(mocks),
+    zSource + '\nreturn openInventoryOrderZ;')(...Object.values(mocks));
+  openDocument({}, 'source');
+  assert.equal(typeof menuClick, 'function','Document V must bind the click');
+  menuClick();
+  assert.ok(Array.isArray(actions), 'Document V must render existing Shared X menu');
+  const transfer = actions.find(action => action.label === 'Перенести позиции');
+  if (status === 'formed') {
+    assert.ok(transfer, 'Formed order V must show transfer action');
+    transfer.onSelect();
+    assert.equal(transferQOpened, true, 'Transfer action must open Q');
+  } else {
+    assert.equal(transfer, undefined, 'Paid or received order is immutable by Core');
+  }
+}
+
 console.log('PASS: transfer Q, next order, history, rollback, lost response, catalog extension');
