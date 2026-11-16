@@ -122,6 +122,13 @@ assert.equal(new Date(recorded).getMonth(), 10);
 assert.equal(new Date(recorded).getDate(), 16);
 assert.equal(inventoryOccurredAt('2026-02-30'), null);
 assert.equal(inventoryOccurredAt(''), null);
+// Manual receipt uses the physical purchase unit (piece/pack), not the
+// internal volume/weight. Container count is inferred only for known pieces.
+assert.match(stock, /const inputUnit = receipt \? \(item\.receiptUnit \|\| item\.unit\)/);
+assert.match(stock, /\(consume \|\| receipt\) && inputUnit !== item\.unit/);
+assert.match(stock, /const receivedContainers = receipt && isWeighedInventoryItem\(item\)/);
+assert.match(stock, /const physicalPieceCount = item\.receiptUnit === 'шт\.'/);
+console.log('PASS: receipt in pieces or packs, no physical count for bulk contents');
 console.log('PASS: dated arrival and completion, optional knowledge, late measured conversion');
 
 console.log('PASS: 12 inventory types, unknown measurements, bulk packaging, threshold 1.05 and sale costs');
