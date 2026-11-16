@@ -538,7 +538,9 @@ function advancedItemFields(item = {}, defaults = {}) {
           select({ name: 'nominalUnit', aria: 'Единица номинала', value: item.nominalUnit || '', options: [{ value: '', label: '—' }, ...retainLegacyUnit(INVENTORY_PIECE_NOMINAL_UNITS, item.nominalUnit)] }) +
         '</div></div>' +
       editorNumber({ label: 'Закупка', name: 'purchasePrice', value: price, unit: '₽', disabled: primaryPrice !== null }) +
-    '</div></div>';
+    '</div>' +
+    (!item.itemId ? '<p class="inventory-editor-label">Остальные сведения можно заполнить позже.</p>' : '') +
+    '</div>';
 
   // Optional usage modes share one row. Basic consumption remains the default.
   const switches = '<div class="inventory-editor-extra-toggles" data-inventory-extra-toggles>' +
@@ -605,9 +607,9 @@ function advancedItemFields(item = {}, defaults = {}) {
     editorPanel('Складская единица', identity, 'identity', {
       controls: compactButton({ kind: 'info', data: 'data-inventory-unit-help', aria: 'Как заполнить складскую единицу' }),
     }) +
-    editorPanel('Использование', usage, 'usage') +
+    editorPanel('Использование', usage, 'usage', { opened: Boolean(item.itemId) }) +
     editorPanel('Классификация', classification, 'classification', { opened: false }) +
-    editorPanel('Запас и контроль', stock, 'stock') +
+    editorPanel('Запас и контроль', stock, 'stock', { opened: Boolean(item.itemId) }) +
     '</div>';
 }
 
