@@ -277,7 +277,18 @@ const INVENTORY_CARD_UNITS = [
 // Do not offer volume or mass as a receipt unit, or packs as one-piece nominal.
 const INVENTORY_RECEIPT_UNITS = [{ value: 'шт.', label: 'шт.' }, { value: 'уп.', label: 'уп.' }];
 const INVENTORY_NOMINAL_UNITS = [{ value: 'шт.', label: 'шт.' }, { value: 'мл', label: 'мл' }, { value: 'г', label: 'г' }];
-const INVENTORY_CONSUMPTION_UNITS = [{ value: 'шт.', label: 'шт.' }, { value: 'мл', label: 'мл' }, { value: 'г', label: 'г' }];
+const INVENTORY_CONSUMPTION_UNITS = [
+  { value: 'шт.', label: 'шт.' }, { value: 'мл', label: 'мл' }, { value: 'г', label: 'г' },
+  { value: 'л', label: 'л' }, { value: 'кг', label: 'кг' },
+];
+const INVENTORY_PACK_CONTENT_UNITS = [
+  { value: 'шт.', label: 'шт.' }, { value: 'г', label: 'г' }, { value: 'кг', label: 'кг' },
+  { value: 'мл', label: 'мл' }, { value: 'л', label: 'л' },
+];
+const INVENTORY_PIECE_NOMINAL_UNITS = [
+  { value: 'шт.', label: 'шт.' }, { value: 'г', label: 'г' }, { value: 'кг', label: 'кг' },
+  { value: 'мл', label: 'мл' }, { value: 'л', label: 'л' },
+];
 function retainLegacyUnit(options, value) {
   return !value || options.some(row => row.value === value)
     ? options : [...options, { value, label: value + ' (ранее)' }];
@@ -290,11 +301,36 @@ function inventoryPackPieceCount(item = {}) {
   if (!(total > 0)) return '';
   let perPiece = item.unit === 'шт.' ? 1
     : Number(item.conversionRules?.find(row => row.unit === 'шт.')?.stockPerUnit);
-  if (!(perPiece > 0) && item.nominalUnit === item.unit && Number(item.nominalQuantity) > 0)
-    perPiece = Number(item.nominalQuantity);
   if (!(perPiece > 0)) return '';
   const pieces = total / perPiece;
   return Number.isSafeInteger(pieces) && pieces >= 2 ? String(pieces) : '';
+}
+// Restores the packaging as recorded, never guesses "N pieces" from grams.
+function inventoryPackContent(item = {}) {
+  if (item.receiptUnit !== 'уп.') return { quantity: '', unit: 'шт.' };
+  const count = inventoryPackPieceCount(item);
+  if (count) return { quantity: count, unit: 'шт.' };
+  const stock = String(item.unit || '');
+  const stored = Number(item.packageQuantity);
+  const nominal = Number(item.nominalQuantity);
+  const nominalUnit = String(item.nominalUnit || '');
+  const factor = nominalUnit === stock ? 1
+    : nominalUnit === 'кг' && stock === 'г' || nominalUnit === 'л' && stock === 'мл' ? 1000
+    : nominalUnit === 'г' && stock === 'кг' || nominalUnit === 'мл' && stock === 'л' ? 0.001 : null;
+  if (nominal > 0 && stored > 0 && factor != null
+      && Math.abs(nominal * factor - stored) < 0.001
+      && INVENTORY_PACK_CONTENT_UNITS.some(row => row.value === nominalUnit))
+    return { quantity: String(nominal), unit: nominalUnit };
+  if (stored > 0 && ['г', 'мл'].includes(stock)) return { quantity: String(stored), unit: stock };
+  return { quantity: '', unit: 'шт.' };
+}
+function inventoryBaseContentUnit(unit) {
+  return unit === 'кг' ? 'г' : unit === 'л' ? 'мл' : unit;
+}
+function inventoryContentInBaseUnits(quantity, unit) {
+  const factor = ['кг', 'л'].includes(unit) ? 1000 : 1;
+  const value = Number(quantity) * factor;
+  return Number.isFinite(value) && value > 0 ? value : null;
 }
 function inventoryStockPerPiece(stockUnit, nominalUnit, nominalQuantity, netWeight) {
   if (stockUnit === 'шт.') return 1;
@@ -440,11 +476,16 @@ function itemNetOnlyFields(item = {}) {
 }
 
 function itemPackageFields(item = {}) {
-  return '<div data-inventory-pack-count hidden>' +
-    editorNumber({ label: 'Количество', name: 'packPieces', value: inventoryPackPieceCount(item), unit: 'шт.',
-      data: 'aria-label="Количество штук в упаковке"' }) +
-    '</div>' +
-    // Internal API quantity (in accounting units), never a second editable nominal.
+  const content = inventoryPackContent(item);
+  return '<div class="inventory-editor-measure" data-inventory-pack-count hidden>' +
+    '<span class="inventory-editor-label">В упаковке</span>' +
+    '<div class="inventory-editor-measure__control">' +
+      field({ name: 'packContentQuantity', value: content.quantity, type: 'number',
+        min: '0.001', step: 'any', inputmode: 'decimal' }) +
+      select({ name: 'packContentUnit', aria: 'Единица содержимого упаковки',
+        value: content.unit, options: INVENTORY_PACK_CONTENT_UNITS }) +
+    '</div></div>' +
+    // Internal API quantity in accounting units, never a second input.
     '<input type="hidden" name="packageQuantity" value="' + escapeHtml(item.packageQuantity ?? '') + '">';
 }
 
@@ -463,10 +504,11 @@ function advancedItemFields(item = {}, defaults = {}) {
       itemPackageFields(item) +
     '</div>' +
     '<div class="inventory-editor-row">' +
-      '<div class="inventory-editor-measure"><span class="inventory-editor-label">Номинал 1 шт.</span>' +
+      '<div class="inventory-editor-measure" data-inventory-one-piece-nominal>' +
+        '<span class="inventory-editor-label" data-inventory-nominal-label>Номинал · если известен</span>' +
         '<div class="inventory-editor-measure__control">' +
           field({ name: 'nominalQuantity', value: item.nominalQuantity ?? '', type: 'number', min: '0.001', step: 'any', inputmode: 'decimal' }) +
-          select({ name: 'nominalUnit', aria: 'Ед. номинала одной штуки', value: item.nominalUnit || '', options: [{ value: '', label: '—' }, ...retainLegacyUnit(INVENTORY_NOMINAL_UNITS, item.nominalUnit)] }) +
+          select({ name: 'nominalUnit', aria: 'Единица номинала', value: item.nominalUnit || '', options: [{ value: '', label: '—' }, ...retainLegacyUnit(INVENTORY_PIECE_NOMINAL_UNITS, item.nominalUnit)] }) +
         '</div></div>' +
       editorNumber({ label: 'Закупка', name: 'purchasePrice', value: price, unit: '₽', disabled: primaryPrice !== null }) +
     '</div></div>';
@@ -525,10 +567,13 @@ function advancedItemFields(item = {}, defaults = {}) {
       field({ label: 'Штрихкод', name: 'barcode', value: item.barcode || '' }),
     ], { columns: 3, ariaLabel: 'Порядок, артикул и штрихкод' }) +
     '</div>';
-  const stock = '<div class="inventory-editor-row">' +
-    editorNumber({ label: 'Критический', name: 'minStock', value: inventoryStockThresholdInput(item, item.minStock), unit: threshold, data: 'aria-label="Критический остаток"' }) +
-    editorNumber({ label: 'Желаемый', name: 'targetStock', value: inventoryStockThresholdInput(item, item.targetStock), unit: threshold, data: 'aria-label="Желаемый остаток"' }) +
-    '</div>';
+  const stock = '<div class="inventory-editor-group">' +
+    select({ label: 'Единица запаса', name: 'thresholdUnit', value: threshold,
+      options: retainLegacyUnit(INVENTORY_PACK_CONTENT_UNITS, threshold) }) +
+    '<div class="inventory-editor-row">' +
+      editorNumber({ label: 'Критический', name: 'minStock', value: inventoryStockThresholdInput(item, item.minStock), unit: threshold, data: 'aria-label="Критический остаток"' }) +
+      editorNumber({ label: 'Желаемый', name: 'targetStock', value: inventoryStockThresholdInput(item, item.targetStock), unit: threshold, data: 'aria-label="Желаемый остаток"' }) +
+    '</div></div>';
   return '<div class="inventory-item-accordion">' +
     editorPanel('Складская единица', identity, 'identity', {
       controls: compactButton({ kind: 'info', data: 'data-inventory-unit-help', aria: 'Как заполнить складскую единицу' }),
