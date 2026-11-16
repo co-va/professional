@@ -276,7 +276,6 @@ const INVENTORY_CARD_UNITS = [
 // Receipt, physical contents and consumption are different dimensions.
 // Do not offer volume or mass as a receipt unit, or packs as one-piece nominal.
 const INVENTORY_RECEIPT_UNITS = [{ value: 'шт.', label: 'шт.' }, { value: 'уп.', label: 'уп.' }];
-const INVENTORY_NOMINAL_UNITS = [{ value: 'шт.', label: 'шт.' }, { value: 'мл', label: 'мл' }, { value: 'г', label: 'г' }];
 const INVENTORY_CONSUMPTION_UNITS = [
   { value: 'шт.', label: 'шт.' }, { value: 'мл', label: 'мл' }, { value: 'г', label: 'г' },
   { value: 'л', label: 'л' }, { value: 'кг', label: 'кг' },
@@ -955,7 +954,6 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
     }
     // A quantity always keeps its own labeled unit; conversions are explicit
     // and never assume that ml has the same numerical mass in grams.
-    const metric = new Set(['кг>г','г>кг','л>мл','мл>л','м>см','см>м']);
     const rules = Array.isArray(item?.conversionRules) ? [...item.conversionRules] : [];
     // Unknown quantity-to-weight conversions are allowed in the catalogue.
     // Actual measured movements will require their own known conversion.
@@ -972,10 +970,6 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
       if (nominalUnit && nominalQuantity > 0)
         setConversion(nominalUnit, perPiece / nominalQuantity);
     }
-    const convertible = (requested) => !requested || requested === unit
-      || metric.has(requested + '>' + unit)
-      || rules.some(rule => rule.unit === requested && Number(rule.stockPerUnit) > 0)
-      || requested === 'уп.' && packageQuantity > 0;
     // A missing conversion is an incomplete optional measurement, not a
     // reason to prevent product creation. Conversion-dependent movements
     // still validate against known values.
