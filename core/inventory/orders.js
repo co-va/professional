@@ -631,7 +631,7 @@ function openInventoryOrderCarryOver(root, orderId, onSaved = () => {}) {
       message: 'Для переноса части заказа нужны минимум две позиции. Полный перенос пока не поддерживается.' });
   }
   const markup = '<div class="form-grid" data-inventory-order-carryover>' +
-    '<p>Отметьте позиции, которых нет у поставщика. Они перейдут в отдельный следующий заказ.</p>' +
+    '<p>Отметьте позиции, которые поставщик не предоставил. Они перейдут в следующий заказ, где можно добавить другие товары.</p>' +
     rows.map((line, index) => {
       const label = String(line.name || getInventoryItem(line.itemId)?.name || 'Без названия');
       return '<div class="data-edit-row" data-inventory-carryover-row="' + index + '">' +
@@ -649,7 +649,7 @@ function openInventoryOrderCarryOver(root, orderId, onSaved = () => {}) {
       data: 'data-inventory-carryover-save', disabled: true,
     })) +
   '</div>';
-  const layer = mountModal(root, modal(markup, { title: 'Нет у поставщика', variant: 'q' }));
+  const layer = mountModal(root, modal(markup, { title: 'Перенести позиции', variant: 'q' }));
   if (!layer) return null;
   const selected = new Set();
   const counter = layer.querySelector('[data-inventory-carryover-count]');
@@ -943,7 +943,7 @@ function openInventoryOrderZ(root, orderId) {
             }, fresh, saveAndRefresh) },
           { id: 'invoice', label: 'Цены по счёту', onSelect: () =>
             openInventoryOrderInvoice(layer, orderId, saveAndRefresh) },
-          { id: 'unavailable', label: 'Нет у поставщика', onSelect: () =>
+          { id: 'unavailable', label: 'Перенести позиции', onSelect: () =>
             openInventoryOrderCarryOver(layer, orderId, () => {
               saveAndRefresh();
             }) },
