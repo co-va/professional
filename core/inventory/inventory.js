@@ -22,8 +22,6 @@ import {
   v2ListEntry,
   initV2ListReorder,
   v2Section,
-  segmentControl,
-  initSegmentControls,
   v2ZLayer,
   workspaceHeaderContext,
 } from '../../ui/ui.js';
@@ -308,12 +306,6 @@ function editorPanel(title, body, key, { controls = '', opened = true } = {}) {
     '</section>';
 }
 
-function inventoryCardShape(item = {}) {
-  if (item.resourceLimit != null || item.serviceStartAt || item.serviceEndAt) return 'tool';
-  if (['мл', 'л'].includes(item.nominalUnit)) return 'liquid';
-  return 'package';
-}
-
 function parseSaleMarkup(raw) {
   const input = String(raw ?? '').trim().replace(',', '.');
   if (!input) return { mode: 'percent', value: null };
@@ -465,11 +457,6 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
   const draft = item || { unit: 'шт.', canConsume: defaults.usage !== 'sale', canSell: defaults.usage === 'sale' };
   const markup = `
     <form data-inventory-item-form>
-      ${segmentControl([
-        { value: 'liquid', label: 'Жидкость' },
-        { value: 'package', label: 'Упаковка' },
-        { value: 'tool', label: 'Инструмент' },
-      ], { value: inventoryCardShape(draft), name: 'inventoryShape', aria: 'Вид позиции' })}
       ${advancedItemFields(draft, defaults)}
       ${actionBlock(button(creating ? 'Применить' : 'Сохранить', { type: 'button', data: 'data-inventory-item-save', aria: creating ? 'Добавить продукт' : 'Сохранить продукт' }))}
       <div class="form-error" data-inventory-item-save-error role="alert" hidden></div>
@@ -486,7 +473,6 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
   const primary = layer.querySelector('[data-inventory-item-save]');
   const saveError = layer.querySelector('[data-inventory-item-save-error]');
   const actions = primary?.closest('.modal-actions');
-  initSegmentControls(form);
   const input = (name) => form.elements.namedItem(name);
   const pressed = (kind) => kind === 'consume'
     ? draft.canConsume !== false
@@ -551,7 +537,6 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
   };
 
   const syncFields = () => {
-    const shape = String(input('inventoryShape')?.value || 'package');
     const consume = pressed('consume');
     const sale = pressed('sale');
     input('usage').value = consume && sale ? 'both' : consume ? 'consume' : sale ? 'sale' : 'track';
@@ -582,48 +567,47 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
       : receipt || item?.thresholdUnit || inventoryStockThresholdUnit(item || { unit: stock });
     setNumberUnit('minStock', threshold);
     setNumberUnit('targetStock', threshold);
-    const measuredConsumption = consume && ['г','кг'].includes(consumeUnit);
+    const measuredConsumption = (consume && ['г','кг'].includes(consumeUnit)) || (sale && ['г','кг'].includes(saleUnit));
     const massFromVolume = measuredConsumption && ['мл','л'].includes(nominal);
-    // A measured commercial pack is explained via net weight, not through
-    // an unrelated "1 g = ? pcs" input.
-    const needsContent = shape === 'package' &&
-      Boolean(receipt && receipt !== stock || consume && consumeUnit !== stock
-        || sale && saleUnit !== stock || item?.packageQuantity);
+    const needsPhysicalMass = measuredConsumption
+      && (['шт.','уп.'].includes(receipt) || massFromVolume
+        || item?.grossWeight != null);
+    const container = form.querySelector('[data-inventory-container-mode]');
+    container.hidden = !needsPhysicalMass;
+    const mode = String(input('containerMode')?.value || '');
+    form.querySelector('[data-inventory-gross-net-tare]').hidden = !needsPhysicalMass || mode !== 'WITH';
+    form.querySelector('[data-inventory-net-only]').hidden = !needsPhysicalMass || mode !== 'NONE';
+    const net = updateNet();
+    const fromNominal = nominal === stock && nominalQuantity > 0 ? nominalQuantity : null;
+    const fromWeight = stock === 'г' && net != null ? net : null;
+    const derived = fromWeight ?? fromNominal;
+    const needsContent = Boolean(
+      receipt && receipt !== stock ||
+      consume && consumeUnit !== stock ||
+      sale && saleUnit !== stock ||
+      item?.packageQuantity
+    );
     const pack = form.querySelector('[data-inventory-package-fields]');
-    pack.hidden = !needsContent;
+    // A new product's content is supplied by its nominal or net mass.
+    // Existing contents remain visible: never reinterpret historical stock.
+    pack.hidden = !needsContent || creating && (
+      derived != null || needsPhysicalMass
+    );
     const packLabel = pack.querySelector('label.field > span');
     if (packLabel) packLabel.textContent = 'Содержимое, ' + stock;
-    const showContainer = massFromVolume || shape === 'package' && measuredConsumption
-      || Boolean(item?.grossWeight != null && measuredConsumption);
-    form.querySelector('[data-inventory-container-mode]').hidden = !showContainer;
-    if (showContainer && !input('containerMode').value && massFromVolume) {
-      input('containerMode').value = 'WITH';
-      const label = input('containerMode').closest('.ui-select')?.querySelector('.ui-select__value');
-      if (label) label.textContent = 'С тарой';
-    }
-    const hasTare = String(input('containerMode')?.value || '') === 'WITH';
-    form.querySelector('[data-inventory-gross-net-tare]').hidden = !showContainer || !hasTare;
-    form.querySelector('[data-inventory-net-only]').hidden = !showContainer || hasTare;
-    const net = updateNet();
-    // The segmented control is an existing AV component and selects which
-    // dependent controls appear, not a new inventory accounting mode.
-    form.querySelector('[data-inventory-extra-toggles]').hidden = shape !== 'tool';
-    if (shape !== 'tool') {
-      // Preserve existing equipment fields when editing a product with a
-      // different presentation; never silently erase persisted resource.
-    }
-    if (creating && !contentEdited && pack && !pack.hidden) {
-      if (hasTare && net != null && stock === 'г') input('packageQuantity').value = numberText(net);
-      else if (nominal && nominal === stock && nominalQuantity > 0) input('packageQuantity').value = numberText(nominalQuantity);
-    }
+    if (creating && !contentEdited && derived != null)
+      input('packageQuantity').value = numberText(derived);
+    // Resource and time are optional characteristics of any physical item.
+    // They are not an exclusive item "type".
+    form.querySelector('[data-inventory-extra-toggles]').hidden = false;
     const resource = extraOn('resource');
     const period = extraOn('period');
     input('resourceEnabled').value = resource ? '1' : '0';
     input('periodEnabled').value = period ? '1' : '0';
-    form.querySelector('[data-inventory-resource-fields]').hidden = shape !== 'tool' || !resource;
+    form.querySelector('[data-inventory-resource-fields]').hidden = !resource;
     form.querySelector('[data-inventory-resource-stock]').hidden = !resource
       || String(input('resourceExhaustionAction')?.value) !== 'WRITE_OFF';
-    form.querySelector('[data-inventory-period-fields]').hidden = shape !== 'tool' || !period;
+    form.querySelector('[data-inventory-period-fields]').hidden = !period;
     setNumberUnit('resourceLimit', String(input('resourceUnit')?.value || 'проц.'));
     updatePrimaryPrice();
   };
@@ -645,7 +629,7 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
     syncDirty();
   });
   form.addEventListener('change', (event) => {
-    if (['inventoryShape', 'receiptUnit', 'nominalUnit', 'consumeUnit', 'saleUnit', 'containerMode', 'resourceUnit', 'resourceExhaustionAction'].includes(event.target?.name)) syncFields();
+    if (['receiptUnit', 'nominalUnit', 'consumeUnit', 'saleUnit', 'containerMode', 'resourceUnit', 'resourceExhaustionAction'].includes(event.target?.name)) syncFields();
     syncDirty();
   });
   syncFields();
@@ -685,11 +669,21 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
       return;
     }
     const containerMode = String(data.get('containerMode') || '') || null;
-    const isMeasured = consumption && ['г','кг'].includes(consumptionUnit);
+    const isMeasured = (consumption && ['г','кг'].includes(consumptionUnit)) || (sale && ['г','кг'].includes(saleUnit));
     const massFromVolume = isMeasured && ['мл','л'].includes(nominalUnit);
-    const mustMeasure = massFromVolume || (String(data.get('inventoryShape')) === 'package' && isMeasured);
+    const retainedContent = !creating && Number(item?.packageQuantity) > 0
+      && String(item?.unit || '') === unit
+      && String(item?.consumeUnit || '') === String(consumptionUnit || '')
+      && String(item?.saleUnit || '') === String(saleUnit || '')
+      && String(item?.receiptUnit || '') === String(receiptUnit || '');
+    const mustMeasure = isMeasured && (['шт.','уп.'].includes(receiptUnit)
+      || massFromVolume || item?.grossWeight != null) && !retainedContent;
     let gross = item?.grossWeight ?? null;
     let tare = item?.tareWeight ?? null;
+    if (mustMeasure && !containerMode) {
+      openNotice({ title: 'Тара', message: 'Укажите, приходит товар с тарой или без.' });
+      return;
+    }
     if (mustMeasure && containerMode === 'WITH') {
       gross = collectOptionalNumber(form, 'grossWeight');
       tare = collectOptionalNumber(form, 'tareWeight');
@@ -702,9 +696,17 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
       tare = gross == null ? null : 0;
     }
     const net = gross != null && tare != null ? Number(gross) - Number(tare) : null;
+    if (mustMeasure && !(net > 0)) {
+      openNotice({ title: 'Вес содержимого', message: 'Укажите массу содержимого: брутто и тару либо вес без тары.' });
+      return;
+    }
     const packed = collectOptionalNumber(form, 'packageQuantity');
+    const measuredPack = unit === 'г' && net != null ? net : null;
+    const nominalPack = nominalUnit === unit ? nominalQuantity : null;
     const packageQuantity = unit === 'уп.' ? null
-      : packed ?? (unit === 'г' ? net : null) ?? (creating ? null : item?.packageQuantity ?? null);
+      : creating
+        ? measuredPack ?? nominalPack ?? packed
+        : packed ?? measuredPack ?? (item?.packageQuantity ?? null);
     if (packageQuantity != null && packageQuantity <= 0) {
       openNotice({ title: 'Содержимое', message: 'Количество содержимого должно быть больше нуля.' });
       return;
