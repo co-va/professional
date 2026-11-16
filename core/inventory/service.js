@@ -129,10 +129,30 @@ export async function createInventoryPurchaseOrder(value) {
   });
 }
 
+
+function verifyPurchaseOrderLines(payload, orderId, requested) {
+  const saved = verifyOrderState(payload, orderId, ['formed']);
+  const expected = Array.isArray(requested?.lines) ? requested.lines : [];
+  const actual = Array.isArray(saved.lines) ? saved.lines : [];
+  if (expected.length !== actual.length) {
+    throw new Error('Сервер сохранил неполный состав заказа.');
+  }
+  const persisted = new Map(actual.map(line => [String(line.itemId), line]));
+  for (const line of expected) {
+    const row = persisted.get(String(line.itemId));
+    const expectedPrice = Number(line.packPrice);
+    const actualPrice = Number(row?.packPrice);
+    if (!row || Number(row.packages) !== Number(line.packages)
+      || line.packPrice != null && (!Number.isFinite(actualPrice)
+        || Math.abs(actualPrice - expectedPrice) > 0.011)) {
+      throw new Error('Сервер не подтвердил количество или цену позиции заказа.');
+    }
+  }
+}
 export async function updateInventoryPurchaseOrder(orderId, value) {
   return inventoryRequest(purchaseOrderPath(orderId), {
     method: 'PUT', body: JSON.stringify(value),
-    verifySnapshot: payload => verifyOrderState(payload, orderId, ['formed']),
+    verifySnapshot: payload => verifyPurchaseOrderLines(payload, orderId, value),
   });
 }
 
