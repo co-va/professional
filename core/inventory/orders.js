@@ -140,7 +140,8 @@ function orderListMarkup(root) {
   else orders.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   return v2ListEntries(orders.map(order => v2ListEntry({
     title: 'Заказ № ' + orderNumber(order.orderId),
-    subtitle: [dateLabel(order.createdAt), order.supplier].filter(Boolean).join(' · '),
+    subtitle: [dateLabel(order.createdAt), order.supplier,
+      order.note?.startsWith('В следующий заказ ·') ? 'В следующий заказ' : ''].filter(Boolean).join(' · '),
     rightTop: statusLabel(order.status),
     rightBottom: (order.lines || []).length + ' поз.',
     interactive: true,
@@ -535,6 +536,140 @@ function openInventoryOrderSelection(root, existing = null, onSaved = () => {}) 
 // A supplier invoice arrives after a purchase order was already formed.
 // Keep this editor limited to the persisted order's exact lines: prices are
 // facts of this order, not writes to warehouse cards or supplier price lists.
+// Transfer only unfulfilled positions to a saved next order. We use the
+// existing persisted PurchaseOrder API; there is no browser-only waiting list.
+// New order first, then source correction, with compensation on failure.
+async function transferMissingOrderLines(sourceOrder, selectedItemIds) {
+  const current = getInventoryOrder(sourceOrder.orderId);
+  if (!current || current.status !== 'formed') throw new Error('Исходный заказ уже нельзя изменять.');
+  const original = Array.isArray(sourceOrder.lines) ? sourceOrder.lines : [];
+  const currentLines = Array.isArray(current.lines) ? current.lines : [];
+  if (currentLines.length !== original.length || original.some(line => {
+    const fresh = currentLines.find(row => row.itemId === line.itemId);
+    return !fresh || Number(fresh.packages) !== Number(line.packages)
+      || Number(fresh.packPrice) !== Number(line.packPrice);
+  })) throw new Error('Заказ изменился. Откройте его заново перед переносом.');
+  const selected = new Set(selectedItemIds);
+  const missing = original.filter(line => selected.has(line.itemId));
+  const remaining = original.filter(line => !selected.has(line.itemId));
+  if (!missing.length) throw new Error('Отметьте позиции, которых нет у поставщика.');
+  if (!remaining.length) throw new Error('В заказе должна остаться хотя бы одна позиция. Полный перенос пока не поддерживается.');
+  const allItems = getInventoryItems();
+  if (missing.some(line => !allItems.some(item => item.itemId === line.itemId))) {
+    throw new Error('Один из товаров недоступен в складе. Перенос не выполнен.');
+  }
+  const prepared = lines => lines.map(line => ({
+    itemId: line.itemId, packages: Number(line.packages),
+    packPrice: Number(line.packPrice) || 0,
+    ...(line.offerId ? { offerId: line.offerId } : {}),
+  }));
+  const oldIds = new Set(getInventoryOrders().map(order => order.orderId));
+  const destinationPayload = {
+    supplier: current.supplier || '',
+    note: 'В следующий заказ · перенос из № ' + orderNumber(current.orderId),
+    // A new supplier invoice will have its own prices; never copy the
+    // previous invoice as the confirmed price of goods not supplied.
+    lines: missing.map(line => ({
+      itemId: line.itemId, packages: Number(line.packages), packPrice: 0,
+      ...(line.offerId ? { offerId: line.offerId } : {}),
+    })),
+  };
+  await createInventoryPurchaseOrder(destinationPayload);
+  const next = getInventoryOrders().filter(order => !oldIds.has(order.orderId));
+  if (next.length !== 1) {
+    throw new Error('Новый заказ создан, но его номер не подтверждён. Обновите список заказов перед повтором.');
+  }
+  const nextId = next[0].orderId;
+  try {
+    await updateInventoryPurchaseOrder(current.orderId, {
+      supplier: current.supplier || '', note: current.note || '',
+      lines: prepared(remaining),
+    });
+  } catch (cause) {
+    try {
+      await deleteInventoryPurchaseOrder(nextId);
+    } catch (rollbackError) {
+      throw new Error('Новый заказ № ' + orderNumber(nextId) +
+        ' сохранён, но исходный не изменён. Не повторяйте перенос: проверьте оба заказа. ' +
+        String(cause?.message || cause));
+    }
+    throw cause;
+  }
+  return nextId;
+}
+
+function openInventoryOrderCarryOver(root, orderId, onSaved = () => {}) {
+  const order = getInventoryOrder(orderId);
+  if (!order || order.status !== 'formed') {
+    return openNotice({ title: 'Нет у поставщика', message: 'Перенос возможен только до оплаты заказа.' });
+  }
+  const rows = Array.isArray(order.lines) ? order.lines : [];
+  if (rows.length < 2) {
+    return openNotice({ title: 'Нет у поставщика',
+      message: 'Для переноса части заказа нужны минимум две позиции. Полный перенос пока не поддерживается.' });
+  }
+  const markup = '<div class="form-grid" data-inventory-order-carryover>' +
+    '<p>Отметьте позиции, которых нет у поставщика. Они перейдут в отдельный следующий заказ.</p>' +
+    rows.map((line, index) => {
+      const label = String(line.name || getInventoryItem(line.itemId)?.name || 'Без названия');
+      return '<div class="data-edit-row" data-inventory-carryover-row="' + index + '">' +
+        '<div class="field-inline-label">' +
+          compactCheck({ label: '', checked: false, aria: 'Нет у поставщика: ' + label,
+            data: 'data-inventory-carryover-check="' + index + '"' }) +
+          '<span class="data-edit-row__name"><strong>' + escapeHtml(label) + '</strong></span>' +
+        '</div>' +
+        '<span>' + escapeHtml(String(line.packages) + ' шт.') + '</span>' +
+      '</div>';
+    }).join('') +
+    '<p data-inventory-carryover-count></p>' +
+    '<p class="form-error" role="status" data-inventory-carryover-error></p>' +
+    actionBlock(button('Перенести в следующий заказ', {
+      data: 'data-inventory-carryover-save', disabled: true,
+    })) +
+  '</div>';
+  const layer = mountModal(root, modal(markup, { title: 'Нет у поставщика', variant: 'q' }));
+  if (!layer) return null;
+  const selected = new Set();
+  const counter = layer.querySelector('[data-inventory-carryover-count]');
+  const error = layer.querySelector('[data-inventory-carryover-error]');
+  const save = layer.querySelector('[data-inventory-carryover-save]');
+  let saving = false;
+  const sync = () => {
+    counter.textContent = 'К переносу: ' + selected.size + ' из ' + rows.length;
+    save.disabled = saving || selected.size === 0 || selected.size === rows.length;
+  };
+  layer.querySelector('[data-inventory-order-carryover]')?.addEventListener('change', event => {
+    const check = event.target.closest?.('[data-inventory-carryover-check]');
+    if (!check || saving) return;
+    const index = Number(check.dataset.inventoryCarryoverCheck);
+    const line = rows[index];
+    if (!line) return;
+    if (check.checked) selected.add(line.itemId);
+    else selected.delete(line.itemId);
+    error.textContent = selected.size === rows.length
+      ? 'Для полного переноса потребуется отдельный сценарий.' : '';
+    sync();
+  });
+  save?.addEventListener('click', async () => {
+    if (saving || !selected.size || selected.size === rows.length) return;
+    saving = true;
+    error.textContent = '';
+    sync();
+    try {
+      const nextOrderId = await transferMissingOrderLines(order, selected);
+      layer.v2Close?.();
+      onSaved(nextOrderId);
+    } catch (cause) {
+      error.textContent = cause instanceof Error ? cause.message : 'Перенос не выполнен.';
+    } finally {
+      saving = false;
+      if (layer.isConnected) sync();
+    }
+  });
+  sync();
+  return layer;
+}
+
 function openInventoryOrderInvoice(root, orderId, onSaved = () => {}) {
   const order = getInventoryOrder(orderId);
   if (!order || order.status !== 'formed') {
@@ -786,6 +921,10 @@ function openInventoryOrderZ(root, orderId) {
             }, fresh, saveAndRefresh) },
           { id: 'invoice', label: 'Цены по счёту', onSelect: () =>
             openInventoryOrderInvoice(layer, orderId, saveAndRefresh) },
+          { id: 'unavailable', label: 'Нет у поставщика', onSelect: () =>
+            openInventoryOrderCarryOver(layer, orderId, () => {
+              saveAndRefresh();
+            }) },
           { id: 'pay', label: 'Оплатить', onSelect: openPayQ },
           exportAction,
           { id: 'delete', label: 'Удалить заказ', variant: 'danger', onSelect: openDeleteQ },
