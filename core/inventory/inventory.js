@@ -332,6 +332,17 @@ function inventoryContentInBaseUnits(quantity, unit) {
   const value = Number(quantity) * factor;
   return Number.isFinite(value) && value > 0 ? value : null;
 }
+// Keep physical stock in pieces until a measured conversion is known.
+function inventoryNewStockUnit({ receipt, packUnit, consumeUnit, saleUnit, nominalUnit,
+  nominalQuantity, netWeight } = {}) {
+  if (receipt === 'уп.' && packUnit && packUnit !== 'шт.') return inventoryBaseContentUnit(packUnit);
+  const requested = [consumeUnit, saleUnit].find(unit => ['г','мл','кг','л'].includes(unit));
+  if (!requested) return 'шт.';
+  const base = inventoryBaseContentUnit(requested);
+  if (base === inventoryBaseContentUnit(nominalUnit) && Number(nominalQuantity) > 0) return base;
+  if (base === 'г' && netWeight > 0) return base;
+  return 'шт.';
+}
 function inventoryStockPerPiece(stockUnit, nominalUnit, nominalQuantity, netWeight) {
   if (stockUnit === 'шт.') return 1;
   // When weighing the contents, use measured net mass (gross minus tare),
@@ -637,6 +648,7 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
   // For a new item, the nominal unit initially owns the consumption unit.
   // An explicit choice of a different consumption unit always wins.
   let consumptionUnitEdited = !creating;
+  let thresholdUnitEdited = !creating;
   const primaryOffer = item?.supplierOffers?.find((offer) => offer.offerId === item.primaryOfferId);
   const primaryOfferPrice = primaryOffer?.effectivePrice == null
     ? (primaryOffer?.actualPrice ?? (primaryOffer?.listPrice == null ? null
@@ -646,6 +658,17 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
   const setNumberUnit = (name, unit) => {
     const suffix = form.querySelector('[data-inventory-unit-for="' + name + '"]');
     if (suffix) suffix.textContent = unit || '';
+  };
+  // Programmatic selection must update both Shared select's hidden value and
+  // its visible trigger, without replacing the shared UI component.
+  const setSelectValue = (name, value) => {
+    const fieldInput = input(name);
+    if (!fieldInput || fieldInput.value === value) return;
+    const trigger = fieldInput.closest('.ui-select')?.querySelector('[data-ui-select-trigger]');
+    const options = JSON.parse(trigger?.dataset.options || '[]');
+    fieldInput.value = value;
+    const text = trigger?.querySelector('.ui-select__value');
+    if (text) text.textContent = options.find(row => row.value === value)?.label || value;
   };
   const updateNet = () => {
     const mode = String(input('containerMode')?.value || '');
@@ -681,7 +704,8 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
     packageQuantity: input('packageQuantity')?.value,
     nominalQuantity: input('nominalQuantity')?.value,
     nominalUnit: String(input('nominalUnit')?.value || ''),
-    packPieces: input('receiptUnit')?.value === 'уп.' ? input('packPieces')?.value : 1,
+    packPieces: input('receiptUnit')?.value === 'уп.'
+      && input('packContentUnit')?.value === 'шт.' ? input('packContentQuantity')?.value : 1,
     conversionRules: item?.conversionRules || [],
   });
   const deriveSellingPrice = () => {
@@ -697,24 +721,34 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
     const consume = pressed('consume');
     const sale = pressed('sale');
     input('usage').value = consume && sale ? 'both' : consume ? 'consume' : sale ? 'sale' : 'track';
-    const selectedNominal = String(input('nominalUnit')?.value || '');
-    if (creating && !consumptionUnitEdited
-        && INVENTORY_CONSUMPTION_UNITS.some(row => row.value === selectedNominal))
-      input('consumeUnit').value = selectedNominal;
-    const consumeUnit = String(input('consumeUnit')?.value || 'шт.');
-    const saleUnit = String(input('saleUnit')?.value || 'шт.');
     const receipt = String(input('receiptUnit')?.value || '');
+    const contentUnit = String(input('packContentUnit')?.value || 'шт.');
+    const bulk = receipt === 'уп.' && contentUnit !== 'шт.';
     const nominal = String(input('nominalUnit')?.value || '');
     const nominalQuantity = Number(input('nominalQuantity')?.value || 0);
-    // For new items the smallest used granularity is the stock base.
-    // Editing an existing item preserves its stored base and movement history.
-    const chosen = [consume ? consumeUnit : null, sale ? saleUnit : null].filter(Boolean);
-    const measured = chosen.find(value => ['г','мл','кг','л'].includes(value));
-    const piece = chosen.includes('шт.') ? 'шт.' : null;
-    // Packs group physical pieces; a whole-pack sale must not make "уп."
-    // the physical stock base. Keep individual pieces as the default.
-    const stock = creating ? (measured || piece || chosen.find(value => value !== 'уп.') || 'шт.')
-      : String(item?.unit || input('calculationUnit')?.value || 'шт.');
+    const pack = form.querySelector('[data-inventory-pack-count]');
+    pack.hidden = receipt !== 'уп.';
+    form.querySelector('[data-inventory-one-piece-nominal]').hidden = bulk;
+    const nominalLabel = form.querySelector('[data-inventory-nominal-label]');
+    if (nominalLabel) nominalLabel.textContent = receipt === 'уп.'
+      ? 'Номинал 1 шт. · необязательно' : 'Номинал · необязательно';
+    // Prefer entered units, never demand a conversion from a newcomer.
+    if (creating && !consumptionUnitEdited) {
+      const preferred = bulk ? contentUnit : nominal;
+      if (INVENTORY_CONSUMPTION_UNITS.some(row => row.value === preferred))
+        setSelectValue('consumeUnit', preferred);
+      else if (bulk) setSelectValue('consumeUnit', inventoryBaseContentUnit(contentUnit));
+    }
+    const consumeUnit = String(input('consumeUnit')?.value || 'шт.');
+    const saleUnit = String(input('saleUnit')?.value || 'шт.');
+    const netForChoice = updateNet();
+    // For a new product with unknown gram weight, preserve physical piece
+    // accounting until the professional records a real measurement.
+    const stock = creating ? inventoryNewStockUnit({
+      receipt, packUnit: contentUnit, consumeUnit: consume ? consumeUnit : '',
+      saleUnit: sale ? saleUnit : '', nominalUnit: bulk ? null : nominal,
+      nominalQuantity: bulk ? null : nominalQuantity, netWeight: netForChoice,
+    }) : String(item?.unit || input('calculationUnit')?.value || 'шт.');
     input('calculationUnit').value = stock;
     for (const kind of ['consume', 'sale']) {
       const node = form.querySelector('[data-inventory-use="' + kind + '"]');
@@ -723,9 +757,9 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
     form.querySelector('[data-inventory-sale-price-row]').hidden = !sale;
     setNumberUnit('consumeQuantity', consumeUnit);
     setNumberUnit('saleQuantity', saleUnit);
-    const threshold = !creating && (item?.minStock != null || item?.targetStock != null)
-      ? item?.thresholdUnit || inventoryStockThresholdUnit(item)
-      : receipt || item?.thresholdUnit || inventoryStockThresholdUnit(item || { unit: stock });
+    const preferredThreshold = receipt === 'уп.' && contentUnit !== 'шт.' ? 'уп.' : 'шт.';
+    if (creating && !thresholdUnitEdited) setSelectValue('thresholdUnit', preferredThreshold);
+    const threshold = String(input('thresholdUnit')?.value || preferredThreshold);
     setNumberUnit('minStock', threshold);
     setNumberUnit('targetStock', threshold);
     const measuredConsumption = (consume && ['г','кг'].includes(consumeUnit)) || (sale && ['г','кг'].includes(saleUnit));
@@ -739,13 +773,13 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
     form.querySelector('[data-inventory-gross-net-tare]').hidden = !needsPhysicalMass || mode !== 'WITH';
     form.querySelector('[data-inventory-net-only]').hidden = !needsPhysicalMass || mode !== 'NONE';
     const net = updateNet();
-    const pack = form.querySelector('[data-inventory-pack-count]');
-    pack.hidden = receipt !== 'уп.';
-    const pieces = receipt === 'уп.' ? Number(input('packPieces')?.value) : 1;
-    const perPiece = inventoryStockPerPiece(stock, nominal, nominalQuantity, net);
-    // Never turn a five-millilitre nominal into five pieces per pack.
-    // The API quantity is physical pieces times accounting content per piece.
-    const calculated = perPiece > 0 && pieces > 0 ? perPiece * pieces : null;
+    const quantity = receipt === 'уп.' ? Number(input('packContentQuantity')?.value) : 1;
+    const perPiece = bulk ? null : inventoryStockPerPiece(stock, nominal, nominalQuantity, net);
+    // Bulk packaging uses ONE mass/volume; multi-piece packs use count ×
+    // nominal per piece. The API still receives one stock-unit quantity.
+    const calculated = bulk
+      ? inventoryContentInBaseUnits(quantity, contentUnit)
+      : perPiece > 0 && quantity > 0 ? perPiece * quantity : null;
     const packageInput = input('packageQuantity');
     if (calculated != null) packageInput.value = String(Math.round(calculated * 1000000) / 1000000);
     else if (creating || receipt !== item?.receiptUnit) packageInput.value = '';
@@ -770,7 +804,7 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
   }
   form.addEventListener('input', (event) => {
     if (saveError) { saveError.hidden = true; saveError.textContent = ''; }
-    if (['grossWeight', 'tareWeight', 'netOnlyWeight', 'nominalQuantity', 'packPieces', 'purchasePrice'].includes(event.target?.name)) {
+    if (['grossWeight', 'tareWeight', 'netOnlyWeight', 'nominalQuantity', 'packContentQuantity', 'purchasePrice'].includes(event.target?.name)) {
       syncFields();
       deriveSellingPrice();
     }
@@ -779,7 +813,14 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
   });
   form.addEventListener('change', (event) => {
     if (event.target?.name === 'consumeUnit') consumptionUnitEdited = true;
-    if (['receiptUnit', 'nominalUnit', 'consumeUnit', 'saleUnit', 'containerMode', 'resourceUnit', 'resourceExhaustionAction'].includes(event.target?.name)) {
+    if (event.target?.name === 'thresholdUnit') {
+      thresholdUnitEdited = true;
+      const selected = String(input('thresholdUnit')?.value || '');
+      setNumberUnit('minStock', selected);
+      setNumberUnit('targetStock', selected);
+    }
+    if (['receiptUnit', 'packContentUnit', 'nominalUnit', 'consumeUnit', 'saleUnit',
+      'containerMode', 'resourceUnit', 'resourceExhaustionAction'].includes(event.target?.name)) {
       syncFields();
       deriveSellingPrice();
     }
