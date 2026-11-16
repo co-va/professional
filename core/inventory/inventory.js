@@ -659,7 +659,9 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
     const chosen = [consume ? consumeUnit : null, sale ? saleUnit : null].filter(Boolean);
     const measured = chosen.find(value => ['г','мл','кг','л'].includes(value));
     const piece = chosen.includes('шт.') ? 'шт.' : null;
-    const stock = creating ? (measured || piece || chosen[0] || receipt || 'шт.')
+    // Packs group physical pieces; a whole-pack sale must not make "уп."
+    // the physical stock base. Keep individual pieces as the default.
+    const stock = creating ? (measured || piece || chosen.find(value => value !== 'уп.') || 'шт.')
       : String(item?.unit || input('calculationUnit')?.value || 'шт.');
     input('calculationUnit').value = stock;
     for (const kind of ['consume', 'sale']) {
