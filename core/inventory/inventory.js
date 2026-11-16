@@ -867,66 +867,69 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
     const consumption = usage === 'consume' || usage === 'both';
     const consumptionUnit = consumption ? String(data.get('consumeUnit') || unit) : null;
     const saleUnit = sale ? String(data.get('saleUnit') || unit) : null;
-    const nominalQuantity = collectOptionalNumber(form, 'nominalQuantity');
-    const nominalUnit = String(data.get('nominalUnit') || '') || null;
-    if ((nominalQuantity == null) !== (nominalUnit == null) || nominalQuantity != null && nominalQuantity <= 0) {
-      openNotice({ title: 'Номинал', message: 'Укажите номинал вместе с единицей.' });
-      return;
-    }
     const receiptUnit = String(data.get('receiptUnit') || '') || null;
     if (!receiptUnit || !['шт.', 'уп.'].includes(receiptUnit)
         && (creating || receiptUnit !== item?.receiptUnit)) {
-      openNotice({ title: 'Ед. прихода', message: 'Приход возможен только в штуках или упаковках.' });
+      openNotice({ title: 'Ед. прихода', message: 'Выберите штуку или упаковку.' });
       return;
     }
-    const pieces = receiptUnit === 'уп.' ? collectOptionalNumber(form, 'packPieces') : 1;
-    if (receiptUnit === 'уп.' && (!Number.isSafeInteger(pieces) || pieces < 2)) {
-      openNotice({ title: 'Упаковка', message: 'Укажите количество штук в упаковке (не менее двух).' });
+    const packUnit = receiptUnit === 'уп.' ? String(data.get('packContentUnit') || 'шт.') : null;
+    const packAmount = receiptUnit === 'уп.' ? collectOptionalNumber(form, 'packContentQuantity') : 1;
+    const bulk = receiptUnit === 'уп.' && packUnit !== 'шт.';
+    if (receiptUnit === 'уп.' && !(packAmount > 0)) {
+      openNotice({ title: 'В упаковке', message: 'Укажите число штук, вес или объём содержимого.' });
       return;
     }
-    const thresholdUnit = receiptUnit || item?.thresholdUnit || inventoryStockThresholdUnit(item || { unit });
-    if (!creating && receiptUnit !== (item?.receiptUnit || null)
-        && (item?.minStock != null || item?.targetStock != null)
-        && thresholdUnit !== (item?.thresholdUnit || inventoryStockThresholdUnit(item))) {
-      openNotice({ title: 'Ед. остатка', message: 'Сначала пересчитайте существующие пороги запаса в новую единицу.' });
+    if (receiptUnit === 'уп.' && packUnit === 'шт.'
+        && (!Number.isSafeInteger(packAmount) || packAmount < 2)) {
+      openNotice({ title: 'В упаковке', message: 'Для многоштучной упаковки укажите целое число от двух штук.' });
       return;
     }
-    const containerMode = String(data.get('containerMode') || '') || null;
-    const isMeasured = (consumption && ['г','кг'].includes(consumptionUnit)) || (sale && ['г','кг'].includes(saleUnit));
-    const massFromVolume = isMeasured && ['мл','л'].includes(nominalUnit);
-    const retainedContent = !creating && Number(item?.packageQuantity) > 0
-      && String(item?.unit || '') === unit
-      && String(item?.consumeUnit || '') === String(consumptionUnit || '')
-      && String(item?.saleUnit || '') === String(saleUnit || '')
-      && String(item?.receiptUnit || '') === String(receiptUnit || '');
-    const mustMeasure = isMeasured && (['шт.','уп.'].includes(receiptUnit)
-      || massFromVolume || item?.grossWeight != null) && !retainedContent;
-    let gross = item?.grossWeight ?? null;
-    let tare = item?.tareWeight ?? null;
-    if (mustMeasure && !containerMode) {
-      openNotice({ title: 'Тара', message: 'Укажите, приходит товар с тарой или без.' });
+    // One bulk pack has a weight/volume. This is not the nominal of a
+    // separate physical piece; the UI never asks for it a second time.
+    const nominalQuantity = bulk ? packAmount : collectOptionalNumber(form, 'nominalQuantity');
+    const nominalUnit = bulk ? packUnit : String(data.get('nominalUnit') || '') || null;
+    if ((nominalQuantity == null) !== (nominalUnit == null) || nominalQuantity != null && nominalQuantity <= 0) {
+      openNotice({ title: 'Номинал', message: 'Укажите и число, и единицу — либо оставьте оба поля пустыми.' });
       return;
     }
-    if (mustMeasure && containerMode === 'WITH') {
-      gross = collectOptionalNumber(form, 'grossWeight');
-      tare = collectOptionalNumber(form, 'tareWeight');
-      if ((gross == null) !== (tare == null) || gross != null && gross <= tare) {
-        openNotice({ title: 'Масса продукта', message: 'Укажите брутто и тару, чтобы вычислить нетто.' });
+    const thresholdUnit = String(data.get('thresholdUnit') || '') || 'шт.';
+    if (!creating && bulk && inventoryBaseContentUnit(packUnit) !== unit) {
+      openNotice({ title: 'Единицы склада', message: 'Нельзя менять уже установленную базовую единицу этой позиции без корректного преобразования.' });
+      return;
+    }
+    if (!creating && thresholdUnit !== (item?.thresholdUnit || inventoryStockThresholdUnit(item))
+        && (item?.minStock != null || item?.targetStock != null)) {
+      const priorMin = item.minStock == null ? '' : String(item.minStock);
+      const priorTarget = item.targetStock == null ? '' : String(item.targetStock);
+      if (String(data.get('minStock') ?? '') === priorMin && String(data.get('targetStock') ?? '') === priorTarget) {
+        openNotice({ title: 'Ед. запаса', message: 'При смене единицы запаса скорректируйте критический и желаемый остаток.' });
         return;
       }
-    } else if (mustMeasure && containerMode === 'NONE') {
+    }
+    const containerMode = String(data.get('containerMode') || '') || null;
+    let gross = item?.grossWeight ?? null;
+    let tare = item?.tareWeight ?? null;
+    // A newcomer may not know the weight yet. Preserve what is known,
+    // including just one measurement, and compute net only from both facts.
+    if (containerMode === 'WITH') {
+      gross = collectOptionalNumber(form, 'grossWeight');
+      tare = collectOptionalNumber(form, 'tareWeight');
+      if (gross != null && tare != null && gross <= tare) {
+        openNotice({ title: 'Тара', message: 'Брутто должно быть больше массы тары.' });
+        return;
+      }
+    } else if (containerMode === 'NONE') {
       gross = collectOptionalNumber(form, 'netOnlyWeight');
       tare = gross == null ? null : 0;
     }
     const net = gross != null && tare != null ? Number(gross) - Number(tare) : null;
-    if (mustMeasure && !(net > 0)) {
-      openNotice({ title: 'Вес содержимого', message: 'Укажите массу содержимого: брутто и тару либо вес без тары.' });
-      return;
-    }
-    const perPiece = inventoryStockPerPiece(unit, nominalUnit, nominalQuantity, net);
-    const calculatedPack = perPiece > 0 ? perPiece * pieces : null;
+    const perPiece = bulk ? null : inventoryStockPerPiece(unit, nominalUnit, nominalQuantity, net);
+    const calculatedPack = bulk ? inventoryContentInBaseUnits(packAmount, packUnit)
+      : perPiece > 0 ? perPiece * packAmount : null;
     const oldPack = item?.packageQuantity ?? null;
-    const packageQuantity = calculatedPack ?? (!creating && receiptUnit === item?.receiptUnit ? oldPack : null);
+    const packageQuantity = calculatedPack
+      ?? (!creating && receiptUnit === item?.receiptUnit ? oldPack : null);
     if (packageQuantity != null && packageQuantity <= 0) {
       openNotice({ title: 'Содержимое', message: 'Количество содержимого должно быть больше нуля.' });
       return;
@@ -935,12 +938,8 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
     // and never assume that ml has the same numerical mass in grams.
     const metric = new Set(['кг>г','г>кг','л>мл','мл>л','м>см','см>м']);
     const rules = Array.isArray(item?.conversionRules) ? [...item.conversionRules] : [];
-    if (receiptUnit && receiptUnit !== unit &&
-        !metric.has(receiptUnit + '>' + unit) && !(packageQuantity > 0) &&
-        !rules.some(rule => rule.unit === receiptUnit && Number(rule.stockPerUnit) > 0)) {
-      openNotice({ title: 'Содержимое', message: 'Укажите содержимое единицы прихода в ' + unit + '.' });
-      return;
-    }
+    // Unknown quantity-to-weight conversions are allowed in the catalogue.
+    // Actual measured movements will require their own known conversion.
     // One physical piece and its nominal are independent from the
     // number of pieces in a purchase pack. Store the bridge explicitly.
     const setConversion = (target, stockPerUnit) => {
@@ -949,21 +948,19 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
       if (index >= 0) rules.splice(index, 1);
       rules.push({ unit: target, stockPerUnit });
     };
-    if (perPiece > 0) {
+    if (!bulk && perPiece > 0) {
       setConversion('шт.', perPiece);
       if (nominalUnit && nominalQuantity > 0)
-        setConversion(nominalUnit, perPiece / nominalQuantity);
+        setConversion(nominalUnit, perPiece / inventoryContentInBaseUnits(nominalQuantity, nominalUnit)
+          * (['кг','л'].includes(nominalUnit) ? 1000 : 1));
     }
     const convertible = (requested) => !requested || requested === unit
       || metric.has(requested + '>' + unit)
       || rules.some(rule => rule.unit === requested && Number(rule.stockPerUnit) > 0)
       || requested === 'уп.' && packageQuantity > 0;
-    const unsupported = [consumptionUnit, saleUnit].filter(requested => !convertible(requested));
-    if (unsupported.length) {
-      openNotice({ title: 'Пересчёт', message: 'Не указан пересчёт ' + unsupported[0] + ' в ' + unit
-        + '. Укажите содержимое или настройте коэффициент пересчёта.' });
-      return;
-    }
+    // A missing conversion is an incomplete optional measurement, not a
+    // reason to prevent product creation. Conversion-dependent movements
+    // still validate against known values.
     const referencePrice = collectOptionalNumber(form, 'purchasePrice');
     let markup = { mode: 'percent', value: null };
     try { if (sale) markup = parseSaleMarkup(data.get('saleMarkup')); }
@@ -972,9 +969,7 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
     }
     const enteredPrice = sale ? collectOptionalNumber(form, 'salePrice') : null;
     const calculatedPrice = sale ? markedUpSalePrice(saleCost(purchaseInput?.value), markup) : null;
-    if (sale && enteredPrice == null && calculatedPrice == null) {
-      openNotice({ title: 'Продажа', message: 'Укажите цену продажи или пересчёт единицы продажи для наценки.' }); return;
-    }
+    // The product may be created before a sale price is known.
     const resourceEnabled = String(data.get('resourceEnabled')) === '1';
     const resourceLimit = resourceEnabled ? collectOptionalNumber(form, 'resourceLimit') : null;
     if (resourceEnabled && !(resourceLimit > 0)) {
