@@ -317,6 +317,61 @@ function parseSaleMarkup(raw) {
   return { mode: /^(₽|руб)/i.test(matched[2] || '') ? 'amount' : 'percent', value };
 }
 
+
+/**
+ * Purchase price is for one receipt unit; sale price is for saleQuantity
+ * units of saleUnit. Convert through known inventory stock quantities only.
+ * Unknown package / physical conversions must never be assumed to be 1:1.
+ */
+function salePurchaseCost({ purchasePrice, receiptUnit, stockUnit, saleUnit,
+  saleQuantity = 1, packageQuantity, nominalQuantity, nominalUnit, conversionRules = [] } = {}) {
+  if (purchasePrice == null || String(purchasePrice).trim() === '') return null;
+  const purchase = Number(purchasePrice);
+  const amount = saleQuantity == null || saleQuantity === '' ? 1 : Number(saleQuantity);
+  if (!Number.isFinite(purchase) || purchase < 0 || !Number.isFinite(amount) || amount <= 0
+      || !receiptUnit || !saleUnit) return null;
+  if (receiptUnit === saleUnit) return purchase * amount;
+
+  const metricFactor = (from, to) => {
+    if (from === to) return 1;
+    const factors = { 'кг>г': 1000, 'г>кг': 0.001, 'л>мл': 1000, 'мл>л': 0.001 };
+    return factors[from + '>' + to] ?? null;
+  };
+  // A nominal is the physical contents of one receipt pack/piece.
+  if (['уп.', 'шт.'].includes(receiptUnit) && Number(nominalQuantity) > 0) {
+    const converted = metricFactor(nominalUnit, saleUnit);
+    if (converted != null) return purchase * amount / (Number(nominalQuantity) * converted);
+  }
+  // Direct metric conversion does not need inventory stock granularity.
+  const direct = metricFactor(receiptUnit, saleUnit);
+  if (direct != null) return purchase * amount / direct;
+
+  const stockPerUnit = (unit) => {
+    if (!unit || !stockUnit) return null;
+    const directMetric = metricFactor(unit, stockUnit);
+    if (directMetric != null) return directMetric;
+    if (unit === receiptUnit && Number(packageQuantity) > 0) return Number(packageQuantity);
+    const rule = conversionRules.find(row => row.unit === unit && Number(row.stockPerUnit) > 0);
+    if (rule) return Number(rule.stockPerUnit);
+    // Conversion between physical contents and the known nominal.
+    if (unit === nominalUnit && Number(packageQuantity) > 0 && Number(nominalQuantity) > 0
+        && ['уп.', 'шт.'].includes(receiptUnit)) {
+      return Number(packageQuantity) / Number(nominalQuantity);
+    }
+    return null;
+  };
+  const stockPerReceipt = stockPerUnit(receiptUnit);
+  const stockPerSale = stockPerUnit(saleUnit);
+  if (!(stockPerReceipt > 0) || !(stockPerSale > 0)) return null;
+  return purchase * amount * stockPerSale / stockPerReceipt;
+}
+
+function markedUpSalePrice(cost, markup) {
+  if (cost == null || !Number.isFinite(cost) || markup?.value == null) return null;
+  const value = markup.mode === 'amount' ? cost + markup.value : cost * (1 + markup.value / 100);
+  return Number.isFinite(value) ? Math.round((value + Number.EPSILON) * 100) / 100 : null;
+}
+
 function inventoryCalculationUnit(item = {}) {
   return UNIT_OPTIONS.some(option => option.value === item.unit) ? item.unit : 'шт.';
 }
@@ -534,14 +589,23 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
     purchaseInput.value = Number.isFinite(price)
       ? String(Math.round((price + Number.EPSILON) * 10000) / 10000) : '';
   };
+  const saleCost = (purchasePrice) => salePurchaseCost({
+    purchasePrice,
+    receiptUnit: String(input('receiptUnit')?.value || ''),
+    stockUnit: String(input('calculationUnit')?.value || ''),
+    saleUnit: String(input('saleUnit')?.value || ''),
+    saleQuantity: input('saleQuantity')?.value,
+    packageQuantity: input('packageQuantity')?.value,
+    nominalQuantity: input('nominalQuantity')?.value,
+    nominalUnit: String(input('nominalUnit')?.value || ''),
+    conversionRules: item?.conversionRules || [],
+  });
   const deriveSellingPrice = () => {
-    const price = Number(purchaseInput?.value);
-    if (!sellingInput || !markupInput?.value.trim() || !Number.isFinite(price)) return;
+    if (!sellingInput || !markupInput?.value.trim()) return;
     try {
-      const markup = parseSaleMarkup(markupInput.value);
-      if (markup.value == null) return;
-      const value = markup.mode === 'amount' ? price + markup.value : price * (1 + markup.value / 100);
-      sellingInput.value = String(Math.round(value * 100) / 100);
+      const price = markedUpSalePrice(saleCost(purchaseInput?.value), parseSaleMarkup(markupInput.value));
+      // Never keep a package-level price when the requested unit cannot be converted.
+      sellingInput.value = price == null ? '' : String(price);
     } catch {}
   };
 
@@ -633,6 +697,7 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
   for (const checkbox of form.querySelectorAll('[data-inventory-usage-check], [data-inventory-extra-check]')) {
     checkbox.addEventListener('change', () => {
       syncFields();
+      deriveSellingPrice();
       syncDirty();
     });
   }
@@ -643,11 +708,14 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
       syncFields();
       deriveSellingPrice();
     }
-    if (event.target.name === 'saleMarkup') deriveSellingPrice();
+    if (['saleMarkup', 'saleQuantity'].includes(event.target.name)) deriveSellingPrice();
     syncDirty();
   });
   form.addEventListener('change', (event) => {
-    if (['receiptUnit', 'nominalUnit', 'consumeUnit', 'saleUnit', 'containerMode', 'resourceUnit', 'resourceExhaustionAction'].includes(event.target?.name)) syncFields();
+    if (['receiptUnit', 'nominalUnit', 'consumeUnit', 'saleUnit', 'containerMode', 'resourceUnit', 'resourceExhaustionAction'].includes(event.target?.name)) {
+      syncFields();
+      deriveSellingPrice();
+    }
     syncDirty();
   });
   syncFields();
@@ -766,9 +834,9 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
       openNotice({ title: 'Наценка', message: error.message }); return;
     }
     const enteredPrice = sale ? collectOptionalNumber(form, 'salePrice') : null;
-    const basePrice = purchaseInput?.disabled ? itemPrimaryPrice(item || {}) : referencePrice;
-    if (sale && enteredPrice == null && (markup.value == null || basePrice == null)) {
-      openNotice({ title: 'Продажа', message: 'Укажите цену продажи или наценку.' }); return;
+    const calculatedPrice = sale ? markedUpSalePrice(saleCost(purchaseInput?.value), markup) : null;
+    if (sale && enteredPrice == null && calculatedPrice == null) {
+      openNotice({ title: 'Продажа', message: 'Укажите цену продажи или пересчёт единицы продажи для наценки.' }); return;
     }
     const resourceEnabled = String(data.get('resourceEnabled')) === '1';
     const resourceLimit = resourceEnabled ? collectOptionalNumber(form, 'resourceLimit') : null;
@@ -804,9 +872,7 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
       saleQuantity: sale ? collectOptionalNumber(form, 'saleQuantity') : null,
       saleMarkupMode: markup.mode,
       saleMarkupValue: sale ? markup.value : null,
-      salePrice: sale ? enteredPrice ?? (markup.value == null || basePrice == null ? null
-        : Math.round((markup.mode === 'amount' ? basePrice + markup.value
-          : basePrice * (1 + markup.value / 100)) * 100) / 100) : null,
+      salePrice: sale ? enteredPrice ?? calculatedPrice : null,
       resourceLimit,
       resourceUnit: resourceEnabled ? String(data.get('resourceUnit') || 'проц.') : null,
       resourceStockQuantity: resourceEnabled ? collectOptionalNumber(form, 'resourceStockQuantity') : null,
