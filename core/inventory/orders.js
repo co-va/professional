@@ -13,7 +13,7 @@ import {
 import {
   createInventoryPurchaseOrder, updateInventoryPurchaseOrder,
   deleteInventoryPurchaseOrder, payInventoryPurchaseOrder,
-  receiveInventoryPurchaseOrder,
+  receiveInventoryPurchaseOrder, loadInventory,
 } from './service.js';
 import { loadWalletCatalog } from '../runtime/auxiliary-state.js';
 import { openInventoryOrderExport } from './order-export.js';
@@ -141,7 +141,7 @@ function orderListMarkup(root) {
   return v2ListEntries(orders.map(order => v2ListEntry({
     title: 'Заказ № ' + orderNumber(order.orderId),
     subtitle: [dateLabel(order.createdAt), order.supplier,
-      order.note?.startsWith('В следующий заказ ·') ? 'В следующий заказ' : ''].filter(Boolean).join(' · '),
+      order.note ? String(order.note).slice(0, 90) : ''].filter(Boolean).join(' · '),
     rightTop: statusLabel(order.status),
     rightBottom: (order.lines || []).length + ' поз.',
     interactive: true,
@@ -586,12 +586,32 @@ async function transferMissingOrderLines(sourceOrder, selectedItemIds) {
       lines: prepared(remaining),
     });
   } catch (cause) {
+    // Network failure after a successful server write is possible. Do not
+    // delete the new order until the original has been re-read and proven
+    // unchanged, otherwise the missing lines could be lost from both orders.
+    let verified = null;
+    try {
+      await loadInventory();
+      verified = getInventoryOrder(current.orderId);
+    } catch { /* Unknown remote state: preserve the new order. */ }
+    const lineKeys = orderLines => (orderLines || []).map(line =>
+      [line.itemId, Number(line.packages), Number(line.packPrice)].join(':')).sort();
+    const sameLines = (a, b) => {
+      const left = lineKeys(a), right = lineKeys(b);
+      return left.length === right.length && left.every((v, i) => v === right[i]);
+    };
+    if (verified?.status === 'formed' && sameLines(verified.lines, remaining)) {
+      return nextId; // The source did save, only its response was lost.
+    }
+    if (!verified || verified.status !== 'formed' || !sameLines(verified.lines, original)) {
+      throw new Error('Новый заказ № ' + orderNumber(nextId) +
+        ' сохранён. Состояние исходного не подтверждено. Проверьте оба заказа перед повтором.');
+    }
     try {
       await deleteInventoryPurchaseOrder(nextId);
-    } catch (rollbackError) {
+    } catch {
       throw new Error('Новый заказ № ' + orderNumber(nextId) +
-        ' сохранён, но исходный не изменён. Не повторяйте перенос: проверьте оба заказа. ' +
-        String(cause?.message || cause));
+        ' сохранён, исходный не изменён. Не повторяйте перенос: проверьте оба заказа.');
     }
     throw cause;
   }
