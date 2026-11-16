@@ -10,7 +10,8 @@
   cursor:pointer;min-height:46px;line-height:46px;
   font-size:14px;font-weight:700;color:var(--text);
 }
-.inventory-editor-panel:has(.inventory-editor-heading__controls) summary.inventory-editor-summary{padding-right:110px}
+.inventory-editor-panel:has(> .inventory-editor-heading__controls)>details>summary.inventory-editor-summary{padding-right:110px}
+.inventory-editor-panel--nested:has(> .inventory-editor-heading__controls)>details>summary.inventory-editor-summary{padding-right:42px}
 .inventory-editor-panel:has([data-inventory-unit-help]) summary.inventory-editor-summary{padding-right:40px}
 .inventory-editor-row--three .field>span{font-size:12px}
 .inventory-editor-heading__controls{

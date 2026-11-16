@@ -397,10 +397,11 @@ function editorNumber({ label, name, value = '', unit = '', ...opts } = {}) {
     '</div>';
 }
 
-function editorPanel(title, body, key, { controls = '', opened = true } = {}) {
+function editorPanel(title, body, key, { controls = '', opened = true, nested = false } = {}) {
   // Native details/summary is the same disclosure mechanism as orders.
   // The checkbox is a sibling of details so it never collapses the section.
-  return '<section class="inventory-editor-panel" data-inventory-panel="' + escapeHtml(key) + '">' +
+  return '<section class="inventory-editor-panel' + (nested ? ' inventory-editor-panel--nested' : '') +
+    '" data-inventory-panel="' + escapeHtml(key) + '">' +
     '<details' + (opened ? ' open' : '') + '><summary class="inventory-editor-summary">' +
       escapeHtml(title) + '</summary><div class="inventory-editor-panel__body">' + body + '</div></details>' +
     (controls ? '<div class="inventory-editor-heading__controls">' + controls + '</div>' : '') +
@@ -554,15 +555,29 @@ function advancedItemFields(item = {}, defaults = {}) {
     '</div>';
 
   // Optional usage modes share one row. Basic consumption remains the default.
-  const switches = '<div class="inventory-editor-extra-toggles" data-inventory-extra-toggles>' +
-    compactCheck({ label: 'Продаю', checked: item.canSell === true, data: 'data-inventory-usage-check="sale"' }) +
-    compactCheck({ label: 'Ресурс', checked: Boolean(isResource), data: 'data-inventory-extra-check="resource"' }) +
-    compactCheck({ label: 'Срок', checked: isPeriod, data: 'data-inventory-extra-check="period"' }) +
+  const saleFields = '<div class="inventory-editor-group">' +
+    stockDisposalFields(item, 'sale') +
+    '<div class="inventory-editor-row" data-inventory-sale-price-row>' +
+      field({ label: 'Наценка', name: 'saleMarkup',
+        value: item.saleMarkupValue == null ? '' : String(item.saleMarkupValue) + (item.saleMarkupMode === 'amount' ? ' ₽' : '%'),
+        placeholder: '20% / 200 ₽' }) +
+      editorNumber({ label: 'Цена продажи', name: 'salePrice', value: item.salePrice ?? '', unit: '₽', data: 'aria-label="Цена продажи, ₽"' }) +
+    '</div></div>';
+  const resourceFields = '<div class="inventory-editor-row inventory-editor-row--three" data-inventory-resource-fields>' +
+    editorNumber({ label: 'Ресурс', name: 'resourceLimit', value: item.resourceLimit ?? '', unit: item.resourceUnit || 'проц.' }) +
+    select({ label: 'Ед. ресурса', name: 'resourceUnit', value: item.resourceUnit || 'проц.', options: RESOURCE_UNIT_OPTIONS }) +
+    select({ label: 'По окончании', name: 'resourceExhaustionAction', value: item.resourceExhaustionAction || 'REVIEW',
+      options: [{ value: 'REVIEW', label: 'Проверить' }, { value: 'WRITE_OFF', label: 'Списать' }] }) +
+    '</div>';
+  const periodFields = '<div class="inventory-editor-row" data-inventory-period-fields>' +
+    datePicker({ label: 'Дата с', name: 'serviceStartAt', value: editorDate(item.serviceStartAt),
+      placeholder: 'Выбрать дату', modalSurface: 'app' }) +
+    datePicker({ label: 'Дата по', name: 'serviceEndAt', value: editorDate(item.serviceEndAt),
+      placeholder: 'Выбрать дату', modalSurface: 'app' }) +
     '</div>';
   const usage = '<div class="inventory-editor-group">' +
     '<input type="hidden" name="usage" value="' + escapeHtml(itemUsageMode(item)) + '">' +
     '<input type="hidden" name="calculationUnit" value="' + escapeHtml(inventoryCalculationUnit(item)) + '">' +
-    // Only usage belongs here. Purchase pack count is in the receipt group.
     stockDisposalFields(item, 'consume') +
     '<div data-inventory-container-mode>' +
       select({ label: 'Тара', name: 'containerMode', value: item.containerMode || (item.grossWeight != null || item.tareWeight != null ? 'WITH' : ''), options: [
@@ -571,29 +586,24 @@ function advancedItemFields(item = {}, defaults = {}) {
     '</div>' +
     itemMassFields(item) +
     itemNetOnlyFields(item) +
-    // Optional controls and their fields always follow the whole accounting section.
-    switches +
-    stockDisposalFields(item, 'sale') +
-    '<div class="inventory-editor-row" data-inventory-sale-price-row>' +
-      field({ label: 'Наценка', name: 'saleMarkup',
-        value: item.saleMarkupValue == null ? '' : String(item.saleMarkupValue) + (item.saleMarkupMode === 'amount' ? ' ₽' : '%'),
-        placeholder: '20% / 200 ₽' }) +
-      editorNumber({ label: 'Цена продажи', name: 'salePrice', value: item.salePrice ?? '', unit: '₽', data: 'aria-label="Цена продажи, ₽"' }) +
-    '</div>' +
     '<input type="hidden" name="resourceEnabled" value="' + (isResource ? '1' : '0') + '">' +
     '<input type="hidden" name="periodEnabled" value="' + (isPeriod ? '1' : '0') + '">' +
-    '<div class="inventory-editor-row inventory-editor-row--three" data-inventory-resource-fields>' +
-      editorNumber({ label: 'Ресурс', name: 'resourceLimit', value: item.resourceLimit ?? '', unit: item.resourceUnit || 'проц.' }) +
-      select({ label: 'Ед. ресурса', name: 'resourceUnit', value: item.resourceUnit || 'проц.', options: RESOURCE_UNIT_OPTIONS }) +
-      select({ label: 'По окончании', name: 'resourceExhaustionAction', value: item.resourceExhaustionAction || 'REVIEW',
-        options: [{ value: 'REVIEW', label: 'Проверить' }, { value: 'WRITE_OFF', label: 'Списать' }] }) +
-    '</div>' +
-    '<div class="inventory-editor-row" data-inventory-period-fields>' +
-      datePicker({ label: 'Дата с', name: 'serviceStartAt', value: editorDate(item.serviceStartAt),
-        placeholder: 'Выбрать дату', modalSurface: 'app' }) +
-      datePicker({ label: 'Дата по', name: 'serviceEndAt', value: editorDate(item.serviceEndAt),
-        placeholder: 'Выбрать дату', modalSurface: 'app' }) +
-    '</div></div>';
+    editorPanel('Продажа', saleFields, 'sale', {
+      nested: true, opened: false,
+      controls: compactCheck({ checked: item.canSell === true, aria: 'Использовать продажу',
+        data: 'data-inventory-usage-check="sale"' }),
+    }) +
+    editorPanel('Ресурс', resourceFields, 'resource', {
+      nested: true, opened: false,
+      controls: compactCheck({ checked: Boolean(isResource), aria: 'Использовать ресурс',
+        data: 'data-inventory-extra-check="resource"' }),
+    }) +
+    editorPanel('Срок', periodFields, 'period', {
+      nested: true, opened: false,
+      controls: compactCheck({ checked: isPeriod, aria: 'Использовать срок',
+        data: 'data-inventory-extra-check="period"' }),
+    }) +
+    '</div>';
 
   const classification = '<div class="inventory-editor-group">' +
     field({ label: 'Полное наименование', name: 'catalogName', value: item.catalogName || '' }) +
@@ -787,11 +797,10 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
       nominalQuantity: bulk ? null : nominalQuantity, netWeight: netForChoice,
     }) : String(item?.unit || input('calculationUnit')?.value || 'шт.');
     input('calculationUnit').value = stock;
-    for (const kind of ['consume', 'sale']) {
-      const node = form.querySelector('[data-inventory-use="' + kind + '"]');
-      if (node) node.hidden = kind === 'consume' ? !consume : !sale;
-    }
-    form.querySelector('[data-inventory-sale-price-row]').hidden = !sale;
+    const consumptionRow = form.querySelector('[data-inventory-use="consume"]');
+    if (consumptionRow) consumptionRow.hidden = !consume;
+    // Optional fields stay in their own native details sections. The checkbox
+    // changes use/saving, never whether clicking the heading may show fields.
     setNumberUnit('consumeQuantity', consumeUnit);
     setNumberUnit('saleQuantity', saleUnit);
     const preferredThreshold = receipt === 'уп.' && contentUnit !== 'шт.' ? 'уп.' : 'шт.';
@@ -826,8 +835,6 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
     const period = extraOn('period');
     input('resourceEnabled').value = resource ? '1' : '0';
     input('periodEnabled').value = period ? '1' : '0';
-    form.querySelector('[data-inventory-resource-fields]').hidden = !resource;
-    form.querySelector('[data-inventory-period-fields]').hidden = !period;
     setNumberUnit('resourceLimit', String(input('resourceUnit')?.value || 'проц.'));
     updatePrimaryPrice();
   };
