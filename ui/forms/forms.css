@@ -1,2 +1,53 @@
 .form-error{color:var(--danger);font-size:13px;line-height:1.35}
 .booking-account .form-error{font-size:13px;text-align:center}
+
+
+/* Inventory item Q: compact domain layout; shared AV input/select/toggle geometry is unchanged. */
+.inventory-item-accordion{border:0;border-radius:0;overflow:visible;background:transparent;min-width:0}
+.inventory-item-accordion .inventory-editor-panel{background:transparent;border-bottom:1px solid var(--border)}
+.inventory-editor-heading{display:flex;align-items:center;gap:6px;min-width:0;min-height:46px}
+.inventory-editor-trigger{display:flex;align-items:center;gap:8px;flex:1 1 auto;width:auto;min-width:0;min-height:46px;border:0;padding:0 2px;background:transparent;white-space:nowrap;font-size:14px}
+.inventory-editor-trigger .accordion-chevron{flex:0 0 15px;display:inline-block;transform:rotate(-90deg);font-size:18px;line-height:1;transition:transform .16s ease}
+.inventory-editor-panel.is-open .inventory-editor-trigger .accordion-chevron{transform:none}
+.inventory-editor-heading__controls{display:flex;align-items:center;gap:6px;flex:0 0 auto;min-width:0}
+.inventory-editor-heading__controls .app-setting-toggle,.inventory-editor-extra-toggles .app-setting-toggle{box-sizing:border-box;display:flex;align-items:center;justify-content:flex-end;gap:5px;min-width:0;width:auto;min-height:30px;height:30px;border:0;border-radius:0;padding:0;background:transparent;white-space:nowrap;box-shadow:none}
+.inventory-editor-heading__controls .app-setting-toggle>span:first-child,.inventory-editor-extra-toggles .app-setting-toggle>span:first-child{font-size:11px;line-height:1;white-space:nowrap}
+.inventory-editor-heading__controls .app-setting-toggle__switch,.inventory-editor-extra-toggles .app-setting-toggle__switch{flex:0 0 42px}
+.inventory-editor-panel .inventory-editor-panel__body{padding:0 0 14px}
+.inventory-editor-panel [hidden]{display:none!important}
+.inventory-editor-group{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;align-content:start;min-width:0}
+.inventory-editor-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;align-items:start;min-width:0}
+.inventory-editor-row--identity{grid-template-columns:minmax(0,1.25fr) minmax(0,1fr)}
+.inventory-editor-row--three{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.inventory-editor-row > *, .inventory-editor-row--three > *, .inventory-editor-measure{min-width:0}
+.inventory-editor-row .field,.inventory-editor-measure .field{min-width:0;max-width:100%;margin:0}
+.inventory-editor-measure{display:grid;gap:6px;align-content:start}
+.inventory-editor-label{font-size:13px;color:var(--text-secondary);line-height:normal}
+.inventory-editor-measure__control{min-width:0;display:grid;grid-template-columns:minmax(0,1fr) minmax(60px,68px);gap:4px}
+.inventory-editor-measure__control > .field > span:empty{display:none}
+.inventory-editor-measure__control .ui-select__control,.inventory-editor-row--three .ui-select__control{box-sizing:border-box;width:100%;min-width:0;padding:0 17px 0 3px}
+.inventory-editor-measure__control .ui-select__chevron,.inventory-editor-row--three .ui-select__chevron{right:3px;font-size:13px}
+.inventory-editor-number{position:relative;min-width:0}
+.inventory-editor-number .field input{box-sizing:border-box;min-width:0;padding-right:41px;text-overflow:clip;font-variant-numeric:tabular-nums}
+.inventory-editor-number__suffix{position:absolute;right:12px;bottom:16px;font-size:12px;line-height:1;color:var(--text-secondary);pointer-events:none;white-space:nowrap}
+.inventory-editor-row--three .inventory-editor-number .field>span,.inventory-editor-row--three .ui-select.field>span{font-size:12px}
+.inventory-editor-row--three .inventory-editor-number .field input{padding-left:7px;padding-right:24px}
+.inventory-editor-row--three .inventory-editor-number__suffix{right:6px}
+.inventory-editor-extra-toggles{display:flex;gap:16px;align-items:center}
+.inventory-editor-number:has([name="netWeight"]) input[readonly]{background:transparent;border-color:transparent;color:var(--text);font-weight:700;cursor:default;opacity:1}
+@media(max-width:380px){
+ .inventory-editor-row{gap:6px}
+ .inventory-editor-row--three{gap:5px}
+ .inventory-editor-heading__controls{gap:4px}
+ .inventory-editor-heading__controls .app-setting-toggle{gap:3px}
+}
+
+.inventory-editor-disposal{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;min-width:0}
+.inventory-editor-disposal [data-inventory-conversion] .inventory-editor-number{max-width:48%}
+
+.inventory-editor-group .column-layout--3{gap:6px}
+.inventory-editor-group .column-layout--3 > .column-layout__column{min-width:0}
+.inventory-editor-group .column-layout--3 .field > span{font-size:12px}
+
+.inventory-editor-number .field input{padding-right:52px}
+.inventory-editor-number:has([name="purchasePrice"]) input:disabled{background:transparent;border-color:transparent;color:var(--text);font-weight:650;opacity:1}

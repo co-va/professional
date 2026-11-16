@@ -87,12 +87,17 @@ export function inventoryOrderSuggestions(mode = 'target') {
         : urgent ? (hasMinimum ? minimum : 0) + 1 : target;
       const needed = Math.max(0, desired - balance);
       if (needed <= 1e-9) return null;
-      // Preserve the existing suggestedPacks(row) contract: grams for
-      // weighed stock, units for other stock. 0.5 tube short -> buy one tube.
-      const weighed = ['г', 'гр', 'гр.', 'грамм', 'граммы']
-        .includes(String(item.unit || '').toLocaleLowerCase('ru-RU'));
-      const packageSize = Number(item.packageQuantity);
-      const suggestedQuantity = Number((needed * (weighed && Number.isFinite(packageSize) && packageSize > 0 ? packageSize : 1)).toFixed(6));
+      // Desired stock quantity comes from Core's exact threshold->stock
+      // factor. Unknown conversions must never be treated as 1 stock unit.
+      const suppliedFactor = item.thresholdStockFactor;
+      if (Object.prototype.hasOwnProperty.call(item, 'thresholdStockFactor')
+        && (suppliedFactor == null || !(Number(suppliedFactor) > 0))) return null;
+      const weighed = isWeighedInventoryItem(item);
+      const legacySize = Number(item.packageQuantity);
+      const legacyFactor = weighed && Number.isFinite(legacySize) && legacySize > 0 ? legacySize : 1;
+      const factor = Object.prototype.hasOwnProperty.call(item, 'thresholdStockFactor')
+        ? Number(suppliedFactor) : legacyFactor;
+      const suggestedQuantity = Number((needed * factor).toFixed(6));
       return { ...item, urgency: urgent ? 'urgent' : 'normal', suggestedQuantity };
     })
     .filter(Boolean);

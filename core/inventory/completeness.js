@@ -19,8 +19,10 @@ export function inventoryItemCompletion(item = {}) {
     { label: 'Артикул или штрихкод', ok: hasText(item.sku) || hasText(item.barcode) },
   ];
   if (isWeighedInventoryItem(item)) {
-    checks.push(
-      { label: 'В упаковке', ok: hasPositive(item.packageQuantity) },
+    checks.push({ label: 'В упаковке', ok: hasPositive(item.packageQuantity) });
+    // No physical container means no tare weight is required. Legacy g-items
+    // with unspecified container mode retain their previous completeness checks.
+    if (item.containerMode !== 'NONE') checks.push(
       { label: 'Масса брутто', ok: hasPositive(item.grossWeight) },
       { label: 'Масса тары', ok: hasNonNegative(item.tareWeight) },
     );
@@ -76,7 +78,7 @@ export function netStocktakeGrams({ gross, containers, tareWeight } = {}) {
 // InventoryItem.minStock/targetStock already store whole-tube equivalents
 // (0.5 = half a tube). Never migrate, divide, or multiply these saved values.
 export function inventoryStockThresholdUnit(item = {}) {
-  return isWeighedInventoryItem(item) ? 'тюб.' : String(item.unit || 'шт.');
+  return String(item.thresholdUnit || item.receiptUnit || (isWeighedInventoryItem(item) ? 'тюб.' : item.unit || 'шт.'));
 }
 
 export function inventoryStockThresholdInput(_item = {}, value = null) {
@@ -97,6 +99,13 @@ export function inventoryStockThresholdStored(_item = {}, value = null) {
 // Convert balance only for recommendation comparisons. Physical containerCount
 // is a separate measurement and must not be used as remaining content.
 export function inventoryStockBalanceInThresholdUnits(item = {}) {
+  // The canonical server decides conversion. An explicit null means unknown,
+  // not grams disguised as pieces; never use a speculative fallback in that case.
+  if (Object.prototype.hasOwnProperty.call(item, 'balanceInThresholdUnit')) {
+    if (item.balanceInThresholdUnit == null) return null;
+    const precise = Number(item.balanceInThresholdUnit);
+    return Number.isFinite(precise) && precise >= 0 ? precise : null;
+  }
   const balance = Number(item.balance);
   if (!Number.isFinite(balance) || balance < 0) return null;
   if (!isWeighedInventoryItem(item)) return balance;
