@@ -153,7 +153,6 @@ function itemSearchText(item = {}) {
     item.name,
     item.productType,
     item.category,
-    item.location,
     item.sku,
     item.barcode,
   ].filter(Boolean).join(' ').toLocaleLowerCase('ru-RU');
@@ -372,7 +371,6 @@ function advancedItemFields(item = {}) {
     field({ label: 'Штрихкод', name: 'barcode', value: item.barcode || '' }),
   ], { columns: 3, ariaLabel: 'Номер, артикул и штрихкод' });
   const inventory = `
-    ${field({ label: 'Место хранения', name: 'location', value: item.location || '' })}
     ${twoColumnLayout(
       field({ label: 'Критический остаток', name: 'minStock',
         value: inventoryStockThresholdInput(item, item.minStock),
@@ -388,7 +386,7 @@ function advancedItemFields(item = {}) {
     stockDisposalFields(item, 'consume'),
     stockDisposalFields(item, 'sale'),
     v2Section('Учёт и цены', `<div class="form-grid">${itemPackageFields(item)}</div>`),
-    v2Section('Хранение и запас', `<div class="form-grid">${inventory}</div>`),
+    v2Section('Запас', `<div class="form-grid">${inventory}</div>`),
   ].join('');
 }
 
@@ -618,7 +616,6 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
       category: String(data.get('category') || '').trim(),
       productType: String(data.get('productType') || '').trim(),
       supplier: String(data.get('supplier') || '').trim(),
-      location: String(data.get('location') || '').trim(),
       sku: String(data.get('sku') || '').trim(),
       barcode: String(data.get('barcode') || '').trim(),
       ...(!creating ? { position: requestedPosition } : {}),
@@ -1084,7 +1081,7 @@ function stockListMarkup(manufacturer, query = '') {
     reorderHandle: canReorder,
     reorderAria: 'Изменить порядок материала',
 
-    subtitle: [productTypeText(item), item.location, tubeCountText(item)].filter(Boolean).join(' · '),
+    subtitle: [productTypeText(item), tubeCountText(item)].filter(Boolean).join(' · '),
     rightTop: `${numberText(item.balance)} ${item.unit}`,
     rightBottom: item.lastPurchasePrice == null ? '' : moneyText(item.lastPurchasePrice),
     interactive: true,
@@ -1136,8 +1133,6 @@ function openStockControls(trigger, level, manufacturer, onChange, mode = 'sort'
         ...stockTypeOptions(manufacturer).slice(1)]}),
     select({label:'Категория', name:'inventoryFilterCategory', value:draft.category,
       options:options('Все категории', item=>item.category)}),
-    select({label:'Место хранения', name:'inventoryFilterLocation', value:draft.location,
-      options:options('Все места', item=>item.location)}),
     select({label:'Единица', name:'inventoryFilterUnit', value:draft.unit,
       options:options('Все единицы', item=>item.unit)}),
     select({label:'Использование', name:'inventoryFilterUsage', value:draft.usage, options:[
@@ -1375,7 +1370,6 @@ function inventoryAuditFilters(items, manufacturer = '') {
     ['manufacturer', 'Производитель'],
     ['productType', 'Тип продукта'],
     ['category', 'Категория'],
-    ['location', 'Место хранения'],
     ['supplier', 'Поставщик'],
     ['unit', 'Единица'],
   ];
@@ -1628,7 +1622,6 @@ const INVENTORY_AUDIT_EDIT_FIELDS = [
   { value: 'position', label: 'Порядковый номер', kind: 'integer' },
   { value: 'sku', label: 'Артикул', kind: 'text' },
   { value: 'barcode', label: 'Штрихкод', kind: 'text' },
-  { value: 'location', label: 'Место хранения', kind: 'text' },
   { value: 'supplier', label: 'Поставщик', kind: 'text' },
   { value: 'referencePrice', label: 'Цена', kind: 'decimal' },
   { value: 'unit', label: 'Единица', kind: 'unit' },

@@ -62,7 +62,6 @@ function productCardFields(item) {
     ['baseUnitPrice', 'Цена за единицу', money(unitPrice)],
     ['lastPurchasePrice', 'Последняя закупка', money(item.lastPurchasePrice)],
     ['supplier', 'Поставщик', item.supplier],
-    ['location', 'Место хранения', item.location],
     ['sku', 'Артикул', item.sku],
     ['barcode', 'Штрихкод', item.barcode],
     ['grossWeight', 'Брутто', item.grossWeight == null ? '' : num(item.grossWeight) + ' г'],
