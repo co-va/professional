@@ -1,6 +1,7 @@
 import {
   actionBlock,
   button,
+  compactButton,
   details,
   columnLayout,
   emptyState,
@@ -199,7 +200,7 @@ function stockTypeOptions(manufacturer = '') {
     .map(productTypeText)
     .filter(Boolean))]
     .sort((left, right) => left.localeCompare(right, 'ru', { numeric: true, sensitivity: 'base' }));
-  return [{ value: '', label: 'Все типы' }, ...values.map((value) => ({ value, label: value }))];
+  return [{ value: '', label: 'Все подкатегории' }, ...values.map((value) => ({ value, label: value }))];
 }
 
 function manufacturerGroups(query = '', type = STOCK_VIEW.manufacturersType) {
@@ -419,11 +420,11 @@ function advancedItemFields(item = {}, defaults = {}) {
 
   const classification = '<div class="inventory-editor-group">' +
     field({ label: 'Полное наименование', name: 'catalogName', value: item.catalogName || '' }) +
-    '<div class="inventory-editor-row">' +
+    '<div class="inventory-editor-row inventory-editor-row--three">' +
       field({ label: 'Производитель', name: 'manufacturer', value: item.manufacturer || defaults.manufacturer || '' }) +
       field({ label: 'Категория', name: 'category', value: item.category || '' }) +
+      field({ label: 'Подкатегория', name: 'productType', value: item.productType || '' }) +
     '</div>' +
-    field({ label: 'Тип', name: 'productType', value: item.productType || '' }) +
     columnLayout([
       field({ label: '№', name: 'position', value: Number(item.position) > 0 ? item.position : '',
         type: 'number', min: '1', step: '1', inputmode: 'numeric' }),
@@ -436,7 +437,9 @@ function advancedItemFields(item = {}, defaults = {}) {
     editorNumber({ label: 'Желаемый', name: 'targetStock', value: inventoryStockThresholdInput(item, item.targetStock), unit: threshold, data: 'aria-label="Желаемый остаток"' }) +
     '</div>';
   return '<div class="inventory-item-accordion">' +
-    editorPanel('Товарная единица', identity, 'identity') +
+    editorPanel('Складская единица', identity, 'identity', {
+      controls: compactButton({ kind: 'info', data: 'data-inventory-unit-help', aria: 'Как заполнить складскую единицу' }),
+    }) +
     editorPanel('Использование', usage, 'usage') +
     editorPanel('Классификация', classification, 'classification', { opened: false }) +
     editorPanel('Запас и контроль', stock, 'stock') +
@@ -467,6 +470,12 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
 
 
   const form = layer.querySelector('[data-inventory-item-form]');
+  layer.querySelector('[data-inventory-unit-help]')?.addEventListener('click', () => {
+    const help = '<div class="modal-title"><h2>Складская единица</h2>' +
+      '<p>Здесь задаются наименование, номинал (число и единица), единица прихода и справочная закупочная цена.</p>' +
+      '<p>Примеры заполнения и правила пересчёта уточним после проверки разных позиций склада.</p></div>';
+    mountModal(document.body, modal(help, { title: 'Складская единица', variant: 'technical', surface: 'app' }));
+  });
   const primary = layer.querySelector('[data-inventory-item-save]');
   const saveError = layer.querySelector('[data-inventory-item-save-error]');
   const actions = primary?.closest('.modal-actions');
@@ -1169,7 +1178,7 @@ function stockSearchField(value = '', data = 'data-inventory-stock-search') {
     value,
     type: 'search',
     autocomplete: 'off',
-    placeholder: 'Название, тип, артикул…',
+    placeholder: 'Название, подкатегория, артикул…',
     data,
   })}</div>`;
 }
@@ -1265,7 +1274,7 @@ function stockSortOptions(level) {
     { value: 'position-asc', label: 'По порядку' },
     { value: 'name-asc', label: 'Название А—Я' },
     { value: 'name-desc', label: 'Название Я—А' },
-    { value: 'type-asc', label: 'По типу' },
+    { value: 'type-asc', label: 'По подкатегории' },
     { value: 'balance-desc', label: 'Остаток: больше сначала' },
     { value: 'balance-asc', label: 'Остаток: меньше сначала' },
   ];
@@ -1289,7 +1298,7 @@ function openStockControls(trigger, level, manufacturer, onChange, mode = 'sort'
   let applied = { ...STOCK_VIEW.itemsFilters };
   let draft = { ...applied };
   const fields = isFilter ? [
-    select({label:'Тип продукта', name:'inventoryType', value:draft.type,
+    select({label:'Подкатегория', name:'inventoryType', value:draft.type,
       options:[...stockTypeOptions(manufacturer).slice(0, 1), ...presence,
         ...stockTypeOptions(manufacturer).slice(1)]}),
     select({label:'Категория', name:'inventoryFilterCategory', value:draft.category,
@@ -1529,7 +1538,7 @@ function inventoryAuditItemLabel(item, includeManufacturer = false) {
 function inventoryAuditFilters(items, manufacturer = '') {
   const definitions = [
     ['manufacturer', 'Производитель'],
-    ['productType', 'Тип продукта'],
+    ['productType', 'Подкатегория'],
     ['category', 'Категория'],
     ['supplier', 'Поставщик'],
     ['unit', 'Единица'],
@@ -1777,7 +1786,7 @@ function inventoryAuditMeasure(item, index, data) {
 
 const INVENTORY_AUDIT_EDIT_FIELDS = [
   { value: 'category', label: 'Категория', kind: 'text' },
-  { value: 'productType', label: 'Тип продукта', kind: 'text' },
+  { value: 'productType', label: 'Подкатегория', kind: 'text' },
   { value: 'name', label: 'Наименование', kind: 'text' },
   { value: 'manufacturer', label: 'Производитель', kind: 'text' },
   { value: 'position', label: 'Порядковый номер', kind: 'integer' },
@@ -2240,7 +2249,7 @@ function renderStock(root) {
   // Canonical Z1 header search: identical shell/spacing to Contacts.
   // Only manufacturer cards belong to the scrollable Z1 body.
   const [searchRow] = setV2ZHeaderRows(root, [`<div class="people-search ui-search-field">
-    ${field({ name: 'inventorySearch', type: 'search', placeholder: 'Название, тип, артикул…', autocomplete: 'off', data: 'data-inventory-stock-search' })}
+    ${field({ name: 'inventorySearch', type: 'search', placeholder: 'Название, подкатегория, артикул…', autocomplete: 'off', data: 'data-inventory-stock-search' })}
   </div>`]);
   const searchInput = searchRow?.querySelector('[data-inventory-stock-search]') || null;
   const listHost = root.querySelector('[data-inventory-manufacturer-list]');
