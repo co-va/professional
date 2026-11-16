@@ -298,8 +298,10 @@ function inventoryPackPieceCount(item = {}) {
 }
 function inventoryStockPerPiece(stockUnit, nominalUnit, nominalQuantity, netWeight) {
   if (stockUnit === 'шт.') return 1;
-  if (stockUnit === nominalUnit && nominalQuantity > 0) return nominalQuantity;
+  // When weighing the contents, use measured net mass (gross minus tare),
+  // not a printed nominal or an assumed ml-to-gram equivalence.
   if (stockUnit === 'г' && netWeight > 0) return netWeight;
+  if (stockUnit === nominalUnit && nominalQuantity > 0) return nominalQuantity;
   return null;
 }
 
@@ -563,8 +565,9 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
   const form = layer.querySelector('[data-inventory-item-form]');
   layer.querySelector('[data-inventory-unit-help]')?.addEventListener('click', () => {
     const help = '<div class="modal-title"><h2>Складская единица</h2>' +
-      '<p>Здесь задаются наименование, номинал (число и единица), единица прихода и справочная закупочная цена.</p>' +
-      '<p>Примеры заполнения и правила пересчёта уточним после проверки разных позиций склада.</p></div>';
+      '<p>Сначала выберите единицу прихода: одна штука или упаковка из нескольких штук.</p>' +
+      '<p>Для упаковки укажите количество штук; для одной штуки это поле отсутствует.</p>' +
+      '<p>Номинал — содержимое ОДНОЙ штуки: например, ампула 5 мл. Расход в штуках означает одну целую ампулу; при расходе в граммах масса определяется по брутто и таре.</p></div>';
     mountModal(document.body, modal(help, { title: 'Складская единица', variant: 'technical', surface: 'app' }));
   });
   const primary = layer.querySelector('[data-inventory-item-save]');
