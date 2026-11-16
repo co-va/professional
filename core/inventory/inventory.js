@@ -589,6 +589,9 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
   const purchaseInput = input('purchasePrice');
   const markupInput = input('saleMarkup');
   const sellingInput = input('salePrice');
+  // For a new item, the nominal unit initially owns the consumption unit.
+  // An explicit choice of a different consumption unit always wins.
+  let consumptionUnitEdited = !creating;
   const primaryOffer = item?.supplierOffers?.find((offer) => offer.offerId === item.primaryOfferId);
   const primaryOfferPrice = primaryOffer?.effectivePrice == null
     ? (primaryOffer?.actualPrice ?? (primaryOffer?.listPrice == null ? null
@@ -649,6 +652,10 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
     const consume = pressed('consume');
     const sale = pressed('sale');
     input('usage').value = consume && sale ? 'both' : consume ? 'consume' : sale ? 'sale' : 'track';
+    const selectedNominal = String(input('nominalUnit')?.value || '');
+    if (creating && !consumptionUnitEdited
+        && INVENTORY_CONSUMPTION_UNITS.some(row => row.value === selectedNominal))
+      input('consumeUnit').value = selectedNominal;
     const consumeUnit = String(input('consumeUnit')?.value || 'шт.');
     const saleUnit = String(input('saleUnit')?.value || 'шт.');
     const receipt = String(input('receiptUnit')?.value || '');
@@ -726,6 +733,7 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
     syncDirty();
   });
   form.addEventListener('change', (event) => {
+    if (event.target?.name === 'consumeUnit') consumptionUnitEdited = true;
     if (['receiptUnit', 'nominalUnit', 'consumeUnit', 'saleUnit', 'containerMode', 'resourceUnit', 'resourceExhaustionAction'].includes(event.target?.name)) {
       syncFields();
       deriveSellingPrice();
