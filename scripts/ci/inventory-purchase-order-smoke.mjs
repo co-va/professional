@@ -178,6 +178,36 @@ const supplierFormat = new Function('getInventoryItem',
   id => id === 'colour' ? {sku:'57-R',barcode:'123456789'} : null,
 );
 assert.equal(supplierFormat.orderNumber('11db0e0a-dc41-4cc0-aa77-bc99aa001122'), '11DB0E0ADC41');
+// The Q editor must keep supplier list price and actual invoice price distinct.
+const priceStart = orderSource.indexOf('const orderSupplierQuote =');
+const priceEnd = orderSource.indexOf('const headSearch =', priceStart);
+assert.ok(priceStart >= 0 && priceEnd > priceStart);
+const { orderSupplierQuote, orderPriceInput } = new Function(
+  orderSource.slice(priceStart, priceEnd) +
+  '\nreturn { orderSupplierQuote, orderPriceInput };'
+)();
+const product = { itemId:'p', unit:'г', receiptUnit:'шт.', packageQuantity:85,
+  primaryOfferId:'offer-a', supplierOffers:[
+    { offerId:'offer-a', supplier:'CHI', listPrice:1389.75, actualPrice:1200, unitsPerOffer:85 },
+    { offerId:'offer-b', supplier:'Other', listPrice:390, actualPrice:375, unitsPerOffer:85 },
+  ],
+};
+assert.equal(orderSupplierQuote(product, 'CHI').price, 1389.75);
+assert.equal(orderSupplierQuote(product, 'CHI').expectedPrice, 1200);
+assert.equal(orderSupplierQuote(product, 'Other').price, 390);
+assert.equal(orderSupplierQuote(product, 'Unknown'), null, 'Do not use wrong supplier prices');
+assert.equal(orderPriceInput('1245,50'), 1245.5);
+assert.equal(orderPriceInput(''), null);
+assert.ok(Number.isNaN(orderPriceInput('-20')));
+assert.match(orderSource, /packPrice: price \?\? 0/,
+  'Invoice line price must persist on the saved purchase order');
+assert.match(orderSource, /const suggestedPrice = oldLine/,
+  'Editing a saved order must not silently replace its previous invoice price');
+assert.match(orderSource, /data-inventory-order-refresh-prices/,
+  'Only explicit action may refresh invoice numbers from the supplier price list');
+assert.match(orderSource, /data-inventory-order-total/,
+  'Q editor must show a calculated total');
+
 assert.deepEqual(supplierFormat.supplierOrderLine({itemId:'colour',name:'Кр–57R',packages:2}), {
   title:'Арт. 57-R',secondary:'Кр–57R',right:['2 шт.'],interactive:false,
 });
@@ -199,7 +229,7 @@ assert.match(z2Code, /id: 'receive', label: 'Получен'/);
 assert.doesNotMatch(z2Code, /data-inventory-order-z-add|data-inventory-order-z-actions|data-inventory-order-z-search/);
 assert.doesNotMatch(z2Code, /actionBlock\(\[/);
 assert.doesNotMatch(z2Code, /v2ListEntry\(/);
-assert.doesNotMatch(z2Code, /rubles\(/);
+assert.match(z2Code, /rubles\(order.total\)/, 'Saved order shows its actual total');
 assert.doesNotMatch(z2Code, /rightBottom: rubles\(item.packages \* item.packPrice\)/);
 assert.match(z2Code, /deleteInventoryPurchaseOrder\(orderId\)/);
 assert.doesNotMatch(orderSource, /не указан вес содержимого одного тюбика/);
