@@ -308,30 +308,16 @@ function inventoryCalculationUnit(item = {}) {
 function itemPackageFields(item = {}) {
   const primaryPrice = itemPrimaryPrice(item);
   const price = primaryPrice ?? item.referencePrice ?? '';
-  const calculationUnit = inventoryCalculationUnit(item);
   const purchase = (name) => field({
     label: 'Закупка', name, value: price, type: 'number',
     min: '0', step: 'any', inputmode: 'decimal', disabled: primaryPrice !== null,
     placeholder: '₽',
   });
   return `
-    <div data-inventory-account-switch>
-      ${button('Другая единица учёта', { variant: 'secondary', data: 'data-inventory-account-switch' })}
-    </div>
-    <div data-inventory-calculation-layout>
-      ${select({ label: 'Единица учёта', name: 'calculationUnit',
-        value: calculationUnit, options: UNIT_OPTIONS })}
-    </div>
-    <div data-inventory-package-switch>
-      ${button('Указать содержимое упаковки', { variant: 'secondary', data: 'data-inventory-package-switch' })}
-    </div>
     <div data-inventory-package-fields>
       ${field({ label: 'Содержимое упаковки', name: 'packageQuantity',
         value: item.packageQuantity ?? '',
         type: 'number', min: '0.001', step: 'any', inputmode: 'decimal' })}
-    </div>
-    <div data-inventory-mass-switch>
-      ${button('Указать массу тары', { variant: 'secondary', data: 'data-inventory-mass-switch' })}
     </div>
     <div data-inventory-gross-net-tare>
       ${columnLayout([
@@ -403,7 +389,7 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
   const draft = item || { unit: 'шт.', canConsume: defaults.usage !== 'sale', canSell: defaults.usage === 'sale' };
   const markup = `
     <form data-inventory-item-form>
-      ${v2Section('Основное', `<div class="form-grid">${itemIdentityFields(draft, defaults)}</div>`)}
+      ${v2Section('Основное', `<div class="form-grid">${itemIdentityFields(draft, defaults)}${select({ label: 'Единица учёта', name: 'calculationUnit', value: inventoryCalculationUnit(draft), options: UNIT_OPTIONS })}</div>`)}
       ${advancedItemFields(draft)}
       ${actionBlock(button(creating ? 'Применить' : 'Сохранить', { type: 'button', data: 'data-inventory-item-save', aria: creating ? 'Добавить продукт' : 'Сохранить продукт' }))}
       <div class="form-error" data-inventory-item-save-error role="alert" hidden></div>
@@ -482,23 +468,7 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
   }
 
 
-  const getNaturalUnit = () => {
-    const usage = String(form.elements.namedItem('usage')?.value || 'consume');
-    if (usage === 'consume' || usage === 'both')
-      return String(form.elements.namedItem('consumeUnit')?.value || 'шт.');
-    if (usage === 'sale') return String(form.elements.namedItem('saleUnit')?.value || 'шт.');
-    return String(form.elements.namedItem('calculationUnit')?.value || 'шт.');
-  };
-  let separateAccounting = !creating && inventoryCalculationUnit(draft) !== getNaturalUnit();
-  let packageExpanded = false;
-  let massExpanded = false;
-  const setUnitChoice = (unit) => {
-    const input = form.elements.namedItem('calculationUnit');
-    if (!input || input.value === unit) return;
-    input.value = unit;
-    const caption = input.closest('.ui-select')?.querySelector('.ui-select__value');
-    if (caption) caption.textContent = UNIT_OPTIONS.find(option => option.value === unit)?.label || unit;
-  };
+  let accountUnitEdited = !creating;
   const syncFields = () => {
     const usage = String(form.elements.namedItem('usage')?.value || 'consume');
     const consumeUnit = String(form.elements.namedItem('consumeUnit')?.value || 'шт.');
@@ -509,62 +479,39 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
       const node = form.querySelector('[data-inventory-use="' + purpose + '"]');
       if (node) node.hidden = purpose === 'sale' ? !sale : !hasConsume;
     }
-    const naturalUnit = getNaturalUnit();
-    // Never silently change the unit of an existing item with stock history.
-    if (!creating && !separateAccounting && draft.unit !== naturalUnit) separateAccounting = true;
-    if (!separateAccounting && (hasConsume || sale)) setUnitChoice(naturalUnit);
-    const stockUnit = String(form.elements.namedItem('calculationUnit')?.value || 'шт.');
-    const accountRow = form.querySelector('[data-inventory-calculation-layout]');
-    const accountAction = form.querySelector('[data-inventory-account-switch]');
-    const accountButton = form.querySelector('[data-inventory-account-switch] button');
-    if (accountRow) accountRow.hidden = !separateAccounting && (hasConsume || sale);
-    if (accountAction) accountAction.hidden = !hasConsume && !sale;
-    if (accountButton) accountButton.textContent = separateAccounting
-      ? 'Использовать единицу ' + (hasConsume ? 'расхода' : 'продажи')
-      : 'Другая единица учёта';
+    // New positions default to the chosen usage unit. Once a user selects an
+    // accounting unit, never silently replace it, even for a new position.
+    const accountInput = form.elements.namedItem('calculationUnit');
+    if (creating && !accountUnitEdited) {
+      const unit = hasConsume ? consumeUnit : sale ? saleUnit : 'шт.';
+      if (accountInput && accountInput.value !== unit) {
+        accountInput.value = unit;
+        const label = accountInput.closest('.ui-select')?.querySelector('.ui-select__value');
+        if (label) label.textContent = UNIT_OPTIONS.find(option => option.value === unit)?.label || unit;
+      }
+    }
+    const stockUnit = String(accountInput?.value || 'шт.');
     const units = [hasConsume ? consumeUnit : null, sale ? saleUnit : null].filter(Boolean);
+    // Only show conversion details when unit conversion is requested or
+    // this item already has a configured quantity per package.
     const needsContent = units.some(unit => unit !== stockUnit
       && (unit === 'уп.' && ['шт.', 'г', 'мл'].includes(stockUnit)
         || unit === 'шт.' && ['г', 'мл'].includes(stockUnit)));
     const packRow = form.querySelector('[data-inventory-package-fields]');
-    const packAction = form.querySelector('[data-inventory-package-switch]');
-    const packButton = form.querySelector('[data-inventory-package-switch] button');
-    if (packRow) packRow.hidden = !needsContent && !packageExpanded;
-    if (packAction) packAction.hidden = stockUnit === 'уп.' || needsContent;
-    if (packButton) packButton.textContent = packageExpanded ? 'Скрыть содержимое упаковки' : 'Указать содержимое упаковки';
+    if (packRow) packRow.hidden = !needsContent && !(item?.packageQuantity > 0 && stockUnit !== 'уп.');
     const packLabel = packRow?.querySelector('label.field > span');
     if (packLabel) {
       const onePiece = units.includes('шт.') && ['г', 'мл'].includes(stockUnit);
       packLabel.textContent = 'Содержимое 1 ' + (onePiece ? 'шт.' : 'уп.') + ', ' + stockUnit;
     }
     const mass = form.querySelector('[data-inventory-gross-net-tare]');
-    const massAction = form.querySelector('[data-inventory-mass-switch]');
-    const massButton = form.querySelector('[data-inventory-mass-switch] button');
     const hasMass = item && (item.grossWeight != null || item.tareWeight != null);
-    if (mass) mass.hidden = stockUnit !== 'г' || (!hasMass && !massExpanded);
-    if (massAction) massAction.hidden = stockUnit !== 'г' || Boolean(hasMass);
-    if (massButton) massButton.textContent = massExpanded ? 'Скрыть массу тары' : 'Указать массу тары';
+    if (mass) mass.hidden = stockUnit !== 'г' || !hasMass;
     const prices = form.querySelector('[data-inventory-sale-price-row]');
     const purchase = form.querySelector('[data-inventory-purchase-row]');
     if (prices) prices.hidden = !sale;
     if (purchase) purchase.hidden = sale;
   };
-  form.querySelector('[data-inventory-account-switch] button')?.addEventListener('click', () => {
-    separateAccounting = !separateAccounting;
-    if (!separateAccounting) setUnitChoice(getNaturalUnit());
-    syncFields();
-    syncDirty();
-  });
-  form.querySelector('[data-inventory-package-switch] button')?.addEventListener('click', () => {
-    packageExpanded = !packageExpanded;
-    syncFields();
-    syncDirty();
-  });
-  form.querySelector('[data-inventory-mass-switch] button')?.addEventListener('click', () => {
-    massExpanded = !massExpanded;
-    syncFields();
-    syncDirty();
-  });
   // The purchase price has one meaning in both conditional layouts.
   const copyPurchasePrice = (source, target) => {
     if (source && target && !target.disabled) target.value = source.value;
@@ -584,6 +531,7 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
   priceInput?.addEventListener('input', deriveSellingPrice);
   purchaseInput?.addEventListener('input', deriveSellingPrice);
   form.addEventListener('change', event => {
+    if (event.target?.name === 'calculationUnit') accountUnitEdited = true;
     if (['usage', 'calculationUnit', 'consumeUnit', 'saleUnit'].includes(event.target?.name)) syncFields();
   });
   syncFields();
