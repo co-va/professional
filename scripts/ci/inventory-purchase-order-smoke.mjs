@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 
 const dataSource = readFileSync('core/inventory/data.js', 'utf8');
 const orderSource = readFileSync('core/inventory/orders.js', 'utf8');
+const counterpartySource = readFileSync('core/inventory/counterparties.js', 'utf8');
 const inventoryUI = readFileSync('core/inventory/inventory.js', 'utf8');
 const service = readFileSync('core/inventory/service.js', 'utf8');
 const excel = readFileSync('core/inventory/excel-v2.js', 'utf8');
@@ -254,4 +255,51 @@ assert.match(inventoryUI, /\{ value: 'ADJUSTMENT', label: 'Инвентариз�
 for (const route of ['/orders', '/pay', '/receive'])
   assert.ok(service.includes(route), 'Missing persisted Core action: ' + route);
 assert.match(service, /verifyOrderState/);
+// Regression: first + on an empty counterparty directory passes null into
+// the shared Q editor. The form must render and wire its submit action.
+const newCompanyStart = counterpartySource.indexOf('function companyForm(');
+const newCompanyEnd = counterpartySource.indexOf('async function openCatalog(', newCompanyStart);
+assert.ok(newCompanyStart >= 0 && newCompanyEnd > newCompanyStart);
+const newCompanyCode = counterpartySource.slice(newCompanyStart, newCompanyEnd);
+let createdCompanyForm = '';
+let onSubmit = null;
+let savedCompany = null;
+let closedCompanyEditor = false;
+const companyFormNode = {
+  querySelector: selector => selector === 'button[type="submit"]'
+    ? { disabled: false }
+    : selector === '[data-counterparty-error]' ? { textContent: '' } : null,
+  addEventListener: (type, fn) => { if (type === 'submit') onSubmit = fn; },
+};
+const companyLayer = {
+  querySelector: selector => selector === '[data-counterparty-form]' ? companyFormNode : null,
+  v2Close: () => { closedCompanyEditor = true; },
+};
+const newCompanyHelpers = {
+  TYPES: [{ value: 'SUPPLIER', label: 'Поставщик' }],
+  field: options => '<input name="' + options.name + '">',
+  select: options => '<select name="' + options.name + '"></select>',
+  actionBlock: value => value,
+  button: () => '<button type="submit">Применить</button>',
+  modal: value => value,
+  mountModal: (_, value) => { createdCompanyForm = value; return companyLayer; },
+  document: { body: {} },
+  json: async (url, options) => { savedCompany = { url, options }; return { id: 'supplier-1' }; },
+  urlId: value => value,
+  errText: value => String(value?.message || ''),
+  FormData: class {
+    entries() { return [['name', 'CHI'], ['kind', 'SUPPLIER']][Symbol.iterator](); }
+  },
+};
+const createCompanyQ = new Function(...Object.keys(newCompanyHelpers),
+  newCompanyCode + '\nreturn openCompanyEditor;')(...Object.values(newCompanyHelpers));
+createCompanyQ(null);
+assert.match(createdCompanyForm, /name="name"/);
+assert.ok(typeof onSubmit === 'function', 'The create company Q must attach submit');
+await onSubmit({ preventDefault() {} });
+assert.ok(closedCompanyEditor, 'Submitted company Q must close');
+assert.equal(savedCompany?.url, '');
+assert.equal(savedCompany?.options?.method, 'POST');
+assert.equal(savedCompany?.options?.body?.name, 'CHI');
+
 console.log('PASS: order Z1/Q/Z2 reuse, minimum/target, no zero clutter, whole packs, single stocktake');
