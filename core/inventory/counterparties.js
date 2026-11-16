@@ -69,6 +69,9 @@ async function download(path, filename) {
 }
 
 function companyForm(company = {}) {
+  // Creating a company passes null; default arguments only cover undefined.
+  // Normalise before reading fields so the Header + can always open its Q.
+  company = company || {};
   return `<form data-counterparty-form>
     ${field({ label: 'Название', name: 'name', value: company.name || '', required: true })}
     ${select({ label: 'Тип', name: 'kind', value: company.kind || 'SUPPLIER', options: TYPES })}
