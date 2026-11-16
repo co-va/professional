@@ -1253,14 +1253,19 @@ function openMovementEditor(root, movementId = '', kind = 'CONSUMPTION', { recor
       const outgoing = previous?.direction ? previous.direction === 'OUT'
         : ['CONSUMPTION', 'SALE', 'WRITE_OFF'].includes(actualKind);
       const containers = previous?.containerDelta == null ? '' : Math.abs(Number(previous.containerDelta));
-      const showContainers = isWeighedInventoryItem(item)
-        && (['RECEIPT', 'RETURN', 'WRITE_OFF'].includes(actualKind) || previous?.containerDelta != null);
+      const physicalPieceCount = item.receiptUnit === 'шт.' || Boolean(inventoryPackPieceCount(item));
+      const showContainers = isWeighedInventoryItem(item) && physicalPieceCount
+        && (['RETURN', 'WRITE_OFF'].includes(actualKind) || previous?.containerDelta != null);
       const quantityPlaceholder = {
         RECEIPT: 'Поступило', CONSUMPTION: 'Израсходовано',
         WRITE_OFF: 'Списано', RETURN: 'Возвращено',
       }[actualKind] || 'Количество';
       const consume = !correcting && actualKind === 'CONSUMPTION';
-      const inputUnit = consume ? (item.consumeUnit || item.unit) : item.unit;
+      const receipt = !correcting && actualKind === 'RECEIPT';
+      // People receive a physical piece or pack, not the internal gram/ml
+      // accounting unit. Let Core perform the one authorized conversion.
+      const inputUnit = receipt ? (item.receiptUnit || item.unit)
+        : consume ? (item.consumeUnit || item.unit) : item.unit;
       // An empty preference stays empty. A stored preference is merely an
       // editable default, not a fixed deduction.
       const initialQuantity = previous?.quantity
@@ -1332,16 +1337,25 @@ function openMovementEditor(root, movementId = '', kind = 'CONSUMPTION', { recor
           : ['CONSUMPTION', 'SALE', 'WRITE_OFF'].includes(actualKind);
         const inputUnit = element.dataset.quantityUnit || item.unit;
         const consume = actualKind === 'CONSUMPTION' && !correcting;
+        const receipt = actualKind === 'RECEIPT' && !correcting;
         const wholeContainer = consume && ['шт.', 'уп.'].includes(inputUnit) && ['г', 'мл'].includes(item.unit);
-        if (consume && (inputUnit === 'уп.' || wholeContainer) && !Number.isSafeInteger(quantity)) {
+        if ((receipt || consume && (inputUnit === 'уп.' || wholeContainer))
+            && ['шт.', 'уп.'].includes(inputUnit) && !Number.isSafeInteger(quantity)) {
           errorHost.textContent = 'Укажите целое количество упаковок или штук: ' + item.name;
           return;
         }
+        // Auto-count physical tubes/ampoules for a full receipt when known.
+        // Bulk powder/sugar has no tube count, and must not invent one.
+        const knownPieces = receipt && inputUnit === 'уп.'
+          ? Number(inventoryPackPieceCount(item)) : receipt && inputUnit === 'шт.' ? 1 : 0;
+        const receivedContainers = receipt && isWeighedInventoryItem(item) && knownPieces > 0
+          ? quantity * knownPieces : null;
         lines.push({
           itemId, quantity,
           // Core translates an explicitly different unit only once.
-          ...(consume && inputUnit !== item.unit ? { quantityUnit: inputUnit } : {}),
+          ...((consume || receipt) && inputUnit !== item.unit ? { quantityUnit: inputUnit } : {}),
           ...(tubeCount != null ? { containerDelta: outgoing ? -tubeCount : tubeCount }
+            : receivedContainers != null ? { containerDelta: receivedContainers }
             : wholeContainer ? { containerDelta: -quantity } : {}),
           ...(direction ? { direction } : {}),
         });
