@@ -61,9 +61,48 @@ const supplierOrderLine = line => {
   return {
     title: article || name || 'Без названия',
     secondary: article && name ? name : '',
-    right: [String(line.packages) + ' шт.'],
+    right: Number(line.packPrice) > 0
+      ? [String(line.packages) + ' шт. × ' + rubles(line.packPrice),
+        rubles(Number(line.packages) * Number(line.packPrice))]
+      : [String(line.packages) + ' шт.'],
     interactive: false,
   };
+};
+// Supplier catalog prices are current offers, not confirmed invoice prices.
+// Never use another supplier's primary offer for a named order.
+const orderSupplierQuote = (item, supplier = '') => {
+  const offers = Array.isArray(item?.supplierOffers) ? item.supplierOffers : [];
+  const normalized = value => String(value || '').trim().replace(/\s+/g, ' ').toLocaleLowerCase('ru-RU');
+  const name = normalized(supplier);
+  const matching = name ? offers.filter(offer => normalized(offer.supplier) === name) : offers;
+  if (!matching.length) return null;
+  const offer = matching.find(row => row.offerId && row.offerId === item.primaryOfferId)
+    || (matching.length === 1 ? matching[0] : null);
+  if (!offer) return null;
+  const stockUnit = String(item.unit || '').trim().toLocaleLowerCase('ru-RU');
+  const receiptUnit = String(item.receiptUnit || item.unit || '').trim().toLocaleLowerCase('ru-RU');
+  const rawSize = Number(item.packageQuantity ?? item.netPackageWeight);
+  const stockPerPack = Number.isFinite(rawSize) && rawSize > 0 ? rawSize
+    : stockUnit === 'шт.' && receiptUnit === 'шт.' ? 1 : null;
+  const unitCost = offer.unitPrice == null ? null : Number(offer.unitPrice);
+  const offeredPrice = offer.effectivePrice ?? offer.actualPrice
+    ?? (offer.listPrice == null ? null
+      : Number(offer.listPrice) * (1 - Number(offer.discountPercent || 0) / 100));
+  const offeredSize = Number(offer.unitsPerOffer);
+  const price = stockPerPack != null && Number.isFinite(unitCost) && unitCost >= 0
+    ? unitCost * stockPerPack
+    : stockPerPack != null && Number.isFinite(offeredSize) && offeredSize > 0
+        && offeredPrice != null && Number.isFinite(Number(offeredPrice))
+        ? Number(offeredPrice) / offeredSize * stockPerPack : null;
+  return { offerId: offer.offerId || '', price: price == null ? null
+    : Math.round((price + Number.EPSILON) * 100) / 100 };
+};
+const orderPriceInput = (raw) => {
+  const text = String(raw ?? '').trim().replace(',', '.');
+  if (!text) return null;
+  const value = Number(text);
+  return Number.isFinite(value) && value >= 0 && value <= 100000000
+    ? Math.round(value * 100) / 100 : NaN;
 };
 const headSearch = data => `<div class="ui-search-field">${field({
   name: 'inventoryOrderSearch', type: 'search', autocomplete: 'off',
@@ -160,6 +199,11 @@ function openInventoryOrderReview(root, { mode = 'target', supplier = '', manufa
     const included = selected.has(item.itemId);
     const quantity = selected.get(item.itemId) || (item.suggestedQuantity > 0 ? suggestedPacks(item) : 1);
     const label = orderItemLabel(item);
+    const oldLine = existingByItem.get(item.itemId);
+    const quote = orderSupplierQuote(item, supplier);
+    const oldPrice = oldLine?.packPrice == null ? null : Number(oldLine.packPrice);
+    const suggestedPrice = oldPrice != null && Number.isFinite(oldPrice) && oldPrice > 0
+      ? oldPrice : quote?.price;
     // The shared data-edit-row already places a compact numeric field beside
     // the product, not under a separate full-width input.
     const quantityField = field({
@@ -182,6 +226,16 @@ function openInventoryOrderReview(root, { mode = 'target', supplier = '', manufa
         '</div>' +
         quantityField +
       '</div>' +
+      '<div data-inventory-order-price-row' + (included ? '' : ' hidden') + '>' +
+        '<div class="inventory-editor-row">' +
+          field({ label: 'Прайс, ₽', value: quote?.price == null ? '' : String(quote.price),
+            name: 'orderQuote-' + index, readonly: true }) +
+          field({ label: 'Цена в заказе, ₽', name: 'orderPrice-' + index, type: 'number',
+            min: '0', max: '100000000', step: '0.01', inputmode: 'decimal',
+            value: suggestedPrice == null ? '' : String(suggestedPrice), disabled: !included }) +
+        '</div>' +
+        '<small data-inventory-order-price-difference></small>' +
+      '</div>' +
       '</section>';
   };
   const includedRows = rows.map((item, index) => selected.has(item.itemId) ? rowMarkup(item, index) : '').join('');
@@ -195,6 +249,10 @@ function openInventoryOrderReview(root, { mode = 'target', supplier = '', manufa
       '<div data-inventory-order-excluded-list>' + excludedRows + '</div>' +
     '</details>' +
     '<div data-inventory-order-active>' + includedRows + '</div>' +
+    '<p data-inventory-order-total></p>' +
+    actionBlock(button('Подставить цены прайса', {
+      variant: 'secondary', data: 'data-inventory-order-refresh-prices',
+    })) +
     '<p class="form-error" role="status" data-inventory-order-selection-error></p>' +
     actionBlock(button(existing ? 'Сохранить заказ' : 'Сформировать', {
       data: 'data-inventory-order-create',
@@ -213,6 +271,7 @@ function openInventoryOrderReview(root, { mode = 'target', supplier = '', manufa
   const excludedGroup = layer.querySelector('[data-inventory-order-excluded]');
   const excludedCount = layer.querySelector('[data-inventory-order-excluded-count]');
   const includedCount = layer.querySelector('[data-inventory-order-selection-count]');
+  const totalHost = layer.querySelector('[data-inventory-order-total]');
   const empty = layer.querySelector('[data-inventory-order-empty]');
   const search = layer.querySelector('[data-inventory-order-catalog-search]');
   const submit = layer.querySelector('[data-inventory-order-create]');
@@ -224,6 +283,32 @@ function openInventoryOrderReview(root, { mode = 'target', supplier = '', manufa
   const sync = () => {
     const total = selected.size;
     includedCount.textContent = 'В заказе: ' + total;
+    let priced = 0;
+    let amountTotal = 0;
+    for (const item of rows) {
+      const index = indexByItem.get(item.itemId);
+      const priceHost = layer.querySelector('[data-inventory-order-row="' + index + '"]');
+      const difference = priceHost?.querySelector('[data-inventory-order-price-difference]');
+      const value = orderPriceInput(priceHost?.querySelector('[name="orderPrice-' + index + '"]')?.value);
+      const quote = orderSupplierQuote(item, supplier);
+      if (difference) {
+        const delta = value == null || !Number.isFinite(value) || quote?.price == null
+          ? null : Math.round((value - quote.price) * 100) / 100;
+        difference.textContent = delta == null ? 'Нет цены для сравнения'
+          : delta === 0 ? 'Совпадает с прайсом'
+          : 'Отличие от прайса: ' + (delta > 0 ? '+' : '') + rubles(delta);
+      }
+      if (!selected.has(item.itemId)) continue;
+      const inputQty = priceHost?.querySelector('[name="orderPackages-' + index + '"]');
+      const quantity = Number(inputQty?.value);
+      if (value == null || !Number.isFinite(value) || !Number.isFinite(quantity) || quantity < 1) continue;
+      priced += 1;
+      amountTotal += value * quantity;
+    }
+    const missing = total - priced;
+    totalHost.textContent = missing
+      ? 'Известная сумма: ' + rubles(amountTotal) + ' · без цены: ' + missing + ' поз.'
+      : 'Итого: ' + rubles(amountTotal);
     excludedCount.textContent = 'Исключено: ' + (rows.length - total);
     empty.hidden = total !== 0;
     submit.disabled = saving || total === 0;
@@ -259,6 +344,12 @@ function openInventoryOrderReview(root, { mode = 'target', supplier = '', manufa
       fields.hidden = !check.checked;
       fields.querySelectorAll('input').forEach(input => { input.disabled = !check.checked; });
     }
+    const priceRow = node.querySelector('[data-inventory-order-price-row]');
+    if (priceRow) {
+      priceRow.hidden = !check.checked;
+      const input = priceRow.querySelector('[name="orderPrice-' + index + '"]');
+      if (input) input.disabled = !check.checked;
+    }
     manuallyChanged.add(item.itemId);
     const destination = check.checked ? activeList : excludedList;
     destination.append(node);
@@ -271,10 +362,22 @@ function openInventoryOrderReview(root, { mode = 'target', supplier = '', manufa
     if (!excludedList.children.length) excludedGroup.open = false;
     sync();
   });
-  // A changed number belongs to this selected line and survives mode switches.
+  // Quantity, invoice price and the live total are edited without re-creating the rows.
   layer.querySelector('[data-inventory-order-review]')?.addEventListener('input', event => {
     const match = /^orderPackages-(\d+)$/.exec(String(event.target?.name || ''));
     if (match && rows[Number(match[1])]) manuallyChanged.add(rows[Number(match[1])].itemId);
+    if (/^order(?:Packages|Price)-\d+$/.test(String(event.target?.name || ''))) sync();
+  });
+  layer.querySelector('[data-inventory-order-refresh-prices]')?.addEventListener('click', () => {
+    if (saving) return;
+    for (const item of rows) {
+      if (!selected.has(item.itemId)) continue;
+      const index = indexByItem.get(item.itemId);
+      const quote = orderSupplierQuote(item, supplier);
+      const price = layer.querySelector('[name="orderPrice-' + index + '"]');
+      if (price && quote?.price != null) price.value = String(quote.price);
+    }
+    sync();
   });
   layer.querySelector('[name="orderReviewMode"]')?.addEventListener('change', event => {
     if (saving) return;
@@ -304,6 +407,12 @@ function openInventoryOrderReview(root, { mode = 'target', supplier = '', manufa
         const input = fields.querySelector('input');
         if (input) input.value = String(packages);
       }
+      const priceRow = node.querySelector('[data-inventory-order-price-row]');
+      if (priceRow) {
+        priceRow.hidden = false;
+        const input = priceRow.querySelector('[name="orderPrice-' + index + '"]');
+        if (input) input.disabled = false;
+      }
       activeList.append(node);
       node.hidden = false;
     }
@@ -328,10 +437,20 @@ function openInventoryOrderReview(root, { mode = 'target', supplier = '', manufa
         return;
       }
       // Orders are counted in whole packages; no tare/net weight at order time.
+      const priceInput = layer.querySelector('[name="orderPrice-' + index + '"]');
+      const price = orderPriceInput(priceInput?.value);
+      if (price !== null && !Number.isFinite(price)) {
+        errorHost.textContent = 'Проверьте цену позиции: ' + item.name;
+        return;
+      }
+      const quote = orderSupplierQuote(item, supplier);
       const old = existingByItem.get(item.itemId);
+      // An unknown price is explicitly zero until the invoice arrives. Never
+      // substitute an offer from another supplier via the server primary offer.
       lines.push({
-        itemId: item.itemId, packages: quantity,
-        ...(old ? { packPrice: old.packPrice, offerId: old.offerId } : {}),
+        itemId: item.itemId, packages: quantity, packPrice: price ?? 0,
+        ...(quote?.offerId ? { offerId: quote.offerId }
+          : old?.offerId ? { offerId: old.offerId } : {}),
       });
     }
     saving = true;
@@ -505,8 +624,13 @@ function openInventoryOrderZ(root, orderId) {
     // An order document includes ALL saved lines in canonical purchase order.
     // Filtering them would make a supplier screenshot incomplete.
     const units = order.lines.reduce((total, line) => total + Number(line.packages || 0), 0);
+    const missing = order.lines.filter(line => !(Number(line.packPrice) > 0)).length;
+    const priceSummary = missing
+      ? 'Известная сумма: ' + rubles(order.total) + ' · без цены: ' + missing + ' поз.'
+      : 'Итого: ' + rubles(order.total);
     summary.innerHTML = '<p>' + escapeHtml(dateLabel(order.createdAt))
-      + ' · Всего ' + escapeHtml(String(units)) + ' шт.</p>';
+      + ' · Всего ' + escapeHtml(String(units)) + ' шт.</p>'
+      + '<p>' + escapeHtml(priceSummary) + '</p>';
     itemsList.innerHTML = list({
       className: 'ui-list--dense',
       items: order.lines.map(supplierOrderLine),
