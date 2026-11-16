@@ -281,13 +281,12 @@ function stockDisposalFields(item = {}, purpose = 'consume') {
   const sale = purpose === 'sale';
   const key = sale ? 'sale' : 'consume';
   const kind = item[key + 'Unit'] || (STOCK_DISPOSAL_UNITS.some(option => option.value === item.unit) ? item.unit : 'шт.');
-  return `<div data-inventory-use="${key}">${v2Section(sale ? 'Продажа' : 'Расход',
-    twoColumnLayout(
-      select({ label: sale ? 'Единица продажи' : 'Единица расхода', name: key + 'Unit', value: kind, options: STOCK_DISPOSAL_UNITS }),
-      field({ label: 'Количество', name: key + 'Quantity', value: item[key + 'Quantity'] ?? '',
-        type: 'number', min: '0.001', step: 'any', inputmode: 'decimal' }),
-      { ariaLabel: (sale ? 'Продажа' : 'Расход') + ': единица и количество' },
-    ))}</div>`;
+  return `<div data-inventory-use="${key}">${twoColumnLayout(
+    select({ label: sale ? 'Продажа, ед.' : 'Расход, ед.', name: key + 'Unit', value: kind, options: STOCK_DISPOSAL_UNITS }),
+    field({ label: 'Количество', name: key + 'Quantity', value: item[key + 'Quantity'] ?? '',
+      type: 'number', min: '0.001', step: 'any', inputmode: 'decimal' }),
+    { ariaLabel: (sale ? 'Продажа' : 'Расход') + ': единица и количество' },
+  )}</div>`;
 }
 
 function parseSaleMarkup(raw) {
@@ -319,15 +318,6 @@ function itemPackageFields(item = {}) {
         value: item.packageQuantity ?? '',
         type: 'number', min: '0.001', step: 'any', inputmode: 'decimal' })}
     </div>
-    <div data-inventory-gross-net-tare>
-      ${columnLayout([
-        field({ label: 'Брутто, г', name: 'grossWeight', value: item.grossWeight ?? '',
-          type: 'number', min: '0', step: 'any', inputmode: 'decimal' }),
-        field({ label: 'Нетто, г', name: 'netWeight', value: item.netPackageWeight ?? '', disabled: true }),
-        field({ label: 'Тара, г', name: 'tareWeight', value: item.tareWeight ?? '',
-          type: 'number', min: '0', step: 'any', inputmode: 'decimal' }),
-      ], { columns: 3, ariaLabel: 'Брутто, нетто, тара' })}
-    </div>
     <div data-inventory-purchase-row>${purchase('purchasePrice')}</div>
     <div data-inventory-sale-price-row>
       ${columnLayout([
@@ -342,16 +332,29 @@ function itemPackageFields(item = {}) {
     </div>`;
 }
 
-function advancedItemFields(item = {}) {
+function itemMassFields(item = {}) {
+  return `
+    <div data-inventory-gross-net-tare>
+      ${columnLayout([
+        field({ label: 'Брутто, г', name: 'grossWeight', value: item.grossWeight ?? '',
+          type: 'number', min: '0', step: 'any', inputmode: 'decimal' }),
+        field({ label: 'Нетто, г', name: 'netWeight', value: item.netPackageWeight ?? '', disabled: true }),
+        field({ label: 'Тара, г', name: 'tareWeight', value: item.tareWeight ?? '',
+          type: 'number', min: '0', step: 'any', inputmode: 'decimal' }),
+      ], { columns: 3, ariaLabel: 'Брутто, нетто, тара' })}
+    </div>`;
+}
+
+function advancedItemFields(item = {}, defaults = {}) {
   const classification = `
     ${field({ label: 'Категория', name: 'category', value: item.category || '' })}
-    ${field({ label: 'Тип продукта', name: 'productType', value: item.productType || '' })}
-    ${select({ label: 'Использование', name: 'usage', value: itemUsageMode(item), options: [
-      { value: 'consume', label: 'Расход' },
-      { value: 'sale', label: 'Продажа' },
-      { value: 'both', label: 'Расход и продажа' },
-      { value: 'track', label: 'Только учёт' },
-    ] })}`;
+    ${field({ label: 'Тип продукта', name: 'productType', value: item.productType || '' })}`;
+  const usage = select({ label: 'Использование', name: 'usage', value: itemUsageMode(item), options: [
+    { value: 'consume', label: 'Расход' },
+    { value: 'sale', label: 'Продажа' },
+    { value: 'both', label: 'Расход и продажа' },
+    { value: 'track', label: 'Только учёт' },
+  ] });
   const identifiers = columnLayout([
     field({ label: '№', name: 'position', value: Number(item.position) > 0 ? item.position : '',
       type: 'number', min: '1', step: '1', inputmode: 'numeric' }),
@@ -367,14 +370,20 @@ function advancedItemFields(item = {}) {
         value: inventoryStockThresholdInput(item, item.targetStock),
         type: 'number', min: '0', step: 'any', inputmode: 'decimal' }),
       { ariaLabel: 'Пороги запаса' },
-    )}`;
+    )}
+    ${itemMassFields(item)}`;
+  const identity = `${itemIdentityFields(item, defaults)}
+    ${select({ label: 'Единица учёта', name: 'calculationUnit', value: inventoryCalculationUnit(item), options: UNIT_OPTIONS })}
+    ${classification}
+    ${identifiers}`;
+  const usageFields = `${usage}
+    ${stockDisposalFields(item, 'consume')}
+    ${stockDisposalFields(item, 'sale')}
+    ${itemPackageFields(item)}`;
   return [
-    v2Section('Маркировка', `<div class="form-grid">${identifiers}</div>`),
-    v2Section('Классификация', `<div class="form-grid">${classification}</div>`),
-    stockDisposalFields(item, 'consume'),
-    stockDisposalFields(item, 'sale'),
-    v2Section('Учёт и цены', `<div class="form-grid">${itemPackageFields(item)}</div>`),
-    v2Section('Запас', `<div class="form-grid">${inventory}</div>`),
+    v2Section('Позиция', `<div class="form-grid">${identity}</div>`),
+    v2Section('Использование', `<div class="form-grid">${usageFields}</div>`),
+    v2Section('Запас и контроль', `<div class="form-grid">${inventory}</div>`),
   ].join('');
 }
 
@@ -389,8 +398,7 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
   const draft = item || { unit: 'шт.', canConsume: defaults.usage !== 'sale', canSell: defaults.usage === 'sale' };
   const markup = `
     <form data-inventory-item-form>
-      ${v2Section('Основное', `<div class="form-grid">${itemIdentityFields(draft, defaults)}${select({ label: 'Единица учёта', name: 'calculationUnit', value: inventoryCalculationUnit(draft), options: UNIT_OPTIONS })}</div>`)}
-      ${advancedItemFields(draft)}
+      ${advancedItemFields(draft, defaults)}
       ${actionBlock(button(creating ? 'Применить' : 'Сохранить', { type: 'button', data: 'data-inventory-item-save', aria: creating ? 'Добавить продукт' : 'Сохранить продукт' }))}
       <div class="form-error" data-inventory-item-save-error role="alert" hidden></div>
     </form>`;
