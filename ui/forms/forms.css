@@ -18,7 +18,8 @@
 }
 .inventory-editor-heading__controls .ui-compact-check__mark,
 .inventory-editor-extra-toggles .ui-compact-check__mark {
-  width:20px;height:20px;flex:0 0 20px;
+  box-sizing:border-box;width:28px;height:28px;min-width:28px;max-width:28px;
+  min-height:28px;max-height:28px;flex:0 0 28px;
 }
 .inventory-editor-heading__controls .ui-compact-check__label,
 .inventory-editor-extra-toggles .ui-compact-check__label {
