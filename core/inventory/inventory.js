@@ -283,10 +283,10 @@ function stockDisposalFields(item = {}, purpose = 'consume') {
   const kind = item[key + 'Unit'] || (STOCK_DISPOSAL_UNITS.some(option => option.value === item.unit) ? item.unit : 'шт.');
   return `<div data-inventory-use="${key}">${v2Section(sale ? 'Продажа' : 'Расход',
     twoColumnLayout(
-      select({ label: 'Ед. списания', name: key + 'Unit', value: kind, options: STOCK_DISPOSAL_UNITS }),
+      select({ label: sale ? 'Единица продажи' : 'Единица расхода', name: key + 'Unit', value: kind, options: STOCK_DISPOSAL_UNITS }),
       field({ label: 'Количество', name: key + 'Quantity', value: item[key + 'Quantity'] ?? '',
         type: 'number', min: '0.001', step: 'any', inputmode: 'decimal' }),
-      { ariaLabel: 'Ед. списания и количество' },
+      { ariaLabel: (sale ? 'Продажа' : 'Расход') + ': единица и количество' },
     ))}</div>`;
 }
 
@@ -329,6 +329,9 @@ function itemPackageFields(item = {}) {
       ${field({ label: 'Содержимое упаковки', name: 'packageQuantity',
         value: item.packageQuantity ?? '',
         type: 'number', min: '0.001', step: 'any', inputmode: 'decimal' })}
+    </div>
+    <div data-inventory-mass-switch>
+      ${button('Указать массу тары', { variant: 'secondary', data: 'data-inventory-mass-switch' })}
     </div>
     <div data-inventory-gross-net-tare>
       ${columnLayout([
@@ -488,6 +491,7 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
   };
   let separateAccounting = !creating && inventoryCalculationUnit(draft) !== getNaturalUnit();
   let packageExpanded = false;
+  let massExpanded = false;
   const setUnitChoice = (unit) => {
     const input = form.elements.namedItem('calculationUnit');
     if (!input || input.value === unit) return;
@@ -534,8 +538,12 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
       packLabel.textContent = 'Содержимое 1 ' + (onePiece ? 'шт.' : 'уп.') + ', ' + stockUnit;
     }
     const mass = form.querySelector('[data-inventory-gross-net-tare]');
+    const massAction = form.querySelector('[data-inventory-mass-switch]');
+    const massButton = form.querySelector('[data-inventory-mass-switch] button');
     const hasMass = item && (item.grossWeight != null || item.tareWeight != null);
-    if (mass) mass.hidden = stockUnit !== 'г' || !hasMass;
+    if (mass) mass.hidden = stockUnit !== 'г' || (!hasMass && !massExpanded);
+    if (massAction) massAction.hidden = stockUnit !== 'г' || Boolean(hasMass);
+    if (massButton) massButton.textContent = massExpanded ? 'Скрыть массу тары' : 'Указать массу тары';
     const prices = form.querySelector('[data-inventory-sale-price-row]');
     const purchase = form.querySelector('[data-inventory-purchase-row]');
     if (prices) prices.hidden = !sale;
@@ -549,6 +557,11 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
   });
   form.querySelector('[data-inventory-package-switch] button')?.addEventListener('click', () => {
     packageExpanded = !packageExpanded;
+    syncFields();
+    syncDirty();
+  });
+  form.querySelector('[data-inventory-mass-switch] button')?.addEventListener('click', () => {
+    massExpanded = !massExpanded;
     syncFields();
     syncDirty();
   });
