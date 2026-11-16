@@ -532,6 +532,129 @@ function openInventoryOrderSelection(root, existing = null, onSaved = () => {}) 
   return criteria;
 }
 
+// A supplier invoice arrives after a purchase order was already formed.
+// Keep this editor limited to the persisted order's exact lines: prices are
+// facts of this order, not writes to warehouse cards or supplier price lists.
+function openInventoryOrderInvoice(root, orderId, onSaved = () => {}) {
+  const order = getInventoryOrder(orderId);
+  if (!order || order.status !== 'formed') {
+    return openNotice({ title: 'Цены по счёту', message: 'Цены можно изменить до оплаты заказа.' });
+  }
+  const lines = Array.isArray(order.lines) ? order.lines : [];
+  if (!lines.length) return openNotice({ title: 'Цены по счёту', message: 'В заказе нет позиций.' });
+  const markup = '<div class="form-grid" data-inventory-order-invoice>' +
+    lines.map((line, index) => {
+      const item = getInventoryItem(line.itemId);
+      const offer = item ? orderSupplierQuote(item, order.supplier) : null;
+      const savedPrice = Number(line.packPrice) > 0 ? Number(line.packPrice) : '';
+      return '<section data-inventory-invoice-row="' + index + '">' +
+        '<div class="data-edit-row">' +
+          '<div class="data-edit-row__name">' +
+            '<strong>' + escapeHtml(line.name || item?.name || 'Без названия') + '</strong>' +
+            '<small>' + escapeHtml(String(line.packages) + ' шт.') + '</small>' +
+          '</div>' +
+          '<strong data-inventory-invoice-line-total></strong>' +
+        '</div>' +
+        '<div class="inventory-editor-row">' +
+          field({ label: 'Прайс, ₽', name: 'invoiceQuote-' + index, readonly: true,
+            value: offer?.price == null ? '' : String(offer.price) }) +
+          field({ label: 'Цена по счёту, ₽', name: 'invoicePrice-' + index,
+            type: 'number', min: '0', max: '100000000', step: '0.01',
+            inputmode: 'decimal', value: savedPrice }) +
+        '</div>' +
+        '<small data-inventory-invoice-difference></small>' +
+      '</section>';
+    }).join('') +
+    '<p data-inventory-invoice-total></p>' +
+    '<p class="form-error" data-inventory-invoice-error role="status"></p>' +
+    actionBlock(button('Сохранить цены', { data: 'data-inventory-invoice-save' })) +
+  '</div>';
+  const layer = mountModal(root, modal(markup, { variant: 'q', title: 'Цены по счёту' }));
+  if (!layer) return null;
+  const totalHost = layer.querySelector('[data-inventory-invoice-total]');
+  const errorHost = layer.querySelector('[data-inventory-invoice-error]');
+  const save = layer.querySelector('[data-inventory-invoice-save]');
+  let saving = false;
+  const values = () => lines.map((line, index) => {
+    const input = layer.querySelector('[name="invoicePrice-' + index + '"]');
+    return orderPriceInput(input?.value);
+  });
+  const sync = () => {
+    const prices = values();
+    let knownTotal = 0;
+    let unknown = 0;
+    let invalid = false;
+    for (const [index, line] of lines.entries()) {
+      const price = prices[index];
+      const lineHost = layer.querySelector('[data-inventory-invoice-row="' + index + '"]');
+      const amountHost = lineHost?.querySelector('[data-inventory-invoice-line-total]');
+      const difference = lineHost?.querySelector('[data-inventory-invoice-difference]');
+      const item = getInventoryItem(line.itemId);
+      const quote = item ? orderSupplierQuote(item, order.supplier) : null;
+      if (price != null && !Number.isFinite(price)) invalid = true;
+      if (price == null || !Number.isFinite(price) || price === 0) {
+        unknown += 1;
+        if (amountHost) amountHost.textContent = '—';
+      } else {
+        const lineTotal = Math.round(price * Number(line.packages) * 100) / 100;
+        knownTotal += lineTotal;
+        if (amountHost) amountHost.textContent = rubles(lineTotal);
+      }
+      if (difference) {
+        if (price == null || !Number.isFinite(price) || price === 0) {
+          difference.textContent = quote?.price != null ? 'Введите цену из счёта' : 'Цена по счёту не указана';
+        } else if (quote?.price == null || !(quote.price > 0)) {
+          difference.textContent = 'Нет цены прайса для сравнения';
+        } else {
+          const percent = Math.round((1 - price / quote.price) * 10000) / 100;
+          difference.textContent = percent > 0 ? 'Скидка относительно прайса: ' + percent.toLocaleString('ru-RU') + '%'
+            : percent < 0 ? 'Выше прайса на ' + Math.abs(percent).toLocaleString('ru-RU') + '%'
+            : 'Цена совпадает с прайсом';
+        }
+      }
+    }
+    totalHost.textContent = unknown
+      ? 'Известная сумма: ' + rubles(knownTotal) + ' · без цены: ' + unknown + ' поз.'
+      : 'Итого: ' + rubles(knownTotal);
+    save.disabled = saving || invalid;
+    return prices;
+  };
+  layer.querySelector('[data-inventory-order-invoice]')?.addEventListener('input', event => {
+    if (/^invoicePrice-\d+$/.test(String(event.target?.name || ''))) sync();
+  });
+  save?.addEventListener('click', async () => {
+    if (saving) return;
+    const prices = sync();
+    if (prices.some(price => price != null && !Number.isFinite(price))) {
+      errorHost.textContent = 'Проверьте цены по счёту';
+      return;
+    }
+    saving = true;
+    errorHost.textContent = '';
+    sync();
+    try {
+      // PUT of the existing formed order retains quantity, supplier, notes and
+      // every current line. Zero is the server's existing unknown-price marker.
+      await updateInventoryPurchaseOrder(orderId, {
+        supplier: order.supplier || '', note: order.note || '',
+        lines: lines.map((line, index) => ({
+          itemId: line.itemId, packages: line.packages, packPrice: prices[index] ?? 0,
+          ...(line.offerId ? { offerId: line.offerId } : {}),
+        })),
+      });
+      layer.v2Close?.();
+      onSaved();
+    } catch (error) {
+      errorHost.textContent = error instanceof Error ? error.message : 'Не удалось сохранить цены.';
+    } finally {
+      saving = false;
+      if (layer.isConnected) sync();
+    }
+  });
+  sync();
+  return layer;
+}
+
 function openInventoryOrderZ(root, orderId) {
   let order = getInventoryOrder(orderId);
   if (!order) return;
@@ -661,6 +784,8 @@ function openInventoryOrderZ(root, orderId) {
             openInventoryOrderReview(layer, {
               mode: 'target', supplier: fresh.supplier || '', sorting: 'position',
             }, fresh, saveAndRefresh) },
+          { id: 'invoice', label: 'Цены по счёту', onSelect: () =>
+            openInventoryOrderInvoice(layer, orderId, saveAndRefresh) },
           { id: 'pay', label: 'Оплатить', onSelect: openPayQ },
           exportAction,
           { id: 'delete', label: 'Удалить заказ', variant: 'danger', onSelect: openDeleteQ },
