@@ -61,6 +61,9 @@ assert.deepEqual(inventoryPackContent({ receiptUnit: 'уп.', unit: 'г', packag
   nominalQuantity: 5, nominalUnit: 'кг', conversionRules: [] }), { quantity: '5', unit: 'кг' });
 assert.deepEqual(inventoryPackContent({ receiptUnit: 'уп.', unit: 'г', packageQuantity: 900,
   nominalQuantity: 900, nominalUnit: 'г' }), { quantity: '900', unit: 'г' });
+assert.deepEqual(inventoryPackContent({ receiptUnit: 'уп.', unit: 'мл', packageQuantity: 50,
+  nominalQuantity: 5, nominalUnit: 'мл', conversionRules: [] }),
+  { quantity: '', unit: 'шт.' }); // Ambiguous old record; never guess bulk.
 assert.deepEqual(inventoryPackContent({ receiptUnit: 'шт.', unit: 'мл', packageQuantity: 80,
   nominalQuantity: 80, nominalUnit: 'мл' }), { quantity: '', unit: 'шт.' });
 
