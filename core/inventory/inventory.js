@@ -376,12 +376,14 @@ function advancedItemFields(item = {}, defaults = {}) {
       editorNumber({ label: 'Закупка', name: 'purchasePrice', value: price, unit: '₽', disabled: primaryPrice !== null }) +
     '</div></div>';
 
-  // One existing AV compact checkbox in the section heading, as agreed.
-  const switches = compactCheck({
-    label: 'Продаю', checked: item.canSell === true,
-    data: 'data-inventory-usage-check="sale"',
-  });
+  // Optional usage modes share one row. Basic consumption remains the default.
+  const switches = '<div class="inventory-editor-extra-toggles" data-inventory-extra-toggles>' +
+    compactCheck({ label: 'Продаю', checked: item.canSell === true, data: 'data-inventory-usage-check="sale"' }) +
+    compactCheck({ label: 'Ресурс', checked: Boolean(isResource), data: 'data-inventory-extra-check="resource"' }) +
+    compactCheck({ label: 'Срок', checked: isPeriod, data: 'data-inventory-extra-check="period"' }) +
+    '</div>';
   const usage = '<div class="inventory-editor-group">' +
+    switches +
     '<input type="hidden" name="usage" value="' + escapeHtml(itemUsageMode(item)) + '">' +
     '<input type="hidden" name="calculationUnit" value="' + escapeHtml(inventoryCalculationUnit(item)) + '">' +
     stockDisposalFields(item, 'consume') + stockDisposalFields(item, 'sale') +
@@ -399,10 +401,6 @@ function advancedItemFields(item = {}, defaults = {}) {
     '</div>' +
     itemMassFields(item) +
     itemNetOnlyFields(item) +
-    '<div class="inventory-editor-extra-toggles" data-inventory-extra-toggles>' +
-      compactCheck({ label: 'Ресурс', checked: Boolean(isResource), data: 'data-inventory-extra-check="resource"' }) +
-      compactCheck({ label: 'Срок', checked: isPeriod, data: 'data-inventory-extra-check="period"' }) +
-    '</div>' +
     '<input type="hidden" name="resourceEnabled" value="' + (isResource ? '1' : '0') + '">' +
     '<input type="hidden" name="periodEnabled" value="' + (isPeriod ? '1' : '0') + '">' +
     '<div class="inventory-editor-row inventory-editor-row--three" data-inventory-resource-fields>' +
@@ -439,7 +437,7 @@ function advancedItemFields(item = {}, defaults = {}) {
     '</div>';
   return '<div class="inventory-item-accordion">' +
     editorPanel('Товарная единица', identity, 'identity') +
-    editorPanel('Использование', usage, 'usage', { controls: switches }) +
+    editorPanel('Использование', usage, 'usage') +
     editorPanel('Классификация', classification, 'classification', { opened: false }) +
     editorPanel('Запас и контроль', stock, 'stock') +
     '</div>';
@@ -597,16 +595,17 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
       : receipt === 'шт.' ? 'В 1 шт.' : receipt ? 'В 1 ' + receipt : 'Содержимое';
     const packageInput = input('packageQuantity');
     const stored = Number(item?.packageQuantity);
-    const autoDerived = derived != null && derived > 0 &&
-      (creating && !contentEdited || !creating && Number.isFinite(stored)
-       && Math.abs(stored - derived) < 0.0005);
+    // Nominal is the source for an empty package size, including existing items.
+    // Preserve a genuinely different stored package size (and stock history).
+    const savedPackage = item?.packageQuantity != null && stored > 0;
+    const autoDerived = derived != null && derived > 0 && !contentEdited
+      && (creating || !savedPackage || Math.abs(stored - derived) < 0.0005);
     if (autoDerived) packageInput.value = numberText(derived);
     // Calculated contents are visible but cannot be edited twice.
     packageInput.readOnly = Boolean(autoDerived || creating && needsPhysicalMass);
     pack.classList.toggle('inventory-editor-derived', packageInput.readOnly);
     // Resource and time are optional characteristics of any physical item.
     // They are not an exclusive item "type".
-    form.querySelector('[data-inventory-extra-toggles]').hidden = false;
     const resource = extraOn('resource');
     const period = extraOn('period');
     input('resourceEnabled').value = resource ? '1' : '0';
