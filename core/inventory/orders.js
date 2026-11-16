@@ -205,8 +205,12 @@ function openInventoryOrderReview(root, { mode = 'target', supplier = '', manufa
     const oldLine = existingByItem.get(item.itemId);
     const quote = orderSupplierQuote(item, supplier);
     const oldPrice = oldLine?.packPrice == null ? null : Number(oldLine.packPrice);
-    const suggestedPrice = oldPrice != null && Number.isFinite(oldPrice) && oldPrice > 0
-      ? oldPrice : quote?.price ?? quote?.expectedPrice;
+    // When revisiting a formed order, never silently replace its saved
+    // invoice price with a newly imported supplier price. The explicit
+    // "Подставить цены прайса" action is the only way to do that.
+    const suggestedPrice = oldLine
+      ? (oldPrice != null && Number.isFinite(oldPrice) && oldPrice > 0 ? oldPrice : null)
+      : quote?.price ?? quote?.expectedPrice;
     // The shared data-edit-row already places a compact numeric field beside
     // the product, not under a separate full-width input.
     const quantityField = field({
