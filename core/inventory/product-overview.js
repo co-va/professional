@@ -51,7 +51,7 @@ function productCardFields(item) {
     ['manufacturer', 'Производитель', item.manufacturer],
     ['name', 'Наименование', item.name],
     ['category', 'Категория', item.category],
-    ['productType', 'Тип', item.productType],
+    ['productType', 'Подкатегория', item.productType],
     ['unit', 'Единица', item.unit],
     ['packageQuantity', 'В упаковке', packSize > 0 ? num(packSize) + ' ' + item.unit : ''],
     ['balance', 'Остаток', num(balance) + ' ' + item.unit],
