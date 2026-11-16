@@ -22,7 +22,8 @@ import {
   v2ListEntry,
   initV2ListReorder,
   v2Section,
-  initAccordions,
+  segmentControl,
+  initSegmentControls,
   v2ZLayer,
   workspaceHeaderContext,
 } from '../../ui/ui.js';
@@ -298,11 +299,19 @@ function editorNumber({ label, name, value = '', unit = '', ...opts } = {}) {
 }
 
 function editorPanel(title, body, key, { controls = '', opened = true } = {}) {
-  return '<section class="accordion-item inventory-editor-panel' + (opened ? ' is-open' : '') + '" data-inventory-panel="' + escapeHtml(key) + '">' +
-    '<div class="inventory-editor-heading"><button type="button" class="accordion-trigger inventory-editor-trigger" data-accordion-trigger aria-expanded="' + (opened ? 'true' : 'false') + '">' +
-    '<span class="accordion-chevron" aria-hidden="true">⌄</span><span>' + escapeHtml(title) + '</span></button>' +
+  // Native details/summary is the same disclosure mechanism as orders.
+  // The checkbox is a sibling of details so it never collapses the section.
+  return '<section class="inventory-editor-panel" data-inventory-panel="' + escapeHtml(key) + '">' +
+    '<details' + (opened ? ' open' : '') + '><summary class="inventory-editor-summary">' +
+      escapeHtml(title) + '</summary><div class="inventory-editor-panel__body">' + body + '</div></details>' +
     (controls ? '<div class="inventory-editor-heading__controls">' + controls + '</div>' : '') +
-    '</div><div class="accordion-panel inventory-editor-panel__body">' + body + '</div></section>';
+    '</section>';
+}
+
+function inventoryCardShape(item = {}) {
+  if (item.resourceLimit != null || item.serviceStartAt || item.serviceEndAt) return 'tool';
+  if (['мл', 'л'].includes(item.nominalUnit)) return 'liquid';
+  return 'package';
 }
 
 function parseSaleMarkup(raw) {
@@ -324,14 +333,10 @@ function stockDisposalFields(item = {}, purpose = 'consume') {
   const sale = purpose === 'sale';
   const key = sale ? 'sale' : 'consume';
   const unit = item[key + 'Unit'] || item.unit || 'шт.';
-  const savedRule = Array.isArray(item.conversionRules)
-    ? item.conversionRules.find(row => row.unit === unit) : null;
   return '<div class="inventory-editor-disposal" data-inventory-use="' + key + '">' +
     '<div class="inventory-editor-row">' +
       select({ label: sale ? 'Ед. продажи' : 'Ед. списания', name: key + 'Unit', value: unit, options: INVENTORY_CARD_UNITS }) +
       editorNumber({ label: 'Количество', name: key + 'Quantity', value: item[key + 'Quantity'] ?? '', unit }) +
-    '</div><div data-inventory-conversion="' + key + '">' +
-      editorNumber({ label: '1 ' + unit + ' =', name: key + 'Factor', value: savedRule?.stockPerUnit ?? '', unit: item.unit || 'шт.' }) +
     '</div></div>';
 }
 
@@ -340,6 +345,14 @@ function itemMassFields(item = {}) {
     editorNumber({ label: 'Брутто', name: 'grossWeight', value: item.grossWeight ?? '', unit: 'г', data: 'aria-label="Брутто, г"' }) +
     editorNumber({ label: 'Тара', name: 'tareWeight', value: item.tareWeight ?? '', unit: 'г', data: 'aria-label="Тара, г"' }) +
     editorNumber({ label: 'Нетто', name: 'netWeight', value: item.netPackageWeight ?? '', unit: 'г', readonly: true, data: 'aria-label="Нетто, г"' }) +
+    '</div>';
+}
+
+function itemNetOnlyFields(item = {}) {
+  const net = item.grossWeight != null && Number(item.tareWeight) === 0
+    ? item.grossWeight : '';
+  return '<div data-inventory-net-only>' +
+    editorNumber({ label: 'Вес содержимого', name: 'netOnlyWeight', value: net, unit: 'г' }) +
     '</div>';
 }
 
@@ -392,7 +405,8 @@ function advancedItemFields(item = {}, defaults = {}) {
       ] }) +
     '</div>' +
     itemMassFields(item) +
-    '<div class="inventory-editor-extra-toggles">' +
+    itemNetOnlyFields(item) +
+    '<div class="inventory-editor-extra-toggles" data-inventory-extra-toggles>' +
       compactCheck({ label: 'Ресурс', checked: Boolean(isResource), data: 'data-inventory-extra-check="resource"' }) +
       compactCheck({ label: 'Срок', checked: isPeriod, data: 'data-inventory-extra-check="period"' }) +
     '</div>' +
@@ -432,7 +446,7 @@ function advancedItemFields(item = {}, defaults = {}) {
     editorNumber({ label: 'Критический', name: 'minStock', value: inventoryStockThresholdInput(item, item.minStock), unit: threshold, data: 'aria-label="Критический остаток"' }) +
     editorNumber({ label: 'Желаемый', name: 'targetStock', value: inventoryStockThresholdInput(item, item.targetStock), unit: threshold, data: 'aria-label="Желаемый остаток"' }) +
     '</div>';
-  return '<div class="accordion inventory-item-accordion" data-accordion>' +
+  return '<div class="inventory-item-accordion">' +
     editorPanel('Товарная единица', identity, 'identity') +
     editorPanel('Использование', usage, 'usage', { controls: switches }) +
     editorPanel('Классификация', classification, 'classification', { opened: false }) +
@@ -451,6 +465,11 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
   const draft = item || { unit: 'шт.', canConsume: defaults.usage !== 'sale', canSell: defaults.usage === 'sale' };
   const markup = `
     <form data-inventory-item-form>
+      ${segmentControl([
+        { value: 'liquid', label: 'Жидкость' },
+        { value: 'package', label: 'Упаковка' },
+        { value: 'tool', label: 'Инструмент' },
+      ], { value: inventoryCardShape(draft), name: 'inventoryShape', aria: 'Вид позиции' })}
       ${advancedItemFields(draft, defaults)}
       ${actionBlock(button(creating ? 'Применить' : 'Сохранить', { type: 'button', data: 'data-inventory-item-save', aria: creating ? 'Добавить продукт' : 'Сохранить продукт' }))}
       <div class="form-error" data-inventory-item-save-error role="alert" hidden></div>
@@ -467,7 +486,7 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
   const primary = layer.querySelector('[data-inventory-item-save]');
   const saveError = layer.querySelector('[data-inventory-item-save-error]');
   const actions = primary?.closest('.modal-actions');
-  initAccordions(form);
+  initSegmentControls(form);
   const input = (name) => form.elements.namedItem(name);
   const pressed = (kind) => kind === 'consume'
     ? draft.canConsume !== false
@@ -496,12 +515,17 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
     if (suffix) suffix.textContent = unit || '';
   };
   const updateNet = () => {
+    const mode = String(input('containerMode')?.value || '');
+    if (mode === 'NONE') {
+      const value = Number(String(input('netOnlyWeight')?.value || '').replace(',', '.'));
+      return Number.isFinite(value) && value > 0 ? value : null;
+    }
     const grossRaw = String(input('grossWeight')?.value || '').trim();
     const tareRaw = String(input('tareWeight')?.value || '').trim();
     const gross = Number(grossRaw.replace(',', '.'));
     const tare = Number(tareRaw.replace(',', '.'));
     const net = grossRaw && tareRaw && Number.isFinite(gross) && Number.isFinite(tare)
-      && gross >= tare && tare >= 0 ? gross - tare : null;
+      && gross > tare && tare >= 0 ? gross - tare : null;
     if (netInput) netInput.value = net === null ? '' : numberText(net);
     return net;
   };
@@ -527,6 +551,7 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
   };
 
   const syncFields = () => {
+    const shape = String(input('inventoryShape')?.value || 'package');
     const consume = pressed('consume');
     const sale = pressed('sale');
     input('usage').value = consume && sale ? 'both' : consume ? 'consume' : sale ? 'sale' : 'track';
@@ -545,23 +570,7 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
     input('calculationUnit').value = stock;
     for (const kind of ['consume', 'sale']) {
       const node = form.querySelector('[data-inventory-use="' + kind + '"]');
-      const active = kind === 'consume' ? consume : sale;
-      if (node) node.hidden = !active;
-      const requested = kind === 'consume' ? consumeUnit : saleUnit;
-      const extra = form.querySelector('[data-inventory-conversion="' + kind + '"]');
-      const metric = new Set(['кг>г','г>кг','л>мл','мл>л','м>см','см>м']);
-      const nominalCount = Number(input('nominalQuantity')?.value || 0);
-      const packageCount = Number(input('packageQuantity')?.value || 0);
-      const normal = requested === stock || metric.has(requested + '>' + stock)
-        || requested === 'уп.' && stock !== 'уп.' && packageCount > 0
-        || requested === 'шт.' && ['г','мл'].includes(stock) && packageCount > 0
-        || requested === nominal && nominalCount > 0 && packageCount > 0;
-      if (extra) {
-        extra.hidden = !active || normal;
-        const title = extra.querySelector('label.field > span');
-        if (title) title.textContent = '1 ' + requested + ' =';
-      }
-      setNumberUnit(kind + 'Factor', stock);
+      if (node) node.hidden = kind === 'consume' ? !consume : !sale;
     }
     form.querySelector('[data-inventory-sale-price-row]').hidden = !sale;
     setNumberUnit('consumeQuantity', consumeUnit);
@@ -573,18 +582,36 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
       : receipt || item?.thresholdUnit || inventoryStockThresholdUnit(item || { unit: stock });
     setNumberUnit('minStock', threshold);
     setNumberUnit('targetStock', threshold);
-    const needsContent = Boolean(receipt && receipt !== stock
-      || consume && consumeUnit !== stock || sale && saleUnit !== stock
-      || nominal && nominal !== stock || item?.packageQuantity);
+    const measuredConsumption = consume && ['г','кг'].includes(consumeUnit);
+    const massFromVolume = measuredConsumption && ['мл','л'].includes(nominal);
+    // A measured commercial pack is explained via net weight, not through
+    // an unrelated "1 g = ? pcs" input.
+    const needsContent = shape === 'package' &&
+      Boolean(receipt && receipt !== stock || consume && consumeUnit !== stock
+        || sale && saleUnit !== stock || item?.packageQuantity);
     const pack = form.querySelector('[data-inventory-package-fields]');
     pack.hidden = !needsContent;
     const packLabel = pack.querySelector('label.field > span');
     if (packLabel) packLabel.textContent = 'Содержимое, ' + stock;
-    const showContainer = stock === 'г' && (consume || sale || Boolean(item?.grossWeight != null));
+    const showContainer = massFromVolume || shape === 'package' && measuredConsumption
+      || Boolean(item?.grossWeight != null && measuredConsumption);
     form.querySelector('[data-inventory-container-mode]').hidden = !showContainer;
+    if (showContainer && !input('containerMode').value && massFromVolume) {
+      input('containerMode').value = 'WITH';
+      const label = input('containerMode').closest('.ui-select')?.querySelector('.ui-select__value');
+      if (label) label.textContent = 'С тарой';
+    }
     const hasTare = String(input('containerMode')?.value || '') === 'WITH';
     form.querySelector('[data-inventory-gross-net-tare]').hidden = !showContainer || !hasTare;
+    form.querySelector('[data-inventory-net-only]').hidden = !showContainer || hasTare;
     const net = updateNet();
+    // The segmented control is an existing AV component and selects which
+    // dependent controls appear, not a new inventory accounting mode.
+    form.querySelector('[data-inventory-extra-toggles]').hidden = shape !== 'tool';
+    if (shape !== 'tool') {
+      // Preserve existing equipment fields when editing a product with a
+      // different presentation; never silently erase persisted resource.
+    }
     if (creating && !contentEdited && pack && !pack.hidden) {
       if (hasTare && net != null && stock === 'г') input('packageQuantity').value = numberText(net);
       else if (nominal && nominal === stock && nominalQuantity > 0) input('packageQuantity').value = numberText(nominalQuantity);
@@ -593,10 +620,10 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
     const period = extraOn('period');
     input('resourceEnabled').value = resource ? '1' : '0';
     input('periodEnabled').value = period ? '1' : '0';
-    form.querySelector('[data-inventory-resource-fields]').hidden = !resource;
+    form.querySelector('[data-inventory-resource-fields]').hidden = shape !== 'tool' || !resource;
     form.querySelector('[data-inventory-resource-stock]').hidden = !resource
       || String(input('resourceExhaustionAction')?.value) !== 'WRITE_OFF';
-    form.querySelector('[data-inventory-period-fields]').hidden = !period;
+    form.querySelector('[data-inventory-period-fields]').hidden = shape !== 'tool' || !period;
     setNumberUnit('resourceLimit', String(input('resourceUnit')?.value || 'проц.'));
     updatePrimaryPrice();
   };
@@ -610,7 +637,7 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
   form.addEventListener('input', (event) => {
     if (saveError) { saveError.hidden = true; saveError.textContent = ''; }
     if (event.target.name === 'packageQuantity') contentEdited = true;
-    if (['grossWeight', 'tareWeight', 'nominalQuantity', 'packageQuantity', 'purchasePrice'].includes(event.target?.name)) {
+    if (['grossWeight', 'tareWeight', 'netOnlyWeight', 'nominalQuantity', 'packageQuantity', 'purchasePrice'].includes(event.target?.name)) {
       syncFields();
       deriveSellingPrice();
     }
@@ -618,13 +645,7 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
     syncDirty();
   });
   form.addEventListener('change', (event) => {
-    if (['consumeUnit', 'saleUnit'].includes(event.target?.name)) {
-      const purpose = event.target.name === 'consumeUnit' ? 'consume' : 'sale';
-      const saved = Array.isArray(item?.conversionRules)
-        ? item.conversionRules.find(row => row.unit === event.target.value) : null;
-      if (input(purpose + 'Factor')) input(purpose + 'Factor').value = saved?.stockPerUnit ?? '';
-    }
-    if (['receiptUnit', 'nominalUnit', 'consumeUnit', 'saleUnit', 'containerMode', 'resourceUnit', 'resourceExhaustionAction'].includes(event.target?.name)) syncFields();
+    if (['inventoryShape', 'receiptUnit', 'nominalUnit', 'consumeUnit', 'saleUnit', 'containerMode', 'resourceUnit', 'resourceExhaustionAction'].includes(event.target?.name)) syncFields();
     syncDirty();
   });
   syncFields();
@@ -664,16 +685,26 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
       return;
     }
     const containerMode = String(data.get('containerMode') || '') || null;
-    const gross = containerMode === 'WITH' && unit === 'г' ? collectOptionalNumber(form, 'grossWeight') : null;
-    const tare = containerMode === 'WITH' && unit === 'г' ? collectOptionalNumber(form, 'tareWeight') : null;
-    if ((gross == null) !== (tare == null) || gross != null && gross <= tare) {
-      openNotice({ title: 'Масса продукта', message: 'Укажите корректные значения брутто и тары.' });
-      return;
+    const isMeasured = consumption && ['г','кг'].includes(consumptionUnit);
+    const massFromVolume = isMeasured && ['мл','л'].includes(nominalUnit);
+    const mustMeasure = massFromVolume || (String(data.get('inventoryShape')) === 'package' && isMeasured);
+    let gross = item?.grossWeight ?? null;
+    let tare = item?.tareWeight ?? null;
+    if (mustMeasure && containerMode === 'WITH') {
+      gross = collectOptionalNumber(form, 'grossWeight');
+      tare = collectOptionalNumber(form, 'tareWeight');
+      if ((gross == null) !== (tare == null) || gross != null && gross <= tare) {
+        openNotice({ title: 'Масса продукта', message: 'Укажите брутто и тару, чтобы вычислить нетто.' });
+        return;
+      }
+    } else if (mustMeasure && containerMode === 'NONE') {
+      gross = collectOptionalNumber(form, 'netOnlyWeight');
+      tare = gross == null ? null : 0;
     }
-    const net = gross != null && tare != null ? gross - tare : null;
+    const net = gross != null && tare != null ? Number(gross) - Number(tare) : null;
     const packed = collectOptionalNumber(form, 'packageQuantity');
     const packageQuantity = unit === 'уп.' ? null
-      : packed ?? net ?? (creating ? null : item?.packageQuantity ?? null);
+      : packed ?? (unit === 'г' ? net : null) ?? (creating ? null : item?.packageQuantity ?? null);
     if (packageQuantity != null && packageQuantity <= 0) {
       openNotice({ title: 'Содержимое', message: 'Количество содержимого должно быть больше нуля.' });
       return;
@@ -682,22 +713,17 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
     // and never assume that ml has the same numerical mass in grams.
     const metric = new Set(['кг>г','г>кг','л>мл','мл>л','м>см','см>м']);
     const rules = Array.isArray(item?.conversionRules) ? [...item.conversionRules] : [];
-    for (const purpose of ['consume', 'sale']) {
-      if (!(purpose === 'consume' ? consumption : sale)) continue;
-      const unitName = String(data.get(purpose + 'Unit') || '');
-      const factor = collectOptionalNumber(form, purpose + 'Factor');
-      if (factor == null) continue;
-      if (!(factor > 0)) {
-        openNotice({ title: 'Пересчёт', message: 'Коэффициент должен быть положительным.' });
-        return;
-      }
-      const index = rules.findIndex(rule => rule.unit === unitName);
+    // For legacy whole-piece stock, weighed consumption is a fraction of
+    // the physical unit. Never ask the user to type "1 g = ? pcs".
+    if (consumptionUnit === 'г' && ['шт.','уп.'].includes(unit) && net > 0) {
+      const index = rules.findIndex(rule => rule.unit === 'г');
       if (index >= 0) rules.splice(index, 1);
-      rules.push({ unit: unitName, stockPerUnit: factor });
+      rules.push({ unit: 'г', stockPerUnit: 1 / net });
     }
     const convertible = (requested) => !requested || requested === unit
       || metric.has(requested + '>' + unit)
       || rules.some(rule => rule.unit === requested && Number(rule.stockPerUnit) > 0)
+      || net > 0 && requested === 'г' && ['шт.','уп.'].includes(unit)
       || packageQuantity > 0 && (requested === 'уп.' && unit !== 'уп.'
         || requested === 'шт.' && ['г','мл'].includes(unit)
         || requested === nominalUnit && nominalQuantity > 0);

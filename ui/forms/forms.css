@@ -2,22 +2,19 @@
 .booking-account .form-error{font-size:13px;text-align:center}
 
 
-/* Inventory item Q: compact domain layout; shared AV input/select/toggle geometry is unchanged. */
-.inventory-item-accordion{border:0;border-radius:0;overflow:visible;background:transparent;min-width:0}
-.inventory-item-accordion .inventory-editor-panel{background:transparent;border-bottom:1px solid var(--border)}
-.inventory-editor-heading{display:flex;align-items:center;gap:6px;min-width:0;min-height:46px}
-.inventory-editor-trigger{display:flex;align-items:center;gap:8px;flex:1 1 auto;width:auto;min-width:0;min-height:46px;border:0;padding:0 2px;background:transparent;white-space:nowrap;font-size:14px}
-.inventory-editor-trigger .accordion-chevron{flex:0 0 15px;display:inline-block;transform:rotate(-90deg);font-size:18px;line-height:1;transition:transform .16s ease}
-.inventory-editor-panel.is-open .inventory-editor-trigger .accordion-chevron{transform:none}
-.inventory-editor-heading__controls{display:flex;align-items:center;gap:6px;flex:0 0 auto;min-width:0}
-/* Place the existing AV compactCheck in a heading; do not restyle its square. */
-.inventory-editor-heading__controls .ui-compact-check,
-.inventory-editor-extra-toggles .ui-compact-check {
-  width:auto;min-width:0;min-height:0;height:auto;border:0;padding:0;
-  display:inline-flex;align-items:center;gap:6px;background:transparent;
-  white-space:nowrap;flex:0 0 auto;
+/* Inventory Q uses the same native details/summary disclosure as orders. */
+.inventory-item-accordion{min-width:0;border:0;background:transparent}
+.inventory-editor-panel{position:relative;min-width:0;border-bottom:1px solid var(--border)}
+.inventory-editor-panel details{min-width:0}
+.inventory-editor-panel summary.inventory-editor-summary{
+  cursor:pointer;min-height:46px;line-height:46px;
+  font-size:14px;font-weight:700;color:var(--text);
 }
-.inventory-editor-panel .inventory-editor-panel__body{padding:0 0 14px}
+.inventory-editor-panel:has(.inventory-editor-heading__controls) summary.inventory-editor-summary{padding-right:110px}
+.inventory-editor-heading__controls{
+  position:absolute;right:0;top:9px;display:flex;align-items:center;gap:6px;
+}
+.inventory-editor-panel__body{padding:0 0 14px}
 .inventory-editor-panel [hidden]{display:none!important}
 .inventory-editor-group{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;align-content:start;min-width:0}
 .inventory-editor-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;align-items:start;min-width:0}
@@ -42,8 +39,6 @@
 @media(max-width:380px){
  .inventory-editor-row{gap:6px}
  .inventory-editor-row--three{gap:5px}
- .inventory-editor-heading__controls{gap:4px}
- 
 }
 
 .inventory-editor-disposal{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;min-width:0}
