@@ -100,4 +100,25 @@ const { inventoryStockThresholdInput, inventoryStockThresholdStored } = new Func
   '\nreturn { inventoryStockThresholdInput, inventoryStockThresholdStored };')();
 assert.equal(inventoryStockThresholdInput({}, 1.05), 1.05);
 assert.equal(inventoryStockThresholdStored({}, 1.05), 1.05);
+// A complete item can be recorded without knowing net weight; a later
+// measurement supplies a gram conversion without changing stock base.
+assert.match(stock, /if \(net > 0\) setConversion\('г', perPiece \/ net\)/);
+assert.match(stock, /Остальные сведения можно заполнить позже/);
+assert.match(stock, /opened: Boolean\(item\.itemId\)/);
+
+// Actual date of arrival or finishing is entered in the existing movement Q.
+assert.match(stock, /name: 'occurredDate', type: 'date', value: inventoryToday\(\)/);
+assert.match(stock, /kind: actualKind,\s*occurredAt,/);
+const dateHelpers = stock.slice(stock.indexOf('function editorDate'),
+  stock.indexOf('// Shared input and selector owners supply the controls.'));
+const { inventoryOccurredAt } = new Function(dateHelpers + '\nreturn { inventoryOccurredAt };')();
+const recorded = inventoryOccurredAt('2026-11-16');
+assert.ok(recorded);
+assert.equal(new Date(recorded).getFullYear(), 2026);
+assert.equal(new Date(recorded).getMonth(), 10);
+assert.equal(new Date(recorded).getDate(), 16);
+assert.equal(inventoryOccurredAt('2026-02-30'), null);
+assert.equal(inventoryOccurredAt(''), null);
+console.log('PASS: dated arrival and completion, optional knowledge, late measured conversion');
+
 console.log('PASS: 12 inventory types, unknown measurements, bulk packaging, threshold 1.05 and sale costs');
