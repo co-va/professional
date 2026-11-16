@@ -719,7 +719,26 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
     syncDirty();
   });
   syncFields();
+  // Existing stock positions may carry a package-level salePrice calculated
+  // before unit-aware markup was implemented. Update only prices that match
+  // that legacy formula; preserve an intentionally entered manual price.
+  // Keep the server value as the initial signature so Save remains available.
   initialSignature = signature();
+  if (pressed('sale') && markupInput?.value.trim() && sellingInput) {
+    try {
+      const current = String(sellingInput.value || '').trim();
+      const markup = parseSaleMarkup(markupInput.value);
+      const legacy = markedUpSalePrice(Number(purchaseInput?.value), markup);
+      const corrected = markedUpSalePrice(saleCost(purchaseInput?.value), markup);
+      if (corrected != null && (!current
+          || legacy != null && Number.isFinite(Number(current))
+            && Math.abs(Number(current) - legacy) < 0.005)) {
+        sellingInput.value = String(corrected);
+      }
+    } catch {
+      // Invalid markup remains editable and is validated on Save.
+    }
+  }
   syncDirty();
 
 
