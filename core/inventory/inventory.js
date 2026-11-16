@@ -384,16 +384,10 @@ function advancedItemFields(item = {}, defaults = {}) {
     compactCheck({ label: 'Срок', checked: isPeriod, data: 'data-inventory-extra-check="period"' }) +
     '</div>';
   const usage = '<div class="inventory-editor-group">' +
-    switches +
     '<input type="hidden" name="usage" value="' + escapeHtml(itemUsageMode(item)) + '">' +
     '<input type="hidden" name="calculationUnit" value="' + escapeHtml(inventoryCalculationUnit(item)) + '">' +
-    stockDisposalFields(item, 'consume') + stockDisposalFields(item, 'sale') +
-    '<div class="inventory-editor-row" data-inventory-sale-price-row>' +
-      field({ label: 'Наценка', name: 'saleMarkup',
-        value: item.saleMarkupValue == null ? '' : String(item.saleMarkupValue) + (item.saleMarkupMode === 'amount' ? ' ₽' : '%'),
-        placeholder: '20% / 200 ₽' }) +
-      editorNumber({ label: 'Цена продажи', name: 'salePrice', value: item.salePrice ?? '', unit: '₽', data: 'aria-label="Цена продажи, ₽"' }) +
-    '</div>' +
+    // The basic accounting/consumption fields never move when optional modes change.
+    stockDisposalFields(item, 'consume') +
     itemPackageFields(item) +
     '<div data-inventory-container-mode>' +
       select({ label: 'Тара', name: 'containerMode', value: item.containerMode || (item.grossWeight != null || item.tareWeight != null ? 'WITH' : ''), options: [
@@ -402,6 +396,15 @@ function advancedItemFields(item = {}, defaults = {}) {
     '</div>' +
     itemMassFields(item) +
     itemNetOnlyFields(item) +
+    // Optional controls and their fields always follow the whole accounting section.
+    switches +
+    stockDisposalFields(item, 'sale') +
+    '<div class="inventory-editor-row" data-inventory-sale-price-row>' +
+      field({ label: 'Наценка', name: 'saleMarkup',
+        value: item.saleMarkupValue == null ? '' : String(item.saleMarkupValue) + (item.saleMarkupMode === 'amount' ? ' ₽' : '%'),
+        placeholder: '20% / 200 ₽' }) +
+      editorNumber({ label: 'Цена продажи', name: 'salePrice', value: item.salePrice ?? '', unit: '₽', data: 'aria-label="Цена продажи, ₽"' }) +
+    '</div>' +
     '<input type="hidden" name="resourceEnabled" value="' + (isResource ? '1' : '0') + '">' +
     '<input type="hidden" name="periodEnabled" value="' + (isPeriod ? '1' : '0') + '">' +
     '<div class="inventory-editor-row inventory-editor-row--three" data-inventory-resource-fields>' +
@@ -420,8 +423,8 @@ function advancedItemFields(item = {}, defaults = {}) {
 
   const classification = '<div class="inventory-editor-group">' +
     field({ label: 'Полное наименование', name: 'catalogName', value: item.catalogName || '' }) +
-    '<div class="inventory-editor-row inventory-editor-row--three">' +
-      field({ label: 'Производитель', name: 'manufacturer', value: item.manufacturer || defaults.manufacturer || '' }) +
+    field({ label: 'Производитель', name: 'manufacturer', value: item.manufacturer || defaults.manufacturer || '' }) +
+    '<div class="inventory-editor-row">' +
       field({ label: 'Категория', name: 'category', value: item.category || '' }) +
       field({ label: 'Подкатегория', name: 'productType', value: item.productType || '' }) +
     '</div>' +
