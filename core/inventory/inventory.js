@@ -468,9 +468,6 @@ function advancedItemFields(item = {}, defaults = {}) {
       select({ label: 'По окончании', name: 'resourceExhaustionAction', value: item.resourceExhaustionAction || 'REVIEW',
         options: [{ value: 'REVIEW', label: 'Проверить' }, { value: 'WRITE_OFF', label: 'Списать' }] }) +
     '</div>' +
-    '<div data-inventory-resource-stock>' +
-      editorNumber({ label: 'Списать после ресурса', name: 'resourceStockQuantity', value: item.resourceStockQuantity ?? 1, unit: item.unit || 'шт.' }) +
-    '</div>' +
     '<div class="inventory-editor-row" data-inventory-period-fields>' +
       field({ label: 'Начало', name: 'serviceStartAt', value: editorDate(item.serviceStartAt), type: 'date' }) +
       field({ label: 'Окончание', name: 'serviceEndAt', value: editorDate(item.serviceEndAt), type: 'date' }) +
@@ -634,7 +631,6 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
     setNumberUnit('consumeQuantity', consumeUnit);
     setNumberUnit('saleQuantity', saleUnit);
     setNumberUnit('packageQuantity', stock);
-    setNumberUnit('resourceStockQuantity', stock);
     const threshold = !creating && (item?.minStock != null || item?.targetStock != null)
       ? item?.thresholdUnit || inventoryStockThresholdUnit(item)
       : receipt || item?.thresholdUnit || inventoryStockThresholdUnit(item || { unit: stock });
@@ -687,8 +683,6 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
     input('resourceEnabled').value = resource ? '1' : '0';
     input('periodEnabled').value = period ? '1' : '0';
     form.querySelector('[data-inventory-resource-fields]').hidden = !resource;
-    form.querySelector('[data-inventory-resource-stock]').hidden = !resource
-      || String(input('resourceExhaustionAction')?.value) !== 'WRITE_OFF';
     form.querySelector('[data-inventory-period-fields]').hidden = !period;
     setNumberUnit('resourceLimit', String(input('resourceUnit')?.value || 'проц.'));
     updatePrimaryPrice();
@@ -894,7 +888,10 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
       salePrice: sale ? enteredPrice ?? calculatedPrice : null,
       resourceLimit,
       resourceUnit: resourceEnabled ? String(data.get('resourceUnit') || 'проц.') : null,
-      resourceStockQuantity: resourceEnabled ? collectOptionalNumber(form, 'resourceStockQuantity') : null,
+      // One item is retired per completed resource cycle; the backend
+      // counts finished cycles and carries the unfinished portion forward.
+      resourceStockQuantity: resourceEnabled
+        && String(data.get('resourceExhaustionAction') || 'REVIEW') === 'WRITE_OFF' ? 1 : null,
       resourceExhaustionAction: resourceEnabled ? String(data.get('resourceExhaustionAction') || 'REVIEW') : null,
       serviceStartAt: startDate || null,
       serviceEndAt: endDate || null,
