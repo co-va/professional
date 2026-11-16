@@ -273,6 +273,36 @@ const INVENTORY_CARD_UNITS = [
   { value: 'компл.', label: 'компл.' },
 ];
 
+// Receipt, physical contents and consumption are different dimensions.
+// Do not offer volume or mass as a receipt unit, or packs as one-piece nominal.
+const INVENTORY_RECEIPT_UNITS = [{ value: 'шт.', label: 'шт.' }, { value: 'уп.', label: 'уп.' }];
+const INVENTORY_NOMINAL_UNITS = [{ value: 'шт.', label: 'шт.' }, { value: 'мл', label: 'мл' }, { value: 'г', label: 'г' }];
+const INVENTORY_CONSUMPTION_UNITS = [{ value: 'шт.', label: 'шт.' }, { value: 'мл', label: 'мл' }, { value: 'г', label: 'г' }];
+function retainLegacyUnit(options, value) {
+  return !value || options.some(row => row.value === value)
+    ? options : [...options, { value, label: value + ' (ранее)' }];
+}
+// The API stores stock units per receipt unit, not a separate pack piece count.
+// Reconstruct count only when stock-unit and per-piece conversion are known.
+function inventoryPackPieceCount(item = {}) {
+  if (item.receiptUnit !== 'уп.') return '';
+  const total = Number(item.packageQuantity);
+  if (!(total > 0)) return '';
+  let perPiece = item.unit === 'шт.' ? 1
+    : Number(item.conversionRules?.find(row => row.unit === 'шт.')?.stockPerUnit);
+  if (!(perPiece > 0) && item.nominalUnit === item.unit && Number(item.nominalQuantity) > 0)
+    perPiece = Number(item.nominalQuantity);
+  if (!(perPiece > 0)) return '';
+  const pieces = total / perPiece;
+  return Number.isSafeInteger(pieces) && pieces >= 2 ? String(pieces) : '';
+}
+function inventoryStockPerPiece(stockUnit, nominalUnit, nominalQuantity, netWeight) {
+  if (stockUnit === 'шт.') return 1;
+  if (stockUnit === nominalUnit && nominalQuantity > 0) return nominalQuantity;
+  if (stockUnit === 'г' && netWeight > 0) return netWeight;
+  return null;
+}
+
 const RESOURCE_UNIT_OPTIONS = [
   { value: 'проц.', label: 'проц.' }, { value: 'примен.', label: 'примен.' },
   { value: 'цикл', label: 'цикл' }, { value: 'ч', label: 'ч' },
@@ -324,23 +354,26 @@ function parseSaleMarkup(raw) {
  * Unknown package / physical conversions must never be assumed to be 1:1.
  */
 function salePurchaseCost({ purchasePrice, receiptUnit, stockUnit, saleUnit,
-  saleQuantity = 1, packageQuantity, nominalQuantity, nominalUnit, conversionRules = [] } = {}) {
+  saleQuantity = 1, packageQuantity, nominalQuantity, nominalUnit, packPieces, conversionRules = [] } = {}) {
   if (purchasePrice == null || String(purchasePrice).trim() === '') return null;
   const purchase = Number(purchasePrice);
   const amount = saleQuantity == null || saleQuantity === '' ? 1 : Number(saleQuantity);
   if (!Number.isFinite(purchase) || purchase < 0 || !Number.isFinite(amount) || amount <= 0
       || !receiptUnit || !saleUnit) return null;
   if (receiptUnit === saleUnit) return purchase * amount;
+  // N pieces in a purchase pack. Nominal is always per ONE piece.
+  const count = receiptUnit === 'уп.' ? Number(packPieces) : 1;
+  if (receiptUnit === 'уп.' && count > 0 && saleUnit === 'шт.') return purchase * amount / count;
 
   const metricFactor = (from, to) => {
     if (from === to) return 1;
     const factors = { 'кг>г': 1000, 'г>кг': 0.001, 'л>мл': 1000, 'мл>л': 0.001 };
     return factors[from + '>' + to] ?? null;
   };
-  // A nominal is the physical contents of one receipt pack/piece.
-  if (['уп.', 'шт.'].includes(receiptUnit) && Number(nominalQuantity) > 0) {
+  // One piece has nominalQuantity of nominalUnit. A pack has count pieces.
+  if (['уп.', 'шт.'].includes(receiptUnit) && count > 0 && Number(nominalQuantity) > 0) {
     const converted = metricFactor(nominalUnit, saleUnit);
-    if (converted != null) return purchase * amount / (Number(nominalQuantity) * converted);
+    if (converted != null) return purchase * amount / (count * Number(nominalQuantity) * converted);
   }
   // Direct metric conversion does not need inventory stock granularity.
   const direct = metricFactor(receiptUnit, saleUnit);
@@ -383,7 +416,7 @@ function stockDisposalFields(item = {}, purpose = 'consume') {
   const unit = item[key + 'Unit'] || item.unit || 'шт.';
   return '<div class="inventory-editor-disposal" data-inventory-use="' + key + '">' +
     '<div class="inventory-editor-row" data-inventory-disposal-row="' + key + '">' +
-      select({ label: sale ? 'Ед. продажи' : 'Ед. списания', name: key + 'Unit', value: unit, options: INVENTORY_CARD_UNITS }) +
+      select({ label: sale ? 'Ед. продажи' : 'Ед. списания', name: key + 'Unit', value: unit, options: retainLegacyUnit(sale ? INVENTORY_CARD_UNITS : INVENTORY_CONSUMPTION_UNITS, unit) }) +
       editorNumber({ label: 'Количество', name: key + 'Quantity', value: item[key + 'Quantity'] ?? '', unit }) +
     '</div></div>';
 }
@@ -405,10 +438,12 @@ function itemNetOnlyFields(item = {}) {
 }
 
 function itemPackageFields(item = {}) {
-  return '<div data-inventory-package-fields hidden>' +
-    editorNumber({ label: 'В упаковке', name: 'packageQuantity', value: item.packageQuantity ?? '', unit: item.unit || 'шт.',
-      data: 'aria-label="Содержимое единицы прихода"' }) +
-    '</div>';
+  return '<div data-inventory-pack-count hidden>' +
+    editorNumber({ label: 'Количество', name: 'packPieces', value: inventoryPackPieceCount(item), unit: 'шт.',
+      data: 'aria-label="Количество штук в упаковке"' }) +
+    '</div>' +
+    // Internal API quantity (in accounting units), never a second editable nominal.
+    '<input type="hidden" name="packageQuantity" value="' + escapeHtml(item.packageQuantity ?? '') + '">';
 }
 
 function advancedItemFields(item = {}, defaults = {}) {
@@ -419,16 +454,18 @@ function advancedItemFields(item = {}, defaults = {}) {
   const isResource = item.resourceLimit != null && Boolean(item.resourceUnit);
   const isPeriod = Boolean(item.serviceStartAt || item.serviceEndAt);
   const identity = '<div class="inventory-editor-group">' +
-    '<div class="inventory-editor-row inventory-editor-row--identity">' +
-      field({ label: 'Наименование', name: 'name', value: item.name || '', required: true, autocomplete: 'off' }) +
-      '<div class="inventory-editor-measure"><span class="inventory-editor-label">Номинал</span>' +
+    field({ label: 'Наименование', name: 'name', value: item.name || '', required: true, autocomplete: 'off' }) +
+    '<div class="inventory-editor-row" data-inventory-receipt-row>' +
+      select({ label: 'Ед. прихода', name: 'receiptUnit', value: receipt,
+        options: [{ value: '', label: 'Не задана' }, ...retainLegacyUnit(INVENTORY_RECEIPT_UNITS, receipt)] }) +
+      itemPackageFields(item) +
+    '</div>' +
+    '<div class="inventory-editor-row">' +
+      '<div class="inventory-editor-measure"><span class="inventory-editor-label">Номинал 1 шт.</span>' +
         '<div class="inventory-editor-measure__control">' +
           field({ name: 'nominalQuantity', value: item.nominalQuantity ?? '', type: 'number', min: '0.001', step: 'any', inputmode: 'decimal' }) +
-          select({ name: 'nominalUnit', aria: 'Ед. номинала', value: item.nominalUnit || '', options: [{ value: '', label: '—' }, ...INVENTORY_CARD_UNITS] }) +
-        '</div></div></div>' +
-    '<div class="inventory-editor-row">' +
-      select({ label: 'Ед. прихода', name: 'receiptUnit', value: receipt,
-        options: [{ value: '', label: 'Не задана' }, ...INVENTORY_CARD_UNITS.map(option => ({ value: option.value, label: option.label }))] }) +
+          select({ name: 'nominalUnit', aria: 'Ед. номинала одной штуки', value: item.nominalUnit || '', options: [{ value: '', label: '—' }, ...retainLegacyUnit(INVENTORY_NOMINAL_UNITS, item.nominalUnit)] }) +
+        '</div></div>' +
       editorNumber({ label: 'Закупка', name: 'purchasePrice', value: price, unit: '₽', disabled: primaryPrice !== null }) +
     '</div></div>';
 
@@ -441,9 +478,8 @@ function advancedItemFields(item = {}, defaults = {}) {
   const usage = '<div class="inventory-editor-group">' +
     '<input type="hidden" name="usage" value="' + escapeHtml(itemUsageMode(item)) + '">' +
     '<input type="hidden" name="calculationUnit" value="' + escapeHtml(inventoryCalculationUnit(item)) + '">' +
-    // The basic accounting/consumption fields never move when optional modes change.
+    // Only usage belongs here. Purchase pack count is in the receipt group.
     stockDisposalFields(item, 'consume') +
-    itemPackageFields(item) +
     '<div data-inventory-container-mode>' +
       select({ label: 'Тара', name: 'containerMode', value: item.containerMode || (item.grossWeight != null || item.tareWeight != null ? 'WITH' : ''), options: [
         { value: '', label: 'Не указана' }, { value: 'WITH', label: 'С тарой' }, { value: 'NONE', label: 'Без тары' },
@@ -555,7 +591,6 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
     ? (primaryOffer?.actualPrice ?? (primaryOffer?.listPrice == null ? null
       : Number(primaryOffer.listPrice) * (1 - Number(primaryOffer.discountPercent || 0) / 100)))
     : primaryOffer.effectivePrice;
-  let contentEdited = false;
 
   const setNumberUnit = (name, unit) => {
     const suffix = form.querySelector('[data-inventory-unit-for="' + name + '"]');
@@ -595,6 +630,7 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
     packageQuantity: input('packageQuantity')?.value,
     nominalQuantity: input('nominalQuantity')?.value,
     nominalUnit: String(input('nominalUnit')?.value || ''),
+    packPieces: input('receiptUnit')?.value === 'уп.' ? input('packPieces')?.value : 1,
     conversionRules: item?.conversionRules || [],
   });
   const deriveSellingPrice = () => {
@@ -630,7 +666,6 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
     form.querySelector('[data-inventory-sale-price-row]').hidden = !sale;
     setNumberUnit('consumeQuantity', consumeUnit);
     setNumberUnit('saleQuantity', saleUnit);
-    setNumberUnit('packageQuantity', stock);
     const threshold = !creating && (item?.minStock != null || item?.targetStock != null)
       ? item?.thresholdUnit || inventoryStockThresholdUnit(item)
       : receipt || item?.thresholdUnit || inventoryStockThresholdUnit(item || { unit: stock });
@@ -647,35 +682,16 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
     form.querySelector('[data-inventory-gross-net-tare]').hidden = !needsPhysicalMass || mode !== 'WITH';
     form.querySelector('[data-inventory-net-only]').hidden = !needsPhysicalMass || mode !== 'NONE';
     const net = updateNet();
-    const fromNominal = nominal === stock && nominalQuantity > 0 ? nominalQuantity : null;
-    const fromWeight = stock === 'г' && net != null ? net : null;
-    const derived = fromWeight ?? fromNominal;
-    // Contents of a receipt unit belong beside consumption unit/quantity.
-    const needsContent = Boolean(receipt && receipt !== stock ||
-      consume && consumeUnit !== stock || sale && saleUnit !== stock ||
-      item?.packageQuantity);
-    const pack = form.querySelector('[data-inventory-package-fields]');
-    const consumeRow = form.querySelector('[data-inventory-disposal-row="consume"]');
-    const saleRow = form.querySelector('[data-inventory-disposal-row="sale"]');
-    const contentRow = consume ? consumeRow : sale ? saleRow : null;
-    if (contentRow && pack.parentElement !== contentRow) contentRow.appendChild(pack);
-    for (const row of [consumeRow, saleRow])
-      row?.classList.toggle('inventory-editor-row--three', row === contentRow && needsContent);
-    pack.hidden = !contentRow || !needsContent;
-    const packLabel = pack.querySelector('label.field > span');
-    if (packLabel) packLabel.textContent = receipt === 'уп.' ? 'В упаковке'
-      : receipt === 'шт.' ? 'В 1 шт.' : receipt ? 'В 1 ' + receipt : 'Содержимое';
+    const pack = form.querySelector('[data-inventory-pack-count]');
+    pack.hidden = receipt !== 'уп.';
+    const pieces = receipt === 'уп.' ? Number(input('packPieces')?.value) : 1;
+    const perPiece = inventoryStockPerPiece(stock, nominal, nominalQuantity, net);
+    // Never turn a five-millilitre nominal into five pieces per pack.
+    // The API quantity is physical pieces times accounting content per piece.
+    const calculated = perPiece > 0 && pieces > 0 ? perPiece * pieces : null;
     const packageInput = input('packageQuantity');
-    const stored = Number(item?.packageQuantity);
-    // Nominal is the source for an empty package size, including existing items.
-    // Preserve a genuinely different stored package size (and stock history).
-    const savedPackage = item?.packageQuantity != null && stored > 0;
-    const autoDerived = derived != null && derived > 0 && !contentEdited
-      && (creating || !savedPackage || Math.abs(stored - derived) < 0.0005);
-    if (autoDerived) packageInput.value = numberText(derived);
-    // Calculated contents are visible but cannot be edited twice.
-    packageInput.readOnly = Boolean(autoDerived || creating && needsPhysicalMass);
-    pack.classList.toggle('inventory-editor-derived', packageInput.readOnly);
+    if (calculated != null) packageInput.value = String(Math.round(calculated * 1000000) / 1000000);
+    else if (creating || receipt !== item?.receiptUnit) packageInput.value = '';
     // Resource and time are optional characteristics of any physical item.
     // They are not an exclusive item "type".
     const resource = extraOn('resource');
@@ -697,8 +713,7 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
   }
   form.addEventListener('input', (event) => {
     if (saveError) { saveError.hidden = true; saveError.textContent = ''; }
-    if (event.target.name === 'packageQuantity' && !event.target.readOnly) contentEdited = true;
-    if (['grossWeight', 'tareWeight', 'netOnlyWeight', 'nominalQuantity', 'packageQuantity', 'purchasePrice'].includes(event.target?.name)) {
+    if (['grossWeight', 'tareWeight', 'netOnlyWeight', 'nominalQuantity', 'packPieces', 'purchasePrice'].includes(event.target?.name)) {
       syncFields();
       deriveSellingPrice();
     }
@@ -760,6 +775,16 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
       return;
     }
     const receiptUnit = String(data.get('receiptUnit') || '') || null;
+    if (!receiptUnit || !['шт.', 'уп.'].includes(receiptUnit)
+        && (creating || receiptUnit !== item?.receiptUnit)) {
+      openNotice({ title: 'Ед. прихода', message: 'Приход возможен только в штуках или упаковках.' });
+      return;
+    }
+    const pieces = receiptUnit === 'уп.' ? collectOptionalNumber(form, 'packPieces') : 1;
+    if (receiptUnit === 'уп.' && (!Number.isSafeInteger(pieces) || pieces < 2)) {
+      openNotice({ title: 'Упаковка', message: 'Укажите количество штук в упаковке (не менее двух).' });
+      return;
+    }
     const thresholdUnit = receiptUnit || item?.thresholdUnit || inventoryStockThresholdUnit(item || { unit });
     if (!creating && receiptUnit !== (item?.receiptUnit || null)
         && (item?.minStock != null || item?.targetStock != null)
@@ -799,13 +824,10 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
       openNotice({ title: 'Вес содержимого', message: 'Укажите массу содержимого: брутто и тару либо вес без тары.' });
       return;
     }
-    const packed = collectOptionalNumber(form, 'packageQuantity');
-    const measuredPack = unit === 'г' && net != null ? net : null;
-    const nominalPack = nominalUnit === unit ? nominalQuantity : null;
-    const packageQuantity = unit === 'уп.' ? null
-      : creating
-        ? measuredPack ?? nominalPack ?? packed
-        : packed ?? measuredPack ?? (item?.packageQuantity ?? null);
+    const perPiece = inventoryStockPerPiece(unit, nominalUnit, nominalQuantity, net);
+    const calculatedPack = perPiece > 0 ? perPiece * pieces : null;
+    const oldPack = item?.packageQuantity ?? null;
+    const packageQuantity = calculatedPack ?? (!creating && receiptUnit === item?.receiptUnit ? oldPack : null);
     if (packageQuantity != null && packageQuantity <= 0) {
       openNotice({ title: 'Содержимое', message: 'Количество содержимого должно быть больше нуля.' });
       return;
@@ -820,20 +842,23 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
       openNotice({ title: 'Содержимое', message: 'Укажите содержимое единицы прихода в ' + unit + '.' });
       return;
     }
-    // For legacy whole-piece stock, weighed consumption is a fraction of
-    // the physical unit. Never ask the user to type "1 g = ? pcs".
-    if (consumptionUnit === 'г' && ['шт.','уп.'].includes(unit) && net > 0) {
-      const index = rules.findIndex(rule => rule.unit === 'г');
+    // One physical piece and its nominal are independent from the
+    // number of pieces in a purchase pack. Store the bridge explicitly.
+    const setConversion = (target, stockPerUnit) => {
+      if (!target || target === unit || !(stockPerUnit > 0)) return;
+      const index = rules.findIndex(rule => rule.unit === target);
       if (index >= 0) rules.splice(index, 1);
-      rules.push({ unit: 'г', stockPerUnit: 1 / net });
+      rules.push({ unit: target, stockPerUnit });
+    };
+    if (perPiece > 0) {
+      setConversion('шт.', perPiece);
+      if (nominalUnit && nominalQuantity > 0)
+        setConversion(nominalUnit, perPiece / nominalQuantity);
     }
     const convertible = (requested) => !requested || requested === unit
       || metric.has(requested + '>' + unit)
       || rules.some(rule => rule.unit === requested && Number(rule.stockPerUnit) > 0)
-      || net > 0 && requested === 'г' && ['шт.','уп.'].includes(unit)
-      || packageQuantity > 0 && (requested === 'уп.' && unit !== 'уп.'
-        || requested === 'шт.' && ['г','мл'].includes(unit)
-        || requested === nominalUnit && nominalQuantity > 0);
+      || requested === 'уп.' && packageQuantity > 0;
     const unsupported = [consumptionUnit, saleUnit].filter(requested => !convertible(requested));
     if (unsupported.length) {
       openNotice({ title: 'Пересчёт', message: 'Не указан пересчёт ' + unsupported[0] + ' в ' + unit
