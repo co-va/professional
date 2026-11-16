@@ -4,6 +4,8 @@ import {
   compactButton,
   details,
   columnLayout,
+  datePicker,
+  initDatePickers,
   emptyState,
   entityVisualCard,
   entityCardStack,
@@ -529,8 +531,14 @@ function advancedItemFields(item = {}, defaults = {}) {
   const identity = '<div class="inventory-editor-group">' +
     field({ label: 'Наименование', name: 'name', value: item.name || '', required: true, autocomplete: 'off' }) +
     '<div class="inventory-editor-row" data-inventory-receipt-row>' +
-      select({ label: 'Ед. прихода', name: 'receiptUnit', value: receipt,
-        options: [{ value: '', label: 'Не задана' }, ...retainLegacyUnit(INVENTORY_RECEIPT_UNITS, receipt)] }) +
+      '<div class="inventory-editor-measure" data-inventory-receipt-choices>' +
+        '<span class="inventory-editor-label">Ед. прихода</span>' +
+        '<div class="inventory-editor-extra-toggles">' +
+          compactCheck({ label: 'Шт.', checked: receipt === 'шт.', data: 'data-inventory-receipt-choice="шт."' }) +
+          compactCheck({ label: 'Уп.', checked: receipt === 'уп.', data: 'data-inventory-receipt-choice="уп."' }) +
+        '</div>' +
+        '<input type="hidden" name="receiptUnit" value="' + escapeHtml(receipt) + '">' +
+      '</div>' +
       itemPackageFields(item) +
     '</div>' +
     '<div class="inventory-editor-row">' +
@@ -581,8 +589,10 @@ function advancedItemFields(item = {}, defaults = {}) {
         options: [{ value: 'REVIEW', label: 'Проверить' }, { value: 'WRITE_OFF', label: 'Списать' }] }) +
     '</div>' +
     '<div class="inventory-editor-row" data-inventory-period-fields>' +
-      field({ label: 'Начало', name: 'serviceStartAt', value: editorDate(item.serviceStartAt), type: 'date' }) +
-      field({ label: 'Окончание', name: 'serviceEndAt', value: editorDate(item.serviceEndAt), type: 'date' }) +
+      datePicker({ label: 'Дата с', name: 'serviceStartAt', value: editorDate(item.serviceStartAt),
+        placeholder: 'Выбрать дату', modalSurface: 'app' }) +
+      datePicker({ label: 'Дата по', name: 'serviceEndAt', value: editorDate(item.serviceEndAt),
+        placeholder: 'Выбрать дату', modalSurface: 'app' }) +
     '</div></div>';
 
   const classification = '<div class="inventory-editor-group">' +
@@ -640,6 +650,7 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
 
 
   const form = layer.querySelector('[data-inventory-item-form]');
+  initDatePickers(form);
   layer.querySelector('[data-inventory-unit-help]')?.addEventListener('click', () => {
     const help = '<div class="modal-title"><h2>Складская единица</h2>' +
       '<p>1. Выберите приход: шт. или уп. Для упаковки укажите 10 шт., 5 кг или 900 г.</p>' +
@@ -834,6 +845,18 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
     syncDirty();
   });
   form.addEventListener('change', (event) => {
+    const receiptChoice = event.target?.closest?.('[data-inventory-receipt-choice]');
+    if (receiptChoice) {
+      // Two existing compact checks act as a single exclusive choice.
+      const chosen = receiptChoice.dataset.inventoryReceiptChoice;
+      for (const checkbox of form.querySelectorAll('[data-inventory-receipt-choice]'))
+        checkbox.checked = checkbox.dataset.inventoryReceiptChoice === chosen;
+      input('receiptUnit').value = chosen;
+      syncFields();
+      deriveSellingPrice();
+      syncDirty();
+      return;
+    }
     if (event.target?.name === 'consumeUnit') consumptionUnitEdited = true;
     if (event.target?.name === 'thresholdUnit') {
       thresholdUnitEdited = true;
@@ -997,8 +1020,8 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
     const periodEnabled = String(data.get('periodEnabled')) === '1';
     const startDate = periodEnabled ? String(data.get('serviceStartAt') || '') : '';
     const endDate = periodEnabled ? String(data.get('serviceEndAt') || '') : '';
-    if (periodEnabled && (!startDate || !endDate || endDate < startDate)) {
-      openNotice({ title: 'Срок эксплуатации', message: 'Укажите даты начала и окончания.' }); return;
+    if (periodEnabled && startDate && endDate && endDate < startDate) {
+      openNotice({ title: 'Срок эксплуатации', message: 'Дата окончания не может быть раньше даты начала.' }); return;
     }
     const value = {
       name,
