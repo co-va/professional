@@ -582,7 +582,9 @@ async function transferMissingOrderLines(sourceOrder, selectedItemIds) {
   const nextId = next[0].orderId;
   try {
     await updateInventoryPurchaseOrder(current.orderId, {
-      supplier: current.supplier || '', note: current.note || '',
+      supplier: current.supplier || '',
+      note: [current.note, 'Не поставлено · перенесено в заказ № ' + orderNumber(nextId)]
+        .filter(Boolean).join('\n'),
       lines: prepared(remaining),
     });
   } catch (cause) {
