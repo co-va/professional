@@ -348,7 +348,8 @@ function inventoryStockPerPiece(stockUnit, nominalUnit, nominalQuantity, netWeig
   // When weighing the contents, use measured net mass (gross minus tare),
   // not a printed nominal or an assumed ml-to-gram equivalence.
   if (stockUnit === 'г' && netWeight > 0) return netWeight;
-  if (stockUnit === nominalUnit && nominalQuantity > 0) return nominalQuantity;
+  if (stockUnit === inventoryBaseContentUnit(nominalUnit) && nominalQuantity > 0)
+    return inventoryContentInBaseUnits(nominalQuantity, nominalUnit);
   return null;
 }
 
@@ -621,9 +622,10 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
   const form = layer.querySelector('[data-inventory-item-form]');
   layer.querySelector('[data-inventory-unit-help]')?.addEventListener('click', () => {
     const help = '<div class="modal-title"><h2>Складская единица</h2>' +
-      '<p>Сначала выберите единицу прихода: одна штука или упаковка из нескольких штук.</p>' +
-      '<p>Для упаковки укажите количество штук; для одной штуки это поле отсутствует.</p>' +
-      '<p>Номинал — содержимое ОДНОЙ штуки: например, ампула 5 мл. Расход в штуках означает одну целую ампулу; при расходе в граммах масса определяется по брутто и таре.</p></div>';
+      '<p>1. Выберите приход: шт. или уп. Для упаковки укажите 10 шт., 5 кг или 900 г.</p>' +
+      '<p>2. Если это ампулы или другие отдельные штуки, номинал — объём одной штуки (например, 5 мл). Если это сахар или земля, второго номинала нет.</p>' +
+      '<p>3. Выберите удобный расход. Массу тары, точную норму и цену можно внести позже. Неизвестные значения не мешают создать позицию.</p>' +
+      '<p>Примеры: пилки — уп. 10 шт., расход 1 шт.; сахар — уп. 1000 г, расход 5 г; краситель — шт., номинал 80 мл, расход г после измерения.</p></div>';
     mountModal(document.body, modal(help, { title: 'Складская единица', variant: 'technical', surface: 'app' }));
   });
   const primary = layer.querySelector('[data-inventory-item-save]');
@@ -705,7 +707,7 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
     nominalQuantity: input('nominalQuantity')?.value,
     nominalUnit: String(input('nominalUnit')?.value || ''),
     packPieces: input('receiptUnit')?.value === 'уп.'
-      && input('packContentUnit')?.value === 'шт.' ? input('packContentQuantity')?.value : 1,
+      && input('packContentUnit')?.value === 'шт.' ? input('packContentQuantity')?.value : null,
     conversionRules: item?.conversionRules || [],
   });
   const deriveSellingPrice = () => {
@@ -951,8 +953,7 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
     if (!bulk && perPiece > 0) {
       setConversion('шт.', perPiece);
       if (nominalUnit && nominalQuantity > 0)
-        setConversion(nominalUnit, perPiece / inventoryContentInBaseUnits(nominalQuantity, nominalUnit)
-          * (['кг','л'].includes(nominalUnit) ? 1000 : 1));
+        setConversion(nominalUnit, perPiece / nominalQuantity);
     }
     const convertible = (requested) => !requested || requested === unit
       || metric.has(requested + '>' + unit)
