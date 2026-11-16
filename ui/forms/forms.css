@@ -11,6 +11,8 @@
   font-size:14px;font-weight:700;color:var(--text);
 }
 .inventory-editor-panel:has(.inventory-editor-heading__controls) summary.inventory-editor-summary{padding-right:110px}
+.inventory-editor-panel:has([data-inventory-unit-help]) summary.inventory-editor-summary{padding-right:40px}
+.inventory-editor-row--three .field>span{font-size:12px}
 .inventory-editor-heading__controls{
   position:absolute;right:0;top:9px;display:flex;align-items:center;gap:6px;
 }
