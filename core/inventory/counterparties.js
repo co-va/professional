@@ -1,6 +1,7 @@
 import {
   actionBlock, button, emptyState, field, modal, mountModal, openNotice,
   page, select, v2ListEntries, v2ListEntry, v2Section, workspaceHeaderContext,
+  mountV2ZLayer, v2ZLayer, openSharedProfileSettingsMenu,
 } from '../../ui/ui.js';
 import { escapeHtml } from '../../ui/utils/escape-html.js';
 import { apiRequest } from '../auth.js';
@@ -275,58 +276,133 @@ function openImport(company, onSaved) {
   });
 }
 
-async function openCompany(companyId, onChanged = () => {}) {
+async function openCompany(companyId, root, onChanged = () => {}) {
   let companies;
   try { companies = await json(); }
-  catch (cause) { return openNotice({ title: 'Контрагенты', message: errText(cause) }); }
-  const layer = mountModal(document.body, modal('<div data-counterparty-detail></div>', {
-    title: 'Контрагент', variant: 'q', surface: 'app',
-  }));
-  if (!layer) return;
+  catch (error) { return openNotice({ title: 'Контрагенты', message: errText(error) }); }
+  let company = companies.find(row => row.id === companyId);
+  if (!company) return openNotice({ title: 'Контрагент', message: 'Компания не найдена.' });
+  const markup = workspaceHeaderContext({
+    title: 'Контрагент', subtitle: company.name,
+    v: { data: 'data-company-actions', aria: 'Действия контрагента' },
+  }) + '<div data-counterparty-detail></div>';
+  const layer = mountV2ZLayer(root, v2ZLayer(markup), { stack: true });
+  if (!layer) return null;
+  const host = layer.querySelector('[data-counterparty-detail]');
+  let revision = 0;
+  const showCatalog = async (search = '', skip = 0) => {
+    const currentRun = ++revision;
+    const list = host.querySelector('[data-company-catalog-list]');
+    const pages = host.querySelector('[data-company-catalog-pages]');
+    if (!list || !pages) return;
+    list.innerHTML = emptyState('Каталог', 'Загружаем…');
+    try {
+      const data = await json('/' + urlId(companyId) + '/catalog?search=' +
+        encodeURIComponent(search.trim()) + '&skip=' + skip);
+      if (!layer.isConnected || !list.isConnected || currentRun !== revision) return;
+      const items = Array.isArray(data.items) ? data.items : [];
+      const count = Number(data.count || 0);
+      list.innerHTML = items.length ? v2ListEntries(items.map(item => v2ListEntry({
+        title: item.name,
+        subtitle: [item.supplierSku && 'Арт. ' + item.supplierSku,
+          item.brand || item.manufacturer].filter(Boolean).join(' · '),
+        rightTop: money(item.listPrice),
+        rightBottom: supplierAvailability(item.supplierAvailable),
+        interactive: true, initial: '',
+        data: 'data-company-product="' + escapeHtml(item.id) + '"',
+        aria: 'Открыть товар ' + item.name,
+      }))) : emptyState('Нет товаров', search ? 'Совпадений нет.' : 'Каталог пока пуст.');
+      pages.innerHTML = items.length ? '<p>' + (skip + 1) + '–' +
+        (skip + items.length) + ' из ' + count + '</p>' : '';
+      pages.innerHTML += actionBlock(
+        (skip > 0 ? button('Предыдущие', { variant: 'secondary', data: 'data-company-prev' }) : '') +
+        (skip + items.length < count
+          ? button('Далее', { variant: 'secondary', data: 'data-company-next' }) : '')
+      );
+      list.querySelectorAll('[data-company-product]').forEach(node => {
+        node.addEventListener('click', () => {
+          const item = items.find(value => value.id === node.dataset.companyProduct);
+          if (item) void openCatalogRow(company, item);
+        });
+      });
+      pages.querySelector('[data-company-prev]')?.addEventListener('click', () => {
+        void showCatalog(search, Math.max(0, skip - 100));
+      });
+      pages.querySelector('[data-company-next]')?.addEventListener('click', () => {
+        void showCatalog(search, skip + 100);
+      });
+    } catch (error) {
+      if (layer.isConnected && currentRun === revision && list.isConnected) {
+        list.innerHTML = emptyState('Каталог недоступен', errText(error));
+      }
+    }
+  };
   const refresh = async () => {
     try { companies = await json(); }
-    catch (cause) { return openNotice({ title: 'Контрагент', message: errText(cause) }); }
-    const company = companies.find(value => value.id === companyId);
+    catch (error) { return openNotice({ title: 'Контрагенты', message: errText(error) }); }
+    if (!layer.isConnected) return;
+    company = companies.find(row => row.id === companyId);
     if (!company) { layer.v2Close?.(); onChanged(); return; }
-    const host = layer.querySelector('[data-counterparty-detail]');
-    if (!host) return;
-    host.innerHTML = `<p><strong>${escapeHtml(company.name)}</strong> · ${kindLabel(company.kind)}</p>
-      ${[company.contactName,company.phone,company.email,company.website].filter(Boolean).map(value => '<p>' + escapeHtml(value) + '</p>').join('')}
-      ${actionBlock(button('Редактировать', { variant: 'secondary', data: 'data-company-edit' }) +
-        button('Загрузить прайс', { data: 'data-company-upload' }) +
-        button('Шаблон Excel', { variant: 'secondary', data: 'data-company-template' }))}
-      ${v2Section('Прайс-листы', company.priceLists?.length
-        ? v2ListEntries(company.priceLists.map(list => v2ListEntry({
-          title: list.filename,
-          subtitle: 'Версия ' + list.revision + ' · ' + new Date(list.createdAt).toLocaleDateString('ru-RU'),
-          rightTop: list.parserStatus === 'READY' ? 'Товаров: ' + list._count.rows : 'Нужен шаблон',
-          interactive: true, initial: '',
-          data: 'data-company-pricelist="' + escapeHtml(list.id) + '"',
-          aria: 'Скачать оригинал прайса',
-        })))
-        : emptyState('Нет прайсов', 'Загрузите Excel или PDF целиком.'))}
-      ${actionBlock(button('Каталог товаров', { data: 'data-company-catalog', variant: 'secondary' }))}`;
-    host.querySelector('[data-company-edit]')?.addEventListener('click', () => openCompanyEditor(company, () => {
-      void refresh(); onChanged();
-    }));
-    host.querySelector('[data-company-upload]')?.addEventListener('click', () => openImport(company, () => {
-      void refresh(); onChanged();
-    }));
-    host.querySelector('[data-company-template]')?.addEventListener('click', () => {
-      void download('/template/xlsx', 'price-list-template.xlsx').catch(err =>
-        openNotice({ title: 'Excel', message: errText(err) }));
+    const files = Array.isArray(company.priceLists) ? company.priceLists : [];
+    const ready = files.some(file => file.parserStatus === 'READY');
+    const facts = v2ListEntries([v2ListEntry({
+      title: kindLabel(company.kind),
+      subtitle: [company.contactName, company.phone, company.email,
+        company.website, company.note].filter(Boolean).join(' · '),
+      interactive: false, initial: '',
+    })]);
+    const documents = files.length ? v2ListEntries(files.map(file => v2ListEntry({
+      title: file.filename,
+      subtitle: 'Версия ' + file.revision + ' · ' +
+        new Date(file.createdAt).toLocaleDateString('ru-RU'),
+      rightTop: file.parserStatus === 'READY'
+        ? String(file._count?.rows || 0) + ' поз.' : 'Нужен Excel',
+      interactive: true, initial: '',
+      data: 'data-company-file="' + escapeHtml(file.id) + '"',
+      aria: 'Скачать ' + file.filename,
+    }))) : emptyState('Файлов нет', 'Загрузите файл через V.');
+    host.innerHTML = '<div class="form-grid">' + facts +
+      v2Section('Файлы', documents) +
+      v2Section('Товары', ready
+        ? '<div class="ui-search-field">' +
+          field({ name: 'catalogSearch', type: 'search',
+            placeholder: 'Название или артикул' }) + '</div>' +
+          '<div data-company-catalog-list></div><div data-company-catalog-pages></div>'
+        : emptyState('Товаров нет', 'Загрузите файл через V.')) + '</div>';
+    host.querySelectorAll('[data-company-file]').forEach(node => {
+      node.addEventListener('click', () => {
+        const file = files.find(row => row.id === node.dataset.companyFile);
+        if (!file) return;
+        void download('/' + urlId(companyId) + '/pricelists/' + urlId(file.id) +
+          '/download', 'catalog-' + file.revision + '.' + file.format)
+          .catch(error => openNotice({ title: 'Файл', message: errText(error) }));
+      });
     });
-    host.querySelector('[data-company-catalog]')?.addEventListener('click', () => { void openCatalog(company); });
-    host.querySelectorAll('[data-company-pricelist]').forEach(node => node.addEventListener('click', () => {
-      const list = company.priceLists.find(value => value.id === node.dataset.companyPricelist);
-      if (!list) return;
-      void download('/' + urlId(company.id) + '/pricelists/' + urlId(list.id) + '/download',
-        'prais-' + list.revision + '.' + list.format).catch(err =>
-        openNotice({ title: 'Прайс', message: errText(err) }));
-    }));
+    const search = host.querySelector('[name="catalogSearch"]');
+    if (search) {
+      let timer;
+      search.addEventListener('input', () => {
+        clearTimeout(timer);
+        timer = setTimeout(() => { void showCatalog(search.value); }, 250);
+      });
+      void showCatalog();
+    }
   };
+  layer.querySelector('[data-company-actions]')?.addEventListener('click', () => {
+    openSharedProfileSettingsMenu({ title: 'Контрагент', actions: [
+      { id: 'edit', label: 'Редактировать', onSelect: () =>
+        openCompanyEditor(company, () => { void refresh(); onChanged(); }) },
+      { id: 'upload', label: 'Загрузить файл', onSelect: () =>
+        openImport(company, () => { void refresh(); onChanged(); }) },
+      { id: 'template', label: 'Шаблон Excel', onSelect: () =>
+        void download('/template/xlsx', 'catalog-template.xlsx').catch(error =>
+          openNotice({ title: 'Excel', message: errText(error) })) },
+    ] });
+  });
   void refresh();
+  return layer;
 }
+
 export async function openSupplierAssociation(itemId, onSaved = () => {}) {
   let companies = [];
   try { companies = await json(); }
@@ -383,7 +459,7 @@ export async function renderCounterparties(root) {
         })))
         : emptyState('Контрагентов пока нет', 'Нажмите +, чтобы создать компанию.');
       host.querySelectorAll('[data-counterparty-open]').forEach(node => {
-        node.addEventListener('click', () => { void openCompany(node.dataset.counterpartyOpen, show); });
+        node.addEventListener('click', () => { void openCompany(node.dataset.counterpartyOpen, root, show); });
       });
     } catch (cause) { host.innerHTML = emptyState('Контрагенты недоступны', errText(cause)); }
   };
