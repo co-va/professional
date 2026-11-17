@@ -352,7 +352,7 @@ function catalogItemList(items = [], selectedCatalogIds = new Set()) {
         columns: [
           [
             { value: item.name, strong: true },
-            { value: [item.supplierSku, item.barcode ? 'ШК ' + item.barcode : ''].filter(Boolean).join(' · ') || '—', muted: true },
+            { value: item.supplierSku || '—', muted: true },
             { value: supplierAvailability(item.supplierAvailable), muted: true },
           ],
           [
