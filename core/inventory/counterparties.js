@@ -239,8 +239,25 @@ async function openCatalogRow(company, row, { itemId = '', onLinked = () => {} }
   });
 }
 
-// V → "Загрузить файл" requests the native OS picker immediately.
-// The confirmation Q appears only after the user actually selects a file.
+// The X explains the preferred template before the native file picker.
+// Alternate .xlsx layouts and PDF remain eligible for server-side preview.
+function openImportGuidance(company, onSaved) {
+  const layer = mountModal(document.body, modal(
+    '<div class="form-grid">' +
+      '<p>Для загрузки ассортимента рекомендуем шаблон Excel приложения (.xlsx).</p>' +
+      '<p>Другой Excel .xlsx или PDF тоже можно выбрать. Позиции появятся только при успешном распознавании файла.</p>' +
+      button('Выбрать файл', { data: 'data-counterparty-pick-file' }) +
+    '</div>',
+    { title: 'Загрузка ассортимента', variant: 'x', xRole: 'action', surface: 'app' },
+  ));
+  layer?.querySelector('[data-counterparty-pick-file]')?.addEventListener('click', () => {
+    layer.v2Close?.();
+    openImport(company, onSaved);
+  });
+}
+
+// The native OS file picker opens directly from the X button's user gesture.
+// The confirmation Q appears only after a file is chosen.
 function openImport(company, onSaved) {
   const input = document.createElement('input');
   input.type = 'file';
@@ -462,7 +479,7 @@ async function openCompany(companyId, root, onChanged = () => {}) {
       { id: 'edit', label: 'Редактировать', onSelect: () =>
         openCompanyEditor(company, () => { void refresh(); onChanged(); }) },
       { id: 'upload', label: 'Загрузить файл', onSelect: () =>
-        openImport(company, () => { void refresh(); onChanged(); }) },
+        openImportGuidance(company, () => { void refresh(); onChanged(); }) },
       { id: 'template', label: 'Шаблон Excel', onSelect: () =>
         void download('/template/xlsx', 'catalog-template.xlsx').catch(error =>
           openNotice({ title: 'Excel', message: errText(error) })) },
