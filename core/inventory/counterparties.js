@@ -360,7 +360,7 @@ function catalogDisclosure(title, content, nested = false) {
     '<div class="inventory-editor-panel__body">' + content + '</div></details></section>';
 }
 
-function catalogGroupsMarkup(items = []) {
+function catalogBrands(items = []) {
   const brands = new Map();
   for (const item of items) {
     const brand = String(item.brand || item.manufacturer || '').trim() || 'Без компании';
@@ -370,13 +370,30 @@ function catalogGroupsMarkup(items = []) {
     if (!categories.has(category)) categories.set(category, []);
     categories.get(category).push(item);
   }
-  return '<div class="inventory-item-accordion">' + [...brands].map(([brand, categories]) =>
-    catalogDisclosure(brand, [...categories].map(([category, rows]) =>
-      category
-        ? catalogDisclosure(category, catalogItemList(rows), true)
-        : catalogItemList(rows),
-    ).join('')),
-  ).join('') + '</div>';
+  return brands;
+}
+
+// Brand is a V2 List row, not a disclosure. Count catalog items across
+// all categories; category headings do not count as products.
+function catalogGroupsMarkup(brands) {
+  return v2ListEntries([...brands].map(([brand, categories]) => v2ListEntry({
+    title: brand,
+    rightTop: [...categories.values()].reduce((sum, rows) => sum + rows.length, 0) + ' поз.',
+    interactive: true,
+    initial: '',
+    omitEmptySubtitle: true,
+    data: 'data-company-brand="' + escapeHtml(brand) + '"',
+    aria: 'Открыть ассортимент ' + brand,
+  })));
+}
+
+// Only product categories use the existing native disclosure. No extra
+// heading for products and no additional UI primitives.
+function catalogBrandMarkup(categories) {
+  return '<div class="inventory-item-accordion">' +
+    [...categories].map(([category, rows]) =>
+      category ? catalogDisclosure(category, catalogItemList(rows)) : catalogItemList(rows),
+    ).join('') + '</div>';
 }
 
 function openCounterpartyFiles(company) {
@@ -441,15 +458,26 @@ async function openCompany(companyId, root, onChanged = () => {}) {
         entries.push(...(Array.isArray(page.items) ? page.items : []));
       }
       if (!layer.isConnected || !list.isConnected || currentRun !== revision) return;
+      const brands = catalogBrands(entries);
       list.innerHTML = entries.length
-        ? catalogGroupsMarkup(entries)
+        ? catalogGroupsMarkup(brands)
         : emptyState('Ассортимент не загружен');
       if (!entries.length) return;
       const byId = new Map(entries.map(row => [row.id, row]));
-      list.querySelectorAll('[data-company-product]').forEach(node => {
+      list.querySelectorAll('[data-company-brand]').forEach(node => {
         node.addEventListener('click', () => {
-          const row = byId.get(node.dataset.companyProduct);
-          if (row) void openCatalogRow(company, row);
+          const brand = node.dataset.companyBrand;
+          const categories = brands.get(brand);
+          if (!categories) return;
+          const brandLayer = mountV2ZLayer(root, v2ZLayer(
+            workspaceHeaderContext({ title: brand }) + catalogBrandMarkup(categories),
+          ), { stack: true });
+          brandLayer?.querySelectorAll('[data-company-product]').forEach(product => {
+            product.addEventListener('click', () => {
+              const row = byId.get(product.dataset.companyProduct);
+              if (row) void openCatalogRow(company, row);
+            });
+          });
         });
       });
     } catch (error) {
