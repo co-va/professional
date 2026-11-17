@@ -352,12 +352,15 @@ function catalogItemList(items = []) {
   });
 }
 
-function catalogDisclosure(title, content, nested = false) {
-  // Same native disclosure as Stock's inventory-editor-panel and Orders.
-  // The built-in <summary> marker is the existing black triangle.
+function catalogDisclosure(title, content, nested = false, count = null) {
+  // Native Stock disclosure with its existing right-side controls slot.
+  const positionCount = Number.isSafeInteger(count) && count >= 0
+    ? '<div class="inventory-editor-heading__controls"><span class="ui-list__secondary">' +
+      count + ' поз.</span></div>' : '';
   return '<section class="inventory-editor-panel' + (nested ? ' inventory-editor-panel--nested' : '') + '">' +
     '<details><summary class="inventory-editor-summary">' + escapeHtml(title) + '</summary>' +
-    '<div class="inventory-editor-panel__body">' + content + '</div></details></section>';
+    '<div class="inventory-editor-panel__body">' + content + '</div></details>' +
+    positionCount + '</section>';
 }
 
 function catalogBrands(items = []) {
@@ -392,7 +395,7 @@ function catalogGroupsMarkup(brands) {
 function catalogBrandMarkup(categories) {
   return '<div class="inventory-item-accordion">' +
     [...categories].map(([category, rows]) =>
-      category ? catalogDisclosure(category, catalogItemList(rows)) : catalogItemList(rows),
+      category ? catalogDisclosure(category, catalogItemList(rows), false, rows.length) : catalogItemList(rows),
     ).join('') + '</div>';
 }
 
