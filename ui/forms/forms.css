@@ -17,6 +17,11 @@
 .inventory-editor-heading__controls{
   position:absolute;right:0;top:9px;display:flex;align-items:center;gap:6px;
 }
+/* Counterparty Q: reuse the 28px compactCheck beside native category disclosure. */
+.inventory-editor-panel--catalog-choice>details>summary.inventory-editor-summary{padding-left:36px}
+.inventory-editor-panel--catalog-choice>.inventory-editor-heading__selection{
+  position:absolute;left:0;top:9px;z-index:1;
+}
 .inventory-editor-panel__body{padding:0 0 14px}
 .inventory-editor-panel [hidden]{display:none!important}
 .inventory-editor-group{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;align-content:start;min-width:0}
