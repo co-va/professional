@@ -339,9 +339,8 @@ function counterpartyInformation(company = {}) {
 }
 
 function catalogItemList(items = [], selectedCatalogIds = new Set()) {
-  // Use the existing V2 List and Compact checkbox, with no new row height.
-  // Supplier SKU remains below the original product name; do not parse the
-  // supplier's naming convention or duplicate an SKU already in the name.
+  // Existing V2 List: two columns of exactly three single-line values.
+  // Import fields come from Core; missing values remain explicitly unknown.
   return v2ListEntries(items.map(item =>
     '<div class="inventory-counterparty-product-row">' +
       compactCheck({
@@ -350,10 +349,19 @@ function catalogItemList(items = [], selectedCatalogIds = new Set()) {
         data: 'data-company-product-check="' + escapeHtml(item.id) + '"',
       }) +
       v2ListEntry({
-        title: item.name,
-        subtitle: item.supplierSku ? 'Арт. ' + item.supplierSku : '',
-        omitEmptySubtitle: true,
-        rightTop: money(item.listPrice),
+        columns: [
+          [
+            { value: item.name, strong: true },
+            { value: [item.supplierSku, item.barcode ? 'ШК ' + item.barcode : ''].filter(Boolean).join(' · ') || '—', muted: true },
+            { value: supplierAvailability(item.supplierAvailable), muted: true },
+          ],
+          [
+            { value: 'Прайс: ' + money(item.listPrice), strong: true },
+            { value: 'Моя: ' + money(item.actualPrice), muted: true },
+            { value: 'Скидка: ' + (item.discountPercent == null ? '—'
+              : Number(item.discountPercent).toLocaleString('ru-RU', { maximumFractionDigits: 2 }) + '%'), muted: true },
+          ],
+        ],
         interactive: true,
         initial: '',
         data: 'data-company-product="' + escapeHtml(item.id) + '"',
