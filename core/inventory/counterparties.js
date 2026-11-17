@@ -1,6 +1,6 @@
 import {
   actionBlock, button, emptyState, field, modal, mountModal, openNotice,
-  page, select, list, v2ListEntries, v2ListEntry, v2Section, workspaceHeaderContext,
+  page, select, v2ListEntries, v2ListEntry, v2Section, workspaceHeaderContext,
   mountV2ZLayer, v2ZLayer, openSharedProfileSettingsMenu,
   entityVisualCard, entityCardStack, openEntityCardAppearanceQ,
 } from '../../ui/ui.js';
