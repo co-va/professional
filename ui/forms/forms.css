@@ -34,8 +34,8 @@
 .inventory-editor-panel--catalog-choice>.inventory-editor-heading__controls{
   top:15px;
 }
-/* Counterparty catalog: canonical V2 three-line columns and Compact check.
-   Product facts use the existing V2 row geometry; no feature-specific heights. */
+/* Counterparty catalog: shared dense UI List and existing Compact check.
+   Do not override the List row height, padding or type scale. */
 .inventory-counterparty-product-row{
   display:grid;
   grid-template-columns:var(--ui-compact-size) minmax(0,1fr);
@@ -43,11 +43,11 @@
   gap:8px;
   min-width:0;
 }
-.inventory-counterparty-product-row>.list-entry{min-width:0}
-.inventory-counterparty-product-row .list-entry__columns{
-  grid-template-columns:minmax(0,1.35fr) minmax(0,.9fr);
-}
-.inventory-counterparty-product-row .list-entry__column-line{
+.inventory-counterparty-product-row>.ui-list{min-width:0}
+.inventory-counterparty-product-row .ui-list__main{overflow:hidden}
+.inventory-counterparty-product-row .ui-list__title,
+.inventory-counterparty-product-row .ui-list__secondary,
+.inventory-counterparty-product-row .ui-list__right-secondary span{
   overflow:hidden;
   text-overflow:ellipsis;
   white-space:nowrap;
