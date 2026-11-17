@@ -2,13 +2,28 @@ import {
   actionBlock, button, emptyState, field, modal, mountModal, openNotice,
   page, select, v2ListEntries, v2ListEntry, v2Section, workspaceHeaderContext,
   mountV2ZLayer, v2ZLayer, openSharedProfileSettingsMenu,
+  entityVisualCard, entityCardStack, openEntityCardAppearanceQ,
 } from '../../ui/ui.js';
 import { escapeHtml } from '../../ui/utils/escape-html.js';
 import { apiRequest } from '../auth.js';
 import { getInventoryItems } from './data.js';
 import { loadInventory } from './service.js';
+import { getCardAppearanceTemplate, saveCardAppearanceTemplate } from '../card-appearance-templates.js';
+import { loadAuxiliaryState } from '../runtime/auxiliary-state.js';
 
 const PATH = '/inventory/counterparties';
+const COUNTERPARTY_CARD_SCOPE = 'inventory-counterparty';
+// Same entity card/constructor used for company cards in Stock. This is
+// presentation inside Z1, not an F/E navigation card or a new UI primitive.
+const COUNTERPARTY_CARD_DEFAULT = {
+  lines: [
+    {}, {}, {}, {}, {},
+    { field: 'name', zone: 'full', align: 'left', size: 'xl', color: 'white', bold: true },
+    {},
+    { field: 'kind', zone: 'full', align: 'left', size: 'm', color: 'white' },
+    { field: 'files', zone: 'right', align: 'right', size: 'm', color: 'white' },
+  ],
+};
 const TYPES = [
   { value: 'SUPPLIER', label: 'Поставщик' },
   { value: 'MANUFACTURER', label: 'Производитель' },
@@ -436,35 +451,93 @@ export async function openSupplierAssociation(itemId, onSaved = () => {}) {
     void openCatalog(company, { itemId, onLinked: () => { layer.v2Close?.(); onSaved(); } });
   });
 }
+function counterpartyCardFields(company = {}) {
+  const files = Array.isArray(company.priceLists) ? company.priceLists : [];
+  const ready = files.find(file => file.parserStatus === 'READY');
+  const positionCount = Number(ready?._count?.rows);
+  return [
+    { value: 'name', label: 'Название', text: company.name || '' },
+    { value: 'kind', label: 'Тип', text: kindLabel(company.kind) },
+    { value: 'files', label: 'Файлы', text: String(files.length) + ' файл.' },
+    { value: 'positions', label: 'Позиции', text: Number.isFinite(positionCount) && ready?._count?.rows != null
+      ? String(positionCount) : '' },
+    { value: 'contactName', label: 'Представитель', text: company.contactName || '' },
+    { value: 'phone', label: 'Телефон', text: company.phone || '' },
+    { value: 'email', label: 'Email', text: company.email || '' },
+    { value: 'website', label: 'Сайт', text: company.website || '' },
+  ];
+}
+
+function counterpartyCardAppearance() {
+  return getCardAppearanceTemplate(COUNTERPARTY_CARD_SCOPE)?.appearance || COUNTERPARTY_CARD_DEFAULT;
+}
+
+function openCounterpartyAppearance(root, sample, onSaved = () => {}) {
+  return openEntityCardAppearanceQ(root, {
+    title: 'Вид',
+    typeOptions: [{ value: COUNTERPARTY_CARD_SCOPE, label: 'Контрагент' }],
+    initialType: COUNTERPARTY_CARD_SCOPE,
+    resolve: () => ({
+      appearance: counterpartyCardAppearance(),
+      fields: counterpartyCardFields(sample),
+    }),
+    save: async ({ appearance }) => {
+      saveCardAppearanceTemplate(COUNTERPARTY_CARD_SCOPE, { appearance });
+    },
+    allowPhoto: false,
+    onSaved,
+  });
+}
+
 export async function renderCounterparties(root) {
   root.innerHTML = page([
     workspaceHeaderContext({
       title: 'Контрагенты',
+      v: { data: 'data-counterparty-view-menu', aria: 'Настройки контрагентов' },
       c: { label: '+', data: 'data-counterparty-add', aria: 'Новый контрагент' },
     }),
     '<div data-counterparties-list></div>',
   ]);
   const host = root.querySelector('[data-counterparties-list]');
+  let currentCompanies = [];
+  const renderCards = () => {
+    if (!host?.isConnected) return;
+    host.innerHTML = currentCompanies.length
+      ? entityCardStack(currentCompanies.map(company => entityVisualCard({
+        appearance: counterpartyCardAppearance(),
+        fields: counterpartyCardFields(company),
+        interactive: true,
+        data: 'data-counterparty-open="' + escapeHtml(company.id) + '"',
+        aria: 'Открыть контрагента ' + company.name,
+      })))
+      : emptyState('Контрагентов пока нет', 'Нажмите +, чтобы создать компанию.');
+    host.querySelectorAll('[data-counterparty-open]').forEach(node => {
+      node.addEventListener('click', () => {
+        void openCompany(node.dataset.counterpartyOpen, root, show);
+      });
+    });
+  };
   const show = async () => {
     host.innerHTML = emptyState('Контрагенты', 'Загружаем…');
     try {
       const companies = await json();
       if (!root.isConnected) return;
-      host.innerHTML = companies.length
-        ? v2ListEntries(companies.map(company => v2ListEntry({
-          title: company.name, subtitle: kindLabel(company.kind),
-          rightTop: company.priceLists?.length ? String(company.priceLists.length) + ' прайс.' : '',
-          interactive: true, initial: '',
-          data: 'data-counterparty-open="' + escapeHtml(company.id) + '"',
-          aria: 'Открыть контрагента ' + company.name,
-        })))
-        : emptyState('Контрагентов пока нет', 'Нажмите +, чтобы создать компанию.');
-      host.querySelectorAll('[data-counterparty-open]').forEach(node => {
-        node.addEventListener('click', () => { void openCompany(node.dataset.counterpartyOpen, root, show); });
-      });
+      currentCompanies = Array.isArray(companies) ? companies : [];
+      renderCards();
     } catch (cause) { host.innerHTML = emptyState('Контрагенты недоступны', errText(cause)); }
   };
+  root.querySelector('[data-counterparty-view-menu]')?.addEventListener('click', () => {
+    openSharedProfileSettingsMenu({
+      title: '',
+      actions: [
+        { id: 'appearance', label: 'Вид', onSelect: () =>
+          openCounterpartyAppearance(root, currentCompanies[0] || {}, renderCards) },
+      ],
+    });
+  });
   root.querySelector('[data-counterparty-add]')?.addEventListener('click', () => openCompanyEditor(null, () => { void show(); }));
+  // Existing service-scoped auxiliary API includes appearance templates.
+  await loadAuxiliaryState('service').catch(() => {});
   await show();
   window.dispatchEvent(new CustomEvent('va-tools:v2-context-changed'));
   return () => {};
