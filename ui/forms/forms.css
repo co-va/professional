@@ -34,9 +34,8 @@
 .inventory-editor-panel--catalog-choice>.inventory-editor-heading__controls{
   top:15px;
 }
-/* Catalog item rows are standard V2 List entries beside the existing Compact
-   checkbox. Keep supplier text to two lines (name and optional SKU), so longer
-   names do not alter the canonical List entry height or move the price. */
+/* Counterparty catalog: canonical V2 three-line columns and Compact check.
+   Product facts use the existing V2 row geometry; no feature-specific heights. */
 .inventory-counterparty-product-row{
   display:grid;
   grid-template-columns:var(--ui-compact-size) minmax(0,1fr);
@@ -45,9 +44,10 @@
   min-width:0;
 }
 .inventory-counterparty-product-row>.list-entry{min-width:0}
-.inventory-counterparty-product-row .list-entry__main strong,
-.inventory-counterparty-product-row .list-entry__main small{
-  min-width:0;
+.inventory-counterparty-product-row .list-entry__columns{
+  grid-template-columns:minmax(0,1.35fr) minmax(0,.9fr);
+}
+.inventory-counterparty-product-row .list-entry__column-line{
   overflow:hidden;
   text-overflow:ellipsis;
   white-space:nowrap;
