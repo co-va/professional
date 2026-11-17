@@ -1,7 +1,6 @@
 import {
   actionBlock, button, emptyState, field, modal, mountModal, openNotice,
-  page, select, v2ListEntries, v2ListEntry, v2Section, workspaceHeaderContext,
-  accordion, initAccordions,
+  page, select, list, v2ListEntries, v2ListEntry, v2Section, workspaceHeaderContext,
   mountV2ZLayer, v2ZLayer, openSharedProfileSettingsMenu,
   entityVisualCard, entityCardStack, openEntityCardAppearanceQ,
 } from '../../ui/ui.js';
@@ -338,21 +337,30 @@ function counterpartyInformation(company = {}) {
     '</div>';
 }
 
-function catalogEntryMarkup(item) {
-  return v2ListEntry({
-    title: item.name,
-    subtitle: [item.supplierSku && 'Арт. ' + item.supplierSku].filter(Boolean).join(' · '),
-    rightTop: item.listPrice == null ? '' : money(item.listPrice),
-    interactive: true,
-    initial: '',
-    data: 'data-company-product="' + escapeHtml(item.id) + '"',
-    aria: 'Открыть позицию ' + item.name,
+function catalogItemList(items = []) {
+  // Same compact Core UI List used in saved purchase orders.
+  return list({
+    className: 'ui-list--dense',
+    items: items.map(item => ({
+      title: item.name,
+      secondary: item.supplierSku ? 'Арт. ' + item.supplierSku : '',
+      right: item.listPrice == null ? [] : [money(item.listPrice)],
+      interactive: true,
+      data: 'data-company-product="' + escapeHtml(item.id) + '"',
+      aria: 'Открыть позицию ' + item.name,
+    })),
   });
 }
 
+function catalogDisclosure(title, content, nested = false) {
+  // Same native disclosure as Stock's inventory-editor-panel and Orders.
+  // The built-in <summary> marker is the existing black triangle.
+  return '<section class="inventory-editor-panel' + (nested ? ' inventory-editor-panel--nested' : '') + '">' +
+    '<details><summary class="inventory-editor-summary">' + escapeHtml(title) + '</summary>' +
+    '<div class="inventory-editor-panel__body">' + content + '</div></details></section>';
+}
+
 function catalogGroupsMarkup(items = []) {
-  // Existing Core fields are enough for the current two-level catalog.
-  // No invented "line", "type", or extra classification columns.
   const brands = new Map();
   for (const item of items) {
     const brand = String(item.brand || item.manufacturer || '').trim() || 'Без компании';
@@ -362,15 +370,13 @@ function catalogGroupsMarkup(items = []) {
     if (!categories.has(category)) categories.set(category, []);
     categories.get(category).push(item);
   }
-  return accordion([...brands].map(([brand, categories]) => ({
-    title: escapeHtml(brand),
-    content: [...categories].map(([category, rows]) => category
-      ? accordion([{
-        title: escapeHtml(category),
-        content: v2ListEntries(rows.map(catalogEntryMarkup)),
-      }])
-      : v2ListEntries(rows.map(catalogEntryMarkup))).join(''),
-  })));
+  return '<div class="inventory-item-accordion">' + [...brands].map(([brand, categories]) =>
+    catalogDisclosure(brand, [...categories].map(([category, rows]) =>
+      category
+        ? catalogDisclosure(category, catalogItemList(rows), true)
+        : catalogItemList(rows),
+    ).join('')),
+  ).join('') + '</div>';
 }
 
 function openCounterpartyFiles(company) {
@@ -439,13 +445,6 @@ async function openCompany(companyId, root, onChanged = () => {}) {
         ? catalogGroupsMarkup(entries)
         : emptyState('Ассортимент не загружен');
       if (!entries.length) return;
-      initAccordions(list);
-      // Nested category accordions must not toggle their parent brand.
-      list.querySelectorAll('[data-accordion] [data-accordion]').forEach(inner => {
-        inner.addEventListener('click', event => {
-          if (event.target.closest?.('[data-accordion-trigger]')) event.stopPropagation();
-        });
-      });
       const byId = new Map(entries.map(row => [row.id, row]));
       list.querySelectorAll('[data-company-product]').forEach(node => {
         node.addEventListener('click', () => {
