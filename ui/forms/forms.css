@@ -17,26 +17,22 @@
 .inventory-editor-heading__controls{
   position:absolute;right:0;top:9px;display:flex;align-items:center;gap:6px;
 }
-/* Counterparty Q: one fixed-height category row; preserve the native marker,
-   canonical compactCheck and existing right-side item-count slot. */
+/* Counterparty Q: use the existing 46px native disclosure row.
+   Only prevent wrapping and position the canonical 28px check. */
 .inventory-editor-panel--catalog-choice:has(> .inventory-editor-heading__controls)>details>summary.inventory-editor-summary{
   box-sizing:border-box;
   width:100%;
-  height:52px;
-  min-height:52px;
-  max-height:52px;
   padding:0 70px 0 36px;
   font-size:13px;
-  line-height:52px;
   white-space:nowrap;
   overflow:hidden;
   text-overflow:ellipsis;
 }
 .inventory-editor-panel--catalog-choice>.inventory-editor-heading__selection{
-  position:absolute;left:0;top:12px;z-index:1;
+  position:absolute;left:0;top:9px;z-index:1;
 }
 .inventory-editor-panel--catalog-choice>.inventory-editor-heading__controls{
-  top:17px;
+  top:15px;
 }
 .inventory-editor-panel__body{padding:0 0 14px}
 .inventory-editor-panel [hidden]{display:none!important}
