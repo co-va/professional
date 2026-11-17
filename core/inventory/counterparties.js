@@ -294,18 +294,16 @@ function openImport(company, onSaved) {
 }
 
 function counterpartyInformation(company = {}) {
-  const type = kindLabel(company.kind);
-  const contact = [company.contactName, company.phone].filter(value => String(value || '').trim()).join(' · ');
-  const lines = [
-    type,
-    contact ? 'Менеджер: ' + contact : '',
-    company.email || '',
-    company.website || '',
-    company.note || '',
-  ].filter(value => String(value || '').trim());
-  // Information is immutable text on Z2. Only the existing V → Edit opens Q.
+  // Reuse existing small/primary/secondary typography, without "data" rows
+  // or locally styled dividers. Editing remains in the existing V → Q flow.
+  const primary = String(company.contactName || '').trim();
+  const secondary = [company.phone, company.email, company.website, company.note]
+    .filter(value => String(value || '').trim());
   return '<div data-counterparty-information>' +
-    lines.map(value => '<p>' + escapeHtml(value) + '</p>').join('') + '</div>';
+    '<span class="ui-list__secondary">' + escapeHtml(kindLabel(company.kind)) + '</span>' +
+    (primary ? '<strong class="ui-list__title">' + escapeHtml(primary) + '</strong>' : '') +
+    secondary.map(value => '<span class="ui-list__secondary">' + escapeHtml(value) + '</span>').join('') +
+    '</div>';
 }
 
 function catalogEntryMarkup(item) {
@@ -391,7 +389,7 @@ async function openCompany(companyId, root, onChanged = () => {}) {
     const currentRun = ++revision;
     const list = host.querySelector('[data-company-catalog-list]');
     if (!list) return;
-    list.innerHTML = '<p>Загружаем ассортимент…</p>';
+    list.innerHTML = emptyState('Ассортимент', 'Загружаем…');
     try {
       const data = await json('/' + urlId(companyId) + '/catalog?skip=0');
       if (!layer.isConnected || !list.isConnected || currentRun !== revision) return;
@@ -407,7 +405,7 @@ async function openCompany(companyId, root, onChanged = () => {}) {
       if (!layer.isConnected || !list.isConnected || currentRun !== revision) return;
       list.innerHTML = entries.length
         ? catalogGroupsMarkup(entries)
-        : '<p>Ассортимент пока не загружен.</p>';
+        : emptyState('Ассортимент не загружен');
       if (!entries.length) return;
       initAccordions(list);
       // Nested category accordions must not toggle their parent brand.
@@ -425,7 +423,7 @@ async function openCompany(companyId, root, onChanged = () => {}) {
       });
     } catch (error) {
       if (layer.isConnected && currentRun === revision && list.isConnected) {
-        list.innerHTML = '<p>' + escapeHtml(errText(error)) + '</p>';
+        list.innerHTML = emptyState('Ассортимент недоступен', errText(error));
       }
     }
   };
