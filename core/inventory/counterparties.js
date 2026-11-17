@@ -300,7 +300,7 @@ function counterpartyInformation(company = {}) {
   const secondary = [company.phone, company.email, company.website, company.note]
     .filter(value => String(value || '').trim());
   return '<div data-counterparty-information>' +
-    '<span class="ui-list__secondary">' + escapeHtml(kindLabel(company.kind)) + '</span>' +
+    (primary ? '<span class="ui-list__secondary">Менеджер</span>' : '') +
     (primary ? '<strong class="ui-list__title">' + escapeHtml(primary) + '</strong>' : '') +
     secondary.map(value => '<span class="ui-list__secondary">' + escapeHtml(value) + '</span>').join('') +
     '</div>';
