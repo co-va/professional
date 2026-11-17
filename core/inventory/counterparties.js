@@ -5,6 +5,7 @@ import {
   entityVisualCard, entityCardStack, openEntityCardAppearanceQ,
 } from '../../ui/ui.js';
 import { escapeHtml } from '../../ui/utils/escape-html.js';
+import { compactCheck } from '../../ui/selection/check-list.js';
 import { apiRequest } from '../auth.js';
 import { getInventoryItems } from './data.js';
 import { loadInventory } from './service.js';
@@ -352,15 +353,18 @@ function catalogItemList(items = []) {
   });
 }
 
-function catalogDisclosure(title, content, nested = false, count = null) {
-  // Native Stock disclosure with its existing right-side controls slot.
+function catalogDisclosure(title, content, nested = false, count = null, check = '') {
+  // Same Stock disclosure and compact check. The check is outside <details>
+  // so selecting a category never opens/closes the product rows.
   const positionCount = Number.isSafeInteger(count) && count >= 0
     ? '<div class="inventory-editor-heading__controls"><span class="ui-list__secondary">' +
       count + ' поз.</span></div>' : '';
-  return '<section class="inventory-editor-panel' + (nested ? ' inventory-editor-panel--nested' : '') + '">' +
+  const selection = check ? '<div class="inventory-editor-heading__selection">' + check + '</div>' : '';
+  return '<section class="inventory-editor-panel' + (nested ? ' inventory-editor-panel--nested' : '') +
+    (check ? ' inventory-editor-panel--catalog-choice' : '') + '">' +
     '<details><summary class="inventory-editor-summary">' + escapeHtml(title) + '</summary>' +
     '<div class="inventory-editor-panel__body">' + content + '</div></details>' +
-    positionCount + '</section>';
+    selection + positionCount + '</section>';
 }
 
 function catalogBrands(items = []) {
@@ -392,11 +396,17 @@ function catalogGroupsMarkup(brands) {
 
 // Only product categories use the existing native disclosure. No extra
 // heading for products and no additional UI primitives.
-function catalogBrandMarkup(categories) {
+function catalogBrandMarkup(categories, selectedCatalogIds) {
   return '<div class="inventory-item-accordion">' +
     [...categories].map(([category, rows]) =>
-      category ? catalogDisclosure(category, catalogItemList(rows), false, rows.length) : catalogItemList(rows),
-    ).join('') + '</div>';
+      category ? catalogDisclosure(category, catalogItemList(rows), false, rows.length,
+        compactCheck({
+          checked: rows.length > 0 && rows.every(row => selectedCatalogIds.has(String(row.id))),
+          aria: 'Выбрать все позиции категории ' + category,
+          data: 'data-company-category-check="' + escapeHtml(category) + '"',
+        })) : catalogItemList(rows),
+    ).join('') + '</div>' +
+    '<p class="ui-list__secondary">Выбор пока не сохраняется в остатках.</p>';
 }
 
 function openCounterpartyFiles(company) {
@@ -442,6 +452,9 @@ async function openCompany(companyId, root, onChanged = () => {}) {
   if (!layer) return null;
   const host = layer.querySelector('[data-counterparty-detail]');
   let revision = 0;
+  // In-memory selection only until Core owns an idempotent bulk catalog operation.
+  // Never create/archive inventory records or invent inventory units here.
+  const selectedCatalogIds = new Set();
 
   const showCatalog = async () => {
     const currentRun = ++revision;
@@ -472,9 +485,18 @@ async function openCompany(companyId, root, onChanged = () => {}) {
           const brand = node.dataset.companyBrand;
           const categories = brands.get(brand);
           if (!categories) return;
-          const brandLayer = mountModal(document.body, modal(catalogBrandMarkup(categories), {
+          const brandLayer = mountModal(document.body, modal(catalogBrandMarkup(categories, selectedCatalogIds), {
             title: brand, variant: 'q', surface: 'app',
           }));
+          brandLayer?.querySelectorAll('[data-company-category-check]').forEach(check => {
+            check.addEventListener('change', () => {
+              const rows = categories.get(check.dataset.companyCategoryCheck) || [];
+              for (const row of rows) {
+                if (check.checked) selectedCatalogIds.add(String(row.id));
+                else selectedCatalogIds.delete(String(row.id));
+              }
+            });
+          });
           brandLayer?.querySelectorAll('[data-company-product]').forEach(product => {
             product.addEventListener('click', () => {
               const row = byId.get(product.dataset.companyProduct);
