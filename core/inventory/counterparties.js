@@ -338,19 +338,29 @@ function counterpartyInformation(company = {}) {
     '</div>';
 }
 
-function catalogItemList(items = []) {
-  // Same compact Core UI List used in saved purchase orders.
-  return list({
-    className: 'ui-list--dense',
-    items: items.map(item => ({
-      title: item.name,
-      secondary: item.supplierSku ? 'Арт. ' + item.supplierSku : '',
-      right: item.listPrice == null ? [] : [money(item.listPrice)],
-      interactive: true,
-      data: 'data-company-product="' + escapeHtml(item.id) + '"',
-      aria: 'Открыть позицию ' + item.name,
-    })),
-  });
+function catalogItemList(items = [], selectedCatalogIds = new Set()) {
+  // Use the existing V2 List and Compact checkbox, with no new row height.
+  // Supplier SKU remains below the original product name; do not parse the
+  // supplier's naming convention or duplicate an SKU already in the name.
+  return v2ListEntries(items.map(item =>
+    '<div class="inventory-counterparty-product-row">' +
+      compactCheck({
+        checked: selectedCatalogIds.has(String(item.id)),
+        aria: 'Выбрать позицию ' + item.name,
+        data: 'data-company-product-check="' + escapeHtml(item.id) + '"',
+      }) +
+      v2ListEntry({
+        title: item.name,
+        subtitle: item.supplierSku ? 'Арт. ' + item.supplierSku : '',
+        omitEmptySubtitle: true,
+        rightTop: money(item.listPrice),
+        interactive: true,
+        initial: '',
+        data: 'data-company-product="' + escapeHtml(item.id) + '"',
+        aria: 'Открыть позицию ' + item.name,
+      }) +
+    '</div>',
+  ));
 }
 
 function catalogDisclosure(title, content, nested = false, count = null, check = '') {
@@ -399,12 +409,12 @@ function catalogGroupsMarkup(brands) {
 function catalogBrandMarkup(categories, selectedCatalogIds) {
   return '<div class="inventory-item-accordion">' +
     [...categories].map(([category, rows]) =>
-      category ? catalogDisclosure(category, catalogItemList(rows), false, rows.length,
+      category ? catalogDisclosure(category, catalogItemList(rows, selectedCatalogIds), false, rows.length,
         compactCheck({
           checked: rows.length > 0 && rows.every(row => selectedCatalogIds.has(String(row.id))),
           aria: 'Выбрать все позиции категории ' + category,
           data: 'data-company-category-check="' + escapeHtml(category) + '"',
-        })) : catalogItemList(rows),
+        })) : catalogItemList(rows, selectedCatalogIds),
     ).join('') + '</div>' +
     '<p class="ui-list__secondary">Выбор пока не сохраняется в остатках.</p>';
 }
@@ -488,6 +498,17 @@ async function openCompany(companyId, root, onChanged = () => {}) {
           const brandLayer = mountModal(document.body, modal(catalogBrandMarkup(categories, selectedCatalogIds), {
             title: brand, variant: 'q', surface: 'app',
           }));
+          const syncSelections = () => {
+            brandLayer?.querySelectorAll('[data-company-product-check]').forEach(check => {
+              check.checked = selectedCatalogIds.has(String(check.dataset.companyProductCheck));
+            });
+            brandLayer?.querySelectorAll('[data-company-category-check]').forEach(check => {
+              const rows = categories.get(check.dataset.companyCategoryCheck) || [];
+              const selected = rows.filter(row => selectedCatalogIds.has(String(row.id))).length;
+              check.checked = rows.length > 0 && selected === rows.length;
+              check.indeterminate = selected > 0 && selected < rows.length;
+            });
+          };
           brandLayer?.querySelectorAll('[data-company-category-check]').forEach(check => {
             check.addEventListener('change', () => {
               const rows = categories.get(check.dataset.companyCategoryCheck) || [];
@@ -495,6 +516,15 @@ async function openCompany(companyId, root, onChanged = () => {}) {
                 if (check.checked) selectedCatalogIds.add(String(row.id));
                 else selectedCatalogIds.delete(String(row.id));
               }
+              syncSelections();
+            });
+          });
+          brandLayer?.querySelectorAll('[data-company-product-check]').forEach(check => {
+            check.addEventListener('change', () => {
+              const id = String(check.dataset.companyProductCheck);
+              if (check.checked) selectedCatalogIds.add(id);
+              else selectedCatalogIds.delete(id);
+              syncSelections();
             });
           });
           brandLayer?.querySelectorAll('[data-company-product]').forEach(product => {
