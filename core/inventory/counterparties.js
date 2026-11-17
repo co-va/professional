@@ -1,6 +1,7 @@
 import {
   actionBlock, button, emptyState, field, modal, mountModal, openNotice,
   page, select, v2ListEntries, v2ListEntry, v2Section, workspaceHeaderContext,
+  accordion, initAccordions,
   mountV2ZLayer, v2ZLayer, openSharedProfileSettingsMenu,
   entityVisualCard, entityCardStack, openEntityCardAppearanceQ,
 } from '../../ui/ui.js';
@@ -292,6 +293,85 @@ function openImport(company, onSaved) {
   });
 }
 
+function counterpartyInformation(company = {}) {
+  const type = kindLabel(company.kind);
+  const contact = [company.contactName, company.phone].filter(value => String(value || '').trim()).join(' · ');
+  const lines = [
+    type,
+    contact ? 'Менеджер: ' + contact : '',
+    company.email || '',
+    company.website || '',
+    company.note || '',
+  ].filter(value => String(value || '').trim());
+  // Information is immutable text on Z2. Only the existing V → Edit opens Q.
+  return '<div data-counterparty-information>' +
+    lines.map(value => '<p>' + escapeHtml(value) + '</p>').join('') + '</div>';
+}
+
+function catalogEntryMarkup(item) {
+  return v2ListEntry({
+    title: item.name,
+    subtitle: [item.supplierSku && 'Арт. ' + item.supplierSku].filter(Boolean).join(' · '),
+    rightTop: item.listPrice == null ? '' : money(item.listPrice),
+    interactive: true,
+    initial: '',
+    data: 'data-company-product="' + escapeHtml(item.id) + '"',
+    aria: 'Открыть позицию ' + item.name,
+  });
+}
+
+function catalogGroupsMarkup(items = []) {
+  // Existing Core fields are enough for the current two-level catalog.
+  // No invented "line", "type", or extra classification columns.
+  const brands = new Map();
+  for (const item of items) {
+    const brand = String(item.brand || item.manufacturer || '').trim() || 'Без компании';
+    const category = String(item.category || '').trim();
+    if (!brands.has(brand)) brands.set(brand, new Map());
+    const categories = brands.get(brand);
+    if (!categories.has(category)) categories.set(category, []);
+    categories.get(category).push(item);
+  }
+  return accordion([...brands].map(([brand, categories]) => ({
+    title: escapeHtml(brand),
+    content: [...categories].map(([category, rows]) => category
+      ? accordion([{
+        title: escapeHtml(category),
+        content: v2ListEntries(rows.map(catalogEntryMarkup)),
+      }])
+      : v2ListEntries(rows.map(catalogEntryMarkup))).join(''),
+  })));
+}
+
+function openCounterpartyFiles(company) {
+  const files = Array.isArray(company.priceLists) ? company.priceLists : [];
+  const content = files.length
+    ? v2ListEntries(files.map(file => v2ListEntry({
+      title: file.filename,
+      subtitle: 'Версия ' + file.revision + ' · ' +
+        new Date(file.createdAt).toLocaleDateString('ru-RU'),
+      rightTop: file.parserStatus === 'READY'
+        ? String(file._count?.rows || 0) + ' поз.' : 'Нужен Excel',
+      interactive: true,
+      initial: '',
+      data: 'data-company-file="' + escapeHtml(file.id) + '"',
+      aria: 'Скачать ' + file.filename,
+    })))
+    : '<p>История загрузок пуста.</p>';
+  const layer = mountModal(document.body, modal(content, {
+    title: 'История загрузок', variant: 'q', surface: 'app',
+  }));
+  layer?.querySelectorAll('[data-company-file]').forEach(node => {
+    node.addEventListener('click', () => {
+      const file = files.find(row => row.id === node.dataset.companyFile);
+      if (!file) return;
+      void download('/' + urlId(company.id) + '/pricelists/' + urlId(file.id) +
+        '/download', 'catalog-' + file.revision + '.' + file.format)
+        .catch(error => openNotice({ title: 'Файл', message: errText(error) }));
+    });
+  });
+}
+
 async function openCompany(companyId, root, onChanged = () => {}) {
   let companies;
   try { companies = await json(); }
@@ -306,105 +386,62 @@ async function openCompany(companyId, root, onChanged = () => {}) {
   if (!layer) return null;
   const host = layer.querySelector('[data-counterparty-detail]');
   let revision = 0;
-  const showCatalog = async (search = '', skip = 0) => {
+
+  const showCatalog = async () => {
     const currentRun = ++revision;
     const list = host.querySelector('[data-company-catalog-list]');
-    const pages = host.querySelector('[data-company-catalog-pages]');
-    if (!list || !pages) return;
-    list.innerHTML = emptyState('Каталог', 'Загружаем…');
+    if (!list) return;
+    list.innerHTML = '<p>Загружаем ассортимент…</p>';
     try {
-      const data = await json('/' + urlId(companyId) + '/catalog?search=' +
-        encodeURIComponent(search.trim()) + '&skip=' + skip);
+      const data = await json('/' + urlId(companyId) + '/catalog?skip=0');
       if (!layer.isConnected || !list.isConnected || currentRun !== revision) return;
-      const items = Array.isArray(data.items) ? data.items : [];
-      const count = Number(data.count || 0);
-      list.innerHTML = items.length ? v2ListEntries(items.map(item => v2ListEntry({
-        title: item.name,
-        subtitle: [item.supplierSku && 'Арт. ' + item.supplierSku,
-          item.brand || item.manufacturer].filter(Boolean).join(' · '),
-        rightTop: money(item.listPrice),
-        rightBottom: supplierAvailability(item.supplierAvailable),
-        interactive: true, initial: '',
-        data: 'data-company-product="' + escapeHtml(item.id) + '"',
-        aria: 'Открыть товар ' + item.name,
-      }))) : emptyState('Нет товаров', search ? 'Совпадений нет.' : 'Каталог пока пуст.');
-      pages.innerHTML = items.length ? '<p>' + (skip + 1) + '–' +
-        (skip + items.length) + ' из ' + count + '</p>' : '';
-      pages.innerHTML += actionBlock(
-        (skip > 0 ? button('Предыдущие', { variant: 'secondary', data: 'data-company-prev' }) : '') +
-        (skip + items.length < count
-          ? button('Далее', { variant: 'secondary', data: 'data-company-next' }) : '')
-      );
-      list.querySelectorAll('[data-company-product]').forEach(node => {
-        node.addEventListener('click', () => {
-          const item = items.find(value => value.id === node.dataset.companyProduct);
-          if (item) void openCatalogRow(company, item);
+      const entries = Array.isArray(data.items) ? [...data.items] : [];
+      const count = Math.max(0, Number(data.count) || 0);
+      // The API returns at most 100 rows per request. Read all existing pages
+      // before grouping so companies after the first page are not invisible.
+      for (let skip = 100; skip < count; skip += 100) {
+        const page = await json('/' + urlId(companyId) + '/catalog?skip=' + skip);
+        if (!layer.isConnected || !list.isConnected || currentRun !== revision) return;
+        entries.push(...(Array.isArray(page.items) ? page.items : []));
+      }
+      if (!layer.isConnected || !list.isConnected || currentRun !== revision) return;
+      list.innerHTML = entries.length
+        ? catalogGroupsMarkup(entries)
+        : '<p>Ассортимент пока не загружен.</p>';
+      if (!entries.length) return;
+      initAccordions(list);
+      // Nested category accordions must not toggle their parent brand.
+      list.querySelectorAll('[data-accordion] [data-accordion]').forEach(inner => {
+        inner.addEventListener('click', event => {
+          if (event.target.closest?.('[data-accordion-trigger]')) event.stopPropagation();
         });
       });
-      pages.querySelector('[data-company-prev]')?.addEventListener('click', () => {
-        void showCatalog(search, Math.max(0, skip - 100));
-      });
-      pages.querySelector('[data-company-next]')?.addEventListener('click', () => {
-        void showCatalog(search, skip + 100);
+      const byId = new Map(entries.map(row => [row.id, row]));
+      list.querySelectorAll('[data-company-product]').forEach(node => {
+        node.addEventListener('click', () => {
+          const row = byId.get(node.dataset.companyProduct);
+          if (row) void openCatalogRow(company, row);
+        });
       });
     } catch (error) {
       if (layer.isConnected && currentRun === revision && list.isConnected) {
-        list.innerHTML = emptyState('Каталог недоступен', errText(error));
+        list.innerHTML = '<p>' + escapeHtml(errText(error)) + '</p>';
       }
     }
   };
+
   const refresh = async () => {
     try { companies = await json(); }
     catch (error) { return openNotice({ title: 'Контрагенты', message: errText(error) }); }
     if (!layer.isConnected) return;
     company = companies.find(row => row.id === companyId);
     if (!company) { layer.v2Close?.(); onChanged(); return; }
-    const files = Array.isArray(company.priceLists) ? company.priceLists : [];
-    const ready = files.some(file => file.parserStatus === 'READY');
-    const facts = v2ListEntries([v2ListEntry({
-      title: kindLabel(company.kind),
-      subtitle: [company.contactName, company.phone, company.email,
-        company.website, company.note].filter(Boolean).join(' · '),
-      interactive: false, initial: '',
-    })]);
-    const documents = files.length ? v2ListEntries(files.map(file => v2ListEntry({
-      title: file.filename,
-      subtitle: 'Версия ' + file.revision + ' · ' +
-        new Date(file.createdAt).toLocaleDateString('ru-RU'),
-      rightTop: file.parserStatus === 'READY'
-        ? String(file._count?.rows || 0) + ' поз.' : 'Нужен Excel',
-      interactive: true, initial: '',
-      data: 'data-company-file="' + escapeHtml(file.id) + '"',
-      aria: 'Скачать ' + file.filename,
-    }))) : emptyState('Файлов нет', 'Загрузите файл через V.');
-    host.innerHTML = '<div class="form-grid">' + facts +
-      v2Section('Файлы', documents) +
-      v2Section('Товары', ready
-        ? '<div class="ui-search-field">' +
-          field({ name: 'catalogSearch', type: 'search',
-            placeholder: 'Название или артикул' }) + '</div>' +
-          '<div data-company-catalog-list></div><div data-company-catalog-pages></div>'
-        : emptyState('Товаров нет', 'Загрузите файл через V.')) + '</div>';
-    host.querySelectorAll('[data-company-file]').forEach(node => {
-      node.addEventListener('click', () => {
-        const file = files.find(row => row.id === node.dataset.companyFile);
-        if (!file) return;
-        void download('/' + urlId(companyId) + '/pricelists/' + urlId(file.id) +
-          '/download', 'catalog-' + file.revision + '.' + file.format)
-          .catch(error => openNotice({ title: 'Файл', message: errText(error) }));
-      });
-    });
-    const search = host.querySelector('[name="catalogSearch"]');
-    if (search) {
-      let timer;
-      search.addEventListener('input', () => {
-        clearTimeout(timer);
-        timer = setTimeout(() => { void showCatalog(search.value); }, 250);
-      });
-      void showCatalog();
-    }
+    host.innerHTML = counterpartyInformation(company) +
+      v2Section('Ассортимент', '<div data-company-catalog-list></div>');
+    void showCatalog();
   };
   layer.querySelector('[data-company-actions]')?.addEventListener('click', () => {
+    const files = Array.isArray(company.priceLists) ? company.priceLists : [];
     openSharedProfileSettingsMenu({ title: 'Контрагент', actions: [
       { id: 'edit', label: 'Редактировать', onSelect: () =>
         openCompanyEditor(company, () => { void refresh(); onChanged(); }) },
@@ -413,6 +450,8 @@ async function openCompany(companyId, root, onChanged = () => {}) {
       { id: 'template', label: 'Шаблон Excel', onSelect: () =>
         void download('/template/xlsx', 'catalog-template.xlsx').catch(error =>
           openNotice({ title: 'Excel', message: errText(error) })) },
+      ...(files.length ? [{ id: 'history', label: 'История загрузок',
+        onSelect: () => openCounterpartyFiles(company) }] : []),
     ] });
   });
   void refresh();
