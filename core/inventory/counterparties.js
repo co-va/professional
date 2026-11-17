@@ -469,9 +469,9 @@ async function openCompany(companyId, root, onChanged = () => {}) {
           const brand = node.dataset.companyBrand;
           const categories = brands.get(brand);
           if (!categories) return;
-          const brandLayer = mountV2ZLayer(root, v2ZLayer(
-            workspaceHeaderContext({ title: brand }) + catalogBrandMarkup(categories),
-          ), { stack: true });
+          const brandLayer = mountModal(document.body, modal(catalogBrandMarkup(categories), {
+            title: brand, variant: 'q', surface: 'app',
+          }));
           brandLayer?.querySelectorAll('[data-company-product]').forEach(product => {
             product.addEventListener('click', () => {
               const row = byId.get(product.dataset.companyProduct);
