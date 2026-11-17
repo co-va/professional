@@ -239,32 +239,46 @@ async function openCatalogRow(company, row, { itemId = '', onLinked = () => {} }
   });
 }
 
+// V → "Загрузить файл" requests the native OS picker immediately.
+// The confirmation Q appears only after the user actually selects a file.
 function openImport(company, onSaved) {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.xlsx,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+  input.hidden = true;
+  document.body.appendChild(input);
+
+  const cleanup = () => input.remove();
+  input.addEventListener('change', () => {
+    const file = input.files?.[0] || null;
+    cleanup();
+    if (file) openImportPreview(company, onSaved, file);
+  }, { once: true });
+  input.addEventListener('cancel', cleanup, { once: true });
+  // Must remain synchronous with the V-menu click for iOS/WebKit.
+  input.click();
+}
+
+function openImportPreview(company, onSaved, file) {
   const layer = mountModal(document.body, modal(`
-    <p>Сначала скачайте шаблон Excel через V-меню контрагента. Заполните строки товарами и загрузите готовый файл: позиции появятся в каталоге контрагента, не в вашем складе.</p>
-    <p>PDF — дополнительный вариант: если позиции не распознаются полностью, исходный файл сохранится без создания товаров.</p>
-    <input type="file" accept=".xlsx,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" data-counterparty-file>
     <div data-counterparty-preview></div>
     <p class="form-error" data-counterparty-import-error role="alert"></p>
-    ${actionBlock(button('Загрузить товары', { data: 'data-counterparty-import-save', disabled: true }))}
-    `, { title: 'Загрузка каталога', variant: 'q', surface: 'app' }));
+    ${actionBlock(button('Загрузить позиции', { data: 'data-counterparty-import-save', disabled: true }))}
+    `, { title: 'Проверка файла', variant: 'q', surface: 'app' }));
   if (!layer) return;
-  const input = layer.querySelector('[data-counterparty-file]');
   const preview = layer.querySelector('[data-counterparty-preview]');
   const errorHost = layer.querySelector('[data-counterparty-import-error]');
   const save = layer.querySelector('[data-counterparty-import-save]');
-  let file = null, result = null;
-  input.addEventListener('change', async () => {
-    file = input.files?.[0] || null; result = null; save.disabled = true;
-    if (!file) return;
-    preview.innerHTML = 'Проверяем файл…';
+  let result = null;
+  const check = async () => {
+    preview.textContent = 'Проверяем файл…';
     try {
       result = await upload(company.id, '/pricelists/preview', file);
       if (!layer.isConnected) return;
       const rows = result.sample || [];
       preview.innerHTML = `<p>${escapeHtml(file.name)} · ${result.count} поз.</p>` +
-        (result.status === 'READY' ? '<p>Проверьте распознанные позиции и цены перед загрузкой.</p>' :
-          '<p>Этот файл нельзя надёжно импортировать как каталог. Исходный файл можно сохранить, а товары загрузить через стандартный шаблон Excel.</p>') +
+        (result.status === 'READY' ? '<p>Проверьте позиции и цены перед загрузкой.</p>' :
+          '<p>Содержимое не распознано полностью. Можно сохранить исходный файл, не создавая позиции.</p>') +
         (result.errors || []).map(value => '<p>' + escapeHtml(value) + '</p>').join('') +
         (rows.length ? v2ListEntries(rows.map(row => v2ListEntry({
           title: row.name,
@@ -272,15 +286,15 @@ function openImport(company, onSaved) {
           rightTop: money(row.listPrice), interactive: false,
         }))) : '');
       save.disabled = false;
-      save.textContent = result.status === 'READY' ? 'Загрузить товары' : 'Сохранить файл';
+      save.textContent = result.status === 'READY' ? 'Загрузить позиции' : 'Сохранить файл';
       errorHost.textContent = '';
     } catch (cause) {
-      preview.innerHTML = '';
+      preview.textContent = '';
       errorHost.textContent = errText(cause);
     }
-  });
+  };
   save.addEventListener('click', async () => {
-    if (!file || !result) return;
+    if (!result) return;
     save.disabled = true;
     try {
       await upload(company.id, '/pricelists', file, result.format === 'pdf' && result.status === 'READY');
@@ -291,6 +305,7 @@ function openImport(company, onSaved) {
       save.disabled = false;
     }
   });
+  void check();
 }
 
 function counterpartyInformation(company = {}) {
