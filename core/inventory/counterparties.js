@@ -434,7 +434,10 @@ async function openCompany(companyId, root, onChanged = () => {}) {
     if (!layer.isConnected) return;
     company = companies.find(row => row.id === companyId);
     if (!company) { layer.v2Close?.(); onChanged(); return; }
-    host.innerHTML = counterpartyInformation(company) +
+    // Separate plain contact details and assortment with the existing Z-section
+    // vertical rhythm. No extra card, divider, or feature-specific CSS.
+    host.innerHTML = '<section class="v2-section"><div class="v2-section__content">' +
+      counterpartyInformation(company) + '</div></section>' +
       v2Section('Ассортимент', '<div data-company-catalog-list></div>');
     void showCatalog();
   };
