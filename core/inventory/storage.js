@@ -4,7 +4,7 @@ import { createInventoryStorageLocation, loadInventory, updateInventoryStorageLo
 
 const locations = () => getInventoryStorageLocations().filter(item => item && !item.archivedAt);
 const options = () => locations().map(location => ({
-  value: location.locationId, label: location.name,
+  value: location.locationId, label: location.isPrimary ? 'Не распределено' : location.name,
 }));
 
 // Earlier inventories stored a human-entered warehouse letter in item.location.
@@ -141,7 +141,7 @@ export function openInventoryStorageLocations(onSaved = () => {}) {
   ));
   if (!host) return null;
   const display = () => {
-    const items = locations();
+    const items = locations().filter(place=>!place.isPrimary);
     const root = host.querySelector('[data-inventory-storage-list]');
     root.innerHTML = items.length ? list({
       className: 'ui-list--dense',
