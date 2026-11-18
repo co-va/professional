@@ -66,12 +66,13 @@ function stockRow(item, selected, scope) {
     }]}) + '</div>';
 }
 
-export function openStockCatalogBrand(brand, {
-  scope = INVENTORY_TOTAL_SCOPE,
-  onOpen = () => {},
-  onNew = () => {},
-  onTarget = () => {},
-} = {}) {
+export function openStockCatalogBrand(brand, options = {}) {
+  const {
+    scope = INVENTORY_TOTAL_SCOPE,
+    onOpen = () => {},
+    onNew = () => {},
+    onTarget = () => {},
+  } = options;
   if (!brand) return null;
   const selected = new Set();
   const groupLookup = new Map();
