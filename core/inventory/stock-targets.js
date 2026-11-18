@@ -5,10 +5,28 @@ import { getInventoryItem, getInventoryStorageLocations } from './data.js';
 import { updateInventoryStockTargets } from './service.js';
 
 export const INVENTORY_TOTAL_SCOPE = 'total';
-export const storageName = place => place?.isPrimary ? 'Основной склад' : place?.name || '';
+export const storageName = place => place?.isPrimary ? 'Не распределено' : place?.name || '';
 export const inventoryLocations = () => getInventoryStorageLocations().filter(place => !place.archivedAt);
 export const itemLocationBalance = (item, locationId) =>
   Number((item?.locationBalances || []).find(row => row.locationId === locationId)?.balance || 0);
+
+/**
+ * "Общий" is an aggregate, not a physical place. A named warehouse shows
+ * actual positive balances at that site, plus its assigned zero-stock items.
+ * The original item.location label supplies those zero-stock assignments for
+ * legacy A/B items after recovery; it must not fabricate stock quantities.
+ */
+export function inventoryItemBelongsToStorage(item, scope = INVENTORY_TOTAL_SCOPE) {
+  if (scope === INVENTORY_TOTAL_SCOPE) return true;
+  if (itemLocationBalance(item,scope) > 0.000001) return true;
+  if (scope === 'primary') return false; // technical undistributed stock
+  const place=inventoryLocations().find(row=>row.locationId===scope && !row.isPrimary);
+  if(!place || String(item.location||'').trim().toLocaleLowerCase('ru-RU')
+       !== String(place.name||'').trim().toLocaleLowerCase('ru-RU')) return false;
+  // A stale legacy label cannot override a real allocation elsewhere.
+  return !(item.locationBalances||[]).some(row=>
+    row.locationId!==scope && Number(row.balance)>0.000001);
+}
 
 export function inventoryDisplayBalance(item, scope = INVENTORY_TOTAL_SCOPE) {
   return scope === INVENTORY_TOTAL_SCOPE ? Number(item?.balance || 0)
