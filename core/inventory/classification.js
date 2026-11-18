@@ -1,4 +1,5 @@
-import { actionBlock, button, emptyState, field, list, modal, mountModal } from '../../ui/ui.js';
+import { actionBlock, button, emptyState, field, modal, mountModal,
+  v2ListEntry, v2ListEntries } from '../../ui/ui.js';
 import { getInventoryCriteria, getInventoryItems, getInventoryClassificationGroups } from './data.js';
 import { loadInventoryCriteria, loadInventory, createInventoryCriterion, updateInventoryCriterion,
   createInventoryCriterionValue, updateInventoryCriterionValue } from './service.js';
@@ -83,6 +84,59 @@ export function openInventoryClassificationGroups(onSaved = () => {}) {
       onSaved();
       return true;
     } catch(cause) {showError(cause);return false;}
+  };
+  // The × is a separate list action. Archive, never delete item records.
+  const confirmRemove = ({title, description, onConfirm}) => {
+    const layer=mountModal(document.body,modal(
+      '<p>'+escapeHtml(description)+'</p>' +
+      '<p class="form-error" role="alert" data-criteria-remove-error></p>' +
+      actionBlock(
+        button('Удалить',{variant:'delete-outline',data:'data-criteria-remove-confirm'}) +
+        button('Отмена',{variant:'secondary',data:'data-criteria-remove-cancel'})
+      ),{title,variant:'q',surface:'app'},
+    ));
+    if(!layer)return;
+    layer.querySelector('[data-criteria-remove-cancel]')?.addEventListener('click',()=>layer.v2Close?.());
+    let saving=false;
+    layer.querySelector('[data-criteria-remove-confirm]')?.addEventListener('click',async()=>{
+      if(saving)return;
+      saving=true;
+      try {
+        await onConfirm();
+        layer.v2Close?.();
+      }catch(cause){
+        const problem=layer.querySelector('[data-criteria-remove-error]');
+        if(problem)problem.textContent=cause instanceof Error?cause.message:'Не удалось удалить.';
+      }finally{saving=false;}
+    });
+  };
+  const wireRemove = (container, selector, handler) => {
+    container.querySelectorAll(selector).forEach(node=>{
+      node.setAttribute('role','button');
+      node.tabIndex=0;
+      const activate=event=>{
+        event.preventDefault();
+        event.stopPropagation();
+        handler(node.dataset.deleteAction);
+      };
+      node.addEventListener('click',activate);
+      node.addEventListener('keydown',event=>{
+        if(event.key==='Enter'||event.key===' '){activate(event);}
+      });
+    });
+  };
+  const removeGroup = id => {
+    const group=current.find(row=>row.id===id);
+    if(!group)return;
+    confirmRemove({
+      title:'Удалить группу',
+      description:'Группа «'+group.name+'» исчезнет из списка. Товары и остатки сохранятся.',
+      onConfirm:async()=>{
+        current=await updateInventoryCriterion(group.id,{archived:true});
+        onSaved();
+        refresh();
+      },
+    });
   };
   const editName = (group = null, onFinished = () => {}) => {
     const editor = mountModal(document.body, modal(
@@ -171,20 +225,34 @@ export function openInventoryClassificationGroups(onSaved = () => {}) {
     const renderValues=()=>{
       const now=current.find(entry=>entry.id===id);
       if(!now){layer.v2Close?.();return;}
-      container.innerHTML=now.values.length?list({
-        className:'ui-list--dense',
-        items:now.values.map(item=>({
-          title:item.name,interactive:true,
-          aria:'Изменить значение '+item.name,
-          data:'data-inventory-criterion-value="'+escapeHtml(item.id)+'"',
-        })),
-      }):emptyState('Значений пока нет');
+      container.innerHTML=now.values.length?v2ListEntries(now.values.map(item=>v2ListEntry({
+        title:item.name,interactive:true,initial:'',omitEmptySubtitle:true,
+        aria:'Изменить значение '+item.name,
+        data:'data-inventory-criterion-value="'+escapeHtml(item.id)+'"',
+        deleteData:item.id,deleteAria:'Удалить значение '+item.name,
+      }))):emptyState('Значений пока нет');
       container.querySelectorAll('[data-inventory-criterion-value]').forEach(node=>
-        node.addEventListener('click',()=>{
+        node.addEventListener('click',event=>{
+          if(event.target.closest('[data-delete-action]'))return;
           const updated=current.find(entry=>entry.id===id);
           const item=updated?.values.find(value=>value.id===node.dataset.inventoryCriterionValue);
           if(item)valueEditor({...updated, refreshValues:renderValues},item);
         }));
+      wireRemove(container,'[data-inventory-criterion-value] [data-delete-action]',valueId=>{
+        const updated=current.find(entry=>entry.id===id);
+        const value=updated?.values.find(entry=>entry.id===valueId);
+        if(!value)return;
+        confirmRemove({
+          title:'Удалить значение',
+          description:'Значение «'+value.name+'» будет удалено из выбора, если не используется товарами.',
+          onConfirm:async()=>{
+            current=await updateInventoryCriterionValue(id,valueId,{archived:true});
+            onSaved();
+            refresh();
+            renderValues();
+          },
+        });
+      });
     };
     layer.querySelector('[data-inventory-add-criterion-value]')?.addEventListener('click',()=>{
       const now=current.find(entry=>entry.id===id);
@@ -198,16 +266,19 @@ export function openInventoryClassificationGroups(onSaved = () => {}) {
   };
   const refresh=()=>{
     if(!main)return;
-    main.innerHTML=current.length?list({
-      className:'ui-list--dense',
-      items:current.map(group=>({
-        title:group.name,secondary:group.values.length+' знач.',
-        interactive:true,aria:'Открыть значения '+group.name,
-        data:'data-inventory-criterion-group="'+escapeHtml(group.id)+'"',
-      })),
-    }):emptyState('Групп пока нет');
+    main.innerHTML=current.length?v2ListEntries(current.map(group=>v2ListEntry({
+      title:group.name,rightTop:group.values.length+' знач.',
+      interactive:true,initial:'',omitEmptySubtitle:true,
+      aria:'Открыть значения '+group.name,
+      data:'data-inventory-criterion-group="'+escapeHtml(group.id)+'"',
+      deleteData:group.id,deleteAria:'Удалить группу '+group.name,
+    }))):emptyState('Групп пока нет');
     main.querySelectorAll('[data-inventory-criterion-group]').forEach(node=>
-      node.addEventListener('click',()=>openValues(node.dataset.inventoryCriterionGroup)));
+      node.addEventListener('click',event=>{
+        if(event.target.closest('[data-delete-action]'))return;
+        openValues(node.dataset.inventoryCriterionGroup);
+      }));
+    wireRemove(main,'[data-inventory-criterion-group] [data-delete-action]',removeGroup);
   };
   host.querySelector('[data-inventory-criteria-add]')?.addEventListener('click',()=>editName());
   if(current.length)refresh();
