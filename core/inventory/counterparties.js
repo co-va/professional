@@ -187,6 +187,42 @@ async function openCatalog(company, { itemId = '', onLinked = () => {} } = {}) {
   void show();
 }
 
+// Stock can start with a supplier catalog without first creating a local item.
+// Reuses the same supplier catalog/row Q as the existing association flow.
+export async function openSupplierCatalogCreation(onSaved = () => {}) {
+  let companies;
+  try { companies = await json(); }
+  catch (error) {
+    openNotice({ title: 'Контрагенты', message: errText(error) });
+    return;
+  }
+  const suppliers = (Array.isArray(companies) ? companies : [])
+    .filter(company => Array.isArray(company.priceLists)
+      && company.priceLists.some(entry => entry.parserStatus === 'READY'));
+  if (!suppliers.length) {
+    openNotice({ title: 'Ассортимент', message: 'Сначала загрузите прайс контрагента.' });
+    return;
+  }
+  const layer = mountModal(document.body, modal(
+    v2ListEntries(suppliers.map(company => v2ListEntry({
+      title: company.name,
+      rightTop: (company.priceLists || []).length + ' загрузок',
+      interactive: true, initial: '',
+      data: 'data-stock-supplier-choose="' + escapeHtml(company.id) + '"',
+      aria: 'Выбрать ассортимент ' + company.name,
+    }))),
+    { title: 'Из ассортимента', variant: 'q', surface: 'app' },
+  ));
+  layer?.querySelectorAll('[data-stock-supplier-choose]').forEach(node => {
+    node.addEventListener('click', () => {
+      const company = suppliers.find(entry => entry.id === node.dataset.stockSupplierChoose);
+      if (!company) return;
+      layer.v2Close?.();
+      openCatalog(company, { onLinked: onSaved });
+    });
+  });
+}
+
 async function openCatalogRow(company, row, { itemId = '', onLinked = () => {} } = {}) {
   try { await loadInventory(); }
   catch (cause) { return openNotice({ title: 'Остатки', message: errText(cause) }); }
