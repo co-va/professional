@@ -504,159 +504,207 @@ function supplierCatalogValueMatches(actual, expected, definition) {
     : String(actual ?? '').trim() === String(expected).trim();
 }
 
+// The selected supplier list follows Inventory's "Изменить данные" flow:
+// one field, one active input, one checkbox per chosen position, one Apply.
+function supplierCatalogBulkDisplay(value, definition) {
+  if (value == null || String(value).trim() === '') return '—';
+  if (definition.kind !== 'number') return String(value);
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) return String(value);
+  if (definition.value === 'listPrice' || definition.value === 'retailPrice') return money(amount);
+  return amount.toLocaleString('ru-RU', { maximumFractionDigits: 4 }) +
+    (definition.value === 'discountPercent' ? '%' : '');
+}
+
+function supplierCatalogBulkRow(row, definition, selected) {
+  const id = String(row.id);
+  return '<div class="inventory-counterparty-product-row" data-company-bulk-item="' +
+    escapeHtml(id) + '">' +
+    compactCheck({ checked: selected, aria: 'Выбрать ' + row.name,
+      data: 'data-company-bulk-check="' + escapeHtml(id) + '"' }) +
+    list({ className: 'ui-list--dense', items: [{
+      title: row.name,
+      right: [supplierCatalogBulkDisplay(row[definition.value], definition)],
+    }] }) +
+    '</div>';
+}
+
 function openSupplierBulkEditor(company, rows, onSaved = () => {}) {
   if (!rows.length) return;
-  const fieldOptions = SUPPLIER_CATALOG_EDIT_FIELDS.map(({ value, label }) => ({ value, label }));
-  const fieldSelect = name => select({
-    label: 'Что изменить', name, value: 'category', options: fieldOptions,
-  });
-  // Use the canonical form-grid, field, select and section components. No
-  // locally copied stocktake geometry, custom control, or second Q editor.
-  const rowMarkup = rows.map((row, index) =>
-    v2Section(row.name, '<div class="form-grid" data-company-bulk-row="' + index + '">' +
-      fieldSelect('supplierBulkField-' + index) +
-      '<div data-company-bulk-value="' + index + '"></div></div>')).join('');
+  const definitions = new Map(SUPPLIER_CATALOG_EDIT_FIELDS.map(item => [item.value, item]));
+  const selected = new Set(rows.map(row => String(row.id)));
   const layer = mountModal(document.body, modal(
     '<form data-company-bulk-editor>' +
-      compactCheck({ label: 'Одинаковое изменение для всех', data: 'data-company-bulk-all' }) +
-      '<div data-company-bulk-common hidden><div class="form-grid">' +
-        fieldSelect('supplierBulkField-all') +
-        '<div data-company-bulk-value-all></div>' +
-      '</div></div>' +
-      '<div data-company-bulk-items>' + rowMarkup + '</div>' +
-      '<p class="form-error" role="status" data-company-bulk-status></p>' +
+      select({ label: 'Что изменить', name: 'supplierBulkField', value: 'category',
+        options: SUPPLIER_CATALOG_EDIT_FIELDS.map(({ value, label }) => ({ value, label })) }) +
+      '<div data-company-bulk-value></div>' +
+      compactCheck({ checked: true, label: 'Выбрать все',
+        data: 'data-company-bulk-all', aria: 'Выбрать все позиции' }) +
+      '<p class="ui-list__secondary" data-company-bulk-count></p>' +
+      '<div data-company-bulk-list></div>' +
+      '<p class="form-error" role="alert" data-company-bulk-error></p>' +
+      '<p class="ui-list__secondary" role="status" data-company-bulk-result></p>' +
       actionBlock(button('Применить', { type: 'submit', data: 'data-company-bulk-save' })) +
     '</form>',
     { title: 'Изменить данные', variant: 'q', surface: 'app' },
   ));
   if (!layer) return;
   const form = layer.querySelector('[data-company-bulk-editor]');
+  const fieldInput = form.querySelector('[name="supplierBulkField"]');
+  const valueHost = form.querySelector('[data-company-bulk-value]');
   const all = form.querySelector('[data-company-bulk-all]');
-  const common = form.querySelector('[data-company-bulk-common]');
-  const items = form.querySelector('[data-company-bulk-items]');
-  const status = form.querySelector('[data-company-bulk-status]');
-  const save = form.querySelector('[data-company-bulk-save]');
-  const fields = new Map(SUPPLIER_CATALOG_EDIT_FIELDS.map(item => [item.value, item]));
-  const setValueField = (name, host, valueName) => {
-    const def = fields.get(form.querySelector('[name="' + name + '"]')?.value);
-    if (!host || !def) return;
-    host.innerHTML = supplierCatalogDataControl(def, valueName, '', 'На что изменить');
+  const count = form.querySelector('[data-company-bulk-count]');
+  const listHost = form.querySelector('[data-company-bulk-list]');
+  const error = form.querySelector('[data-company-bulk-error]');
+  const result = form.querySelector('[data-company-bulk-result]');
+  const submit = form.querySelector('[data-company-bulk-save]');
+  let busy = false;
+  let changed = false;
+  const definition = () => definitions.get(fieldInput.value);
+  const valueInput = () => valueHost.querySelector('[name="supplierBulkValue"]');
+  const resetMessages = () => { error.textContent = ''; result.textContent = ''; };
+
+  // On close, update the parent assortment only if data was actually changed.
+  // Do not close or clear selection on each Apply: subsequent fields can be edited.
+  const originalClose = layer.v2Close;
+  layer.v2Close = () => {
+    if (!layer.isConnected) return;
+    originalClose?.();
+    if (changed) onSaved();
   };
-  const renderFields = () => {
-    rows.forEach((row, index) => setValueField('supplierBulkField-' + index,
-      form.querySelector('[data-company-bulk-value="' + index + '"]'),
-      'supplierBulkValue-' + index));
-    setValueField('supplierBulkField-all',
-      form.querySelector('[data-company-bulk-value-all]'), 'supplierBulkValue-all');
-  };
-  const syncMode = () => {
-    const shared = Boolean(all.checked);
-    common.hidden = !shared;
-    items.hidden = shared;
-    // Disabled controls inside the hidden branch must not enter FormData.
-    common.querySelectorAll('input').forEach(input => { input.disabled = !shared; });
-    items.querySelectorAll('input').forEach(input => {
-      if (!input.matches('[data-ui-select-trigger]')) input.disabled = shared;
+
+  const preview = () => {
+    const def = definition();
+    if (!def) return;
+    let next = null;
+    try { next = supplierCatalogEditValue(def, valueInput()?.value); }
+    catch { /* Keep the stored value visible until the new input is valid. */ }
+    listHost.querySelectorAll('[data-company-bulk-item]').forEach(node => {
+      const id = String(node.dataset.companyBulkItem);
+      const row = rows.find(item => String(item.id) === id);
+      const right = node.querySelector('.ui-list__right-secondary span');
+      if (row && right) right.textContent = supplierCatalogBulkDisplay(
+        selected.has(id) && next !== null ? next : row[def.value], def);
     });
-    status.textContent = '';
   };
-  form.addEventListener('change', event => {
-    if (event.target === all) { syncMode(); return; }
-    const selector = event.target.closest?.('input[name^="supplierBulkField-"]');
-    if (!selector) return;
-    const suffix = selector.name.slice('supplierBulkField-'.length);
-    setValueField(selector.name,
-      form.querySelector(suffix === 'all' ? '[data-company-bulk-value-all]' :
-        '[data-company-bulk-value="' + suffix + '"]'),
-      'supplierBulkValue-' + suffix);
-    status.textContent = '';
+  const sync = () => {
+    all.checked = selected.size === rows.length;
+    count.textContent = 'Выбрано ' + selected.size + ' из ' + rows.length;
+    submit.disabled = busy || !selected.size;
+    preview();
+  };
+  const renderList = () => {
+    const def = definition();
+    if (!def) return;
+    listHost.innerHTML = rows.map(row =>
+      supplierCatalogBulkRow(row, def, selected.has(String(row.id)))).join('');
+    sync();
+  };
+  const renderField = () => {
+    const def = definition();
+    if (!def) return;
+    valueHost.innerHTML = supplierCatalogDataControl(def, 'supplierBulkValue',
+      '', 'На что изменить');
+    resetMessages();
+    renderList();
+  };
+  fieldInput.addEventListener('change', renderField);
+  valueHost.addEventListener('input', () => { result.textContent = ''; preview(); });
+  listHost.addEventListener('change', event => {
+    const checkbox = event.target.closest?.('[data-company-bulk-check]');
+    if (!checkbox || busy) return;
+    const id = String(checkbox.dataset.companyBulkCheck);
+    if (checkbox.checked) selected.add(id);
+    else selected.delete(id);
+    resetMessages();
+    sync();
   });
-  const collect = () => {
-    const data = new FormData(form);
-    if (all.checked) {
-      const fieldName = String(data.get('supplierBulkField-all') || '');
-      const def = fields.get(fieldName);
-      if (!def) throw new Error('Выберите поле для изменения.');
-      const value = supplierCatalogEditValue(def, data.get('supplierBulkValue-all'));
-      if (value === null) throw new Error('Укажите новое значение.');
-      return rows.map(row => ({ id: String(row.id), field: fieldName, definition: def, value }));
-    }
-    const changes = rows.flatMap((row, index) => {
-      const fieldName = String(data.get('supplierBulkField-' + index) || '');
-      const def = fields.get(fieldName);
-      if (!def) return [];
-      const value = supplierCatalogEditValue(def, data.get('supplierBulkValue-' + index));
-      return value === null ? [] : [{ id: String(row.id), field: fieldName, definition: def, value }];
-    });
-    if (!changes.length) throw new Error('Введите значение хотя бы для одной позиции.');
-    return changes;
-  };
+  all.addEventListener('change', () => {
+    if (busy) return;
+    if (all.checked) rows.forEach(row => selected.add(String(row.id)));
+    else selected.clear();
+    resetMessages();
+    renderList();
+  });
+
   const loadSelected = async () => {
     const base = '/' + urlId(company.id) + '/catalog?skip=';
     const first = await json(base + '0');
     const catalog = Array.isArray(first.items) ? [...first.items] : [];
-    const count = Number(first.count) || 0;
-    for (let offset = 100; offset < count; offset += 100) {
-      const page = await json(base + offset);
-      catalog.push(...(Array.isArray(page.items) ? page.items : []));
+    const total = Number(first.count) || 0;
+    for (let offset = 100; offset < total; offset += 400) {
+      const offsets = [];
+      for (let skip = offset; skip < Math.min(offset + 400, total); skip += 100)
+        offsets.push(skip);
+      const pages = await Promise.all(offsets.map(skip => json(base + skip)));
+      pages.forEach(page => catalog.push(...(Array.isArray(page.items) ? page.items : [])));
     }
     const byId = new Map(catalog.map(row => [String(row.id), row]));
     if (rows.some(row => !byId.has(String(row.id))))
       throw new Error('Выбор устарел. Закройте редактор и обновите ассортимент.');
     return byId;
   };
+
   form.addEventListener('submit', async event => {
     event.preventDefault();
-    if (save.disabled) return;
-    let targets;
-    try { targets = collect(); }
-    catch (cause) { status.textContent = errText(cause); return; }
-    save.disabled = true;
+    if (busy || !selected.size) return;
+    const def = definition();
+    if (!def) { error.textContent = 'Выберите поле для изменения.'; return; }
+    let value;
+    try {
+      value = supplierCatalogEditValue(def, valueInput()?.value);
+      if (value === null) throw new Error('Введите новое значение.');
+    } catch (cause) { error.textContent = errText(cause); return; }
+    const targets = rows.filter(row => selected.has(String(row.id)) &&
+      !supplierCatalogValueMatches(row[def.value], value, def));
+    if (!targets.length) {
+      error.textContent = 'У выбранных позиций уже указано это значение.';
+      return;
+    }
+    busy = true;
+    submit.disabled = true;
+    error.textContent = '';
+    result.textContent = '';
     const failed = new Map();
     try {
-      const live = await loadSelected();
-      const changes = targets.filter(entry =>
-        !supplierCatalogValueMatches(
-          live.get(entry.id)?.[entry.field], entry.value, entry.definition));
-      if (!changes.length) {
-        status.textContent = 'У выбранных позиций уже указаны эти значения.';
-        return;
-      }
-      for (let offset = 0; offset < changes.length; offset += 4) {
-        const batch = changes.slice(offset, offset + 4);
-        const responses = await Promise.allSettled(batch.map(entry =>
-          json('/' + urlId(company.id) + '/catalog/' + urlId(entry.id), {
-            method: 'PUT', body: { [entry.field]: entry.value },
+      for (let offset = 0; offset < targets.length; offset += 4) {
+        const batch = targets.slice(offset, offset + 4);
+        const responses = await Promise.allSettled(batch.map(row =>
+          json('/' + urlId(company.id) + '/catalog/' + urlId(row.id), {
+            method: 'PUT', body: { [def.value]: value },
           })));
         responses.forEach((response, index) => {
           if (response.status === 'rejected')
-            failed.set(batch[index].id, errText(response.reason));
+            failed.set(String(batch[index].id), errText(response.reason));
         });
-        status.textContent = 'Обработано: ' +
-          Math.min(offset + 4, changes.length) + ' из ' + changes.length;
+        result.textContent = 'Обработано: ' +
+          Math.min(offset + 4, targets.length) + ' из ' + targets.length;
       }
       const saved = await loadSelected();
-      const unresolved = changes.filter(entry =>
-        !supplierCatalogValueMatches(
-          saved.get(entry.id)?.[entry.field], entry.value, entry.definition));
-      if (unresolved.length || failed.size) {
-        status.textContent = 'Изменено ' + (changes.length - unresolved.length) +
-          ' из ' + changes.length + '. Не подтверждено: ' + unresolved.length + '.' +
-          (failed.size ? ' ' + [...failed.values()][0] : '');
-        return;
+      const confirmed = targets.filter(row =>
+        supplierCatalogValueMatches(saved.get(String(row.id))?.[def.value], value, def));
+      // Keep the same checked rows and refresh their right-column values after
+      // every Apply; the selector may then change to another field.
+      rows.forEach(row => Object.assign(row, saved.get(String(row.id))));
+      if (confirmed.length) changed = true;
+      valueInput().value = '';
+      renderList();
+      if (confirmed.length !== targets.length || failed.size) {
+        error.textContent = 'Сохранено ' + confirmed.length + ' из ' + targets.length +
+          '. Не подтверждено: ' + (targets.length - confirmed.length) +
+          (failed.size ? '. ' + [...failed.values()][0] : '');
+      } else {
+        result.textContent = 'Сохранено ' + confirmed.length +
+          ' позиций. Можно изменить другое поле.';
       }
-      layer.v2Close?.();
-      onSaved();
-      openNotice({ title: 'Изменить данные',
-        message: 'Изменено ' + changes.length + ' позиций.' });
     } catch (cause) {
-      status.textContent = errText(cause);
+      error.textContent = errText(cause);
     } finally {
-      if (save.isConnected) save.disabled = false;
+      busy = false;
+      if (submit.isConnected) sync();
     }
   });
-  renderFields();
-  syncMode();
+  renderField();
 }
 
 function openSupplierProductEditor(company, row, onSaved = () => {}) {
