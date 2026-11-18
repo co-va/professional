@@ -1,6 +1,6 @@
 import { actionBlock, button, emptyState, field, list, modal, mountModal, select } from '../../ui/ui.js';
-import { getInventoryItems, getInventoryStorageLocations } from './data.js';
-import { createInventoryStorageLocation, updateInventoryStorageLocation } from './service.js';
+import { getInventoryItem, getInventoryItems, getInventoryStorageLocations } from './data.js';
+import { createInventoryStorageLocation, updateInventoryStorageLocation, transferInventoryStock } from './service.js';
 
 const locations = () => getInventoryStorageLocations().filter(item => item && !item.archivedAt);
 // Legacy Excel inventories already had a warehouse for every position in
