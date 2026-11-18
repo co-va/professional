@@ -15,9 +15,18 @@ assert.equal(supplierEffectivePrice({listPrice:1500,appliedDiscountPercent:12.5}
 assert.equal(supplierEffectivePrice({listPrice:1500}, {}),1500);
 assert.equal(supplierEffectivePrice({listPrice:null},{}),null);
 assert.equal(supplierDiscount({discountPercent:0}, {discountPercent:10}), '0%');
-assert.match(source, /id: 'discount', label: 'Скидка по договору'/);
-assert.match(source, /purchasePriceSample/);
-assert.match(source, /listPriceSample/);
+assert.match(source, /label: 'Скидка по договору, %', name: 'discountPercent'/,
+  'Agreement percentage is edited as part of the counterparty');
+assert.match(source, /input\.discountPercent = discount;/,
+  'Counterparty edit sends the validated percentage to Core');
+assert.doesNotMatch(source, /purchasePriceSample|listPriceSample|openSupplierAgreement/,
+  'Obsolete sample-price calculator and its separate Q must not return');
+assert.doesNotMatch(source, /id: 'discount'|id: 'excluded'/,
+  'Company V contains only company-level actions');
+assert.match(source, /openCounterpartyFiles\(currentCompanies\)/,
+  'Upload history is available from the Counterparties list V');
+assert.match(source, /data-company-excluded-open/,
+  'Existing excluded product data remains recoverable in the assortment');
 assert.match(source, /\/catalog\/prices/);
 assert.match(source, /function openSupplierProductEditor\(/);
 assert.match(source, /function openSupplierBatchPrices\(/);
