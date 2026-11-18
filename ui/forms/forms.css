@@ -60,6 +60,13 @@
   white-space:nowrap;
   overflow-wrap:normal;
 }
+/* Availability is expressed only by the price tone, not a separate dot. */
+.inventory-counterparty-product-row .is-supplier-available .ui-list__right-secondary{
+  color:var(--text);
+}
+.inventory-counterparty-product-row .is-supplier-unavailable .ui-list__right-secondary{
+  color:var(--text-muted);
+}
 .inventory-editor-panel__body{padding:0 0 14px}
 .inventory-editor-panel [hidden]{display:none!important}
 .inventory-editor-group{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;align-content:start;min-width:0}
