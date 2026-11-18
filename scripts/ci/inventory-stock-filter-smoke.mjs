@@ -43,7 +43,18 @@ for (const [filter, expected] of cases) {
  assert.deepEqual(items.map(item=>matchesStockFilters(item,{...emptyStockFilters(),...filter})),expected,
    'Filter mismatch '+JSON.stringify(filter));
 }
-assert.match(ui,/matchesStockFilters\(item, STOCK_VIEW\.itemsFilters\)/);
+assert.match(ui,/matchesStockFilters\(item, STOCK_VIEW\.itemsFilters, getInventoryClassificationGroups\(\)\)/);
+const nested = [
+  {groupId:'parent',parentGroupId:'',name:'Краски'},
+  {groupId:'child',parentGroupId:'parent',name:'Окислители'},
+  {groupId:'deep',parentGroupId:'child',name:'Профессиональные'},
+];
+assert.equal(matchesStockFilters({classificationGroupId:'deep'}, {group:'parent'}, nested), true,
+  'Ancestor group must include all nested levels');
+assert.equal(matchesStockFilters({classificationGroupId:'deep'}, {group:'child'}, nested), true);
+assert.equal(matchesStockFilters({classificationGroupId:'deep'}, {group:'missing'}, nested), false);
+assert.equal(matchesStockFilters({classificationGroupId:'other'}, {group:'parent'}, nested), false);
+assert.ok(ui.includes("name:'inventoryFilterGroup'"), 'Core groups are selectable in Stock filter');
 assert.match(ui,/data-inventory-stock-filter-action/);
 assert.match(ui,/itemsFilters: emptyStockFilters\(\)/);
 const uiFilters = ui.slice(ui.indexOf('function openStockControls('),ui.indexOf('function bindManufacturerCards('));
