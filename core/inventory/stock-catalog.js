@@ -5,6 +5,7 @@ import {
 import { compactCheck } from '../../ui/selection/check-list.js';
 import { escapeHtml } from '../../ui/utils/escape-html.js';
 import { catalogDisclosure } from './catalog-ui.js';
+import { getInventoryItems } from './data.js';
 import {
   INVENTORY_TOTAL_SCOPE, inventoryDisplayBalance, inventoryDisplayTarget,
 } from './stock-targets.js';
@@ -101,6 +102,12 @@ export function openStockCatalogBrand(brand, {
   ));
   if (!layer) return null;
   const refresh = () => {
+    // Refresh from the server snapshot after any Q edit; old row objects
+    // must never hide a saved name, target or classification change.
+    brand = buildStockCatalogGroups(getInventoryItems())
+      .find(group=>group.name===brand.name) || brand;
+    const visibleIds = new Set(brand.items.map(item=>String(item.itemId)));
+    [...selected].forEach(id=>{if(!visibleIds.has(id))selected.delete(id);});
     const body = layer.querySelector('[data-stock-catalog-body]');
     if (!body) return;
     groupLookup.clear();
