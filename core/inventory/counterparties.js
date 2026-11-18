@@ -410,20 +410,29 @@ function openImportPreview(onSaved, file) {
     save.disabled = true;
     const counterpartyId = chosenCompany();
     const name = proposedName();
+    let imported;
     try {
-      const imported = await importExcel('', file, {
+      imported = await importExcel('', file, {
         ...(counterpartyId ? { counterpartyId } : { name }),
         ...(result.format === 'pdf' ? { confirmedPdf: 'true' } : {}),
       });
-      layer.v2Close?.();
-      await onSaved?.();
-      openNotice({ title: 'Excel',
-        message: (imported.duplicate ? 'Этот файл уже загружен. ' : 'Прайс загружен. ') +
-          'Контрагент: ' + imported.counterpartyName + '.' });
     } catch (cause) {
       errorHost.textContent = errText(cause);
       save.disabled = false;
+      return;
     }
+    // The import is already committed in Core. A failed list refresh must never
+    // present it as a failed import or encourage repeating the same upload.
+    layer.v2Close?.();
+    try { await onSaved?.(); }
+    catch (cause) {
+      openNotice({ title: 'Excel', message: 'Прайс сохранён, но список пока не обновился: ' +
+        errText(cause) });
+      return;
+    }
+    openNotice({ title: 'Excel',
+      message: (imported.duplicate ? 'Этот файл уже загружен. ' : 'Прайс загружен. ') +
+        'Контрагент: ' + imported.counterpartyName + '.' });
   });
   void check();
 }
