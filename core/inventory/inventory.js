@@ -44,7 +44,7 @@ import { renderInventoryOrders } from './orders.js';
 import { classificationOptions, openInventoryClassificationGroups,
   inventoryCriterionGroups, criterionOptions } from './classification.js';
 import { openInventoryStorageLocations, openInventoryTransfer } from './storage.js';
-import { renderStockBrandList } from './stock-catalog.js';
+import { renderStockBrandList, buildStockCatalogGroups } from './stock-catalog.js';
 import { INVENTORY_TOTAL_SCOPE, inventoryDisplayBalance,
   inventoryDisplayTarget, inventoryLocations, openInventoryStockTargets, storageName } from './stock-targets.js';
 import {
@@ -1542,9 +1542,10 @@ function openManufacturerAppearance(root, onSaved = () => {}) {
   });
 }
 
-function stockListMarkup(manufacturer, query = '') {
+function stockListMarkup(manufacturer, query = '', rowsProvider = null) {
   const needle = normalizedSearch(query);
-  const group = getInventoryItems().filter(item => manufacturerName(item) === manufacturer);
+  const group = typeof rowsProvider === 'function'
+    ? rowsProvider() : getInventoryItems().filter(item => manufacturerName(item) === manufacturer);
   const classificationGroups = getInventoryClassificationGroups();
   const storageLocations = getInventoryStorageLocations();
   const items = sortItems(group.filter((item) => {
@@ -1553,14 +1554,19 @@ function stockListMarkup(manufacturer, query = '') {
     return !needle || itemSearchText(item).includes(needle);
   }), STOCK_VIEW.itemsSort);
   if (!items.length) return emptyState('Ничего не найдено', 'Измените поиск или фильтр.');
-  // Reordering a partial list would silently misplace hidden products.
-  const canReorder = STOCK_VIEW.itemsSort === 'position-asc'
-    && !needle && !hasStockFilters(STOCK_VIEW.itemsFilters) && items.length > 1;
-  return v2ListEntries(items.map((item) => v2ListEntry({
+
+  // Sections are display-only. Neither category nor type requires opening a
+  // nested folder; every product is directly clickable in this Z2.
+  const criteria = inventoryCriterionGroups();
+  const byCategory = criteria.some(entry => entry.legacyField === 'category');
+  const byType = criteria.some(entry => entry.legacyField === 'productType');
+  const canReorder = !byCategory && !byType
+    && STOCK_VIEW.itemsSort === 'position-asc' && !needle
+    && !hasStockFilters(STOCK_VIEW.itemsFilters) && items.length > 1;
+  const itemRow = item => v2ListEntry({
     title: `${Number(item.position) > 0 ? `${item.position} · ` : ''}${item.name}`,
     reorderHandle: canReorder,
     reorderAria: 'Изменить порядок материала',
-
     subtitle: [productTypeText(item), tubeCountText(item)].filter(Boolean).join(' · '),
     rightTop: `${numberText(item.balance)} ${item.unit}`,
     rightBottom: item.lastPurchasePrice == null ? '' : moneyText(item.lastPurchasePrice),
@@ -1568,7 +1574,30 @@ function stockListMarkup(manufacturer, query = '') {
     initial: '',
     data: `data-inventory-item="${escapeHtml(item.itemId)}" data-reorder-id="${escapeHtml(item.itemId)}"`,
     aria: `Открыть ${item.name}`,
-  })));
+  });
+  if (!byCategory && !byType) return v2ListEntries(items.map(itemRow));
+  const categories = new Map();
+  for (const item of items) {
+    const category = byCategory ? String(item.category || '').trim() || 'Без категории' : '';
+    const type = byType ? String(item.productType || '').trim() || 'Без типа' : '';
+    if (!categories.has(category)) categories.set(category,new Map());
+    const types=categories.get(category);
+    if (!types.has(type)) types.set(type,[]);
+    types.get(type).push(item);
+  }
+  const compareGroups=(a,b)=>String(a).localeCompare(String(b),'ru',{numeric:true,sensitivity:'base'});
+  return [...categories.entries()].sort(([a],[b])=>compareGroups(a,b)).map(([category,types])=>{
+    const total=[...types.values()].reduce((n,rows)=>n+rows.length,0);
+    return '<section class="inventory-stock-category">' +
+      (byCategory
+        ? '<div class="inventory-stock-category-heading"><strong>' + escapeHtml(category) +
+          '</strong><small>' + total + ' поз.</small></div>' : '') +
+      [...types.entries()].sort(([a],[b])=>compareGroups(a,b)).map(([type,rows])=>
+        (byType ? '<div class="inventory-stock-type-heading"><span>' + escapeHtml(type) +
+          '</span><small>' + rows.length + ' поз.</small></div>' : '') +
+        v2ListEntries(rows.map(itemRow))
+      ).join('') + '</section>';
+  }).join('');
 }
 
 function stockSortOptions(level) {
@@ -1713,18 +1742,22 @@ function bindManufacturerCards(root, host) {
   });
 }
 
-function openManufacturerStock(root, manufacturer) {
+function openManufacturerStock(root, manufacturer, groupContext = null) {
   // Each visit to a physical shelf opens in the explicit numerical order.
   // A remembered name/price filter must not silently replace shelf sequence.
   saveInventorySortMode('itemsSort', 'position-asc');
   STOCK_VIEW.itemsType = '';
   STOCK_VIEW.itemsFilters = emptyStockFilters();
+  const rowsProvider = groupContext
+    ? () => buildStockCatalogGroups(getInventoryItems(),groupContext.criteria)
+      .find(entry => entry.name === manufacturer)?.items || []
+    : null;
   const markup = `
     ${context(manufacturer, {
       v: { data: 'data-inventory-item-controls', aria: 'Сортировка и фильтр товаров' },
       c: { label: '+', data: 'data-inventory-add-item', aria: 'Добавить позицию' },
     })}
-    <div data-inventory-company-list>${stockListMarkup(manufacturer)}</div>`;
+    <div data-inventory-company-list>${stockListMarkup(manufacturer, '', rowsProvider)}</div>`;
   const layer = mountV2ZLayer(root, v2ZLayer(markup, { className: 'inventory-manufacturer-z' }), { stack: true });
   if (!layer) return;
   const [searchRow] = setV2ZHeaderRows(layer, [stockSearchField('', 'data-inventory-company-search')]);
@@ -1735,7 +1768,7 @@ function openManufacturerStock(root, manufacturer) {
   const renderList = () => {
     disposeReorder();
     const query = searchInput?.value || '';
-    if (listHost) listHost.innerHTML = stockListMarkup(manufacturer, query);
+    if (listHost) listHost.innerHTML = stockListMarkup(manufacturer, query, rowsProvider);
     listHost?.querySelectorAll('[data-inventory-item]').forEach((control) => control.addEventListener('click', () => {
       const itemId = control.dataset.inventoryItem;
       openInventoryProductOverview(itemId, {
@@ -1743,7 +1776,10 @@ function openManufacturerStock(root, manufacturer) {
         onChanged: renderList,
       });
     }));
-    if (STOCK_VIEW.itemsSort !== 'position-asc'
+    if (inventoryCriterionGroups().some(entry=>
+      entry.legacyField==='category'||entry.legacyField==='productType')
+      || (groupContext && groupContext.criteria[0]?.legacyField !== 'manufacturer')
+      || STOCK_VIEW.itemsSort !== 'position-asc'
       || hasStockFilters(STOCK_VIEW.itemsFilters) || normalizedSearch(query)) return;
     disposeReorder = initV2ListReorder(listHost, {
       onReorder: async (ids) => {
@@ -1786,7 +1822,7 @@ function openManufacturerStock(root, manufacturer) {
           onSelect: () => {
             // One shared inventory-item appearance for all products.
             // This product supplies only preview values in the existing card constructor.
-            const sample = getInventoryItems().find((item) => manufacturerName(item) === manufacturer);
+            const sample = rowsProvider?.()[0] || getInventoryItems().find((item) => manufacturerName(item) === manufacturer);
             if (sample) openInventoryProductAppearanceQ(sample.itemId, renderList);
           },
         },
@@ -1795,7 +1831,15 @@ function openManufacturerStock(root, manufacturer) {
       ],
     });
   });
-  layer.querySelector('[data-inventory-add-item]')?.addEventListener('click', () => openItemEditor(root, '', { manufacturer: manufacturer === EMPTY_MANUFACTURER ? '' : manufacturer }, renderList));
+  layer.querySelector('[data-inventory-add-item]')?.addEventListener('click', () => {
+    const first=groupContext?.criteria?.[0];
+    const value=first?.values?.find(entry=>entry.name===manufacturer);
+    const defaults=first?.legacyField
+      ? { [first.legacyField]:value?.name || '' }
+      : first && value ? { criteriaValues:{[first.id]:value.id} }
+      : { manufacturer:manufacturer===EMPTY_MANUFACTURER?'':manufacturer };
+    openStockCreateOptions(root,renderList,defaults);
+  });
   renderList();
   notifyContext();
 }
@@ -2628,22 +2672,8 @@ function renderStock(root) {
         message.textContent=error instanceof Error?error.message:'Порядок компаний не сохранился.';
         listHost.prepend(message);
       },
-      onOpen:(itemId,onRefresh)=>{
-        openInventoryProductOverview(itemId,{
-          edit:(saved)=>openItemEditor(root,itemId,{},saved),
-          onChanged:()=>{refresh();onRefresh();},
-        });
-      },
-      onNew:(label,onRefresh)=>{
-        const value=first?.values?.find(row=>row.name===label);
-        const defaults=first?.legacyField
-          ? {[first.legacyField]:value?.name||''}
-          : value ? {criteriaValues:{[first.id]:value.id}} : {};
-        openStockCreateOptions(root,()=>{refresh();onRefresh();},defaults);
-      },
-      onTarget:(itemId,onRefresh)=>{
-        openInventoryStockTargets(itemId,()=>{refresh();onRefresh();});
-      },
+      // Z1 company → native Z2, never a Q with forced item selection.
+      onBrandOpen:brand=>openManufacturerStock(root,brand.name,{criteria}),
     });
   };
   scopeInput?.addEventListener('change',event=>{
