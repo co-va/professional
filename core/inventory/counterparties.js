@@ -98,6 +98,7 @@ function companyForm(company = {}) {
     ${field({ label: 'Email', name: 'email', value: company.email || '', type: 'email' })}
     ${field({ label: 'Сайт', name: 'website', value: company.website || '' })}
     ${field({ label: 'Примечание', name: 'note', value: company.note || '' })}
+    ${field({ label: 'Скидка по договору, %', name: 'discountPercent', value: company.discountPercent ?? '', type: 'number', min: '0', max: '100', step: '0.01', inputmode: 'decimal' })}
     <p class="form-error" data-counterparty-error role="alert"></p>
     ${actionBlock(button('Применить', { type: 'submit' }))}
   </form>`;
@@ -113,6 +114,13 @@ function openCompanyEditor(company, onSaved) {
     const error = form.querySelector('[data-counterparty-error]');
     const input = Object.fromEntries(new FormData(form).entries());
     if (!String(input.name || '').trim()) { error.textContent = 'Укажите название'; return; }
+    const rawDiscount = String(input.discountPercent ?? '').trim();
+    const discount = rawDiscount === '' ? null : Number(rawDiscount.replace(',', '.'));
+    if (discount !== null && (!Number.isFinite(discount) || discount < 0 || discount > 100)) {
+      error.textContent = 'Скидка должна быть от 0 до 100%.';
+      return;
+    }
+    input.discountPercent = discount;
     save.disabled = true;
     try {
       const updated = await json(company?.id ? '/' + urlId(company.id) : '', {
@@ -397,80 +405,6 @@ function supplierDiscount(row = {}, company = {}) {
 
 // Supplier's price and the tenant's agreement discount are owned by Counterparty,
 // not by the stock item. This Q never edits receipts or historical costs.
-function openSupplierAgreement(company, onSaved = () => {}) {
-  const q = mountModal(document.body, modal(
-    '<form data-company-agreement-form>' +
-    field({ label: 'Прайсовая цена, ₽', name: 'listPriceSample',
-      type: 'number', min: '0.01', step: '0.01', inputmode: 'decimal' }) +
-    field({ label: 'Цена закупки для расчёта, ₽', name: 'purchasePriceSample',
-      type: 'number', min: '0', step: '0.01', inputmode: 'decimal' }) +
-    '<p class="ui-list__secondary" data-company-agreement-inferred></p>' +
-    field({ label: 'Скидка по договору, %', name: 'discountPercent',
-      value: company.discountPercent ?? '', type: 'number', min: '0', max: '100',
-      step: '0.0001', inputmode: 'decimal' }) +
-    '<p class="ui-list__secondary" data-company-agreement-result></p>' +
-    '<p class="form-error" role="alert" data-company-agreement-error></p>' +
-    actionBlock(button('Применить', { type: 'submit' })) + '</form>',
-    { title: 'Скидка по договору', variant: 'q', surface: 'app' },
-  ));
-  if (!q) return;
-  const form = q.querySelector('[data-company-agreement-form]');
-  const inferred = form.querySelector('[data-company-agreement-inferred]');
-  const result = form.querySelector('[data-company-agreement-result]');
-  const sampleList = form.querySelector('[name="listPriceSample"]');
-  const samplePaid = form.querySelector('[name="purchasePriceSample"]');
-  const discountField = form.querySelector('[name="discountPercent"]');
-  const parse = element => {
-    const raw = String(element?.value || '').trim();
-    return raw === '' ? null : Number(raw.replace(',', '.'));
-  };
-  const update = (derive = false) => {
-    const listPrice = parse(sampleList), paidPrice = parse(samplePaid);
-    const canInfer = listPrice !== null && listPrice > 0 && Number.isFinite(listPrice)
-      && paidPrice !== null && paidPrice >= 0 && paidPrice <= listPrice;
-    if (derive && canInfer) {
-      const percent = Math.round((1 - paidPrice / listPrice) * 1000000) / 10000;
-      discountField.value = String(percent);
-    }
-    inferred.textContent = canInfer
-      ? 'Расчётная скидка: ' +
-        (Math.round((1 - paidPrice / listPrice) * 1000000) / 10000)
-          .toLocaleString('ru-RU', { maximumFractionDigits: 4 }) + '%'
-      : listPrice != null && paidPrice != null
-        ? 'Проверьте цены: закупочная должна быть не выше прайсовой.' : '';
-    const percentage = parse(discountField);
-    result.textContent = listPrice != null && listPrice > 0 && percentage != null
-      && percentage >= 0 && percentage <= 100
-      ? 'Цена со скидкой: ' + money(Math.round((listPrice *
-        (1 - percentage / 100) + Number.EPSILON) * 100) / 100)
-      : '';
-  };
-  sampleList.addEventListener('input', () => update(true));
-  samplePaid.addEventListener('input', () => update(true));
-  discountField.addEventListener('input', () => update());
-  update();
-  form.addEventListener('submit', async event => {
-    event.preventDefault();
-    const amount = parse(discountField);
-    const error = form.querySelector('[data-company-agreement-error]');
-    if (amount !== null && (!Number.isFinite(amount) || amount < 0 || amount > 100)) {
-      error.textContent = 'Скидка должна быть от 0 до 100%.'; return;
-    }
-    const submit = form.querySelector('[type="submit"]');
-    submit.disabled = true;
-    try {
-      const updated = await json('/' + urlId(company.id), {
-        method: 'PUT', body: { discountPercent: amount },
-      });
-      q.v2Close?.();
-      onSaved(updated);
-    } catch (cause) {
-      error.textContent = errText(cause);
-      submit.disabled = false;
-    }
-  });
-}
-
 function openSupplierBatchPrices(company, rows, onSaved = () => {}) {
   if (!rows.length) return;
   const layer = mountModal(document.body, modal(
@@ -713,7 +647,7 @@ function catalogBrandMarkup(categories, selectedCatalogIds, linkedCatalogIds = n
     actionBlock(
       button('Создать карточку', { data: 'data-company-selection-card' }) +
       button('Цены', { data: 'data-company-selection-prices' }) +
-      button('Удалить', {
+      button('Убрать из ассортимента', {
         variant: 'delete-outline',
         data: 'data-company-selection-delete',
       }),
@@ -896,28 +830,30 @@ async function openSelectedCatalogCards(company, rows, onLinked = () => {}, sugg
   });
 }
 
-function openCounterpartyFiles(company) {
-  const files = Array.isArray(company.priceLists) ? company.priceLists : [];
-  const content = files.length
-    ? v2ListEntries(files.map(file => v2ListEntry({
-      title: file.filename,
+function openCounterpartyFiles(companies = []) {
+  const entries = companies.flatMap(company => (Array.isArray(company.priceLists) ? company.priceLists : [])
+    .map(file => ({ company, file })));
+  const content = entries.length
+    ? v2ListEntries(entries.map(({ company, file }, index) => v2ListEntry({
+      title: company.name + ' · ' + file.filename,
       subtitle: 'Версия ' + file.revision + ' · ' +
         new Date(file.createdAt).toLocaleDateString('ru-RU'),
       rightTop: file.parserStatus === 'READY'
         ? String(file._count?.rows || 0) + ' поз.' : 'Нужен Excel',
       interactive: true,
       initial: '',
-      data: 'data-company-file="' + escapeHtml(file.id) + '"',
+      data: 'data-company-file-index="' + index + '"',
       aria: 'Скачать ' + file.filename,
     })))
     : '<p>История загрузок пуста.</p>';
   const layer = mountModal(document.body, modal(content, {
     title: 'История загрузок', variant: 'q', surface: 'app',
   }));
-  layer?.querySelectorAll('[data-company-file]').forEach(node => {
+  layer?.querySelectorAll('[data-company-file-index]').forEach(node => {
     node.addEventListener('click', () => {
-      const file = files.find(row => row.id === node.dataset.companyFile);
-      if (!file) return;
+      const entry = entries[Number(node.dataset.companyFileIndex)];
+      if (!entry) return;
+      const { company, file } = entry;
       void download('/' + urlId(company.id) + '/pricelists/' + urlId(file.id) +
         '/download', 'catalog-' + file.revision + '.' + file.format)
         .catch(error => openNotice({ title: 'Файл', message: errText(error) }));
@@ -970,11 +906,11 @@ async function openCompany(companyId, root, onChanged = () => {}) {
         entries.push(...(Array.isArray(page.items) ? page.items : []));
       }
     } catch (error) {
-      openNotice({ title: 'Исключённые', message: errText(error) });
+      openNotice({ title: 'Удалённые из ассортимента', message: errText(error) });
       return;
     }
     if (!entries.length) {
-      openNotice({ title: 'Исключённые', message: 'Исключённых позиций нет.' });
+      openNotice({ title: 'Удалённые из ассортимента', message: 'Удалённых позиций нет.' });
       return;
     }
     const selected = new Set();
@@ -982,7 +918,7 @@ async function openCompany(companyId, root, onChanged = () => {}) {
       catalogItemList(entries, selected, linkedCatalogIds, matchedCatalogItems, catalogLinkStatuses) +
         '<p class="form-error" data-company-restore-error role="alert"></p>' +
         actionBlock(button('Восстановить', { data: 'data-company-restore-apply' })),
-      { title: 'Исключённые', variant: 'q', surface: 'app' },
+      { title: 'Удалённые из ассортимента', variant: 'q', surface: 'app' },
     ));
     if (!restoreLayer) return;
     const apply = restoreLayer.querySelector('[data-company-restore-apply]');
@@ -1069,9 +1005,25 @@ async function openCompany(companyId, root, onChanged = () => {}) {
       }
       if (!layer.isConnected || !list.isConnected || currentRun !== revision) return;
       const brands = catalogBrands(entries);
-      list.innerHTML = entries.length
+      let removedCount = 0;
+      try {
+        const removed = await json(excludedPath + '&skip=0');
+        removedCount = Math.max(0, Number(removed.count ?? removed.items?.length ?? 0));
+      } catch { /* An older Core may not provide excluded counts. */ }
+      if (!layer.isConnected || !list.isConnected || currentRun !== revision) return;
+      list.innerHTML = (entries.length
         ? catalogGroupsMarkup(brands)
-        : emptyState('Ассортимент не загружен');
+        : emptyState('Ассортимент не загружен')) +
+        (removedCount ? v2ListEntries([v2ListEntry({
+          title: 'Удалённые из ассортимента',
+          subtitle: removedCount + ' поз. · можно восстановить',
+          interactive: true,
+          data: 'data-company-excluded-open',
+          aria: 'Восстановить удалённые из ассортимента позиции',
+        })]) : '');
+      list.querySelector('[data-company-excluded-open]')?.addEventListener('click', () => {
+        void openExcludedCatalogItems();
+      });
       if (!entries.length) return;
       const byId = new Map(entries.map(row => [row.id, row]));
       list.querySelectorAll('[data-company-brand]').forEach(node => {
@@ -1155,7 +1107,7 @@ async function openCompany(companyId, root, onChanged = () => {}) {
               '<p>Исключить ' + ids.length + ' позиций из ассортимента? ' +
               'Их можно вернуть через «Исключённые».</p>' +
               '<p class="form-error" data-company-exclude-error role="alert"></p>' +
-              actionBlock(button('Удалить', { variant: 'delete-outline',
+              actionBlock(button('Убрать из ассортимента', { variant: 'delete-outline',
                 data: 'data-company-exclude-apply' })),
               { title: 'Исключить позиции', variant: 'q', surface: 'app' },
             ));
@@ -1211,20 +1163,11 @@ async function openCompany(companyId, root, onChanged = () => {}) {
     void showCatalog();
   };
   layer.querySelector('[data-company-actions]')?.addEventListener('click', () => {
-    const files = Array.isArray(company.priceLists) ? company.priceLists : [];
     openSharedProfileSettingsMenu({ title: 'Контрагент', actions: [
       { id: 'edit', label: 'Редактировать', onSelect: () =>
         openCompanyEditor(company, () => { void refresh(); onChanged(); }) },
       { id: 'upload', label: 'Загрузить файл', onSelect: () =>
         openImportGuidance(company, () => { void refresh(); onChanged(); }) },
-      { id: 'discount', label: 'Скидка по договору', onSelect: () =>
-        openSupplierAgreement(company, () => { void refresh(); onChanged(); }) },
-      { id: 'excluded', label: 'Исключённые', onSelect: () => void openExcludedCatalogItems() },
-      { id: 'template', label: 'Шаблон Excel', onSelect: () =>
-        void download('/template/xlsx', 'catalog-template.xlsx').catch(error =>
-          openNotice({ title: 'Excel', message: errText(error) })) },
-      ...(files.length ? [{ id: 'history', label: 'История загрузок',
-        onSelect: () => openCounterpartyFiles(company) }] : []),
     ] });
   });
   void refresh();
@@ -1344,6 +1287,12 @@ export async function renderCounterparties(root) {
       actions: [
         { id: 'appearance', label: 'Вид', onSelect: () =>
           openCounterpartyAppearance(root, currentCompanies[0] || {}, renderCards) },
+        { id: 'template', label: 'Шаблон Excel', onSelect: () =>
+          void download('/template/xlsx', 'catalog-template.xlsx').catch(error =>
+            openNotice({ title: 'Excel', message: errText(error) })) },
+        ...(currentCompanies.some(company => Array.isArray(company.priceLists) && company.priceLists.length)
+          ? [{ id: 'history', label: 'История загрузок', onSelect: () =>
+            openCounterpartyFiles(currentCompanies) }] : []),
       ],
     });
   });
