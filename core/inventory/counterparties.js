@@ -344,9 +344,9 @@ function openCatalogProductDetails(row, status = null) {
   const stockItem = status?.itemId
     ? getInventoryItems().find(item => String(item.itemId) === String(status.itemId)) : null;
   const rows = [
-    ['Артикул', row.supplierSku],
-    ['Название', row.name],
-    ['Короткое название', stockItem?.name],
+    ['Артикул', row.supplierSku || '—'],
+    ['Короткое название', stockItem?.name || '—'],
+    ['Наименование поставщика', row.name],
     ['Производитель', row.manufacturer || row.brand],
     ['Штрихкод', row.barcode],
     ['Категория', row.category],
@@ -366,7 +366,7 @@ function openCatalogProductDetails(row, status = null) {
   }), { title: 'Данные товара', variant: 'q', surface: 'app' }));
 }
 
-function catalogItemList(items = [], selectedCatalogIds = new Set(), linkedCatalogIds = null, matchedCatalogItems = null) {
+function catalogItemList(items = [], selectedCatalogIds = new Set(), linkedCatalogIds = null, matchedCatalogItems = null, statuses = new Map()) {
   // The link indicator belongs next to the supplier SKU, not before the title.
   // Only a persisted Core supplier offer is a confirmed link.
   return '<div class="inventory-counterparty-product-list">' + items.map(item =>
@@ -390,7 +390,9 @@ function catalogItemList(items = [], selectedCatalogIds = new Set(), linkedCatal
             : linkedCatalogIds.has(String(item.id)) ? 'Связан с карточкой склада'
               : matchedCatalogItems?.has(String(item.id))
                 ? 'Совпадает артикул или штрихкод; связь не подтверждена'
-                : 'Не найдено совпадений с карточками склада',
+                : statuses.get(String(item.id))?.status === 'conflict'
+                  ? 'Неоднозначная связь: выберите карточку вручную'
+                  : 'Не найдено совпадений с карточками склада',
           right: [
             money(item.listPrice) + ' · ' + (item.discountPercent == null ? '—'
               : Number(item.discountPercent).toLocaleString('ru-RU', { maximumFractionDigits: 2 }) + '%'),
@@ -448,15 +450,15 @@ function catalogGroupsMarkup(brands) {
 
 // Only product categories use the existing native disclosure. No extra
 // heading for products and no additional UI primitives.
-function catalogBrandMarkup(categories, selectedCatalogIds, linkedCatalogIds = null, matchedCatalogItems = null) {
+function catalogBrandMarkup(categories, selectedCatalogIds, linkedCatalogIds = null, matchedCatalogItems = null, statuses = new Map()) {
   return '<div class="inventory-item-accordion">' +
     [...categories].map(([category, rows]) =>
-      category ? catalogDisclosure(category, catalogItemList(rows, selectedCatalogIds, linkedCatalogIds, matchedCatalogItems), false, rows.length,
+      category ? catalogDisclosure(category, catalogItemList(rows, selectedCatalogIds, linkedCatalogIds, matchedCatalogItems, statuses), false, rows.length,
         compactCheck({
           checked: rows.length > 0 && rows.every(row => selectedCatalogIds.has(String(row.id))),
           aria: 'Выбрать все позиции категории ' + category,
           data: 'data-company-category-check="' + escapeHtml(category) + '"',
-        })) : catalogItemList(rows, selectedCatalogIds, linkedCatalogIds, matchedCatalogItems),
+        })) : catalogItemList(rows, selectedCatalogIds, linkedCatalogIds, matchedCatalogItems, statuses),
     ).join('') + '</div>' +
     actionBlock(
       button('Создать карточку', { data: 'data-company-selection-card' }) +
@@ -726,7 +728,7 @@ async function openCompany(companyId, root, onChanged = () => {}) {
     }
     const selected = new Set();
     const restoreLayer = mountModal(document.body, modal(
-      catalogItemList(entries, selected, linkedCatalogIds, matchedCatalogItems) +
+      catalogItemList(entries, selected, linkedCatalogIds, matchedCatalogItems, catalogLinkStatuses) +
         '<p class="form-error" data-company-restore-error role="alert"></p>' +
         actionBlock(button('Восстановить', { data: 'data-company-restore-apply' })),
       { title: 'Исключённые', variant: 'q', surface: 'app' },
@@ -826,7 +828,7 @@ async function openCompany(companyId, root, onChanged = () => {}) {
           const brand = node.dataset.companyBrand;
           const categories = brands.get(brand);
           if (!categories) return;
-          const brandLayer = mountModal(document.body, modal(catalogBrandMarkup(categories, selectedCatalogIds, linkedCatalogIds, matchedCatalogItems), {
+          const brandLayer = mountModal(document.body, modal(catalogBrandMarkup(categories, selectedCatalogIds, linkedCatalogIds, matchedCatalogItems, catalogLinkStatuses), {
             title: brand, variant: 'q', surface: 'app',
           }));
           const syncSelections = () => {
