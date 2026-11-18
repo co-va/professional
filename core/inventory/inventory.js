@@ -17,6 +17,7 @@ import {
   openEntityCardAppearanceQ,
   openSharedProfileSettingsMenu,
   page,
+  list,
   select,
   setV2ZHeaderRows,
   shortDateTimeParts,
@@ -42,6 +43,9 @@ import { openInventoryProductAppearanceQ, openInventoryProductOverview } from '.
 import { renderInventoryOrders } from './orders.js';
 import { classificationOptions, openInventoryClassificationGroups } from './classification.js';
 import { openInventoryStorageLocations, openInventoryTransfer } from './storage.js';
+import { renderStockBrandList } from './stock-catalog.js';
+import { INVENTORY_TOTAL_SCOPE, inventoryDisplayBalance,
+  inventoryDisplayTarget, inventoryLocations, openInventoryStockTargets, storageName } from './stock-targets.js';
 import {
   emptyStockFilters, hasStockFilters, matchesStockFilters,
   stockFilterOptions, stockSupplierNames, STOCK_FILLED, STOCK_EMPTY,
@@ -101,6 +105,7 @@ const STOCK_VIEW = {
   manufacturersType: '',
   itemsType: '',
   itemsFilters: emptyStockFilters(),
+  storageScope: INVENTORY_TOTAL_SCOPE,
 };
 
 function saveInventorySortMode(key, value) {
@@ -1579,7 +1584,8 @@ function stockSortOptions(level) {
 function openStockControls(trigger, level, manufacturer, onChange, mode = 'sort') {
   const sortKey = level === 'manufacturers' ? 'manufacturersSort' : 'itemsSort';
   const isFilter = level === 'items' && mode === 'filter';
-  const currentItems = getInventoryItems().filter(item => manufacturerName(item) === manufacturer);
+  const currentItems = getInventoryItems().filter(item =>
+    !manufacturer || manufacturerName(item) === manufacturer);
   const presence = [
     { value: STOCK_FILLED, label: 'Заполнено' },
     { value: STOCK_EMPTY, label: 'Не заполнено' },
@@ -1602,7 +1608,7 @@ function openStockControls(trigger, level, manufacturer, onChange, mode = 'sort'
     select({label:'Группа', name:'inventoryFilterGroup', value:draft.group,
       options: [{ value: '', label: 'Все группы' }, ...classificationOptions().slice(1)] }),
     select({label:'Место хранения', name:'inventoryFilterLocation', value:draft.location,
-      options:[{value:'',label:'Все места'}, ...presence,
+      options:[{value:'',label:'Без ограничения'}, ...presence,
         ...getInventoryStorageLocations().filter(place => !place.archivedAt)
           .map(place => ({ value: place.locationId, label: place.name })),
         ...stockFilterOptions(currentItems, item => item.location)
@@ -2543,45 +2549,108 @@ function openInventoryAuditCriteria(root, { mode, ids = [], fieldName = 'categor
 }
 
 
+function openStockCreateOptions(root, onChanged, defaults = {}) {
+  const layer = mountModal(document.body, modal(
+    actionBlock(button('Из ассортимента', { data: 'data-stock-create-supplier' }) +
+      button('Своя позиция', { variant: 'secondary', data: 'data-stock-create-manual' })),
+    { title: 'Добавить товар', variant: 'q', surface: 'app' },
+  ));
+  if (!layer) return;
+  layer.querySelector('[data-stock-create-supplier]')?.addEventListener('click', async () => {
+    layer.v2Close?.();
+    const { openSupplierCatalogCreation } = await import('./counterparties.js');
+    await openSupplierCatalogCreation(onChanged);
+  });
+  layer.querySelector('[data-stock-create-manual]')?.addEventListener('click', () => {
+    layer.v2Close?.();
+    openItemEditor(root, '', defaults, onChanged);
+  });
+}
+
 function renderStock(root) {
   STOCK_VIEW.manufacturersType = '';
+  const locations = inventoryLocations();
+  const scopes = [
+    {value: INVENTORY_TOTAL_SCOPE, label: 'Общий остаток'},
+    ...locations.map(place=>({value:place.locationId,label:storageName(place)})),
+  ];
+  if (!scopes.some(entry=>entry.value===STOCK_VIEW.storageScope))
+    STOCK_VIEW.storageScope=INVENTORY_TOTAL_SCOPE;
   root.innerHTML = page([
-    context('Остатки', {
-      v: { data: 'data-inventory-stock-menu', aria: 'Настройки остатков' },
-      c: { label: '+', data: 'data-inventory-add-item', aria: 'Добавить позицию' },
+    context('Остатки',{
+      v:{data:'data-inventory-stock-menu',aria:'Настройки остатков'},
+      c:{label:'+',data:'data-inventory-add-item',aria:'Добавить позицию'},
     }),
-    '<div data-inventory-manufacturer-list></div>',
+    '<div data-inventory-stock-group-list></div>',
   ]);
-  // Canonical Z1 header search: identical shell/spacing to Contacts.
-  // Only manufacturer cards belong to the scrollable Z1 body.
-  const [searchRow] = setV2ZHeaderRows(root, [`<div class="people-search ui-search-field">
-    ${field({ name: 'inventorySearch', type: 'search', placeholder: 'Название, подкатегория, артикул…', autocomplete: 'off', data: 'data-inventory-stock-search' })}
-  </div>`]);
-  const searchInput = searchRow?.querySelector('[data-inventory-stock-search]') || null;
-  const listHost = root.querySelector('[data-inventory-manufacturer-list]');
-  const renderManufacturers = () => {
-    const query = searchInput?.value || '';
-    if (listHost) listHost.innerHTML = stockManufacturerCardsMarkup(query);
-    if (listHost) bindManufacturerCards(root, listHost);
+  const rows=setV2ZHeaderRows(root,[
+    select({label:'Склад',name:'inventoryStockScope',
+      value:STOCK_VIEW.storageScope,options:scopes}),
+    '<div class="people-search ui-search-field">' +
+      field({name:'inventorySearch',type:'search',
+        placeholder:'Название, артикул, группа…',autocomplete:'off',
+        data:'data-inventory-stock-search'}) + '</div>',
+  ]);
+  const scopeInput=rows[0]?.querySelector('[name="inventoryStockScope"]');
+  const searchInput=rows[1]?.querySelector('[data-inventory-stock-search]');
+  const listHost=root.querySelector('[data-inventory-stock-group-list]');
+  const refresh=()=>{
+    const locationId=STOCK_VIEW.storageScope;
+    const word=normalizedSearch(searchInput?.value || '');
+    const classifications=getInventoryClassificationGroups();
+    const locations=getInventoryStorageLocations();
+    const filtered=sortItems(getInventoryItems().filter(item=>{
+      const balance=inventoryDisplayBalance(item,locationId);
+      const factor=Number(item.thresholdStockFactor);
+      const thresholdBalance=balance===0?0:
+        Number.isFinite(factor)&&factor>0 ? balance/factor : null;
+      const scoped={...item,balance,balanceInThresholdUnit:thresholdBalance,
+        targetStock:inventoryDisplayTarget(item,locationId)};
+      if (!matchesStockFilters(scoped,STOCK_VIEW.itemsFilters,classifications,locations))
+        return false;
+      return !word||itemSearchText(item).includes(word);
+    }),STOCK_VIEW.itemsSort);
+    renderStockBrandList(listHost,filtered,{
+      scope:locationId,
+      sort:STOCK_VIEW.manufacturersSort,
+      onOpen:(itemId,onRefresh)=>{
+        openInventoryProductOverview(itemId,{
+          edit:(saved)=>openItemEditor(root,itemId,{},saved),
+          onChanged:()=>{refresh();onRefresh();},
+        });
+      },
+      onNew:(manufacturer,onRefresh)=>{
+        openStockCreateOptions(root,()=>{refresh();onRefresh();},
+          {manufacturer:manufacturer==='Без производителя'?'':manufacturer});
+      },
+      onTarget:(itemId,onRefresh)=>{
+        openInventoryStockTargets(itemId,()=>{refresh();onRefresh();});
+      },
+    });
   };
-  searchInput?.addEventListener('input', renderManufacturers);
-  root.querySelector('[data-inventory-stock-menu]')?.addEventListener('click', () => {
+  scopeInput?.addEventListener('change',event=>{
+    STOCK_VIEW.storageScope=event.target.value;
+    refresh();
+  });
+  searchInput?.addEventListener('input',refresh);
+  root.querySelector('[data-inventory-stock-menu]')?.addEventListener('click',()=>{
     openSharedProfileSettingsMenu({
-      title: 'Настройки остатков',
-      actions: [
-        { id: 'appearance', label: 'Вид', onSelect: () => openManufacturerAppearance(root, renderManufacturers) },
-        { id: 'controls', label: 'Сортировка', onSelect: () => openStockControls(root, 'manufacturers', '', renderManufacturers) },
-        { id: 'groups', label: 'Группы', onSelect: () =>
-          openInventoryClassificationGroups(renderManufacturers) },
-        { id: 'storage', label: 'Места хранения', onSelect: () =>
-          openInventoryStorageLocations(renderManufacturers) },
-        { id: 'transfer', label: 'Перемещение', onSelect: () =>
-          openInventoryTransfer(renderManufacturers) },
+      title:'Настройки остатков',
+      actions:[
+        {id:'sort',label:'Сортировка',onSelect:()=>
+          openStockControls(root,'manufacturers','',refresh,'sort')},
+        {id:'filter',label:'Фильтр',onSelect:()=>
+          openStockControls(root,'items','',refresh,'filter')},
+        {id:'groups',label:'Группы',onSelect:()=>
+          openInventoryClassificationGroups(refresh)},
+        {id:'storage',label:'Склады',onSelect:()=>
+          openInventoryStorageLocations(()=>renderStock(root))},
       ],
     });
   });
-  root.querySelector('[data-inventory-add-item]')?.addEventListener('click', () => openItemEditor(root, '', {}, () => renderStock(root)));
-  renderManufacturers();
+  root.querySelector('[data-inventory-add-item]')?.addEventListener('click',()=>
+    openStockCreateOptions(root,()=>renderStock(root)));
+  refresh();
   notifyContext();
 }
 
