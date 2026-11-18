@@ -132,7 +132,7 @@ assert.match(source, /rowIds: ids, excluded: true/,
 assert.match(source, /openCounterpartyFiles\(currentCompanies\)/,
   'Upload history is global and grouped by counterparty');
 const supplierMenu = source.slice(source.indexOf("layer.querySelector('[data-company-actions]')"),
-  source.indexOf('  void refresh();\n  return layer;', source.indexOf("layer.querySelector('[data-company-actions]')")));
+  source.indexOf('  // No second GET to open a company already present in the source list.', source.indexOf("layer.querySelector('[data-company-actions]')")));
 assert.match(supplierMenu, /id: 'edit', label: 'Редактировать', variant: 'primary'/,
   'Edit is the primary action within each counterparty');
 assert.match(supplierMenu, /id: 'excluded', label: 'Скрытые'/,
