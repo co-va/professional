@@ -220,53 +220,156 @@ assert.throws(() => editor.supplierCatalogEditValue(discountField, '120'), /Пр
 assert.throws(() => editor.supplierCatalogEditValue(priceField, '-3'), /Проверьте значение/);
 assert.throws(() => editor.supplierCatalogEditValue(packageField, '0'), /Проверьте значение/);
 assert.equal(editor.supplierCatalogValueMatches('12.5000', 12.5, discountField), true);
-assert.doesNotMatch(massSource, /twoColumnLayout\(|inventory-audit-value-heading|inventory-audit-value-line|data-edit-row/,
-  'Remove hand-copied inventory geometry instead of tuning another local layout');
-assert.match(massSource, /v2Section\(row\.name, '<div class="form-grid"/,
-  'Every selected supplier product has its own existing shared section and form geometry');
-assert.match(massSource, /fieldSelect\('supplierBulkField-' \+ index\)/,
-  'Each product has its own independent editable field selector');
-assert.match(massSource, /supplierCatalogDataControl\(def, valueName, '', 'На что изменить'\)/,
-  'Value input is a canonical active field with a normal label');
-assert.match(massSource, /compactCheck\(\{ label: 'Одинаковое изменение для всех'/,
-  'Shared values remain possible without disabling individual editing by default');
-assert.match(massSource, /common\.hidden = !shared;\s*items\.hidden = shared;/,
-  'Common and individual modes must never appear on top of each other');
-assert.match(massSource, /form\.addEventListener\('submit',/,
-  'One Q handles all selected products without a second Q hop');
-assert.match(massSource, /method: 'PUT', body: \{ \[entry\.field\]: entry\.value \}/,
-  'Mixed edits use only the existing per-row Core PUT for each field');
+assert.doesNotMatch(massSource,
+  /twoColumnLayout\(|inventory-audit-value-heading|inventory-audit-value-line|data-edit-row|v2Section\(row\.name/,
+  'Do not recreate stocktake geometry or per-item selector forms');
+assert.match(massSource, /select\(\{ label: 'Что изменить', name: 'supplierBulkField'/,
+  'Only one shared field selector is rendered');
+assert.match(massSource, /supplierCatalogDataControl\(def, 'supplierBulkValue',\s*'', 'На что изменить'\)/,
+  'Active input for the new value is always visible');
+assert.match(massSource, /compactCheck\(\{ checked: true, label: 'Выбрать все'/,
+  'Only one select-all control exists');
+assert.match(massSource, /supplierCatalogBulkRow\(row, def, selected\.has\(String\(row\.id\)\)\)/,
+  'Each chosen item is listed once, with its own checkbox');
+assert.match(massSource, /right: \[supplierCatalogBulkDisplay\(row\[definition\.value\], definition\)\]/,
+  'Every row displays the current selected-field value on the right');
+assert.match(massSource, /selected\.has\(id\) && next !== null \? next : row\[def\.value\]/,
+  'Typing a valid new value previews it on the right for checked rows only');
+assert.match(massSource, /method: 'PUT', body: \{ \[def\.value\]: value \}/,
+  'Existing Core single-position PUT is used');
 assert.match(massSource, /const saved = await loadSelected\(\)/,
-  'Core values must be verified after saving');
-assert.doesNotMatch(massSource, /mountModal\(layer|title: 'Массовое изменение'/,
-  'No nested Q or outdated bulk action remains');
-// Check rendered structure, not just source snippets: two selected products
-// must each receive an independent "Что изменить" and live "На что изменить".
-const mockFields = [];
-let actualMarkup = '';
-const mockBulk = new Function('document', 'mountModal', 'modal', 'select',
-  'field', 'v2Section', 'compactCheck', 'actionBlock', 'button',
-  massSource + '\nreturn openSupplierBulkEditor;')(
-  { body: {} },
-  (_, markup) => { actualMarkup = markup; return null; },
-  content => content,
-  options => { mockFields.push(options.name); return '<select name="' + options.name + '"></select>'; },
-  options => '<input name="' + options.name + '"' + (options.disabled ? ' disabled' : '') + '>',
-  (name, content) => '<section class="v2-section"><h2>' + name + '</h2>' + content + '</section>',
-  () => '<input type="checkbox">',
-  content => content,
-  label => '<button>' + label + '</button>');
-mockBulk({ id: 'supplier1' }, [{ id: 'a', name: 'Шампунь' }, { id: 'b', name: 'Краска' }]);
-assert.ok(mockFields.includes('supplierBulkField-0') && mockFields.includes('supplierBulkField-1'),
-  'Each selected product has its own selector');
-assert.ok(mockFields.includes('supplierBulkField-all'),
-  'One shared selector is available for the optional common action');
-assert.equal((actualMarkup.match(/<section class="v2-section">/g) || []).length, 2,
-  'The two selected products render as two separate visible sections');
-assert.equal((actualMarkup.match(/class="form-grid"/g) || []).length, 3,
-  'Fields use only the existing stacked form geometry');
-assert.doesNotMatch(actualMarkup, /two-column-layout|inventory-audit-value-cell|disabled/,
-  'No copied columns or initially disabled value controls in the editor markup');
+  'Saved data is reread and verified');
+assert.match(massSource, /rows\.forEach\(row => Object\.assign\(row, saved\.get\(String\(row\.id\)\)\)\)/,
+  'The table is updated to the persisted data instead of being closed');
+assert.match(massSource, /valueInput\(\)\.value = '';\s*renderList\(\)/,
+  'Value input clears while selection and table remain for another field');
+assert.doesNotMatch(massSource, /mountModal\(layer|layer\.v2Close\?\.\(\);\s*onSaved\(\)/,
+  'Applying must not close the editor or clear the selected items');
+
+const liveRows = [
+  { id: 'a', name: 'Шампунь 250 мл', category: 'Уход', supplierSku: 'A01', listPrice: 1500 },
+  { id: 'b', name: 'Шампунь 1000 мл', category: 'Уход', supplierSku: 'A02', listPrice: 3000 },
+];
+const serverRows = liveRows.map(row => ({ ...row }));
+const mockRequests = [];
+let markup = '';
+let closeCount = 0;
+let callbackCount = 0;
+const events = () => ({ handlers: {},
+  addEventListener(name, callback) { this.handlers[name] = callback; },
+  emit(name, event = {}) { return this.handlers[name]?.(event); },
+});
+const selectorNode = Object.assign(events(), { value: 'supplierSku' });
+const valueNode = { value: '', isConnected: true };
+const valueHostNode = Object.assign(events(), {
+  innerHTML: '',
+  querySelector() { return valueNode; },
+});
+const allNode = Object.assign(events(), { checked: true });
+const listNode = Object.assign(events(), {
+  innerHTML: '',
+  querySelectorAll() { return liveRows.map(row => ({
+    dataset: { companyBulkItem: row.id },
+    querySelector() { return { textContent: '' }; },
+  })); },
+});
+const submitNode = { disabled: false, isConnected: true };
+const countNode = { textContent: '' };
+const errorNode = { textContent: '' };
+const resultNode = { textContent: '' };
+const formNode = Object.assign(events(), {
+  querySelector(name) { return ({
+    '[name="supplierBulkField"]': selectorNode,
+    '[data-company-bulk-value]': valueHostNode,
+    '[data-company-bulk-all]': allNode,
+    '[data-company-bulk-count]': countNode,
+    '[data-company-bulk-list]': listNode,
+    '[data-company-bulk-error]': errorNode,
+    '[data-company-bulk-result]': resultNode,
+    '[data-company-bulk-save]': submitNode,
+  })[name]; },
+});
+const mockLayer = {
+  isConnected: true,
+  querySelector(name) { return name === '[data-company-bulk-editor]' ? formNode : null; },
+  v2Close() { closeCount++; this.isConnected = false; },
+};
+const bulkMocks = {
+  document: { body: {} },
+  mountModal: (_, html) => { markup = html; return mockLayer; },
+  modal: markup => markup,
+  select: ({ name }) => '<select name="' + name + '"></select>',
+  compactCheck: ({ label = '', checked = false }) =>
+    '<label><input type="checkbox"' + (checked ? ' checked' : '') + '>' + label + '</label>',
+  field: ({ name, label = '' }) => '<label>' + label + '<input name="' + name + '"></label>',
+  list: ({ items }) => '<div class="ui-list__right-secondary"><span>' + items[0].right[0] + '</span></div>',
+  money: amount => String(amount) + ' ₽',
+  escapeHtml: value => String(value),
+  actionBlock: value => value,
+  button: label => '<button>' + label + '</button>',
+  urlId: value => String(value),
+  errText: cause => cause.message,
+  openNotice: () => {},
+  json: async (path, options = {}) => {
+    mockRequests.push({ path, options });
+    if (options.method === 'PUT') {
+      const id = path.split('/').pop();
+      const row = serverRows.find(row => row.id === id);
+      Object.assign(row, options.body);
+      return { ...row };
+    }
+    if (path.includes('/catalog?skip='))
+      return { count: serverRows.length, items: serverRows.map(row => ({ ...row })) };
+    throw new Error('Unexpected API request ' + path);
+  },
+};
+const mockBulkEditor = new Function(...Object.keys(bulkMocks),
+  massSource + '\nreturn {openSupplierBulkEditor,supplierCatalogBulkDisplay,supplierCatalogBulkRow};')(
+  ...Object.values(bulkMocks));
+mockBulkEditor.openSupplierBulkEditor({ id: 'supplier-1' }, liveRows,
+  () => { callbackCount++; });
+assert.equal((markup.match(/name="supplierBulkField"/g) || []).length, 1,
+  'Exactly one field selector in the supplier editor');
+assert.equal((markup.match(/Выбрать все/g) || []).length, 1,
+  'Exactly one select-all checkbox');
+assert.equal((markup.match(/Что изменить/g) || []).length, 0,
+  'Selector label is supplied by the canonical selector, not manually duplicated');
+assert.equal(countNode.textContent, 'Выбрано 2 из 2');
+assert.match(listNode.innerHTML, /Шампунь 250 мл/);
+assert.match(listNode.innerHTML, /Шампунь 1000 мл/);
+assert.match(listNode.innerHTML, /A01|A02/,
+  'Right column shows the stored article before editing');
+assert.equal(mockBulkEditor.supplierCatalogBulkDisplay(1500, priceField), '1500 ₽');
+
+valueNode.value = 'NEW-ART';
+await formNode.emit('submit', { preventDefault() {} });
+assert.equal(serverRows[0].supplierSku, 'NEW-ART');
+assert.equal(serverRows[1].supplierSku, 'NEW-ART');
+assert.equal(selectorNode.value, 'supplierSku', 'Editor remains on current field after saving');
+assert.equal(valueNode.value, '', 'Input clears after saving to enable another field');
+assert.equal(countNode.textContent, 'Выбрано 2 из 2', 'Selected set must not be reset');
+assert.equal(callbackCount, 0, 'Parent selection/list must not be closed on Apply');
+assert.equal(closeCount, 0, 'Q must stay open after applying article');
+assert.match(listNode.innerHTML, /NEW-ART/, 'Saved article is visible in the same list');
+assert.match(resultNode.textContent, /Сохранено 2 позиции/, 'Result is confirmed');
+selectorNode.value = 'listPrice';
+selectorNode.emit('change');
+assert.match(listNode.innerHTML, /1500 ₽/, 'Choosing price shows saved prices on the right');
+valueNode.value = '2700';
+await formNode.emit('submit', { preventDefault() {} });
+assert.equal(serverRows[0].listPrice, 2700);
+assert.equal(serverRows[1].listPrice, 2700);
+assert.equal(serverRows[0].supplierSku, 'NEW-ART', 'Second edit does not erase first edit');
+assert.equal(callbackCount, 0);
+assert.equal(closeCount, 0);
+assert.match(listNode.innerHTML, /2700 ₽/, 'New price stays visible after second Apply');
+const puts = mockRequests.filter(request => request.options.method === 'PUT');
+assert.equal(puts.length, 4, 'Two successive changes are saved for two products');
+assert.ok(puts.every(request => request.path.startsWith('/supplier-1/catalog/')),
+  'No duplicate bulk Core route was added');
+mockLayer.v2Close();
+assert.equal(callbackCount, 1, 'Parent refresh happens once after explicit close');
+assert.equal(closeCount, 1);
 assert.match(source, /if \(row\) openCatalogProductDetails|openCatalogProductDetails\(row,/);
 assert.doesNotMatch(source, /if \(check\) check\.click\(\);/);
 const detail = source.slice(source.indexOf('function openCatalogProductDetails('),
