@@ -55,9 +55,7 @@ const contactOnly = counterpartyInformation({
   discountPercent: 15, website: 'hidden.example', note: 'Private note',
 });
 for (const value of ['Светлана', '+7 900 000 00 00', 'svetlana@example.com'])
-  assert.match(contactOnly, new RegExp(value.replace(/[.*+?^${}()|[\]\\]/g, '\\assert.match(source, /<strong class="ui-list__title">Скидка по договору:/,
-  'Z2 must show a stored agreement prominently');')),
-    'Z2 shows contact details');
+  assert.ok(contactOnly.includes(value), 'Z2 shows contact details: ' + value);
 for (const value of ['Компания Альфа', '15%', 'hidden.example', 'Private note', 'Менеджер'])
   assert.ok(!contactOnly.includes(value), 'Z2 must not duplicate supplier card data: ' + value);
 assert.match(source, /title: company\.name,/,
