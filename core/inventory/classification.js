@@ -4,6 +4,7 @@ import { getInventoryCriteria, getInventoryItems, getInventoryClassificationGrou
 import { loadInventoryCriteria, loadInventory, createInventoryCriterion, updateInventoryCriterion,
   createInventoryCriterionValue, updateInventoryCriterionValue } from './service.js';
 import { escapeHtml } from '../../ui/utils/escape-html.js';
+import { openInventoryClassificationRecovery } from './classification-recovery.js';
 
 // Only these three legacy keys retain the existing InventoryItem columns.
 // User-facing names and all additional groups are read from Core.
@@ -67,7 +68,10 @@ export function openInventoryClassificationGroups(onSaved = () => {}) {
   const host = mountModal(document.body, modal(
     '<div data-inventory-criteria-list></div>' +
     '<p class="form-error" role="alert" data-inventory-criteria-error></p>' +
-    actionBlock(button('Добавить группу',{data:'data-inventory-criteria-add'})),
+    actionBlock(
+      button('Добавить группу',{data:'data-inventory-criteria-add'}) +
+      button('Восстановить из таблицы',{variant:'secondary',
+        data:'data-inventory-criteria-recovery'})),
     {title:'Группы',variant:'q',surface:'app'},
   ));
   if (!host) return null;
@@ -281,6 +285,12 @@ export function openInventoryClassificationGroups(onSaved = () => {}) {
     wireRemove(main,'[data-inventory-criterion-group] [data-delete-action]',removeGroup);
   };
   host.querySelector('[data-inventory-criteria-add]')?.addEventListener('click',()=>editName());
+  host.querySelector('[data-inventory-criteria-recovery]')?.addEventListener('click',()=>
+    openInventoryClassificationRecovery(()=>{
+      current=getInventoryCriteria()||[];
+      refresh();
+      onSaved();
+    }));
   if(current.length)refresh();
   else main.innerHTML=emptyState('Загружаем группы…');
   void loadInventoryCriteria().then(rows=>{current=rows;refresh();}).catch(showError);
