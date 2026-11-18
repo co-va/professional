@@ -616,8 +616,7 @@ async function openCompany(companyId, root, onChanged = () => {}) {
   if (!layer) return null;
   const host = layer.querySelector('[data-counterparty-detail]');
   let revision = 0;
-  // Selection stays in this view. Confirmed create/link actions use the existing
-  // Core per-row endpoints; persistent exclusions require a separate Core operation.
+  // A selected set is actionable. Core owns both saved links and recoverable exclusions.
   const selectedCatalogIds = new Set();
   let linkedCatalogIds = null;
   let matchedCatalogItems = null;
@@ -626,6 +625,72 @@ async function openCompany(companyId, root, onChanged = () => {}) {
     .filter(offer => String(offer.counterpartyId || '') === String(companyId)
       && offer.catalogItemId)
     .map(offer => String(offer.catalogItemId)));
+
+  const excludedPath = '/'+urlId(companyId)+'/catalog?excluded=true';
+  const openExcludedCatalogItems = async () => {
+    let entries = [];
+    try {
+      const first = await json(excludedPath + '&skip=0');
+      entries = Array.isArray(first.items) ? [...first.items] : [];
+      for (let skip = 100; skip < (Number(first.count) || 0); skip += 100) {
+        const page = await json(excludedPath + '&skip=' + skip);
+        entries.push(...(Array.isArray(page.items) ? page.items : []));
+      }
+    } catch (error) {
+      openNotice({ title: 'Исключённые', message: errText(error) });
+      return;
+    }
+    if (!entries.length) {
+      openNotice({ title: 'Исключённые', message: 'Исключённых позиций нет.' });
+      return;
+    }
+    const selected = new Set();
+    const restoreLayer = mountModal(document.body, modal(
+      catalogItemList(entries, selected, linkedCatalogIds, matchedCatalogItems) +
+        '<p class="form-error" data-company-restore-error role="alert"></p>' +
+        actionBlock(button('Восстановить', { data: 'data-company-restore-apply' })),
+      { title: 'Исключённые', variant: 'q', surface: 'app' },
+    ));
+    if (!restoreLayer) return;
+    const apply = restoreLayer.querySelector('[data-company-restore-apply]');
+    const sync = () => {
+      apply.disabled = !selected.size;
+      restoreLayer.querySelectorAll('[data-company-product-check]').forEach(input => {
+        input.checked = selected.has(String(input.dataset.companyProductCheck));
+      });
+    };
+    restoreLayer.querySelectorAll('[data-company-product-check]').forEach(input => {
+      input.addEventListener('change', () => {
+        const id = String(input.dataset.companyProductCheck);
+        if (input.checked) selected.add(id);
+        else selected.delete(id);
+        sync();
+      });
+    });
+    restoreLayer.querySelectorAll('[data-company-product]').forEach(row => {
+      row.addEventListener('click', () => {
+        const check = restoreLayer.querySelector('[data-company-product-check="' +
+          CSS.escape(String(row.dataset.companyProduct)) + '"]');
+        check?.click();
+      });
+    });
+    apply.addEventListener('click', async () => {
+      if (!selected.size) return;
+      apply.disabled = true;
+      const error = restoreLayer.querySelector('[data-company-restore-error]');
+      try {
+        await json('/' + urlId(companyId) + '/catalog/selection', {
+          method: 'POST', body: { rowIds: [...selected], excluded: false },
+        });
+        restoreLayer.v2Close?.();
+        await showCatalog();
+      } catch (cause) {
+        error.textContent = errText(cause);
+        sync();
+      }
+    });
+    sync();
+  };
 
   const showCatalog = async () => {
     const currentRun = ++revision;
@@ -722,6 +787,36 @@ async function openCompany(companyId, root, onChanged = () => {}) {
             if (rows.length) void openSelectedCatalogCards(company, rows, linked,
               row => matchedCatalogItems?.get(String(row.id)) || '');
           });
+          brandLayer?.querySelector('[data-company-selection-delete]')?.addEventListener('click', () => {
+            const ids = entries.filter(row => selectedCatalogIds.has(String(row.id)))
+              .map(row => String(row.id));
+            if (!ids.length) return;
+            const confirm = mountModal(document.body, modal(
+              '<p>Исключить ' + ids.length + ' позиций из ассортимента? ' +
+              'Их можно вернуть через «Исключённые».</p>' +
+              '<p class="form-error" data-company-exclude-error role="alert"></p>' +
+              actionBlock(button('Удалить', { variant: 'delete-outline',
+                data: 'data-company-exclude-apply' })),
+              { title: 'Исключить позиции', variant: 'q', surface: 'app' },
+            ));
+            const submit = confirm?.querySelector('[data-company-exclude-apply]');
+            submit?.addEventListener('click', async () => {
+              submit.disabled = true;
+              const error = confirm.querySelector('[data-company-exclude-error]');
+              try {
+                await json('/' + urlId(companyId) + '/catalog/selection', {
+                  method: 'POST', body: { rowIds: ids, excluded: true },
+                });
+                ids.forEach(id => selectedCatalogIds.delete(id));
+                confirm.v2Close?.();
+                brandLayer?.v2Close?.();
+                await showCatalog();
+              } catch (cause) {
+                error.textContent = errText(cause);
+                submit.disabled = false;
+              }
+            });
+          });
           brandLayer?.querySelectorAll('[data-company-product]').forEach(product => {
             product.addEventListener('click', () => {
               const check = brandLayer.querySelector('[data-company-product-check="' +
@@ -759,6 +854,7 @@ async function openCompany(companyId, root, onChanged = () => {}) {
         openCompanyEditor(company, () => { void refresh(); onChanged(); }) },
       { id: 'upload', label: 'Загрузить файл', onSelect: () =>
         openImportGuidance(company, () => { void refresh(); onChanged(); }) },
+      { id: 'excluded', label: 'Исключённые', onSelect: () => void openExcludedCatalogItems() },
       { id: 'template', label: 'Шаблон Excel', onSelect: () =>
         void download('/template/xlsx', 'catalog-template.xlsx').catch(error =>
           openNotice({ title: 'Excel', message: errText(error) })) },
