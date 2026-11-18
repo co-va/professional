@@ -533,6 +533,7 @@ function openSupplierBulkEditor(company, rows, onSaved = () => {}) {
   if (!rows.length) return;
   const definitions = new Map(SUPPLIER_CATALOG_EDIT_FIELDS.map(item => [item.value, item]));
   const selected = new Set(rows.map(row => String(row.id)));
+  const rowsById = new Map(rows.map(row => [String(row.id), row]));
   const layer = mountModal(document.body, modal(
     '<form data-company-bulk-editor>' +
       select({ label: 'Что изменить', name: 'supplierBulkField', value: 'category',
@@ -581,7 +582,7 @@ function openSupplierBulkEditor(company, rows, onSaved = () => {}) {
     catch { /* Keep the stored value visible until the new input is valid. */ }
     listHost.querySelectorAll('[data-company-bulk-item]').forEach(node => {
       const id = String(node.dataset.companyBulkItem);
-      const row = rows.find(item => String(item.id) === id);
+      const row = rowsById.get(id);
       const right = node.querySelector('.ui-list__right-secondary span');
       if (row && right) right.textContent = supplierCatalogBulkDisplay(
         selected.has(id) && next !== null ? next : row[def.value], def);
@@ -674,8 +675,8 @@ function openSupplierBulkEditor(company, rows, onSaved = () => {}) {
             method: 'PUT', body: { [def.value]: value },
           })));
         responses.forEach((response, index) => {
-          if (response.status === 'rejected')
-            failed.set(String(batch[index].id), errText(response.reason));
+          if (response.status === 'fulfilled') changed = true;
+          else failed.set(String(batch[index].id), errText(response.reason));
         });
         result.textContent = 'Обработано: ' +
           Math.min(offset + 4, targets.length) + ' из ' + targets.length;
