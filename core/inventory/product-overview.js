@@ -13,7 +13,7 @@ import { inventoryLocations, itemLocationBalance, storageName,
   openInventoryStockTargets, inventoryDisplayBalance, INVENTORY_TOTAL_SCOPE } from './stock-targets.js';
 import {
   archiveInventorySupplierOffer, createInventorySupplierOffer, setInventoryPrimarySupplierOffer,
-  updateInventoryItem, updateInventorySupplierOffer,
+  loadInventory, updateInventoryItem, updateInventorySupplierOffer,
 } from './service.js';
 
 const PRODUCT_APPEARANCE_SCOPE = 'inventory-item';
@@ -366,9 +366,23 @@ function confirmProductDelete(itemId, overview, onChanged) {
       overview.v2Close?.();
       onChanged();
     } catch (error) {
+      // Core may commit the archive before a response fails. Confirm the
+      // authoritative active-items state before showing a failure.
+      let archived = false;
+      try {
+        await loadInventory();
+        archived = !getInventoryItem(itemId);
+      } catch { /* Preserve the real failure if the snapshot cannot be read. */ }
+      if (archived) {
+        confirm.v2Close?.();
+        overview.v2Close?.();
+        onChanged();
+        return;
+      }
       control.disabled = false;
       const host = confirm.querySelector('[data-inventory-product-delete-error]');
-      if (host) host.textContent = error instanceof Error ? error.message : 'Не удалось удалить складскую единицу.';
+      if (host) host.textContent = error instanceof Error && error.message !== 'Internal server error'
+        ? error.message : 'Не удалось подтвердить удаление. Позиция осталась в остатках.';
     }
   });
 }
