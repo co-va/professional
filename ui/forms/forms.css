@@ -34,19 +34,22 @@
 .inventory-editor-panel--catalog-choice>.inventory-editor-heading__controls{
   top:15px;
 }
-/* Counterparty product rows use the existing dense UI List + Compact check.
-   No V2 raised cards, custom sizes or change to shared List styling. */
-.inventory-counterparty-product-row{
-  display:grid;
-  grid-template-columns:var(--ui-compact-size) minmax(0,1fr);
-  align-items:center;
-  gap:8px;
-  min-width:0;
+/* Catalog products: the existing Compact check sits inside the white dense
+   List row, not in a separate column. Preserve the shared row geometry. */
+.inventory-counterparty-product-row{position:relative;min-width:0}
+.inventory-counterparty-product-row>.ui-compact-check{
+  position:absolute;
+  top:50%;
+  left:12px;
+  transform:translateY(-50%);
+  z-index:1;
 }
 .inventory-counterparty-product-row>.ui-list{min-width:0}
+.inventory-counterparty-product-row .ui-list__item{
+  padding-left:calc(12px + var(--ui-compact-size,28px) + 8px);
+}
 .inventory-counterparty-product-row+.inventory-counterparty-product-row>.ui-list{border-top:0}
 .inventory-counterparty-product-row .ui-list__main{overflow:hidden}
-.inventory-counterparty-product-row .ui-list__overline,
 .inventory-counterparty-product-row .ui-list__title,
 .inventory-counterparty-product-row .ui-list__secondary{
   overflow:hidden;
