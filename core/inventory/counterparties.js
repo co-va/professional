@@ -648,11 +648,21 @@ async function openCompany(companyId, root, onChanged = () => {}) {
   const selectedCatalogIds = new Set();
   let linkedCatalogIds = null;
   let matchedCatalogItems = null;
+  let catalogLinkStatuses = new Map();
   const readConfirmedLinks = () => new Set(getInventoryItems().flatMap(item =>
     Array.isArray(item.supplierOffers) ? item.supplierOffers : [])
     .filter(offer => String(offer.counterpartyId || '') === String(companyId)
       && offer.catalogItemId)
     .map(offer => String(offer.catalogItemId)));
+  const refreshCatalogLinkStatuses = async () => {
+    const data = await json('/' + urlId(companyId) + '/catalog/link-status');
+    if (!Array.isArray(data?.statuses)) throw new Error('Статусы связей недоступны.');
+    catalogLinkStatuses = new Map(data.statuses.map(item => [String(item.catalogItemId), item]));
+    linkedCatalogIds = new Set(data.statuses.filter(item => item.status === 'linked')
+      .map(item => String(item.catalogItemId)));
+    matchedCatalogItems = new Map(data.statuses.filter(item => item.status === 'matched' && item.itemId)
+      .map(item => [String(item.catalogItemId), String(item.itemId)]));
+  };
 
   const excludedPath = '/'+urlId(companyId)+'/catalog?excluded=true';
   const openExcludedCatalogItems = async () => {
@@ -737,17 +747,32 @@ async function openCompany(companyId, root, onChanged = () => {}) {
         entries.push(...(Array.isArray(page.items) ? page.items : []));
       }
       if (!layer.isConnected || !list.isConnected || currentRun !== revision) return;
-      // Core inventory snapshot is authoritative: matching SKU alone is not a link.
+      // Prefer Core's canonical persisted-link / unique-match classification.
+      // Preserve a read-only local hint when an older server lacks this endpoint.
       try {
         await loadInventory();
-        linkedCatalogIds = readConfirmedLinks();
+        try {
+          await refreshCatalogLinkStatuses();
+        } catch {
+          linkedCatalogIds = readConfirmedLinks();
+          matchedCatalogItems = findCatalogMatches(entries, getInventoryItems());
+          catalogLinkStatuses = new Map(entries.map(row => {
+            const id = String(row.id);
+            const itemId = matchedCatalogItems.get(id);
+            return [id, linkedCatalogIds.has(id)
+              ? { status: 'linked', itemId: getInventoryItems().find(item =>
+                item.supplierOffers?.some(offer =>
+                  String(offer.counterpartyId) === String(companyId)
+                    && String(offer.catalogItemId) === id))?.itemId || '' }
+              : itemId ? { status: 'matched', itemId } : { status: 'unlinked', itemId: null }];
+          }));
+        }
       } catch {
-        // Do not claim either saved links or matches if inventory cannot be read.
         linkedCatalogIds = null;
         matchedCatalogItems = null;
+        catalogLinkStatuses = new Map();
       }
       if (!layer.isConnected || !list.isConnected || currentRun !== revision) return;
-      matchedCatalogItems = linkedCatalogIds === null ? null : findCatalogMatches(entries, getInventoryItems());
       const brands = catalogBrands(entries);
       list.innerHTML = entries.length
         ? catalogGroupsMarkup(brands)
@@ -781,6 +806,10 @@ async function openCompany(companyId, root, onChanged = () => {}) {
           const linked = row => {
             linkedCatalogIds = readConfirmedLinks();
             selectedCatalogIds.delete(String(row.id));
+            const item = getInventoryItems().find(entry => entry.supplierOffers?.some(offer =>
+              String(offer.counterpartyId) === String(companyId)
+                && String(offer.catalogItemId) === String(row.id)));
+            catalogLinkStatuses.set(String(row.id), { status: 'linked', itemId: item?.itemId || '' });
             const product = [...(brandLayer?.querySelectorAll('[data-company-product]') || [])]
               .find(node => String(node.dataset.companyProduct) === String(row.id));
             const indicator = product?.querySelector('.ui-list__secondary .ui-list__indicator');
@@ -790,6 +819,7 @@ async function openCompany(companyId, root, onChanged = () => {}) {
               indicator.title = 'Связан с карточкой склада';
             }
             syncSelections();
+            void refreshCatalogLinkStatuses().catch(() => {});
           };
           brandLayer?.querySelectorAll('[data-company-category-check]').forEach(check => {
             check.addEventListener('change', () => {
