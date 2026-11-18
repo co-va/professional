@@ -1241,6 +1241,8 @@ function movementNoteLabel(kind) {
 function openMovementEditor(root, movementId = '', kind = 'CONSUMPTION', { record = null, onSaved = null } = {}) {
   const movement = movementId ? getInventoryMovement(movementId) : null;
   const correcting = Boolean(movement);
+  // Canonical movement retries must never create a second stock fact.
+  const movementRequestId = correcting ? '' : (globalThis.crypto?.randomUUID?.() || '');
   if (correcting && movement.kind === 'ADJUSTMENT'
       && movement.lines?.some(line => line.actualContainerCount != null)) {
     openNotice({ title: 'Инвентаризация', message: 'Для исправления физического пересчёта проведите новую инвентаризацию.' });
@@ -1510,6 +1512,10 @@ function openMovementEditor(root, movementId = '', kind = 'CONSUMPTION', { recor
         errorHost.textContent = 'Укажите корректную дату операции.';
         return;
       }
+      if (!correcting && !movementRequestId) {
+        errorHost.textContent = 'Не удалось подготовить идентификатор движения.';
+        return;
+      }
       saveButton.disabled = true;
       try {
         if (!correcting) lines.forEach(line => { line.storageLocationId = selectedPlace; });
@@ -1517,6 +1523,7 @@ function openMovementEditor(root, movementId = '', kind = 'CONSUMPTION', { recor
           await correctInventoryMovement(movement.movementId, { lines, note });
         } else {
           await createInventoryMovement({
+            movementId: movementRequestId,
             kind: actualKind,
             occurredAt,
             sourceType: record?.recordId ? 'record' : 'manual',
