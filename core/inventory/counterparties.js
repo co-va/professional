@@ -55,11 +55,13 @@ async function json(path = '', { method = 'GET', body } = {}) {
   if (!response.ok) throw new Error(message(value, response.status));
   return value;
 }
-async function upload(id, action, file, confirmedPdf = false) {
+async function importExcel(action, file, fields = {}) {
   const data = new FormData();
   data.append('file', file);
-  if (confirmedPdf) data.append('confirmedPdf', 'true');
-  const response = await apiRequest(PATH + '/' + urlId(id) + action, {
+  Object.entries(fields).forEach(([key, value]) => {
+    if (value != null && String(value) !== '') data.append(key, String(value));
+  });
+  const response = await apiRequest(PATH + '/import' + action, {
     method: 'POST', body: data, timeoutMs: 90000,
   });
   const value = await response.json().catch(() => ({}));
@@ -331,69 +333,93 @@ async function openCatalogRow(company, row, { itemId = '', onLinked = () => {} }
   });
 }
 
-// The X explains the preferred template before the native file picker.
-// Alternate .xlsx layouts and PDF remain eligible for server-side preview.
-// The native OS file picker opens directly from the X button's user gesture.
-// The confirmation Q appears only after a file is chosen.
-function openImport(company, onSaved) {
+// One global intake for all supplier files; the OS picker opens on a direct tap.
+function openImport(onSaved) {
   const input = document.createElement('input');
   input.type = 'file';
   input.accept = '.xlsx,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
   input.hidden = true;
   document.body.appendChild(input);
-
   const cleanup = () => input.remove();
   input.addEventListener('change', () => {
     const file = input.files?.[0] || null;
     cleanup();
-    if (file) openImportPreview(company, onSaved, file);
+    if (file) openImportPreview(onSaved, file);
   }, { once: true });
   input.addEventListener('cancel', cleanup, { once: true });
-  // Must remain synchronous with the V-menu click for iOS/WebKit.
   input.click();
 }
 
-function openImportPreview(company, onSaved, file) {
-  const layer = mountModal(document.body, modal(`
-    <div data-counterparty-preview></div>
-    <p class="form-error" data-counterparty-import-error role="alert"></p>
-    ${actionBlock(button('Загрузить позиции', { data: 'data-counterparty-import-save', disabled: true }))}
-    `, { title: 'Проверка файла', variant: 'q', surface: 'app' }));
+function openImportPreview(onSaved, file) {
+  const layer = mountModal(document.body, modal(
+    '<div data-counterparty-preview></div><div data-counterparty-target></div>' +
+    '<p class="form-error" data-counterparty-import-error role="alert"></p>' +
+    actionBlock(button('Загрузить', { data: 'data-counterparty-import-save', disabled: true })),
+    { title: 'Проверка Excel', variant: 'q', surface: 'app' }));
   if (!layer) return;
   const preview = layer.querySelector('[data-counterparty-preview]');
+  const target = layer.querySelector('[data-counterparty-target]');
   const errorHost = layer.querySelector('[data-counterparty-import-error]');
   const save = layer.querySelector('[data-counterparty-import-save]');
   let result = null;
+  const chosenCompany = () => String(layer.querySelector('[name="counterpartyId"]')?.value || '');
+  const proposedName = () => String(layer.querySelector('[name="newCounterpartyName"]')?.value || '').trim();
+  const sync = () => {
+    const nameField = layer.querySelector('[name="newCounterpartyName"]')?.closest('.field');
+    if (nameField) nameField.hidden = Boolean(chosenCompany());
+    save.disabled = !result || result.status !== 'READY'
+      || (!chosenCompany() && (!proposedName() || Boolean(result.ambiguousMatch)));
+  };
   const check = async () => {
-    preview.textContent = 'Проверяем файл…';
+    preview.textContent = 'Проверяем Excel…';
     try {
-      result = await upload(company.id, '/pricelists/preview', file);
+      const [parsed, companies] = await Promise.all([importExcel('/preview', file), json()]);
       if (!layer.isConnected) return;
-      const rows = result.sample || [];
-      preview.innerHTML = `<p>${escapeHtml(file.name)} · ${result.count} поз.</p>` +
-        (result.status === 'READY' ? '<p>Проверьте позиции и цены перед загрузкой.</p>' :
-          '<p>Содержимое не распознано полностью. Можно сохранить исходный файл, не создавая позиции.</p>') +
-        (result.errors || []).map(value => '<p>' + escapeHtml(value) + '</p>').join('') +
-        (rows.length ? v2ListEntries(rows.map(row => v2ListEntry({
+      result = parsed;
+      preview.innerHTML = '<p>' + escapeHtml(file.name) + ' · ' + parsed.count + ' поз.</p>' +
+        (parsed.errors || []).map(value => '<p>' + escapeHtml(value) + '</p>').join('') +
+        ((parsed.sample || []).length ? v2ListEntries(parsed.sample.map(row => v2ListEntry({
           title: row.name,
           subtitle: [row.supplierSku, supplierAvailability(row.supplierAvailable)].filter(Boolean).join(' · '),
           rightTop: money(row.listPrice), interactive: false,
         }))) : '');
-      save.disabled = false;
-      save.textContent = result.status === 'READY' ? 'Загрузить позиции' : 'Сохранить файл';
-      errorHost.textContent = '';
+      const known = Array.isArray(companies) ? companies : [];
+      target.innerHTML = select({
+        label: 'Контрагент', name: 'counterpartyId',
+        value: parsed.matchedCounterpartyId || '', searchable: true,
+        options: [{ value: '', label: 'Новый контрагент' },
+          ...known.map(row => ({ value: row.id, label: row.name }))],
+      }) + field({ label: 'Название нового контрагента', name: 'newCounterpartyName',
+        value: parsed.supplierName || '' });
+      if (parsed.ambiguousMatch) errorHost.textContent =
+        'Есть несколько контрагентов с таким названием. Выберите нужного.';
+      if (parsed.status !== 'READY') errorHost.textContent =
+        'Сначала исправьте файл. Позиции не загружены.';
+      target.addEventListener('input', sync);
+      target.addEventListener('change', sync);
+      sync();
     } catch (cause) {
+      result = null;
       preview.textContent = '';
       errorHost.textContent = errText(cause);
+      save.disabled = true;
     }
   };
   save.addEventListener('click', async () => {
-    if (!result) return;
+    if (!result || result.status !== 'READY' || save.disabled) return;
     save.disabled = true;
+    const counterpartyId = chosenCompany();
+    const name = proposedName();
     try {
-      await upload(company.id, '/pricelists', file, result.format === 'pdf' && result.status === 'READY');
+      const imported = await importExcel('', file, {
+        ...(counterpartyId ? { counterpartyId } : { name }),
+        ...(result.format === 'pdf' ? { confirmedPdf: 'true' } : {}),
+      });
       layer.v2Close?.();
-      onSaved?.();
+      await onSaved?.();
+      openNotice({ title: 'Excel',
+        message: (imported.duplicate ? 'Этот файл уже загружен. ' : 'Прайс загружен. ') +
+          'Контрагент: ' + imported.counterpartyName + '.' });
     } catch (cause) {
       errorHost.textContent = errText(cause);
       save.disabled = false;
@@ -846,28 +872,26 @@ async function openSelectedCatalogCards(company, rows, onLinked = () => {}, sugg
   });
 }
 
-function openCounterpartyFiles(company) {
-  const files = Array.isArray(company.priceLists) ? company.priceLists : [];
-  const content = files.length
-    ? v2ListEntries(files.map(file => v2ListEntry({
-      title: file.filename,
+function openCounterpartyFiles(companies = []) {
+  const entries = companies.flatMap(company =>
+    (Array.isArray(company.priceLists) ? company.priceLists : []).map(file => ({ company, file })));
+  const content = entries.length
+    ? v2ListEntries(entries.map(({ company, file }, index) => v2ListEntry({
+      title: company.name + ' · ' + file.filename,
       subtitle: 'Версия ' + file.revision + ' · ' +
         new Date(file.createdAt).toLocaleDateString('ru-RU'),
-      rightTop: file.parserStatus === 'READY'
-        ? String(file._count?.rows || 0) + ' поз.' : 'Нужен Excel',
-      interactive: true,
-      initial: '',
-      data: 'data-company-file="' + escapeHtml(file.id) + '"',
-      aria: 'Скачать ' + file.filename,
-    })))
-    : '<p>История загрузок пуста.</p>';
+      rightTop: file.parserStatus === 'READY' ? String(file._count?.rows || 0) + ' поз.' : 'Нужен Excel',
+      interactive: true, initial: '',
+      data: 'data-company-file-index="' + index + '"', aria: 'Скачать ' + file.filename,
+    }))) : '<p>История загрузок пуста.</p>';
   const layer = mountModal(document.body, modal(content, {
     title: 'История загрузок', variant: 'q', surface: 'app',
   }));
-  layer?.querySelectorAll('[data-company-file]').forEach(node => {
+  layer?.querySelectorAll('[data-company-file-index]').forEach(node => {
     node.addEventListener('click', () => {
-      const file = files.find(row => row.id === node.dataset.companyFile);
-      if (!file) return;
+      const entry = entries[Number(node.dataset.companyFileIndex)];
+      if (!entry) return;
+      const { company, file } = entry;
       void download('/' + urlId(company.id) + '/pricelists/' + urlId(file.id) +
         '/download', 'catalog-' + file.revision + '.' + file.format)
         .catch(error => openNotice({ title: 'Файл', message: errText(error) }));
@@ -1164,16 +1188,6 @@ async function openCompany(companyId, root, onChanged = () => {}) {
     openSharedProfileSettingsMenu({ title: 'Контрагент', actions: [
       { id: 'edit', label: 'Редактировать', variant: 'primary', onSelect: () =>
         openCompanyEditor(company, () => { void refresh(); onChanged(); }) },
-      { id: 'excel', label: 'Excel', onSelect: () =>
-        openSharedProfileSettingsMenu({ title: 'Excel', actions: [
-          { id: 'upload', label: 'Загрузить', variant: 'primary', onSelect: () =>
-            openImport(company, () => { void refresh(); onChanged(); }) },
-          { id: 'template', label: 'Шаблон Excel', onSelect: () =>
-            void download('/template/xlsx', 'catalog-template.xlsx').catch(error =>
-              openNotice({ title: 'Excel', message: errText(error) })) },
-        ] }) },
-      { id: 'history', label: 'История загрузок', onSelect: () =>
-        openCounterpartyFiles(company) },
       { id: 'excluded', label: 'Исключённые позиции', onSelect: () =>
         void openExcludedCatalogItems() },
     ] });
@@ -1295,6 +1309,16 @@ export async function renderCounterparties(root) {
       actions: [
         { id: 'appearance', label: 'Вид', onSelect: () =>
           openCounterpartyAppearance(root, currentCompanies[0] || {}, renderCards) },
+        { id: 'excel', label: 'Excel', onSelect: () =>
+          openSharedProfileSettingsMenu({ title: 'Excel', actions: [
+            { id: 'upload', label: 'Загрузить', variant: 'primary', onSelect: () =>
+              openImport(show) },
+            { id: 'template', label: 'Шаблон Excel', onSelect: () =>
+              void download('/template/xlsx', 'counterparties-template.xlsx').catch(error =>
+                openNotice({ title: 'Excel', message: errText(error) })) },
+            { id: 'history', label: 'История загрузок', onSelect: () =>
+              openCounterpartyFiles(currentCompanies) },
+          ] }) },
       ],
     });
   });
