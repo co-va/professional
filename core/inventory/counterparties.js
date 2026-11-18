@@ -338,7 +338,7 @@ function counterpartyInformation(company = {}) {
     '</div>';
 }
 
-function catalogItemList(items = [], selectedCatalogIds = new Set(), linkedCatalogIds = null) {
+function catalogItemList(items = [], selectedCatalogIds = new Set(), linkedCatalogIds = null, matchedCatalogItems = null) {
   // The link indicator belongs next to the supplier SKU, not before the title.
   // Only a persisted Core supplier offer is a confirmed link.
   return '<div class="inventory-counterparty-product-list">' + items.map(item =>
@@ -356,10 +356,13 @@ function catalogItemList(items = [], selectedCatalogIds = new Set(), linkedCatal
           title: item.name,
           secondary: item.supplierSku || '—',
           secondaryIndicatorColor: linkedCatalogIds === null ? ''
-            : linkedCatalogIds.has(String(item.id)) ? '#37B24D' : '#A8AAAC',
+            : linkedCatalogIds.has(String(item.id)) ? '#37B24D'
+              : matchedCatalogItems?.has(String(item.id)) ? '#F6D32D' : '#A8AAAC',
           secondaryIndicatorLabel: linkedCatalogIds === null ? ''
-            : linkedCatalogIds.has(String(item.id))
-              ? 'Связан с карточкой склада' : 'Не связан с карточкой склада',
+            : linkedCatalogIds.has(String(item.id)) ? 'Связан с карточкой склада'
+              : matchedCatalogItems?.has(String(item.id))
+                ? 'Совпадает артикул или штрихкод; связь не подтверждена'
+                : 'Не найдено совпадений с карточками склада',
           right: [
             money(item.listPrice) + ' · ' + (item.discountPercent == null ? '—'
               : Number(item.discountPercent).toLocaleString('ru-RU', { maximumFractionDigits: 2 }) + '%'),
@@ -417,30 +420,60 @@ function catalogGroupsMarkup(brands) {
 
 // Only product categories use the existing native disclosure. No extra
 // heading for products and no additional UI primitives.
-function catalogBrandMarkup(categories, selectedCatalogIds, linkedCatalogIds = null) {
+function catalogBrandMarkup(categories, selectedCatalogIds, linkedCatalogIds = null, matchedCatalogItems = null) {
   return '<div class="inventory-item-accordion">' +
     [...categories].map(([category, rows]) =>
-      category ? catalogDisclosure(category, catalogItemList(rows, selectedCatalogIds, linkedCatalogIds), false, rows.length,
+      category ? catalogDisclosure(category, catalogItemList(rows, selectedCatalogIds, linkedCatalogIds, matchedCatalogItems), false, rows.length,
         compactCheck({
           checked: rows.length > 0 && rows.every(row => selectedCatalogIds.has(String(row.id))),
           aria: 'Выбрать все позиции категории ' + category,
           data: 'data-company-category-check="' + escapeHtml(category) + '"',
-        })) : catalogItemList(rows, selectedCatalogIds, linkedCatalogIds),
+        })) : catalogItemList(rows, selectedCatalogIds, linkedCatalogIds, matchedCatalogItems),
     ).join('') + '</div>' +
     actionBlock(
       button('Создать карточку', { data: 'data-company-selection-card' }) +
       button('Удалить', {
-        variant: 'delete-outline', disabled: true,
-        data: 'data-company-selection-delete title="Требуется серверное исключение из ассортимента"',
+        variant: 'delete-outline',
+        data: 'data-company-selection-delete',
       }),
       { className: 'inventory-counterparty-selection-actions' },
     );
 }
 
+// Matching is a hint, never a substitute for a persisted Core supplier link.
+// An ambiguous SKU/barcode on either side is not treated as a match.
+function findCatalogMatches(catalogRows = [], stockItems = []) {
+  const normalize = value => String(value || '').trim().toLocaleUpperCase('ru-RU');
+  const index = (rows, field) => {
+    const ids = new Map();
+    for (const row of rows) {
+      const value = normalize(row[field]);
+      if (!value) continue;
+      const group = ids.get(value) || [];
+      group.push(row);
+      ids.set(value, group);
+    }
+    return ids;
+  };
+  const skuStock = index(stockItems, 'sku'), barcodeStock = index(stockItems, 'barcode');
+  const skuCatalog = index(catalogRows, 'supplierSku'), barcodeCatalog = index(catalogRows, 'barcode');
+  const matches = new Map();
+  for (const row of catalogRows) {
+    const candidates = new Set();
+    const sku = normalize(row.supplierSku), barcode = normalize(row.barcode);
+    if (sku && skuCatalog.get(sku)?.length === 1 && skuStock.get(sku)?.length === 1)
+      candidates.add(skuStock.get(sku)[0].itemId);
+    if (barcode && barcodeCatalog.get(barcode)?.length === 1 && barcodeStock.get(barcode)?.length === 1)
+      candidates.add(barcodeStock.get(barcode)[0].itemId);
+    if (candidates.size === 1) matches.set(String(row.id), [...candidates][0]);
+  }
+  return matches;
+}
+
 // The existing Core routes already support one-to-one create/link. A selected
 // group is processed one product at a time so unit choices and matching cannot
 // silently create incorrect stock cards or duplicate supplier offers.
-async function openSelectedCatalogCards(company, rows, onLinked = () => {}) {
+async function openSelectedCatalogCards(company, rows, onLinked = () => {}, suggestedItemId = () => '') {
   if (!rows.length) return;
   try { await loadInventory(); }
   catch (error) { openNotice({ title: 'Остатки', message: errText(error) }); return; }
@@ -497,7 +530,7 @@ async function openSelectedCatalogCards(company, rows, onLinked = () => {}) {
     const matches = sku ? inventoryItems.filter(item =>
       String(item.sku || '').trim().toLocaleLowerCase('ru-RU') === sku) : [];
     const suggested = linked.length === 1 ? linked[0].itemId
-      : matches.length === 1 ? matches[0].itemId : '';
+      : suggestedItemId(row) || (matches.length === 1 ? matches[0].itemId : '');
     const layer = mountModal(document.body, modal(
       '<p>' + escapeHtml(row.name) + '</p>' +
       (progress(index) ? '<p class="ui-list__secondary">' + progress(index) + '</p>' : '') +
@@ -587,6 +620,7 @@ async function openCompany(companyId, root, onChanged = () => {}) {
   // Core per-row endpoints; persistent exclusions require a separate Core operation.
   const selectedCatalogIds = new Set();
   let linkedCatalogIds = null;
+  let matchedCatalogItems = null;
   const readConfirmedLinks = () => new Set(getInventoryItems().flatMap(item =>
     Array.isArray(item.supplierOffers) ? item.supplierOffers : [])
     .filter(offer => String(offer.counterpartyId || '') === String(companyId)
@@ -616,10 +650,12 @@ async function openCompany(companyId, root, onChanged = () => {}) {
         await loadInventory();
         linkedCatalogIds = readConfirmedLinks();
       } catch {
-        // Do not present missing links as confirmed unlinked when inventory is unavailable.
+        // Do not claim either saved links or matches if inventory cannot be read.
         linkedCatalogIds = null;
+        matchedCatalogItems = null;
       }
       if (!layer.isConnected || !list.isConnected || currentRun !== revision) return;
+      matchedCatalogItems = linkedCatalogIds === null ? null : findCatalogMatches(entries, getInventoryItems());
       const brands = catalogBrands(entries);
       list.innerHTML = entries.length
         ? catalogGroupsMarkup(brands)
@@ -631,7 +667,7 @@ async function openCompany(companyId, root, onChanged = () => {}) {
           const brand = node.dataset.companyBrand;
           const categories = brands.get(brand);
           if (!categories) return;
-          const brandLayer = mountModal(document.body, modal(catalogBrandMarkup(categories, selectedCatalogIds, linkedCatalogIds), {
+          const brandLayer = mountModal(document.body, modal(catalogBrandMarkup(categories, selectedCatalogIds, linkedCatalogIds, matchedCatalogItems), {
             title: brand, variant: 'q', surface: 'app',
           }));
           const syncSelections = () => {
@@ -683,7 +719,8 @@ async function openCompany(companyId, root, onChanged = () => {}) {
           });
           brandLayer?.querySelector('[data-company-selection-card]')?.addEventListener('click', () => {
             const rows = entries.filter(row => selectedCatalogIds.has(String(row.id)));
-            if (rows.length) void openSelectedCatalogCards(company, rows, linked);
+            if (rows.length) void openSelectedCatalogCards(company, rows, linked,
+              row => matchedCatalogItems?.get(String(row.id)) || '');
           });
           brandLayer?.querySelectorAll('[data-company-product]').forEach(product => {
             product.addEventListener('click', () => {
