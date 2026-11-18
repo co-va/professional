@@ -2594,12 +2594,12 @@ function renderStock(root) {
   const scopeInput=rows[0]?.querySelector('[name="inventoryStockScope"]');
   const searchInput=rows[1]?.querySelector('[data-inventory-stock-search]');
   const listHost=root.querySelector('[data-inventory-stock-group-list]');
-  const refresh=()=>{
+  const visibleRows=()=>{
     const locationId=STOCK_VIEW.storageScope;
     const word=normalizedSearch(searchInput?.value || '');
     const classifications=getInventoryClassificationGroups();
     const locations=getInventoryStorageLocations();
-    const filtered=sortItems(getInventoryItems().filter(item=>{
+    return sortItems(getInventoryItems().filter(item=>{
       const balance=inventoryDisplayBalance(item,locationId);
       const factor=Number(item.thresholdStockFactor);
       const thresholdBalance=balance===0?0:
@@ -2610,8 +2610,12 @@ function renderStock(root) {
         return false;
       return !word||itemSearchText(item).includes(word);
     }),STOCK_VIEW.itemsSort);
-    renderStockBrandList(listHost,filtered,{
+  };
+  const refresh=()=>{
+    const locationId=STOCK_VIEW.storageScope;
+    renderStockBrandList(listHost,visibleRows(),{
       scope:locationId,
+      itemsForView:visibleRows,
       sort:STOCK_VIEW.manufacturersSort,
       onOpen:(itemId,onRefresh)=>{
         openInventoryProductOverview(itemId,{
