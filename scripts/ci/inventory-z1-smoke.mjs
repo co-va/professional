@@ -48,6 +48,13 @@ assert.equal(state(localStorage).STOCK_VIEW.manufacturersSort, 'name-desc', 'Sor
 first.saveInventorySortMode('itemsSort', 'invalid');
 assert.equal(state(localStorage).STOCK_VIEW.itemsSort, 'balance-asc', 'Invalid sort is ignored');
 assert.match(page, /openSharedProfileSettingsMenu\(/, 'Reuse existing settings action menu');
+for (const item of [
+  "id: 'groups', label: 'Группы'",
+  "id: 'storage', label: 'Места хранения'",
+  "id: 'transfer', label: 'Перемещение'",
+]) assert.ok(page.includes(item), 'Stock E exposes Core operation ' + item);
+assert.match(inventory, /classificationOptions\(item\.classificationGroupId/,
+  'Stock item editor selects a Core-owned classification');
 assert.match(page, /setV2ZHeaderRows\(root,/, 'Existing header search');
 assert.match(page, /bindManufacturerCards\(root, listHost\)/, 'All brand cards remain interactive');
 
