@@ -1944,7 +1944,11 @@ function openManufacturerStock(root, manufacturer, groupContext = null) {
       c: { label: '+', data: 'data-inventory-add-item', aria: 'Добавить позицию' },
     })}
     <div data-stock-selected-actions hidden>
-      ${actionBlock(button('Действия', { data: 'data-stock-selected-open' }))}
+      <p class="ui-list__secondary">Выбрано: <strong data-stock-selected-count>0</strong></p>
+      ${actionBlock(
+        button('Переместить', { data: 'data-stock-selected-transfer' }) +
+        button('Удалить', { variant: 'delete-outline', data: 'data-stock-selected-delete' })
+      )}
     </div>
     <div data-inventory-company-list>${stockListMarkup(manufacturer, '', rowsProvider, expandedStockGroups)}</div>`;
   const layer = mountV2ZLayer(root, v2ZLayer(markup, { className: 'inventory-manufacturer-z' }), { stack: true });
@@ -1954,11 +1958,11 @@ function openManufacturerStock(root, manufacturer, groupContext = null) {
 
   const listHost = layer.querySelector('[data-inventory-company-list]');
   const selectionActions = layer.querySelector('[data-stock-selected-actions]');
-  const selectedAction = layer.querySelector('[data-stock-selected-open]');
+  const selectedCount = layer.querySelector('[data-stock-selected-count]');
   const syncSelected = () => {
     for (const id of selectedStockItems) if (!getInventoryItem(id)) selectedStockItems.delete(id);
     if (selectionActions) selectionActions.hidden = !selectedStockItems.size;
-    if (selectedAction) selectedAction.textContent = 'Действия · ' + selectedStockItems.size;
+    if (selectedCount) selectedCount.textContent = String(selectedStockItems.size);
   };
   const deleteSelected = () => {
     const chosen = [...selectedStockItems].map(id => getInventoryItem(id)).filter(Boolean);
@@ -1998,28 +2002,39 @@ function openManufacturerStock(root, manufacturer, groupContext = null) {
         openNotice({ title: 'Остатки', message: 'Удалено позиций: ' + safe.length +
           (skipped ? '. Не удалены позиции с остатками: ' + skipped + '.' : '.') });
       } catch (cause) {
+        // A committed delete can be followed by a failed response/snapshot.
+        // Read the authoritative active catalog before reporting an error.
+        let archived = false;
+        try {
+          await loadInventory();
+          archived = safe.every(item => !getInventoryItem(item.itemId));
+        } catch { /* Keep the original failure if Core cannot be read. */ }
+        if (archived) {
+          safe.forEach(item => selectedStockItems.delete(item.itemId));
+          dialog.v2Close?.();
+          renderList();
+          openNotice({ title: 'Остатки', message: 'Удалено позиций: ' + safe.length +
+            (skipped ? '. Не удалены позиции с остатками: ' + skipped + '.' : '.') });
+          return;
+        }
         const error = dialog.querySelector('[data-stock-bulk-delete-error]');
-        if (error) error.textContent = cause instanceof Error ? cause.message : 'Не удалось удалить выбранные товары.';
+        if (error) error.textContent = cause instanceof Error && cause.message !== 'Internal server error'
+          ? cause.message : 'Не удалось подтвердить удаление. Позиции остались в остатках.';
         submit.disabled = false;
         saving = false;
       }
     });
   };
-  selectedAction?.addEventListener('click', () => {
+  layer.querySelector('[data-stock-selected-transfer]')?.addEventListener('click', () => {
     const ids = [...selectedStockItems].filter(id => Boolean(getInventoryItem(id)));
     if (!ids.length) return;
-    openSharedProfileSettingsMenu({
-      title: 'Выбрано: ' + ids.length,
-      actions: [
-        { id: 'transfer', label: 'Переместить', onSelect: () => openInventoryTransfer(() => {
-          selectedStockItems.clear();
-          renderList();
-        }, { selectedItemIds: ids, fromLocationId: STOCK_VIEW.storageScope === INVENTORY_TOTAL_SCOPE
-          ? '' : STOCK_VIEW.storageScope }) },
-        { id: 'archive', label: 'Удалить из остатков', variant: 'delete-outline', onSelect: deleteSelected },
-      ],
-    });
+    openInventoryTransfer(() => {
+      selectedStockItems.clear();
+      renderList();
+    }, { selectedItemIds: ids, fromLocationId: STOCK_VIEW.storageScope === INVENTORY_TOTAL_SCOPE
+      ? '' : STOCK_VIEW.storageScope });
   });
+  layer.querySelector('[data-stock-selected-delete]')?.addEventListener('click', deleteSelected);
   let disposeCategoryReorder = () => {};
   let disposeCategoryPreview = () => {};
   const renderList = () => {
