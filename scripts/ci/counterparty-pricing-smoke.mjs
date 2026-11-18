@@ -220,18 +220,53 @@ assert.throws(() => editor.supplierCatalogEditValue(discountField, '120'), /Пр
 assert.throws(() => editor.supplierCatalogEditValue(priceField, '-3'), /Проверьте значение/);
 assert.throws(() => editor.supplierCatalogEditValue(packageField, '0'), /Проверьте значение/);
 assert.equal(editor.supplierCatalogValueMatches('12.5000', 12.5, discountField), true);
-assert.match(massSource, /twoColumnLayout\(/,
-  'Mass editing reuses the two-column UI from stocktake');
-assert.match(massSource, /inventory-audit-value-heading/,
-  'Mass editing reuses the audit data-value header');
-assert.match(massSource, /class="data-edit-row"/,
-  'Individual changes reuse the audit compact data rows');
-assert.match(massSource, /applyAll\(\) \? 'Применить' : 'Продолжить'/,
-  'Mass editing supports shared or per-position values');
-assert.match(massSource, /method: 'PUT', body: \{ \[def\.value\]: entry\.value \}/,
-  'Mass editing calls only the existing single-row Core API');
+assert.doesNotMatch(massSource, /twoColumnLayout\(|inventory-audit-value-heading|inventory-audit-value-line|data-edit-row/,
+  'Remove hand-copied inventory geometry instead of tuning another local layout');
+assert.match(massSource, /v2Section\(row\.name, '<div class="form-grid"/,
+  'Every selected supplier product has its own existing shared section and form geometry');
+assert.match(massSource, /fieldSelect\('supplierBulkField-' \+ index\)/,
+  'Each product has its own independent editable field selector');
+assert.match(massSource, /supplierCatalogDataControl\(def, valueName, '', 'На что изменить'\)/,
+  'Value input is a canonical active field with a normal label');
+assert.match(massSource, /compactCheck\(\{ label: 'Одинаковое изменение для всех'/,
+  'Shared values remain possible without disabling individual editing by default');
+assert.match(massSource, /common\.hidden = !shared;\s*items\.hidden = shared;/,
+  'Common and individual modes must never appear on top of each other');
+assert.match(massSource, /form\.addEventListener\('submit',/,
+  'One Q handles all selected products without a second Q hop');
+assert.match(massSource, /method: 'PUT', body: \{ \[entry\.field\]: entry\.value \}/,
+  'Mixed edits use only the existing per-row Core PUT for each field');
 assert.match(massSource, /const saved = await loadSelected\(\)/,
-  'Mass editing confirms persisted values against a fresh Core read');
+  'Core values must be verified after saving');
+assert.doesNotMatch(massSource, /mountModal\(layer|title: 'Массовое изменение'/,
+  'No nested Q or outdated bulk action remains');
+// Check rendered structure, not just source snippets: two selected products
+// must each receive an independent "Что изменить" and live "На что изменить".
+const mockFields = [];
+let actualMarkup = '';
+const mockBulk = new Function('document', 'mountModal', 'modal', 'select',
+  'field', 'v2Section', 'compactCheck', 'actionBlock', 'button',
+  massSource + '\nreturn openSupplierBulkEditor;')(
+  { body: {} },
+  (_, markup) => { actualMarkup = markup; return null; },
+  content => content,
+  options => { mockFields.push(options.name); return '<select name="' + options.name + '"></select>'; },
+  options => '<input name="' + options.name + '"' + (options.disabled ? ' disabled' : '') + '>',
+  (name, content) => '<section class="v2-section"><h2>' + name + '</h2>' + content + '</section>',
+  () => '<input type="checkbox">',
+  content => content,
+  label => '<button>' + label + '</button>');
+mockBulk({ id: 'supplier1' }, [{ id: 'a', name: 'Шампунь' }, { id: 'b', name: 'Краска' }]);
+assert.ok(mockFields.includes('supplierBulkField-0') && mockFields.includes('supplierBulkField-1'),
+  'Each selected product has its own selector');
+assert.ok(mockFields.includes('supplierBulkField-all'),
+  'One shared selector is available for the optional common action');
+assert.equal((actualMarkup.match(/<section class="v2-section">/g) || []).length, 2,
+  'The two selected products render as two separate visible sections');
+assert.equal((actualMarkup.match(/class="form-grid"/g) || []).length, 3,
+  'Fields use only the existing stacked form geometry');
+assert.doesNotMatch(actualMarkup, /two-column-layout|inventory-audit-value-cell|disabled/,
+  'No copied columns or initially disabled value controls in the editor markup');
 assert.match(source, /if \(row\) openCatalogProductDetails|openCatalogProductDetails\(row,/);
 assert.doesNotMatch(source, /if \(check\) check\.click\(\);/);
 const detail = source.slice(source.indexOf('function openCatalogProductDetails('),
