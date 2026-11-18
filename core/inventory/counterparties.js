@@ -1,6 +1,6 @@
 import {
   actionBlock, button, emptyState, field, modal, mountModal, openNotice,
-  page, select, v2ListEntries, v2ListEntry, v2Section, workspaceHeaderContext,
+  page, select, list, v2ListEntries, v2ListEntry, v2Section, workspaceHeaderContext,
   mountV2ZLayer, v2ZLayer, openSharedProfileSettingsMenu,
   entityVisualCard, entityCardStack, openEntityCardAppearanceQ,
 } from '../../ui/ui.js';
@@ -339,36 +339,34 @@ function counterpartyInformation(company = {}) {
 }
 
 function catalogItemList(items = [], selectedCatalogIds = new Set()) {
-  // Existing V2 List: two columns of exactly three single-line values.
-  // Import fields come from Core; missing values remain explicitly unknown.
-  return v2ListEntries(items.map(item =>
+  // Existing compact UI List (not the raised V2 entry used for brands).
+  // All three text lines and three price lines use the canonical List fields.
+  return '<div class="inventory-counterparty-product-list">' + items.map(item =>
     '<div class="inventory-counterparty-product-row">' +
       compactCheck({
         checked: selectedCatalogIds.has(String(item.id)),
         aria: 'Выбрать позицию ' + item.name,
         data: 'data-company-product-check="' + escapeHtml(item.id) + '"',
       }) +
-      v2ListEntry({
-        columns: [
-          [
-            { value: item.name, strong: true },
-            { value: item.supplierSku || '—', muted: true },
-            { value: supplierAvailability(item.supplierAvailable), muted: true },
+      list({
+        className: 'ui-list--dense',
+        items: [{
+          overline: supplierAvailability(item.supplierAvailable),
+          title: item.name,
+          secondary: item.supplierSku || '—',
+          right: [
+            'Прайс: ' + money(item.listPrice),
+            'Моя: ' + money(item.actualPrice),
+            'Скидка: ' + (item.discountPercent == null ? '—'
+              : Number(item.discountPercent).toLocaleString('ru-RU', { maximumFractionDigits: 2 }) + '%'),
           ],
-          [
-            { value: 'Прайс: ' + money(item.listPrice), strong: true },
-            { value: 'Моя: ' + money(item.actualPrice), muted: true },
-            { value: 'Скидка: ' + (item.discountPercent == null ? '—'
-              : Number(item.discountPercent).toLocaleString('ru-RU', { maximumFractionDigits: 2 }) + '%'), muted: true },
-          ],
-        ],
-        interactive: true,
-        initial: '',
-        data: 'data-company-product="' + escapeHtml(item.id) + '"',
-        aria: 'Открыть позицию ' + item.name,
+          interactive: true,
+          data: 'data-company-product="' + escapeHtml(item.id) + '"',
+          aria: 'Открыть позицию ' + item.name,
+        }],
       }) +
     '</div>',
-  ));
+  ).join('') + '</div>';
 }
 
 function catalogDisclosure(title, content, nested = false, count = null, check = '') {
