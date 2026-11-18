@@ -701,6 +701,7 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
     .filter(([name]) => name !== 'netWeight')
     .map(([name, value]) => [name, typeof value === 'string' ? value : '']));
   let initialSignature = '';
+  let initialFormFields = new Map();
   const syncDirty = () => {
     if (!creating) setSharedActionVisible(actions, signature() !== initialSignature);
   };
@@ -904,6 +905,8 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
   // that legacy formula; preserve an intentionally entered manual price.
   // Keep the server value as the initial signature so Save remains available.
   initialSignature = signature();
+  initialFormFields = new Map([...new FormData(form).entries()].map(
+    ([key, value]) => [key, typeof value === 'string' ? value : '']));
   if (pressed('sale') && markupInput?.value.trim() && sellingInput) {
     try {
       const current = String(sellingInput.value || '').trim();
@@ -923,10 +926,48 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
 
 
   const save = async () => {
-    if (primary.disabled || (!creating && signature() === initialSignature)) return;
+    if (primary.disabled) return;
+    try {
     const data = new FormData(form);
+    if (!creating && signature() === initialSignature) {
+      openNotice({title:'Сохранение',message:'Изменений нет. Выберите новое значение или измените поле.'});
+      return;
+    }
     const name = String(data.get('name') || '').trim();
     if (!name) return openNotice({ title: 'Наименование', message: 'Укажите наименование позиции.' });
+    // Editing only classification, name or identifiers must not resubmit
+    // untouched legacy packaging, quantities and sale settings. Core accepts
+    // field-level updates; unrelated historical fields stay exactly as stored.
+    if (!creating) {
+      const changed = [...data.entries()].filter(([key, value]) =>
+        String(value ?? '') !== String(initialFormFields.get(key) ?? ''));
+      const simpleFields = new Set([
+        'name','catalogName','manufacturer','category','productType','sku','barcode','position',
+      ]);
+      if (changed.length && changed.every(([key]) =>
+        simpleFields.has(key) || key.startsWith('criteriaValue:'))) {
+        const edits = {};
+        for (const [key, value] of changed) {
+          if (key.startsWith('criteriaValue:')) {
+            const id = key.slice('criteriaValue:'.length);
+            if (id) (edits.criteriaValues ||= {})[id] = String(value ?? '');
+          } else if (key === 'position') {
+            const raw = String(value ?? '').trim();
+            const number = raw ? Number(raw) : 0;
+            if (!Number.isSafeInteger(number) || number < 0)
+              throw new Error('Порядковый номер должен быть целым неотрицательным числом.');
+            edits.position = number;
+          } else {
+            edits[key] = String(value ?? '').trim();
+          }
+        }
+        primary.disabled = true;
+        await updateInventoryItem(item.itemId, edits);
+        layer.v2Close?.();
+        onSaved(item.itemId);
+        return;
+      }
+    }
     const requestedPositionText = String(data.get('position') ?? '').trim();
     const requestedPosition = requestedPositionText === '' ? 0 : Number(requestedPositionText);
     if (!creating && (!Number.isSafeInteger(requestedPosition) || requestedPosition < 0)) {
@@ -1108,19 +1149,22 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
       openNotice({ title: 'Правила остатка', message: error.message }); return;
     }
     primary.disabled = true;
-    try {
-      const priorIds = creating ? new Set(getInventoryItems().map(row => row.itemId)) : null;
-      if (creating) await createInventoryItem(value);
-      else await updateInventoryItem(item.itemId, value);
-      const savedId = creating ? getInventoryItems().find(row => !priorIds.has(row.itemId))?.itemId : item.itemId;
-      layer.v2Close?.();
-      onSaved(savedId);
+    const priorIds = creating ? new Set(getInventoryItems().map(row => row.itemId)) : null;
+    if (creating) await createInventoryItem(value);
+    else await updateInventoryItem(item.itemId, value);
+    const savedId = creating ? getInventoryItems().find(row => !priorIds.has(row.itemId))?.itemId : item.itemId;
+    layer.v2Close?.();
+    onSaved(savedId);
     } catch (error) {
       primary.disabled = false;
+      const message = error instanceof Error ? error.message : 'Не удалось сохранить товар.';
       if (saveError) {
-        saveError.textContent = error instanceof Error ? error.message : 'Ошибка склада';
+        saveError.textContent = message;
         saveError.hidden = false;
       }
+      // The error below a sticky bottom action is outside the visible viewport
+      // on iPhone. Always surface the actual server/validation failure at once.
+      openNotice({title:'Не удалось сохранить',message});
     }
   };
   primary.addEventListener('click', () => { void save(); });
