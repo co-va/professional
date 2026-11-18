@@ -1530,9 +1530,10 @@ function openManufacturerAppearance(root, onSaved = () => {}) {
 function stockListMarkup(manufacturer, query = '') {
   const needle = normalizedSearch(query);
   const group = getInventoryItems().filter(item => manufacturerName(item) === manufacturer);
+  const classificationGroups = getInventoryClassificationGroups();
   const items = sortItems(group.filter((item) => {
     if (!matchesType(item, STOCK_VIEW.itemsType)
-      || !matchesStockFilters(item, STOCK_VIEW.itemsFilters, getInventoryClassificationGroups())) return false;
+      || !matchesStockFilters(item, STOCK_VIEW.itemsFilters, classificationGroups)) return false;
     return !needle || itemSearchText(item).includes(needle);
   }), STOCK_VIEW.itemsSort);
   if (!items.length) return emptyState('Ничего не найдено', 'Измените поиск или фильтр.');
