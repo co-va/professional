@@ -24,6 +24,10 @@ function transferUnits(item) {
 export function openInventoryTransfer(onSaved = () => {}) {
   const stock = getInventoryItems();
   const places = options();
+  // One stable operation identifier per form; retries cannot duplicate stock.
+  const transferId = globalThis.crypto?.randomUUID?.() || '';
+  let pending = false;
+  let submittedPayload = null;
   const fromDefault = places.find(place => place.value === 'primary')?.value || places[0]?.value || '';
   const toDefault = places.find(place => place.value !== fromDefault)?.value || '';
   // Do not preselect an arbitrary product for a stock-changing operation.
@@ -73,6 +77,7 @@ export function openInventoryTransfer(onSaved = () => {}) {
   });
   form.addEventListener('submit', async event => {
     event.preventDefault();
+    if (pending) return;
     const data = new FormData(form);
     const from = String(data.get('fromLocationId') || '');
     const to = String(data.get('toLocationId') || '');
@@ -92,15 +97,25 @@ export function openInventoryTransfer(onSaved = () => {}) {
       error.textContent = 'Укажите целое число штук или упаковок.';
       return;
     }
+    if (!transferId) { error.textContent = 'Не удалось подготовить идентификатор операции.'; return; }
+    const candidate = { transferId, fromLocationId: from, toLocationId: to,
+      lines: [{ itemId, quantity, unit: quantityUnit }] };
+    // A retry uses the same immutable request even if the first reply was lost.
+    if (submittedPayload && JSON.stringify(submittedPayload) !== JSON.stringify(candidate)) {
+      error.textContent = 'Предыдущая попытка переноса не подтверждена. Обновите остатки перед новой операцией.';
+      return;
+    }
+    submittedPayload = candidate;
     const submit = form.querySelector('[type="submit"]');
+    pending = true;
     submit.disabled = true;
     try {
-      await transferInventoryStock({ fromLocationId: from, toLocationId: to,
-        lines: [{ itemId, quantity, unit: quantityUnit }] });
+      await transferInventoryStock(submittedPayload);
       host.v2Close?.();
       onSaved();
     } catch (cause) {
       error.textContent = cause instanceof Error ? cause.message : 'Не удалось переместить товар.';
+      pending = false;
       submit.disabled = false;
     }
   });
