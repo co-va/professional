@@ -41,7 +41,8 @@ import {
 } from './completeness.js';
 import { openInventoryProductAppearanceQ, openInventoryProductOverview } from './product-overview.js';
 import { renderInventoryOrders } from './orders.js';
-import { classificationOptions, openInventoryClassificationGroups } from './classification.js';
+import { classificationOptions, openInventoryClassificationGroups,
+  inventoryCriterionGroups, criterionOptions } from './classification.js';
 import { openInventoryStorageLocations, openInventoryTransfer } from './storage.js';
 import { renderStockBrandList } from './stock-catalog.js';
 import { INVENTORY_TOTAL_SCOPE, inventoryDisplayBalance,
@@ -63,6 +64,7 @@ import {
   createInventoryItem,
   createInventoryMovement,
   loadInventory,
+  loadInventoryCriteria,
   updateInventoryItem,
   reorderInventoryItems,
 } from './service.js';
@@ -614,17 +616,17 @@ function advancedItemFields(item = {}, defaults = {}) {
     }) +
     '</div>';
 
+  const criteriaFields = inventoryCriterionGroups().map(group=>{
+    const key=group.legacyField || 'criteriaValue:'+group.id;
+    const current=group.legacyField
+      ? String(item[group.legacyField] || defaults[group.legacyField] || '')
+      : String(item.criteriaValues?.[group.id] || defaults.criteriaValues?.[group.id] || '');
+    return select({label:group.name,name:key,value:current,
+      options:criterionOptions(group,current)});
+  }).join('');
   const classification = '<div class="inventory-editor-group">' +
     field({ label: 'Полное наименование', name: 'catalogName', value: item.catalogName || '' }) +
-    field({ label: 'Производитель', name: 'manufacturer', value: item.manufacturer || defaults.manufacturer || '' }) +
-    '<div class="inventory-editor-row">' +
-      field({ label: 'Категория', name: 'category', value: item.category || '' }) +
-      field({ label: 'Подкатегория', name: 'productType', value: item.productType || '' }) +
-    '</div>' +
-    select({ label: 'Группа', name: 'classificationGroupId',
-      value: item.classificationGroupId || defaults.classificationGroupId || '',
-      options: classificationOptions(item.classificationGroupId || defaults.classificationGroupId || ''),
-      searchable: true }) +
+    criteriaFields +
     columnLayout([
       field({ label: '№', name: 'position', value: Number(item.position) > 0 ? item.position : '',
         type: 'number', min: '1', step: '1', inputmode: 'numeric' }),
@@ -1054,11 +1056,17 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
       nominalQuantity, nominalUnit, receiptUnit, thresholdUnit, containerMode,
       unit, packageQuantity,
       ...(!purchaseInput?.disabled ? { referencePrice } : {}),
-      manufacturer: String(data.get('manufacturer') || '').trim(),
-      category: String(data.get('category') || '').trim(),
-      productType: String(data.get('productType') || '').trim(),
-      ...(String(data.get('classificationGroupId') || '') || item?.classificationGroupId
-        ? { classificationGroupId: String(data.get('classificationGroupId') || '') } : {}),
+      // Hidden classification groups are not rendered in the form, so retain
+      // their legacy values. Never erase an existing manufacturer's name.
+      manufacturer: String(data.get('manufacturer') ?? item?.manufacturer ?? '').trim(),
+      category: String(data.get('category') ?? item?.category ?? '').trim(),
+      productType: String(data.get('productType') ?? item?.productType ?? '').trim(),
+      ...(() => {
+        const additional=inventoryCriterionGroups().filter(group=>!group.legacyField);
+        if(!additional.length)return {};
+        return {criteriaValues:Object.fromEntries(additional.map(group=>
+          [group.id,String(data.get('criteriaValue:'+group.id) || '')]))};
+      })(),
       sku: String(data.get('sku') || '').trim(),
       barcode: String(data.get('barcode') || '').trim(),
       ...(!creating ? { position: requestedPosition } : {}),
@@ -2658,7 +2666,14 @@ export async function renderInventory(root, section = 'stock') {
   try {
     await Promise.all([
       loadInventory(),
-      ...(section === 'stock' ? [loadAuxiliaryState('service')] : []),
+      ...(section === 'stock' ? [
+        loadAuxiliaryState('service'),
+        // Older Core builds may not yet have deployed the criteria migration.
+        // Never make the entire stock catalog disappear in that case.
+        loadInventoryCriteria().catch(error=>{
+          console.error('Inventory criteria unavailable',error);
+        }),
+      ] : []),
     ]);
   } catch (error) {
     root.innerHTML = emptyState('Склад недоступен', error instanceof Error ? error.message : 'Не удалось загрузить данные.');
