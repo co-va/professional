@@ -296,21 +296,6 @@ async function openCatalogRow(company, row, { itemId = '', onLinked = () => {} }
 
 // The X explains the preferred template before the native file picker.
 // Alternate .xlsx layouts and PDF remain eligible for server-side preview.
-function openImportGuidance(company, onSaved) {
-  const layer = mountModal(document.body, modal(
-    '<div class="form-grid">' +
-      '<p>Для загрузки ассортимента рекомендуем шаблон Excel приложения (.xlsx).</p>' +
-      '<p>Другой Excel .xlsx или PDF тоже можно выбрать. Позиции появятся только при успешном распознавании файла.</p>' +
-      button('Выбрать файл', { data: 'data-counterparty-pick-file' }) +
-    '</div>',
-    { title: 'Загрузка ассортимента', variant: 'x', xRole: 'action', surface: 'app' },
-  ));
-  layer?.querySelector('[data-counterparty-pick-file]')?.addEventListener('click', () => {
-    layer.v2Close?.();
-    openImport(company, onSaved);
-  });
-}
-
 // The native OS file picker opens directly from the X button's user gesture.
 // The confirmation Q appears only after a file is chosen.
 function openImport(company, onSaved) {
@@ -1137,13 +1122,16 @@ async function openCompany(companyId, root, onChanged = () => {}) {
   };
   layer.querySelector('[data-company-actions]')?.addEventListener('click', () => {
     openSharedProfileSettingsMenu({ title: 'Контрагент', actions: [
-      { id: 'edit', label: 'Редактировать', onSelect: () =>
+      { id: 'edit', label: 'Редактировать', variant: 'primary', onSelect: () =>
         openCompanyEditor(company, () => { void refresh(); onChanged(); }) },
-      { id: 'upload', label: 'Загрузить файл', variant: 'primary', onSelect: () =>
-        openImportGuidance(company, () => { void refresh(); onChanged(); }) },
-      { id: 'template', label: 'Шаблон Excel', onSelect: () =>
-        void download('/template/xlsx', 'catalog-template.xlsx').catch(error =>
-          openNotice({ title: 'Excel', message: errText(error) })) },
+      { id: 'excel', label: 'Excel', onSelect: () =>
+        openSharedProfileSettingsMenu({ title: 'Excel', actions: [
+          { id: 'upload', label: 'Загрузить', variant: 'primary', onSelect: () =>
+            openImport(company, () => { void refresh(); onChanged(); }) },
+          { id: 'template', label: 'Шаблон Excel', onSelect: () =>
+            void download('/template/xlsx', 'catalog-template.xlsx').catch(error =>
+              openNotice({ title: 'Excel', message: errText(error) })) },
+        ] }) },
       ...(Array.isArray(company.priceLists) && company.priceLists.length
         ? [{ id: 'history', label: 'История загрузок', onSelect: () =>
           openCounterpartyFiles(company) }] : []),
