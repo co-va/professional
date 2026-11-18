@@ -250,3 +250,10 @@ export function updateInventoryStorageLocation(locationId, value) {
 export function transferInventoryStock(value) {
   return inventoryRequest('/transfers', { method: 'POST', body: JSON.stringify(value) });
 }
+
+// Desired quantities are a separate planning operation; never create a physical movement.
+export function updateInventoryStockTargets(itemId, value) {
+  return inventoryRequest('/items/' + encodeURIComponent(String(itemId)) + '/targets', {
+    method: 'PUT', body: JSON.stringify(value),
+  });
+}
