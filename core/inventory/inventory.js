@@ -2576,26 +2576,25 @@ function renderStock(root) {
   ];
   if (!scopes.some(entry=>entry.value===STOCK_VIEW.storageScope))
     STOCK_VIEW.storageScope=INVENTORY_TOTAL_SCOPE;
+  const scopeSelector=select({label:'Склад',name:'inventoryStockScope',
+    value:STOCK_VIEW.storageScope,options:scopes});
   root.innerHTML = page([
     context('Остатки',{
       v:{data:'data-inventory-stock-menu',aria:'Настройки остатков'},
       c:{label:'+',data:'data-inventory-add-item',aria:'Добавить позицию'},
     }),
-    '<div data-inventory-scope-selector>' +
-      select({label:'Склад',name:'inventoryStockScope',
-        value:STOCK_VIEW.storageScope,options:scopes}) + '</div>',
-    '<div class="ui-search-field">' +
-      field({name:'inventorySearch',type:'search',
-        placeholder:'Название, артикул, группа…',autocomplete:'off',
-        data:'data-inventory-stock-search'}) + '</div>',
     '<div data-inventory-stock-group-list></div>',
   ]);
-  const scopeInput=root.querySelector('[name="inventoryStockScope"]');
-  const searchInput=root.querySelector('[data-inventory-stock-search]');
+  // Z1 owns the scope selector in its Shared Header, not in the scrollable
+  // brand list. Keep a visible fallback if the host has not been mounted.
+  const headerRows=setV2ZHeaderRows(root,[scopeSelector]);
   const listHost=root.querySelector('[data-inventory-stock-group-list]');
+  if (!headerRows.length) listHost?.insertAdjacentHTML('beforebegin',
+    '<div data-inventory-scope-selector>'+scopeSelector+'</div>');
+  const scopeInput=headerRows[0]?.querySelector('[name="inventoryStockScope"]')
+    || root.querySelector('[name="inventoryStockScope"]');
   const visibleRows=()=>{
     const locationId=STOCK_VIEW.storageScope;
-    const word=normalizedSearch(searchInput?.value || '');
     const classifications=getInventoryClassificationGroups();
     const locations=getInventoryStorageLocations();
     return sortItems(getInventoryItems().filter(item=>{
@@ -2605,9 +2604,7 @@ function renderStock(root) {
         Number.isFinite(factor)&&factor>0 ? balance/factor : null;
       const scoped={...item,balance,balanceInThresholdUnit:thresholdBalance,
         targetStock:inventoryDisplayTarget(item,locationId)};
-      if (!matchesStockFilters(scoped,STOCK_VIEW.itemsFilters,classifications,locations))
-        return false;
-      return !word||itemSearchText(item).includes(word);
+      return matchesStockFilters(scoped,STOCK_VIEW.itemsFilters,classifications,locations);
     }),STOCK_VIEW.itemsSort);
   };
   const refresh=()=>{
@@ -2615,7 +2612,6 @@ function renderStock(root) {
     renderStockBrandList(listHost,visibleRows(),{
       scope:locationId,
       itemsForView:visibleRows,
-      sort:STOCK_VIEW.manufacturersSort,
       onOpen:(itemId,onRefresh)=>{
         openInventoryProductOverview(itemId,{
           edit:(saved)=>openItemEditor(root,itemId,{},saved),
@@ -2635,13 +2631,10 @@ function renderStock(root) {
     STOCK_VIEW.storageScope=event.target.value;
     refresh();
   });
-  searchInput?.addEventListener('input',refresh);
   root.querySelector('[data-inventory-stock-menu]')?.addEventListener('click',()=>{
     openSharedProfileSettingsMenu({
       title:'Настройки остатков',
       actions:[
-        {id:'sort',label:'Сортировка',onSelect:()=>
-          openStockControls(root,'manufacturers','',refresh,'sort')},
         {id:'filter',label:'Фильтр',onSelect:()=>
           openStockControls(root,'items','',refresh,'filter')},
         {id:'groups',label:'Группы',onSelect:()=>
