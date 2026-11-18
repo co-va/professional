@@ -203,15 +203,34 @@ async function openCatalogRow(company, row, { itemId = '', onLinked = () => {} }
       options: [{ value: '', label: 'Выбрать товар' },
         ...items.map(item => ({ value: item.itemId, label: [item.manufacturer, item.name].filter(Boolean).join(' · ') }))],
       searchable: true })}
+    <div data-catalog-row-unit-fields hidden>
+      ${field({ label: 'Единиц склада в предложении', name: 'unitsPerOffer',
+        type: 'number', min: '0.001', step: 'any' })}
+    </div>
     <p class="form-error" data-catalog-link-error role="alert"></p>
-    ${actionBlock(button('Связать', { data: 'data-catalog-row-link' }) +
-      button('Новая рабочая карточка', { variant: 'secondary', data: 'data-catalog-new-item' }))}
+    ${actionBlock(button('Применить', { data: 'data-catalog-row-link' }) +
+      (itemId ? '' : button('Новая карточка', { variant: 'secondary', data: 'data-catalog-new-item' })))}
   </div>`, { title: 'Подключить товар', variant: 'q', surface: 'app' }));
   if (!layer) return;
   const errorHost = layer.querySelector('[data-catalog-link-error]');
+  const needsUnits = chosen => {
+    const stock = getInventoryItems().find(entry => String(entry.itemId) === String(chosen));
+    const unit = value => String(value || '').trim().toLocaleLowerCase('ru-RU').replace(/\.$/, '');
+    return Boolean(row.unit && stock?.unit && unit(row.unit) !== unit(stock.unit));
+  };
+  const unitFields = layer.querySelector('[data-catalog-row-unit-fields]');
+  const updateUnits = () => {
+    unitFields.hidden = !needsUnits(layer.querySelector('[name="itemId"]')?.value);
+  };
+  layer.querySelector('[name="itemId"]')?.addEventListener('change', updateUnits);
+  updateUnits();
   const link = async chosen => {
+    const units = Number(layer.querySelector('[name="unitsPerOffer"]')?.value);
+    if (needsUnits(chosen) && !(Number.isFinite(units) && units > 0))
+      throw new Error('Укажите количество единиц склада в предложении.');
     await json('/' + urlId(company.id) + '/catalog/' + urlId(row.id) + '/link', {
-      method: 'POST', body: { itemId: chosen },
+      method: 'POST', body: { itemId: chosen,
+        ...(needsUnits(chosen) ? { unitsPerOffer: units } : {}) },
     });
     await loadInventory();
     layer.v2Close?.();
