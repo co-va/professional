@@ -225,7 +225,10 @@ export function renderStockBrandList(host, items, options = {}) {
   host.querySelectorAll('[data-stock-brand]').forEach(node=>{
     node.addEventListener('click',()=>{
       const brand = groups.find(group=>group.name===node.dataset.stockBrand);
-      if(brand)openStockCatalogBrand(brand,options);
+      if(brand) {
+        if(typeof options.onBrandOpen==='function') options.onBrandOpen(brand);
+        else openStockCatalogBrand(brand,options);
+      }
     });
   });
   return allowReorder ? initV2ListReorder(host,{
