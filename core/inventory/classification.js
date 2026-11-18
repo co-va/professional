@@ -1,5 +1,5 @@
 import { actionBlock, button, emptyState, field, list, modal, mountModal } from '../../ui/ui.js';
-import { getInventoryCriteria, getInventoryItems } from './data.js';
+import { getInventoryCriteria, getInventoryItems, getInventoryClassificationGroups } from './data.js';
 import { loadInventoryCriteria, loadInventory, createInventoryCriterion, updateInventoryCriterion,
   createInventoryCriterionValue, updateInventoryCriterionValue } from './service.js';
 import { escapeHtml } from '../../ui/utils/escape-html.js';
@@ -37,10 +37,26 @@ export function criterionOptions(group, current = '') {
 // Legacy tree options are still used by the existing item-specific filter.
 // They do not define the new editable criteria; no group tree in product forms.
 export function classificationOptions(value = '') {
-  const options = [{value:'',label:'Без группы'}];
-  const groups = (getInventoryCriteria() || []).filter(g=>g.legacyField==='category');
-  for(const group of groups)for(const entry of (group.values || []))
-    options.push({value:entry.id,label:entry.name});
+  const rows = getInventoryClassificationGroups().filter(group=>group && group.groupId);
+  const byParent = new Map();
+  rows.forEach(group=>{
+    const parent=group.parentGroupId||'';
+    const children=byParent.get(parent)||[];
+    children.push(group);byParent.set(parent,children);
+  });
+  const options=[{value:'',label:'Все группы'}];
+  const seen=new Set();
+  const walk=(parent,depth=0)=>{
+    if(depth>64)return;
+    (byParent.get(parent)||[]).sort((a,b)=>(a.position||0)-(b.position||0)
+      ||compare(a.name,b.name)).forEach(group=>{
+      if(seen.has(group.groupId))return;
+      seen.add(group.groupId);
+      options.push({value:group.groupId,label:'— '.repeat(Math.min(depth,8))+group.name});
+      walk(group.groupId,depth+1);
+    });
+  };
+  walk('');
   if(value&&!options.some(item=>item.value===value))
     options.push({value,label:'Ранее выбранная группа'});
   return options;
@@ -68,7 +84,7 @@ export function openInventoryClassificationGroups(onSaved = () => {}) {
       return true;
     } catch(cause) {showError(cause);return false;}
   };
-  const editName = (group = null) => {
+  const editName = (group = null, onFinished = () => {}) => {
     const editor = mountModal(document.body, modal(
       '<form data-inventory-criterion-form>' +
       field({label:'Название группы',name:'name',value:group?.name||'',required:true}) +
@@ -91,7 +107,7 @@ export function openInventoryClassificationGroups(onSaved = () => {}) {
         const ok=await save(()=>group
           ? updateInventoryCriterion(group.id,patch)
           : createInventoryCriterion(name));
-        if(ok){editor.v2Close?.();refresh();}
+        if(ok){editor.v2Close?.();refresh();onFinished();}
         else message.textContent=error.textContent;
       } finally{saving=false;}
     };
@@ -128,6 +144,7 @@ export function openInventoryClassificationGroups(onSaved = () => {}) {
         editor.v2Close?.();
         onSaved();
         refresh();
+        group.refreshValues?.();
       }catch(cause){
         message.textContent=cause instanceof Error?cause.message:'Не удалось сохранить значение.';
       }finally{saving=false;}
@@ -175,7 +192,7 @@ export function openInventoryClassificationGroups(onSaved = () => {}) {
     });
     layer.querySelector('[data-inventory-edit-criterion]')?.addEventListener('click',()=>{
       const now=current.find(entry=>entry.id===id);
-      if(now)editName(now);
+      if(now)editName(now,()=>layer.v2Close?.());
     });
     renderValues();
   };
