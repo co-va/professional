@@ -528,7 +528,7 @@ function openSupplierBulkEditor(company, rows, onSaved = () => {}) {
     '<p class="form-error" role="status" data-company-bulk-status></p>' +
     actionBlock(button('Продолжить', { data: 'data-company-bulk-next' })) +
     '</div>',
-    { title: 'Массовое изменение', variant: 'q', surface: 'app' },
+    { title: 'Изменить данные', variant: 'q', surface: 'app' },
   ));
   if (!layer) return;
   const fieldInput = layer.querySelector('[name="supplierBulkField"]');
@@ -603,7 +603,7 @@ function openSupplierBulkEditor(company, rows, onSaved = () => {}) {
       editLayer.v2Close?.();
       if (editLayer !== layer) layer.v2Close?.();
       onSaved();
-      openNotice({ title: 'Массовое изменение',
+      openNotice({ title: 'Изменить данные',
         message: 'Изменено ' + changes.length + ' позиций.' });
     } catch (cause) {
       errorHost.textContent = errText(cause);
@@ -844,8 +844,8 @@ function catalogBrandMarkup(categories, selectedCatalogIds, linkedCatalogIds = n
     ).join('') + '</div>' +
     actionBlock(
       button('Создать карточку', { data: 'data-company-selection-card' }) +
-      button('Массовое изменение', { variant: 'secondary', data: 'data-company-selection-bulk' }) +
-      button('Исключить из ассортимента', {
+      button('Изменить данные', { variant: 'secondary', data: 'data-company-selection-bulk' }) +
+      button('Скрыть', {
         variant: 'delete-outline',
         data: 'data-company-selection-delete',
       }),
@@ -1100,11 +1100,11 @@ async function openCompany(companyId, root, onChanged = () => {}) {
         entries.push(...(Array.isArray(page.items) ? page.items : []));
       }
     } catch (error) {
-      openNotice({ title: 'Исключённые позиции', message: errText(error) });
+      openNotice({ title: 'Скрытые', message: errText(error) });
       return;
     }
     if (!entries.length) {
-      openNotice({ title: 'Исключённые позиции', message: 'Исключённых позиций нет.' });
+      openNotice({ title: 'Скрытые', message: 'Скрытых позиций нет.' });
       return;
     }
     const selected = new Set();
@@ -1112,7 +1112,7 @@ async function openCompany(companyId, root, onChanged = () => {}) {
       catalogItemList(entries, selected, linkedCatalogIds, matchedCatalogItems, catalogLinkStatuses) +
         '<p class="form-error" data-company-restore-error role="alert"></p>' +
         actionBlock(button('Восстановить', { data: 'data-company-restore-apply' })),
-      { title: 'Исключённые позиции', variant: 'q', surface: 'app' },
+      { title: 'Скрытые', variant: 'q', surface: 'app' },
     ));
     if (!restoreLayer) return;
     const apply = restoreLayer.querySelector('[data-company-restore-apply]');
@@ -1282,12 +1282,11 @@ async function openCompany(companyId, root, onChanged = () => {}) {
               .map(row => String(row.id));
             if (!ids.length) return;
             const confirm = mountModal(document.body, modal(
-              '<p>Исключить ' + ids.length + ' позиций из ассортимента? ' +
-              'Их можно вернуть через «Исключённые».</p>' +
+              '<p>Скрыть ' + ids.length + ' позиций? Их можно восстановить через «Скрытые».</p>' +
               '<p class="form-error" data-company-exclude-error role="alert"></p>' +
-              actionBlock(button('Исключить из ассортимента', { variant: 'delete-outline',
+              actionBlock(button('Скрыть', { variant: 'delete-outline',
                 data: 'data-company-exclude-apply' })),
-              { title: 'Исключить позиции', variant: 'q', surface: 'app' },
+              { title: 'Подтверждение скрытия', variant: 'x', xRole: 'action', surface: 'app' },
             ));
             const submit = confirm?.querySelector('[data-company-exclude-apply]');
             submit?.addEventListener('click', async () => {
@@ -1342,7 +1341,7 @@ async function openCompany(companyId, root, onChanged = () => {}) {
     openSharedProfileSettingsMenu({ title: 'Контрагент', actions: [
       { id: 'edit', label: 'Редактировать', variant: 'primary', onSelect: () =>
         openCompanyEditor(company, () => { void refresh(); onChanged(); }) },
-      { id: 'excluded', label: 'Исключённые позиции', onSelect: () =>
+      { id: 'excluded', label: 'Скрытые', onSelect: () =>
         void openExcludedCatalogItems() },
     ] });
   });
