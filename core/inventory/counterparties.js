@@ -574,7 +574,7 @@ function counterpartyInformation(company = {}) {
   return '<div data-counterparty-information>' +
     (discount !== null
       ? '<strong class="ui-list__title">Скидка по договору: ' + escapeHtml(discount) + '</strong>'
-      : '<span class="ui-list__secondary">Скидка по договору: не указана</span>') +
+      : '') +
     (primary ? '<span class="ui-list__secondary">Менеджер</span>' : '') +
     (primary ? '<strong class="ui-list__title">' + escapeHtml(primary) + '</strong>' : '') +
     secondary.map(value => '<span class="ui-list__secondary">' + escapeHtml(value) + '</span>').join('') +
@@ -1252,7 +1252,7 @@ function counterpartyCardFields(company = {}) {
     { value: 'email', label: 'Email', text: company.email || '' },
     { value: 'website', label: 'Сайт', text: company.website || '' },
     { value: 'discountPercent', label: 'Скидка по договору',
-      text: company.discountPercent == null ? 'Скидка по договору: не указана'
+      text: company.discountPercent == null ? ''
         : 'Скидка по договору: ' + Number(company.discountPercent)
           .toLocaleString('ru-RU', { maximumFractionDigits: 4 }) + '%' },
   ];
