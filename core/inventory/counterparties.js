@@ -519,13 +519,55 @@ async function openSelectedCatalogCards(company, rows, onLinked = () => {}, sugg
   ));
   if (!menu) return;
 
-  const link = async (row, itemId) => {
+  const needsUnits = (row, itemId) => {
+    const item = getInventoryItems().find(entry => String(entry.itemId) === String(itemId));
+    const norm = value => String(value || '').trim().toLocaleLowerCase('ru-RU').replace(/\\.$/, '');
+    return Boolean(row.unit && item?.unit && norm(row.unit) !== norm(item.unit));
+  };
+  const link = async (row, itemId, unitsPerOffer = null) => {
     if (!itemId) throw new Error('Не выбрана карточка склада.');
+    if (needsUnits(row, itemId) && !(unitsPerOffer > 0))
+      throw new Error('Укажите количество единиц склада в предложении.');
     await json('/' + urlId(company.id) + '/catalog/' + urlId(row.id) + '/link', {
-      method: 'POST', body: { itemId },
+      method: 'POST', body: { itemId, ...(unitsPerOffer > 0 ? { unitsPerOffer } : {}) },
     });
     await loadInventory();
     onLinked(row);
+  };
+  const finishLink = (row, itemId, onDone) => {
+    if (!needsUnits(row, itemId)) {
+      void link(row, itemId).then(onDone).catch(error =>
+        openNotice({ title: 'Связь с карточкой', message: errText(error) }));
+      return;
+    }
+    const entry = getInventoryItems().find(item => String(item.itemId) === String(itemId));
+    const unitLayer = mountModal(document.body, modal(
+      '<p>' + escapeHtml(row.name) + '</p>' +
+      '<p class="ui-list__secondary">У поставщика: ' + escapeHtml(row.unit) +
+      ' · В карточке: ' + escapeHtml(entry?.unit || '—') + '</p>' +
+      field({ label: 'Единиц склада в предложении', name: 'unitsPerOffer', type: 'number',
+        min: '0.001', step: 'any', required: true }) +
+      '<p class="form-error" role="alert" data-company-link-units-error></p>' +
+      actionBlock(button('Применить', { data: 'data-company-link-units-save' })),
+      { title: 'Количество в упаковке', variant: 'q', surface: 'app' },
+    ));
+    unitLayer?.querySelector('[data-company-link-units-save]')?.addEventListener('click', async event => {
+      const save = event.currentTarget;
+      const status = unitLayer.querySelector('[data-company-link-units-error]');
+      const units = Number(unitLayer.querySelector('[name="unitsPerOffer"]')?.value);
+      if (!Number.isFinite(units) || units <= 0) {
+        status.textContent = 'Укажите положительное количество.'; return;
+      }
+      save.disabled = true;
+      try {
+        await link(row, itemId, units);
+        unitLayer.v2Close?.();
+        onDone();
+      } catch (error) {
+        status.textContent = errText(error);
+        save.disabled = false;
+      }
+    });
   };
   const progress = index => rows.length === 1 ? '' : (index + 1) + ' из ' + rows.length;
   const next = (mode, index) => {
@@ -540,12 +582,7 @@ async function openSelectedCatalogCards(company, rows, onLinked = () => {}, sugg
       openItemEditor(document.body, '', {
         name: row.name, manufacturer: row.manufacturer, sku: row.supplierSku, barcode: row.barcode,
       }, async itemId => {
-        try {
-          await link(row, itemId);
-          next(mode, index + 1);
-        } catch (error) {
-          openNotice({ title: 'Карточка создана', message: 'Сохранение связи не завершено: ' + errText(error) });
-        }
+        finishLink(row, itemId, () => next(mode, index + 1));
       });
       return;
     }
@@ -580,6 +617,11 @@ async function openSelectedCatalogCards(company, rows, onLinked = () => {}, sugg
       if (!itemId) { errorHost.textContent = 'Выберите товар.'; return; }
       submit.disabled = true;
       try {
+        if (needsUnits(row, itemId)) {
+          layer.v2Close?.();
+          finishLink(row, itemId, () => next(mode, index + 1));
+          return;
+        }
         await link(row, itemId);
         layer.v2Close?.();
         next(mode, index + 1);
