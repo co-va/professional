@@ -55,35 +55,37 @@ assert.match(source, /const excludedPath = '\/'\+urlId\(companyId\)\+'\/catalog\
   'Excluded offers are queried separately by counterparty');
 assert.match(source, /rowIds: ids, excluded: true/,
   'Exclusions are stored using Core selection endpoint');
-assert.match(source, /openCounterpartyFiles\(company\)/,
-  'Price-list history belongs to the selected supplier');
+assert.match(source, /openCounterpartyFiles\(currentCompanies\)/,
+  'Upload history is global and grouped by counterparty');
 const supplierMenu = source.slice(source.indexOf("layer.querySelector('[data-company-actions]')"),
   source.indexOf('  void refresh();\n  return layer;', source.indexOf("layer.querySelector('[data-company-actions]')")));
-for (const label of ["id: 'edit'", "id: 'excel'", "id: 'history'", "id: 'excluded'"]) {
-  assert.ok(supplierMenu.includes(label), 'Supplier V must include ' + label);
-}
-const supplierActionOrder = ["id: 'edit'", "id: 'excel'", "id: 'history'", "id: 'excluded'"]
-  .map(action => supplierMenu.indexOf(action));
-assert.ok(supplierActionOrder.every((value, index) => value >= 0 &&
-  (!index || value > supplierActionOrder[index - 1])), 'Supplier V must have exactly the approved action order');
 assert.match(supplierMenu, /id: 'edit', label: 'Редактировать', variant: 'primary'/,
-  'Edit must be the black first action');
-assert.match(supplierMenu, /id: 'excel', label: 'Excel'/,
-  'Excel must open nested X');
-assert.match(supplierMenu, /id: 'upload', label: 'Загрузить', variant: 'primary'/,
-  'Nested Excel X must have primary Upload');
-assert.ok(supplierMenu.indexOf("id: 'upload'") < supplierMenu.indexOf("id: 'template'"),
-  'Nested Excel X must show Upload before Template');
-assert.doesNotMatch(source, /openImportGuidance|data-counterparty-pick-file/,
-  'Obsolete extra instruction screen and select-file action must be removed');
+  'Edit is the primary action within each counterparty');
+assert.match(supplierMenu, /id: 'excluded', label: 'Исключённые позиции'/,
+  'Only excluded positions remain in supplier V beside editing');
+assert.doesNotMatch(supplierMenu, /id: 'excel'|id: 'upload'|id: 'history'|id: 'template'/,
+  'Supplier V must not contain any Excel operation');
 const globalMenu = source.slice(source.indexOf("root.querySelector('[data-counterparty-view-menu]')"),
   source.indexOf("root.querySelector('[data-counterparty-add]')"));
-assert.doesNotMatch(globalMenu, /'Шаблон Excel'|'История загрузок'|'Загрузить файл'/,
-  'Global V contains no supplier price-list operations');
-assert.match(supplierMenu, /'Шаблон Excel'/,
-  'Template belongs to the selected supplier');
-assert.match(supplierMenu, /'История загрузок'/,
-  'Price-list history belongs to the selected supplier');
+assert.match(globalMenu, /id: 'appearance', label: 'Вид'/,
+  'Global V retains View');
+assert.match(globalMenu, /id: 'excel', label: 'Excel'/,
+  'Global V contains all supplier Excel operations');
+assert.match(globalMenu, /id: 'upload', label: 'Загрузить', variant: 'primary'/,
+  'Excel X has the black Upload action');
+assert.ok(globalMenu.indexOf("id: 'upload'") < globalMenu.indexOf("id: 'template'")
+  && globalMenu.indexOf("id: 'template'") < globalMenu.indexOf("id: 'history'"),
+  'Excel X order: Upload, Template, History');
+assert.match(globalMenu, /'Шаблон Excel'/);
+assert.match(globalMenu, /'История загрузок'/);
+assert.match(source, /importExcel\('\/preview', file\)/,
+  'Preview is sent to Core before choosing a supplier');
+assert.match(source, /counterpartyId = chosenCompany\(\)/,
+  'User must choose an existing supplier or enter a name');
+assert.match(source, /importExcel\('', file,/,
+  'Global import must use the Core global upload endpoint');
+assert.doesNotMatch(source, /openImportGuidance|data-counterparty-pick-file|openImport\(company/,
+  'Old supplier-scoped upload flow must be absent');
 assert.doesNotMatch(source, /data-company-excluded-open|removedCount/,
   'No duplicate restore action in the supplier catalog surface');
 assert.match(source, /\/catalog\/prices/);
