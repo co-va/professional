@@ -2569,6 +2569,8 @@ function openStockCreateOptions(root, onChanged, defaults = {}) {
 
 function renderStock(root) {
   STOCK_VIEW.manufacturersType = '';
+  // Root stock catalog must never inherit an invisible legacy filter.
+  STOCK_VIEW.itemsFilters = emptyStockFilters();
   const locations = inventoryLocations();
   const scopes = [
     {value: INVENTORY_TOTAL_SCOPE, label: 'Общий остаток'},
@@ -2593,20 +2595,8 @@ function renderStock(root) {
     '<div data-inventory-scope-selector>'+scopeSelector+'</div>');
   const scopeInput=headerRows[0]?.querySelector('[name="inventoryStockScope"]')
     || root.querySelector('[name="inventoryStockScope"]');
-  const visibleRows=()=>{
-    const locationId=STOCK_VIEW.storageScope;
-    const classifications=getInventoryClassificationGroups();
-    const locations=getInventoryStorageLocations();
-    return sortItems(getInventoryItems().filter(item=>{
-      const balance=inventoryDisplayBalance(item,locationId);
-      const factor=Number(item.thresholdStockFactor);
-      const thresholdBalance=balance===0?0:
-        Number.isFinite(factor)&&factor>0 ? balance/factor : null;
-      const scoped={...item,balance,balanceInThresholdUnit:thresholdBalance,
-        targetStock:inventoryDisplayTarget(item,locationId)};
-      return matchesStockFilters(scoped,STOCK_VIEW.itemsFilters,classifications,locations);
-    }),STOCK_VIEW.itemsSort);
-  };
+  // Companies are navigated directly; no search or filter on Z1.
+  const visibleRows=()=>getInventoryItems();
   const refresh=()=>{
     const locationId=STOCK_VIEW.storageScope;
     renderStockBrandList(listHost,visibleRows(),{
@@ -2635,8 +2625,6 @@ function renderStock(root) {
     openSharedProfileSettingsMenu({
       title:'Настройки остатков',
       actions:[
-        {id:'filter',label:'Фильтр',onSelect:()=>
-          openStockControls(root,'items','',refresh,'filter')},
         {id:'groups',label:'Группы',onSelect:()=>
           openInventoryClassificationGroups(refresh)},
         {id:'storage',label:'Склады',onSelect:()=>
