@@ -8,6 +8,7 @@ import { escapeHtml } from '../../ui/utils/escape-html.js';
 import { compactCheck } from '../../ui/selection/check-list.js';
 import { apiRequest } from '../auth.js';
 import { getInventoryItems } from './data.js';
+import { catalogDisclosure } from './catalog-ui.js';
 import { loadInventory } from './service.js';
 import { getCardAppearanceTemplate, saveCardAppearanceTemplate } from '../card-appearance-templates.js';
 import { loadAuxiliaryState } from '../runtime/auxiliary-state.js';
@@ -632,20 +633,6 @@ function catalogItemList(items = [], selectedCatalogIds = new Set(), linkedCatal
       }) +
     '</div>',
   ).join('') + '</div>';
-}
-
-function catalogDisclosure(title, content, nested = false, count = null, check = '') {
-  // Same Stock disclosure and compact check. The check is outside <details>
-  // so selecting a category never opens/closes the product rows.
-  const positionCount = Number.isSafeInteger(count) && count >= 0
-    ? '<div class="inventory-editor-heading__controls"><span class="ui-list__secondary">' +
-      count + ' поз.</span></div>' : '';
-  const selection = check ? '<div class="inventory-editor-heading__selection">' + check + '</div>' : '';
-  return '<section class="inventory-editor-panel' + (nested ? ' inventory-editor-panel--nested' : '') +
-    (check ? ' inventory-editor-panel--catalog-choice' : '') + '">' +
-    '<details><summary class="inventory-editor-summary">' + escapeHtml(title) + '</summary>' +
-    '<div class="inventory-editor-panel__body">' + content + '</div></details>' +
-    selection + positionCount + '</section>';
 }
 
 function catalogBrands(items = []) {
