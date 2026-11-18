@@ -572,7 +572,7 @@ function counterpartyInformation(company = {}) {
   const contacts = [company.phone, company.email]
     .map(value => String(value || '').trim()).filter(Boolean);
   return '<div data-counterparty-information>' +
-    (representative ? '<strong class="ui-list__title">Представитель: ' +
+    (representative ? '<strong class="ui-list__title">' +
       escapeHtml(representative) + '</strong>' : '') +
     contacts.map(value => '<span class="ui-list__secondary">' +
       escapeHtml(value) + '</span>').join('') +
@@ -1184,10 +1184,8 @@ async function openCompany(companyId, root, onChanged = () => {}) {
     if (!layer.isConnected) return;
     company = companies.find(row => row.id === companyId);
     if (!company) { layer.v2Close?.(); onChanged(); return; }
-    // Separate plain contact details and assortment with the existing Z-section
-    // vertical rhythm. No extra card, divider, or feature-specific CSS.
-    host.innerHTML = '<section class="v2-section"><div class="v2-section__content">' +
-      counterpartyInformation(company) + '</div></section>' +
+    // Both sections share the same canonical v2Section heading and spacing.
+    host.innerHTML = v2Section('Представитель', counterpartyInformation(company)) +
       v2Section('Ассортимент', '<div data-company-catalog-list></div>');
     void showCatalog();
   };
