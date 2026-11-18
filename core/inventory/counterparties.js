@@ -1041,10 +1041,13 @@ function openCounterpartyFiles(companies = []) {
   });
 }
 
-async function openCompany(companyId, root, onChanged = () => {}) {
-  let companies;
-  try { companies = await json(); }
-  catch (error) { return openNotice({ title: 'Контрагенты', message: errText(error) }); }
+async function openCompany(companyId, root, onChanged = () => {}, { initialCompanies = null, catalogCache = null } = {}) {
+  // The parent has just loaded the company list. Reuse it instead of GETting it again.
+  let companies = initialCompanies;
+  if (!Array.isArray(companies)) {
+    try { companies = await json(); }
+    catch (error) { return openNotice({ title: 'Контрагенты', message: errText(error) }); }
+  }
   let company = companies.find(row => row.id === companyId);
   if (!company) return openNotice({ title: 'Контрагент', message: 'Компания не найдена.' });
   const markup = workspaceHeaderContext({
@@ -1065,14 +1068,16 @@ async function openCompany(companyId, root, onChanged = () => {}) {
     .filter(offer => String(offer.counterpartyId || '') === String(companyId)
       && offer.catalogItemId)
     .map(offer => String(offer.catalogItemId)));
-  const refreshCatalogLinkStatuses = async () => {
+  const refreshCatalogLinkStatuses = async (run = revision) => {
     const data = await json('/' + urlId(companyId) + '/catalog/link-status');
     if (!Array.isArray(data?.statuses)) throw new Error('Статусы связей недоступны.');
+    if (run !== revision) return false;
     catalogLinkStatuses = new Map(data.statuses.map(item => [String(item.catalogItemId), item]));
     linkedCatalogIds = new Set(data.statuses.filter(item => item.status === 'linked')
       .map(item => String(item.catalogItemId)));
     matchedCatalogItems = new Map(data.statuses.filter(item => item.status === 'matched' && item.itemId)
       .map(item => [String(item.catalogItemId), String(item.itemId)]));
+    return true;
   };
 
   const excludedPath = '/'+urlId(companyId)+'/catalog?excluded=true';
@@ -1140,50 +1145,9 @@ async function openCompany(companyId, root, onChanged = () => {}) {
     sync();
   };
 
-  const showCatalog = async () => {
-    const currentRun = ++revision;
-    const list = host.querySelector('[data-company-catalog-list]');
-    if (!list) return;
-    list.innerHTML = emptyState('Ассортимент', 'Загружаем…');
-    try {
-      const data = await json('/' + urlId(companyId) + '/catalog?skip=0');
-      if (!layer.isConnected || !list.isConnected || currentRun !== revision) return;
-      const entries = Array.isArray(data.items) ? [...data.items] : [];
-      const count = Math.max(0, Number(data.count) || 0);
-      // The API returns at most 100 rows per request. Read all existing pages
-      // before grouping so companies after the first page are not invisible.
-      for (let skip = 100; skip < count; skip += 100) {
-        const page = await json('/' + urlId(companyId) + '/catalog?skip=' + skip);
-        if (!layer.isConnected || !list.isConnected || currentRun !== revision) return;
-        entries.push(...(Array.isArray(page.items) ? page.items : []));
-      }
-      if (!layer.isConnected || !list.isConnected || currentRun !== revision) return;
-      // Prefer Core's canonical persisted-link / unique-match classification.
-      // Preserve a read-only local hint when an older server lacks this endpoint.
-      try {
-        await loadInventory();
-        try {
-          await refreshCatalogLinkStatuses();
-        } catch {
-          linkedCatalogIds = readConfirmedLinks();
-          matchedCatalogItems = findCatalogMatches(entries, getInventoryItems());
-          catalogLinkStatuses = new Map(entries.map(row => {
-            const id = String(row.id);
-            const itemId = matchedCatalogItems.get(id);
-            return [id, linkedCatalogIds.has(id)
-              ? { status: 'linked', itemId: getInventoryItems().find(item =>
-                item.supplierOffers?.some(offer =>
-                  String(offer.counterpartyId) === String(companyId)
-                    && String(offer.catalogItemId) === id))?.itemId || '' }
-              : itemId ? { status: 'matched', itemId } : { status: 'unlinked', itemId: null }];
-          }));
-        }
-      } catch {
-        linkedCatalogIds = null;
-        matchedCatalogItems = null;
-        catalogLinkStatuses = new Map();
-      }
-      if (!layer.isConnected || !list.isConnected || currentRun !== revision) return;
+  // The brand list is presentation only; it must not wait for a full stock reload.
+  // Cache is scoped to this Counterparties screen, never localStorage or another account.
+  const renderCatalog = (entries, list) => {
       const brands = catalogBrands(entries);
       list.innerHTML = entries.length
         ? catalogGroupsMarkup(brands)
@@ -1215,6 +1179,7 @@ async function openCompany(companyId, root, onChanged = () => {}) {
             if (create) create.textContent = 'Создать карточку · ' + selectedCatalogIds.size;
           };
           const linked = row => {
+            catalogCache?.delete(String(companyId));
             linkedCatalogIds = readConfirmedLinks();
             selectedCatalogIds.delete(String(row.id));
             const item = getInventoryItems().find(entry => entry.supplierOffers?.some(offer =>
@@ -1305,23 +1270,94 @@ async function openCompany(companyId, root, onChanged = () => {}) {
           syncSelections();
         });
       });
-    } catch (error) {
-      if (layer.isConnected && currentRun === revision && list.isConnected) {
-        list.innerHTML = emptyState('Ассортимент недоступен', errText(error));
+  };
+
+  const showCatalog = async ({ preferCache = false } = {}) => {
+    const currentRun = ++revision;
+    const list = host.querySelector('[data-company-catalog-list]');
+    if (!list) return;
+    const key = String(companyId);
+    const cached = preferCache ? catalogCache?.get(key) : null;
+    if (cached) {
+      linkedCatalogIds = cached.linked === null ? null : new Set(cached.linked);
+      matchedCatalogItems = cached.matched === null ? null : new Map(cached.matched);
+      catalogLinkStatuses = new Map(cached.statuses);
+      renderCatalog(cached.entries, list);
+      // Opening a previously viewed supplier should be immediate. Old data remains
+      // visible while the server revalidates after one minute.
+      if (Date.now() - cached.at < 60000) return;
+    } else {
+      catalogCache?.delete(key);
+      list.innerHTML = emptyState('Ассортимент', 'Загружаем…');
+    }
+    try {
+      // Independent link classification and catalog pages can load in parallel.
+      const statusesPromise = refreshCatalogLinkStatuses(currentRun).catch(() => false);
+      const data = await json('/' + urlId(companyId) + '/catalog?skip=0');
+      if (!layer.isConnected || !list.isConnected || currentRun !== revision) return;
+      const entries = Array.isArray(data.items) ? [...data.items] : [];
+      const count = Math.max(0, Number(data.count) || 0);
+      // Core pages at 100 items. Limit concurrency to four pages, keep order.
+      for (let skip = 100; skip < count; skip += 400) {
+        const offsets = [];
+        for (let offset = skip; offset < Math.min(count, skip + 400); offset += 100)
+          offsets.push(offset);
+        const pages = await Promise.all(offsets.map(offset =>
+          json('/' + urlId(companyId) + '/catalog?skip=' + offset)));
+        if (!layer.isConnected || !list.isConnected || currentRun !== revision) return;
+        pages.forEach(page => entries.push(...(Array.isArray(page.items) ? page.items : [])));
       }
+      if (!layer.isConnected || !list.isConnected || currentRun !== revision) return;
+      // The stock snapshot is expensive and unnecessary when Core has already
+      // classified catalog links. Read it only for a legacy server fallback.
+      if (!(await statusesPromise)) {
+        try {
+          await loadInventory();
+          linkedCatalogIds = readConfirmedLinks();
+          matchedCatalogItems = findCatalogMatches(entries, getInventoryItems());
+          catalogLinkStatuses = new Map(entries.map(row => {
+            const id = String(row.id);
+            const itemId = matchedCatalogItems.get(id);
+            return [id, linkedCatalogIds.has(id)
+              ? { status: 'linked', itemId: getInventoryItems().find(item =>
+                item.supplierOffers?.some(offer =>
+                  String(offer.counterpartyId) === String(companyId)
+                    && String(offer.catalogItemId) === id))?.itemId || '' }
+              : itemId ? { status: 'matched', itemId } : { status: 'unlinked', itemId: null }];
+          }));
+        } catch {
+          linkedCatalogIds = null;
+          matchedCatalogItems = null;
+          catalogLinkStatuses = new Map();
+        }
+      }
+      if (!layer.isConnected || !list.isConnected || currentRun !== revision) return;
+      catalogCache?.set(key, {
+        at: Date.now(), entries,
+        linked: linkedCatalogIds === null ? null : [...linkedCatalogIds],
+        matched: matchedCatalogItems === null ? null : [...matchedCatalogItems],
+        statuses: [...catalogLinkStatuses],
+      });
+      renderCatalog(entries, list);
+    } catch (error) {
+      if (layer.isConnected && currentRun === revision && list.isConnected && !cached)
+        list.innerHTML = emptyState('Ассортимент недоступен', errText(error));
     }
   };
 
+  const displayCompany = (preferCache = false) => {
+    // Existing section headings and content are not changed by the cache.
+    host.innerHTML = v2Section('Представитель', counterpartyInformation(company)) +
+      v2Section('Ассортимент', '<div data-company-catalog-list></div>');
+    void showCatalog({ preferCache });
+  };
   const refresh = async () => {
     try { companies = await json(); }
     catch (error) { return openNotice({ title: 'Контрагенты', message: errText(error) }); }
     if (!layer.isConnected) return;
     company = companies.find(row => row.id === companyId);
     if (!company) { layer.v2Close?.(); onChanged(); return; }
-    // Both sections share the same canonical v2Section heading and spacing.
-    host.innerHTML = v2Section('Представитель', counterpartyInformation(company)) +
-      v2Section('Ассортимент', '<div data-company-catalog-list></div>');
-    void showCatalog();
+    displayCompany();
   };
   layer.querySelector('[data-company-actions]')?.addEventListener('click', () => {
     openSharedProfileSettingsMenu({ title: 'Контрагент', actions: [
@@ -1331,7 +1367,9 @@ async function openCompany(companyId, root, onChanged = () => {}) {
         void openExcludedCatalogItems() },
     ] });
   });
-  void refresh();
+  // No second GET to open a company already present in the source list.
+  if (Array.isArray(initialCompanies)) displayCompany(true);
+  else void refresh();
   return layer;
 }
 
@@ -1439,6 +1477,8 @@ export async function renderCounterparties(root) {
     '<div data-counterparties-list></div>',
   ]);
   const host = root.querySelector('[data-counterparties-list]');
+  // In-memory view cache lives only as long as this Counterparties page.
+  const catalogCache = new Map();
   let currentCompanies = [];
   const renderCards = () => {
     if (!host?.isConnected) return;
@@ -1453,11 +1493,14 @@ export async function renderCounterparties(root) {
       : emptyState('Контрагентов пока нет', 'Нажмите +, чтобы создать компанию.');
     host.querySelectorAll('[data-counterparty-open]').forEach(node => {
       node.addEventListener('click', () => {
-        void openCompany(node.dataset.counterpartyOpen, root, show);
+        void openCompany(node.dataset.counterpartyOpen, root, show,
+          { initialCompanies: currentCompanies, catalogCache });
       });
     });
   };
   const show = async () => {
+    // Called after create/edit/import; old cached catalogs must not survive writes.
+    catalogCache.clear();
     host.innerHTML = emptyState('Контрагенты', 'Загружаем…');
     try {
       const companies = await json();
