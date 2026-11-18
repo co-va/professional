@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { inventoryManufacturerCompletion } from '../../core/inventory/completeness.js';
+import { emptyStockFilters } from '../../core/inventory/stock-filters.js';
 
 const inventory = readFileSync('core/inventory/inventory.js', 'utf8');
 const templates = readFileSync('core/card-appearance-templates.js', 'utf8');
@@ -35,18 +36,19 @@ const localStorage = {
   setItem: (key, value) => stored.set(key, value),
 };
 const stateSource = inventory.slice(inventory.indexOf('const INVENTORY_SORT_KEY ='), inventory.indexOf('const MANUFACTURER_CARD_APPEARANCE ='));
-const state = new Function('localStorage', stateSource + '\nreturn { STOCK_VIEW, saveInventorySortMode };');
-const first = state(localStorage);
+const state = new Function('localStorage', 'emptyStockFilters',
+  stateSource + '\nreturn { STOCK_VIEW, saveInventorySortMode };');
+const first = state(localStorage, emptyStockFilters);
 assert.equal(first.STOCK_VIEW.manufacturersSort, 'name-asc');
 assert.equal(first.STOCK_VIEW.itemsSort, 'position-asc', 'Manual item order becomes the default');
 first.saveInventorySortMode('manufacturersSort', 'count-desc');
 first.saveInventorySortMode('itemsSort', 'balance-asc');
-assert.equal(state(localStorage).STOCK_VIEW.manufacturersSort, 'count-desc', 'Manufacturer sort survives a fresh session');
-assert.equal(state(localStorage).STOCK_VIEW.itemsSort, 'balance-asc', 'Item sort survives independently');
+assert.equal(state(localStorage, emptyStockFilters).STOCK_VIEW.manufacturersSort, 'count-desc', 'Manufacturer sort survives a fresh session');
+assert.equal(state(localStorage, emptyStockFilters).STOCK_VIEW.itemsSort, 'balance-asc', 'Item sort survives independently');
 first.saveInventorySortMode('manufacturersSort', 'name-desc');
-assert.equal(state(localStorage).STOCK_VIEW.manufacturersSort, 'name-desc', 'Sort changes only when selected');
+assert.equal(state(localStorage, emptyStockFilters).STOCK_VIEW.manufacturersSort, 'name-desc', 'Sort changes only when selected');
 first.saveInventorySortMode('itemsSort', 'invalid');
-assert.equal(state(localStorage).STOCK_VIEW.itemsSort, 'balance-asc', 'Invalid sort is ignored');
+assert.equal(state(localStorage, emptyStockFilters).STOCK_VIEW.itemsSort, 'balance-asc', 'Invalid sort is ignored');
 assert.match(page, /openSharedProfileSettingsMenu\(/, 'Reuse existing settings action menu');
 for (const item of [
   "id: 'groups', label: 'Группы'",
