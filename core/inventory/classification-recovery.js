@@ -101,6 +101,7 @@ export function openInventoryClassificationRecovery(onSaved = () => {}) {
         }):emptyState('Изменений не требуется'))+
         (changed.length>10?'<p>И ещё '+(changed.length-10)+' поз.</p>':'')+
         '<p>Восстановление изменит только категорию и тип этих позиций. '+
+        'Неиспользуемые прежние значения исправленных категорий и типов будут скрыты. ' +
         'Остатки, цены и движения останутся без изменений.</p>';
       if(applyButton)applyButton.disabled=!changed.length;
     } catch(cause){preview=null;showError(cause);}
@@ -115,7 +116,8 @@ export function openInventoryClassificationRecovery(onSaved = () => {}) {
     try {
       const result=await applyInventoryCriteriaRecovery(preview.changes);
       await Promise.all([loadInventory(),loadInventoryCriteria()]);
-      if(status)status.textContent='Восстановлено: '+Number(result.updatedCount||0)+' поз.';
+      if(status)status.textContent='Восстановлено: '+Number(result.updatedCount||0)+' поз.' +
+        (Number(result.hiddenValuesCount||0)?' · Скрыто неиспользуемых значений: '+Number(result.hiddenValuesCount):'');
       if(summary)summary.innerHTML='';
       preview=null;
       onSaved();
