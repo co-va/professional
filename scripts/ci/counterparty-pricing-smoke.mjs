@@ -162,10 +162,60 @@ assert.doesNotMatch(source, /openImportGuidance|data-counterparty-pick-file|open
   'Old supplier-scoped upload flow must be absent');
 assert.doesNotMatch(source, /data-company-excluded-open|removedCount/,
   'No duplicate restore action in the supplier catalog surface');
-assert.match(source, /\/catalog\/prices/);
-assert.match(source, /function openSupplierProductEditor\(/);
-assert.match(source, /function openSupplierBatchPrices\(/);
-assert.match(source, /data-company-selection-prices/);
+assert.match(source, /function openSupplierProductEditor\(/,
+  'The single-position editor is retained');
+assert.match(source, /function openSupplierBulkEditor\(/,
+  'The selected-position editor is present');
+assert.match(source, /data-company-selection-bulk/,
+  'The selected-position button opens mass editing');
+assert.doesNotMatch(source, /openSupplierBatchPrices|data-company-selection-prices/,
+  'Old price-only mass editor must not exist');
+assert.doesNotMatch(source, /json\('\/' \+ urlId\(company\.id\) \+ '\/catalog\/prices'/,
+  'No second bulk price mutation path from Professional');
+const selectedActions = source.slice(source.indexOf('function catalogBrandMarkup('),
+  source.indexOf('// Matching is a hint'));
+assert.match(selectedActions,
+  /button\('Создать карточку', \{ data: 'data-company-selection-card' \}\)/,
+  'Selected catalog offers exactly one main action');
+assert.match(selectedActions,
+  /button\('Массовое изменение', \{ variant: 'secondary', data: 'data-company-selection-bulk' \}\)/,
+  'Mass editing is secondary, not a second black button');
+assert.ok(selectedActions.indexOf("button('Исключить из ассортимента'")
+  > selectedActions.indexOf("button('Массовое изменение'"),
+  'Exclude action must be last');
+const massSource = source.slice(source.indexOf('const SUPPLIER_CATALOG_EDIT_FIELDS ='),
+  source.indexOf('function openSupplierProductEditor('));
+const editor = new Function(massSource +
+  '\\nreturn {SUPPLIER_CATALOG_EDIT_FIELDS, supplierCatalogEditValue, supplierCatalogValueMatches};')();
+assert.equal(editor.SUPPLIER_CATALOG_EDIT_FIELDS.length, 12,
+  'Exactly the existing twelve editable supplier fields are offered to the batch editor');
+assert.deepEqual(editor.SUPPLIER_CATALOG_EDIT_FIELDS.map(item => item.value), [
+  'name', 'supplierSku', 'barcode', 'manufacturer', 'brand', 'category',
+  'listPrice', 'retailPrice', 'discountPercent', 'unit', 'packageQuantity', 'supplierNote',
+]);
+const discountField = editor.SUPPLIER_CATALOG_EDIT_FIELDS.find(item => item.value === 'discountPercent');
+const priceField = editor.SUPPLIER_CATALOG_EDIT_FIELDS.find(item => item.value === 'listPrice');
+const packageField = editor.SUPPLIER_CATALOG_EDIT_FIELDS.find(item => item.value === 'packageQuantity');
+assert.equal(editor.supplierCatalogEditValue(discountField, '12,5'), 12.5);
+assert.equal(editor.supplierCatalogEditValue(discountField, '0'), 0);
+assert.equal(editor.supplierCatalogEditValue(discountField, ''), null,
+  'Empty individual bulk field must leave its record untouched');
+assert.throws(() => editor.supplierCatalogEditValue(discountField, '120'), /Проверьте значение/);
+assert.throws(() => editor.supplierCatalogEditValue(priceField, '-3'), /Проверьте значение/);
+assert.throws(() => editor.supplierCatalogEditValue(packageField, '0'), /Проверьте значение/);
+assert.equal(editor.supplierCatalogValueMatches('12.5000', 12.5, discountField), true);
+assert.match(massSource, /twoColumnLayout\(/,
+  'Mass editing reuses the two-column UI from stocktake');
+assert.match(massSource, /inventory-audit-value-heading/,
+  'Mass editing reuses the audit data-value header');
+assert.match(massSource, /class="data-edit-row"/,
+  'Individual changes reuse the audit compact data rows');
+assert.match(massSource, /applyAll\(\) \? 'Применить' : 'Продолжить'/,
+  'Mass editing supports shared or per-position values');
+assert.match(massSource, /method: 'PUT', body: \{ \[def\.value\]: entry\.value \}/,
+  'Mass editing calls only the existing single-row Core API');
+assert.match(massSource, /const saved = await loadSelected\(\)/,
+  'Mass editing confirms persisted values against a fresh Core read');
 assert.match(source, /if \(row\) openCatalogProductDetails|openCatalogProductDetails\(row,/);
 assert.doesNotMatch(source, /if \(check\) check\.click\(\);/);
 const detail = source.slice(source.indexOf('function openCatalogProductDetails('),
