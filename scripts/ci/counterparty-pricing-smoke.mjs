@@ -31,14 +31,29 @@ assert.match(source, /rowIds: ids, excluded: true/,
   'Exclusions are stored using Core selection endpoint');
 assert.match(source, /openCounterpartyFiles\(company\)/,
   'Price-list history belongs to the selected supplier');
-assert.match(source, /id: 'upload', label: 'Загрузить файл', variant: 'primary'/,
-  'Price-list upload is the primary action within a supplier');
+const supplierMenu = source.slice(source.indexOf("layer.querySelector('[data-company-actions]')"),
+  source.indexOf('  void refresh();\n  return layer;', source.indexOf("layer.querySelector('[data-company-actions]')")));
+for (const label of ["id: 'edit'", "id: 'excel'", "id: 'history'", "id: 'excluded'"]) {
+  assert.ok(supplierMenu.includes(label), 'Supplier V must include ' + label);
+}
+const supplierActionOrder = ["id: 'edit'", "id: 'excel'", "id: 'history'", "id: 'excluded'"]
+  .map(action => supplierMenu.indexOf(action));
+assert.ok(supplierActionOrder.every((value, index) => value >= 0 &&
+  (!index || value > supplierActionOrder[index - 1])), 'Supplier V must have exactly the approved action order');
+assert.match(supplierMenu, /id: 'edit', label: 'Редактировать', variant: 'primary'/,
+  'Edit must be the black first action');
+assert.match(supplierMenu, /id: 'excel', label: 'Excel'/,
+  'Excel must open nested X');
+assert.match(supplierMenu, /id: 'upload', label: 'Загрузить', variant: 'primary'/,
+  'Nested Excel X must have primary Upload');
+assert.ok(supplierMenu.indexOf("id: 'upload'") < supplierMenu.indexOf("id: 'template'"),
+  'Nested Excel X must show Upload before Template');
+assert.doesNotMatch(source, /openImportGuidance|data-counterparty-pick-file/,
+  'Obsolete extra instruction screen and select-file action must be removed');
 const globalMenu = source.slice(source.indexOf("root.querySelector('[data-counterparty-view-menu]')"),
   source.indexOf("root.querySelector('[data-counterparty-add]')"));
 assert.doesNotMatch(globalMenu, /'Шаблон Excel'|'История загрузок'|'Загрузить файл'/,
   'Global V contains no supplier price-list operations');
-const supplierMenu = source.slice(source.indexOf("layer.querySelector('[data-company-actions]')"),
-  source.indexOf('  void refresh();\n  return layer;', source.indexOf("layer.querySelector('[data-company-actions]')")));
 assert.match(supplierMenu, /'Шаблон Excel'/,
   'Template belongs to the selected supplier');
 assert.match(supplierMenu, /'История загрузок'/,
