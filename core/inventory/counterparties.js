@@ -355,10 +355,10 @@ function catalogItemList(items = [], selectedCatalogIds = new Set()) {
           title: item.name,
           secondary: item.supplierSku || '—',
           right: [
-            'Прайс: ' + money(item.listPrice),
-            'Моя: ' + money(item.actualPrice),
-            'Скидка: ' + (item.discountPercent == null ? '—'
-              : Number(item.discountPercent).toLocaleString('ru-RU', { maximumFractionDigits: 2 }) + '%'),
+            money(item.listPrice),
+            money(item.actualPrice),
+            item.discountPercent == null ? '—'
+              : Number(item.discountPercent).toLocaleString('ru-RU', { maximumFractionDigits: 2 }) + '%',
           ],
           interactive: true,
           data: 'data-company-product="' + escapeHtml(item.id) + '"',
