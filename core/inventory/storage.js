@@ -79,12 +79,12 @@ export function openInventoryTransfer(onSaved = () => {}) {
   const places = options();
   const fromDefault = places.find(place => place.value === 'primary')?.value || places[0]?.value || '';
   const toDefault = places.find(place => place.value !== fromDefault)?.value || '';
-  const currentItem = stock[0];
+  // Do not preselect an arbitrary product for a stock-changing operation.
   const host = mountModal(document.body, modal(
     '<form data-inventory-transfer-form>' +
     select({ label: 'Из места', name: 'fromLocationId', value: fromDefault, options: places }) +
     select({ label: 'В место', name: 'toLocationId', value: toDefault, options: places }) +
-    select({ label: 'Товар', name: 'itemId', value: currentItem?.itemId || '',
+    select({ label: 'Товар', name: 'itemId', value: '',
       options: [{ value: '', label: 'Выбрать товар' },
         ...stock.map(item => ({
           value: item.itemId, label: [item.manufacturer, item.name].filter(Boolean).join(' · '),
