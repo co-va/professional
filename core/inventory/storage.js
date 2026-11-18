@@ -79,7 +79,7 @@ export function openInventoryStorageLocations(onSaved = () => {}) {
   const host = mountModal(document.body, modal(
     '<div data-inventory-storage-list></div>' +
     actionBlock(button('Добавить', { data: 'data-inventory-storage-add' })),
-    { title: 'Места хранения', variant: 'q', surface: 'app' },
+    { title: 'Склады', variant: 'x', xRole: 'action', surface: 'app' },
   ));
   if (!host) return null;
   const display = () => {
@@ -89,7 +89,7 @@ export function openInventoryStorageLocations(onSaved = () => {}) {
       className: 'ui-list--dense',
       items: items.map(place => ({
         title: place.name,
-        secondary: place.isPrimary ? 'Основное' : '',
+        secondary: '',
         interactive: !place.isPrimary,
         aria: 'Место хранения ' + place.name,
         data: place.isPrimary ? '' : 'data-inventory-storage-edit="' + place.locationId + '"',
@@ -109,7 +109,7 @@ export function openInventoryStorageLocations(onSaved = () => {}) {
         (current ? button('Удалить', { variant: 'delete-outline', type: 'button',
           data: 'data-inventory-storage-archive' }) : '')) +
       '</form>',
-      { title: current ? 'Место хранения' : 'Новое место хранения', variant: 'q', surface: 'app' },
+      { title: current ? 'Склад' : 'Новый склад', variant: 'x', xRole: 'editor', surface: 'app' },
     ));
     if (!window) return;
     const form = window.querySelector('[data-inventory-storage-form]');
