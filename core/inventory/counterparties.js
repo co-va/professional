@@ -40,15 +40,6 @@ const money = amount => amount == null ? '—'
 const urlId = value => encodeURIComponent(String(value || ''));
 const supplierAvailability = value => value === true ? 'Есть у поставщика'
   : value === false ? 'Нет у поставщика' : 'Наличие не указано';
-function discountLabel(base, paid, given) {
-  const list = Number(base), actual = Number(paid);
-  if (base != null && paid != null && Number.isFinite(list) && list > 0 && Number.isFinite(actual) && actual >= 0) {
-    const difference = Math.round((1 - actual / list) * 10000) / 100;
-    return difference >= 0 ? 'Расчётная скидка: ' + difference.toLocaleString('ru-RU') + '%'
-      : 'Цена выше прайса на ' + Math.abs(difference).toLocaleString('ru-RU') + '%';
-  }
-  return given == null ? 'Скидка не указана' : 'Скидка поставщика: ' + Number(given).toLocaleString('ru-RU') + '%';
-}
 const errText = (error, fallback = 'Не удалось загрузить данные') => error instanceof Error ? error.message : fallback;
 function message(payload, status) {
   const server = Array.isArray(payload?.message) ? payload.message.join('; ') : payload?.message;
