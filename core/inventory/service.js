@@ -280,3 +280,6 @@ export const createInventoryCriterionValue = (id, name) =>
 export const updateInventoryCriterionValue = (id, valueId, patch) =>
   criteriaRequest('/' + encodeURIComponent(id) + '/values/' + encodeURIComponent(valueId), 'PUT', patch);
 
+
+export const reorderInventoryCriterionValues = (groupId, valueIds) =>
+  criteriaRequest('/' + encodeURIComponent(groupId) + '/values/order', 'PUT', { valueIds });
