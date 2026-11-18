@@ -338,9 +338,9 @@ function counterpartyInformation(company = {}) {
     '</div>';
 }
 
-function catalogItemList(items = [], selectedCatalogIds = new Set()) {
-  // Existing compact UI List (not the raised V2 entry used for brands).
-  // Two lines: name/SKU and price with discount/payable amount.
+function catalogItemList(items = [], selectedCatalogIds = new Set(), linkedCatalogIds = null) {
+  // The link indicator belongs next to the supplier SKU, not before the title.
+  // Only a persisted Core supplier offer is a confirmed link.
   return '<div class="inventory-counterparty-product-list">' + items.map(item =>
     '<div class="inventory-counterparty-product-row">' +
       compactCheck({
@@ -355,6 +355,11 @@ function catalogItemList(items = [], selectedCatalogIds = new Set()) {
             : item.supplierAvailable === false ? 'is-supplier-unavailable' : '',
           title: item.name,
           secondary: item.supplierSku || '—',
+          secondaryIndicatorColor: linkedCatalogIds === null ? ''
+            : linkedCatalogIds.has(String(item.id)) ? '#37B24D' : '#A8AAAC',
+          secondaryIndicatorLabel: linkedCatalogIds === null ? ''
+            : linkedCatalogIds.has(String(item.id))
+              ? 'Связан с карточкой склада' : 'Не связан с карточкой склада',
           right: [
             money(item.listPrice) + ' · ' + (item.discountPercent == null ? '—'
               : Number(item.discountPercent).toLocaleString('ru-RU', { maximumFractionDigits: 2 }) + '%'),
@@ -412,15 +417,15 @@ function catalogGroupsMarkup(brands) {
 
 // Only product categories use the existing native disclosure. No extra
 // heading for products and no additional UI primitives.
-function catalogBrandMarkup(categories, selectedCatalogIds) {
+function catalogBrandMarkup(categories, selectedCatalogIds, linkedCatalogIds = null) {
   return '<div class="inventory-item-accordion">' +
     [...categories].map(([category, rows]) =>
-      category ? catalogDisclosure(category, catalogItemList(rows, selectedCatalogIds), false, rows.length,
+      category ? catalogDisclosure(category, catalogItemList(rows, selectedCatalogIds, linkedCatalogIds), false, rows.length,
         compactCheck({
           checked: rows.length > 0 && rows.every(row => selectedCatalogIds.has(String(row.id))),
           aria: 'Выбрать все позиции категории ' + category,
           data: 'data-company-category-check="' + escapeHtml(category) + '"',
-        })) : catalogItemList(rows, selectedCatalogIds),
+        })) : catalogItemList(rows, selectedCatalogIds, linkedCatalogIds),
     ).join('') + '</div>' +
     '<p class="ui-list__secondary">Выбор пока не сохраняется в остатках.</p>';
 }
@@ -471,6 +476,12 @@ async function openCompany(companyId, root, onChanged = () => {}) {
   // In-memory selection only until Core owns an idempotent bulk catalog operation.
   // Never create/archive inventory records or invent inventory units here.
   const selectedCatalogIds = new Set();
+  let linkedCatalogIds = null;
+  const readConfirmedLinks = () => new Set(getInventoryItems().flatMap(item =>
+    Array.isArray(item.supplierOffers) ? item.supplierOffers : [])
+    .filter(offer => String(offer.counterpartyId || '') === String(companyId)
+      && offer.catalogItemId)
+    .map(offer => String(offer.catalogItemId)));
 
   const showCatalog = async () => {
     const currentRun = ++revision;
@@ -490,6 +501,15 @@ async function openCompany(companyId, root, onChanged = () => {}) {
         entries.push(...(Array.isArray(page.items) ? page.items : []));
       }
       if (!layer.isConnected || !list.isConnected || currentRun !== revision) return;
+      // Core inventory snapshot is authoritative: matching SKU alone is not a link.
+      try {
+        await loadInventory();
+        linkedCatalogIds = readConfirmedLinks();
+      } catch {
+        // Do not present missing links as confirmed unlinked when inventory is unavailable.
+        linkedCatalogIds = null;
+      }
+      if (!layer.isConnected || !list.isConnected || currentRun !== revision) return;
       const brands = catalogBrands(entries);
       list.innerHTML = entries.length
         ? catalogGroupsMarkup(brands)
@@ -501,7 +521,7 @@ async function openCompany(companyId, root, onChanged = () => {}) {
           const brand = node.dataset.companyBrand;
           const categories = brands.get(brand);
           if (!categories) return;
-          const brandLayer = mountModal(document.body, modal(catalogBrandMarkup(categories, selectedCatalogIds), {
+          const brandLayer = mountModal(document.body, modal(catalogBrandMarkup(categories, selectedCatalogIds, linkedCatalogIds), {
             title: brand, variant: 'q', surface: 'app',
           }));
           const syncSelections = () => {
@@ -536,7 +556,17 @@ async function openCompany(companyId, root, onChanged = () => {}) {
           brandLayer?.querySelectorAll('[data-company-product]').forEach(product => {
             product.addEventListener('click', () => {
               const row = byId.get(product.dataset.companyProduct);
-              if (row) void openCatalogRow(company, row);
+              if (row) void openCatalogRow(company, row, {
+                onLinked: () => {
+                  linkedCatalogIds = readConfirmedLinks();
+                  const indicator = product.querySelector('.ui-list__secondary .ui-list__indicator');
+                  if (indicator) {
+                    indicator.style.setProperty('--ui-list-indicator', '#37B24D');
+                    indicator.setAttribute('aria-label', 'Связан с карточкой склада');
+                    indicator.title = 'Связан с карточкой склада';
+                  }
+                },
+              });
             });
           });
         });
