@@ -29,8 +29,20 @@ assert.match(source, /const excludedPath = '\/'\+urlId\(companyId\)\+'\/catalog\
   'Excluded offers are queried separately by counterparty');
 assert.match(source, /rowIds: ids, excluded: true/,
   'Exclusions are stored using Core selection endpoint');
-assert.match(source, /openCounterpartyFiles\(currentCompanies\)/,
-  'Upload history is available from the Counterparties list V');
+assert.match(source, /openCounterpartyFiles\(company\)/,
+  'Price-list history belongs to the selected supplier');
+assert.match(source, /id: 'upload', label: 'Загрузить файл', variant: 'primary'/,
+  'Price-list upload is the primary action within a supplier');
+const globalMenu = source.slice(source.indexOf("root.querySelector('[data-counterparty-view-menu]')"),
+  source.indexOf("root.querySelector('[data-counterparty-add]')"));
+assert.doesNotMatch(globalMenu, /'Шаблон Excel'|'История загрузок'|'Загрузить файл'/,
+  'Global V contains no supplier price-list operations');
+const supplierMenu = source.slice(source.indexOf("layer.querySelector('[data-company-actions]')"),
+  source.indexOf('  void refresh();\n  return layer;', source.indexOf("layer.querySelector('[data-company-actions]')")));
+assert.match(supplierMenu, /'Шаблон Excel'/,
+  'Template belongs to the selected supplier');
+assert.match(supplierMenu, /'История загрузок'/,
+  'Price-list history belongs to the selected supplier');
 assert.doesNotMatch(source, /data-company-excluded-open|removedCount/,
   'No duplicate restore action in the supplier catalog surface');
 assert.match(source, /\/catalog\/prices/);
