@@ -1594,7 +1594,7 @@ function openManufacturerAppearance(root, onSaved = () => {}) {
 
 // Existing Stock accordion and ordinary Core UI List. Stock item order
 // comes from the saved position; there is no touch/drag reorder in Z2.
-function stockListMarkup(manufacturer, query = '', rowsProvider = null, expanded = new Set()) {
+function stockListMarkup(manufacturer, query = '', rowsProvider = null, expanded = new Set(), selected = new Set(), allowCategoryReorder = false) {
   const needle = normalizedSearch(query);
   const group = typeof rowsProvider === 'function'
     ? rowsProvider() : getInventoryItems().filter(item => manufacturerName(item) === manufacturer);
@@ -1618,16 +1618,28 @@ function stockListMarkup(manufacturer, query = '', rowsProvider = null, expanded
     data: `data-inventory-item="${escapeHtml(item.itemId)}"`,
     aria: `Открыть ${item.name}`,
   });
-  const itemList = rows => list({className:'ui-list--dense',items:rows.map(itemRow)});
+  // The compact selector is a sibling of the clickable stock row, never a
+  // child of its button. Checking an item does not open its Q overview.
+  const itemList = rows => rows.map(item =>
+    '<div class="inventory-counterparty-product-row">' +
+      compactCheck({
+        checked:selected.has(String(item.itemId)),
+        aria:'Выбрать складскую единицу ' + item.name,
+        data:'data-stock-item-check="' + escapeHtml(item.itemId) + '"',
+      }) +
+      list({className:'ui-list--dense',items:[itemRow(item)]}) +
+    '</div>'
+  ).join('');
   const criteria = inventoryCriterionGroups();
-  const byCategory = criteria.some(entry => entry.legacyField === 'category');
+  const categoryCriterion = criteria.find(entry => entry.legacyField === 'category');
+  const byCategory = Boolean(categoryCriterion);
   const byType = criteria.some(entry => entry.legacyField === 'productType');
   if (!byCategory && !byType) return itemList(items);
 
   // Preserve existing group disclosure state after editing a product or
   // searching. Searching opens only matched groups for immediate access.
-  const disclosure = (label, content, key, nested = false) =>
-    catalogDisclosure(label, content, nested).replace('<details>',
+  const disclosure = (label, content, key, nested = false, reorderId = '') =>
+    catalogDisclosure(label, content, nested, null, '', reorderId).replace('<details>',
       '<details data-stock-disclosure="' + escapeHtml(key) + '"' +
       (needle || expanded.has(key) ? ' open' : '') + '>');
   const categories = new Map();
@@ -1639,15 +1651,26 @@ function stockListMarkup(manufacturer, query = '', rowsProvider = null, expanded
     if (!types.has(type)) types.set(type,[]);
     types.get(type).push(item);
   }
-  // Map iteration retains the order of first occurrence in saved position
-  // order, and items inside each section retain that same position order.
-  return [...categories.entries()].map(([category,types])=>{
+  // Position numbers control rows INSIDE each category; persisted criterion
+  // value order controls the category sections themselves. These two orders
+  // must never overwrite one another.
+  const order = new Map((categoryCriterion?.values || []).map((v,i)=>[v.name,i]));
+  const ids = new Map((categoryCriterion?.values || []).map(v=>[v.name,v.id]));
+  const grouped = [...categories.entries()].sort(([a],[b])=>
+    (order.get(a) ?? Number.MAX_SAFE_INTEGER) -
+    (order.get(b) ?? Number.MAX_SAFE_INTEGER)
+    || a.localeCompare(b,'ru',{numeric:true,sensitivity:'base'}));
+  const content = grouped.map(([category,types])=>{
     const typeContent=[...types.entries()].map(([type,rows])=>
       byType ? disclosure(type,itemList(rows),'t:'+category+'::'+type,true)
         : itemList(rows)).join('');
-    return byCategory ? disclosure(category,typeContent,'c:'+category)
+    const reorderId=allowCategoryReorder ? ids.get(category) || '' : '';
+    return byCategory ? disclosure(category,typeContent,'c:'+category,false,reorderId)
       : typeContent;
   }).join('');
+  return byCategory
+    ? '<div class="list-entries inventory-stock-category-sequence">' + content + '</div>'
+    : content;
 }
 
 function stockSortOptions(level) {
@@ -1804,6 +1827,9 @@ function openManufacturerStock(root, manufacturer, groupContext = null) {
       .find(entry => entry.name === manufacturer)?.items || []
     : null;
   const expandedStockGroups = new Set();
+  // Keep selection through expanding, collapsing, search and list redraws.
+  // No bulk action is invented until its behavior is specified.
+  const selectedStockItems = new Set();
   const markup = `
     ${context(manufacturer, {
       v: { data: 'data-inventory-item-controls', aria: 'Сортировка и фильтр товаров' },
@@ -1816,9 +1842,54 @@ function openManufacturerStock(root, manufacturer, groupContext = null) {
   const searchInput = searchRow?.querySelector('[data-inventory-company-search]') || null;
 
   const listHost = layer.querySelector('[data-inventory-company-list]');
+  let disposeCategoryReorder = () => {};
   const renderList = () => {
+    disposeCategoryReorder();
     const query = searchInput?.value || '';
-    if (listHost) listHost.innerHTML = stockListMarkup(manufacturer, query, rowsProvider, expandedStockGroups);
+    const criteria = inventoryCriterionGroups();
+    const categoryCriterion = criteria.find(group=>group.legacyField==='category');
+    const categories = new Set((rowsProvider?.() ||
+      getInventoryItems().filter(item=>manufacturerName(item)===manufacturer))
+      .map(item=>String(item.category||'').trim()).filter(Boolean));
+    const allowCategoryReorder = !query.trim() && !hasStockFilters(STOCK_VIEW.itemsFilters)
+      && STOCK_VIEW.itemsSort==='position-asc'
+      && categoryCriterion?.values?.filter(value=>categories.has(value.name)).length>1;
+    if (listHost) listHost.innerHTML = stockListMarkup(
+      manufacturer, query, rowsProvider, expandedStockGroups, selectedStockItems,
+      allowCategoryReorder);
+    listHost?.querySelectorAll('[data-stock-item-check]').forEach(check=>
+      check.addEventListener('change',()=>{
+        const id=String(check.dataset.stockItemCheck);
+        if(check.checked)selectedStockItems.add(id);
+        else selectedStockItems.delete(id);
+      }));
+    if (allowCategoryReorder && listHost) {
+      disposeCategoryReorder=initV2ListReorder(listHost,{
+        selector:'[data-stock-category][data-reorder-id]',
+        onReorder:async draggedIds=>{
+          // The view may hide categories belonging to other manufacturers.
+          // Persist the COMPLETE catalog sequence with hidden IDs unchanged.
+          const group=inventoryCriterionGroups().find(entry=>entry.id===categoryCriterion.id);
+          if (!group) throw new Error('Группа категорий изменилась. Откройте список заново.');
+          const all=group.values.map(entry=>entry.id);
+          const visible=new Set(draggedIds);
+          if (visible.size!==draggedIds.length
+            || draggedIds.some(id=>!all.includes(id)))
+            throw new Error('Порядок категорий изменился. Откройте список заново.');
+          let index=0;
+          const merged=all.map(id=>visible.has(id)?draggedIds[index++]:id);
+          await reorderInventoryCriterionValues(group.id,merged);
+          renderList();
+        },
+        onError:error=>{
+          const problem=document.createElement('div');
+          problem.className='form-error';
+          problem.textContent=error instanceof Error
+            ? error.message : 'Порядок групп не сохранился.';
+          listHost.prepend(problem);
+        },
+      });
+    }
     listHost?.querySelectorAll('[data-inventory-item]').forEach(control=>
       control.addEventListener('click', () => {
         const itemId = control.dataset.inventoryItem;
