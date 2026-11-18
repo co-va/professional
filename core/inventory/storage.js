@@ -1,4 +1,4 @@
-import { actionBlock, button, checkList, emptyState, field, initCheckList, list, modal, mountModal, select } from '../../ui/ui.js';
+import { actionBlock, button, emptyState, field, list, modal, mountModal, select } from '../../ui/ui.js';
 import { getInventoryItem, getInventoryItems, getInventoryStorageLocations } from './data.js';
 import { createInventoryStorageLocation, loadInventory, updateInventoryStorageLocation, transferInventoryStock } from './service.js';
 
@@ -7,18 +7,17 @@ const options = () => locations().map(location => ({
   value: location.locationId, label: location.isPrimary ? 'Не распределено' : location.name,
 }));
 
-// Earlier inventories stored a human-entered warehouse letter in item.location.
-// The newer location registry did not import those labels, and old movement
-// lines were migrated to the technical 'primary' location. This read-only
-// diagnostic works from the current account's server snapshot, never guesses
-// missing labels or modifies inventory on modal open.
+// Legacy Excel inventories already had a warehouse for every position in
+// InventoryItem.location. The new location table was introduced without
+// importing those names. Reconcile them once via the existing Core storage
+// endpoints; never make the user reassign their own saved A/B labels.
 export function legacyInventoryLocations(items = getInventoryItems()) {
   const grouped = new Map();
   for (const item of items) {
     const name = String(item?.location || '').trim();
     if (!name) continue;
     const key = name.toLocaleLowerCase('ru-RU');
-    if (!grouped.has(key)) grouped.set(key,{name,items:[]});
+    if (!grouped.has(key)) grouped.set(key, {name, items:[]});
     grouped.get(key).items.push(item);
   }
   return [...grouped.values()].sort((a,b)=>a.name.localeCompare(b.name,'ru',{numeric:true}));
@@ -26,116 +25,59 @@ export function legacyInventoryLocations(items = getInventoryItems()) {
 
 const stockAt = (item, id) => Number(
   (item?.locationBalances || []).find(row=>row.locationId===id)?.balance || 0);
-const legacyFingerprint = items => items.map(item =>
-  [item.itemId, item.location,stockAt(item,'primary')].join('|')).sort().join('\n');
+const existingSite = name => locations().find(place => !place.isPrimary &&
+  place.name.toLocaleLowerCase('ru-RU')===name.toLocaleLowerCase('ru-RU'));
 
-export function openInventoryLegacyStorageRecovery(onSaved = () => {}) {
-  const groups=legacyInventoryLocations();
-  if (!groups.length) return null;
-  const activeLocations=locations().filter(place=>!place.isPrimary);
-  const missing=groups.filter(group=>!activeLocations.some(place=>
-    place.name.toLocaleLowerCase('ru-RU')===group.name.toLocaleLowerCase('ru-RU')));
-  const candidates=groups.filter(group=>missing.includes(group)
-    || group.items.some(item=>stockAt(item,'primary')>0.000001));
-  if (!candidates.length) return null;
+// Prevent two Stock renders in the same session from migrating twice.
+// A failed run can be retried safely on the next navigation; each request
+// recalculates the remaining technical balance from the latest Core snapshot.
+let reconciliation = null;
 
-  const original=legacyFingerprint(getInventoryItems());
-  const markup = '<p>В старых карточках сохранились обозначения мест хранения. ' +
-    'Выберите, какие восстановить. Остатки будут перенесены из прежнего учёта; ' +
-    'общее количество товаров не изменится.</p>' +
-    '<div data-legacy-storage-list>' + checkList(candidates.map(group=>({
-      value:group.name,label:group.name,checked:true,
-      secondary:group.items.length+' поз. · '+group.items.filter(
-        item=>stockAt(item,'primary')>0.000001).length+' с остатками',
-    }))) + '</div>' +
-    '<p class="form-error" role="alert" data-legacy-storage-error></p>' +
-    '<p class="ui-list__secondary" data-legacy-storage-progress></p>' +
-    actionBlock(button('Восстановить выбранные',{data:'data-legacy-storage-run'}));
-  const host=mountModal(document.body,modal(markup,{
-    title:'Восстановление складов',variant:'q',surface:'app',
-  }));
-  if(!host)return null;
-  initCheckList(host);
-  const submit=host.querySelector('[data-legacy-storage-run]');
-  const status=host.querySelector('[data-legacy-storage-error]');
-  const progress=host.querySelector('[data-legacy-storage-progress]');
-  const confirmed=async selected=>{
-    submit.disabled=true;
-    try {
-      progress.textContent='Проверяем актуальные остатки…';
-      await loadInventory();
-      if (legacyFingerprint(getInventoryItems())!==original)
-        throw new Error('Остатки изменились с момента просмотра. Закройте окно и откройте проверку заново.');
-      let moved=0,created=0;
-      for(const name of selected) {
-        const group=legacyInventoryLocations().find(entry=>entry.name===name);
-        if(!group)throw new Error('Не найден прежний склад: '+name);
-        let location=locations().find(place=>!place.isPrimary
-          && place.name.toLocaleLowerCase('ru-RU')===name.toLocaleLowerCase('ru-RU'));
-        if(!location) {
-          progress.textContent='Восстанавливаем «'+name+'»…';
-          await createInventoryStorageLocation({name});
-          created++;
-          location=locations().find(place=>!place.isPrimary
-            && place.name.toLocaleLowerCase('ru-RU')===name.toLocaleLowerCase('ru-RU'));
-        }
-        if(!location)throw new Error('Не удалось найти созданный склад '+name);
-        const ids=group.items.map(item=>item.itemId);
-        for(let from=0;from<ids.length;from+=100) {
-          const chunk=ids.slice(from,from+100).map(id=>getInventoryItem(id)).filter(Boolean)
-            .map(item=>({itemId:item.itemId,quantity:stockAt(item,'primary'),unit:item.unit}))
-            .filter(line=>line.quantity>0.000001);
-          if(!chunk.length)continue;
-          progress.textContent='Переносим остатки в «'+name+'»: '+(from+chunk.length)+' из '+ids.length;
-          await transferInventoryStock({
-            fromLocationId:'primary',toLocationId:location.locationId,lines:chunk,
-            note:'Восстановление из старого поля склада: '+name,
-          });
-          moved+=chunk.length;
-        }
+/**
+ * Existing Core APIs handle atomic 100-position transfer batches and update
+ * the snapshot. Zero-balance positions keep their original A/B assignment.
+ * The physical movement history is appended, never rewritten or deleted.
+ */
+export function reconcileLegacyInventoryStorage() {
+  if (reconciliation) return reconciliation;
+  reconciliation = (async () => {
+    const groups = legacyInventoryLocations();
+    let created=0, moved=0;
+    for (const {name,items} of groups) {
+      let site=existingSite(name);
+      if (!site) {
+        await createInventoryStorageLocation({name});
+        site=existingSite(name);
+        if(!site)throw new Error('Не удалось восстановить склад «'+name+'».');
+        created++;
       }
-      await loadInventory();
-      const left=selected.flatMap(name=>legacyInventoryLocations().find(entry=>entry.name===name)?.items || [])
-        .map(item=>getInventoryItem(item.itemId)).filter(item=>item&&stockAt(item,'primary')>0.000001);
-      if(left.length)throw new Error('Часть остатков осталась без распределения ('+left.length+'). Проверьте и повторите.');
-      host.v2Close?.();
-      onSaved();
-      // Completion is only reported after refetch and verifying no stock
-      // remained under the legacy technical location for selected products.
-      // Zero-balance products keep their old location label for visibility.
-    } catch(error) {
-      status.textContent=error instanceof Error?error.message:'Не удалось восстановить склады.';
-      progress.textContent='Ранее успешно перенесённые остатки сохранены. Повторная проверка не создаст их ещё раз.';
-      submit.disabled=false;
+      // Recalculate the remaining primary quantity immediately before each
+      // transfer. Never pull back amounts the user already placed elsewhere.
+      for(let offset=0;offset<items.length;offset+=100) {
+        const lines=items.slice(offset,offset+100)
+          .map(item=>getInventoryItem(item.itemId)).filter(Boolean)
+          .filter(item=>(item.locationBalances||[]).every(row=>
+            row.locationId==='primary' || Number(row.balance)<=0.000001))
+          .map(item=>({
+            itemId:item.itemId,quantity:stockAt(item,'primary'),unit:item.unit,
+          })).filter(line=>Number.isFinite(line.quantity) && line.quantity>0.000001);
+        if (!lines.length) continue;
+        await transferInventoryStock({
+          fromLocationId:'primary',toLocationId:site.locationId,lines,
+          note:'Восстановление исходного склада «'+name+'» из карточек товаров',
+        });
+        moved+=lines.length;
+      }
     }
-  };
-  submit.addEventListener('click',()=>{
-    const selected=[...host.querySelectorAll('[data-legacy-storage-list] input[type="checkbox"]')]
-      .filter(input=>input.checked).map(input=>input.value);
-    if(!selected.length){status.textContent='Выберите хотя бы один склад.';return;}
-    status.textContent='';
-    const check=mountModal(document.body,modal(
-      '<div class="modal-title"><h2>Восстановить склады?</h2><p>' +
-      selected.join(', ').replace(/&/g,'&amp;').replace(/</g,'&lt;') +
-      '. Будут созданы недостающие места и перенесены только доступные остатки. ' +
-      'История операций и общий остаток сохраняются.</p></div>' +
-      actionBlock(button('Подтвердить',{data:'data-legacy-storage-confirm'}) +
-        button('Отмена',{variant:'secondary',data:'data-legacy-storage-cancel'})),
-      {title:'Подтверждение',variant:'x',xRole:'action'},
-    ));
-    check?.querySelector('[data-legacy-storage-cancel]')?.addEventListener('click',()=>check.v2Close?.());
-    check?.querySelector('[data-legacy-storage-confirm]')?.addEventListener('click',()=>{
-      check.v2Close?.();void confirmed(selected);
-    });
-  });
-  return host;
+    return {created,moved};
+  })().finally(()=>{reconciliation=null;});
+  return reconciliation;
 }
 
 // Places and transfers already belong to Core; this is their E «Остатки» interface.
 export function openInventoryStorageLocations(onSaved = () => {}) {
   const host = mountModal(document.body, modal(
     '<div data-inventory-storage-list></div>' +
-    '<div data-inventory-legacy-action></div>' +
     actionBlock(button('Добавить', { data: 'data-inventory-storage-add' })),
     { title: 'Места хранения', variant: 'q', surface: 'app' },
   ));
@@ -155,19 +97,7 @@ export function openInventoryStorageLocations(onSaved = () => {}) {
     }) : emptyState('Мест хранения нет');
     root.querySelectorAll('[data-inventory-storage-edit]').forEach(node =>
       node.addEventListener('click', () => edit(node.dataset.inventoryStorageEdit)));
-    const restore=host.querySelector('[data-inventory-legacy-action]');
-    const groups=legacyInventoryLocations();
-    const unmatched=groups.some(group=>!locations().some(place=>!place.isPrimary &&
-      place.name.toLocaleLowerCase('ru-RU')===group.name.toLocaleLowerCase('ru-RU'))
-      || group.items.some(item=>stockAt(item,'primary')>0.000001));
-    if(restore) {
-      restore.innerHTML=unmatched ? actionBlock(button('Восстановить прежние склады',{
-        variant:'secondary',data:'data-inventory-legacy-restore',
-      })) : '';
-      restore.querySelector('[data-inventory-legacy-restore]')?.addEventListener('click',()=>{
-        openInventoryLegacyStorageRecovery(()=>{display();onSaved();});
-      });
-    }
+
   };
   const edit = (locationId = '') => {
     const current = locations().find(place => place.locationId === locationId);
