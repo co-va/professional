@@ -194,11 +194,14 @@ export async function payInventoryPurchaseOrder(orderId, value) {
   });
 }
 
-export async function receiveInventoryPurchaseOrder(orderId, receivedAt, allocations = null, rejections = []) {
+export async function receiveInventoryPurchaseOrder(orderId, receivedAt, allocations, rejections = []) {
+  // The purchase receipt always uses explicit location allocations.
+  // The former unscoped path must not remain available through Professional.
+  if (!Array.isArray(allocations) || !Array.isArray(rejections)) {
+    throw new Error('Для получения заказа обязательно распределение по складам.');
+  }
   return inventoryRequest(`${purchaseOrderPath(orderId)}/receive`, {
-    method: 'POST', body: JSON.stringify({
-      receivedAt, ...(allocations ? { allocations, rejections } : {}),
-    }),
+    method: 'POST', body: JSON.stringify({ receivedAt, allocations, rejections }),
     verifySnapshot: payload => {
       const order = verifyOrderState(payload, orderId, ['received']);
       if (!order.receiptMovementId && !rejections.length) throw new Error('Сервер не подтвердил приход.');
