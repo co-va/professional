@@ -843,7 +843,7 @@ function catalogItemList(items = [], selectedCatalogIds = new Set(), linkedCatal
 // Hidden supplier rows use the same company/category disclosures as the
 // assortment, never a flat list. Worksheet labels are import metadata,
 // not names of manufacturers or product categories.
-function catalogExcludedGroups(entries, companyName, selected, linked, matched, statuses, lookup) {
+function catalogExcludedGroups(entries, companyName) {
   const groupName = value => {
     const name = String(value ?? '').trim();
     return /^(?:лист|sheet)\s*[-_№#]?\s*\d+(?:\s*\(\d+\))?$/iu.test(name) ? '' : name;
@@ -853,31 +853,8 @@ function catalogExcludedGroups(entries, companyName, selected, linked, matched, 
     brand: groupName(row.brand) || groupName(row.manufacturer) || companyName,
     category: groupName(row.category),
   }));
-  const brands = catalogBrands(normalized);
-  return '<div class="inventory-item-accordion">' +
-    [...brands].map(([brand, categories], brandIndex) => {
-      const brandRows = [...categories.values()].flat();
-      const brandKey = 'brand-' + brandIndex;
-      lookup.set(brandKey, brandRows);
-      const contents = [...categories].map(([category, rows], categoryIndex) => {
-        const products = catalogItemList(rows, selected, linked, matched, statuses);
-        if (!category) return products;
-        const categoryKey = 'category-' + brandIndex + '-' + categoryIndex;
-        lookup.set(categoryKey, rows);
-        return catalogDisclosure(category, products, true, rows.length, compactCheck({
-          aria: 'Выбрать группу ' + category,
-          data: 'data-company-restore-group-check="' + categoryKey + '"',
-        }));
-      }).join('');
-      return catalogDisclosure(brand,
-        '<div class="inventory-item-accordion">' + contents + '</div>',
-        false, brandRows.length, compactCheck({
-          aria: 'Выбрать компанию ' + brand,
-          data: 'data-company-restore-group-check="' + brandKey + '"',
-        }));
-    }).join('') + '</div>';
+  return catalogBrands(normalized);
 }
-
 function catalogBrands(items = []) {
   const brands = new Map();
   for (const item of items) {
@@ -905,18 +882,22 @@ function catalogGroupsMarkup(brands) {
   })));
 }
 
-// Only product categories use the existing native disclosure. No extra
-// heading for products and no additional UI primitives.
-function catalogBrandMarkup(categories, selectedCatalogIds, linkedCatalogIds = null, matchedCatalogItems = null, statuses = new Map()) {
+// Shared assortment/hidden category layout: identical native disclosure,
+// compact selection and product rows. Only the action footer differs.
+function catalogCategoryRowsMarkup(categories, selectedCatalogIds, linkedCatalogIds, matchedCatalogItems, statuses, checkAttribute = 'data-company-category-check') {
   return '<div class="inventory-item-accordion">' +
     [...categories].map(([category, rows]) =>
       category ? catalogDisclosure(category, catalogItemList(rows, selectedCatalogIds, linkedCatalogIds, matchedCatalogItems, statuses), false, rows.length,
         compactCheck({
           checked: rows.length > 0 && rows.every(row => selectedCatalogIds.has(String(row.id))),
           aria: 'Выбрать все позиции категории ' + category,
-          data: 'data-company-category-check="' + escapeHtml(category) + '"',
+          data: checkAttribute + '="' + escapeHtml(category) + '"',
         })) : catalogItemList(rows, selectedCatalogIds, linkedCatalogIds, matchedCatalogItems, statuses),
-    ).join('') + '</div>' +
+    ).join('') + '</div>';
+}
+
+function catalogBrandMarkup(categories, selectedCatalogIds, linkedCatalogIds = null, matchedCatalogItems = null, statuses = new Map()) {
+  return catalogCategoryRowsMarkup(categories, selectedCatalogIds, linkedCatalogIds, matchedCatalogItems, statuses) +
     actionBlock(
       button('Создать карточку', { data: 'data-company-selection-card' }) +
       button('Изменить данные', { variant: 'secondary', data: 'data-company-selection-bulk' }) +
@@ -1187,69 +1168,95 @@ async function openCompany(companyId, root, onChanged = () => {}, { initialCompa
       openNotice({ title: 'Скрытые', message: 'Скрытых позиций нет.' });
       return;
     }
+    // The top-level hidden list uses the exact V2 List entry as the
+    // visible assortment. Each brand opens the same category/product Q.
+    const brands = catalogExcludedGroups(entries, company.name);
     const selected = new Set();
-    const groupLookup = new Map();
     const restoreLayer = mountModal(document.body, modal(
-      catalogExcludedGroups(entries, company.name, selected, linkedCatalogIds,
-        matchedCatalogItems, catalogLinkStatuses, groupLookup) +
-        '<p class="form-error" data-company-restore-error role="alert"></p>' +
-        actionBlock(button('Восстановить', { data: 'data-company-restore-apply' })),
+      catalogGroupsMarkup(brands),
       { title: 'Скрытые', variant: 'q', surface: 'app' },
     ));
     if (!restoreLayer) return;
-    const apply = restoreLayer.querySelector('[data-company-restore-apply]');
-    const sync = () => {
-      apply.disabled = !selected.size;
-      restoreLayer.querySelectorAll('[data-company-product-check]').forEach(input => {
-        input.checked = selected.has(String(input.dataset.companyProductCheck));
-      });
-      restoreLayer.querySelectorAll('[data-company-restore-group-check]').forEach(input => {
-        const rows = groupLookup.get(input.dataset.companyRestoreGroupCheck) || [];
-        const marked = rows.filter(row => selected.has(String(row.id))).length;
-        input.checked = rows.length > 0 && marked === rows.length;
-        input.indeterminate = marked > 0 && marked < rows.length;
-      });
-    };
-    restoreLayer.querySelectorAll('[data-company-restore-group-check]').forEach(input => {
-      input.addEventListener('change', () => {
-        const rows = groupLookup.get(input.dataset.companyRestoreGroupCheck) || [];
-        rows.forEach(row => {
-          if (input.checked) selected.add(String(row.id));
-          else selected.delete(String(row.id));
-        });
-        sync();
-      });
-    });
-    restoreLayer.querySelectorAll('[data-company-product-check]').forEach(input => {
-      input.addEventListener('change', () => {
-        const id = String(input.dataset.companyProductCheck);
-        if (input.checked) selected.add(id);
-        else selected.delete(id);
-        sync();
-      });
-    });
-    restoreLayer.querySelectorAll('[data-company-product]').forEach(node => {
-      node.addEventListener('click', () => {
-        const row = entries.find(item => String(item.id) === String(node.dataset.companyProduct));
-        if (row) openCatalogProductDetails(row, catalogLinkStatuses.get(String(row.id)));
-      });
-    });
-    apply.addEventListener('click', async () => {
-      if (!selected.size) return;
-      apply.disabled = true;
-      const error = restoreLayer.querySelector('[data-company-restore-error]');
+    let busy = false;
+    const restoreSelected = async (brandLayer) => {
+      if (!selected.size || busy) return;
+      busy = true;
+      const apply = brandLayer.querySelector('[data-company-restore-apply]');
+      if (apply) apply.disabled = true;
+      const error = brandLayer.querySelector('[data-company-restore-error]');
+      if (error) error.textContent = '';
       try {
         await json('/' + urlId(companyId) + '/catalog/selection', {
           method: 'POST', body: { rowIds: [...selected], excluded: false },
         });
+        catalogCache?.delete(String(companyId));
+        brandLayer.v2Close?.();
         restoreLayer.v2Close?.();
         await showCatalog();
       } catch (cause) {
-        error.textContent = errText(cause);
-        sync();
+        if (error) error.textContent = errText(cause);
+        if (apply) apply.disabled = !selected.size;
+      } finally {
+        busy = false;
       }
+    };
+    restoreLayer.querySelectorAll('[data-company-brand]').forEach(node => {
+      node.addEventListener('click', () => {
+        const brand = node.dataset.companyBrand;
+        const categories = brands.get(brand);
+        if (!categories) return;
+        const brandLayer = mountModal(document.body, modal(
+          catalogCategoryRowsMarkup(categories, selected, linkedCatalogIds,
+            matchedCatalogItems, catalogLinkStatuses, 'data-company-restore-category-check') +
+          '<p class="form-error" data-company-restore-error role="alert"></p>' +
+          actionBlock(button('Восстановить', { data: 'data-company-restore-apply' })),
+          { title: brand, variant: 'q', surface: 'app' },
+        ));
+        if (!brandLayer) return;
+        const apply = brandLayer.querySelector('[data-company-restore-apply]');
+        const sync = () => {
+          brandLayer.querySelectorAll('[data-company-product-check]').forEach(input => {
+            input.checked = selected.has(String(input.dataset.companyProductCheck));
+          });
+          brandLayer.querySelectorAll('[data-company-restore-category-check]').forEach(input => {
+            const rows = categories.get(input.dataset.companyRestoreCategoryCheck) || [];
+            const marked = rows.filter(row => selected.has(String(row.id))).length;
+            input.checked = rows.length > 0 && marked === rows.length;
+            input.indeterminate = marked > 0 && marked < rows.length;
+          });
+          apply.disabled = busy || !selected.size;
+        };
+        brandLayer.querySelectorAll('[data-company-restore-category-check]').forEach(input => {
+          input.addEventListener('change', () => {
+            if (busy) return;
+            const rows = categories.get(input.dataset.companyRestoreCategoryCheck) || [];
+            rows.forEach(row => {
+              if (input.checked) selected.add(String(row.id));
+              else selected.delete(String(row.id));
+            });
+            sync();
+          });
+        });
+        brandLayer.querySelectorAll('[data-company-product-check]').forEach(input => {
+          input.addEventListener('change', () => {
+            if (busy) return;
+            const id = String(input.dataset.companyProductCheck);
+            if (input.checked) selected.add(id);
+            else selected.delete(id);
+            sync();
+          });
+        });
+        brandLayer.querySelectorAll('[data-company-product]').forEach(product => {
+          product.addEventListener('click', () => {
+            const row = [...categories.values()].flat().find(item =>
+              String(item.id) === String(product.dataset.companyProduct));
+            if (row) openCatalogProductDetails(row, catalogLinkStatuses.get(String(row.id)));
+          });
+        });
+        apply.addEventListener('click', () => void restoreSelected(brandLayer));
+        sync();
+      });
     });
-    sync();
   };
 
   // The brand list is presentation only; it must not wait for a full stock reload.
