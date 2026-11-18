@@ -1132,9 +1132,8 @@ async function openCompany(companyId, root, onChanged = () => {}) {
             void download('/template/xlsx', 'catalog-template.xlsx').catch(error =>
               openNotice({ title: 'Excel', message: errText(error) })) },
         ] }) },
-      ...(Array.isArray(company.priceLists) && company.priceLists.length
-        ? [{ id: 'history', label: 'История загрузок', onSelect: () =>
-          openCounterpartyFiles(company) }] : []),
+      { id: 'history', label: 'История загрузок', onSelect: () =>
+        openCounterpartyFiles(company) },
       { id: 'excluded', label: 'Исключённые позиции', onSelect: () =>
         void openExcludedCatalogItems() },
     ] });
