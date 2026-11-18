@@ -46,8 +46,9 @@ import { classificationOptions, openInventoryClassificationGroups,
 import { openInventoryStorageLocations, openInventoryTransfer } from './storage.js';
 import { renderStockBrandList, buildStockCatalogGroups } from './stock-catalog.js';
 import { catalogDisclosure } from './catalog-ui.js';
-import { INVENTORY_TOTAL_SCOPE, inventoryDisplayBalance,
-  inventoryDisplayTarget, inventoryLocations, openInventoryStockTargets, storageName } from './stock-targets.js';
+import { INVENTORY_TOTAL_SCOPE, inventoryDisplayBalance, inventoryDisplayTarget,
+  inventoryItemBelongsToStorage, itemLocationBalance, inventoryLocations,
+  openInventoryStockTargets, storageName } from './stock-targets.js';
 import {
   emptyStockFilters, hasStockFilters, matchesStockFilters,
   stockFilterOptions, stockSupplierNames, STOCK_FILLED, STOCK_EMPTY,
@@ -1610,7 +1611,7 @@ function stockListMarkup(manufacturer, query = '', rowsProvider = null, expanded
     title: `${Number(item.position) > 0 ? `${item.position} · ` : ''}${item.name}`,
     secondary: [item.sku, productTypeText(item)].filter(Boolean).join(' · '),
     right: [
-      `${numberText(item.balance)} ${item.unit || ''}`,
+      `${numberText(inventoryDisplayBalance(item,STOCK_VIEW.storageScope))} ${item.unit || ''}`,
       item.lastPurchasePrice == null ? '' : moneyText(item.lastPurchasePrice),
     ].filter(Boolean),
     interactive: true,
@@ -1798,7 +1799,8 @@ function openManufacturerStock(root, manufacturer, groupContext = null) {
   STOCK_VIEW.itemsType = '';
   STOCK_VIEW.itemsFilters = emptyStockFilters();
   const rowsProvider = groupContext
-    ? () => buildStockCatalogGroups(getInventoryItems(),groupContext.criteria)
+    ? () => buildStockCatalogGroups(
+      groupContext.itemsForView?.() || getInventoryItems(),groupContext.criteria)
       .find(entry => entry.name === manufacturer)?.items || []
     : null;
   const expandedStockGroups = new Set();
@@ -2648,11 +2650,12 @@ function renderStock(root) {
   STOCK_VIEW.manufacturersType = '';
   // Root stock catalog must never inherit an invisible legacy filter.
   STOCK_VIEW.itemsFilters = emptyStockFilters();
-  const locations = inventoryLocations();
+  const locations = inventoryLocations().filter(place=>!place.isPrimary);
+  const hasUnallocated=getInventoryItems().some(item=>itemLocationBalance(item,'primary')>0.000001);
   const scopes = [
     {value: INVENTORY_TOTAL_SCOPE, label: 'Общий остаток'},
-    ...locations.map(place=>({value:place.locationId,
-      label: 'Склад · ' + (place.isPrimary ? 'Основной' : storageName(place))})),
+    ...locations.map(place=>({value:place.locationId,label:'Склад · '+storageName(place)})),
+    ...(hasUnallocated ? [{value:'primary',label:'Остатки без распределения'}] : []),
   ];
   if (!scopes.some(entry=>entry.value===STOCK_VIEW.storageScope))
     STOCK_VIEW.storageScope=INVENTORY_TOTAL_SCOPE;
@@ -2674,7 +2677,7 @@ function renderStock(root) {
   const scopeInput=headerRows[0]?.querySelector('[name="inventoryStockScope"]')
     || root.querySelector('[name="inventoryStockScope"]');
   // Companies are navigated directly; no search or filter on Z1.
-  const visibleRows=()=>getInventoryItems();
+  const visibleRows=()=>getInventoryItems().filter(item=>inventoryItemBelongsToStorage(item,STOCK_VIEW.storageScope));
   let disposeBrandReorder=()=>{};
   const refresh=()=>{
     disposeBrandReorder();
@@ -2697,7 +2700,7 @@ function renderStock(root) {
         listHost.prepend(message);
       },
       // Z1 company → native Z2, never a Q with forced item selection.
-      onBrandOpen:brand=>openManufacturerStock(root,brand.name,{criteria}),
+      onBrandOpen:brand=>openManufacturerStock(root,brand.name,{criteria,itemsForView:visibleRows}),
     });
   };
   scopeInput?.addEventListener('change',event=>{
