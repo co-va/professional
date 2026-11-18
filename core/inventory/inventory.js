@@ -2574,11 +2574,12 @@ function renderStock(root) {
   const locations = inventoryLocations();
   const scopes = [
     {value: INVENTORY_TOTAL_SCOPE, label: 'Общий остаток'},
-    ...locations.map(place=>({value:place.locationId,label:storageName(place)})),
+    ...locations.map(place=>({value:place.locationId,
+      label: 'Склад · ' + (place.isPrimary ? 'Основной' : storageName(place))})),
   ];
   if (!scopes.some(entry=>entry.value===STOCK_VIEW.storageScope))
     STOCK_VIEW.storageScope=INVENTORY_TOTAL_SCOPE;
-  const scopeSelector=select({label:'Склад',name:'inventoryStockScope',
+  const scopeSelector=select({name:'inventoryStockScope',aria:'Выбрать склад',
     value:STOCK_VIEW.storageScope,options:scopes});
   root.innerHTML = page([
     context('Остатки',{
