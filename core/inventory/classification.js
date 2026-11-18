@@ -2,7 +2,8 @@ import { actionBlock, button, emptyState, field, modal, mountModal,
   v2ListEntry, v2ListEntries } from '../../ui/ui.js';
 import { getInventoryCriteria, getInventoryItems, getInventoryClassificationGroups } from './data.js';
 import { loadInventoryCriteria, loadInventory, createInventoryCriterion, updateInventoryCriterion,
-  createInventoryCriterionValue, updateInventoryCriterionValue } from './service.js';
+  createInventoryCriterionValue, updateInventoryCriterionValue,
+  removeInventoryCriterionValueAndAssignments } from './service.js';
 import { escapeHtml } from '../../ui/utils/escape-html.js';
 import { openInventoryClassificationRecovery } from './classification-recovery.js';
 
@@ -177,6 +178,21 @@ export function openInventoryClassificationGroups(onSaved = () => {}) {
       void run({archived:true});
     });
   };
+  const removeValue = (group, entry, afterRemoved = () => {}) => {
+    confirmRemove({
+      title:'Удалить значение',
+      description:'Значение «'+entry.name+'» будет удалено, а его назначения '+
+        'в товарах сняты. Сами товары и остатки сохранятся.',
+      onConfirm:async()=>{
+        const result=await removeInventoryCriterionValueAndAssignments(group,entry);
+        current=result.groups;
+        onSaved();
+        refresh();
+        group.refreshValues?.();
+        afterRemoved();
+      },
+    });
+  };
   const valueEditor = (group, entry = null) => {
     const editor = mountModal(document.body, modal(
       '<form data-inventory-criterion-value-form>' +
@@ -212,7 +228,7 @@ export function openInventoryClassificationGroups(onSaved = () => {}) {
       void perform({name:form.elements.namedItem('name')?.value});
     });
     form.querySelector('[data-inventory-criterion-value-delete]')?.addEventListener('click',()=>{
-      void perform({archived:true});
+      if(entry)removeValue(group,entry,()=>editor.v2Close?.());
     });
   };
   const openValues = id => {
@@ -246,16 +262,7 @@ export function openInventoryClassificationGroups(onSaved = () => {}) {
         const updated=current.find(entry=>entry.id===id);
         const value=updated?.values.find(entry=>entry.id===valueId);
         if(!value)return;
-        confirmRemove({
-          title:'Удалить значение',
-          description:'Значение «'+value.name+'» будет удалено из выбора, если не используется товарами.',
-          onConfirm:async()=>{
-            current=await updateInventoryCriterionValue(id,valueId,{archived:true});
-            onSaved();
-            refresh();
-            renderValues();
-          },
-        });
+        removeValue({...updated,refreshValues:renderValues},value);
       });
     };
     layer.querySelector('[data-inventory-add-criterion-value]')?.addEventListener('click',()=>{
