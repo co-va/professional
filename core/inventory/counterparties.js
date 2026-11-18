@@ -344,12 +344,157 @@ function openImportPreview(company, onSaved, file) {
   void check();
 }
 
+function supplierEffectivePrice(row = {}, company = {}) {
+  if (row.effectivePrice != null) return Number(row.effectivePrice);
+  if (row.listPrice == null) return null;
+  const discount = Number(row.appliedDiscountPercent ?? row.discountPercent ?? company.discountPercent ?? 0);
+  return Math.round((Number(row.listPrice) * (1 - discount / 100) + Number.EPSILON) * 100) / 100;
+}
+
+function supplierDiscount(row = {}, company = {}) {
+  const discount = row.appliedDiscountPercent ?? row.discountPercent ?? company.discountPercent;
+  return discount == null ? 'Не задана' : Number(discount).toLocaleString('ru-RU', {
+    maximumFractionDigits: 4,
+  }) + '%';
+}
+
+// Supplier's price and the tenant's agreement discount are owned by Counterparty,
+// not by the stock item. This Q never edits receipts or historical costs.
+function openSupplierAgreement(company, onSaved = () => {}) {
+  const q = mountModal(document.body, modal(
+    '<form data-company-agreement-form>' +
+    field({ label: 'Цена из прайса, ₽', name: 'listPriceSample',
+      type: 'number', min: '0.01', step: '0.01', inputmode: 'decimal' }) +
+    field({ label: 'Известная закупочная цена, ₽', name: 'purchasePriceSample',
+      type: 'number', min: '0', step: '0.01', inputmode: 'decimal' }) +
+    '<p class="ui-list__secondary" data-company-agreement-inferred></p>' +
+    field({ label: 'Моя скидка, %', name: 'discountPercent',
+      value: company.discountPercent ?? '', type: 'number', min: '0', max: '100',
+      step: '0.0001', inputmode: 'decimal' }) +
+    '<p class="ui-list__secondary" data-company-agreement-result></p>' +
+    '<p class="form-error" role="alert" data-company-agreement-error></p>' +
+    actionBlock(button('Применить', { type: 'submit' })) + '</form>',
+    { title: 'Скидка контрагента', variant: 'q', surface: 'app' },
+  ));
+  if (!q) return;
+  const form = q.querySelector('[data-company-agreement-form]');
+  const inferred = form.querySelector('[data-company-agreement-inferred]');
+  const result = form.querySelector('[data-company-agreement-result]');
+  const sampleList = form.querySelector('[name="listPriceSample"]');
+  const samplePaid = form.querySelector('[name="purchasePriceSample"]');
+  const discountField = form.querySelector('[name="discountPercent"]');
+  const parse = element => {
+    const raw = String(element?.value || '').trim();
+    return raw === '' ? null : Number(raw.replace(',', '.'));
+  };
+  const update = (derive = false) => {
+    const listPrice = parse(sampleList), paidPrice = parse(samplePaid);
+    const canInfer = listPrice !== null && listPrice > 0 && Number.isFinite(listPrice)
+      && paidPrice !== null && paidPrice >= 0 && paidPrice <= listPrice;
+    if (derive && canInfer) {
+      const percent = Math.round((1 - paidPrice / listPrice) * 1000000) / 10000;
+      discountField.value = String(percent);
+    }
+    inferred.textContent = canInfer
+      ? 'По этим ценам скидка: ' +
+        (Math.round((1 - paidPrice / listPrice) * 1000000) / 10000)
+          .toLocaleString('ru-RU', { maximumFractionDigits: 4 }) + '%'
+      : listPrice != null && paidPrice != null
+        ? 'Проверьте цены: закупочная должна быть не выше прайсовой.' : '';
+    const percentage = parse(discountField);
+    result.textContent = listPrice != null && listPrice > 0 && percentage != null
+      && percentage >= 0 && percentage <= 100
+      ? 'Расчётная цена: ' + money(Math.round((listPrice *
+        (1 - percentage / 100) + Number.EPSILON) * 100) / 100)
+      : '';
+  };
+  sampleList.addEventListener('input', () => update(true));
+  samplePaid.addEventListener('input', () => update(true));
+  discountField.addEventListener('input', () => update());
+  update();
+  form.addEventListener('submit', async event => {
+    event.preventDefault();
+    const amount = parse(discountField);
+    const error = form.querySelector('[data-company-agreement-error]');
+    if (amount !== null && (!Number.isFinite(amount) || amount < 0 || amount > 100)) {
+      error.textContent = 'Скидка должна быть от 0 до 100%.'; return;
+    }
+    const submit = form.querySelector('[type="submit"]');
+    submit.disabled = true;
+    try {
+      const updated = await json('/' + urlId(company.id), {
+        method: 'PUT', body: { discountPercent: amount },
+      });
+      q.v2Close?.();
+      onSaved(updated);
+    } catch (cause) {
+      error.textContent = errText(cause);
+      submit.disabled = false;
+    }
+  });
+}
+
+function openSupplierProductEditor(company, row, onSaved = () => {}) {
+  const fields = [
+    field({ label: 'Наименование поставщика', name: 'name', value: row.name || '', required: true }),
+    field({ label: 'Артикул', name: 'supplierSku', value: row.supplierSku || '' }),
+    field({ label: 'Штрихкод', name: 'barcode', value: row.barcode || '' }),
+    field({ label: 'Производитель', name: 'manufacturer', value: row.manufacturer || '' }),
+    field({ label: 'Бренд', name: 'brand', value: row.brand || '' }),
+    field({ label: 'Группа поставщика', name: 'category', value: row.category || '' }),
+    field({ label: 'Цена без скидки, ₽', name: 'listPrice',
+      value: row.listPrice ?? '', type: 'number', min: '0', step: '0.01' }),
+    field({ label: 'РРЦ, ₽', name: 'retailPrice',
+      value: row.retailPrice ?? '', type: 'number', min: '0', step: '0.01' }),
+    field({ label: 'Скидка товара, %', name: 'discountPercent',
+      value: row.discountPercent ?? '', type: 'number', min: '0', max: '100',
+      step: '0.0001' }),
+    field({ label: 'Ед. поставщика', name: 'unit', value: row.unit || '' }),
+    field({ label: 'В упаковке', name: 'packageQuantity', value: row.packageQuantity ?? '',
+      type: 'number', min: '0.001', step: 'any' }),
+    field({ label: 'Примечание поставщика', name: 'supplierNote', value: row.supplierNote || '' }),
+  ];
+  const layer = mountModal(document.body, modal(
+    '<form data-company-catalog-edit-form>' + fields.join('') +
+    '<p class="ui-list__secondary">Пустая скидка — по договору. 0% — без скидки.</p>' +
+    '<p class="form-error" role="alert" data-company-catalog-edit-error></p>' +
+    actionBlock(button('Применить', { type: 'submit' })) + '</form>',
+    { title: 'Позиция поставщика', variant: 'q', surface: 'app' },
+  ));
+  if (!layer) return;
+  const form = layer.querySelector('[data-company-catalog-edit-form]');
+  form.addEventListener('submit', async event => {
+    event.preventDefault();
+    const input = Object.fromEntries(new FormData(form).entries());
+    const error = form.querySelector('[data-company-catalog-edit-error]');
+    const name = String(input.name || '').trim();
+    if (!name) { error.textContent = 'Укажите название.'; return; }
+    for (const key of ['listPrice', 'retailPrice', 'discountPercent', 'packageQuantity']) {
+      const raw = String(input[key] ?? '').trim();
+      input[key] = raw === '' ? null : Number(raw.replace(',', '.'));
+    }
+    const save = form.querySelector('[type="submit"]');
+    save.disabled = true;
+    try {
+      await json('/' + urlId(company.id) + '/catalog/' + urlId(row.id),
+        { method: 'PUT', body: input });
+      layer.v2Close?.();
+      onSaved();
+    } catch (cause) {
+      error.textContent = errText(cause);
+      save.disabled = false;
+    }
+  });
+}
+
 function counterpartyInformation(company = {}) {
   // Reuse existing small/primary/secondary typography, without "data" rows
   // or locally styled dividers. Editing remains in the existing V → Q flow.
   const primary = String(company.contactName || '').trim();
   const secondary = [company.phone, company.email, company.website, company.note]
     .filter(value => String(value || '').trim());
+  if (company.discountPercent != null) secondary.push('Скидка: ' + Number(company.discountPercent)
+    .toLocaleString('ru-RU', { maximumFractionDigits: 4 }) + '%');
   return '<div data-counterparty-information>' +
     (primary ? '<span class="ui-list__secondary">Менеджер</span>' : '') +
     (primary ? '<strong class="ui-list__title">' + escapeHtml(primary) + '</strong>' : '') +
