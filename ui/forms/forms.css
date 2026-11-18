@@ -43,6 +43,27 @@
    All products remain directly clickable without extra disclosure gestures. */
 .inventory-stock-category{min-width:0;margin-top:12px}
 .inventory-stock-category:first-child{margin-top:0}
+/* Stock Z2 category drag: existing V2 handle and reorder engine.
+   The triangle stays native <summary>; the separate right handle only moves
+   whole categories. Do not change shared Q/Z geometry or product row sizes. */
+.inventory-stock-category-sequence{gap:0}
+.inventory-stock-category-sequence>.inventory-stock-category{margin-top:0}
+.inventory-stock-category-sequence>.inventory-stock-category:has(> .inventory-editor-heading__controls)>details>summary.inventory-editor-summary{padding-right:46px}
+.inventory-stock-category-sequence>.inventory-stock-category>.inventory-editor-heading__controls{top:0;right:0;height:46px}
+.inventory-stock-category-sequence>.inventory-stock-category .list-entry__reorder-handle{height:46px}
+.inventory-stock-category-sequence>.inventory-stock-category.is-reordering{
+  z-index:4;transform:translate3d(0,var(--list-entry-drag-y,0px),0);
+  transition:none;background:var(--white);box-shadow:0 10px 24px rgba(0,0,0,.16);
+  pointer-events:none;will-change:transform
+}
+.inventory-stock-category-sequence>.inventory-stock-category.is-reorder-target-before::before,
+.inventory-stock-category-sequence>.inventory-stock-category.is-reorder-target-after::after{
+  content:"";position:absolute;left:0;right:0;height:2px;
+  background:var(--text);z-index:5;pointer-events:none
+}
+.inventory-stock-category-sequence>.inventory-stock-category.is-reorder-target-before::before{top:0}
+.inventory-stock-category-sequence>.inventory-stock-category.is-reorder-target-after::after{bottom:0}
+
 .inventory-stock-category-heading,.inventory-stock-type-heading{
   display:flex;justify-content:space-between;align-items:baseline;gap:8px;
   min-width:0;overflow-wrap:anywhere;
