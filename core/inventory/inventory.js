@@ -63,6 +63,7 @@ import {
   getInventoryMovements,
 } from './data.js';
 import {
+  archiveSelectedInventoryItems,
   correctInventoryMovement,
   createInventoryItem,
   createInventoryMovement,
@@ -1935,14 +1936,16 @@ function openManufacturerStock(root, manufacturer, groupContext = null) {
       .find(entry => entry.name === manufacturer)?.items || []
     : null;
   const expandedStockGroups = new Set();
-  // Keep selection through expanding, collapsing, search and list redraws.
-  // No bulk action is invented until its behavior is specified.
+  // One selection drives both actions; no separate stock mutation owner.
   const selectedStockItems = new Set();
   const markup = `
     ${context(manufacturer, {
       v: { data: 'data-inventory-item-controls', aria: 'Сортировка и фильтр товаров' },
       c: { label: '+', data: 'data-inventory-add-item', aria: 'Добавить позицию' },
     })}
+    <div data-stock-selected-actions hidden>
+      ${actionBlock(button('Действия', { data: 'data-stock-selected-open' }))}
+    </div>
     <div data-inventory-company-list>${stockListMarkup(manufacturer, '', rowsProvider, expandedStockGroups)}</div>`;
   const layer = mountV2ZLayer(root, v2ZLayer(markup, { className: 'inventory-manufacturer-z' }), { stack: true });
   if (!layer) return;
@@ -1950,9 +1953,76 @@ function openManufacturerStock(root, manufacturer, groupContext = null) {
   const searchInput = searchRow?.querySelector('[data-inventory-company-search]') || null;
 
   const listHost = layer.querySelector('[data-inventory-company-list]');
+  const selectionActions = layer.querySelector('[data-stock-selected-actions]');
+  const selectedAction = layer.querySelector('[data-stock-selected-open]');
+  const syncSelected = () => {
+    for (const id of selectedStockItems) if (!getInventoryItem(id)) selectedStockItems.delete(id);
+    if (selectionActions) selectionActions.hidden = !selectedStockItems.size;
+    if (selectedAction) selectedAction.textContent = 'Действия · ' + selectedStockItems.size;
+  };
+  const deleteSelected = () => {
+    const chosen = [...selectedStockItems].map(id => getInventoryItem(id)).filter(Boolean);
+    const safe = chosen.filter(item =>
+      Math.abs(Number(item.balance) || 0) < 0.000001 &&
+      !(item.locationBalances || []).some(row => Math.abs(Number(row.balance) || 0) > 0.000001) &&
+      !((Number(item.containerCount) || 0) > 0) &&
+      !(item.locationContainerCounts || []).some(row => Number(row.containers) !== 0));
+    const skipped = chosen.length - safe.length;
+    if (!safe.length)
+      return openNotice({ title: 'Удаление', message:
+        'У выбранных товаров есть остатки. Сначала оформите перемещение или списание в «Движениях».' });
+    const dialog = mountModal(document.body, modal(
+      '<p>Удалить ' + safe.length + ' позиций из «Остатков»?' +
+      (skipped ? ' · С остатками останутся: ' + skipped + '.' : '') +
+      ' Прайсы контрагентов и история сохраняются.</p>' +
+      '<p class="form-error" role="alert" data-stock-bulk-delete-error></p>' +
+      actionBlock(button('Удалить · ' + safe.length, {
+        variant: 'delete-outline', data: 'data-stock-bulk-delete-confirm',
+      }) + button('Отмена', {
+        variant: 'secondary', data: 'data-stock-bulk-delete-cancel',
+      })), { title: 'Удаление выбранных', variant: 'x', xRole: 'action', surface: 'app' },
+    ));
+    if (!dialog) return;
+    dialog.querySelector('[data-stock-bulk-delete-cancel]')?.addEventListener('click', () => dialog.v2Close?.());
+    let saving = false;
+    dialog.querySelector('[data-stock-bulk-delete-confirm]')?.addEventListener('click', async event => {
+      if (saving) return;
+      saving = true;
+      const submit = event.currentTarget;
+      submit.disabled = true;
+      try {
+        await archiveSelectedInventoryItems(safe.map(item => item.itemId));
+        safe.forEach(item => selectedStockItems.delete(item.itemId));
+        dialog.v2Close?.();
+        renderList();
+        openNotice({ title: 'Остатки', message: 'Удалено позиций: ' + safe.length +
+          (skipped ? '. Не удалены позиции с остатками: ' + skipped + '.' : '.') });
+      } catch (cause) {
+        const error = dialog.querySelector('[data-stock-bulk-delete-error]');
+        if (error) error.textContent = cause instanceof Error ? cause.message : 'Не удалось удалить выбранные товары.';
+        submit.disabled = false;
+        saving = false;
+      }
+    });
+  };
+  selectedAction?.addEventListener('click', () => {
+    const ids = [...selectedStockItems].filter(id => Boolean(getInventoryItem(id)));
+    if (!ids.length) return;
+    openSharedProfileSettingsMenu({
+      title: 'Выбрано: ' + ids.length,
+      actions: [
+        { id: 'transfer', label: 'Переместить', onSelect: () => openInventoryTransfer(() => {
+          renderList();
+        }, { selectedItemIds: ids, fromLocationId: STOCK_VIEW.storageScope === INVENTORY_TOTAL_SCOPE
+          ? '' : STOCK_VIEW.storageScope }) },
+        { id: 'archive', label: 'Удалить из остатков', variant: 'delete-outline', onSelect: deleteSelected },
+      ],
+    });
+  });
   let disposeCategoryReorder = () => {};
   let disposeCategoryPreview = () => {};
   const renderList = () => {
+    syncSelected();
     disposeCategoryPreview();
     disposeCategoryReorder();
     const query = searchInput?.value || '';
@@ -1972,6 +2042,7 @@ function openManufacturerStock(root, manufacturer, groupContext = null) {
         const id=String(check.dataset.stockItemCheck);
         if(check.checked)selectedStockItems.add(id);
         else selectedStockItems.delete(id);
+        syncSelected();
       }));
     if (allowCategoryReorder && listHost) {
       disposeCategoryReorder=initV2ListReorder(listHost,{

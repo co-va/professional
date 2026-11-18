@@ -106,6 +106,20 @@ export async function reorderInventoryItems(manufacturer, itemIds) {
   });
 }
 
+export async function archiveSelectedInventoryItems(itemIds) {
+  const ids = [...new Set(Array.isArray(itemIds) ? itemIds.map(String) : [])];
+  if (!ids.length || ids.length > 500) throw new Error('Выберите от 1 до 500 товаров.');
+  return inventoryRequest('/items/archive-selection', {
+    method: 'POST',
+    body: JSON.stringify({ itemIds: ids }),
+    verifySnapshot: payload => {
+      if (!Array.isArray(payload?.items) || ids.some(id =>
+        payload.items.some(item => String(item.itemId) === id)))
+        throw new Error('Сервер не подтвердил удаление выбранных позиций.');
+    },
+  });
+}
+
 export async function createInventoryMovement(value = {}) {
   return inventoryRequest('/movements', {
     method: 'POST',
