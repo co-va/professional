@@ -338,6 +338,34 @@ function counterpartyInformation(company = {}) {
     '</div>';
 }
 
+// Tapping a supplier product opens its data Q. Selection is exclusively
+// the compact checkbox; item details never initiate stock creation or linking.
+function openCatalogProductDetails(row, status = null) {
+  const stockItem = status?.itemId
+    ? getInventoryItems().find(item => String(item.itemId) === String(status.itemId)) : null;
+  const rows = [
+    ['Артикул', row.supplierSku],
+    ['Название', row.name],
+    ['Короткое название', stockItem?.name],
+    ['Производитель', row.manufacturer || row.brand],
+    ['Штрихкод', row.barcode],
+    ['Категория', row.category],
+    ['Наличие', supplierAvailability(row.supplierAvailable)],
+    ['Цена поставщика', money(row.listPrice)],
+    ['РРЦ', money(row.retailPrice)],
+    ['Моя закупочная цена', money(row.actualPrice)],
+    ['Скидка', discountLabel(row.listPrice, row.actualPrice, row.discountPercent)],
+    ['Карточка склада', status?.status === 'linked' ? stockItem?.name || 'Связана'
+      : status?.status === 'matched' ? 'Найдено совпадение'
+      : status?.status === 'conflict' ? 'Неоднозначное совпадение' : 'Не связана'],
+    ['Примечание', row.supplierNote],
+  ].filter(([,value]) => value != null && String(value).trim() !== '');
+  return mountModal(document.body, modal(list({
+    className: 'ui-list--dense',
+    items: rows.map(([title, value]) => ({ title, right: [String(value)] })),
+  }), { title: 'Данные товара', variant: 'q', surface: 'app' }));
+}
+
 function catalogItemList(items = [], selectedCatalogIds = new Set(), linkedCatalogIds = null, matchedCatalogItems = null) {
   // The link indicator belongs next to the supplier SKU, not before the title.
   // Only a persisted Core supplier offer is a confirmed link.
@@ -370,7 +398,7 @@ function catalogItemList(items = [], selectedCatalogIds = new Set(), linkedCatal
           ],
           interactive: true,
           data: 'data-company-product="' + escapeHtml(item.id) + '"',
-          aria: 'Выбрать позицию ' + item.name + '. ' + supplierAvailability(item.supplierAvailable),
+          aria: 'Данные товара ' + item.name + '. ' + supplierAvailability(item.supplierAvailable),
         }],
       }) +
     '</div>',
@@ -667,11 +695,10 @@ async function openCompany(companyId, root, onChanged = () => {}) {
         sync();
       });
     });
-    restoreLayer.querySelectorAll('[data-company-product]').forEach(row => {
-      row.addEventListener('click', () => {
-        const check = restoreLayer.querySelector('[data-company-product-check="' +
-          CSS.escape(String(row.dataset.companyProduct)) + '"]');
-        check?.click();
+    restoreLayer.querySelectorAll('[data-company-product]').forEach(node => {
+      node.addEventListener('click', () => {
+        const row = entries.find(item => String(item.id) === String(node.dataset.companyProduct));
+        if (row) openCatalogProductDetails(row, catalogLinkStatuses.get(String(row.id)));
       });
     });
     apply.addEventListener('click', async () => {
@@ -819,9 +846,8 @@ async function openCompany(companyId, root, onChanged = () => {}) {
           });
           brandLayer?.querySelectorAll('[data-company-product]').forEach(product => {
             product.addEventListener('click', () => {
-              const check = brandLayer.querySelector('[data-company-product-check="' +
-                CSS.escape(String(product.dataset.companyProduct)) + '"]');
-              if (check) check.click();
+              const row = byId.get(String(product.dataset.companyProduct));
+              if (row) openCatalogProductDetails(row, catalogLinkStatuses.get(String(row.id)));
             });
           });
           syncSelections();
