@@ -1,4 +1,4 @@
-import { actionBlock, button, emptyState, field, modal, mountModal,
+import { actionBlock, button, emptyState, field, modal, mountModal, openNotice,
   v2ListEntry, v2ListEntries } from '../../ui/ui.js';
 import { getInventoryCriteria, getInventoryItems, getInventoryClassificationGroups } from './data.js';
 import { loadInventoryCriteria, loadInventory, createInventoryCriterion, updateInventoryCriterion,
@@ -103,16 +103,28 @@ export function openInventoryClassificationGroups(onSaved = () => {}) {
     if(!layer)return;
     layer.querySelector('[data-criteria-remove-cancel]')?.addEventListener('click',()=>layer.v2Close?.());
     let saving=false;
-    layer.querySelector('[data-criteria-remove-confirm]')?.addEventListener('click',async()=>{
+    const confirmButton=layer.querySelector('[data-criteria-remove-confirm]');
+    confirmButton?.addEventListener('click',async()=>{
       if(saving)return;
       saving=true;
+      confirmButton.disabled=true;
+      const initialLabel=confirmButton.textContent;
+      confirmButton.textContent='Удаляем…';
       try {
         await onConfirm();
         layer.v2Close?.();
       }catch(cause){
+        const message=cause instanceof Error?cause.message:'Не удалось удалить.';
         const problem=layer.querySelector('[data-criteria-remove-error]');
-        if(problem)problem.textContent=cause instanceof Error?cause.message:'Не удалось удалить.';
-      }finally{saving=false;}
+        if(problem)problem.textContent=message;
+        // A Q's inline footer may be outside the iPhone scroll viewport.
+        // Always show the reason for a failed value/group removal.
+        openNotice({title:'Не удалось удалить',message});
+      }finally{
+        saving=false;
+        confirmButton.disabled=false;
+        confirmButton.textContent=initialLabel;
+      }
     });
   };
   const wireRemove = (container, selector, handler) => {
