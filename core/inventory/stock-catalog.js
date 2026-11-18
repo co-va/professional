@@ -1,10 +1,9 @@
 import {
-  actionBlock, button, emptyState, list, modal, mountModal,
+  actionBlock, button, emptyState, field, list, modal, mountModal,
   v2ListEntries, v2ListEntry, initV2ListReorder,
 } from '../../ui/ui.js';
 import { compactCheck } from '../../ui/selection/check-list.js';
 import { escapeHtml } from '../../ui/utils/escape-html.js';
-import { catalogDisclosure } from './catalog-ui.js';
 import { getInventoryItems } from './data.js';
 import {
   INVENTORY_TOTAL_SCOPE, inventoryDisplayBalance, inventoryDisplayTarget,
@@ -70,7 +69,7 @@ function stockRow(item, selected, scope) {
     }) +
     list({className:'ui-list--dense',items:[{
       title:item.name,
-      secondary:[item.sku, item.productType || item.category].filter(Boolean).join(' · ') || '—',
+      secondary:[item.sku, item.category, item.productType].filter(Boolean).join(' · ') || '—',
       right:[
         quantity(balance) + ' ' + (item.unit || ''),
         target == null ? 'Цель не задана'
@@ -91,36 +90,15 @@ export function openStockCatalogBrand(brand, options = {}) {
   } = options;
   if (!brand) return null;
   const selected = new Set();
-  const groupLookup = new Map();
-  const makeList = (node, key = 'root', depth = 0) => {
-    const flat = node.items.filter(item => ![...node.children.values()]
-      .some(child => child.items.some(other=>other.itemId===item.itemId)));
-    let html = flat.length
-      ? '<div class="inventory-counterparty-product-list">' +
-        flat.map(item=>stockRow(item,selected,scope)).join('') + '</div>'
-      : '';
-    [...node.children.values()].sort((a,b)=>compare(a.name,b.name))
-      .forEach((child,index)=>{
-        const groupKey = key + '-' + index;
-        groupLookup.set(groupKey,child.items.map(item=>String(item.itemId)));
-        const allChecked = child.items.length > 0 && child.items.every(item=>selected.has(String(item.itemId)));
-        html += catalogDisclosure(child.name, makeList(child,groupKey,depth+1),
-          depth>0,child.items.length,compactCheck({
-            checked:allChecked,
-            aria:'Выбрать группу ' + child.name,
-            data:'data-stock-group-check="' + escapeHtml(groupKey) + '"',
-          }));
-      });
-    return html;
-  };
+  let search = '';
   const layer = mountModal(document.body, modal(
     '<div data-stock-catalog-body></div>',
     {title:brand.name,variant:'q',surface:'app'},
   ));
   if (!layer) return null;
   const refresh = () => {
-    // Refresh from the server snapshot after any Q edit; old row objects
-    // must never hide a saved name, target or classification change.
+    // Classification values can be wrong in legacy imports. They must never
+    // form compulsory folders that prevent access to an inventory item.
     const visible = typeof options.itemsForView === 'function'
       ? options.itemsForView() : getInventoryItems();
     brand = buildStockCatalogGroups(visible,options.criteria||[])
@@ -129,53 +107,64 @@ export function openStockCatalogBrand(brand, options = {}) {
     [...selected].forEach(id=>{if(!visibleIds.has(id))selected.delete(id);});
     const body = layer.querySelector('[data-stock-catalog-body]');
     if (!body) return;
-    groupLookup.clear();
-    body.innerHTML = '<div class="inventory-item-accordion">' +
-      makeList(brand) + '</div>' +
+    body.innerHTML = '<div class="ui-search-field">' +
+      field({label:'Поиск',name:'inventoryStockItemSearch',type:'search',
+        placeholder:'Название, артикул, категория, тип…',autocomplete:'off',
+        data:'data-stock-catalog-search'}) + '</div>' +
+      '<div data-stock-catalog-products></div>' +
       actionBlock(
         button('Желаемый остаток',{data:'data-stock-selection-target'}) +
         button('Новый товар',{variant:'secondary',data:'data-stock-selection-new'}),
         {className:'inventory-counterparty-selection-actions'},
       ) + '<p class="ui-list__secondary" data-stock-selection-count></p>';
-    const target = layer.querySelector('[data-stock-selection-target]');
-    const counter = layer.querySelector('[data-stock-selection-count]');
+    const input = body.querySelector('[data-stock-catalog-search]');
+    const products = body.querySelector('[data-stock-catalog-products]');
+    const target = body.querySelector('[data-stock-selection-target]');
+    const counter = body.querySelector('[data-stock-selection-count]');
     const sync = () => {
       if (target) target.disabled = selected.size !== 1;
       if (counter) counter.textContent = selected.size ? 'Выбрано: '+selected.size : '';
-      layer.querySelectorAll('[data-stock-item-check]').forEach(node=>{
+      products?.querySelectorAll('[data-stock-item-check]').forEach(node=>{
         node.checked=selected.has(String(node.dataset.stockItemCheck));
       });
-      layer.querySelectorAll('[data-stock-group-check]').forEach(node=>{
-        const ids=groupLookup.get(node.dataset.stockGroupCheck)||[];
-        const count=ids.filter(id=>selected.has(id)).length;
-        node.checked=ids.length>0&&count===ids.length;
-        node.indeterminate=count>0&&count<ids.length;
-      });
     };
-    layer.querySelectorAll('[data-stock-item-check]').forEach(node=>{
-      node.addEventListener('change',()=>{
-        const id=String(node.dataset.stockItemCheck);
-        if(node.checked)selected.add(id);else selected.delete(id);
-        sync();
+    const draw = () => {
+      if (!products) return;
+      const term=search.trim().toLocaleLowerCase('ru-RU');
+      const items=term ? brand.items.filter(item=>
+        [item.name,item.catalogName,item.sku,item.barcode,item.manufacturer,
+          item.category,item.productType].some(value=>
+          name(value).toLocaleLowerCase('ru-RU').includes(term))) : brand.items;
+      products.innerHTML=items.length
+        ? '<div class="inventory-counterparty-product-list">' +
+          items.map(item=>stockRow(item,selected,scope)).join('') + '</div>'
+        : emptyState(term ? 'Товар не найден' : 'В этой группе пока нет товаров');
+      products.querySelectorAll('[data-stock-item-check]').forEach(node=>{
+        node.addEventListener('change',()=>{
+          const id=String(node.dataset.stockItemCheck);
+          if(node.checked)selected.add(id);else selected.delete(id);
+          sync();
+        });
       });
-    });
-    layer.querySelectorAll('[data-stock-group-check]').forEach(node=>{
-      node.addEventListener('change',()=>{
-        const ids=groupLookup.get(node.dataset.stockGroupCheck)||[];
-        ids.forEach(id=>node.checked?selected.add(id):selected.delete(id));
-        sync();
+      products.querySelectorAll('[data-stock-product]').forEach(node=>{
+        node.addEventListener('click',()=>onOpen(node.dataset.stockProduct,refresh));
       });
-    });
-    layer.querySelectorAll('[data-stock-product]').forEach(node=>{
-      node.addEventListener('click',()=>onOpen(node.dataset.stockProduct,refresh));
-    });
+      sync();
+    };
+    if (input) {
+      input.value=search;
+      input.addEventListener('input',event=>{
+        search=String(event.target.value||'');
+        draw();
+      });
+    }
     target?.addEventListener('click',()=>{
       if(selected.size===1)onTarget([...selected][0],refresh);
     });
-    layer.querySelector('[data-stock-selection-new]')?.addEventListener('click',()=>{
+    body.querySelector('[data-stock-selection-new]')?.addEventListener('click',()=>{
       onNew(brand.name,refresh);
     });
-    sync();
+    draw();
   };
   refresh();
   return layer;
