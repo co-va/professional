@@ -1,19 +1,21 @@
 import {
   actionBlock, button, datePicker, emptyState, field, initDatePickers,
   modal, mountModal, mountV2ZLayer, openNotice, openSharedProfileSettingsMenu,
-  select, list, v2ListEntries, v2ListEntry, v2ZLayer,
+  select, list, twoColumnLayout, v2ListEntries, v2ListEntry, v2ZLayer,
   workspaceHeaderContext,
 } from '../../ui/ui.js';
 import { compactCheck } from '../../ui/selection/check-list.js';
 import { escapeHtml } from '../../ui/utils/escape-html.js';
 import {
   getInventoryItem, getInventoryItems, getInventoryOrder, getInventoryOrders,
+  getInventoryStorageLocations, getInventorySupplierClaims,
   inventoryOrderSuggestions,
 } from './data.js';
 import {
   createInventoryPurchaseOrder, updateInventoryPurchaseOrder,
   deleteInventoryPurchaseOrder, payInventoryPurchaseOrder,
-  receiveInventoryPurchaseOrder, loadInventory,
+  receiveInventoryPurchaseOrder, returnInventoryPurchaseOrderToSupplier,
+  refundInventorySupplierClaim, loadInventory,
 } from './service.js';
 import { loadWalletCatalog } from '../runtime/auxiliary-state.js';
 import { openInventoryOrderExport } from './order-export.js';
@@ -860,31 +862,230 @@ function openInventoryOrderZ(root, orderId) {
     });
   };
 
+
+  const availableWarehouses = () => getInventoryStorageLocations()
+    .filter(location => !location.archivedAt);
+  const warehouseChoice = () => select({
+    label: 'Склад', name: 'receivedLocation', value: '',
+    options: [{ value: '', label: 'Выберите склад' },
+      ...availableWarehouses().map(place => ({
+        value: place.locationId, label: place.isPrimary ? 'Не распределено' : place.name,
+      }))],
+  });
+  const receiptAllocationRow = (quantity = '') =>
+    '<div data-order-receipt-allocation>' +
+    twoColumnLayout(warehouseChoice(), field({
+      label: 'Количество, шт.', name: 'receivedPackages', type: 'number',
+      min: '0', step: '1', value: quantity, inputmode: 'numeric',
+    }), { ariaLabel: 'Склад и полученное количество' }) + '</div>';
+
   const openReceiveQ = () => {
-    const today = new Date();
-    const day = [today.getFullYear(), String(today.getMonth() + 1).padStart(2, '0'),
-      String(today.getDate()).padStart(2, '0')].join('-');
-    const popup = mountModal(layer, modal(`<div class="form-grid">
-      ${datePicker({ label: 'Дата получения', name: 'inventoryOrderReceivedAt',
-        value: day, allowClear: false, showYear: true, modalVariant: 'bottom',
-        modalSurface: 'app', modalClassName: 'modal--form-sheet' })}
-      <p class="form-error" role="status" data-inventory-order-receive-error></p>
-      ${actionBlock(button('Получен', { data: 'data-inventory-order-receive-save' }))}
-    </div>`, { variant: 'q', title: 'Поступление заказа' }));
+    const saved = current();
+    if (!saved || saved.status !== 'paid') return;
+    const day = new Date();
+    const value = [day.getFullYear(), String(day.getMonth()+1).padStart(2,'0'),
+      String(day.getDate()).padStart(2,'0')].join('-');
+    const places = availableWarehouses();
+    if (!places.some(place => !place.isPrimary)) {
+      return openNotice({ title: 'Приёмка', message: 'Создайте склад в разделе «Остатки → Склады».' });
+    }
+    const productRows = saved.lines.map((line, index) =>
+      '<section data-order-receipt-item="' + index + '">' +
+      '<p><strong>' + escapeHtml(line.name) + '</strong> · ' +
+        escapeHtml(String(line.packages)) + ' шт.</p>' +
+      '<div data-order-receipt-allocations>' + receiptAllocationRow(line.packages) + '</div>' +
+      actionBlock(button('Добавить склад', {
+        variant: 'secondary', data: 'data-order-receipt-add="' + index + '"',
+      })) +
+      twoColumnLayout(
+        field({ label: 'Не соответствует, шт.', name: 'rejectedPackages',
+          type: 'number', min: '0', step: '1', value: '0', inputmode: 'numeric' }),
+        field({ label: 'Причина возврата', name: 'rejectionReason', placeholder: 'Если есть расхождение' }),
+        { ariaLabel: 'Возврат неверного товара' },
+      ) + '</section>'
+    ).join('');
+    const popup = mountModal(layer, modal('<form data-order-receive-form class="form-grid">' +
+      datePicker({ label: 'Дата получения', name: 'inventoryOrderReceivedAt',
+        value, allowClear: false, showYear: true, modalVariant: 'bottom',
+        modalSurface: 'app', modalClassName: 'modal--form-sheet' }) +
+      productRows +
+      '<p class="form-error" role="status" data-inventory-order-receive-error></p>' +
+      actionBlock(button('Получен', { type: 'submit', data: 'data-inventory-order-receive-save' })) +
+      '</form>', { variant: 'q', title: 'Поступление заказа' }));
     if (!popup) return;
     initDatePickers(popup);
+    const form = popup.querySelector('[data-order-receive-form]');
+    const error = popup.querySelector('[data-inventory-order-receive-error]');
     const submit = popup.querySelector('[data-inventory-order-receive-save]');
-    submit?.addEventListener('click', async () => {
-      const date = popup.querySelector('[name="inventoryOrderReceivedAt"]')?.value;
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(date || '') || current()?.status !== 'paid') return;
+    form.querySelectorAll('[data-order-receipt-add]').forEach(control => {
+      control.addEventListener('click', () => {
+        form.querySelector('[data-order-receipt-item="' +
+          control.dataset.orderReceiptAdd + '"] [data-order-receipt-allocations]')
+          ?.insertAdjacentHTML('beforeend', receiptAllocationRow('0'));
+      });
+    });
+    form.addEventListener('submit', async event => {
+      event.preventDefault();
+      if (submit.disabled) return;
+      error.textContent = '';
+      const date = form.querySelector('[name="inventoryOrderReceivedAt"]')?.value;
+      if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date || '') || current()?.status !== 'paid') {
+        error.textContent = 'Проверьте дату получения.';
+        return;
+      }
+      const allocations = [], rejections = [];
+      for (const row of form.querySelectorAll('[data-order-receipt-item]')) {
+        const line = saved.lines[Number(row.dataset.orderReceiptItem)];
+        if (!line) continue;
+        let accepted = 0;
+        for (const position of row.querySelectorAll('[data-order-receipt-allocation]')) {
+          const location = position.querySelector('[name="receivedLocation"]')?.value || '';
+          const count = Number(position.querySelector('[name="receivedPackages"]')?.value || 0);
+          if (!Number.isSafeInteger(count) || count < 0 || count > 0 &&
+              !places.some(place => place.locationId === location)) {
+            error.textContent = 'Проверьте склад и количество: ' + line.name;
+            return;
+          }
+          if (count > 0) { allocations.push({
+            itemId: line.itemId, storageLocationId: location, packages: count,
+          }); accepted += count; }
+        }
+        const wrong = Number(row.querySelector('[name="rejectedPackages"]')?.value || 0);
+        const reason = row.querySelector('[name="rejectionReason"]')?.value.trim() || '';
+        if (!Number.isSafeInteger(wrong) || wrong < 0 || accepted + wrong !== line.packages
+          || wrong > 0 && !reason) {
+          error.textContent = 'Количество по складам и возврат должно совпадать с заказом: ' + line.name;
+          return;
+        }
+        if (wrong > 0) rejections.push({ itemId: line.itemId, packages: wrong, reason });
+      }
       submit.disabled = true;
       try {
-        await receiveInventoryPurchaseOrder(orderId, `${date}T12:00:00.000Z`);
+        await receiveInventoryPurchaseOrder(orderId,
+          date + 'T12:00:00.000Z', allocations, rejections);
         popup.v2Close?.();
         saveAndRefresh();
-      } catch (error) {
-        popup.querySelector('[data-inventory-order-receive-error]').textContent = String(error?.message || 'Не удалось создать приход.');
+      } catch (cause) {
+        error.textContent = String(cause?.message || 'Не удалось принять заказ.');
         if (submit.isConnected) submit.disabled = false;
+      }
+    });
+  };
+
+  const openReturnToSupplierQ = () => {
+    const saved = current();
+    if (!saved || saved.status !== 'received') return;
+    const places = availableWarehouses();
+    const claims = getInventorySupplierClaims(orderId);
+    const fields = saved.lines.map((line, index) => {
+      const claimed = claims.filter(claim => claim.itemId === line.itemId)
+        .reduce((sum, claim) => sum + Number(claim.packages || 0), 0);
+      const max = Math.max(0, line.packages - claimed);
+      return '<section data-supplier-return-row="' + index + '">' +
+        '<p>' + escapeHtml(line.name) + ' · доступно к оформлению: ' +
+          escapeHtml(String(max)) + ' шт.</p>' +
+        twoColumnLayout(
+          field({label:'Вернуть, шт.',name:'returnPackages',type:'number',
+            value:'0',min:'0',max:String(max),step:'1',inputmode:'numeric'}),
+          field({label:'Причина',name:'returnReason',placeholder:'Несоответствие'}),
+          {ariaLabel:'Возврат поставщику'},
+        ) + '</section>';
+    }).join('');
+    const popup = mountModal(layer, modal('<form data-supplier-return-form class="form-grid">' +
+      select({label:'С какого склада', name:'returnLocation', value:'',
+        options:[{value:'',label:'Выберите склад'},...places.map(place=>({
+          value:place.locationId,label:place.isPrimary?'Не распределено':place.name,
+        }))]}) +
+      fields +
+      '<p class="form-error" role="status" data-supplier-return-error></p>' +
+      actionBlock(button('Вернуть поставщику',{type:'submit',data:'data-supplier-return-save'})) +
+      '</form>',{title:'Возврат поставщику',variant:'q'}));
+    if (!popup) return;
+    const form=popup.querySelector('[data-supplier-return-form]');
+    const error=popup.querySelector('[data-supplier-return-error]');
+    const save=popup.querySelector('[data-supplier-return-save]');
+    const returnId=globalThis.crypto?.randomUUID?.();
+    form.addEventListener('submit',async event=>{
+      event.preventDefault();
+      if(save.disabled)return;
+      const location=form.querySelector('[name="returnLocation"]')?.value||'';
+      if(!places.some(place=>place.locationId===location)) {
+        error.textContent='Выберите склад возврата.';return;
+      }
+      const lines=[];
+      for(const row of form.querySelectorAll('[data-supplier-return-row]')){
+        const line=saved.lines[Number(row.dataset.supplierReturnRow)];
+        const count=Number(row.querySelector('[name="returnPackages"]')?.value||0);
+        const reason=row.querySelector('[name="returnReason"]')?.value.trim()||'';
+        const claimed=claims.filter(claim=>claim.itemId===line.itemId)
+          .reduce((sum,claim)=>sum+Number(claim.packages||0),0);
+        if(!Number.isSafeInteger(count)||count<0||count+claimed>line.packages||
+          count>0&&!reason){error.textContent='Проверьте количество и причину: '+line.name;return;}
+        if(count>0)lines.push({itemId:line.itemId,packages:count,reason});
+      }
+      if(!lines.length||!returnId){error.textContent='Выберите позиции возврата.';return;}
+      save.disabled=true;
+      try{
+        await returnInventoryPurchaseOrderToSupplier(orderId,{
+          returnId,storageLocationId:location,lines,
+        });
+        popup.v2Close?.();saveAndRefresh();
+      }catch(cause){
+        error.textContent=String(cause?.message||'Не удалось сохранить возврат.');
+        if(save.isConnected)save.disabled=false;
+      }
+    });
+  };
+
+  const openSupplierRefundQ = async () => {
+    const claims=getInventorySupplierClaims(orderId)
+      .filter(claim=>Number(claim.outstanding)>0.009);
+    if(!claims.length)return openNotice({title:'Расчёты',message:'Непогашенной задолженности нет.'});
+    let wallets=[];
+    try{wallets=await loadWalletCatalog();}
+    catch(e){return openNotice({title:'Расчёты',message:String(e?.message||'Кошельки недоступны')});}
+    if(!wallets.length)return openNotice({title:'Расчёты',message:'Нет кошельков.'});
+    const popup=mountModal(layer,modal('<form data-supplier-refund-form class="form-grid">'+
+      select({label:'Задолженность',name:'claimId',value:'',
+        options:[{value:'',label:'Выберите позицию'},...claims.map(claim=>({
+          value:claim.claimId,
+          label:(current()?.lines.find(line=>line.itemId===claim.itemId)?.name||'Товар')+
+            ' · '+rubles(claim.outstanding),
+        }))]})+
+      select({label:'Кошелёк',name:'walletId',value:'',
+        options:[{value:'',label:'Выберите кошелёк'},...wallets.map(w=>({value:w.id,label:w.name}))]})+
+      field({label:'Получено, ₽',name:'refundAmount',type:'number',min:'0.01',step:'0.01'})+
+      '<p class="form-error" data-supplier-refund-error></p>'+
+      actionBlock(button('Поступление денег',{type:'submit',data:'data-supplier-refund-save'}))+
+      '</form>',{title:'Возврат денег поставщиком',variant:'q'}));
+    if(!popup)return;
+    const form=popup.querySelector('[data-supplier-refund-form]');
+    const error=popup.querySelector('[data-supplier-refund-error]');
+    const submit=popup.querySelector('[data-supplier-refund-save]');
+    const settlementId=globalThis.crypto?.randomUUID?.();
+    form.querySelector('[name="claimId"]')?.addEventListener('change',event=>{
+      const claim=claims.find(row=>row.claimId===event.target.value);
+      form.querySelector('[name="refundAmount"]').value=claim?String(claim.outstanding):'';
+    });
+    form.addEventListener('submit',async event=>{
+      event.preventDefault();
+      if(submit.disabled)return;
+      const claim=claims.find(row=>row.claimId===form.querySelector('[name="claimId"]')?.value);
+      const wallet=wallets.find(w=>w.id===form.querySelector('[name="walletId"]')?.value);
+      const value=Number(form.querySelector('[name="refundAmount"]')?.value);
+      if(!claim||!wallet||!(value>0)||value>Number(claim.outstanding)+0.001||!settlementId){
+        error.textContent='Выберите задолженность, кошелёк и сумму не выше остатка долга.';return;
+      }
+      submit.disabled=true;
+      try{
+        await refundInventorySupplierClaim(claim.claimId,{
+          settlementId,walletId:wallet.id,walletName:wallet.name,
+          amount:value,occurredAt:new Date().toISOString(),
+        });
+        popup.v2Close?.();saveAndRefresh();
+      }catch(cause){
+        error.textContent=String(cause?.message||'Не удалось провести возврат денег.');
+        if(submit.isConnected)submit.disabled=false;
       }
     });
   };
@@ -920,9 +1121,14 @@ function openInventoryOrderZ(root, orderId) {
     const priceSummary = missing
       ? 'Известная сумма: ' + rubles(order.total) + ' · без цены: ' + missing + ' поз.'
       : 'Итого: ' + rubles(order.total);
+    const claims=getInventorySupplierClaims(orderId);
+    const outstanding=claims.reduce((sum,claim)=>sum+Number(claim.outstanding||0),0);
     summary.innerHTML = '<p>' + escapeHtml(dateLabel(order.createdAt))
       + ' · Всего ' + escapeHtml(String(units)) + ' шт.</p>'
-      + '<p>' + escapeHtml(priceSummary) + '</p>';
+      + '<p>' + escapeHtml(priceSummary) + '</p>' +
+      (claims.length ? '<p>Поставщик должен: <strong>' +
+        escapeHtml(rubles(outstanding)) + '</strong> · Претензий: ' +
+        escapeHtml(String(claims.length)) + '</p>' : '');
     itemsList.innerHTML = list({
       className: 'ui-list--dense',
       items: order.lines.map(supplierOrderLine),
@@ -953,7 +1159,13 @@ function openInventoryOrderZ(root, orderId) {
         ]
       : fresh.status === 'paid'
         ? [{ id: 'receive', label: 'Получен', onSelect: openReceiveQ }, exportAction]
-        : [exportAction];
+        : fresh.status === 'received' ? [
+            { id: 'supplier-return', label: 'Вернуть поставщику', onSelect: openReturnToSupplierQ },
+            ...(getInventorySupplierClaims(orderId).some(claim=>Number(claim.outstanding)>0.009)
+              ? [{ id: 'supplier-refund', label: 'Возврат денег', onSelect: openSupplierRefundQ }]
+              : []),
+            exportAction,
+          ] : [exportAction];
     openSharedProfileSettingsMenu({
       title: 'Заказ № ' + orderNumber(orderId),
       actions,
