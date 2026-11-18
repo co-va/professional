@@ -1100,8 +1100,8 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
     try {
       const minimum = collectOptionalNumber(form, 'minStock');
       const target = collectOptionalNumber(form, 'targetStock');
-      if (minimum != null && target != null && target <= minimum)
-        throw new Error('Желаемый остаток должен быть больше критического.');
+      // Both stock-control thresholds are optional. Zero is a valid value;
+      // the user may set either, both, or neither without a forced ordering.
       value.minStock = inventoryStockThresholdStored({ ...value }, minimum);
       value.targetStock = inventoryStockThresholdStored({ ...value }, target);
     } catch (error) {
