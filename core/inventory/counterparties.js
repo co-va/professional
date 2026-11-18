@@ -821,30 +821,28 @@ async function openSelectedCatalogCards(company, rows, onLinked = () => {}, sugg
   });
 }
 
-function openCounterpartyFiles(companies = []) {
-  const entries = companies.flatMap(company => (Array.isArray(company.priceLists) ? company.priceLists : [])
-    .map(file => ({ company, file })));
-  const content = entries.length
-    ? v2ListEntries(entries.map(({ company, file }, index) => v2ListEntry({
-      title: company.name + ' · ' + file.filename,
+function openCounterpartyFiles(company) {
+  const files = Array.isArray(company.priceLists) ? company.priceLists : [];
+  const content = files.length
+    ? v2ListEntries(files.map(file => v2ListEntry({
+      title: file.filename,
       subtitle: 'Версия ' + file.revision + ' · ' +
         new Date(file.createdAt).toLocaleDateString('ru-RU'),
       rightTop: file.parserStatus === 'READY'
         ? String(file._count?.rows || 0) + ' поз.' : 'Нужен Excel',
       interactive: true,
       initial: '',
-      data: 'data-company-file-index="' + index + '"',
+      data: 'data-company-file="' + escapeHtml(file.id) + '"',
       aria: 'Скачать ' + file.filename,
     })))
     : '<p>История загрузок пуста.</p>';
   const layer = mountModal(document.body, modal(content, {
     title: 'История загрузок', variant: 'q', surface: 'app',
   }));
-  layer?.querySelectorAll('[data-company-file-index]').forEach(node => {
+  layer?.querySelectorAll('[data-company-file]').forEach(node => {
     node.addEventListener('click', () => {
-      const entry = entries[Number(node.dataset.companyFileIndex)];
-      if (!entry) return;
-      const { company, file } = entry;
+      const file = files.find(row => row.id === node.dataset.companyFile);
+      if (!file) return;
       void download('/' + urlId(company.id) + '/pricelists/' + urlId(file.id) +
         '/download', 'catalog-' + file.revision + '.' + file.format)
         .catch(error => openNotice({ title: 'Файл', message: errText(error) }));
@@ -1141,8 +1139,14 @@ async function openCompany(companyId, root, onChanged = () => {}) {
     openSharedProfileSettingsMenu({ title: 'Контрагент', actions: [
       { id: 'edit', label: 'Редактировать', onSelect: () =>
         openCompanyEditor(company, () => { void refresh(); onChanged(); }) },
-      { id: 'upload', label: 'Загрузить файл', onSelect: () =>
+      { id: 'upload', label: 'Загрузить файл', variant: 'primary', onSelect: () =>
         openImportGuidance(company, () => { void refresh(); onChanged(); }) },
+      { id: 'template', label: 'Шаблон Excel', onSelect: () =>
+        void download('/template/xlsx', 'catalog-template.xlsx').catch(error =>
+          openNotice({ title: 'Excel', message: errText(error) })) },
+      ...(Array.isArray(company.priceLists) && company.priceLists.length
+        ? [{ id: 'history', label: 'История загрузок', onSelect: () =>
+          openCounterpartyFiles(company) }] : []),
       { id: 'excluded', label: 'Исключённые позиции', onSelect: () =>
         void openExcludedCatalogItems() },
     ] });
@@ -1264,12 +1268,6 @@ export async function renderCounterparties(root) {
       actions: [
         { id: 'appearance', label: 'Вид', onSelect: () =>
           openCounterpartyAppearance(root, currentCompanies[0] || {}, renderCards) },
-        { id: 'template', label: 'Шаблон Excel', onSelect: () =>
-          void download('/template/xlsx', 'catalog-template.xlsx').catch(error =>
-            openNotice({ title: 'Excel', message: errText(error) })) },
-        ...(currentCompanies.some(company => Array.isArray(company.priceLists) && company.priceLists.length)
-          ? [{ id: 'history', label: 'История загрузок', onSelect: () =>
-            openCounterpartyFiles(currentCompanies) }] : []),
       ],
     });
   });
