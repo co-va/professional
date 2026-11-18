@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { normalizeEntityCardAppearance } from '../../ui/cards/entity-card-constructor.js';
 
 const source = readFileSync('core/inventory/counterparties.js', 'utf8');
 const part = source.slice(source.indexOf('function supplierEffectivePrice('),
@@ -44,6 +45,47 @@ assert.match(source, /Скидка по договору: не указана/,
   'Z2 must state explicitly when no agreement is stored');
 assert.match(source, /<strong class="ui-list__title">Скидка по договору:/,
   'Z2 must show a stored agreement prominently');
+
+
+// Agreement must be available both as a selectable field and on the face of
+// supplier cards, even when an older custom layout has unused slots.
+const defaultSource = source.slice(source.indexOf('const COUNTERPARTY_CARD_DEFAULT ='),
+  source.indexOf('const TYPES ='));
+const supplierCardSource = source.slice(source.indexOf('function counterpartyCardFields('),
+  source.indexOf('function openCounterpartyAppearance('));
+const buildCard = new Function('getCardAppearanceTemplate', 'normalizeEntityCardAppearance',
+  'kindLabel', defaultSource + supplierCardSource +
+  '\nreturn { counterpartyCardFields, counterpartyCardAppearance };');
+const companyWithDiscount = { name: 'Тест поставщик', discountPercent: 15 };
+const base = buildCard(() => null, normalizeEntityCardAppearance, kind => kind);
+assert.equal(base.counterpartyCardFields(companyWithDiscount)
+  .find(item => item.value === 'discountPercent')?.text, 'Скидка по договору: 15%',
+  'Agreement field must be available to the shared card constructor');
+assert.equal(base.counterpartyCardFields({ discountPercent: 0 })
+  .find(item => item.value === 'discountPercent')?.text, 'Скидка по договору: 0%',
+  'Explicit zero discount is displayed, not hidden');
+assert.equal(base.counterpartyCardFields({})
+  .find(item => item.value === 'discountPercent')?.text, 'Скидка по договору: не указана',
+  'No stored agreement must not be presented as 0%');
+assert.equal(normalizeEntityCardAppearance(base.counterpartyCardAppearance())
+  .lines[6].cells.left.field, 'discountPercent', 'Default card shows the discount immediately');
+const savedLayout = normalizeEntityCardAppearance({ lines: [
+  { cells: { left: { field: 'name' }, right: { field: 'files' } } },
+  {}, {}, {}, {}, {}, { cells: { left: { field: 'contactName' } } }, {}, {},
+] });
+const savedCopy = JSON.stringify(savedLayout);
+const custom = buildCard(() => ({ appearance: savedLayout }),
+  normalizeEntityCardAppearance, kind => kind);
+const customAppearance = custom.counterpartyCardAppearance();
+assert.equal(customAppearance.lines[0].cells.left.field, 'name');
+assert.equal(customAppearance.lines[0].cells.right.field, 'files');
+assert.equal(customAppearance.lines[6].cells.left.field, 'contactName',
+  'Existing custom card fields must not be moved or replaced');
+assert.ok(customAppearance.lines.some(row =>
+  Object.values(row.cells).some(cell => cell.field === 'discountPercent')),
+  'Legacy custom cards must show the agreement in an unused cell');
+assert.equal(JSON.stringify(savedLayout), savedCopy,
+  'The stored custom card cannot be mutated when rendering');
 
 assert.doesNotMatch(source, /purchasePriceSample|listPriceSample|openSupplierAgreement/,
   'Obsolete sample-price calculator and its separate Q must not return');
