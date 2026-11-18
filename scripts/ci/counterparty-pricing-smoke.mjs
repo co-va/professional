@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 
 const source = readFileSync('core/inventory/counterparties.js', 'utf8');
 const part = source.slice(source.indexOf('function supplierEffectivePrice('),
-  source.indexOf('function openSupplierAgreement('));
+  source.indexOf('function openSupplierBatchPrices('));
 assert.ok(part.startsWith('function supplierEffectivePrice('), 'Supplier price calculation exists');
 const { supplierEffectivePrice, supplierDiscount } = new Function(part +
   '\nreturn {supplierEffectivePrice,supplierDiscount};')();
