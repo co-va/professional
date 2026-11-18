@@ -101,41 +101,61 @@ export function openInventoryStorageLocations(onSaved = () => {}) {
   };
   const edit = (locationId = '') => {
     const current = locations().find(place => place.locationId === locationId);
+    const initialName = String(current?.name || '').trim();
     const window = mountModal(document.body, modal(
       '<form data-inventory-storage-form>' +
-      field({ label: 'Название', name: 'name', value: current?.name || '', required: true }) +
+      field({ label: 'Название', name: 'name', value: initialName, required: true }) +
       '<p class="form-error" role="alert" data-inventory-storage-error></p>' +
-      actionBlock(button('Сохранить', { type: 'submit' }) +
-        (current ? button('Удалить', { variant: 'delete-outline', type: 'button',
-          data: 'data-inventory-storage-archive' }) : '')) +
+      actionBlock(button(current ? 'Удалить' : 'Сохранить', {
+        variant: current ? 'delete-outline' : 'primary',
+        type: 'submit', data: 'data-inventory-storage-action',
+      })) +
       '</form>',
       { title: current ? 'Склад' : 'Новый склад', variant: 'x', xRole: 'editor', surface: 'app' },
     ));
     if (!window) return;
     const form = window.querySelector('[data-inventory-storage-form]');
     const status = window.querySelector('[data-inventory-storage-error]');
-    const save = form.querySelector('[type="submit"]');
-    const archive = form.querySelector('[data-inventory-storage-archive]');
-    const run = async (archived = false) => {
-      save.disabled = true;
-      if (archive) archive.disabled = true;
+    const action = window.querySelector('[data-inventory-storage-action]');
+    const nameInput = form.elements.namedItem('name');
+    let saving = false;
+    const isChanged = () => String(nameInput?.value || '').trim() !== initialName;
+    const refreshAction = () => {
+      const deleteMode = Boolean(current) && !isChanged();
+      action.textContent = deleteMode ? 'Удалить' : 'Сохранить';
+      action.classList.toggle('ui-button--delete-outline', deleteMode);
+      if (!saving) action.disabled = !deleteMode && !String(nameInput?.value || '').trim();
+    };
+    nameInput?.addEventListener('input', () => {
+      status.textContent = '';
+      refreshAction();
+    });
+    form.addEventListener('submit', async event => {
+      event.preventDefault();
+      if (saving || action.disabled) return;
+      const name = String(nameInput?.value || '').trim();
+      const deleting = Boolean(current) && !isChanged();
+      if (!deleting && !name) {
+        status.textContent = 'Укажите название.';
+        return;
+      }
+      saving = true;
+      action.disabled = true;
       try {
-        const name = String(new FormData(form).get('name') || '').trim();
-        if (!archived && !name) throw new Error('Укажите название.');
         if (current) await updateInventoryStorageLocation(current.locationId,
-          archived ? { archived: true } : { name });
+          deleting ? { archived: true } : { name });
         else await createInventoryStorageLocation({ name });
         window.v2Close?.();
         display();
         onSaved();
       } catch (error) {
-        status.textContent = error instanceof Error ? error.message : 'Не удалось сохранить место хранения.';
-        save.disabled = false;
-        if (archive) archive.disabled = false;
+        status.textContent = error instanceof Error ? error.message : 'Не удалось сохранить склад.';
+      } finally {
+        saving = false;
+        refreshAction();
       }
-    };
-    form.addEventListener('submit', event => { event.preventDefault(); void run(); });
-    archive?.addEventListener('click', () => { void run(true); });
+    });
+    refreshAction();
   };
   host.querySelector('[data-inventory-storage-add]')?.addEventListener('click', () => edit());
   display();
