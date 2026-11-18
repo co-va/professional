@@ -2581,18 +2581,17 @@ function renderStock(root) {
       v:{data:'data-inventory-stock-menu',aria:'Настройки остатков'},
       c:{label:'+',data:'data-inventory-add-item',aria:'Добавить позицию'},
     }),
-    '<div data-inventory-stock-group-list></div>',
-  ]);
-  const rows=setV2ZHeaderRows(root,[
-    select({label:'Склад',name:'inventoryStockScope',
-      value:STOCK_VIEW.storageScope,options:scopes}),
-    '<div class="people-search ui-search-field">' +
+    '<div data-inventory-scope-selector>' +
+      select({label:'Склад',name:'inventoryStockScope',
+        value:STOCK_VIEW.storageScope,options:scopes}) + '</div>',
+    '<div class="ui-search-field">' +
       field({name:'inventorySearch',type:'search',
         placeholder:'Название, артикул, группа…',autocomplete:'off',
         data:'data-inventory-stock-search'}) + '</div>',
+    '<div data-inventory-stock-group-list></div>',
   ]);
-  const scopeInput=rows[0]?.querySelector('[name="inventoryStockScope"]');
-  const searchInput=rows[1]?.querySelector('[data-inventory-stock-search]');
+  const scopeInput=root.querySelector('[name="inventoryStockScope"]');
+  const searchInput=root.querySelector('[data-inventory-stock-search]');
   const listHost=root.querySelector('[data-inventory-stock-group-list]');
   const visibleRows=()=>{
     const locationId=STOCK_VIEW.storageScope;
