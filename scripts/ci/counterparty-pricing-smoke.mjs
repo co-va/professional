@@ -186,7 +186,7 @@ assert.ok(selectedActions.indexOf("button('Исключить из ассорт�
 const massSource = source.slice(source.indexOf('const SUPPLIER_CATALOG_EDIT_FIELDS ='),
   source.indexOf('function openSupplierProductEditor('));
 const editor = new Function(massSource +
-  '\\nreturn {SUPPLIER_CATALOG_EDIT_FIELDS, supplierCatalogEditValue, supplierCatalogValueMatches};')();
+  '\nreturn {SUPPLIER_CATALOG_EDIT_FIELDS, supplierCatalogEditValue, supplierCatalogValueMatches};')();
 assert.equal(editor.SUPPLIER_CATALOG_EDIT_FIELDS.length, 12,
   'Exactly the existing twelve editable supplier fields are offered to the batch editor');
 assert.deepEqual(editor.SUPPLIER_CATALOG_EDIT_FIELDS.map(item => item.value), [
