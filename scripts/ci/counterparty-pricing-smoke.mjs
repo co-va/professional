@@ -302,7 +302,8 @@ const bulkMocks = {
   compactCheck: ({ label = '', checked = false }) =>
     '<label><input type="checkbox"' + (checked ? ' checked' : '') + '>' + label + '</label>',
   field: ({ name, label = '' }) => '<label>' + label + '<input name="' + name + '"></label>',
-  list: ({ items }) => '<div class="ui-list__right-secondary"><span>' + items[0].right[0] + '</span></div>',
+  list: ({ items }) => '<div class="ui-list__title">' + items[0].title + '</div>' +
+    '<div class="ui-list__right-secondary"><span>' + items[0].right[0] + '</span></div>',
   money: amount => String(amount) + ' ₽',
   escapeHtml: value => String(value),
   actionBlock: value => value,
