@@ -82,13 +82,17 @@ export function openInventoryClassificationGroups(onSaved = () => {}) {
     const all = groups();
     const current = all.find(group => group.groupId === id);
     const disabled = new Set(id ? [id] : []);
-    const parents = id
-      ? all.filter(group => groupPath(group.groupId, all).includes(current?.name)
-        && (group.groupId === id || groupPath(group.parentGroupId, all)
-          .includes(current?.name)))
-      : [];
-    // Prevent a group becoming its own ancestor even before Core validation.
-    parents.forEach(group => disabled.add(group.groupId));
+    // Compare stable IDs, not names: two branches may contain the same label.
+    const byId = new Map(all.map(group => [group.groupId, group]));
+    for (const entry of all) {
+      let parentId = entry.parentGroupId;
+      const visited = new Set();
+      while (id && parentId && !visited.has(parentId)) {
+        if (parentId === id) { disabled.add(entry.groupId); break; }
+        visited.add(parentId);
+        parentId = byId.get(parentId)?.parentGroupId;
+      }
+    }
     const options = [{ value: '', label: 'Основной уровень' },
       ...all.filter(group => !disabled.has(group.groupId)).map(group => ({
         value: group.groupId, label: groupPath(group.groupId, all).join(' / '),
