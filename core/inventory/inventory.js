@@ -1642,7 +1642,7 @@ function stockListMarkup(manufacturer, query = '', rowsProvider = null, expanded
   // order, and items inside each section retain that same position order.
   return [...categories.entries()].map(([category,types])=>{
     const typeContent=[...types.entries()].map(([type,rows])=>
-      byType ? disclosure(type,itemList(rows),'t:'+category+'\\u0000'+type,true)
+      byType ? disclosure(type,itemList(rows),'t:'+category+'::'+type,true)
         : itemList(rows)).join('');
     return byCategory ? disclosure(category,typeContent,'c:'+category)
       : typeContent;
