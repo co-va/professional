@@ -38,17 +38,17 @@ function hierarchyOf(item, criteria, root) {
   return names.filter((value,index)=>!index||value!==names[index-1]);
 }
 
-export function buildStockCatalogGroups(items = [], configured = []) {
-  const criteria=configured.length?configured:baseCriteria;
-  const root=criteria[0]||baseCriteria[0];
+export function buildStockCatalogGroups(items = [], configured = null) {
+  const criteria=Array.isArray(configured)?configured:baseCriteria;
+  const root=criteria[0]||null;
   const brands=new Map();
   for(const item of items) {
-    const brand=brandOf(item,root);
+    const brand=root?brandOf(item,root):'Все товары';
     if(!brands.has(brand)) brands.set(brand,{name:brand,items:[],children:new Map()});
     const group=brands.get(brand);
     group.items.push(item);
     let node=group;
-    for(const part of hierarchyOf(item,criteria,root)) {
+    for(const part of (root?hierarchyOf(item,criteria,root):[])) {
       if(!node.children.has(part))
         node.children.set(part,{name:part,items:[],children:new Map()});
       node=node.children.get(part);
