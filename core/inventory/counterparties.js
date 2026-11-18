@@ -521,7 +521,7 @@ async function openSelectedCatalogCards(company, rows, onLinked = () => {}, sugg
 
   const needsUnits = (row, itemId) => {
     const item = getInventoryItems().find(entry => String(entry.itemId) === String(itemId));
-    const norm = value => String(value || '').trim().toLocaleLowerCase('ru-RU').replace(/\\.$/, '');
+    const norm = value => String(value || '').trim().toLocaleLowerCase('ru-RU').replace(/\.$/, '');
     return Boolean(row.unit && item?.unit && norm(row.unit) !== norm(item.unit));
   };
   const link = async (row, itemId, unitsPerOffer = null) => {
