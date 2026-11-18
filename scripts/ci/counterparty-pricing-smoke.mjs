@@ -123,7 +123,7 @@ assert.doesNotMatch(source, /purchasePriceSample|listPriceSample|openSupplierAgr
   'Obsolete sample-price calculator and its separate Q must not return');
 assert.doesNotMatch(source, /id: 'discount'/,
   'Agreement discount is in the company editor rather than a separate menu');
-assert.match(source, /id: 'excluded', label: 'Исключённые позиции'/,
+assert.match(source, /id: 'excluded', label: 'Скрытые'/,
   'Excluded offers remain in the selected counterparty V');
 assert.match(source, /const excludedPath = '\/'\+urlId\(companyId\)\+'\/catalog\?excluded=true'/,
   'Excluded offers are queried separately by counterparty');
@@ -135,7 +135,7 @@ const supplierMenu = source.slice(source.indexOf("layer.querySelector('[data-com
   source.indexOf('  void refresh();\n  return layer;', source.indexOf("layer.querySelector('[data-company-actions]')")));
 assert.match(supplierMenu, /id: 'edit', label: 'Редактировать', variant: 'primary'/,
   'Edit is the primary action within each counterparty');
-assert.match(supplierMenu, /id: 'excluded', label: 'Исключённые позиции'/,
+assert.match(supplierMenu, /id: 'excluded', label: 'Скрытые'/,
   'Only excluded positions remain in supplier V beside editing');
 assert.doesNotMatch(supplierMenu, /id: 'excel'|id: 'upload'|id: 'history'|id: 'template'/,
   'Supplier V must not contain any Excel operation');
@@ -178,11 +178,27 @@ assert.match(selectedActions,
   /button\('Создать карточку', \{ data: 'data-company-selection-card' \}\)/,
   'Selected catalog offers exactly one main action');
 assert.match(selectedActions,
-  /button\('Массовое изменение', \{ variant: 'secondary', data: 'data-company-selection-bulk' \}\)/,
+  /button\('Изменить данные', \{ variant: 'secondary', data: 'data-company-selection-bulk' \}\)/,
   'Mass editing is secondary, not a second black button');
-assert.ok(selectedActions.indexOf("button('Исключить из ассортимента'")
-  > selectedActions.indexOf("button('Массовое изменение'"),
-  'Exclude action must be last');
+assert.ok(selectedActions.indexOf("button('Скрыть'")
+  > selectedActions.indexOf("button('Изменить данные'"),
+  'Hide action must be last');
+assert.match(source, /'Скрыть ' \+ ids\.length \+ ' позиций\? Их можно восстановить через «Скрытые»\.'/,
+  'X confirmation has one short explanatory sentence');
+const hideAction = source.slice(source.indexOf("brandLayer?.querySelector('[data-company-selection-delete]')"),
+  source.indexOf("brandLayer?.querySelectorAll('[data-company-product]')", source.indexOf("brandLayer?.querySelector('[data-company-selection-delete]')")));
+assert.match(hideAction, /variant: 'x', xRole: 'action', surface: 'app'/,
+  'Hide confirmation is a compact X action modal, not a full-height Q');
+assert.doesNotMatch(hideAction, /variant: 'q'|<h[1-6]|v2-q-title|modal-title/,
+  'X body has no visible heading, only description and confirmation');
+assert.match(hideAction, /button\('Скрыть', \{ variant: 'delete-outline'/,
+  'Hide confirmation uses the short red-outline action');
+assert.match(hideAction, /rowIds: ids, excluded: true/,
+  'Hide continues to use existing supplier exclusion API');
+assert.match(source, /rowIds: \[\.\.\.selected\], excluded: false/,
+  'Hidden items remain recoverable through the existing restore action');
+assert.doesNotMatch(source, /Массовое изменение|Исключить из ассортимента|Исключённые позиции/,
+  'Obsolete long labels are removed from the supplier UI');
 const massSource = source.slice(source.indexOf('const SUPPLIER_CATALOG_EDIT_FIELDS ='),
   source.indexOf('function openSupplierProductEditor('));
 const editor = new Function(massSource +
