@@ -45,6 +45,7 @@ import { classificationOptions, openInventoryClassificationGroups,
   inventoryCriterionGroups, criterionOptions } from './classification.js';
 import { openInventoryStorageLocations, openInventoryTransfer } from './storage.js';
 import { renderStockBrandList, buildStockCatalogGroups } from './stock-catalog.js';
+import { catalogDisclosure } from './catalog-ui.js';
 import { INVENTORY_TOTAL_SCOPE, inventoryDisplayBalance,
   inventoryDisplayTarget, inventoryLocations, openInventoryStockTargets, storageName } from './stock-targets.js';
 import {
@@ -67,7 +68,6 @@ import {
   loadInventoryCriteria,
   reorderInventoryCriterionValues,
   updateInventoryItem,
-  reorderInventoryItems,
 } from './service.js';
 
 const UNIT_OPTIONS = [
@@ -1591,60 +1591,62 @@ function openManufacturerAppearance(root, onSaved = () => {}) {
   });
 }
 
-function stockListMarkup(manufacturer, query = '', rowsProvider = null, allowReorder = true) {
+// Existing Stock accordion and ordinary Core UI List. Stock item order
+// comes from the saved position; there is no touch/drag reorder in Z2.
+function stockListMarkup(manufacturer, query = '', rowsProvider = null, expanded = new Set()) {
   const needle = normalizedSearch(query);
   const group = typeof rowsProvider === 'function'
     ? rowsProvider() : getInventoryItems().filter(item => manufacturerName(item) === manufacturer);
   const classificationGroups = getInventoryClassificationGroups();
   const storageLocations = getInventoryStorageLocations();
-  const items = sortItems(group.filter((item) => {
+  const items = sortItems(group.filter(item => {
     if (!matchesType(item, STOCK_VIEW.itemsType)
       || !matchesStockFilters(item, STOCK_VIEW.itemsFilters, classificationGroups, storageLocations)) return false;
     return !needle || itemSearchText(item).includes(needle);
   }), STOCK_VIEW.itemsSort);
   if (!items.length) return emptyState('Ничего не найдено', 'Измените поиск или фильтр.');
 
-  // Position order is the owner's canonical shelf sequence PER manufacturer.
-  // Section headers are inserted along that sequence, never used to sort it.
-  // One shared V2 list preserves item drag reorder across section boundaries.
+  const itemRow = item => ({
+    title: `${Number(item.position) > 0 ? `${item.position} · ` : ''}${item.name}`,
+    secondary: [item.sku, productTypeText(item)].filter(Boolean).join(' · '),
+    right: [
+      `${numberText(item.balance)} ${item.unit || ''}`,
+      item.lastPurchasePrice == null ? '' : moneyText(item.lastPurchasePrice),
+    ].filter(Boolean),
+    interactive: true,
+    data: `data-inventory-item="${escapeHtml(item.itemId)}"`,
+    aria: `Открыть ${item.name}`,
+  });
+  const itemList = rows => list({className:'ui-list--dense',items:rows.map(itemRow)});
   const criteria = inventoryCriterionGroups();
   const byCategory = criteria.some(entry => entry.legacyField === 'category');
   const byType = criteria.some(entry => entry.legacyField === 'productType');
-  const canReorder = allowReorder && STOCK_VIEW.itemsSort === 'position-asc'
-    && !needle && !hasStockFilters(STOCK_VIEW.itemsFilters)
-    && items.filter(item => Number(item.position) > 0).length > 1;
-  const itemRow = item => v2ListEntry({
-    title: `${Number(item.position) > 0 ? `${item.position} · ` : ''}${item.name}`,
-    reorderHandle: canReorder && Number(item.position) > 0,
-    reorderAria: 'Изменить порядок материала',
-    subtitle: [productTypeText(item), tubeCountText(item)].filter(Boolean).join(' · '),
-    rightTop: `${numberText(item.balance)} ${item.unit}`,
-    rightBottom: item.lastPurchasePrice == null ? '' : moneyText(item.lastPurchasePrice),
-    interactive: true,
-    initial: '',
-    data: `data-inventory-item="${escapeHtml(item.itemId)}" data-reorder-id="${escapeHtml(item.itemId)}"`,
-    aria: `Открыть ${item.name}`,
-  });
-  const rows = [];
-  let previousCategory = null;
-  let previousType = null;
+  if (!byCategory && !byType) return itemList(items);
+
+  // Preserve existing group disclosure state after editing a product or
+  // searching. Searching opens only matched groups for immediate access.
+  const disclosure = (label, content, key, nested = false) =>
+    catalogDisclosure(label, content, nested).replace('<details>',
+      '<details data-stock-disclosure="' + escapeHtml(key) + '"' +
+      (needle || expanded.has(key) ? ' open' : '') + '>');
+  const categories = new Map();
   for (const item of items) {
     const category = byCategory ? String(item.category || '').trim() || 'Без категории' : '';
     const type = byType ? String(item.productType || '').trim() || 'Без типа' : '';
-    if (byCategory && category !== previousCategory) {
-      rows.push('<div class="inventory-stock-category-heading"><strong>' +
-        escapeHtml(category) + '</strong></div>');
-      previousCategory = category;
-      previousType = null;
-    }
-    if (byType && type !== previousType) {
-      rows.push('<div class="inventory-stock-type-heading"><span>' +
-        escapeHtml(type) + '</span></div>');
-      previousType = type;
-    }
-    rows.push(itemRow(item));
+    if (!categories.has(category)) categories.set(category,new Map());
+    const types=categories.get(category);
+    if (!types.has(type)) types.set(type,[]);
+    types.get(type).push(item);
   }
-  return v2ListEntries(rows);
+  // Map iteration retains the order of first occurrence in saved position
+  // order, and items inside each section retain that same position order.
+  return [...categories.entries()].map(([category,types])=>{
+    const typeContent=[...types.entries()].map(([type,rows])=>
+      byType ? disclosure(type,itemList(rows),'t:'+category+'\\u0000'+type,true)
+        : itemList(rows)).join('');
+    return byCategory ? disclosure(category,typeContent,'c:'+category)
+      : typeContent;
+  }).join('');
 }
 
 function stockSortOptions(level) {
@@ -1799,64 +1801,37 @@ function openManufacturerStock(root, manufacturer, groupContext = null) {
     ? () => buildStockCatalogGroups(getInventoryItems(),groupContext.criteria)
       .find(entry => entry.name === manufacturer)?.items || []
     : null;
-  const canReorderItems = !groupContext
-    || groupContext.criteria[0]?.legacyField === 'manufacturer';
+  const expandedStockGroups = new Set();
   const markup = `
     ${context(manufacturer, {
       v: { data: 'data-inventory-item-controls', aria: 'Сортировка и фильтр товаров' },
       c: { label: '+', data: 'data-inventory-add-item', aria: 'Добавить позицию' },
     })}
-    <div data-inventory-company-list>${stockListMarkup(manufacturer, '', rowsProvider, canReorderItems)}</div>`;
+    <div data-inventory-company-list>${stockListMarkup(manufacturer, '', rowsProvider, expandedStockGroups)}</div>`;
   const layer = mountV2ZLayer(root, v2ZLayer(markup, { className: 'inventory-manufacturer-z' }), { stack: true });
   if (!layer) return;
   const [searchRow] = setV2ZHeaderRows(layer, [stockSearchField('', 'data-inventory-company-search')]);
   const searchInput = searchRow?.querySelector('[data-inventory-company-search]') || null;
 
   const listHost = layer.querySelector('[data-inventory-company-list]');
-  let disposeReorder = () => {};
   const renderList = () => {
-    disposeReorder();
     const query = searchInput?.value || '';
-    if (listHost) listHost.innerHTML = stockListMarkup(manufacturer, query, rowsProvider, canReorderItems);
-    listHost?.querySelectorAll('[data-inventory-item]').forEach((control) => control.addEventListener('click', () => {
-      const itemId = control.dataset.inventoryItem;
-      openInventoryProductOverview(itemId, {
-        edit: (onSaved) => openItemEditor(root, itemId, {}, onSaved),
-        onChanged: renderList,
-      });
-    }));
-    if (!canReorderItems
-      || STOCK_VIEW.itemsSort !== 'position-asc'
-      || hasStockFilters(STOCK_VIEW.itemsFilters) || normalizedSearch(query)
-      || (rowsProvider?.() || getInventoryItems().filter(
-        item => manufacturerName(item) === manufacturer))
-        .filter(item => Number(item.position) > 0).length < 2) return;
-    disposeReorder = initV2ListReorder(listHost, {
-      onReorder: async (ids) => {
-        await reorderInventoryItems(manufacturer === EMPTY_MANUFACTURER ? '' : manufacturer, ids);
-        // Rebuild only the Z2 list after Core confirms the new numbers.
-        // Headers follow the stored sequence without changing item categories.
-        renderList();
-      },
-      onError: (error) => {
-        // An error inside the same Z stays readable after the transient
-        // system notice is gone. Never mount another modal or shift Z itself.
-        if (!listHost?.isConnected) return;
-        // The shared gesture restores row IDs; redraw headings in their
-        // canonical positions on an error before presenting the message.
-        renderList();
-        let message = listHost.querySelector('[data-inventory-reorder-error]');
-        if (!message) {
-          message = document.createElement('div');
-          message.className = 'form-error';
-          message.dataset.inventoryReorderError = '';
-          message.setAttribute('role', 'alert');
-          listHost.prepend(message);
-        }
-        message.textContent = error instanceof Error
-          ? error.message : 'Не удалось изменить порядок материалов.';
-      },
-    });
+    if (listHost) listHost.innerHTML = stockListMarkup(manufacturer, query, rowsProvider, expandedStockGroups);
+    listHost?.querySelectorAll('[data-inventory-item]').forEach(control=>
+      control.addEventListener('click', () => {
+        const itemId = control.dataset.inventoryItem;
+        openInventoryProductOverview(itemId, {
+          edit: onSaved => openItemEditor(root, itemId, {}, onSaved),
+          onChanged: renderList,
+        });
+      }));
+    listHost?.querySelectorAll('[data-stock-disclosure]').forEach(details =>
+      details.addEventListener('toggle', () => {
+        if (!details.isConnected || (searchInput?.value || '').trim()) return;
+        const key = details.dataset.stockDisclosure;
+        if (details.open) expandedStockGroups.add(key);
+        else expandedStockGroups.delete(key);
+      }));
   };
 
   searchInput?.addEventListener('input', renderList);
