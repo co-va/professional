@@ -45,8 +45,23 @@ assert.match(source, /if \(mismatch\) throw new Error/,
   'Missing server-side fields must not be silently accepted');
 assert.doesNotMatch(source, /Скидка по договору: не указана/,
   'Missing optional agreement must not appear as technical text');
-assert.match(source, /<strong class="ui-list__title">Скидка по договору:/,
-  'Z2 must show a stored agreement prominently');
+const detailsMarkup = source.slice(source.indexOf('function counterpartyInformation('),
+  source.indexOf('// Tapping a supplier product'));
+const counterpartyInformation = new Function('escapeHtml',
+  detailsMarkup + '\nreturn counterpartyInformation;')(value => String(value));
+const contactOnly = counterpartyInformation({
+  name: 'Компания Альфа', contactName: 'Светлана',
+  phone: '+7 900 000 00 00', email: 'svetlana@example.com',
+  discountPercent: 15, website: 'hidden.example', note: 'Private note',
+});
+for (const value of ['Светлана', '+7 900 000 00 00', 'svetlana@example.com'])
+  assert.match(contactOnly, new RegExp(value.replace(/[.*+?^${}()|[\]\\]/g, '\\assert.match(source, /<strong class="ui-list__title">Скидка по договору:/,
+  'Z2 must show a stored agreement prominently');')),
+    'Z2 shows contact details');
+for (const value of ['Компания Альфа', '15%', 'hidden.example', 'Private note', 'Менеджер'])
+  assert.ok(!contactOnly.includes(value), 'Z2 must not duplicate supplier card data: ' + value);
+assert.match(source, /title: company\.name,/,
+  'Z2 header must use the company name without generic title');
 
 
 // Agreement must be available both as a selectable field and on the face of
