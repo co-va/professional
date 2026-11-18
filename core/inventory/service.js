@@ -211,3 +211,42 @@ export async function setInventoryPrimarySupplierOffer(itemId, offerId = '') {
     method: 'PUT', body: JSON.stringify({ offerId: String(offerId || '') }),
   });
 }
+
+
+// Classification is a tenant-owned Core dictionary. Mutations return the
+// dictionary, so refresh the canonical Inventory snapshot after every write.
+async function inventoryGroupMutation(path, method, value = {}) {
+  const response = await apiRequest('/inventory' + path, {
+    method, body: JSON.stringify(value),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const reason = Array.isArray(payload?.message) ? payload.message.join('; ')
+      : typeof payload?.message === 'string' ? payload.message : '';
+    throw new Error(reason || 'Не удалось изменить группы (HTTP ' + response.status + ')');
+  }
+  if (!Array.isArray(payload)) throw new Error('Сервер не подтвердил сохранение группы.');
+  return loadInventory();
+}
+
+export function createInventoryClassificationGroup(value) {
+  return inventoryGroupMutation('/classification-groups', 'POST', value);
+}
+
+export function updateInventoryClassificationGroup(groupId, value) {
+  return inventoryGroupMutation('/classification-groups/' + encodeURIComponent(String(groupId)), 'PUT', value);
+}
+
+export function createInventoryStorageLocation(value) {
+  return inventoryRequest('/storage-locations', { method: 'POST', body: JSON.stringify(value) });
+}
+
+export function updateInventoryStorageLocation(locationId, value) {
+  return inventoryRequest('/storage-locations/' + encodeURIComponent(String(locationId)), {
+    method: 'PUT', body: JSON.stringify(value),
+  });
+}
+
+export function transferInventoryStock(value) {
+  return inventoryRequest('/transfers', { method: 'POST', body: JSON.stringify(value) });
+}
