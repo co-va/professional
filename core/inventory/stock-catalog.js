@@ -18,10 +18,13 @@ const quantity = value => Number(value || 0).toLocaleString('ru-RU',{
 }).replaceAll('\u00a0',' ');
 
 function hierarchyOf(item) {
-  const full = Array.isArray(item.classificationPath) ? item.classificationPath.map(name).filter(Boolean) : [];
-  if (full.length) return full[0] === brandOf(item) ? full.slice(1) : full;
-  const values = [name(item.category), name(item.productType)].filter(Boolean);
-  return values.filter((value,index) => !index || value !== values[index-1]);
+  // Category and type are the two explicit stock classifications. The
+  // server's classificationPath is a separate customizable tree, which may
+  // contain extra imported levels (including numeric labels). Never inject
+  // those levels into the Stock assortment navigation.
+  const category = name(item.category);
+  const type = name(item.productType);
+  return [category, type && type !== category ? type : ''].filter(Boolean);
 }
 
 export function buildStockCatalogGroups(items = []) {
