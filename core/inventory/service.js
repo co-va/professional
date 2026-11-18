@@ -283,3 +283,22 @@ export const updateInventoryCriterionValue = (id, valueId, patch) =>
 
 export const reorderInventoryCriterionValues = (groupId, valueIds) =>
   criteriaRequest('/' + encodeURIComponent(groupId) + '/values/order', 'PUT', { valueIds });
+
+async function criteriaRecoveryRequest(action, body) {
+  const response = await apiRequest('/inventory/criteria/recovery/' + action, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const reason = Array.isArray(data.message) ? data.message.join('; ')
+      : typeof data.message === 'string' ? data.message : '';
+    throw new Error(reason || 'Не удалось сверить классификацию склада.');
+  }
+  return data;
+}
+
+export const previewInventoryCriteriaRecovery = rows =>
+  criteriaRecoveryRequest('preview', { rows });
+export const applyInventoryCriteriaRecovery = changes =>
+  criteriaRecoveryRequest('apply', { changes });
