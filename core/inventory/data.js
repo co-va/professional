@@ -5,6 +5,8 @@ let snapshot = {
   lots: [],
   movements: [],
   orders: [],
+  classificationGroups: [],
+  storageLocations: [],
 };
 
 function asArray(value) {
@@ -17,6 +19,8 @@ export function applyInventorySnapshot(value = {}) {
     lots: asArray(value?.lots),
     movements: asArray(value?.movements),
     orders: asArray(value?.orders),
+    classificationGroups: asArray(value?.classificationGroups),
+    storageLocations: asArray(value?.storageLocations),
   };
   window.dispatchEvent(new CustomEvent('professional:inventory-changed'));
   return snapshot;
@@ -28,6 +32,14 @@ export function getInventorySnapshot() {
 
 export function getInventoryItems() {
   return snapshot.items;
+}
+
+export function getInventoryClassificationGroups() {
+  return snapshot.classificationGroups;
+}
+
+export function getInventoryStorageLocations() {
+  return snapshot.storageLocations;
 }
 
 export function getInventoryItem(itemId) {
