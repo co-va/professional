@@ -76,7 +76,7 @@ function stockRow(item, selected, scope) {
           : 'Цель ' + quantity(target) + ' ' + threshold,
       ],
       interactive:true,
-      aria:'Открыть карточку продукта ' + item.name,
+      aria:'Открыть карточку складской единицы ' + item.name,
       data:'data-stock-product="' + escapeHtml(item.itemId) + '"',
     }]}) + '</div>';
 }
