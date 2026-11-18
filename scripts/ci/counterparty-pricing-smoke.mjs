@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { normalizeEntityCardAppearance } from '../../ui/cards/entity-card-constructor.js';
+import { normalizeEntityCardAppearance, entityVisualCard } from '../../ui/cards/entity-card-constructor.js';
 
 const source = readFileSync('core/inventory/counterparties.js', 'utf8');
 const part = source.slice(source.indexOf('function supplierEffectivePrice('),
@@ -16,8 +16,10 @@ assert.equal(supplierEffectivePrice({listPrice:1500,appliedDiscountPercent:12.5}
 assert.equal(supplierEffectivePrice({listPrice:1500}, {}),1500);
 assert.equal(supplierEffectivePrice({listPrice:null},{}),null);
 assert.equal(supplierDiscount({discountPercent:0}, {discountPercent:10}), '0%');
-assert.match(source, /label: 'Скидка по договору, %', name: 'discountPercent'/,
+assert.match(source, /label: 'Скидка по договору', name: 'discountPercent'/,
   'Agreement percentage is edited as part of the counterparty');
+assert.match(source, /class="inventory-editor-number__suffix" aria-hidden="true">%<\/span>/,
+  'Agreement numeric input must have a visible percent suffix, not only an external label');
 assert.match(source, /input\.discountPercent = discount;/,
   'Counterparty edit sends the validated percentage to Core');
 const mismatchSource = source.slice(source.indexOf('function counterpartyFieldMismatch('),
@@ -59,16 +61,23 @@ const buildCard = new Function('getCardAppearanceTemplate', 'normalizeEntityCard
 const companyWithDiscount = { name: 'Тест поставщик', discountPercent: 15 };
 const base = buildCard(() => null, normalizeEntityCardAppearance, kind => kind);
 assert.equal(base.counterpartyCardFields(companyWithDiscount)
-  .find(item => item.value === 'discountPercent')?.text, 'Скидка по договору: 15%',
+  .find(item => item.value === 'discountPercent')?.text, '15%',
   'Agreement field must be available to the shared card constructor');
 assert.equal(base.counterpartyCardFields({ discountPercent: 0 })
-  .find(item => item.value === 'discountPercent')?.text, 'Скидка по договору: 0%',
+  .find(item => item.value === 'discountPercent')?.text, '0%',
   'Explicit zero discount is displayed, not hidden');
 assert.equal(base.counterpartyCardFields({})
   .find(item => item.value === 'discountPercent')?.text, '',
   'No agreement must leave the supplier card field empty');
 assert.equal(normalizeEntityCardAppearance(base.counterpartyCardAppearance())
   .lines[6].cells.left.field, 'discountPercent', 'Default card shows the discount immediately');
+const rendered = entityVisualCard({
+  appearance: base.counterpartyCardAppearance(),
+  fields: base.counterpartyCardFields(companyWithDiscount),
+});
+assert.match(rendered, />15%<\/span>/, 'Actual supplier card HTML must show 15% without clipping-prone prose');
+assert.doesNotMatch(rendered, /Скидка по договору: 15%/,
+  'Card field is compact; the field selector retains its full label');
 const savedLayout = normalizeEntityCardAppearance({ lines: [
   { cells: { left: { field: 'name' }, right: { field: 'files' } } },
   {}, {}, {}, {}, {}, { cells: { left: { field: 'contactName' } } }, {}, {},
