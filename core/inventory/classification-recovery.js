@@ -17,6 +17,7 @@ export function parseInventoryCriteriaRecoveryFile(source) {
     'Выберите исходную таблицу склада или файл восстановления с четырьмя колонками.');
   const rows=[];
   const keys=new Set();
+  let missingSkuCount=0;
   for(const [i,line] of lines.entries()){
     if(!line.trim()||(isPrepared&&i===0))continue;
     if(isOriginal&&!/^\d+\t/.test(line))continue;
@@ -28,14 +29,17 @@ export function parseInventoryCriteriaRecoveryFile(source) {
       : {sku:columns[0],manufacturer:columns[1],
         category:columns[2],productType:columns[3]};
     Object.keys(row).forEach(key=>{row[key]=String(row[key]||'').trim();});
-    if(Object.values(row).some(value=>!value))throw new Error(
-      'Отсутствует производитель, артикул, категория или тип в строке '+(i+1)+'.');
+    if(!row.manufacturer||!row.category)throw new Error(
+      'Отсутствует производитель или категория в строке '+(i+1)+'.');
+    if(!row.sku) { missingSkuCount++; continue; }
+    // An empty Type in the original file is an explicit empty choice.
     const id=(row.manufacturer+'::'+row.sku).toLocaleUpperCase('ru-RU');
     if(keys.has(id))throw new Error('Повторяющийся артикул: '+row.sku+'.');
     keys.add(id);
     rows.push(row);
   }
-  if(!rows.length||rows.length>1000)throw new Error('Ожидалось от 1 до 1000 товаров.');
+  if(!rows.length||rows.length>1000)throw new Error('Ожидалось от 1 до 1000 товаров с артикулами.');
+  rows.missingSkuCount=missingSkuCount;
   return rows;
 }
 
@@ -79,6 +83,7 @@ export function openInventoryClassificationRecovery(onSaved = () => {}) {
       if(!file)throw new Error('Выберите исходную таблицу.');
       if(file.size>2*1024*1024)throw new Error('Размер файла не должен превышать 2 МБ.');
       const rows=parseInventoryCriteriaRecoveryFile(await file.text());
+      const missingSkuCount=rows.missingSkuCount||0;
       preview=await previewInventoryCriteriaRecovery(rows);
       const changed=Array.isArray(preview.changes)?preview.changes:[];
       const missing=Array.isArray(preview.notFound)?preview.notFound:[];
@@ -88,6 +93,8 @@ export function openInventoryClassificationRecovery(onSaved = () => {}) {
         'совпало со складом: <strong>'+Number(preview.matchedCount||0)+'</strong> · '+
         'исправить: <strong>'+changed.length+'</strong> · '+
         'уже правильно: <strong>'+Number(preview.unchangedCount||0)+'</strong></p>'+
+        (missingSkuCount?'<p>Без артикула пропущено: '+missingSkuCount+
+          ' (безопасно сопоставить их невозможно).</p>':'')+
         (missing.length?'<p>Нет на складе ('+missing.length+'): '+
           escapeHtml(missing.slice(0,12).join(', '))+'</p>':'')+
         (ambiguous.length?'<p>Неоднозначные артикулы ('+ambiguous.length+'): '+
