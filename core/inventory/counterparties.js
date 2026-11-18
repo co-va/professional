@@ -638,7 +638,7 @@ function catalogBrandMarkup(categories, selectedCatalogIds, linkedCatalogIds = n
     actionBlock(
       button('Создать карточку', { data: 'data-company-selection-card' }) +
       button('Цены', { data: 'data-company-selection-prices' }) +
-      button('Убрать из ассортимента', {
+      button('Исключить из ассортимента', {
         variant: 'delete-outline',
         data: 'data-company-selection-delete',
       }),
@@ -897,11 +897,11 @@ async function openCompany(companyId, root, onChanged = () => {}) {
         entries.push(...(Array.isArray(page.items) ? page.items : []));
       }
     } catch (error) {
-      openNotice({ title: 'Удалённые из ассортимента', message: errText(error) });
+      openNotice({ title: 'Исключённые позиции', message: errText(error) });
       return;
     }
     if (!entries.length) {
-      openNotice({ title: 'Удалённые из ассортимента', message: 'Удалённых позиций нет.' });
+      openNotice({ title: 'Исключённые позиции', message: 'Исключённых позиций нет.' });
       return;
     }
     const selected = new Set();
@@ -909,7 +909,7 @@ async function openCompany(companyId, root, onChanged = () => {}) {
       catalogItemList(entries, selected, linkedCatalogIds, matchedCatalogItems, catalogLinkStatuses) +
         '<p class="form-error" data-company-restore-error role="alert"></p>' +
         actionBlock(button('Восстановить', { data: 'data-company-restore-apply' })),
-      { title: 'Удалённые из ассортимента', variant: 'q', surface: 'app' },
+      { title: 'Исключённые позиции', variant: 'q', surface: 'app' },
     ));
     if (!restoreLayer) return;
     const apply = restoreLayer.querySelector('[data-company-restore-apply]');
@@ -996,25 +996,9 @@ async function openCompany(companyId, root, onChanged = () => {}) {
       }
       if (!layer.isConnected || !list.isConnected || currentRun !== revision) return;
       const brands = catalogBrands(entries);
-      let removedCount = 0;
-      try {
-        const removed = await json(excludedPath + '&skip=0');
-        removedCount = Math.max(0, Number(removed.count ?? removed.items?.length ?? 0));
-      } catch { /* An older Core may not provide excluded counts. */ }
-      if (!layer.isConnected || !list.isConnected || currentRun !== revision) return;
-      list.innerHTML = (entries.length
+      list.innerHTML = entries.length
         ? catalogGroupsMarkup(brands)
-        : emptyState('Ассортимент не загружен')) +
-        (removedCount ? v2ListEntries([v2ListEntry({
-          title: 'Удалённые из ассортимента',
-          subtitle: removedCount + ' поз. · можно восстановить',
-          interactive: true,
-          data: 'data-company-excluded-open',
-          aria: 'Восстановить удалённые из ассортимента позиции',
-        })]) : '');
-      list.querySelector('[data-company-excluded-open]')?.addEventListener('click', () => {
-        void openExcludedCatalogItems();
-      });
+        : emptyState('Ассортимент не загружен');
       if (!entries.length) return;
       const byId = new Map(entries.map(row => [row.id, row]));
       list.querySelectorAll('[data-company-brand]').forEach(node => {
@@ -1098,7 +1082,7 @@ async function openCompany(companyId, root, onChanged = () => {}) {
               '<p>Исключить ' + ids.length + ' позиций из ассортимента? ' +
               'Их можно вернуть через «Исключённые».</p>' +
               '<p class="form-error" data-company-exclude-error role="alert"></p>' +
-              actionBlock(button('Убрать из ассортимента', { variant: 'delete-outline',
+              actionBlock(button('Исключить из ассортимента', { variant: 'delete-outline',
                 data: 'data-company-exclude-apply' })),
               { title: 'Исключить позиции', variant: 'q', surface: 'app' },
             ));
@@ -1159,6 +1143,8 @@ async function openCompany(companyId, root, onChanged = () => {}) {
         openCompanyEditor(company, () => { void refresh(); onChanged(); }) },
       { id: 'upload', label: 'Загрузить файл', onSelect: () =>
         openImportGuidance(company, () => { void refresh(); onChanged(); }) },
+      { id: 'excluded', label: 'Исключённые позиции', onSelect: () =>
+        void openExcludedCatalogItems() },
     ] });
   });
   void refresh();
