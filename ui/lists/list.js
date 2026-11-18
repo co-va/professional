@@ -40,11 +40,21 @@ export function list({ items = [], className = '' } = {}) {
     const overline = item.overline
       ? `<span class="ui-list__overline">${escapeHtml(item.overline)}</span>`
       : '';
+    // Optional placement of the same canonical indicator AFTER secondary text.
+    // Unspecified items retain their original markup and leading indicator.
+    const secondaryIndicatorColor = String(item.secondaryIndicatorColor || '').trim();
+    const secondaryIndicatorLabel = String(item.secondaryIndicatorLabel || '').trim();
+    const secondaryIndicator = secondaryIndicatorColor
+      ? `<span class="ui-list__indicator" style="--ui-list-indicator:${escapeHtml(secondaryIndicatorColor)}" role="img" aria-label="${escapeHtml(secondaryIndicatorLabel)}" title="${escapeHtml(secondaryIndicatorLabel)}"></span>`
+      : '';
+    const secondaryMarkup = secondaryIndicator
+      ? `<span class="ui-list__secondary-text">${escapeHtml(primarySecondary)}</span>${secondaryIndicator}`
+      : escapeHtml(primarySecondary);
 
     return `<${tag} class="${classes}"${interactive ? ` type="button"` : ''}${attrs}>` +
       indicator +
       `<span class="ui-list__main">${overline}<span class="ui-list__title">${escapeHtml(item.title ?? '')}</span>` +
-      (primarySecondary ? `<span class="ui-list__secondary">${escapeHtml(primarySecondary)}</span>` : '') +
+      (primarySecondary || secondaryIndicator ? `<span class="ui-list__secondary">${secondaryMarkup}</span>` : '') +
       `</span>` +
       (rightSecondary.length ? `<span class="ui-list__right-secondary">${rightSecondary.map((value) => `<span>${escapeHtml(value)}</span>`).join('')}</span>` : '') +
       `</${tag}>`;
