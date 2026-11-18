@@ -2,6 +2,9 @@
 .booking-account .form-error{font-size:13px;text-align:center}
 
 
+/* Separate the bulk-selection controls from the value editor above. */
+.inventory-counterparty-bulk-selection{margin-top:16px}
+
 /* Inventory Q uses the same native details/summary disclosure as orders. */
 .inventory-item-accordion{min-width:0;border:0;background:transparent}
 .inventory-editor-panel{position:relative;min-width:0;border-bottom:1px solid var(--border)}
