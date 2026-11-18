@@ -266,11 +266,12 @@ const valueHostNode = Object.assign(events(), {
   querySelector() { return valueNode; },
 });
 const allNode = Object.assign(events(), { checked: true });
+const rightNodes = new Map(liveRows.map(row => [row.id, { textContent: '' }]));
 const listNode = Object.assign(events(), {
   innerHTML: '',
   querySelectorAll() { return liveRows.map(row => ({
     dataset: { companyBulkItem: row.id },
-    querySelector() { return { textContent: '' }; },
+    querySelector() { return rightNodes.get(row.id); },
   })); },
 });
 const submitNode = { disabled: false, isConnected: true };
@@ -342,7 +343,14 @@ assert.match(listNode.innerHTML, /A01|A02/,
   'Right column shows the stored article before editing');
 assert.equal(mockBulkEditor.supplierCatalogBulkDisplay(1500, priceField), '1500 ₽');
 
+assert.equal(rightNodes.get('a').textContent, 'A01',
+  'Current article appears at right before typing');
+assert.equal(rightNodes.get('b').textContent, 'A02');
 valueNode.value = 'NEW-ART';
+valueHostNode.emit('input');
+assert.equal(rightNodes.get('a').textContent, 'NEW-ART',
+  'Typing previews new article on the right before saving');
+assert.equal(rightNodes.get('b').textContent, 'NEW-ART');
 await formNode.emit('submit', { preventDefault() {} });
 assert.equal(serverRows[0].supplierSku, 'NEW-ART');
 assert.equal(serverRows[1].supplierSku, 'NEW-ART');
@@ -356,6 +364,8 @@ assert.match(resultNode.textContent, /Сохранено: 2 из 2/, 'Result is 
 selectorNode.value = 'listPrice';
 selectorNode.emit('change');
 assert.match(listNode.innerHTML, /1500 ₽/, 'Choosing price shows saved prices on the right');
+assert.equal(rightNodes.get('a').textContent, '1500 ₽');
+assert.equal(rightNodes.get('b').textContent, '3000 ₽');
 valueNode.value = '2700';
 await formNode.emit('submit', { preventDefault() {} });
 assert.equal(serverRows[0].listPrice, 2700);
@@ -364,8 +374,27 @@ assert.equal(serverRows[0].supplierSku, 'NEW-ART', 'Second edit does not erase f
 assert.equal(callbackCount, 0);
 assert.equal(closeCount, 0);
 assert.match(listNode.innerHTML, /2700 ₽/, 'New price stays visible after second Apply');
+// Only a subset can be selected for the next field change without reopening Q.
+allNode.checked = false;
+allNode.emit('change');
+assert.equal(countNode.textContent, 'Выбрано 0 из 2');
+const firstCheck = { checked: true, dataset: { companyBulkCheck: 'a' } };
+firstCheck.closest = () => firstCheck;
+listNode.emit('change', { target: firstCheck });
+assert.equal(countNode.textContent, 'Выбрано 1 из 2');
+valueNode.value = '2850';
+valueHostNode.emit('input');
+assert.equal(rightNodes.get('a').textContent, '2850 ₽',
+  'Only a checked row previews the edited price');
+assert.equal(rightNodes.get('b').textContent, '2700 ₽',
+  'Unchecked row keeps its own price');
+await formNode.emit('submit', { preventDefault() {} });
+assert.equal(serverRows[0].listPrice, 2850);
+assert.equal(serverRows[1].listPrice, 2700, 'Unchecked row is not written');
+assert.equal(countNode.textContent, 'Выбрано 1 из 2', 'Subset remains selected after save');
+assert.equal(closeCount, 0);
 const puts = mockRequests.filter(request => request.options.method === 'PUT');
-assert.equal(puts.length, 4, 'Two successive changes are saved for two products');
+assert.equal(puts.length, 5, 'Consecutive edits save 2 articles, 2 prices, then 1 selected price');
 assert.ok(puts.every(request => request.path.startsWith('/supplier-1/catalog/')),
   'No duplicate bulk Core route was added');
 mockLayer.v2Close();
