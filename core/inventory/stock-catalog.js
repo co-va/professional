@@ -104,8 +104,10 @@ export function openStockCatalogBrand(brand, {
   const refresh = () => {
     // Refresh from the server snapshot after any Q edit; old row objects
     // must never hide a saved name, target or classification change.
-    brand = buildStockCatalogGroups(getInventoryItems())
-      .find(group=>group.name===brand.name) || brand;
+    const visible = typeof options.itemsForView === 'function'
+      ? options.itemsForView() : getInventoryItems();
+    brand = buildStockCatalogGroups(visible)
+      .find(group=>group.name===brand.name) || { ...brand, items:[], children:new Map() };
     const visibleIds = new Set(brand.items.map(item=>String(item.itemId)));
     [...selected].forEach(id=>{if(!visibleIds.has(id))selected.delete(id);});
     const body = layer.querySelector('[data-stock-catalog-body]');
