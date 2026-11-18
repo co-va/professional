@@ -91,7 +91,10 @@ function companyForm(company = {}) {
     ${field({ label: 'Email', name: 'email', value: company.email || '', type: 'email' })}
     ${field({ label: 'Сайт', name: 'website', value: company.website || '' })}
     ${field({ label: 'Примечание', name: 'note', value: company.note || '' })}
-    ${field({ label: 'Скидка по договору, %', name: 'discountPercent', value: company.discountPercent ?? '', type: 'number', min: '0', max: '100', step: '0.01', inputmode: 'decimal' })}
+    <div class="inventory-editor-number" data-counterparty-discount>
+      ${field({ label: 'Скидка по договору', name: 'discountPercent', value: company.discountPercent ?? '', type: 'number', min: '0', max: '100', step: '0.01', inputmode: 'decimal' })}
+      <span class="inventory-editor-number__suffix" aria-hidden="true">%</span>
+    </div>
     <p class="form-error" data-counterparty-error role="alert"></p>
     ${actionBlock(button('Применить', { type: 'submit' }))}
   </form>`;
@@ -1253,7 +1256,7 @@ function counterpartyCardFields(company = {}) {
     { value: 'website', label: 'Сайт', text: company.website || '' },
     { value: 'discountPercent', label: 'Скидка по договору',
       text: company.discountPercent == null ? ''
-        : 'Скидка по договору: ' + Number(company.discountPercent)
+        : Number(company.discountPercent)
           .toLocaleString('ru-RU', { maximumFractionDigits: 4 }) + '%' },
   ];
 }
