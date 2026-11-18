@@ -40,6 +40,8 @@ import {
 } from './completeness.js';
 import { openInventoryProductAppearanceQ, openInventoryProductOverview } from './product-overview.js';
 import { renderInventoryOrders } from './orders.js';
+import { classificationOptions, openInventoryClassificationGroups } from './classification.js';
+import { openInventoryStorageLocations, openInventoryTransfer } from './storage.js';
 import {
   emptyStockFilters, hasStockFilters, matchesStockFilters,
   stockFilterOptions, stockSupplierNames, STOCK_FILLED, STOCK_EMPTY,
@@ -612,6 +614,10 @@ function advancedItemFields(item = {}, defaults = {}) {
       field({ label: 'Категория', name: 'category', value: item.category || '' }) +
       field({ label: 'Подкатегория', name: 'productType', value: item.productType || '' }) +
     '</div>' +
+    select({ label: 'Группа', name: 'classificationGroupId',
+      value: item.classificationGroupId || defaults.classificationGroupId || '',
+      options: classificationOptions(item.classificationGroupId || defaults.classificationGroupId || ''),
+      searchable: true }) +
     columnLayout([
       field({ label: '№', name: 'position', value: Number(item.position) > 0 ? item.position : '',
         type: 'number', min: '1', step: '1', inputmode: 'numeric' }),
@@ -1044,6 +1050,7 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
       manufacturer: String(data.get('manufacturer') || '').trim(),
       category: String(data.get('category') || '').trim(),
       productType: String(data.get('productType') || '').trim(),
+      classificationGroupId: String(data.get('classificationGroupId') || ''),
       sku: String(data.get('sku') || '').trim(),
       barcode: String(data.get('barcode') || '').trim(),
       ...(!creating ? { position: requestedPosition } : {}),
@@ -2549,6 +2556,12 @@ function renderStock(root) {
       actions: [
         { id: 'appearance', label: 'Вид', onSelect: () => openManufacturerAppearance(root, renderManufacturers) },
         { id: 'controls', label: 'Сортировка', onSelect: () => openStockControls(root, 'manufacturers', '', renderManufacturers) },
+        { id: 'groups', label: 'Группы', onSelect: () =>
+          openInventoryClassificationGroups(renderManufacturers) },
+        { id: 'storage', label: 'Места хранения', onSelect: () =>
+          openInventoryStorageLocations(renderManufacturers) },
+        { id: 'transfer', label: 'Перемещение', onSelect: () =>
+          openInventoryTransfer(renderManufacturers) },
       ],
     });
   });
