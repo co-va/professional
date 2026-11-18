@@ -165,6 +165,11 @@ export function openStockCatalogBrand(brand, {
 export function renderStockBrandList(host, items, options = {}) {
   if (!host) return;
   const groups = buildStockCatalogGroups(items);
+  if (options.sort === 'name-desc') groups.reverse();
+  else if (options.sort === 'count-desc') groups.sort((a,b)=>
+    b.items.length-a.items.length || compare(a.name,b.name));
+  else if (options.sort === 'count-asc') groups.sort((a,b)=>
+    a.items.length-b.items.length || compare(a.name,b.name));
   host.innerHTML = groups.length ? v2ListEntries(groups.map(group=>v2ListEntry({
     title: group.name,
     rightTop: group.items.length + ' поз.',
