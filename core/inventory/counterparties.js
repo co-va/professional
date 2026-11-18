@@ -694,8 +694,8 @@ function openSupplierBulkEditor(company, rows, onSaved = () => {}) {
           '. Не подтверждено: ' + (targets.length - confirmed.length) +
           (failed.size ? '. ' + [...failed.values()][0] : '');
       } else {
-        result.textContent = 'Сохранено ' + confirmed.length +
-          ' позиций. Можно изменить другое поле.';
+        result.textContent = 'Сохранено: ' + confirmed.length + ' из ' +
+          targets.length + '. Можно изменить другое поле.';
       }
     } catch (cause) {
       error.textContent = errText(cause);
