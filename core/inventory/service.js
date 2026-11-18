@@ -50,13 +50,30 @@ export async function updateInventoryItem(itemId, value = {}) {
     // A stale phone or browser tab cannot overwrite a more recent slot number.
     body: JSON.stringify(Object.prototype.hasOwnProperty.call(value, 'position')
       ? { ...value, expectedPosition: Number(previous?.position) || 0 } : value),
-    verifySnapshot: positionChanged ? payload => {
+    verifySnapshot: payload => {
       const saved = snapshotItem(payload, itemId);
-      if (!saved || !Object.prototype.hasOwnProperty.call(saved, 'position')
-        || Number(saved.position) !== expected) {
+      if (!saved) throw new Error('Сервер не подтвердил сохранение товара.');
+      if (positionChanged && Number(saved.position) !== expected)
         throw new Error('Номер не сохранился. ' + SERVER_ORDER_UNAVAILABLE);
+      // A successful HTTP status alone is insufficient: older API versions
+      // sometimes acknowledged classification edits without persisting them.
+      const fields = ['name','catalogName','manufacturer','category','productType','sku','barcode'];
+      for (const key of fields) {
+        if (Object.prototype.hasOwnProperty.call(value,key)
+            && String(saved[key] ?? '') !== String(value[key] ?? ''))
+          throw new Error('Не сохранилось поле «' + ({
+            name:'Наименование',catalogName:'Полное наименование',
+            manufacturer:'Производитель',category:'Категория',productType:'Тип',
+            sku:'Артикул',barcode:'Штрихкод',
+          }[key] || key) + '». Обновите склад и повторите.');
       }
-    } : undefined,
+      if (value.criteriaValues) {
+        for (const [id, requested] of Object.entries(value.criteriaValues)) {
+          if (String(saved.criteriaValues?.[id] ?? '') !== String(requested ?? ''))
+            throw new Error('Не сохранилось значение группы. Обновите склад и повторите.');
+        }
+      }
+    },
   });
 }
 
