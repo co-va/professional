@@ -16,7 +16,7 @@ const compare = (a,b) => String(a).localeCompare(String(b),'ru',{numeric:true,se
 
 export function inventoryCriterionGroups() {
   const stored = getInventoryCriteria();
-  return Array.isArray(stored) && stored.length ? stored : LEGACY.map(seed=>({
+  return Array.isArray(stored) ? stored : LEGACY.map(seed=>({
     ...seed,values:[...new Set(getInventoryItems().map(item=>valueText(item[seed.legacyField])).filter(Boolean))]
       .sort(compare).map(name=>({id:name,name})),
   }));
@@ -72,7 +72,7 @@ export function openInventoryClassificationGroups(onSaved = () => {}) {
   if (!host) return null;
   const main = host.querySelector('[data-inventory-criteria-list]');
   const error = host.querySelector('[data-inventory-criteria-error]');
-  let current = getInventoryCriteria();
+  let current = getInventoryCriteria() || [];
   const showError = cause => {
     error.textContent = cause instanceof Error ? cause.message : 'Не удалось сохранить группу.';
   };
