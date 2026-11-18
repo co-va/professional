@@ -572,8 +572,8 @@ function counterpartyInformation(company = {}) {
   const contacts = [company.phone, company.email]
     .map(value => String(value || '').trim()).filter(Boolean);
   return '<div data-counterparty-information>' +
-    (representative ? '<span class="ui-list__secondary">Представитель</span>' +
-      '<strong class="ui-list__title">' + escapeHtml(representative) + '</strong>' : '') +
+    (representative ? '<strong class="ui-list__title">Представитель: ' +
+      escapeHtml(representative) + '</strong>' : '') +
     contacts.map(value => '<span class="ui-list__secondary">' +
       escapeHtml(value) + '</span>').join('') +
     '</div>';
