@@ -247,6 +247,7 @@ function movementTitle(movement = {}) {
   if (movement.kind === 'TRANSFER') return 'Перемещение';
   if (movement.kind === 'SALE') return 'Продажа';
   if (movement.kind === 'RETURN') return 'Возврат на склад';
+  if (movement.kind === 'SUPPLIER_RETURN') return 'Возврат поставщику';
   if (movement.kind === 'ADJUSTMENT') return 'Инвентаризация';
   if (movement.kind === 'CORRECTION') return 'Корректировка';
   return 'Движение';
@@ -2072,7 +2073,7 @@ function openMovementDetails(root, movementId) {
   // The journal is the V2 list. An opened movement is a detail card, never a second list.
   const lines = details((movement.lines || []).map(line => ({
     left: [line.name || getInventoryItem(line.itemId)?.name || 'Позиция',
-      movement.kind === 'TRANSFER' ? storageName(inventoryLocations().find(
+      ['TRANSFER', 'SUPPLIER_RETURN'].includes(movement.kind) ? storageName(inventoryLocations().find(
         place => place.locationId === (line.storageLocationId || 'primary'))) : ''].filter(Boolean).join(' · '),
     right: `${movementSign(line)}${numberText(line.quantity)} ${line.unit || getInventoryItem(line.itemId)?.unit || ''}`,
   })), { variant: 'split' });
@@ -2083,7 +2084,9 @@ function openMovementDetails(root, movementId) {
     ${movement.personUei ? `<p>${escapeHtml(movement.personUei)}</p>` : ''}
     ${movementSubtitle(movement) ? `<p>${escapeHtml(movementSubtitle(movement))}</p>` : ''}
     ${lines}
-    ${physicalAudit || movement.kind === 'TRANSFER' ? '' : actionBlock(button('Исправить', { data: 'data-inventory-movement-correct' }))}
+    ${physicalAudit || ['TRANSFER', 'SUPPLIER_RETURN'].includes(movement.kind)
+      || movement.sourceType === 'inventory-purchase-order'
+      ? '' : actionBlock(button('Исправить', { data: 'data-inventory-movement-correct' }))}
   </div>`;
   const layer = mountModal(root, modal(markup, { title: movementTitle(movement), variant: 'q' }));
   layer?.querySelector('[data-inventory-movement-correct]')?.addEventListener('click', () => {
