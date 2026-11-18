@@ -351,9 +351,8 @@ function catalogItemList(items = [], selectedCatalogIds = new Set()) {
       list({
         className: 'ui-list--dense',
         items: [{
-          indicatorColor: item.supplierAvailable === true ? '#37B24D'
-            : item.supplierAvailable === false ? '#FF1111' : '#A8AAAC',
-          indicatorLabel: supplierAvailability(item.supplierAvailable),
+          className: item.supplierAvailable === true ? 'is-supplier-available'
+            : item.supplierAvailable === false ? 'is-supplier-unavailable' : '',
           title: item.name,
           secondary: item.supplierSku || '—',
           right: [
@@ -363,7 +362,7 @@ function catalogItemList(items = [], selectedCatalogIds = new Set()) {
           ],
           interactive: true,
           data: 'data-company-product="' + escapeHtml(item.id) + '"',
-          aria: 'Открыть позицию ' + item.name,
+          aria: 'Открыть позицию ' + item.name + '. ' + supplierAvailability(item.supplierAvailable),
         }],
       }) +
     '</div>',
