@@ -56,6 +56,10 @@ const contactOnly = counterpartyInformation({
 });
 for (const value of ['Светлана', '+7 900 000 00 00', 'svetlana@example.com'])
   assert.ok(contactOnly.includes(value), 'Z2 shows contact details: ' + value);
+assert.ok(contactOnly.includes('Представитель: Светлана'),
+  'Representative must be one line, without a secondary heading');
+assert.ok(!contactOnly.includes('ui-list__secondary">Представитель'),
+  'Separate representative subtitle must be absent');
 for (const value of ['Компания Альфа', '15%', 'hidden.example', 'Private note', 'Менеджер'])
   assert.ok(!contactOnly.includes(value), 'Z2 must not duplicate supplier card data: ' + value);
 assert.match(source, /title: company\.name,/,
