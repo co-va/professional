@@ -49,7 +49,7 @@ assert.match(source, /<strong class="ui-list__title">Скидка по дого�
 
 // Agreement must be available both as a selectable field and on the face of
 // supplier cards, even when an older custom layout has unused slots.
-const defaultSource = source.slice(source.indexOf('const COUNTERPARTY_CARD_DEFAULT ='),
+const defaultSource = source.slice(source.indexOf('const COUNTERPARTY_CARD_SCOPE ='),
   source.indexOf('const TYPES ='));
 const supplierCardSource = source.slice(source.indexOf('function counterpartyCardFields('),
   source.indexOf('function openCounterpartyAppearance('));
