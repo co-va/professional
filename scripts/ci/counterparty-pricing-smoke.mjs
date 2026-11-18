@@ -21,12 +21,18 @@ assert.match(source, /input\.discountPercent = discount;/,
   'Counterparty edit sends the validated percentage to Core');
 assert.doesNotMatch(source, /purchasePriceSample|listPriceSample|openSupplierAgreement/,
   'Obsolete sample-price calculator and its separate Q must not return');
-assert.doesNotMatch(source, /id: 'discount'|id: 'excluded'/,
-  'Company V contains only company-level actions');
+assert.doesNotMatch(source, /id: 'discount'/,
+  'Agreement discount is in the company editor rather than a separate menu');
+assert.match(source, /id: 'excluded', label: 'Исключённые позиции'/,
+  'Excluded offers remain in the selected counterparty V');
+assert.match(source, /const excludedPath = '\/'\+urlId\(companyId\)\+'\/catalog\?excluded=true'/,
+  'Excluded offers are queried separately by counterparty');
+assert.match(source, /rowIds: ids, excluded: true/,
+  'Exclusions are stored using Core selection endpoint');
 assert.match(source, /openCounterpartyFiles\(currentCompanies\)/,
   'Upload history is available from the Counterparties list V');
-assert.match(source, /data-company-excluded-open/,
-  'Existing excluded product data remains recoverable in the assortment');
+assert.doesNotMatch(source, /data-company-excluded-open|removedCount/,
+  'No duplicate restore action in the supplier catalog surface');
 assert.match(source, /\/catalog\/prices/);
 assert.match(source, /function openSupplierProductEditor\(/);
 assert.match(source, /function openSupplierBatchPrices\(/);
