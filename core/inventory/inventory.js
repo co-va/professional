@@ -1050,7 +1050,8 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
       manufacturer: String(data.get('manufacturer') || '').trim(),
       category: String(data.get('category') || '').trim(),
       productType: String(data.get('productType') || '').trim(),
-      classificationGroupId: String(data.get('classificationGroupId') || ''),
+      ...(String(data.get('classificationGroupId') || '') || item?.classificationGroupId
+        ? { classificationGroupId: String(data.get('classificationGroupId') || '') } : {}),
       sku: String(data.get('sku') || '').trim(),
       barcode: String(data.get('barcode') || '').trim(),
       ...(!creating ? { position: requestedPosition } : {}),
