@@ -367,7 +367,7 @@ function catalogItemList(items = [], selectedCatalogIds = new Set(), linkedCatal
           ],
           interactive: true,
           data: 'data-company-product="' + escapeHtml(item.id) + '"',
-          aria: 'Открыть позицию ' + item.name + '. ' + supplierAvailability(item.supplierAvailable),
+          aria: 'Выбрать позицию ' + item.name + '. ' + supplierAvailability(item.supplierAvailable),
         }],
       }) +
     '</div>',
@@ -687,8 +687,9 @@ async function openCompany(companyId, root, onChanged = () => {}) {
           });
           brandLayer?.querySelectorAll('[data-company-product]').forEach(product => {
             product.addEventListener('click', () => {
-              const row = byId.get(product.dataset.companyProduct);
-              if (row) void openSelectedCatalogCards(company, [row], linked);
+              const check = brandLayer.querySelector('[data-company-product-check="' +
+                CSS.escape(String(product.dataset.companyProduct)) + '"]');
+              if (check) check.click();
             });
           });
           syncSelections();
