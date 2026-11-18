@@ -638,6 +638,24 @@ async function openCompany(companyId, root, onChanged = () => {}) {
               check.checked = rows.length > 0 && selected === rows.length;
               check.indeterminate = selected > 0 && selected < rows.length;
             });
+            const actions = brandLayer?.querySelector('.inventory-counterparty-selection-actions');
+            if (selectedCatalogIds.size) actions?.removeAttribute('data-ui-action-hidden');
+            else actions?.setAttribute('data-ui-action-hidden', '');
+            const create = brandLayer?.querySelector('[data-company-selection-card]');
+            if (create) create.textContent = 'Создать карточку · ' + selectedCatalogIds.size;
+          };
+          const linked = row => {
+            linkedCatalogIds = readConfirmedLinks();
+            selectedCatalogIds.delete(String(row.id));
+            const product = [...(brandLayer?.querySelectorAll('[data-company-product]') || [])]
+              .find(node => String(node.dataset.companyProduct) === String(row.id));
+            const indicator = product?.querySelector('.ui-list__secondary .ui-list__indicator');
+            if (indicator) {
+              indicator.style.setProperty('--ui-list-indicator', '#37B24D');
+              indicator.setAttribute('aria-label', 'Связан с карточкой склада');
+              indicator.title = 'Связан с карточкой склада';
+            }
+            syncSelections();
           };
           brandLayer?.querySelectorAll('[data-company-category-check]').forEach(check => {
             check.addEventListener('change', () => {
@@ -657,22 +675,17 @@ async function openCompany(companyId, root, onChanged = () => {}) {
               syncSelections();
             });
           });
+          brandLayer?.querySelector('[data-company-selection-card]')?.addEventListener('click', () => {
+            const rows = entries.filter(row => selectedCatalogIds.has(String(row.id)));
+            if (rows.length) void openSelectedCatalogCards(company, rows, linked);
+          });
           brandLayer?.querySelectorAll('[data-company-product]').forEach(product => {
             product.addEventListener('click', () => {
               const row = byId.get(product.dataset.companyProduct);
-              if (row) void openCatalogRow(company, row, {
-                onLinked: () => {
-                  linkedCatalogIds = readConfirmedLinks();
-                  const indicator = product.querySelector('.ui-list__secondary .ui-list__indicator');
-                  if (indicator) {
-                    indicator.style.setProperty('--ui-list-indicator', '#37B24D');
-                    indicator.setAttribute('aria-label', 'Связан с карточкой склада');
-                    indicator.title = 'Связан с карточкой склада';
-                  }
-                },
-              });
+              if (row) void openSelectedCatalogCards(company, [row], linked);
             });
           });
+          syncSelections();
         });
       });
     } catch (error) {
