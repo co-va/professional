@@ -944,7 +944,8 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
     // later. Never fabricate package quantities for an unselected mode.
     const receiptUnit = String(data.get('receiptUnit') || '') || null;
     const packUnit = receiptUnit === 'уп.' ? String(data.get('packContentUnit') || 'шт.') : null;
-    const packAmount = receiptUnit === 'уп.' ? collectOptionalNumber(form, 'packContentQuantity') : 1;
+    const packAmount = receiptUnit === 'уп.' ? collectOptionalNumber(form, 'packContentQuantity')
+      : receiptUnit === 'шт.' ? 1 : null;
     const bulk = receiptUnit === 'уп.' && packUnit !== 'шт.';
     if (packAmount != null && receiptUnit === 'уп.' && packAmount <= 0) {
       openNotice({ title: 'В упаковке', message: 'Количество должно быть больше нуля.' });
@@ -996,8 +997,9 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
     }
     const net = gross != null && tare != null ? Number(gross) - Number(tare) : null;
     const perPiece = bulk ? null : inventoryStockPerPiece(unit, nominalUnit, nominalQuantity, net);
-    const calculatedPack = bulk ? inventoryContentInBaseUnits(packAmount, packUnit)
-      : perPiece > 0 ? perPiece * packAmount : null;
+    const calculatedPack = bulk ? (packAmount == null ? null
+        : inventoryContentInBaseUnits(packAmount, packUnit))
+      : perPiece > 0 && packAmount != null ? perPiece * packAmount : null;
     const oldPack = item?.packageQuantity ?? null;
     const packageQuantity = calculatedPack
       ?? (!creating && receiptUnit === item?.receiptUnit ? oldPack : null);
