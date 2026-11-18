@@ -427,7 +427,111 @@ function catalogBrandMarkup(categories, selectedCatalogIds, linkedCatalogIds = n
           data: 'data-company-category-check="' + escapeHtml(category) + '"',
         })) : catalogItemList(rows, selectedCatalogIds, linkedCatalogIds),
     ).join('') + '</div>' +
-    '<p class="ui-list__secondary">Выбор пока не сохраняется в остатках.</p>';
+    actionBlock(
+      button('Создать карточку', { data: 'data-company-selection-card' }) +
+      button('Удалить', {
+        variant: 'delete-outline', disabled: true,
+        data: 'data-company-selection-delete title="Требуется серверное исключение из ассортимента"',
+      }),
+      { className: 'inventory-counterparty-selection-actions' },
+    );
+}
+
+// The existing Core routes already support one-to-one create/link. A selected
+// group is processed one product at a time so unit choices and matching cannot
+// silently create incorrect stock cards or duplicate supplier offers.
+async function openSelectedCatalogCards(company, rows, onLinked = () => {}) {
+  if (!rows.length) return;
+  try { await loadInventory(); }
+  catch (error) { openNotice({ title: 'Остатки', message: errText(error) }); return; }
+  const menu = mountModal(document.body, modal(
+    list({
+      className: 'ui-list--dense',
+      items: [
+        { title: 'Создать новую', interactive: true,
+          data: 'data-company-create-new', aria: 'Создать новую карточку' },
+        { title: 'Использовать существующую', interactive: true,
+          data: 'data-company-use-existing', aria: 'Выбрать существующую карточку' },
+      ],
+    }),
+    { title: 'Создать карточку · ' + rows.length + ' поз.', variant: 'q', surface: 'app' },
+  ));
+  if (!menu) return;
+
+  const link = async (row, itemId) => {
+    if (!itemId) throw new Error('Не выбрана карточка склада.');
+    await json('/' + urlId(company.id) + '/catalog/' + urlId(row.id) + '/link', {
+      method: 'POST', body: { itemId },
+    });
+    await loadInventory();
+    onLinked(row);
+  };
+  const progress = index => rows.length === 1 ? '' : (index + 1) + ' из ' + rows.length;
+  const next = (mode, index) => {
+    if (index < rows.length) void run(mode, index);
+  };
+  const run = async (mode, index) => {
+    const row = rows[index];
+    if (!row) return;
+    if (mode === 'new') {
+      const { openItemEditor } = await import('./inventory.js');
+      openItemEditor(document.body, '', {
+        name: row.name, manufacturer: row.manufacturer, sku: row.supplierSku, barcode: row.barcode,
+      }, async itemId => {
+        try {
+          await link(row, itemId);
+          next(mode, index + 1);
+        } catch (error) {
+          openNotice({ title: 'Карточка создана', message: 'Сохранение связи не завершено: ' + errText(error) });
+        }
+      });
+      return;
+    }
+    const inventoryItems = getInventoryItems();
+    const sku = String(row.supplierSku || '').trim().toLocaleLowerCase('ru-RU');
+    const matches = sku ? inventoryItems.filter(item =>
+      String(item.sku || '').trim().toLocaleLowerCase('ru-RU') === sku) : [];
+    const suggested = matches.length === 1 ? matches[0].itemId : '';
+    const layer = mountModal(document.body, modal(
+      '<p>' + escapeHtml(row.name) + '</p>' +
+      (progress(index) ? '<p class="ui-list__secondary">' + progress(index) + '</p>' : '') +
+      select({
+        label: 'Карточка склада', name: 'itemId', value: suggested,
+        options: [{ value: '', label: 'Выберите товар' },
+          ...inventoryItems.map(item => ({ value: item.itemId,
+            label: [item.manufacturer, item.name].filter(Boolean).join(' · ') }))],
+        searchable: true,
+      }) +
+      '<p class="form-error" data-company-link-error role="alert"></p>' +
+      actionBlock(button('Применить', { data: 'data-company-apply-link' })),
+      { title: 'Использовать существующую', variant: 'q', surface: 'app' },
+    ));
+    const submit = layer?.querySelector('[data-company-apply-link]');
+    submit?.addEventListener('click', async () => {
+      const itemId = layer.querySelector('[name="itemId"]')?.value;
+      const errorHost = layer.querySelector('[data-company-link-error]');
+      if (!itemId) { errorHost.textContent = 'Выберите товар.'; return; }
+      submit.disabled = true;
+      try {
+        await link(row, itemId);
+        layer.v2Close?.();
+        next(mode, index + 1);
+      } catch (error) {
+        errorHost.textContent = errText(error);
+        submit.disabled = false;
+      }
+    });
+  };
+  menu.querySelector('[data-company-create-new]')?.addEventListener('click', () => {
+    menu.v2Close?.();
+    void run('new', 0).catch(error =>
+      openNotice({ title: 'Создать карточку', message: errText(error) }));
+  });
+  menu.querySelector('[data-company-use-existing]')?.addEventListener('click', () => {
+    menu.v2Close?.();
+    void run('existing', 0).catch(error =>
+      openNotice({ title: 'Карточка склада', message: errText(error) }));
+  });
 }
 
 function openCounterpartyFiles(company) {
