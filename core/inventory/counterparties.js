@@ -468,7 +468,8 @@ async function openSelectedCatalogCards(company, rows, onLinked = () => {}) {
   };
   const progress = index => rows.length === 1 ? '' : (index + 1) + ' из ' + rows.length;
   const next = (mode, index) => {
-    if (index < rows.length) void run(mode, index);
+    if (index < rows.length) void run(mode, index).catch(error =>
+      openNotice({ title: 'Создать карточку', message: errText(error) }));
   };
   const run = async (mode, index) => {
     const row = rows[index];
@@ -489,9 +490,14 @@ async function openSelectedCatalogCards(company, rows, onLinked = () => {}) {
     }
     const inventoryItems = getInventoryItems();
     const sku = String(row.supplierSku || '').trim().toLocaleLowerCase('ru-RU');
+    const linked = inventoryItems.filter(item =>
+      Array.isArray(item.supplierOffers) && item.supplierOffers.some(offer =>
+        String(offer.counterpartyId || '') === String(company.id)
+          && String(offer.catalogItemId || '') === String(row.id)));
     const matches = sku ? inventoryItems.filter(item =>
       String(item.sku || '').trim().toLocaleLowerCase('ru-RU') === sku) : [];
-    const suggested = matches.length === 1 ? matches[0].itemId : '';
+    const suggested = linked.length === 1 ? linked[0].itemId
+      : matches.length === 1 ? matches[0].itemId : '';
     const layer = mountModal(document.body, modal(
       '<p>' + escapeHtml(row.name) + '</p>' +
       (progress(index) ? '<p class="ui-list__secondary">' + progress(index) + '</p>' : '') +
@@ -577,8 +583,8 @@ async function openCompany(companyId, root, onChanged = () => {}) {
   if (!layer) return null;
   const host = layer.querySelector('[data-counterparty-detail]');
   let revision = 0;
-  // In-memory selection only until Core owns an idempotent bulk catalog operation.
-  // Never create/archive inventory records or invent inventory units here.
+  // Selection stays in this view. Confirmed create/link actions use the existing
+  // Core per-row endpoints; persistent exclusions require a separate Core operation.
   const selectedCatalogIds = new Set();
   let linkedCatalogIds = null;
   const readConfirmedLinks = () => new Set(getInventoryItems().flatMap(item =>
