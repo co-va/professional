@@ -195,11 +195,11 @@ async function openCatalogRow(company, row, { itemId = '', onLinked = () => {} }
     <p>${escapeHtml([row.manufacturer, row.supplierSku && 'Арт. ' + row.supplierSku].filter(Boolean).join(' · '))}</p>
     <p>Наличие: ${supplierAvailability(row.supplierAvailable)}</p>
     ${row.supplierNote ? '<p>' + escapeHtml(row.supplierNote) + '</p>' : ''}
-    <p>Цена без скидки: ${money(row.listPrice)}</p>
+    <p>Прайсовая цена: ${money(row.listPrice)}</p>
     <p>Скидка: ${supplierDiscount(row, company)}</p>
     <p>Цена со скидкой: ${money(supplierEffectivePrice(row, company))}</p>
     <p>РРЦ: ${money(row.retailPrice)}</p>
-    ${select({ label: 'Моя рабочая карточка', name: 'itemId', value: itemId,
+    ${select({ label: 'Карточка склада', name: 'itemId', value: itemId,
       options: [{ value: '', label: 'Выбрать товар' },
         ...items.map(item => ({ value: item.itemId, label: [item.manufacturer, item.name].filter(Boolean).join(' · ') }))],
       searchable: true })}
@@ -363,18 +363,18 @@ function supplierDiscount(row = {}, company = {}) {
 function openSupplierAgreement(company, onSaved = () => {}) {
   const q = mountModal(document.body, modal(
     '<form data-company-agreement-form>' +
-    field({ label: 'Цена из прайса, ₽', name: 'listPriceSample',
+    field({ label: 'Прайсовая цена, ₽', name: 'listPriceSample',
       type: 'number', min: '0.01', step: '0.01', inputmode: 'decimal' }) +
-    field({ label: 'Известная закупочная цена, ₽', name: 'purchasePriceSample',
+    field({ label: 'Цена закупки для расчёта, ₽', name: 'purchasePriceSample',
       type: 'number', min: '0', step: '0.01', inputmode: 'decimal' }) +
     '<p class="ui-list__secondary" data-company-agreement-inferred></p>' +
-    field({ label: 'Моя скидка, %', name: 'discountPercent',
+    field({ label: 'Скидка по договору, %', name: 'discountPercent',
       value: company.discountPercent ?? '', type: 'number', min: '0', max: '100',
       step: '0.0001', inputmode: 'decimal' }) +
     '<p class="ui-list__secondary" data-company-agreement-result></p>' +
     '<p class="form-error" role="alert" data-company-agreement-error></p>' +
     actionBlock(button('Применить', { type: 'submit' })) + '</form>',
-    { title: 'Скидка контрагента', variant: 'q', surface: 'app' },
+    { title: 'Скидка по договору', variant: 'q', surface: 'app' },
   ));
   if (!q) return;
   const form = q.querySelector('[data-company-agreement-form]');
@@ -396,7 +396,7 @@ function openSupplierAgreement(company, onSaved = () => {}) {
       discountField.value = String(percent);
     }
     inferred.textContent = canInfer
-      ? 'По этим ценам скидка: ' +
+      ? 'Расчётная скидка: ' +
         (Math.round((1 - paidPrice / listPrice) * 1000000) / 10000)
           .toLocaleString('ru-RU', { maximumFractionDigits: 4 }) + '%'
       : listPrice != null && paidPrice != null
@@ -404,7 +404,7 @@ function openSupplierAgreement(company, onSaved = () => {}) {
     const percentage = parse(discountField);
     result.textContent = listPrice != null && listPrice > 0 && percentage != null
       && percentage >= 0 && percentage <= 100
-      ? 'Расчётная цена: ' + money(Math.round((listPrice *
+      ? 'Цена со скидкой: ' + money(Math.round((listPrice *
         (1 - percentage / 100) + Number.EPSILON) * 100) / 100)
       : '';
   };
@@ -499,11 +499,11 @@ function openSupplierProductEditor(company, row, onSaved = () => {}) {
     field({ label: 'Производитель', name: 'manufacturer', value: row.manufacturer || '' }),
     field({ label: 'Бренд', name: 'brand', value: row.brand || '' }),
     field({ label: 'Группа поставщика', name: 'category', value: row.category || '' }),
-    field({ label: 'Цена без скидки, ₽', name: 'listPrice',
+    field({ label: 'Прайсовая цена, ₽', name: 'listPrice',
       value: row.listPrice ?? '', type: 'number', min: '0', step: '0.01' }),
     field({ label: 'РРЦ, ₽', name: 'retailPrice',
       value: row.retailPrice ?? '', type: 'number', min: '0', step: '0.01' }),
-    field({ label: 'Скидка товара, %', name: 'discountPercent',
+    field({ label: 'Скидка по позиции, %', name: 'discountPercent',
       value: row.discountPercent ?? '', type: 'number', min: '0', max: '100',
       step: '0.0001' }),
     field({ label: 'Ед. поставщика', name: 'unit', value: row.unit || '' }),
@@ -513,7 +513,7 @@ function openSupplierProductEditor(company, row, onSaved = () => {}) {
   ];
   const layer = mountModal(document.body, modal(
     '<form data-company-catalog-edit-form>' + fields.join('') +
-    '<p class="ui-list__secondary">Пустая скидка — по договору. 0% — без скидки.</p>' +
+    '<p class="ui-list__secondary">Не указана — скидка по договору; 0% — без скидки.</p>' +
     '<p class="form-error" role="alert" data-company-catalog-edit-error></p>' +
     actionBlock(button('Применить', { type: 'submit' })) + '</form>',
     { title: 'Позиция поставщика', variant: 'q', surface: 'app' },
@@ -550,7 +550,7 @@ function counterpartyInformation(company = {}) {
   const primary = String(company.contactName || '').trim();
   const secondary = [company.phone, company.email, company.website, company.note]
     .filter(value => String(value || '').trim());
-  if (company.discountPercent != null) secondary.push('Скидка: ' + Number(company.discountPercent)
+  if (company.discountPercent != null) secondary.push('Скидка по договору: ' + Number(company.discountPercent)
     .toLocaleString('ru-RU', { maximumFractionDigits: 4 }) + '%');
   return '<div data-counterparty-information>' +
     (primary ? '<span class="ui-list__secondary">Менеджер</span>' : '') +
@@ -572,7 +572,7 @@ function openCatalogProductDetails(row, status = null, company = null, onSaved =
     ['Штрихкод', row.barcode],
     ['Категория', row.category],
     ['Наличие', supplierAvailability(row.supplierAvailable)],
-    ['Цена без скидки', money(row.listPrice)],
+    ['Прайсовая цена', money(row.listPrice)],
     ['Скидка', supplierDiscount(row, company)],
     ['Цена со скидкой', money(supplierEffectivePrice(row, company))],
     ['РРЦ', money(row.retailPrice)],
@@ -1194,7 +1194,7 @@ async function openCompany(companyId, root, onChanged = () => {}) {
         openCompanyEditor(company, () => { void refresh(); onChanged(); }) },
       { id: 'upload', label: 'Загрузить файл', onSelect: () =>
         openImportGuidance(company, () => { void refresh(); onChanged(); }) },
-      { id: 'discount', label: 'Моя скидка', onSelect: () =>
+      { id: 'discount', label: 'Скидка по договору', onSelect: () =>
         openSupplierAgreement(company, () => { void refresh(); onChanged(); }) },
       { id: 'excluded', label: 'Исключённые', onSelect: () => void openExcludedCatalogItems() },
       { id: 'template', label: 'Шаблон Excel', onSelect: () =>
