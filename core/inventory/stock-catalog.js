@@ -1,6 +1,6 @@
 import {
   actionBlock, button, emptyState, list, modal, mountModal,
-  v2ListEntries, v2ListEntry,
+  v2ListEntries, v2ListEntry, initV2ListReorder,
 } from '../../ui/ui.js';
 import { compactCheck } from '../../ui/selection/check-list.js';
 import { escapeHtml } from '../../ui/utils/escape-html.js';
@@ -169,18 +169,28 @@ export function openStockCatalogBrand(brand, options = {}) {
 }
 
 export function renderStockBrandList(host, items, options = {}) {
-  if (!host) return;
+  if (!host) return () => {};
   const groups = buildStockCatalogGroups(items);
+  const valueOrder = new Map((options.brandValues || []).map((item,index)=>[item.name,index]));
+  if (valueOrder.size) groups.sort((a,b)=>
+    (valueOrder.get(a.name) ?? Number.MAX_SAFE_INTEGER) -
+    (valueOrder.get(b.name) ?? Number.MAX_SAFE_INTEGER) || compare(a.name,b.name));
   if (options.sort === 'name-desc') groups.reverse();
   else if (options.sort === 'count-desc') groups.sort((a,b)=>
     b.items.length-a.items.length || compare(a.name,b.name));
   else if (options.sort === 'count-asc') groups.sort((a,b)=>
     a.items.length-b.items.length || compare(a.name,b.name));
+  const ids = new Map((options.brandValues || []).map(value=>[value.name,value.id]));
+  const allowReorder=typeof options.onReorder==='function';
   host.innerHTML = groups.length ? v2ListEntries(groups.map(group=>v2ListEntry({
     title: group.name,
     rightTop: group.items.length + ' поз.',
     interactive:true, initial:'', omitEmptySubtitle:true,
-    data:'data-stock-brand="' + escapeHtml(group.name) + '"',
+    reorderHandle:allowReorder && ids.has(group.name),
+    reorderAria:'Изменить порядок ' + group.name,
+    data:'data-stock-brand="' + escapeHtml(group.name) + '"' +
+      (allowReorder && ids.has(group.name)
+        ? ' data-reorder-id="' + escapeHtml(ids.get(group.name)) + '"' : ''),
     aria:'Открыть ассортимент ' + group.name,
   }))) : emptyState('Товаров нет','Создайте позицию или выберите её у контрагента.');
   host.querySelectorAll('[data-stock-brand]').forEach(node=>{
@@ -189,4 +199,9 @@ export function renderStockBrandList(host, items, options = {}) {
       if(brand)openStockCatalogBrand(brand,options);
     });
   });
+  return allowReorder ? initV2ListReorder(host,{
+    selector:'[data-stock-brand][data-reorder-id]',
+    onReorder:options.onReorder,
+    onError:options.onReorderError || (()=>{}),
+  }) : () => {};
 }
