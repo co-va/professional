@@ -94,6 +94,23 @@ function companyForm(company = {}) {
     ${actionBlock(button('Применить', { type: 'submit' }))}
   </form>`;
 }
+// Check all eight fields from the existing editor against a fresh Core GET.
+function counterpartyFieldMismatch(input, stored) {
+  if (!stored || typeof stored !== 'object') return 'контрагент';
+  const fields = [
+    ['name', 'Название'], ['kind', 'Тип'], ['contactName', 'Представитель'],
+    ['phone', 'Телефон'], ['email', 'Email'], ['website', 'Сайт'],
+    ['note', 'Примечание'],
+  ];
+  for (const [key, label] of fields) {
+    if (String(input[key] ?? '').trim() !== String(stored[key] ?? '').trim()) return label;
+  }
+  const expected = input.discountPercent;
+  const actual = stored.discountPercent == null ? null : Number(stored.discountPercent);
+  if (expected !== actual) return 'Скидка по договору';
+  return '';
+}
+
 function openCompanyEditor(company, onSaved) {
   const layer = mountModal(document.body, modal(companyForm(company), {
     title: company?.id ? 'Контрагент' : 'Новый контрагент', variant: 'q', surface: 'app',
@@ -113,14 +130,34 @@ function openCompanyEditor(company, onSaved) {
     }
     input.discountPercent = discount;
     save.disabled = true;
+    let created = null;
     try {
       const updated = await json(company?.id ? '/' + urlId(company.id) : '', {
         method: company?.id ? 'PUT' : 'POST', body: input,
       });
+      if (!company?.id) created = updated;
+      // An HTTP 200 is not evidence that every field was actually persisted.
+      // Read the authoritative Core record before closing the editor.
+      const id = String(company?.id || updated?.id || '');
+      if (!id) throw new Error('Core не вернул идентификатор контрагента.');
+      const stored = (await json()).find(row => String(row.id) === id);
+      if (!stored) throw new Error('Core не подтвердил сохранение контрагента.');
+      const mismatch = counterpartyFieldMismatch(input, stored);
+      if (mismatch) throw new Error('Core не сохранил поле «' + mismatch + '». Изменения не подтверждены.');
       layer.v2Close?.();
-      onSaved?.(updated);
-    } catch (cause) { error.textContent = errText(cause); }
-    finally { save.disabled = false; }
+      onSaved?.(stored);
+    } catch (cause) {
+      if (created?.id) {
+        // Creation cannot be safely retried: the entity already exists in Core.
+        layer.v2Close?.();
+        onSaved?.(created);
+        openNotice({ title: 'Сохранение не подтверждено',
+          message: 'Контрагент создан, но сохранение всех полей не подтверждено. ' +
+            errText(cause) + ' Не создавайте его повторно.' });
+      } else {
+        error.textContent = errText(cause);
+      }
+    } finally { save.disabled = false; }
   });
   return layer;
 }
@@ -497,9 +534,12 @@ function counterpartyInformation(company = {}) {
   const primary = String(company.contactName || '').trim();
   const secondary = [company.phone, company.email, company.website, company.note]
     .filter(value => String(value || '').trim());
-  if (company.discountPercent != null) secondary.push('Скидка по договору: ' + Number(company.discountPercent)
-    .toLocaleString('ru-RU', { maximumFractionDigits: 4 }) + '%');
+  const discount = company.discountPercent == null ? null
+    : Number(company.discountPercent).toLocaleString('ru-RU', { maximumFractionDigits: 4 }) + '%';
   return '<div data-counterparty-information>' +
+    (discount !== null
+      ? '<strong class="ui-list__title">Скидка по договору: ' + escapeHtml(discount) + '</strong>'
+      : '<span class="ui-list__secondary">Скидка по договору: не указана</span>') +
     (primary ? '<span class="ui-list__secondary">Менеджер</span>' : '') +
     (primary ? '<strong class="ui-list__title">' + escapeHtml(primary) + '</strong>' : '') +
     secondary.map(value => '<span class="ui-list__secondary">' + escapeHtml(value) + '</span>').join('') +
