@@ -41,8 +41,8 @@ assert.match(source, /const stored = \(await json\(\)\)\.find/,
   'Editor must re-read persisted Core data after a successful HTTP request');
 assert.match(source, /if \(mismatch\) throw new Error/,
   'Missing server-side fields must not be silently accepted');
-assert.match(source, /Скидка по договору: не указана/,
-  'Z2 must state explicitly when no agreement is stored');
+assert.doesNotMatch(source, /Скидка по договору: не указана/,
+  'Missing optional agreement must not appear as technical text');
 assert.match(source, /<strong class="ui-list__title">Скидка по договору:/,
   'Z2 must show a stored agreement prominently');
 
@@ -65,8 +65,8 @@ assert.equal(base.counterpartyCardFields({ discountPercent: 0 })
   .find(item => item.value === 'discountPercent')?.text, 'Скидка по договору: 0%',
   'Explicit zero discount is displayed, not hidden');
 assert.equal(base.counterpartyCardFields({})
-  .find(item => item.value === 'discountPercent')?.text, 'Скидка по договору: не указана',
-  'No stored agreement must not be presented as 0%');
+  .find(item => item.value === 'discountPercent')?.text, '',
+  'No agreement must leave the supplier card field empty');
 assert.equal(normalizeEntityCardAppearance(base.counterpartyCardAppearance())
   .lines[6].cells.left.field, 'discountPercent', 'Default card shows the discount immediately');
 const savedLayout = normalizeEntityCardAppearance({ lines: [
