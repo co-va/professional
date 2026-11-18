@@ -83,7 +83,7 @@ function productCard(item) {
     fields: productCardFields(item),
     interactive: true,
     data: 'data-inventory-product-card',
-    aria: 'Редактировать продукт ' + item.name,
+    aria: 'Редактировать складскую единицу ' + item.name,
   });
 }
 
@@ -256,7 +256,7 @@ export function openInventoryProductAppearanceQ(itemId, onSaved = () => {}) {
   if (!item) return null;
   return openEntityCardAppearanceQ(document.body, {
     title: 'Вид',
-    typeOptions: [{ value: PRODUCT_APPEARANCE_SCOPE, label: 'Продукт' }],
+    typeOptions: [{ value: PRODUCT_APPEARANCE_SCOPE, label: 'Складская единица' }],
     initialType: PRODUCT_APPEARANCE_SCOPE,
     targetOptions: () => [],
     allowPhoto: false,
@@ -280,12 +280,12 @@ function confirmProductDelete(itemId, overview, onChanged) {
     return;
   }
   const confirm = mountModal(document.body, modal(
-    `<div class="modal-title"><h2>Удалить продукт?</h2><p>История движений и закупок сохранится.</p></div>
+    `<div class="modal-title"><h2>Удалить складскую единицу?</h2><p>История движений и закупок сохранится.</p></div>
     <div class="form-error" data-inventory-product-delete-error role="alert"></div>
     <div class="modal-actions">
       ${button('Удалить', { variant: 'critical', data: 'data-inventory-product-confirm-delete' })}
       ${button('Отмена', { variant: 'secondary', data: 'data-inventory-product-cancel-delete' })}
-    </div>`, { title: 'Удаление продукта', variant: 'x', xRole: 'action' },
+    </div>`, { title: 'Удаление складской единицы', variant: 'x', xRole: 'action' },
   ));
   if (!confirm) return;
   confirm.querySelector('[data-inventory-product-cancel-delete]')?.addEventListener('click', () => confirm.v2Close?.());
@@ -300,7 +300,7 @@ function confirmProductDelete(itemId, overview, onChanged) {
     } catch (error) {
       control.disabled = false;
       const host = confirm.querySelector('[data-inventory-product-delete-error]');
-      if (host) host.textContent = error instanceof Error ? error.message : 'Не удалось удалить продукт.';
+      if (host) host.textContent = error instanceof Error ? error.message : 'Не удалось удалить складскую единицу.';
     }
   });
 }
@@ -335,7 +335,7 @@ export function openInventoryProductOverview(itemId, { edit = () => {}, onChange
     className: 'inventory-product-overview-q',
   }));
   if (!layer) return null;
-  layer.querySelector('.modal-sheet')?.setAttribute('aria-label', 'Карточка продукта: ' + (initial.name || 'Продукт'));
+  layer.querySelector('.modal-sheet')?.setAttribute('aria-label', 'Карточка складской единицы: ' + (initial.name || 'Складская единица'));
 
   const render = () => {
     const item = getInventoryItem(itemId);
@@ -358,7 +358,7 @@ export function openInventoryProductOverview(itemId, { edit = () => {}, onChange
       actionBlock(
         button('Добавить', {
           variant: 'secondary', data: 'data-inventory-supplier-add', aria: 'Связать с контрагентом',
-        }) + button('Удалить продукт', {
+        }) + button('Удалить складскую единицу', {
           variant: 'critical', data: 'data-inventory-product-delete',
         }),
       ),
