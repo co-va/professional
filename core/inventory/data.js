@@ -16,6 +16,8 @@ let snapshot = {
   lots: [],
   movements: [],
   orders: [],
+  supplierClaims: [],
+  supplierClaimSettlements: [],
   classificationGroups: [],
   storageLocations: [],
 };
@@ -30,6 +32,8 @@ export function applyInventorySnapshot(value = {}) {
     lots: asArray(value?.lots),
     movements: asArray(value?.movements),
     orders: asArray(value?.orders),
+    supplierClaims: asArray(value?.supplierClaims),
+    supplierClaimSettlements: asArray(value?.supplierClaimSettlements),
     classificationGroups: asArray(value?.classificationGroups),
     storageLocations: asArray(value?.storageLocations),
   };
@@ -67,6 +71,10 @@ export function getInventoryMovement(movementId) {
 
 export function getInventoryOrders() {
   return snapshot.orders;
+}
+
+export function getInventorySupplierClaims(orderId = '') {
+  return snapshot.supplierClaims.filter(claim => !orderId || claim.orderId === orderId);
 }
 
 export function getInventoryOrder(orderId) {
