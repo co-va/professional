@@ -1,5 +1,5 @@
 import { apiRequest } from '../auth.js';
-import { applyInventorySnapshot, getInventoryItem, getInventorySnapshot, setInventoryCriteriaCatalog } from './data.js';
+import { applyInventorySnapshot, getInventoryItem, getInventoryItems, getInventoryCriteria, getInventorySnapshot, setInventoryCriteriaCatalog } from './data.js';
 
 const SERVER_ORDER_UNAVAILABLE = 'Сервер склада ещё не обновлён. Порядок не сохранён.';
 
@@ -302,3 +302,55 @@ export const previewInventoryCriteriaRecovery = rows =>
   criteriaRecoveryRequest('preview', { rows });
 export const applyInventoryCriteriaRecovery = changes =>
   criteriaRecoveryRequest('apply', { changes });
+
+/**
+ * Remove a criterion value and release its assignments through the existing
+ * per-item Core PATCH endpoint. Never delete any stock item or movement.
+ * No new backend endpoint, migration or shared UI dependency.
+ *
+ * This is intentionally serial and retryable. Since Core does not expose a
+ * transactional detach-and-archive operation, failures must be reported:
+ * successful earlier detaches cannot be rolled back by the browser.
+ */
+export async function removeInventoryCriterionValueAndAssignments(group, value) {
+  if (!group?.id || !value?.id) throw new Error('Значение не найдено.');
+  await Promise.all([loadInventory(), loadInventoryCriteria()]);
+  const liveGroup = (getInventoryCriteria() || []).find(entry => entry.id === group.id);
+  const liveValue = liveGroup?.values?.find(entry => entry.id === value.id);
+  if (!liveValue || liveValue.name !== value.name) {
+    throw new Error('Значение изменилось. Обновите список и повторите удаление.');
+  }
+  const field = liveGroup.legacyField;
+  const assigned = item => field
+    ? String(item?.[field] ?? '').trim() === liveValue.name
+    : String(item?.criteriaValues?.[liveGroup.id] ?? '') === liveValue.id;
+  const affected = getInventoryItems().filter(assigned).map(item => item.itemId);
+  let released = 0;
+  for (const itemId of affected) {
+    const item = getInventoryItem(itemId);
+    if (!item || !assigned(item)) continue;
+    try {
+      await updateInventoryItem(itemId, field
+        ? { [field]: '' }
+        : { criteriaValues: { [liveGroup.id]: '' } });
+      released++;
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : 'Ошибка сохранения.';
+      throw new Error('Снято назначений: ' + released + ' из ' + affected.length +
+        '. Удаление не завершено; повторите действие. ' + detail);
+    }
+  }
+  // Recheck the canonical Core snapshot before archiving the dictionary value.
+  await loadInventory();
+  if (getInventoryItems().some(assigned)) {
+    throw new Error('Часть назначений ещё используется. Обновите список и повторите удаление.');
+  }
+  try {
+    const groups = await updateInventoryCriterionValue(liveGroup.id,liveValue.id,{archived:true});
+    return { groups, released };
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : 'Ошибка сохранения.';
+    throw new Error('Назначения сняты (' + released +
+      '), но значение ещё не удалено. Повторите действие. ' + detail);
+  }
+}
