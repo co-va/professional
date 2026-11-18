@@ -83,7 +83,7 @@ function consumptionUnitCost(item) {
   return factor==null ? '' : money(base*factor) + '/' + usage;
 }
 
-function actualInventoryConsumption(item) {
+function actualInventoryConsumption(item, stockScope = INVENTORY_TOTAL_SCOPE) {
   const movements=getInventoryMovements();
   // Core currently sends at most the latest 600 movements. At the limit the
   // sum may be partial; an empty display is safer than a false lifetime total.
@@ -97,6 +97,7 @@ function actualInventoryConsumption(item) {
     if (!consumption) continue;
     for(const line of movement.lines || []) {
       if(line.itemId!==item.itemId)continue;
+      if(stockScope!==INVENTORY_TOTAL_SCOPE && (line.storageLocationId || 'primary')!==stockScope)continue;
       const amount=Number(line.quantity);
       if(!Number.isFinite(amount)||amount<0)continue;
       used+=line.direction==='OUT'?amount:-amount;
@@ -133,7 +134,7 @@ function productCardFields(item, stockScope = INVENTORY_TOTAL_SCOPE) {
     ['basePrice', 'Закупочная цена со скидкой', money(purchasePrice)],
     ['storage', 'Склад', stockScopeName(stockScope)],
     ['balance', 'Остаток', num(inventoryDisplayBalance(item, stockScope)) + ' ' + (item.unit||'')],
-    ['consumption', 'Расход', actualInventoryConsumption(item)],
+    ['consumption', 'Расход', actualInventoryConsumption(item, stockScope)],
     ['baseUnitPrice', 'Себестоимость единицы расхода', consumptionUnitCost(item)],
     ['saleIndicator', 'Продажа', item.canSell===true ? 'Продажа ☑' : 'Продажа ☐'],
   ];

@@ -43,7 +43,8 @@ import { openInventoryProductAppearanceQ, openInventoryProductOverview } from '.
 import { renderInventoryOrders } from './orders.js';
 import { classificationOptions, openInventoryClassificationGroups,
   inventoryCriterionGroups, criterionOptions } from './classification.js';
-import { openInventoryStorageLocations, openInventoryTransfer, reconcileLegacyInventoryStorage } from './storage.js';
+import { openInventoryStorageLocations, reconcileLegacyInventoryStorage } from './storage.js';
+import { openInventoryTransfer } from './movement-transfer.js';
 import { renderStockBrandList, buildStockCatalogGroups } from './stock-catalog.js';
 import { catalogDisclosure } from './catalog-ui.js';
 import { INVENTORY_TOTAL_SCOPE, inventoryDisplayBalance, inventoryDisplayTarget,
@@ -1246,6 +1247,11 @@ function openMovementEditor(root, movementId = '', kind = 'CONSUMPTION', { recor
     return;
   }
   let actualKind = movement?.kind || kind;
+  if (correcting && movement.lines?.some(line =>
+    (line.storageLocationId || 'primary') !== 'primary')) {
+    openNotice({ title: 'Движения', message: 'Операция по конкретному складу исправляется новым компенсирующим движением.' });
+    return;
+  }
   const originalLines = new Map((movement?.lines || []).map(line => [line.itemId, line]));
   const selected = new Set(originalLines.keys());
   const recordLabel = [record?.personUei, record?.personName].map(value => String(value || '').trim()).filter(Boolean).join(' · ');
@@ -1274,6 +1280,7 @@ function openMovementEditor(root, movementId = '', kind = 'CONSUMPTION', { recor
         { value: '', label: 'Операция' },
         { value: 'RECEIPT', label: 'Приход' },
         { value: 'CONSUMPTION', label: 'Расход' },
+        { value: 'TRANSFER', label: 'Перемещение' },
         { value: 'WRITE_OFF', label: 'Списание' },
         { value: 'RETURN', label: 'Возврат' },
         ...(canUseCapability('inventory.stocktake.access')
@@ -1313,6 +1320,11 @@ function openMovementEditor(root, movementId = '', kind = 'CONSUMPTION', { recor
   };
   selectionLayer.addEventListener('change', event => {
     if (event.target.matches?.('input[name="movementKind"]')) {
+      if (event.target.value === 'TRANSFER') {
+        selectionLayer.v2Close?.();
+        openInventoryTransfer(() => renderMovements(root));
+        return;
+      }
       if (event.target.value === 'ADJUSTMENT' && canUseCapability('inventory.stocktake.access')) {
         selectionLayer.v2Close?.();
         openInventoryAuditSelection(root, { onSaved: () => renderMovements(root) });
@@ -1401,7 +1413,22 @@ function openMovementEditor(root, movementId = '', kind = 'CONSUMPTION', { recor
           : quantityInput}
       </section>`;
     }).join('');
+    // This selector belongs to Movements, not the Stock card or Orders.
+    // A record's workplace may preselect a location only on an exact match.
+    const places = inventoryLocations();
+    const recordedPlace = places.find(place =>
+      String(place.locationId) === String(record?.workplaceKey || '') ||
+      (!place.isPrimary && String(storageName(place)).trim().toLocaleLowerCase('ru-RU') ===
+        String(record?.workplaceKey || '').trim().toLocaleLowerCase('ru-RU')));
+    const scopedPlace = places.find(place => place.locationId === STOCK_VIEW.storageScope);
+    const initialPlace = recordedPlace?.locationId || (record ? '' : scopedPlace?.locationId || '');
+    const placeSelector = !correcting ? select({
+      label: 'Склад', name: 'storageLocationId', value: initialPlace,
+      options: [{ value: '', label: 'Выберите склад' },
+        ...places.map(place => ({ value: place.locationId, label: storageName(place) }))],
+    }) : '';
     const editorMarkup = `<form class="form-grid" data-inventory-movement-form>
+      ${placeSelector}
       ${actualKind === 'RECEIPT' && !correcting ? field({
         label: 'Поставщик', name: 'supplier', placeholder: 'Необязательно',
       }) : ''}
@@ -1473,6 +1500,11 @@ function openMovementEditor(root, movementId = '', kind = 'CONSUMPTION', { recor
       if (!lines.length) { errorHost.textContent = 'Выберите материалы.'; return; }
       const values = new FormData(form);
       const note = String(values.get('note') || '').trim();
+      const selectedPlace = String(values.get('storageLocationId') || '').trim();
+      if (!correcting && !inventoryLocations().some(place => place.locationId === selectedPlace)) {
+        errorHost.textContent = 'Выберите склад, на котором выполняется операция.';
+        return;
+      }
       const occurredAt = !correcting ? inventoryOccurredAt(values.get('occurredDate')) : null;
       if (!correcting && !occurredAt) {
         errorHost.textContent = 'Укажите корректную дату операции.';
@@ -1480,6 +1512,7 @@ function openMovementEditor(root, movementId = '', kind = 'CONSUMPTION', { recor
       }
       saveButton.disabled = true;
       try {
+        if (!correcting) lines.forEach(line => { line.storageLocationId = selectedPlace; });
         if (correcting) {
           await correctInventoryMovement(movement.movementId, { lines, note });
         } else {
@@ -2031,7 +2064,9 @@ function openMovementDetails(root, movementId) {
   if (!movement) return;
   // The journal is the V2 list. An opened movement is a detail card, never a second list.
   const lines = details((movement.lines || []).map(line => ({
-    left: line.name || getInventoryItem(line.itemId)?.name || 'Позиция',
+    left: [line.name || getInventoryItem(line.itemId)?.name || 'Позиция',
+      movement.kind === 'TRANSFER' ? storageName(inventoryLocations().find(
+        place => place.locationId === (line.storageLocationId || 'primary'))) : ''].filter(Boolean).join(' · '),
     right: `${movementSign(line)}${numberText(line.quantity)} ${line.unit || getInventoryItem(line.itemId)?.unit || ''}`,
   })), { variant: 'split' });
   const physicalAudit = movement.kind === 'ADJUSTMENT' &&
@@ -2858,6 +2893,8 @@ function renderStock(root) {
           openInventoryClassificationGroups(refresh)},
         {id:'storage',label:'Склады',onSelect:()=>
           openInventoryStorageLocations(()=>renderStock(root))},
+        {id:'transfer',label:'Перемещение',onSelect:()=>
+          openInventoryTransfer(()=>renderStock(root))},
       ],
     });
   });
