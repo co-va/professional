@@ -846,7 +846,7 @@ function catalogItemList(items = [], selectedCatalogIds = new Set(), linkedCatal
 function catalogExcludedGroups(entries, companyName, selected, linked, matched, statuses, lookup) {
   const groupName = value => {
     const name = String(value ?? '').trim();
-    return /^(?:лист|sheet)\\s*[-_№#]?\\s*\\d+(?:\\s*\\(\\d+\\))?$/iu.test(name) ? '' : name;
+    return /^(?:лист|sheet)\s*[-_№#]?\s*\d+(?:\s*\(\d+\))?$/iu.test(name) ? '' : name;
   };
   const normalized = entries.map(row => ({
     ...row,
