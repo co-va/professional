@@ -43,7 +43,7 @@ for (const [filter, expected] of cases) {
  assert.deepEqual(items.map(item=>matchesStockFilters(item,{...emptyStockFilters(),...filter})),expected,
    'Filter mismatch '+JSON.stringify(filter));
 }
-assert.match(ui,/matchesStockFilters\(item, STOCK_VIEW\.itemsFilters, classificationGroups\)/);
+assert.match(ui,/matchesStockFilters\(item, STOCK_VIEW\.itemsFilters, classificationGroups, storageLocations\)/);
 const nested = [
   {groupId:'parent',parentGroupId:'',name:'Краски'},
   {groupId:'child',parentGroupId:'parent',name:'Окислители'},
