@@ -81,6 +81,34 @@ function stockRow(item, selected, scope) {
     }]}) + '</div>';
 }
 
+/**
+ * Visual sections only: category -> type -> visible item rows.
+ * No disclosure state, extra category API, or change to persisted item data.
+ */
+export function stockGroupedSections(items, selected = new Set(), scope = INVENTORY_TOTAL_SCOPE) {
+  const categories = new Map();
+  for (const item of items) {
+    const category = name(item.category) || 'Без категории';
+    const type = name(item.productType) || 'Без типа';
+    if (!categories.has(category)) categories.set(category,new Map());
+    const types = categories.get(category);
+    if (!types.has(type)) types.set(type,[]);
+    types.get(type).push(item);
+  }
+  return '<div class="inventory-counterparty-product-list">' +
+    [...categories.entries()].sort(([a],[b])=>compare(a,b)).map(([category,types])=>{
+      const count=[...types.values()].reduce((sum,rows)=>sum+rows.length,0);
+      return '<section class="inventory-stock-category">' +
+        '<div class="inventory-stock-category-heading"><strong>' + escapeHtml(category) +
+        '</strong><small>' + count + ' поз.</small></div>' +
+        [...types.entries()].sort(([a],[b])=>compare(a,b)).map(([type,rows])=>
+          '<div class="inventory-stock-type-heading"><span>'+escapeHtml(type)+
+          '</span><small>'+rows.length+' поз.</small></div>' +
+          rows.map(item=>stockRow(item,selected,scope)).join('')
+        ).join('') + '</section>';
+    }).join('') + '</div>';
+}
+
 export function openStockCatalogBrand(brand, options = {}) {
   const {
     scope = INVENTORY_TOTAL_SCOPE,
@@ -136,8 +164,7 @@ export function openStockCatalogBrand(brand, options = {}) {
           item.category,item.productType].some(value=>
           name(value).toLocaleLowerCase('ru-RU').includes(term))) : brand.items;
       products.innerHTML=items.length
-        ? '<div class="inventory-counterparty-product-list">' +
-          items.map(item=>stockRow(item,selected,scope)).join('') + '</div>'
+        ? stockGroupedSections(items,selected,scope)
         : emptyState(term ? 'Товар не найден' : 'В этой группе пока нет товаров');
       products.querySelectorAll('[data-stock-item-check]').forEach(node=>{
         node.addEventListener('change',()=>{
