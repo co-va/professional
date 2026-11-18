@@ -1,5 +1,5 @@
 import { apiRequest } from '../auth.js';
-import { applyInventorySnapshot, getInventoryItem, getInventorySnapshot } from './data.js';
+import { applyInventorySnapshot, getInventoryItem, getInventorySnapshot, setInventoryCriteriaCatalog } from './data.js';
 
 const SERVER_ORDER_UNAVAILABLE = 'Сервер склада ещё не обновлён. Порядок не сохранён.';
 
@@ -257,3 +257,26 @@ export function updateInventoryStockTargets(itemId, value) {
     method: 'PUT', body: JSON.stringify(value),
   });
 }
+
+async function criteriaRequest(path = '', method = 'GET', data = null) {
+  const response = await apiRequest('/inventory/criteria' + path, {
+    method,
+    ...(data === null ? {} : { body: JSON.stringify(data) }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const message = Array.isArray(payload.message) ? payload.message.join('; ')
+      : typeof payload.message === 'string' ? payload.message : '';
+    throw new Error(message || 'Не удалось сохранить классификацию склада.');
+  }
+  if (!Array.isArray(payload)) throw new Error('Сервер не вернул справочник групп.');
+  return setInventoryCriteriaCatalog(payload);
+}
+export const loadInventoryCriteria = () => criteriaRequest();
+export const createInventoryCriterion = name => criteriaRequest('', 'POST', { name });
+export const updateInventoryCriterion = (id, patch) => criteriaRequest('/' + encodeURIComponent(id), 'PUT', patch);
+export const createInventoryCriterionValue = (id, name) =>
+  criteriaRequest('/' + encodeURIComponent(id) + '/values', 'POST', { name });
+export const updateInventoryCriterionValue = (id, valueId, patch) =>
+  criteriaRequest('/' + encodeURIComponent(id) + '/values/' + encodeURIComponent(valueId), 'PUT', patch);
+
