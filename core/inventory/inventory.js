@@ -669,11 +669,11 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
   const markup = `
     <form data-inventory-item-form>
       ${advancedItemFields(draft, defaults)}
-      ${actionBlock(button(creating ? 'Применить' : 'Сохранить', { type: 'button', data: 'data-inventory-item-save', aria: creating ? 'Добавить продукт' : 'Сохранить продукт' }))}
+      ${actionBlock(button(creating ? 'Применить' : 'Сохранить', { type: 'button', data: 'data-inventory-item-save', aria: creating ? 'Добавить складскую единицу' : 'Сохранить складскую единицу' }))}
       <div class="form-error" data-inventory-item-save-error role="alert" hidden></div>
     </form>`;
   const layer = mountModal(document.body, modal(markup, {
-    title: creating ? 'Новый продукт' : item.name,
+    title: creating ? 'Новая складская единица' : item.name,
     variant: 'q',
     surface: 'app',
   }));
