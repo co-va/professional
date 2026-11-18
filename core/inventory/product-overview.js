@@ -1,6 +1,6 @@
 import {
   actionBlock, button, emptyState, entityCardDefaultRows, entityVisualCard, field,
-  modal, mountModal, openEntityCardAppearanceQ, openNotice,
+  modal, mountModal, openEntityCardAppearanceQ, openNotice, openSharedProfileSettingsMenu,
   page, select, twoColumnLayout, v2ListEntries, v2ListEntry, v2Section,
   workspaceHeaderContext,
 } from '../../ui/ui.js';
@@ -415,7 +415,10 @@ export function openInventoryProductOverview(itemId, { edit = () => {}, onChange
     const host = layer.querySelector('[data-inventory-product-overview]');
     if (!host) return;
     host.innerHTML = page([
-      workspaceHeaderContext({ title: item.name }),
+      workspaceHeaderContext({
+        title: item.name,
+        v: { data: 'data-inventory-product-menu', aria: 'Действия с товаром' },
+      }),
       productCard(item, stockScope),
       v2Section('Остатки', locationOverview(item) +
         actionBlock(button('Настроить', {
@@ -423,13 +426,9 @@ export function openInventoryProductOverview(itemId, { edit = () => {}, onChange
           aria: 'Настроить желаемые остатки по складам',
         }))),
       v2Section('Поставщики', supplierRows(item)),
-      actionBlock(
-        button('Добавить', {
-          variant: 'secondary', data: 'data-inventory-supplier-add', aria: 'Связать с контрагентом',
-        }) + button('Удалить складскую единицу', {
-          variant: 'critical', data: 'data-inventory-product-delete',
-        }),
-      ),
+      actionBlock(button('Добавить', {
+        variant: 'secondary', data: 'data-inventory-supplier-add', aria: 'Связать с контрагентом',
+      })),
     ]);
     host.querySelector('[data-inventory-product-card]')?.addEventListener('click', () => {
       edit(() => {
@@ -450,8 +449,16 @@ export function openInventoryProductOverview(itemId, { edit = () => {}, onChange
         onChanged();
       });
     }));
-    host.querySelector('[data-inventory-product-delete]')?.addEventListener('click', () => {
-      confirmProductDelete(itemId, layer, onChanged);
+    host.querySelector('[data-inventory-product-menu]')?.addEventListener('click', () => {
+      openSharedProfileSettingsMenu({
+        title: 'Складская единица',
+        actions: [{
+          id: 'archive-item',
+          label: 'Удалить складскую единицу',
+          variant: 'critical',
+          onSelect: () => confirmProductDelete(itemId, layer, onChanged),
+        }],
+      });
     });
     window.dispatchEvent(new CustomEvent('va-tools:v2-context-changed'));
   };

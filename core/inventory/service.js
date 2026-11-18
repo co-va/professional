@@ -52,6 +52,12 @@ export async function updateInventoryItem(itemId, value = {}) {
       ? { ...value, expectedPosition: Number(previous?.position) || 0 } : value),
     verifySnapshot: payload => {
       const saved = snapshotItem(payload, itemId);
+      // Archived items intentionally disappear from the active stock snapshot.
+      // Their absence confirms that Core committed the archive operation.
+      if (value.archived === true) {
+        if (saved) throw new Error('Сервер не подтвердил удаление складской единицы.');
+        return;
+      }
       if (!saved) throw new Error('Сервер не подтвердил сохранение товара.');
       if (positionChanged && Number(saved.position) !== expected)
         throw new Error('Номер не сохранился. ' + SERVER_ORDER_UNAVAILABLE);
