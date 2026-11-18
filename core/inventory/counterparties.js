@@ -2,7 +2,7 @@ import {
   actionBlock, button, emptyState, field, modal, mountModal, openNotice,
   page, select, list, v2ListEntries, v2ListEntry, v2Section, workspaceHeaderContext,
   mountV2ZLayer, v2ZLayer, openSharedProfileSettingsMenu,
-  entityVisualCard, entityCardStack, openEntityCardAppearanceQ,
+  entityVisualCard, entityCardStack, openEntityCardAppearanceQ, normalizeEntityCardAppearance,
 } from '../../ui/ui.js';
 import { escapeHtml } from '../../ui/utils/escape-html.js';
 import { compactCheck } from '../../ui/selection/check-list.js';
@@ -21,7 +21,7 @@ const COUNTERPARTY_CARD_DEFAULT = {
   lines: [
     {}, {}, {}, {}, {},
     { field: 'name', zone: 'full', align: 'left', size: 'xl', color: 'white', bold: true },
-    {},
+    { field: 'discountPercent', zone: 'full', align: 'left', size: 'm', color: 'white' },
     { field: 'kind', zone: 'full', align: 'left', size: 'm', color: 'white' },
     { field: 'files', zone: 'right', align: 'right', size: 'm', color: 'white' },
   ],
@@ -1251,11 +1251,35 @@ function counterpartyCardFields(company = {}) {
     { value: 'phone', label: 'Телефон', text: company.phone || '' },
     { value: 'email', label: 'Email', text: company.email || '' },
     { value: 'website', label: 'Сайт', text: company.website || '' },
+    { value: 'discountPercent', label: 'Скидка по договору',
+      text: company.discountPercent == null ? 'Скидка по договору: не указана'
+        : 'Скидка по договору: ' + Number(company.discountPercent)
+          .toLocaleString('ru-RU', { maximumFractionDigits: 4 }) + '%' },
   ];
 }
 
 function counterpartyCardAppearance() {
-  return getCardAppearanceTemplate(COUNTERPARTY_CARD_SCOPE)?.appearance || COUNTERPARTY_CARD_DEFAULT;
+  const saved = getCardAppearanceTemplate(COUNTERPARTY_CARD_SCOPE)?.appearance;
+  if (!saved) return COUNTERPARTY_CARD_DEFAULT;
+  // Existing user layouts stay intact: fill only one empty cell for the new
+  // supplier discount; never move or replace a configured card field.
+  const appearance = normalizeEntityCardAppearance(saved);
+  const columns = ['left', 'center', 'right'];
+  if (appearance.lines.some(row => columns.some(col => row.cells[col].field === 'discountPercent')))
+    return appearance;
+  const preferred = [[6, 'left'], [6, 'right'], [6, 'center']];
+  for (let i = 8; i >= 0; i--) for (const column of columns)
+    if (!preferred.some(([row, col]) => row === i && col === column))
+      preferred.push([i, column]);
+  const spot = preferred.find(([row, column]) => !appearance.lines[row].cells[column].field);
+  if (spot) {
+    const [row, column] = spot;
+    appearance.lines[row].cells[column] = {
+      ...appearance.lines[row].cells[column],
+      field: 'discountPercent', size: 'm', color: '#FFFFFF',
+    };
+  }
+  return appearance;
 }
 
 function openCounterpartyAppearance(root, sample, onSaved = () => {}) {
