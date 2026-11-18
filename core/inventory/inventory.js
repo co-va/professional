@@ -939,28 +939,27 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
     const consumption = usage === 'consume' || usage === 'both';
     const consumptionUnit = consumption ? String(data.get('consumeUnit') || unit) : null;
     const saleUnit = sale ? String(data.get('saleUnit') || unit) : null;
+    // The only required field for a new catalog item is its name.
+    // Receipt mode and package contents are optional and can be completed
+    // later. Never fabricate package quantities for an unselected mode.
     const receiptUnit = String(data.get('receiptUnit') || '') || null;
-    if (!receiptUnit || !['шт.', 'уп.'].includes(receiptUnit)
-        && (creating || receiptUnit !== item?.receiptUnit)) {
-      openNotice({ title: 'Ед. прихода', message: 'Выберите штуку или упаковку.' });
-      return;
-    }
     const packUnit = receiptUnit === 'уп.' ? String(data.get('packContentUnit') || 'шт.') : null;
     const packAmount = receiptUnit === 'уп.' ? collectOptionalNumber(form, 'packContentQuantity') : 1;
     const bulk = receiptUnit === 'уп.' && packUnit !== 'шт.';
-    if (receiptUnit === 'уп.' && !(packAmount > 0)) {
-      openNotice({ title: 'В упаковке', message: 'Укажите число штук, вес или объём содержимого.' });
+    if (packAmount != null && receiptUnit === 'уп.' && packAmount <= 0) {
+      openNotice({ title: 'В упаковке', message: 'Количество должно быть больше нуля.' });
       return;
     }
-    if (receiptUnit === 'уп.' && packUnit === 'шт.'
-        && (!Number.isSafeInteger(packAmount) || packAmount < 2)) {
-      openNotice({ title: 'В упаковке', message: 'Для многоштучной упаковки укажите целое число от двух штук.' });
+    if (receiptUnit === 'уп.' && packUnit === 'шт.' && packAmount != null
+        && (!Number.isSafeInteger(packAmount) || packAmount < 1)) {
+      openNotice({ title: 'В упаковке', message: 'Укажите целое число штук.' });
       return;
     }
-    // One bulk pack has a weight/volume. This is not the nominal of a
-    // separate physical piece; the UI never asks for it a second time.
+    // Keep the incomplete bulk-package fields unset instead of forcing
+    // the owner to invent a nominal just to save the item.
     const nominalQuantity = bulk ? packAmount : collectOptionalNumber(form, 'nominalQuantity');
-    const nominalUnit = bulk ? packUnit : String(data.get('nominalUnit') || '') || null;
+    const nominalUnit = bulk ? (packAmount == null ? null : packUnit)
+      : String(data.get('nominalUnit') || '') || null;
     if ((nominalQuantity == null) !== (nominalUnit == null) || nominalQuantity != null && nominalQuantity <= 0) {
       openNotice({ title: 'Номинал', message: 'Укажите и число, и единицу — либо оставьте оба поля пустыми.' });
       return;
@@ -1041,8 +1040,10 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
     // The product may be created before a sale price is known.
     const resourceEnabled = String(data.get('resourceEnabled')) === '1';
     const resourceLimit = resourceEnabled ? collectOptionalNumber(form, 'resourceLimit') : null;
-    if (resourceEnabled && !(resourceLimit > 0)) {
-      openNotice({ title: 'Ресурс', message: 'Укажите положительный ресурс.' }); return;
+    // Resource tracking is optional even if its section is opened.
+    // A blank resource is not an obligation to fill it on item creation.
+    if (resourceEnabled && resourceLimit != null && !(resourceLimit > 0)) {
+      openNotice({ title: 'Ресурс', message: 'Ресурс должен быть больше нуля.' }); return;
     }
     const periodEnabled = String(data.get('periodEnabled')) === '1';
     const startDate = periodEnabled ? String(data.get('serviceStartAt') || '') : '';
@@ -1083,12 +1084,14 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
       saleMarkupValue: sale ? markup.value : null,
       salePrice: sale ? enteredPrice ?? calculatedPrice : null,
       resourceLimit,
-      resourceUnit: resourceEnabled ? String(data.get('resourceUnit') || 'проц.') : null,
+      resourceUnit: resourceEnabled && resourceLimit != null
+        ? String(data.get('resourceUnit') || 'проц.') : null,
       // One item is retired per completed resource cycle; the backend
       // counts finished cycles and carries the unfinished portion forward.
-      resourceStockQuantity: resourceEnabled
+      resourceStockQuantity: resourceEnabled && resourceLimit != null
         && String(data.get('resourceExhaustionAction') || 'REVIEW') === 'WRITE_OFF' ? 1 : null,
-      resourceExhaustionAction: resourceEnabled ? String(data.get('resourceExhaustionAction') || 'REVIEW') : null,
+      resourceExhaustionAction: resourceEnabled && resourceLimit != null
+        ? String(data.get('resourceExhaustionAction') || 'REVIEW') : null,
       serviceStartAt: startDate || null,
       serviceEndAt: endDate || null,
     };
