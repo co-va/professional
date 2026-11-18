@@ -3,10 +3,6 @@ import { getInventoryItems, getInventoryStorageLocations } from './data.js';
 import { createInventoryStorageLocation, updateInventoryStorageLocation } from './service.js';
 
 const locations = () => getInventoryStorageLocations().filter(item => item && !item.archivedAt);
-const options = () => locations().map(location => ({
-  value: location.locationId, label: location.isPrimary ? 'Не распределено' : location.name,
-}));
-
 // Legacy Excel inventories already had a warehouse for every position in
 // InventoryItem.location. The new location table was introduced without
 // importing those names. Reconcile them once via the existing Core storage

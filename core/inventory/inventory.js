@@ -246,7 +246,7 @@ function movementTitle(movement = {}) {
   if (movement.kind === 'WRITE_OFF') return 'Списание';
   if (movement.kind === 'TRANSFER') return 'Перемещение';
   if (movement.kind === 'SALE') return 'Продажа';
-  if (movement.kind === 'RETURN') return 'Возврат';
+  if (movement.kind === 'RETURN') return 'Возврат на склад';
   if (movement.kind === 'ADJUSTMENT') return 'Инвентаризация';
   if (movement.kind === 'CORRECTION') return 'Корректировка';
   return 'Движение';
@@ -1282,7 +1282,7 @@ function openMovementEditor(root, movementId = '', kind = 'CONSUMPTION', { recor
         { value: 'CONSUMPTION', label: 'Расход' },
         { value: 'TRANSFER', label: 'Перемещение' },
         { value: 'WRITE_OFF', label: 'Списание' },
-        { value: 'RETURN', label: 'Возврат' },
+        { value: 'RETURN', label: 'Возврат на склад' },
         ...(canUseCapability('inventory.stocktake.access')
           ? [{ value: 'ADJUSTMENT', label: 'Инвентаризация' }] : []),
       ],
@@ -1319,7 +1319,7 @@ function openMovementEditor(root, movementId = '', kind = 'CONSUMPTION', { recor
     nextButton.disabled = selected.size === 0;
   };
   selectionLayer.addEventListener('change', event => {
-    if (event.target.matches?.('input[name="movementKind"]')) {
+    if (event.target.matches?.('[name="movementKind"]')) {
       if (event.target.value === 'TRANSFER') {
         selectionLayer.v2Close?.();
         openInventoryTransfer(() => renderMovements(root));
@@ -2076,7 +2076,7 @@ function openMovementDetails(root, movementId) {
     ${movement.personUei ? `<p>${escapeHtml(movement.personUei)}</p>` : ''}
     ${movementSubtitle(movement) ? `<p>${escapeHtml(movementSubtitle(movement))}</p>` : ''}
     ${lines}
-    ${physicalAudit ? '' : actionBlock(button('Исправить', { data: 'data-inventory-movement-correct' }))}
+    ${physicalAudit || movement.kind === 'TRANSFER' ? '' : actionBlock(button('Исправить', { data: 'data-inventory-movement-correct' }))}
   </div>`;
   const layer = mountModal(root, modal(markup, { title: movementTitle(movement), variant: 'q' }));
   layer?.querySelector('[data-inventory-movement-correct]')?.addEventListener('click', () => {
