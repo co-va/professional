@@ -4,7 +4,7 @@ import { normalizeEntityCardAppearance, entityVisualCard } from '../../ui/cards/
 
 const source = readFileSync('core/inventory/counterparties.js', 'utf8');
 const part = source.slice(source.indexOf('function supplierEffectivePrice('),
-  source.indexOf('function openSupplierBatchPrices('));
+  source.indexOf('const SUPPLIER_CATALOG_EDIT_FIELDS ='));
 assert.ok(part.startsWith('function supplierEffectivePrice('), 'Supplier price calculation exists');
 const { supplierEffectivePrice, supplierDiscount } = new Function(part +
   '\nreturn {supplierEffectivePrice,supplierDiscount};')();
