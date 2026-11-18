@@ -3,7 +3,7 @@ import { inventoryStockBalanceInThresholdUnits } from './completeness.js';
 // One compound filter for canonical InventoryItem fields. No custom visual
 // controls: the Stock section renders this model via shared Select/Field.
 export const EMPTY_STOCK_FILTERS = Object.freeze({
-  type: '', category: '', group: '', unit: '', usage: '',
+  type: '', category: '', group: '', location: '', unit: '', usage: '',
   supplier: '', availability: '', price: '', tare: '',
   name: '', sku: '', barcode: '', position: '', minStock: '',
   targetStock: '', packageQuantity: '', grossWeight: '',
@@ -30,7 +30,7 @@ const supplierNames = item => [
 const usageCode = item => item.canConsume !== false && item.canSell === true ? 'both'
   : item.canConsume !== false ? 'consume' : item.canSell === true ? 'sale' : 'track';
 
-export function matchesStockFilters(item = {}, filters = {}, classificationGroups = []) {
+export function matchesStockFilters(item = {}, filters = {}, classificationGroups = [], storageLocations = []) {
   if (filters.group) {
     const byId = new Map(classificationGroups.map(group => [String(group.groupId), group]));
     let id = String(item.classificationGroupId || '');
@@ -46,6 +46,17 @@ export function matchesStockFilters(item = {}, filters = {}, classificationGroup
   const typeValue = isPresence(filters.type) ? item.productType : item.productType || item.category;
   if (!matchesChoice(typeValue, filters.type)) return false;
   if (!matchesChoice(item.category, filters.category)) return false;
+  if (filters.location) {
+    const stored = Array.isArray(item.locationBalances) ? item.locationBalances : [];
+    const occupied = stored.filter(row => Number(row.balance) > 0);
+    if (isPresence(filters.location)) {
+      if (!matchesPresence(item.location || (occupied.length ? 'Есть' : ''), filters.location))
+        return false;
+    } else if (!matchesChoice(item.location, filters.location)
+      && !occupied.some(row => norm(row.locationId) === norm(filters.location)
+        || storageLocations.some(place => place.locationId === row.locationId
+          && norm(place.name) === norm(filters.location)))) return false;
+  }
   if (!matchesChoice(item.unit, filters.unit)) return false;
   if (filters.usage && usageCode(item) !== filters.usage) return false;
   const suppliers = supplierNames(item);
