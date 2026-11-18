@@ -65,6 +65,7 @@ import {
   createInventoryMovement,
   loadInventory,
   loadInventoryCriteria,
+  reorderInventoryCriterionValues,
   updateInventoryItem,
   reorderInventoryItems,
 } from './service.js';
@@ -2606,11 +2607,25 @@ function renderStock(root) {
     || root.querySelector('[name="inventoryStockScope"]');
   // Companies are navigated directly; no search or filter on Z1.
   const visibleRows=()=>getInventoryItems();
+  let disposeBrandReorder=()=>{};
   const refresh=()=>{
+    disposeBrandReorder();
     const locationId=STOCK_VIEW.storageScope;
-    renderStockBrandList(listHost,visibleRows(),{
+    const manufacturer=inventoryCriterionGroups().find(group=>group.legacyField==='manufacturer');
+    disposeBrandReorder=renderStockBrandList(listHost,visibleRows(),{
       scope:locationId,
       itemsForView:visibleRows,
+      brandValues:manufacturer?.values||[],
+      onReorder:async ids=>{
+        if(manufacturer)await reorderInventoryCriterionValues(manufacturer.id,ids);
+      },
+      onReorderError:error=>{
+        if(!listHost?.isConnected)return;
+        const message=document.createElement('div');
+        message.className='form-error';
+        message.textContent=error instanceof Error?error.message:'Порядок компаний не сохранился.';
+        listHost.prepend(message);
+      },
       onOpen:(itemId,onRefresh)=>{
         openInventoryProductOverview(itemId,{
           edit:(saved)=>openItemEditor(root,itemId,{},saved),
