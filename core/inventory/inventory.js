@@ -50,6 +50,7 @@ import {
   getInventoryItem,
   getInventoryItems,
   getInventoryClassificationGroups,
+  getInventoryStorageLocations,
   getInventoryMovement,
   getInventoryMovements,
 } from './data.js';
@@ -1531,9 +1532,10 @@ function stockListMarkup(manufacturer, query = '') {
   const needle = normalizedSearch(query);
   const group = getInventoryItems().filter(item => manufacturerName(item) === manufacturer);
   const classificationGroups = getInventoryClassificationGroups();
+  const storageLocations = getInventoryStorageLocations();
   const items = sortItems(group.filter((item) => {
     if (!matchesType(item, STOCK_VIEW.itemsType)
-      || !matchesStockFilters(item, STOCK_VIEW.itemsFilters, classificationGroups)) return false;
+      || !matchesStockFilters(item, STOCK_VIEW.itemsFilters, classificationGroups, storageLocations)) return false;
     return !needle || itemSearchText(item).includes(needle);
   }), STOCK_VIEW.itemsSort);
   if (!items.length) return emptyState('Ничего не найдено', 'Измените поиск или фильтр.');
@@ -1599,6 +1601,14 @@ function openStockControls(trigger, level, manufacturer, onChange, mode = 'sort'
       options:options('Все категории', item=>item.category)}),
     select({label:'Группа', name:'inventoryFilterGroup', value:draft.group,
       options: [{ value: '', label: 'Все группы' }, ...classificationOptions().slice(1)] }),
+    select({label:'Место хранения', name:'inventoryFilterLocation', value:draft.location,
+      options:[{value:'',label:'Все места'}, ...presence,
+        ...getInventoryStorageLocations().filter(place => !place.archivedAt)
+          .map(place => ({ value: place.locationId, label: place.name })),
+        ...stockFilterOptions(currentItems, item => item.location)
+          .filter(value => !getInventoryStorageLocations().some(place =>
+            place.name === value || place.locationId === value))
+          .map(value => ({ value, label: value }))]}),
     select({label:'Единица', name:'inventoryFilterUnit', value:draft.unit,
       options:options('Все единицы', item=>item.unit)}),
     select({label:'Использование', name:'inventoryFilterUsage', value:draft.usage, options:[
