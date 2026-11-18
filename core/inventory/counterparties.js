@@ -450,7 +450,7 @@ async function openSelectedCatalogCards(company, rows, onLinked = () => {}) {
       items: [
         { title: 'Создать новую', interactive: true,
           data: 'data-company-create-new', aria: 'Создать новую карточку' },
-        { title: 'Использовать существующую', interactive: true,
+        { title: 'Выбрать из склада', interactive: true,
           data: 'data-company-use-existing', aria: 'Выбрать существующую карточку' },
       ],
     }),
