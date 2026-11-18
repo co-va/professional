@@ -2611,14 +2611,16 @@ function renderStock(root) {
   const refresh=()=>{
     disposeBrandReorder();
     const locationId=STOCK_VIEW.storageScope;
-    const manufacturer=inventoryCriterionGroups().find(group=>group.legacyField==='manufacturer');
+    const criteria=inventoryCriterionGroups();
+    const first=criteria[0];
     disposeBrandReorder=renderStockBrandList(listHost,visibleRows(),{
       scope:locationId,
       itemsForView:visibleRows,
-      brandValues:manufacturer?.values||[],
-      onReorder:async ids=>{
-        if(manufacturer)await reorderInventoryCriterionValues(manufacturer.id,ids);
-      },
+      criteria,
+      brandValues:first?.values||[],
+      onReorder:first ? async ids=>{
+        await reorderInventoryCriterionValues(first.id,ids);
+      } : null,
       onReorderError:error=>{
         if(!listHost?.isConnected)return;
         const message=document.createElement('div');
@@ -2632,9 +2634,12 @@ function renderStock(root) {
           onChanged:()=>{refresh();onRefresh();},
         });
       },
-      onNew:(manufacturer,onRefresh)=>{
-        openStockCreateOptions(root,()=>{refresh();onRefresh();},
-          {manufacturer:manufacturer==='Без производителя'?'':manufacturer});
+      onNew:(label,onRefresh)=>{
+        const value=first?.values?.find(row=>row.name===label);
+        const defaults=first?.legacyField
+          ? {[first.legacyField]:value?.name||''}
+          : value ? {criteriaValues:{[first.id]:value.id}} : {};
+        openStockCreateOptions(root,()=>{refresh();onRefresh();},defaults);
       },
       onTarget:(itemId,onRefresh)=>{
         openInventoryStockTargets(itemId,()=>{refresh();onRefresh();});
