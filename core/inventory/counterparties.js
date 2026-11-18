@@ -195,10 +195,10 @@ async function openCatalogRow(company, row, { itemId = '', onLinked = () => {} }
     <p>${escapeHtml([row.manufacturer, row.supplierSku && 'Арт. ' + row.supplierSku].filter(Boolean).join(' · '))}</p>
     <p>Наличие: ${supplierAvailability(row.supplierAvailable)}</p>
     ${row.supplierNote ? '<p>' + escapeHtml(row.supplierNote) + '</p>' : ''}
-    <p>Цена поставщика: ${money(row.listPrice)}</p>
+    <p>Цена без скидки: ${money(row.listPrice)}</p>
+    <p>Скидка: ${supplierDiscount(row, company)}</p>
+    <p>Цена со скидкой: ${money(supplierEffectivePrice(row, company))}</p>
     <p>РРЦ: ${money(row.retailPrice)}</p>
-    <p>Моя закупочная цена: ${money(row.actualPrice)}</p>
-    <p>${escapeHtml(discountLabel(row.listPrice, row.actualPrice, row.discountPercent))}</p>
     ${select({ label: 'Моя рабочая карточка', name: 'itemId', value: itemId,
       options: [{ value: '', label: 'Выбрать товар' },
         ...items.map(item => ({ value: item.itemId, label: [item.manufacturer, item.name].filter(Boolean).join(' · ') }))],
@@ -434,6 +434,63 @@ function openSupplierAgreement(company, onSaved = () => {}) {
   });
 }
 
+function openSupplierBatchPrices(company, rows, onSaved = () => {}) {
+  if (!rows.length) return;
+  const layer = mountModal(document.body, modal(
+    '<form data-company-batch-form>' +
+    '<p class="ui-list__secondary">Выбрано позиций: ' + rows.length + '</p>' +
+    select({ label: 'Изменение цен', name: 'mode', value: 'percent',
+      options: [{ value: 'percent', label: 'На процент' },
+        { value: 'amount', label: 'На сумму, ₽' }] }) +
+    field({ label: 'Изменение (+ или −)', name: 'value', type: 'number',
+      step: 'any', value: '', required: true }) +
+    '<p class="ui-list__secondary" data-company-batch-example></p>' +
+    '<p class="form-error" role="alert" data-company-batch-error></p>' +
+    actionBlock(button('Применить', { type: 'submit' })) + '</form>',
+    { title: 'Цены поставщика', variant: 'q', surface: 'app' },
+  ));
+  if (!layer) return;
+  const form = layer.querySelector('[data-company-batch-form]');
+  const example = form.querySelector('[data-company-batch-example]');
+  const sample = rows.find(item => item.listPrice != null);
+  const updatePreview = () => {
+    const data = new FormData(form);
+    const raw = String(data.get('value') ?? '').trim();
+    const delta = raw === '' ? NaN : Number(raw.replace(',', '.'));
+    const original = Number(sample?.listPrice);
+    if (!sample || !Number.isFinite(delta)) { example.textContent = ''; return; }
+    const changed = String(data.get('mode')) === 'percent'
+      ? original * (1 + delta / 100) : original + delta;
+    example.textContent = Number.isFinite(changed) && changed >= 0
+      ? 'Например: ' + money(original) + ' → ' +
+        money(Math.round((changed + Number.EPSILON) * 100) / 100)
+      : 'Проверьте изменение цены.';
+  };
+  form.addEventListener('input', updatePreview);
+  form.addEventListener('change', updatePreview);
+  form.addEventListener('submit', async event => {
+    event.preventDefault();
+    const data = new FormData(form);
+    const mode = String(data.get('mode') || '');
+    const raw = String(data.get('value') || '').trim();
+    const value = raw === '' ? NaN : Number(raw.replace(',', '.'));
+    const error = form.querySelector('[data-company-batch-error]');
+    if (!Number.isFinite(value)) { error.textContent = 'Укажите изменение цены.'; return; }
+    const save = form.querySelector('[type="submit"]');
+    save.disabled = true;
+    try {
+      await json('/' + urlId(company.id) + '/catalog/prices', {
+        method: 'POST', body: { rowIds: rows.map(row => String(row.id)), mode, value },
+      });
+      layer.v2Close?.();
+      onSaved();
+    } catch (cause) {
+      error.textContent = errText(cause);
+      save.disabled = false;
+    }
+  });
+}
+
 function openSupplierProductEditor(company, row, onSaved = () => {}) {
   const fields = [
     field({ label: 'Наименование поставщика', name: 'name', value: row.name || '', required: true }),
@@ -504,7 +561,7 @@ function counterpartyInformation(company = {}) {
 
 // Tapping a supplier product opens its data Q. Selection is exclusively
 // the compact checkbox; item details never initiate stock creation or linking.
-function openCatalogProductDetails(row, status = null) {
+function openCatalogProductDetails(row, status = null, company = null, onSaved = null) {
   const stockItem = status?.itemId
     ? getInventoryItems().find(item => String(item.itemId) === String(status.itemId)) : null;
   const rows = [
@@ -515,19 +572,26 @@ function openCatalogProductDetails(row, status = null) {
     ['Штрихкод', row.barcode],
     ['Категория', row.category],
     ['Наличие', supplierAvailability(row.supplierAvailable)],
-    ['Цена поставщика', money(row.listPrice)],
+    ['Цена без скидки', money(row.listPrice)],
+    ['Скидка', supplierDiscount(row, company)],
+    ['Цена со скидкой', money(supplierEffectivePrice(row, company))],
     ['РРЦ', money(row.retailPrice)],
-    ['Моя закупочная цена', money(row.actualPrice)],
-    ['Скидка', discountLabel(row.listPrice, row.actualPrice, row.discountPercent)],
     ['Карточка склада', status?.status === 'linked' ? stockItem?.name || 'Связана'
       : status?.status === 'matched' ? 'Найдено совпадение'
       : status?.status === 'conflict' ? 'Неоднозначное совпадение' : 'Не связана'],
     ['Примечание', row.supplierNote],
   ].filter(([,value]) => value != null && String(value).trim() !== '');
-  return mountModal(document.body, modal(list({
-    className: 'ui-list--dense',
-    items: rows.map(([title, value]) => ({ title, right: [String(value)] })),
-  }), { title: 'Данные товара', variant: 'q', surface: 'app' }));
+  const layer = mountModal(document.body, modal(
+    list({ className: 'ui-list--dense',
+      items: rows.map(([title, value]) => ({ title, right: [String(value)] })),
+    }) + (onSaved ? actionBlock(button('Изменить', { data: 'data-company-product-edit' })) : ''),
+    { title: 'Данные товара', variant: 'q', surface: 'app' },
+  ));
+  layer?.querySelector('[data-company-product-edit]')?.addEventListener('click', () => {
+    layer.v2Close?.();
+    openSupplierProductEditor(company, row, onSaved);
+  });
+  return layer;
 }
 
 function catalogItemList(items = [], selectedCatalogIds = new Set(), linkedCatalogIds = null, matchedCatalogItems = null, statuses = new Map()) {
@@ -558,9 +622,8 @@ function catalogItemList(items = [], selectedCatalogIds = new Set(), linkedCatal
                   ? 'Неоднозначная связь: выберите карточку вручную'
                   : 'Не найдено совпадений с карточками склада',
           right: [
-            money(item.listPrice) + ' · ' + (item.discountPercent == null ? '—'
-              : Number(item.discountPercent).toLocaleString('ru-RU', { maximumFractionDigits: 2 }) + '%'),
-            'К оплате ' + money(item.actualPrice),
+            money(item.listPrice) + ' · ' + supplierDiscount(item),
+            'Со скидкой ' + money(supplierEffectivePrice(item)),
           ],
           interactive: true,
           data: 'data-company-product="' + escapeHtml(item.id) + '"',
