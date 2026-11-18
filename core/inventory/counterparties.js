@@ -1308,6 +1308,9 @@ async function openCompany(companyId, root, onChanged = () => {}, { initialCompa
         pages.forEach(page => entries.push(...(Array.isArray(page.items) ? page.items : [])));
       }
       if (!layer.isConnected || !list.isConnected || currentRun !== revision) return;
+      // The assortment is independent of stock link classification. Display its
+      // ready brand groups now, even if the link-status service is still responding.
+      renderCatalog(entries, list);
       // The stock snapshot is expensive and unnecessary when Core has already
       // classified catalog links. Read it only for a legacy server fallback.
       if (!(await statusesPromise)) {
@@ -1338,7 +1341,6 @@ async function openCompany(companyId, root, onChanged = () => {}, { initialCompa
         matched: matchedCatalogItems === null ? null : [...matchedCatalogItems],
         statuses: [...catalogLinkStatuses],
       });
-      renderCatalog(entries, list);
     } catch (error) {
       if (layer.isConnected && currentRun === revision && list.isConnected && !cached)
         list.innerHTML = emptyState('Ассортимент недоступен', errText(error));
