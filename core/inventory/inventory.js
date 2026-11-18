@@ -49,6 +49,7 @@ import {
 import {
   getInventoryItem,
   getInventoryItems,
+  getInventoryClassificationGroups,
   getInventoryMovement,
   getInventoryMovements,
 } from './data.js';
@@ -1531,7 +1532,7 @@ function stockListMarkup(manufacturer, query = '') {
   const group = getInventoryItems().filter(item => manufacturerName(item) === manufacturer);
   const items = sortItems(group.filter((item) => {
     if (!matchesType(item, STOCK_VIEW.itemsType)
-      || !matchesStockFilters(item, STOCK_VIEW.itemsFilters)) return false;
+      || !matchesStockFilters(item, STOCK_VIEW.itemsFilters, getInventoryClassificationGroups())) return false;
     return !needle || itemSearchText(item).includes(needle);
   }), STOCK_VIEW.itemsSort);
   if (!items.length) return emptyState('Ничего не найдено', 'Измените поиск или фильтр.');
@@ -1595,6 +1596,8 @@ function openStockControls(trigger, level, manufacturer, onChange, mode = 'sort'
         ...stockTypeOptions(manufacturer).slice(1)]}),
     select({label:'Категория', name:'inventoryFilterCategory', value:draft.category,
       options:options('Все категории', item=>item.category)}),
+    select({label:'Группа', name:'inventoryFilterGroup', value:draft.group,
+      options: [{ value: '', label: 'Все группы' }, ...classificationOptions().slice(1)] }),
     select({label:'Единица', name:'inventoryFilterUnit', value:draft.unit,
       options:options('Все единицы', item=>item.unit)}),
     select({label:'Использование', name:'inventoryFilterUsage', value:draft.usage, options:[
