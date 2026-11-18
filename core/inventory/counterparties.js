@@ -689,6 +689,7 @@ function catalogBrandMarkup(categories, selectedCatalogIds, linkedCatalogIds = n
     ).join('') + '</div>' +
     actionBlock(
       button('Создать карточку', { data: 'data-company-selection-card' }) +
+      button('Цены', { data: 'data-company-selection-prices' }) +
       button('Удалить', {
         variant: 'delete-outline',
         data: 'data-company-selection-delete',
@@ -1115,6 +1116,14 @@ async function openCompany(companyId, root, onChanged = () => {}) {
             if (rows.length) void openSelectedCatalogCards(company, rows, linked,
               row => matchedCatalogItems?.get(String(row.id)) || '');
           });
+          brandLayer?.querySelector('[data-company-selection-prices]')?.addEventListener('click', () => {
+            const rows = entries.filter(row => selectedCatalogIds.has(String(row.id)));
+            if (rows.length) openSupplierBatchPrices(company, rows, () => {
+              selectedCatalogIds.clear();
+              brandLayer?.v2Close?.();
+              void showCatalog();
+            });
+          });
           brandLayer?.querySelector('[data-company-selection-delete]')?.addEventListener('click', () => {
             const ids = entries.filter(row => selectedCatalogIds.has(String(row.id)))
               .map(row => String(row.id));
@@ -1148,7 +1157,11 @@ async function openCompany(companyId, root, onChanged = () => {}) {
           brandLayer?.querySelectorAll('[data-company-product]').forEach(product => {
             product.addEventListener('click', () => {
               const row = byId.get(String(product.dataset.companyProduct));
-              if (row) openCatalogProductDetails(row, catalogLinkStatuses.get(String(row.id)));
+              if (row) openCatalogProductDetails(row,
+                catalogLinkStatuses.get(String(row.id)), company, () => {
+                  brandLayer?.v2Close?.();
+                  void showCatalog();
+                });
             });
           });
           syncSelections();
@@ -1181,6 +1194,8 @@ async function openCompany(companyId, root, onChanged = () => {}) {
         openCompanyEditor(company, () => { void refresh(); onChanged(); }) },
       { id: 'upload', label: 'Загрузить файл', onSelect: () =>
         openImportGuidance(company, () => { void refresh(); onChanged(); }) },
+      { id: 'discount', label: 'Моя скидка', onSelect: () =>
+        openSupplierAgreement(company, () => { void refresh(); onChanged(); }) },
       { id: 'excluded', label: 'Исключённые', onSelect: () => void openExcludedCatalogItems() },
       { id: 'template', label: 'Шаблон Excel', onSelect: () =>
         void download('/template/xlsx', 'catalog-template.xlsx').catch(error =>
