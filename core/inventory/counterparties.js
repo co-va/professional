@@ -340,7 +340,7 @@ function counterpartyInformation(company = {}) {
 
 function catalogItemList(items = [], selectedCatalogIds = new Set()) {
   // Existing compact UI List (not the raised V2 entry used for brands).
-  // All three text lines and three price lines use the canonical List fields.
+  // Two lines: name/SKU and price with discount/payable amount.
   return '<div class="inventory-counterparty-product-list">' + items.map(item =>
     '<div class="inventory-counterparty-product-row">' +
       compactCheck({
@@ -351,14 +351,15 @@ function catalogItemList(items = [], selectedCatalogIds = new Set()) {
       list({
         className: 'ui-list--dense',
         items: [{
-          overline: supplierAvailability(item.supplierAvailable),
+          indicatorColor: item.supplierAvailable === true ? '#37B24D'
+            : item.supplierAvailable === false ? '#FF1111' : '#A8AAAC',
+          indicatorLabel: supplierAvailability(item.supplierAvailable),
           title: item.name,
           secondary: item.supplierSku || '—',
           right: [
-            'Цена: ' + money(item.listPrice),
-            'Скидка: ' + (item.discountPercent == null ? '—'
+            money(item.listPrice) + ' · ' + (item.discountPercent == null ? '—'
               : Number(item.discountPercent).toLocaleString('ru-RU', { maximumFractionDigits: 2 }) + '%'),
-            'К оплате: ' + money(item.actualPrice),
+            'К оплате ' + money(item.actualPrice),
           ],
           interactive: true,
           data: 'data-company-product="' + escapeHtml(item.id) + '"',
