@@ -1,151 +1,200 @@
-import { actionBlock, button, emptyState, field, list, modal, mountModal, select } from '../../ui/ui.js';
-import { getInventoryClassificationGroups, getInventoryItems } from './data.js';
-import { createInventoryClassificationGroup, updateInventoryClassificationGroup } from './service.js';
+import { actionBlock, button, emptyState, field, list, modal, mountModal } from '../../ui/ui.js';
+import { getInventoryCriteria, getInventoryItems } from './data.js';
+import { loadInventoryCriteria, loadInventory, createInventoryCriterion, updateInventoryCriterion,
+  createInventoryCriterionValue, updateInventoryCriterionValue } from './service.js';
+import { escapeHtml } from '../../ui/utils/escape-html.js';
 
-// E «Остатки» owns this UI. Names, nesting and assignment are stored in Core.
-function groups() {
-  return getInventoryClassificationGroups().filter(group => group && group.groupId);
+// Only these three legacy keys retain the existing InventoryItem columns.
+// User-facing names and all additional groups are read from Core.
+const LEGACY = [
+  {id:'manufacturer',name:'Производитель',legacyField:'manufacturer'},
+  {id:'category',name:'Категория',legacyField:'category'},
+  {id:'productType',name:'Тип',legacyField:'productType'},
+];
+const valueText = value => String(value ?? '').trim();
+const compare = (a,b) => String(a).localeCompare(String(b),'ru',{numeric:true,sensitivity:'base'});
+
+export function inventoryCriterionGroups() {
+  const stored = getInventoryCriteria();
+  return Array.isArray(stored) && stored.length ? stored : LEGACY.map(seed=>({
+    ...seed,values:[...new Set(getInventoryItems().map(item=>valueText(item[seed.legacyField])).filter(Boolean))]
+      .sort(compare).map(name=>({id:name,name})),
+  }));
 }
 
-function groupPath(id, source = groups()) {
-  const byId = new Map(source.map(group => [group.groupId, group]));
-  const names = [], seen = new Set();
-  while (id && !seen.has(id) && names.length < 64) {
-    seen.add(id);
-    const entry = byId.get(id);
-    if (!entry) break;
-    names.unshift(entry.name);
-    id = entry.parentGroupId;
-  }
-  return names;
+export function criterionOptions(group, current = '') {
+  const options = [{value:'',label:'Не указано'}];
+  const entries = Array.isArray(group?.values) ? group.values : [];
+  entries.forEach(entry=>options.push({
+    value: group.legacyField ? entry.name : entry.id,label:entry.name,
+  }));
+  const existing = valueText(current);
+  if (existing && !options.some(option=>option.value===existing))
+    options.push({value:existing,label:existing});
+  return options;
 }
 
+// Legacy tree options are still used by the existing item-specific filter.
+// They do not define the new editable criteria; no group tree in product forms.
 export function classificationOptions(value = '') {
-  const source = groups();
-  const byParent = new Map();
-  source.forEach(group => {
-    const rows = byParent.get(group.parentGroupId || '') || [];
-    rows.push(group);
-    byParent.set(group.parentGroupId || '', rows);
-  });
-  const result = [{ value: '', label: 'Без группы' }], visited = new Set();
-  const walk = (parent, depth = 0) => {
-    if (depth > 64) return;
-    const rows = (byParent.get(parent) || []).sort((a,b) =>
-      (Number(a.position) || 0) - (Number(b.position) || 0)
-      || String(a.name).localeCompare(String(b.name),'ru'));
-    for (const group of rows) {
-      if (visited.has(group.groupId)) continue;
-      visited.add(group.groupId);
-      result.push({ value: group.groupId, label: '— '.repeat(Math.min(depth, 8)) + group.name });
-      walk(group.groupId, depth + 1);
-    }
-  };
-  walk('');
-  // If a stale parent exists, still show the orphaned group and do not lose membership.
-  source.filter(group => !visited.has(group.groupId))
-    .forEach(group => result.push({ value: group.groupId, label: group.name }));
-  if (value && !result.some(row => row.value === value)) {
-    result.push({ value, label: 'Группа недоступна' });
-  }
-  return result;
+  const options = [{value:'',label:'Без группы'}];
+  const groups = (getInventoryCriteria() || []).filter(g=>g.legacyField==='category');
+  for(const group of groups)for(const entry of (group.values || []))
+    options.push({value:entry.id,label:entry.name});
+  if(value&&!options.some(item=>item.value===value))
+    options.push({value,label:'Ранее выбранная группа'});
+  return options;
 }
 
 export function openInventoryClassificationGroups(onSaved = () => {}) {
   const host = mountModal(document.body, modal(
-    '<div data-inventory-classification-list></div>' +
-    '<p class="form-error" role="alert" data-inventory-classification-list-error></p>' +
-    actionBlock(button('Добавить', { data: 'data-inventory-classification-add' })),
-    { title: 'Группы', variant: 'q', surface: 'app' },
+    '<div data-inventory-criteria-list></div>' +
+    '<p class="form-error" role="alert" data-inventory-criteria-error></p>' +
+    actionBlock(button('Добавить группу',{data:'data-inventory-criteria-add'})),
+    {title:'Группы',variant:'q',surface:'app'},
   ));
   if (!host) return null;
-  const listHost = host.querySelector('[data-inventory-classification-list]');
-  const status = host.querySelector('[data-inventory-classification-list-error]');
-  const refresh = () => {
-    const all = groups();
-    listHost.innerHTML = all.length ? list({
-      className: 'ui-list--dense',
-      items: all.map(group => ({
-        title: group.name,
-        secondary: groupPath(group.parentGroupId, all).join(' / ') || 'Основной уровень',
-        interactive: true,
-        aria: 'Изменить группу ' + group.name,
-        data: 'data-inventory-classification-edit="' + group.groupId + '"',
-      })),
-    }) : emptyState('Групп пока нет');
-    listHost.querySelectorAll('[data-inventory-classification-edit]').forEach(node => {
-      node.addEventListener('click', () =>
-        openEditor(node.dataset.inventoryClassificationEdit));
+  const main = host.querySelector('[data-inventory-criteria-list]');
+  const error = host.querySelector('[data-inventory-criteria-error]');
+  let current = getInventoryCriteria();
+  const showError = cause => {
+    error.textContent = cause instanceof Error ? cause.message : 'Не удалось сохранить группу.';
+  };
+  const save = async run => {
+    try {
+      error.textContent = '';
+      current = await run();
+      onSaved();
+      return true;
+    } catch(cause) {showError(cause);return false;}
+  };
+  const editName = (group = null) => {
+    const editor = mountModal(document.body, modal(
+      '<form data-inventory-criterion-form>' +
+      field({label:'Название группы',name:'name',value:group?.name||'',required:true}) +
+      '<p class="form-error" data-inventory-criterion-edit-error role="alert"></p>' +
+      actionBlock(button('Сохранить',{type:'submit'}) +
+        (group ? button('Удалить группу',{type:'button',variant:'delete-outline',
+          data:'data-inventory-criterion-remove'}) : '')) +
+      '</form>',{title:group?'Изменить группу':'Новая группа',variant:'q',surface:'app'},
+    ));
+    if(!editor)return;
+    const form=editor.querySelector('[data-inventory-criterion-form]');
+    const message=editor.querySelector('[data-inventory-criterion-edit-error]');
+    let saving=false;
+    const run=async patch=>{
+      if(saving)return;
+      saving=true;
+      try {
+        const name = valueText(patch?.name);
+        if(!patch?.archived && !name)throw new Error('Введите название группы.');
+        const ok=await save(()=>group
+          ? updateInventoryCriterion(group.id,patch)
+          : createInventoryCriterion(name));
+        if(ok){editor.v2Close?.();refresh();}
+        else message.textContent=error.textContent;
+      } finally{saving=false;}
+    };
+    form.addEventListener('submit',event=>{
+      event.preventDefault();
+      void run({name:form.elements.namedItem('name')?.value});
+    });
+    form.querySelector('[data-inventory-criterion-remove]')?.addEventListener('click',()=>{
+      void run({archived:true});
     });
   };
-  const openEditor = (id = '') => {
-    const all = groups();
-    const current = all.find(group => group.groupId === id);
-    const disabled = new Set(id ? [id] : []);
-    // Compare stable IDs, not names: two branches may contain the same label.
-    const byId = new Map(all.map(group => [group.groupId, group]));
-    for (const entry of all) {
-      let parentId = entry.parentGroupId;
-      const visited = new Set();
-      while (id && parentId && !visited.has(parentId)) {
-        if (parentId === id) { disabled.add(entry.groupId); break; }
-        visited.add(parentId);
-        parentId = byId.get(parentId)?.parentGroupId;
-      }
-    }
-    const options = [{ value: '', label: 'Основной уровень' },
-      ...all.filter(group => !disabled.has(group.groupId)).map(group => ({
-        value: group.groupId, label: groupPath(group.groupId, all).join(' / '),
-      }))];
-    const form = mountModal(document.body, modal(
-      '<form data-inventory-classification-form>' +
-      field({ label: 'Название', name: 'name', value: current?.name || '', required: true }) +
-      select({ label: 'Родительская группа', name: 'parentGroupId',
-        value: current?.parentGroupId || '', options, searchable: true }) +
-      field({ label: 'Порядок', name: 'position', value: current?.position || 0,
-        type: 'number', min: '0', step: '1' }) +
-      '<p class="form-error" role="alert" data-inventory-classification-error></p>' +
-      actionBlock(button('Сохранить', { type: 'submit' }) +
-        (current ? button('Удалить', {
-          variant: 'delete-outline', type: 'button',
-          data: 'data-inventory-classification-archive',
-        }) : '')) +
-      '</form>',
-      { title: current ? 'Группа' : 'Новая группа', variant: 'q', surface: 'app' },
+  const valueEditor = (group, entry = null) => {
+    const editor = mountModal(document.body, modal(
+      '<form data-inventory-criterion-value-form>' +
+      field({label:'Значение',name:'name',value:entry?.name||'',required:true}) +
+      '<p class="form-error" role="alert" data-inventory-criterion-value-error></p>' +
+      actionBlock(button('Сохранить',{type:'submit'}) +
+        (entry ? button('Удалить значение',{variant:'delete-outline',type:'button',
+          data:'data-inventory-criterion-value-delete'}) : '')) +
+      '</form>',{title:entry?'Значение':'Новое значение',variant:'q',surface:'app'},
     ));
-    if (!form) return;
-    const editor = form.querySelector('[data-inventory-classification-form]');
-    const message = form.querySelector('[data-inventory-classification-error]');
-    const run = async (isArchive = false) => {
-      const save = editor.querySelector('[type="submit"]');
-      const remove = editor.querySelector('[data-inventory-classification-archive]');
-      save.disabled = true;
-      if (remove) remove.disabled = true;
+    if(!editor)return;
+    const form=editor.querySelector('[data-inventory-criterion-value-form]');
+    const message=editor.querySelector('[data-inventory-criterion-value-error]');
+    let saving=false;
+    const perform=async patch=>{
+      if(saving)return;
+      saving=true;
       try {
-        const values = new FormData(editor);
-        const payload = isArchive ? { archived: true } : {
-          name: String(values.get('name') || '').trim(),
-          parentGroupId: String(values.get('parentGroupId') || ''),
-          position: Number(values.get('position') || 0),
-        };
-        if (!isArchive && !payload.name) throw new Error('Укажите название группы.');
-        if (current) await updateInventoryClassificationGroup(current.groupId, payload);
-        else await createInventoryClassificationGroup(payload);
-        form.v2Close?.();
-        refresh();
+        if(!patch.archived&&!valueText(patch.name))throw new Error('Введите значение.');
+        if(entry) current = await updateInventoryCriterionValue(group.id,entry.id,patch);
+        else current = await createInventoryCriterionValue(group.id,patch.name);
+        if(entry&&patch.name)await loadInventory();
+        editor.v2Close?.();
         onSaved();
-      } catch (error) {
-        message.textContent = error instanceof Error ? error.message : 'Не удалось сохранить группу.';
-        save.disabled = false;
-        if (remove) remove.disabled = false;
-      }
+        refresh();
+      }catch(cause){
+        message.textContent=cause instanceof Error?cause.message:'Не удалось сохранить значение.';
+      }finally{saving=false;}
     };
-    editor.addEventListener('submit', event => { event.preventDefault(); void run(); });
-    editor.querySelector('[data-inventory-classification-archive]')
-      ?.addEventListener('click', () => { void run(true); });
+    form.addEventListener('submit',event=>{
+      event.preventDefault();
+      void perform({name:form.elements.namedItem('name')?.value});
+    });
+    form.querySelector('[data-inventory-criterion-value-delete]')?.addEventListener('click',()=>{
+      void perform({archived:true});
+    });
   };
-  host.querySelector('[data-inventory-classification-add]')
-    ?.addEventListener('click', () => openEditor());
-  refresh();
+  const openValues = id => {
+    const group=current.find(entry=>entry.id===id);
+    if(!group)return;
+    const layer=mountModal(document.body,modal(
+      '<div data-inventory-criterion-values></div>'+
+      actionBlock(button('Добавить значение',{data:'data-inventory-add-criterion-value'})+
+        button('Изменить группу',{variant:'secondary',data:'data-inventory-edit-criterion'})),
+      {title:group.name,variant:'q',surface:'app'},
+    ));
+    if(!layer)return;
+    const container=layer.querySelector('[data-inventory-criterion-values]');
+    const renderValues=()=>{
+      const now=current.find(entry=>entry.id===id);
+      if(!now){layer.v2Close?.();return;}
+      container.innerHTML=now.values.length?list({
+        className:'ui-list--dense',
+        items:now.values.map(item=>({
+          title:item.name,interactive:true,
+          aria:'Изменить значение '+item.name,
+          data:'data-inventory-criterion-value="'+escapeHtml(item.id)+'"',
+        })),
+      }):emptyState('Значений пока нет');
+      container.querySelectorAll('[data-inventory-criterion-value]').forEach(node=>
+        node.addEventListener('click',()=>{
+          const updated=current.find(entry=>entry.id===id);
+          const item=updated?.values.find(value=>value.id===node.dataset.inventoryCriterionValue);
+          if(item)valueEditor({...updated, refreshValues:renderValues},item);
+        }));
+    };
+    layer.querySelector('[data-inventory-add-criterion-value]')?.addEventListener('click',()=>{
+      const now=current.find(entry=>entry.id===id);
+      if(now)valueEditor({...now,refreshValues:renderValues});
+    });
+    layer.querySelector('[data-inventory-edit-criterion]')?.addEventListener('click',()=>{
+      const now=current.find(entry=>entry.id===id);
+      if(now)editName(now);
+    });
+    renderValues();
+  };
+  const refresh=()=>{
+    if(!main)return;
+    main.innerHTML=current.length?list({
+      className:'ui-list--dense',
+      items:current.map(group=>({
+        title:group.name,secondary:group.values.length+' знач.',
+        interactive:true,aria:'Открыть значения '+group.name,
+        data:'data-inventory-criterion-group="'+escapeHtml(group.id)+'"',
+      })),
+    }):emptyState('Групп пока нет');
+    main.querySelectorAll('[data-inventory-criterion-group]').forEach(node=>
+      node.addEventListener('click',()=>openValues(node.dataset.inventoryCriterionGroup)));
+  };
+  host.querySelector('[data-inventory-criteria-add]')?.addEventListener('click',()=>editName());
+  if(current.length)refresh();
+  else main.innerHTML=emptyState('Загружаем группы…');
+  void loadInventoryCriteria().then(rows=>{current=rows;refresh();}).catch(showError);
   return host;
 }
