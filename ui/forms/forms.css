@@ -43,26 +43,61 @@
    All products remain directly clickable without extra disclosure gestures. */
 .inventory-stock-category{min-width:0;margin-top:12px}
 .inventory-stock-category:first-child{margin-top:0}
-/* Stock Z2 category drag: existing V2 handle and reorder engine.
-   The triangle stays native <summary>; the separate right handle only moves
-   whole categories. Do not change shared Q/Z geometry or product row sizes. */
-.inventory-stock-category-sequence{gap:0}
-.inventory-stock-category-sequence>.inventory-stock-category{margin-top:0}
-.inventory-stock-category-sequence>.inventory-stock-category:has(> .inventory-editor-heading__controls)>details>summary.inventory-editor-summary{padding-right:46px}
+/* Stock Z2 only: every row is compact and fixed-height, independent
+   of the selection checkbox or the category reorder handle. */
+.inventory-stock-category-sequence{gap:0;min-width:0;width:100%}
+.inventory-stock-category-sequence>.inventory-stock-category{margin-top:0;width:100%;min-width:0}
+.inventory-stock-category-sequence .inventory-editor-panel__body{padding:0}
+.inventory-stock-category-sequence .inventory-editor-summary{
+  box-sizing:border-box;width:100%;height:46px;min-height:46px;max-height:46px;
+  padding-top:0;padding-bottom:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis
+}
+.inventory-stock-category-sequence>.inventory-stock-category:has(> .inventory-editor-heading__controls)>details>summary.inventory-editor-summary{padding-right:48px}
 .inventory-stock-category-sequence>.inventory-stock-category>.inventory-editor-heading__controls{top:0;right:0;height:46px}
-.inventory-stock-category-sequence>.inventory-stock-category .list-entry__reorder-handle{height:46px}
+.inventory-stock-category-sequence>.inventory-stock-category .list-entry__reorder-handle{
+  box-sizing:border-box;width:36px;height:46px;min-height:46px;max-height:46px;margin:0
+}
+.inventory-stock-category-sequence .inventory-counterparty-product-row,
+.inventory-stock-category-sequence .inventory-counterparty-product-row>.ui-list{box-sizing:border-box;width:100%;min-width:0}
+.inventory-stock-category-sequence .inventory-counterparty-product-row .ui-list__item{
+  box-sizing:border-box;height:46px;min-height:46px;max-height:46px;overflow:hidden;
+  padding-top:4px;padding-bottom:4px
+}
+.inventory-stock-category-sequence .inventory-counterparty-product-row .ui-list__main,
+.inventory-stock-category-sequence .inventory-counterparty-product-row .ui-list__right-secondary{min-width:0;overflow:hidden}
+/* Expanded groups do not jump; just their 46px heading preview follows
+   the finger. The shared engine still owns the reorder and save. */
 .inventory-stock-category-sequence>.inventory-stock-category.is-reordering{
-  z-index:4;transform:translate3d(0,var(--list-entry-drag-y,0px),0);
-  transition:none;background:var(--white);box-shadow:0 10px 24px rgba(0,0,0,.16);
-  pointer-events:none;will-change:transform
+  z-index:2;transform:none;transition:none;box-shadow:none;pointer-events:none;will-change:auto
 }
-.inventory-stock-category-sequence>.inventory-stock-category.is-reorder-target-before::before,
-.inventory-stock-category-sequence>.inventory-stock-category.is-reorder-target-after::after{
-  content:"";position:absolute;left:0;right:0;height:2px;
-  background:var(--text);z-index:5;pointer-events:none
+.inventory-stock-category-sequence>.inventory-stock-category.is-reordering>details>summary{
+  background:var(--v2-inner-surface,#F5F5F3);
+  outline:2px solid var(--text);outline-offset:-2px
 }
-.inventory-stock-category-sequence>.inventory-stock-category.is-reorder-target-before::before{top:0}
-.inventory-stock-category-sequence>.inventory-stock-category.is-reorder-target-after::after{bottom:0}
+.inventory-stock-category-drag-preview{
+  position:fixed;z-index:2147483647;box-sizing:border-box;height:46px;
+  display:flex;flex-direction:column;justify-content:center;gap:2px;
+  min-width:0;padding:0 45px 0 14px;background:var(--white);color:var(--text);
+  font-family:inherit;font-size:14px;line-height:1.15;
+  border:2px solid var(--text);box-shadow:0 12px 24px rgba(0,0,0,.22);
+  overflow:hidden;pointer-events:none;touch-action:none
+}
+.inventory-stock-category-drag-preview strong,
+.inventory-stock-category-drag-preview small{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.inventory-stock-category-drag-preview strong{font-weight:750}
+.inventory-stock-category-drag-preview small{font-size:11px;color:var(--text-secondary)}
+.inventory-stock-category-drag-preview::after{
+  content:"⋮⋮";position:absolute;right:16px;top:50%;transform:translateY(-50%);
+  font-size:19px;letter-spacing:-3px;color:var(--text)
+}
+/* Mark the precise destination on the fixed heading, not at the far
+   bottom edge of an expanded category's contents. */
+.inventory-stock-category-sequence>.inventory-stock-category.is-reorder-target-before>details>summary{
+  box-shadow:inset 0 3px 0 var(--text);background:var(--v2-inner-surface,#F5F5F3)
+}
+.inventory-stock-category-sequence>.inventory-stock-category.is-reorder-target-after>details>summary{
+  box-shadow:inset 0 -3px 0 var(--text);background:var(--v2-inner-surface,#F5F5F3)
+}
 
 .inventory-stock-category-heading,.inventory-stock-type-heading{
   display:flex;justify-content:space-between;align-items:baseline;gap:8px;

@@ -1592,8 +1592,75 @@ function openManufacturerAppearance(root, onSaved = () => {}) {
   });
 }
 
-// Existing Stock accordion and ordinary Core UI List. Stock item order
-// comes from the saved position; there is no touch/drag reorder in Z2.
+// Stock item rows stay fixed. Only category headers can be reordered.
+// The existing shared list engine saves category order. Only a temporary
+// compact header preview follows the pointer; expanded contents stay in flow.
+function initStockCategoryDragPreview(sequence) {
+  if (!sequence) return () => {};
+  let gesture = null;
+  let preview = null;
+  let destination = null;
+  const clear = () => {
+    preview?.remove();
+    preview = null;
+    destination = null;
+    gesture = null;
+  };
+  const onDown = event => {
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    const handle = event.target.closest?.('[data-reorder-handle]');
+    const group = handle?.closest?.('[data-stock-category]');
+    if (!group || !sequence.contains(group)) return;
+    const heading = group.querySelector(':scope > details > summary');
+    if (!heading) return;
+    const rect = heading.getBoundingClientRect();
+    gesture = {
+      pointerId: event.pointerId, startY: event.clientY,
+      offsetY: Math.max(0,Math.min(rect.height,event.clientY-rect.top)),
+      left: rect.left, width: rect.width, title: heading.textContent.trim(),
+    };
+  };
+  const onMove = event => {
+    if (!gesture || gesture.pointerId !== event.pointerId) return;
+    if (!preview && Math.abs(event.clientY-gesture.startY) < 4) return;
+    if (!preview) {
+      preview = document.createElement('div');
+      preview.className = 'inventory-stock-category-drag-preview';
+      const title = document.createElement('strong');
+      title.textContent = gesture.title;
+      destination = document.createElement('small');
+      destination.textContent = 'Перемещение группы';
+      preview.append(title,destination);
+      preview.style.left = gesture.left + 'px';
+      preview.style.width = gesture.width + 'px';
+      document.body.appendChild(preview);
+    }
+    preview.style.top = event.clientY-gesture.offsetY + 'px';
+    const target = sequence.querySelector(
+      '[data-stock-category].is-reorder-target-before, [data-stock-category].is-reorder-target-after');
+    const label = target?.querySelector(':scope > details > summary')?.textContent?.trim();
+    destination.textContent = label
+      ? (target.classList.contains('is-reorder-target-before') ? 'Перед: ' : 'После: ') + label
+      : 'Перемещение группы';
+  };
+  const onEnd = event => {
+    if (gesture?.pointerId === event.pointerId) clear();
+  };
+  sequence.addEventListener('pointerdown',onDown);
+  sequence.addEventListener('pointermove',onMove);
+  sequence.addEventListener('pointerup',onEnd);
+  sequence.addEventListener('pointercancel',onEnd);
+  sequence.addEventListener('lostpointercapture',onEnd);
+  return () => {
+    clear();
+    sequence.removeEventListener('pointerdown',onDown);
+    sequence.removeEventListener('pointermove',onMove);
+    sequence.removeEventListener('pointerup',onEnd);
+    sequence.removeEventListener('pointercancel',onEnd);
+    sequence.removeEventListener('lostpointercapture',onEnd);
+  };
+}
+
 function stockListMarkup(manufacturer, query = '', rowsProvider = null, expanded = new Set(), selected = new Set(), allowCategoryReorder = false) {
   const needle = normalizedSearch(query);
   const group = typeof rowsProvider === 'function'
@@ -1843,7 +1910,9 @@ function openManufacturerStock(root, manufacturer, groupContext = null) {
 
   const listHost = layer.querySelector('[data-inventory-company-list]');
   let disposeCategoryReorder = () => {};
+  let disposeCategoryPreview = () => {};
   const renderList = () => {
+    disposeCategoryPreview();
     disposeCategoryReorder();
     const query = searchInput?.value || '';
     const criteria = inventoryCriterionGroups();
@@ -1889,11 +1958,14 @@ function openManufacturerStock(root, manufacturer, groupContext = null) {
           listHost.prepend(problem);
         },
       });
+      disposeCategoryPreview=initStockCategoryDragPreview(
+        listHost.querySelector('.inventory-stock-category-sequence'));
     }
     listHost?.querySelectorAll('[data-inventory-item]').forEach(control=>
       control.addEventListener('click', () => {
         const itemId = control.dataset.inventoryItem;
         openInventoryProductOverview(itemId, {
+          stockScope: STOCK_VIEW.storageScope,
           edit: onSaved => openItemEditor(root, itemId, {}, onSaved),
           onChanged: renderList,
         });
@@ -1920,7 +1992,7 @@ function openManufacturerStock(root, manufacturer, groupContext = null) {
             // One shared inventory-item appearance for all products.
             // This product supplies only preview values in the existing card constructor.
             const sample = rowsProvider?.()[0] || getInventoryItems().find((item) => manufacturerName(item) === manufacturer);
-            if (sample) openInventoryProductAppearanceQ(sample.itemId, renderList);
+            if (sample) openInventoryProductAppearanceQ(sample.itemId, renderList, STOCK_VIEW.storageScope);
           },
         },
         { id: 'sort', label: 'Сортировка', variant: 'secondary', onSelect: () => openStockControls(layer, 'items', manufacturer, renderList, 'sort') },

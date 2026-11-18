@@ -10,7 +10,7 @@ import { flushBusinessPersistence } from '../business-persistence.js';
 import { getInventoryItem, getInventoryMovements } from './data.js';
 import { inventoryCriterionGroups } from './classification.js';
 import { inventoryLocations, itemLocationBalance, storageName,
-  openInventoryStockTargets } from './stock-targets.js';
+  openInventoryStockTargets, inventoryDisplayBalance, INVENTORY_TOTAL_SCOPE } from './stock-targets.js';
 import {
   archiveInventorySupplierOffer, createInventorySupplierOffer, setInventoryPrimarySupplierOffer,
   updateInventoryItem, updateInventorySupplierOffer,
@@ -23,6 +23,7 @@ const DEFAULT_PRODUCT_APPEARANCE = {
     { row: 4, column: 'left', field: 'name', size: 'xl', color: '#FFFFFF', bold: true },
     { row: 6, column: 'left', field: 'category', size: 'm', color: '#FFFFFF' },
     { row: 7, column: 'left', field: 'productType', size: 'm', color: '#FFFFFF' },
+    { row: 8, column: 'left', field: 'storage', size: 'm', color: '#FFFFFF' },
     { row: 9, column: 'left', field: 'balance', size: 'm', color: '#FFFFFF' },
     { row: 9, column: 'right', field: 'basePrice', size: 'm', color: '#FFFFFF' },
   ]),
@@ -104,7 +105,16 @@ function actualInventoryConsumption(item) {
   return num(Math.max(0,Math.round(used*1000)/1000)) + ' ' + (item.unit||'');
 }
 
-function productCardFields(item) {
+function stockScopeName(scope) {
+  if (scope === INVENTORY_TOTAL_SCOPE) return 'Складские остатки';
+  if (scope === 'primary') return 'Не распределено';
+  const place = inventoryLocations().find(row=>row.locationId===scope);
+  const label = storageName(place).trim();
+  if (!label) return 'Склад недоступен';
+  return /^склад(?:\s|$)/i.test(label) ? label : 'Склад ' + label;
+}
+
+function productCardFields(item, stockScope = INVENTORY_TOTAL_SCOPE) {
   const primary=(item.supplierOffers || []).find(offer =>
     offer.offerId && offer.offerId===item.primaryOfferId) || null;
   const purchasePrice=item.basePrice ?? item.referencePrice;
@@ -121,7 +131,8 @@ function productCardFields(item) {
     ['supplierListPrice', 'Цена по прайсу', money(supplierListPrice(item,primary))],
     ['supplierDiscount', 'Скидка поставщика', discountText],
     ['basePrice', 'Закупочная цена со скидкой', money(purchasePrice)],
-    ['balance', 'Остаток', num(Number(item.balance)||0) + ' ' + (item.unit||'')],
+    ['storage', 'Склад', stockScopeName(stockScope)],
+    ['balance', 'Остаток', num(inventoryDisplayBalance(item, stockScope)) + ' ' + (item.unit||'')],
     ['consumption', 'Расход', actualInventoryConsumption(item)],
     ['baseUnitPrice', 'Себестоимость единицы расхода', consumptionUnitCost(item)],
     ['saleIndicator', 'Продажа', item.canSell===true ? 'Продажа ☑' : 'Продажа ☐'],
@@ -133,10 +144,10 @@ function productCardAppearance() {
   return getCardAppearanceTemplate(PRODUCT_APPEARANCE_SCOPE)?.appearance || DEFAULT_PRODUCT_APPEARANCE;
 }
 
-function productCard(item) {
+function productCard(item, stockScope = INVENTORY_TOTAL_SCOPE) {
   return entityVisualCard({
     appearance: productCardAppearance(),
-    fields: productCardFields(item),
+    fields: productCardFields(item, stockScope),
     interactive: true,
     data: 'data-inventory-product-card',
     aria: 'Редактировать складскую единицу ' + item.name,
@@ -307,7 +318,7 @@ function openSupplierEditor(itemId, offerId = '', onSaved = () => {}) {
   return layer;
 }
 
-export function openInventoryProductAppearanceQ(itemId, onSaved = () => {}) {
+export function openInventoryProductAppearanceQ(itemId, onSaved = () => {}, stockScope = INVENTORY_TOTAL_SCOPE) {
   const item = getInventoryItem(itemId);
   if (!item) return null;
   return openEntityCardAppearanceQ(document.body, {
@@ -318,7 +329,7 @@ export function openInventoryProductAppearanceQ(itemId, onSaved = () => {}) {
     allowPhoto: false,
     resolve: () => ({
       appearance: productCardAppearance(),
-      fields: productCardFields(getInventoryItem(itemId) || item),
+      fields: productCardFields(getInventoryItem(itemId) || item, stockScope),
     }),
     save: async ({ appearance }) => {
       saveCardAppearanceTemplate(PRODUCT_APPEARANCE_SCOPE, { appearance });
@@ -382,7 +393,7 @@ function locationOverview(item) {
   return v2ListEntries(rows.map(row => v2ListEntry(row)));
 }
 
-export function openInventoryProductOverview(itemId, { edit = () => {}, onChanged = () => {} } = {}) {
+export function openInventoryProductOverview(itemId, { edit = () => {}, onChanged = () => {}, stockScope = INVENTORY_TOTAL_SCOPE } = {}) {
   const initial = getInventoryItem(itemId);
   if (!initial) return null;
   const layer = mountModal(document.body, modal('<div data-inventory-product-overview></div>', {
@@ -404,7 +415,7 @@ export function openInventoryProductOverview(itemId, { edit = () => {}, onChange
     if (!host) return;
     host.innerHTML = page([
       workspaceHeaderContext({ title: item.name }),
-      productCard(item),
+      productCard(item, stockScope),
       v2Section('Остатки', locationOverview(item) +
         actionBlock(button('Настроить', {
           variant: 'secondary', data: 'data-inventory-product-targets',
