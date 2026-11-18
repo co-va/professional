@@ -48,7 +48,7 @@ export function openInventoryClassificationRecovery(onSaved = () => {}) {
     '<div data-inventory-classification-restore>' +
       '<p>Сверьте исходные категории и типы с нынешними товарами по производителю и артикулу. ' +
       'Товары, которых нет в файле, не изменятся.</p>' +
-      field({label:'Исходная таблица',name:'classificationSource',type:'file',
+      field({label:'Файл классификации (.tsv или .txt)',name:'classificationSource',type:'file',
         data:'data-inventory-restore-file accept=".tsv,.txt,text/plain"'}) +
       '<p class="form-error" role="alert" data-inventory-restore-status></p>' +
       '<div data-inventory-restore-preview></div>' +
@@ -102,8 +102,8 @@ export function openInventoryClassificationRecovery(onSaved = () => {}) {
         (changed.length?list({className:'ui-list--dense',
           items:changed.slice(0,10).map(item=>({
             title:item.sku+' · '+item.name,
-            secondary:[item.beforeCategory+' / '+item.beforeProductType,
-              '→ '+item.category+' / '+item.productType],
+            secondary:(item.beforeCategory||'—')+' / '+(item.beforeProductType||'—')+
+              ' → '+(item.category||'—')+' / '+(item.productType||'—'),
           })),
         }):emptyState('Изменений не требуется'))+
         (changed.length>10?'<p>И ещё '+(changed.length-10)+' поз.</p>':'')+
