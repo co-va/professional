@@ -567,20 +567,15 @@ function openSupplierProductEditor(company, row, onSaved = () => {}) {
 }
 
 function counterpartyInformation(company = {}) {
-  // Reuse existing small/primary/secondary typography, without "data" rows
-  // or locally styled dividers. Editing remains in the existing V → Q flow.
-  const primary = String(company.contactName || '').trim();
-  const secondary = [company.phone, company.email, company.website, company.note]
-    .filter(value => String(value || '').trim());
-  const discount = company.discountPercent == null ? null
-    : Number(company.discountPercent).toLocaleString('ru-RU', { maximumFractionDigits: 4 }) + '%';
+  // Header owns the company name; Z2 details show contact information only.
+  const representative = String(company.contactName || '').trim();
+  const contacts = [company.phone, company.email]
+    .map(value => String(value || '').trim()).filter(Boolean);
   return '<div data-counterparty-information>' +
-    (discount !== null
-      ? '<strong class="ui-list__title">Скидка по договору: ' + escapeHtml(discount) + '</strong>'
-      : '') +
-    (primary ? '<span class="ui-list__secondary">Менеджер</span>' : '') +
-    (primary ? '<strong class="ui-list__title">' + escapeHtml(primary) + '</strong>' : '') +
-    secondary.map(value => '<span class="ui-list__secondary">' + escapeHtml(value) + '</span>').join('') +
+    (representative ? '<span class="ui-list__secondary">Представитель</span>' +
+      '<strong class="ui-list__title">' + escapeHtml(representative) + '</strong>' : '') +
+    contacts.map(value => '<span class="ui-list__secondary">' +
+      escapeHtml(value) + '</span>').join('') +
     '</div>';
 }
 
@@ -918,7 +913,7 @@ async function openCompany(companyId, root, onChanged = () => {}) {
   let company = companies.find(row => row.id === companyId);
   if (!company) return openNotice({ title: 'Контрагент', message: 'Компания не найдена.' });
   const markup = workspaceHeaderContext({
-    title: 'Контрагент', subtitle: company.name,
+    title: company.name,
     v: { data: 'data-company-actions', aria: 'Действия контрагента' },
   }) + '<div data-counterparty-detail></div>';
   const layer = mountV2ZLayer(root, v2ZLayer(markup), { stack: true });
