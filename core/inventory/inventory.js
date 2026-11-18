@@ -1547,7 +1547,7 @@ function openManufacturerAppearance(root, onSaved = () => {}) {
   });
 }
 
-function stockListMarkup(manufacturer, query = '', rowsProvider = null) {
+function stockListMarkup(manufacturer, query = '', rowsProvider = null, allowReorder = true) {
   const needle = normalizedSearch(query);
   const group = typeof rowsProvider === 'function'
     ? rowsProvider() : getInventoryItems().filter(item => manufacturerName(item) === manufacturer);
@@ -1560,17 +1560,18 @@ function stockListMarkup(manufacturer, query = '', rowsProvider = null) {
   }), STOCK_VIEW.itemsSort);
   if (!items.length) return emptyState('Ничего не найдено', 'Измените поиск или фильтр.');
 
-  // Sections are display-only. Neither category nor type requires opening a
-  // nested folder; every product is directly clickable in this Z2.
+  // Position order is the owner's canonical shelf sequence PER manufacturer.
+  // Section headers are inserted along that sequence, never used to sort it.
+  // One shared V2 list preserves item drag reorder across section boundaries.
   const criteria = inventoryCriterionGroups();
   const byCategory = criteria.some(entry => entry.legacyField === 'category');
   const byType = criteria.some(entry => entry.legacyField === 'productType');
-  const canReorder = !byCategory && !byType
-    && STOCK_VIEW.itemsSort === 'position-asc' && !needle
-    && !hasStockFilters(STOCK_VIEW.itemsFilters) && items.length > 1;
+  const canReorder = allowReorder && STOCK_VIEW.itemsSort === 'position-asc'
+    && !needle && !hasStockFilters(STOCK_VIEW.itemsFilters)
+    && items.filter(item => Number(item.position) > 0).length > 1;
   const itemRow = item => v2ListEntry({
     title: `${Number(item.position) > 0 ? `${item.position} · ` : ''}${item.name}`,
-    reorderHandle: canReorder,
+    reorderHandle: canReorder && Number(item.position) > 0,
     reorderAria: 'Изменить порядок материала',
     subtitle: [productTypeText(item), tubeCountText(item)].filter(Boolean).join(' · '),
     rightTop: `${numberText(item.balance)} ${item.unit}`,
@@ -1580,29 +1581,26 @@ function stockListMarkup(manufacturer, query = '', rowsProvider = null) {
     data: `data-inventory-item="${escapeHtml(item.itemId)}" data-reorder-id="${escapeHtml(item.itemId)}"`,
     aria: `Открыть ${item.name}`,
   });
-  if (!byCategory && !byType) return v2ListEntries(items.map(itemRow));
-  const categories = new Map();
+  const rows = [];
+  let previousCategory = null;
+  let previousType = null;
   for (const item of items) {
     const category = byCategory ? String(item.category || '').trim() || 'Без категории' : '';
     const type = byType ? String(item.productType || '').trim() || 'Без типа' : '';
-    if (!categories.has(category)) categories.set(category,new Map());
-    const types=categories.get(category);
-    if (!types.has(type)) types.set(type,[]);
-    types.get(type).push(item);
+    if (byCategory && category !== previousCategory) {
+      rows.push('<div class="inventory-stock-category-heading"><strong>' +
+        escapeHtml(category) + '</strong></div>');
+      previousCategory = category;
+      previousType = null;
+    }
+    if (byType && type !== previousType) {
+      rows.push('<div class="inventory-stock-type-heading"><span>' +
+        escapeHtml(type) + '</span></div>');
+      previousType = type;
+    }
+    rows.push(itemRow(item));
   }
-  const compareGroups=(a,b)=>String(a).localeCompare(String(b),'ru',{numeric:true,sensitivity:'base'});
-  return [...categories.entries()].sort(([a],[b])=>compareGroups(a,b)).map(([category,types])=>{
-    const total=[...types.values()].reduce((n,rows)=>n+rows.length,0);
-    return '<section class="inventory-stock-category">' +
-      (byCategory
-        ? '<div class="inventory-stock-category-heading"><strong>' + escapeHtml(category) +
-          '</strong><small>' + total + ' поз.</small></div>' : '') +
-      [...types.entries()].sort(([a],[b])=>compareGroups(a,b)).map(([type,rows])=>
-        (byType ? '<div class="inventory-stock-type-heading"><span>' + escapeHtml(type) +
-          '</span><small>' + rows.length + ' поз.</small></div>' : '') +
-        v2ListEntries(rows.map(itemRow))
-      ).join('') + '</section>';
-  }).join('');
+  return v2ListEntries(rows);
 }
 
 function stockSortOptions(level) {
@@ -1757,12 +1755,14 @@ function openManufacturerStock(root, manufacturer, groupContext = null) {
     ? () => buildStockCatalogGroups(getInventoryItems(),groupContext.criteria)
       .find(entry => entry.name === manufacturer)?.items || []
     : null;
+  const canReorderItems = !groupContext
+    || groupContext.criteria[0]?.legacyField === 'manufacturer';
   const markup = `
     ${context(manufacturer, {
       v: { data: 'data-inventory-item-controls', aria: 'Сортировка и фильтр товаров' },
       c: { label: '+', data: 'data-inventory-add-item', aria: 'Добавить позицию' },
     })}
-    <div data-inventory-company-list>${stockListMarkup(manufacturer, '', rowsProvider)}</div>`;
+    <div data-inventory-company-list>${stockListMarkup(manufacturer, '', rowsProvider, canReorderItems)}</div>`;
   const layer = mountV2ZLayer(root, v2ZLayer(markup, { className: 'inventory-manufacturer-z' }), { stack: true });
   if (!layer) return;
   const [searchRow] = setV2ZHeaderRows(layer, [stockSearchField('', 'data-inventory-company-search')]);
@@ -1773,7 +1773,7 @@ function openManufacturerStock(root, manufacturer, groupContext = null) {
   const renderList = () => {
     disposeReorder();
     const query = searchInput?.value || '';
-    if (listHost) listHost.innerHTML = stockListMarkup(manufacturer, query, rowsProvider);
+    if (listHost) listHost.innerHTML = stockListMarkup(manufacturer, query, rowsProvider, canReorderItems);
     listHost?.querySelectorAll('[data-inventory-item]').forEach((control) => control.addEventListener('click', () => {
       const itemId = control.dataset.inventoryItem;
       openInventoryProductOverview(itemId, {
@@ -1781,26 +1781,26 @@ function openManufacturerStock(root, manufacturer, groupContext = null) {
         onChanged: renderList,
       });
     }));
-    if (inventoryCriterionGroups().some(entry=>
-      entry.legacyField==='category'||entry.legacyField==='productType')
-      || (groupContext && groupContext.criteria[0]?.legacyField !== 'manufacturer')
+    if (!canReorderItems
       || STOCK_VIEW.itemsSort !== 'position-asc'
-      || hasStockFilters(STOCK_VIEW.itemsFilters) || normalizedSearch(query)) return;
+      || hasStockFilters(STOCK_VIEW.itemsFilters) || normalizedSearch(query)
+      || (rowsProvider?.() || getInventoryItems().filter(
+        item => manufacturerName(item) === manufacturer))
+        .filter(item => Number(item.position) > 0).length < 2) return;
     disposeReorder = initV2ListReorder(listHost, {
       onReorder: async (ids) => {
         await reorderInventoryItems(manufacturer === EMPTY_MANUFACTURER ? '' : manufacturer, ids);
-        // The list is already in the correct DOM order after drop.
-        // Refresh only visible number text; do not rebuild the Z or its rows.
-        listHost?.querySelectorAll('[data-inventory-item]').forEach(node => {
-          const item = getInventoryItem(node.dataset.inventoryItem);
-          const label = node.querySelector('.list-entry__text > strong');
-          if (item && label) label.textContent = `${item.position} · ${item.name}`;
-        });
+        // Rebuild only the Z2 list after Core confirms the new numbers.
+        // Headers follow the stored sequence without changing item categories.
+        renderList();
       },
       onError: (error) => {
         // An error inside the same Z stays readable after the transient
         // system notice is gone. Never mount another modal or shift Z itself.
         if (!listHost?.isConnected) return;
+        // The shared gesture restores row IDs; redraw headings in their
+        // canonical positions on an error before presenting the message.
+        renderList();
         let message = listHost.querySelector('[data-inventory-reorder-error]');
         if (!message) {
           message = document.createElement('div');
