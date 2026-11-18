@@ -8,6 +8,8 @@ import { escapeHtml } from '../../ui/utils/escape-html.js';
 import { getCardAppearanceTemplate, saveCardAppearanceTemplate } from '../card-appearance-templates.js';
 import { flushBusinessPersistence } from '../business-persistence.js';
 import { getInventoryItem } from './data.js';
+import { inventoryLocations, itemLocationBalance, storageName,
+  openInventoryStockTargets } from './stock-targets.js';
 import {
   archiveInventorySupplierOffer, createInventorySupplierOffer, setInventoryPrimarySupplierOffer,
   updateInventoryItem, updateInventorySupplierOffer,
@@ -303,6 +305,27 @@ function confirmProductDelete(itemId, overview, onChanged) {
   });
 }
 
+function locationOverview(item) {
+  const unit = item.unit || 'шт.';
+  const threshold = item.thresholdUnit || item.receiptUnit || unit;
+  const totalGoal = item.targetStock == null ? 'Не задан'
+    : num(Number(item.targetStock)) + ' ' + threshold;
+  const rows = [{
+    title: 'Общий остаток', subtitle: 'Желаемый: ' + totalGoal,
+    rightTop: num(Number(item.balance || 0)) + ' ' + unit,
+  }, ...inventoryLocations().map(place => {
+    const configured = (item.locationTargets || [])
+      .find(row => row.locationId === place.locationId);
+    return {
+      title: storageName(place),
+      subtitle: 'Желаемый: ' + (configured
+        ? num(Number(configured.targetStock)) + ' ' + threshold : 'Не задан'),
+      rightTop: num(itemLocationBalance(item, place.locationId)) + ' ' + unit,
+    };
+  })];
+  return v2ListEntries(rows.map(row => v2ListEntry(row)));
+}
+
 export function openInventoryProductOverview(itemId, { edit = () => {}, onChanged = () => {} } = {}) {
   const initial = getInventoryItem(itemId);
   if (!initial) return null;
@@ -326,6 +349,11 @@ export function openInventoryProductOverview(itemId, { edit = () => {}, onChange
     host.innerHTML = page([
       workspaceHeaderContext({ title: item.name }),
       productCard(item),
+      v2Section('Остатки', locationOverview(item) +
+        actionBlock(button('Настроить', {
+          variant: 'secondary', data: 'data-inventory-product-targets',
+          aria: 'Настроить желаемые остатки по складам',
+        }))),
       v2Section('Поставщики', supplierRows(item)),
       actionBlock(
         button('Добавить', {
@@ -340,6 +368,9 @@ export function openInventoryProductOverview(itemId, { edit = () => {}, onChange
         render();
         onChanged();
       });
+    });
+    host.querySelector('[data-inventory-product-targets]')?.addEventListener('click', () => {
+      openInventoryStockTargets(itemId, () => { render(); onChanged(); });
     });
     host.querySelector('[data-inventory-supplier-add]')?.addEventListener('click', async () => {
       const { openSupplierAssociation } = await import('./counterparties.js');
