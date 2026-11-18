@@ -3,7 +3,7 @@ import { inventoryStockBalanceInThresholdUnits } from './completeness.js';
 // One compound filter for canonical InventoryItem fields. No custom visual
 // controls: the Stock section renders this model via shared Select/Field.
 export const EMPTY_STOCK_FILTERS = Object.freeze({
-  type: '', category: '', unit: '', usage: '',
+  type: '', category: '', group: '', unit: '', usage: '',
   supplier: '', availability: '', price: '', tare: '',
   name: '', sku: '', barcode: '', position: '', minStock: '',
   targetStock: '', packageQuantity: '', grossWeight: '',
@@ -30,7 +30,19 @@ const supplierNames = item => [
 const usageCode = item => item.canConsume !== false && item.canSell === true ? 'both'
   : item.canConsume !== false ? 'consume' : item.canSell === true ? 'sale' : 'track';
 
-export function matchesStockFilters(item = {}, filters = {}) {
+export function matchesStockFilters(item = {}, filters = {}, classificationGroups = []) {
+  if (filters.group) {
+    const byId = new Map(classificationGroups.map(group => [String(group.groupId), group]));
+    let id = String(item.classificationGroupId || '');
+    const seen = new Set();
+    let belongs = false;
+    while (id && !seen.has(id)) {
+      if (id === String(filters.group)) { belongs = true; break; }
+      seen.add(id);
+      id = String(byId.get(id)?.parentGroupId || '');
+    }
+    if (!belongs) return false;
+  }
   const typeValue = isPresence(filters.type) ? item.productType : item.productType || item.category;
   if (!matchesChoice(typeValue, filters.type)) return false;
   if (!matchesChoice(item.category, filters.category)) return false;
