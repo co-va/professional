@@ -60,7 +60,7 @@ assert.match(counterparties, /\['Цена со скидкой', money\(supplierE
 const supplierQ = counterparties.slice(counterparties.indexOf('function openCatalogProductDetails('),
   counterparties.indexOf('function catalogItemList('));
 assert.doesNotMatch(supplierQ, /row\.actualPrice|inventoryItem\.update/);
-assert.match(counterparties, /id: 'discount', label: 'Моя скидка'/);
+assert.match(counterparties, /id: 'discount', label: 'Скидка по договору'/);
 assert.match(counterparties, /unitsPerOffer/);
 assert.match(classification, /createInventoryClassificationGroup/);
 assert.match(classification, /updateInventoryClassificationGroup/);
