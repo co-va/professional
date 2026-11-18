@@ -539,8 +539,10 @@ function openSupplierBulkEditor(company, rows, onSaved = () => {}) {
       select({ label: 'Что изменить', name: 'supplierBulkField', value: 'category',
         options: SUPPLIER_CATALOG_EDIT_FIELDS.map(({ value, label }) => ({ value, label })) }) +
       '<div data-company-bulk-value></div>' +
-      compactCheck({ checked: true, label: 'Выбрать все',
-        data: 'data-company-bulk-all', aria: 'Выбрать все позиции' }) +
+      '<div class="inventory-counterparty-bulk-selection">' +
+        compactCheck({ checked: true, label: 'Выбрать все',
+          data: 'data-company-bulk-all', aria: 'Выбрать все позиции' }) +
+      '</div>' +
       '<p class="ui-list__secondary" data-company-bulk-count></p>' +
       '<div data-company-bulk-list></div>' +
       '<p class="form-error" role="alert" data-company-bulk-error></p>' +
@@ -836,6 +838,44 @@ function catalogItemList(items = [], selectedCatalogIds = new Set(), linkedCatal
       }) +
     '</div>',
   ).join('') + '</div>';
+}
+
+// Hidden supplier rows use the same company/category disclosures as the
+// assortment, never a flat list. Worksheet labels are import metadata,
+// not names of manufacturers or product categories.
+function catalogExcludedGroups(entries, companyName, selected, linked, matched, statuses, lookup) {
+  const groupName = value => {
+    const name = String(value ?? '').trim();
+    return /^(?:лист|sheet)\\s*[-_№#]?\\s*\\d+(?:\\s*\\(\\d+\\))?$/iu.test(name) ? '' : name;
+  };
+  const normalized = entries.map(row => ({
+    ...row,
+    brand: groupName(row.brand) || groupName(row.manufacturer) || companyName,
+    category: groupName(row.category),
+  }));
+  const brands = catalogBrands(normalized);
+  return '<div class="inventory-item-accordion">' +
+    [...brands].map(([brand, categories], brandIndex) => {
+      const brandRows = [...categories.values()].flat();
+      const brandKey = 'brand-' + brandIndex;
+      lookup.set(brandKey, brandRows);
+      const contents = [...categories].map(([category, rows], categoryIndex) => {
+        const products = catalogItemList(rows, selected, linked, matched, statuses);
+        if (!category) return products;
+        const categoryKey = 'category-' + brandIndex + '-' + categoryIndex;
+        lookup.set(categoryKey, rows);
+        return catalogDisclosure(category, products, true, rows.length, compactCheck({
+          aria: 'Выбрать группу ' + category,
+          data: 'data-company-restore-group-check="' + categoryKey + '"',
+        }));
+      }).join('');
+      return catalogDisclosure(brand,
+        '<div class="inventory-item-accordion">' + contents + '</div>',
+        false, brandRows.length, compactCheck({
+          aria: 'Выбрать компанию ' + brand,
+          data: 'data-company-restore-group-check="' + brandKey + '"',
+        }));
+    }).join('') + '</div>';
 }
 
 function catalogBrands(items = []) {
@@ -1148,8 +1188,10 @@ async function openCompany(companyId, root, onChanged = () => {}, { initialCompa
       return;
     }
     const selected = new Set();
+    const groupLookup = new Map();
     const restoreLayer = mountModal(document.body, modal(
-      catalogItemList(entries, selected, linkedCatalogIds, matchedCatalogItems, catalogLinkStatuses) +
+      catalogExcludedGroups(entries, company.name, selected, linkedCatalogIds,
+        matchedCatalogItems, catalogLinkStatuses, groupLookup) +
         '<p class="form-error" data-company-restore-error role="alert"></p>' +
         actionBlock(button('Восстановить', { data: 'data-company-restore-apply' })),
       { title: 'Скрытые', variant: 'q', surface: 'app' },
@@ -1161,7 +1203,23 @@ async function openCompany(companyId, root, onChanged = () => {}, { initialCompa
       restoreLayer.querySelectorAll('[data-company-product-check]').forEach(input => {
         input.checked = selected.has(String(input.dataset.companyProductCheck));
       });
+      restoreLayer.querySelectorAll('[data-company-restore-group-check]').forEach(input => {
+        const rows = groupLookup.get(input.dataset.companyRestoreGroupCheck) || [];
+        const marked = rows.filter(row => selected.has(String(row.id))).length;
+        input.checked = rows.length > 0 && marked === rows.length;
+        input.indeterminate = marked > 0 && marked < rows.length;
+      });
     };
+    restoreLayer.querySelectorAll('[data-company-restore-group-check]').forEach(input => {
+      input.addEventListener('change', () => {
+        const rows = groupLookup.get(input.dataset.companyRestoreGroupCheck) || [];
+        rows.forEach(row => {
+          if (input.checked) selected.add(String(row.id));
+          else selected.delete(String(row.id));
+        });
+        sync();
+      });
+    });
     restoreLayer.querySelectorAll('[data-company-product-check]').forEach(input => {
       input.addEventListener('change', () => {
         const id = String(input.dataset.companyProductCheck);
