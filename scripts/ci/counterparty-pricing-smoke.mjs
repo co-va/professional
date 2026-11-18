@@ -183,7 +183,7 @@ assert.match(selectedActions,
 assert.ok(selectedActions.indexOf("button('Скрыть'")
   > selectedActions.indexOf("button('Изменить данные'"),
   'Hide action must be last');
-assert.match(source, /'Скрыть ' \+ ids\.length \+ ' позиций\? Их можно восстановить через «Скрытые»\.'/,
+assert.match(source, /Скрыть ' \+ ids\.length \+ ' позиций\? Их можно восстановить через «Скрытые»\./,
   'X confirmation has one short explanatory sentence');
 const hideAction = source.slice(source.indexOf("brandLayer?.querySelector('[data-company-selection-delete]')"),
   source.indexOf("brandLayer?.querySelectorAll('[data-company-product]')", source.indexOf("brandLayer?.querySelector('[data-company-selection-delete]')")));
