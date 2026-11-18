@@ -352,7 +352,7 @@ assert.equal(countNode.textContent, 'Выбрано 2 из 2', 'Selected set mus
 assert.equal(callbackCount, 0, 'Parent selection/list must not be closed on Apply');
 assert.equal(closeCount, 0, 'Q must stay open after applying article');
 assert.match(listNode.innerHTML, /NEW-ART/, 'Saved article is visible in the same list');
-assert.match(resultNode.textContent, /Сохранено 2 позиции/, 'Result is confirmed');
+assert.match(resultNode.textContent, /Сохранено: 2 из 2/, 'Result is confirmed');
 selectorNode.value = 'listPrice';
 selectorNode.emit('change');
 assert.match(listNode.innerHTML, /1500 ₽/, 'Choosing price shows saved prices on the right');
