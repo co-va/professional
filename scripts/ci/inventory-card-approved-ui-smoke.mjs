@@ -48,6 +48,19 @@ assert.match(details, /\['Артикул',/);
 assert.match(details, /\['Короткое название',/);
 assert.doesNotMatch(details, /data-company-selection-card|data-company-product-check/);
 assert.match(counterparties, /catalog\/link-status/);
+assert.match(counterparties, /function openSupplierAgreement\(/,
+  'Agreement discount belongs to Counterparty, not Stock card');
+assert.match(counterparties, /listPriceSample/);
+assert.match(counterparties, /purchasePriceSample/);
+assert.match(counterparties, /function openSupplierBatchPrices\(/);
+assert.match(counterparties, /catalog\/prices/);
+assert.match(counterparties, /function openSupplierProductEditor\(/);
+assert.match(counterparties, /data-company-product-edit/);
+assert.match(counterparties, /\['Цена со скидкой', money\(supplierEffectivePrice\(row, company\)\)\]/);
+const supplierQ = counterparties.slice(counterparties.indexOf('function openCatalogProductDetails('),
+  counterparties.indexOf('function catalogItemList('));
+assert.doesNotMatch(supplierQ, /row\.actualPrice|inventoryItem\.update/);
+assert.match(counterparties, /id: 'discount', label: 'Моя скидка'/);
 assert.match(counterparties, /unitsPerOffer/);
 assert.match(classification, /createInventoryClassificationGroup/);
 assert.match(classification, /updateInventoryClassificationGroup/);
