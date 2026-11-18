@@ -2012,6 +2012,7 @@ function openManufacturerStock(root, manufacturer, groupContext = null) {
       title: 'Выбрано: ' + ids.length,
       actions: [
         { id: 'transfer', label: 'Переместить', onSelect: () => openInventoryTransfer(() => {
+          selectedStockItems.clear();
           renderList();
         }, { selectedItemIds: ids, fromLocationId: STOCK_VIEW.storageScope === INVENTORY_TOTAL_SCOPE
           ? '' : STOCK_VIEW.storageScope }) },
