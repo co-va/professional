@@ -60,6 +60,18 @@
   white-space:nowrap;
   overflow-wrap:normal;
 }
+/* The existing List indicator follows the SKU in the second line. */
+.inventory-counterparty-product-row .ui-list__secondary:has(>.ui-list__indicator){
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.inventory-counterparty-product-row .ui-list__secondary-text{
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
 /* Availability is expressed only by the price tone, not a separate dot. */
 .inventory-counterparty-product-row .is-supplier-available .ui-list__right-secondary{
   color:var(--text);
