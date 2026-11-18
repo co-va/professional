@@ -1,5 +1,16 @@
 import { inventoryStockBalanceInThresholdUnits, isWeighedInventoryItem } from './completeness.js';
 
+let criteriaCatalog = [];
+if (typeof window !== 'undefined') window.addEventListener('professional:auth-logout', () => {
+  criteriaCatalog = [];
+});
+
+export const getInventoryCriteria = () => criteriaCatalog;
+export function setInventoryCriteriaCatalog(rows = []) {
+  criteriaCatalog = Array.isArray(rows) ? rows : [];
+  return criteriaCatalog;
+}
+
 let snapshot = {
   items: [],
   lots: [],
