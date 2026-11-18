@@ -927,7 +927,7 @@ function openInventoryOrderZ(root, orderId) {
       if (submit.disabled) return;
       error.textContent = '';
       const date = form.querySelector('[name="inventoryOrderReceivedAt"]')?.value;
-      if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date || '') || current()?.status !== 'paid') {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date || '') || current()?.status !== 'paid') {
         error.textContent = 'Проверьте дату получения.';
         return;
       }
