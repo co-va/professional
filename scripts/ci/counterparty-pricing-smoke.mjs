@@ -19,6 +19,32 @@ assert.match(source, /label: 'Скидка по договору, %', name: 'dis
   'Agreement percentage is edited as part of the counterparty');
 assert.match(source, /input\.discountPercent = discount;/,
   'Counterparty edit sends the validated percentage to Core');
+const mismatchSource = source.slice(source.indexOf('function counterpartyFieldMismatch('),
+  source.indexOf('function openCompanyEditor('));
+const counterpartyFieldMismatch = new Function(mismatchSource +
+  '\nreturn counterpartyFieldMismatch;')();
+const savedCompany = {
+  name: 'Supplier', kind: 'SUPPLIER', contactName: 'Representative',
+  phone: '+7', email: 'test@example.com', website: 'site.test', note: 'Agreement',
+  discountPercent: '12.5000',
+};
+assert.equal(counterpartyFieldMismatch({ ...savedCompany, discountPercent: 12.5 }, savedCompany), '',
+  'Core decimals serialized as strings must compare numerically');
+assert.equal(counterpartyFieldMismatch({ ...savedCompany, discountPercent: 13 }, savedCompany),
+  'Скидка по договору', 'An ignored Core discount must be detected');
+assert.equal(counterpartyFieldMismatch({ ...savedCompany, website: 'other.example', discountPercent: 12.5 },
+  savedCompany), 'Сайт', 'Every other form field must also be verified');
+assert.equal(counterpartyFieldMismatch({ ...savedCompany, discountPercent: null },
+  { ...savedCompany, discountPercent: null }), '', 'Unset discount is valid');
+assert.match(source, /const stored = \(await json\(\)\)\.find/,
+  'Editor must re-read persisted Core data after a successful HTTP request');
+assert.match(source, /if \(mismatch\) throw new Error/,
+  'Missing server-side fields must not be silently accepted');
+assert.match(source, /Скидка по договору: не указана/,
+  'Z2 must state explicitly when no agreement is stored');
+assert.match(source, /<strong class="ui-list__title">Скидка по договору:/,
+  'Z2 must show a stored agreement prominently');
+
 assert.doesNotMatch(source, /purchasePriceSample|listPriceSample|openSupplierAgreement/,
   'Obsolete sample-price calculator and its separate Q must not return');
 assert.doesNotMatch(source, /id: 'discount'/,
