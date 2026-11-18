@@ -43,7 +43,7 @@ import { openInventoryProductAppearanceQ, openInventoryProductOverview } from '.
 import { renderInventoryOrders } from './orders.js';
 import { classificationOptions, openInventoryClassificationGroups,
   inventoryCriterionGroups, criterionOptions } from './classification.js';
-import { openInventoryStorageLocations, openInventoryTransfer } from './storage.js';
+import { openInventoryStorageLocations, openInventoryTransfer, reconcileLegacyInventoryStorage } from './storage.js';
 import { renderStockBrandList, buildStockCatalogGroups } from './stock-catalog.js';
 import { catalogDisclosure } from './catalog-ui.js';
 import { INVENTORY_TOTAL_SCOPE, inventoryDisplayBalance, inventoryDisplayTarget,
@@ -2757,8 +2757,26 @@ export async function renderInventory(root, section = 'stock') {
     return () => {};
   }
 
+  // Excel A/B labels survived the schema migration in InventoryItem.location.
+  // Before switching the Stock view to named locations, automatically restore
+  // their actual locations and remaining physical balances via Core's atomic
+  // stock-transfer API. The operation is idempotent and has no extra button.
+  let legacyError=null;
+  if (section === 'stock') {
+    try {
+      await reconcileLegacyInventoryStorage();
+    } catch (error) {
+      legacyError=error instanceof Error ? error.message : 'Не удалось восстановить старые склады.';
+    }
+  }
   if (section === 'movements') renderMovements(root);
   else if (section === 'orders') renderOrders(root);
-  else renderStock(root);
+  else {
+    renderStock(root);
+    if (legacyError) openNotice({
+      title:'Не удалось сопоставить склады',
+      message:legacyError+'. Существующие товары не удалены; проверьте склады и повторите вход.',
+    });
+  }
   return () => {};
 }
