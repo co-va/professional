@@ -194,12 +194,44 @@ export async function payInventoryPurchaseOrder(orderId, value) {
   });
 }
 
-export async function receiveInventoryPurchaseOrder(orderId, receivedAt) {
+export async function receiveInventoryPurchaseOrder(orderId, receivedAt, allocations = null, rejections = []) {
   return inventoryRequest(`${purchaseOrderPath(orderId)}/receive`, {
-    method: 'POST', body: JSON.stringify({ receivedAt }),
+    method: 'POST', body: JSON.stringify({
+      receivedAt, ...(allocations ? { allocations, rejections } : {}),
+    }),
     verifySnapshot: payload => {
       const order = verifyOrderState(payload, orderId, ['received']);
-      if (!order.receiptMovementId) throw new Error('Сервер не подтвердил приход.');
+      if (!order.receiptMovementId && !rejections.length) throw new Error('Сервер не подтвердил приход.');
+      if (rejections.length) {
+        const claims = Array.isArray(payload?.supplierClaims) ? payload.supplierClaims : [];
+        for (const line of rejections) if (!claims.some(claim =>
+          claim.orderId === orderId && claim.itemId === line.itemId && Number(claim.packages) === Number(line.packages)))
+          throw new Error('Сервер не подтвердил возврат неверной позиции.');
+      }
+    },
+  });
+}
+
+export function returnInventoryPurchaseOrderToSupplier(orderId, value) {
+  return inventoryRequest(`${purchaseOrderPath(orderId)}/supplier-returns`, {
+    method: 'POST', body: JSON.stringify(value),
+    verifySnapshot: payload => {
+      const movementId = 'inventory-supplier-return-' + value.returnId;
+      if (!Array.isArray(payload?.movements) ||
+          !payload.movements.some(movement => movement.movementId === movementId))
+        throw new Error('Сервер не подтвердил возврат поставщику.');
+    },
+  });
+}
+
+export function refundInventorySupplierClaim(claimId, value) {
+  return inventoryRequest('/supplier-claims/' + encodeURIComponent(claimId) + '/refund', {
+    method: 'POST', body: JSON.stringify(value),
+    verifySnapshot: payload => {
+      if (!Array.isArray(payload?.supplierClaimSettlements) ||
+          !payload.supplierClaimSettlements.some(row =>
+            row.claimId === claimId && row.settlementId === value.settlementId))
+        throw new Error('Сервер не подтвердил возврат денег.');
     },
   });
 }
