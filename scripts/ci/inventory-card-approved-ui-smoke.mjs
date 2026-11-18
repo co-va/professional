@@ -5,6 +5,9 @@ const form = readFileSync('core/inventory/inventory.js', 'utf8');
 const layout = readFileSync('ui/forms/forms.css', 'utf8');
 const sharedCheck = readFileSync('ui/selection/check-list.css', 'utf8');
 const disclosure = readFileSync('core/inventory/orders.js', 'utf8');
+const counterparties = readFileSync('core/inventory/counterparties.js', 'utf8');
+const classification = readFileSync('core/inventory/classification.js', 'utf8');
+const storage = readFileSync('core/inventory/storage.js', 'utf8');
 const card = form.slice(form.indexOf('function advancedItemFields('), form.indexOf('function collectOptionalNumber('));
 const save = form.slice(form.indexOf('  const save = async () => {'), form.indexOf("    primary.disabled = true;", form.indexOf('  const save = async () => {')));
 
@@ -36,4 +39,18 @@ assert.match(sharedCheck, /color:var\(--text\);font-size:19px/);
 assert.match(layout, /\[name="packageQuantity"\]\) input\[readonly\]/);
 assert.doesNotMatch(layout, /\.ui-compact-check__mark/);
 assert.doesNotMatch(layout, /\.accordion-chevron/);
-console.log('PASS: compact inventory receipt/nominal/consumption layout and independent supplier offers');
+// Supplier row opens a data-only Q; only its independent compact check chooses it.
+assert.match(counterparties, /if \(row\) openCatalogProductDetails\(row, catalogLinkStatuses\.get/);
+assert.doesNotMatch(counterparties, /if \(check\) check\.click\(\);/);
+const details = counterparties.slice(counterparties.indexOf('function openCatalogProductDetails('),
+  counterparties.indexOf('function catalogItemList('));
+assert.match(details, /\['Артикул',/);
+assert.match(details, /\['Короткое название',/);
+assert.doesNotMatch(details, /data-company-selection-card|data-company-product-check/);
+assert.match(counterparties, /catalog\/link-status/);
+assert.match(counterparties, /unitsPerOffer/);
+assert.match(classification, /createInventoryClassificationGroup/);
+assert.match(classification, /updateInventoryClassificationGroup/);
+assert.match(storage, /transferInventoryStock/);
+assert.match(storage, /updateInventoryStorageLocation/);
+console.log('PASS: compact inventory receipt/nominal/consumption UI and Core group/storage/supplier Q controls');
