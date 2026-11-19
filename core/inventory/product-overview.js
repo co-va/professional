@@ -135,6 +135,7 @@ function productCardFields(item, stockScope = INVENTORY_TOTAL_SCOPE) {
     ['consumption', 'Расход', actualInventoryConsumption(item, stockScope)],
     ['baseUnitPrice', 'Себестоимость', consumptionUnitCost(item)],
     ['saleIndicator', 'Продажа', item.canSell===true ? 'Продажа ☑' : 'Продажа ☐'],
+    ['salePrice', 'Цена продажи', item.canSell===true ? money(item.salePrice) : ''],
   ];
   return entries.map(([value, label, text]) => ({value,label,text:optionalText(text)}));
 }
@@ -334,6 +335,7 @@ function stockCardPreviewExamples(item) {
     consumption: '5 ' + unit,
     baseUnitPrice: '10 ₽/' + unit,
     saleIndicator: 'Продажа ☐',
+    salePrice: '1 500 ₽',
   };
 }
 
