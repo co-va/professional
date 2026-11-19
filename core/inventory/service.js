@@ -92,6 +92,9 @@ export async function updateInventoryItem(itemId, value = {}) {
     && expected !== (Number(previous?.position) || 0);
   return inventoryRequest(`/items/${encodeURIComponent(String(itemId || ''))}`, {
     method: 'PUT',
+    // A bounded wait prevents a stalled Core position write from freezing Q.
+    // Core's position transaction has a 60s timeout plus up to 10s lock wait.
+    ...(Object.prototype.hasOwnProperty.call(value, 'position') ? { timeoutMs: 75000 } : {}),
     // A stale phone or browser tab cannot overwrite a more recent slot number.
     body: JSON.stringify(Object.prototype.hasOwnProperty.call(value, 'position')
       ? { ...value, expectedPosition: Number(previous?.position) || 0 } : value),
