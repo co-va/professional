@@ -2802,6 +2802,13 @@ function openInventoryAuditCriteria(root, { mode, ids = [], fieldName = 'categor
     const value = String(valueInput?.value ?? '').trim();
     const commonDirty = clearing || (dataCommonTouched && value !== '' &&
       (!dataUniform || value !== dataInitial));
+    individualHost?.querySelectorAll('[data-inventory-audit-clear-item]').forEach(check => {
+      const index = Number(check.dataset.inventoryAuditClearItem);
+      const input = individualHost.querySelector('[name="auditItem-' + index + '"]');
+      if (input) input.disabled = check.checked;
+      const selectTrigger = input?.closest('.ui-select')?.querySelector('[data-ui-select-trigger]');
+      if (selectTrigger) selectTrigger.disabled = check.checked;
+    });
     const individualDirty = items.some((item, index) => {
       if (individualHost?.querySelector('[data-inventory-audit-clear-item="' + index + '"]')?.checked)
         return true;
