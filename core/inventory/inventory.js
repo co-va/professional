@@ -2739,7 +2739,7 @@ function openInventoryAuditCriteria(root, { mode, ids = [], fieldName = 'categor
   let definition = inventoryAuditFieldDefinition(fieldName);
   if (isData && !definition) return openNotice({ title: 'Данные', message: 'Выберите характеристику.' });
   const fields = isData
-    ? '<div data-inventory-audit-data-editor>' +
+    ? '<div class="form-grid" data-inventory-audit-data-editor>' +
       compactCheck({ label: 'Одно значение для всех', checked: true,
         data: 'data-inventory-data-common' }) +
       '<div data-inventory-audit-data-common></div>' +
