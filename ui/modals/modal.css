@@ -1,0 +1,67 @@
+.modal-sheet{overscroll-behavior:contain}
+.modal-sheet:focus{outline:none}
+.modal-title{padding-right:0;margin-bottom:18px}.modal--technical .modal-title{padding-right:44px}.modal-title h2{margin:0;font-size:23px}.modal-title p{margin:6px 0 0;color:var(--text-secondary);font-size:14px}
+.modal-title--action{display:flex;align-items:center;justify-content:space-between;gap:12px}.modal-title--action .ui-info{flex:0 0 auto}
+.modal-actions{display:grid;gap:8px}.compact-form{display:grid;gap:12px}.compact-form .modal-title{margin-bottom:2px}
+
+/* One measured action stack for all Z/Q surfaces; no button-count rules. */
+.modal-actions[hidden]{display:none!important}
+/* Shared action visibility retains the occupied footer height and scroll bounds. */
+.modal-actions[data-ui-action-hidden]{
+  visibility:hidden;
+  pointer-events:none;
+}
+:is([data-v2-z-body],[data-v2-q-body]):has(.modal-actions){
+  padding-bottom:calc(var(--ui-action-height,0px) + 44px);
+  scroll-padding-bottom:calc(var(--ui-action-height,0px) + 44px);
+}
+/* The Z body excludes the existing horizontal overscan. Center its footer
+   on the same visible work area, without changing the primary button width. */
+[data-v2-z-body]{--ui-action-shift:calc(var(--v2-z-viewport-overscan) / 2)}
+[data-v2-q-body]{--ui-action-shift:0px}
+:is([data-v2-z-body],[data-v2-q-body]) .modal-actions{
+  position:absolute;
+  z-index:5;
+  left:calc(var(--ui-action-inset) - var(--ui-action-shift,0px));
+  right:calc(var(--ui-action-inset) + var(--ui-action-shift,0px));
+  bottom:calc(24px + var(--ui-bottom-safe,env(safe-area-inset-bottom)));
+  box-sizing:border-box;
+  margin:0;
+  padding:0;
+}
+/* X action is the final part of its natural content, not a floating
+   second footer. There is no scrollable blank area after the button. */
+.v2-layer--bottom .modal-actions{
+  position:static;
+  box-sizing:border-box;
+  margin-top:8px;
+  padding:0;
+  background:var(--v2-inner-surface,#F5F5F3);
+}
+
+.modal-sheet input,.modal-sheet select,.modal-sheet textarea{font-size:16px;max-width:100%;min-width:0}.modal-sheet input:focus,.modal-sheet select:focus,.modal-sheet textarea:focus{font-size:16px}
+.modal-sheet.modal--surface-app:not(.modal--technical){background:var(--v2-inner-surface,#F5F5F3)}
+.modal-bottom-action{width:100%;height:100%;border:0;background:transparent;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:0 18px;color:var(--text);text-align:left}.modal-bottom-action span{font-size:14px;color:var(--text-secondary)}.modal-bottom-action strong{font-size:18px;white-space:nowrap}.modal-bottom-action--partial{background:rgba(154,98,88,.14)}.modal-bottom-action--paid{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:0;text-align:center}.modal-bottom-action--paid strong{display:block;width:100%;font-size:18px;line-height:1.15;text-align:center}
+
+/* S is facts only: when document information follows a source tile, the tile is not repeated inside S. */
+.modal-sheet.modal--top > .document-tiles:has(+ .entity-details){display:none}
+.modal-sheet.modal--top > .document-tiles:has(+ .entity-details) + .entity-details{margin-top:0}
+
+.modal-sheet.modal--bottom.modal--consent-sheet{height:auto;min-height:210px;max-height:46%;padding:max(18px,var(--v2-layer-gesture-size)) 18px 18px;background:var(--v2-inner-surface,#F5F5F3);overflow:hidden}
+.modal--consent-sheet .account-consent-sheet{min-width:0;overflow:hidden}
+.modal--consent-sheet .document-tiles--rail{margin:0;padding-bottom:6px}
+
+.modal-sheet.modal--bottom.modal--password-sheet{height:auto;min-height:330px;max-height:62%;padding:max(22px,var(--v2-layer-gesture-size)) 18px calc(20px + env(safe-area-inset-bottom));background:var(--v2-inner-surface,#F5F5F3);overflow:auto}
+
+.modal-sheet.modal--bottom.modal--photo-sheet{height:auto;min-height:138px;max-height:38%;padding:max(20px,var(--v2-layer-gesture-size)) 18px calc(18px + env(safe-area-inset-bottom));background:var(--v2-inner-surface,#F5F5F3);overflow:auto}
+
+.modal-sheet.modal--bottom.modal--profile-settings-sheet{height:auto;min-height:320px;max-height:64%;padding:max(20px,var(--v2-layer-gesture-size)) 18px calc(18px + env(safe-area-inset-bottom));background:var(--v2-inner-surface,#F5F5F3);overflow:auto}
+
+.modal-sheet.modal--bottom.modal--color-sheet{height:auto;min-height:260px;max-height:54%;padding:max(20px,var(--v2-layer-gesture-size)) 18px calc(18px + env(safe-area-inset-bottom));background:var(--v2-inner-surface,#F5F5F3);overflow:auto}
+.modal-sheet.modal--bottom.modal--time-range-sheet{height:auto;min-height:260px;max-height:54%;padding:max(20px,var(--v2-layer-gesture-size)) 18px calc(18px + env(safe-area-inset-bottom));background:var(--v2-inner-surface,#F5F5F3);overflow:auto}
+.modal-sheet.modal--bottom.modal--form-sheet{height:auto;min-height:260px;max-height:54%;padding:max(20px,var(--v2-layer-gesture-size)) 18px calc(18px + env(safe-area-inset-bottom));background:var(--v2-inner-surface,#F5F5F3);overflow:auto}
+
+.modal-sheet.modal--bottom.modal--time-picker-sheet{height:auto;min-height:360px;max-height:72%;padding:max(20px,var(--v2-layer-gesture-size)) 18px calc(18px + env(safe-area-inset-bottom));background:var(--v2-inner-surface,#F5F5F3);overflow:auto}
+
+/* Only this long Q title scales on narrow phones; other Q headings are unchanged. */
+.modal--account-controls .v2-q-title{font-size:clamp(13px,4.3vw,18px);letter-spacing:-.035em;white-space:nowrap;max-width:100%}

@@ -1,0 +1,39 @@
+import { canUseCapability } from '../access.js';
+
+const FINANCE_NAVIGATION = [
+  { id: 'cash', label: 'Касса', capability: 'finance.cash.access' },
+  { id: 'dds', label: 'ДДС', capability: 'finance.dds.access' },
+  { id: 'z-report', label: 'Z-отчёт', capability: 'finance.z_report.access' },
+];
+
+function cashCompositionAccessible() {
+  return canUseCapability('finance.cash.access')
+    || canUseCapability('finance.special.access')
+    || canUseCapability('finance.investment.self.access')
+    || canUseCapability('finance.investment.raise.access')
+    || canUseCapability('finance.investment.external.access');
+}
+
+export function financeNavigationItems() {
+  return FINANCE_NAVIGATION
+    .filter((item) => item.id === 'cash'
+      ? cashCompositionAccessible()
+      : canUseCapability(item.capability))
+    .map(({ id, label }) => ({ id, label }));
+}
+
+export function renderFinanceSection(root, section = 'cash', options = {}) {
+  return import('../runtime/auxiliary-state.js')
+    .then(({ loadFinanceState, loadWalletCatalog }) => Promise.all([loadFinanceState(), loadWalletCatalog()]))
+    .then(() => {
+      if (section === 'dds') {
+        return import('./dds/index.js').then(({ renderDDS }) => renderDDS(root));
+      }
+      if (section === 'z-report') {
+        return import('./z-report/index.js').then(({ renderZReport }) => renderZReport(root));
+      }
+      return import('./cash/cash.js').then(({ renderWallets }) => renderWallets(root, options));
+    });
+}
+
+export { renderFinanceSection as render };

@@ -1,0 +1,69 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+
+const form = readFileSync('core/inventory/inventory.js', 'utf8');
+const layout = readFileSync('ui/forms/forms.css', 'utf8');
+const sharedCheck = readFileSync('ui/selection/check-list.css', 'utf8');
+const disclosure = readFileSync('core/inventory/orders.js', 'utf8');
+const counterparties = readFileSync('core/inventory/counterparties.js', 'utf8');
+const classification = readFileSync('core/inventory/classification.js', 'utf8');
+const storage = readFileSync('core/inventory/storage.js', 'utf8');
+const card = form.slice(form.indexOf('function advancedItemFields('), form.indexOf('function collectOptionalNumber('));
+const save = form.slice(form.indexOf('  const save = async () => {'), form.indexOf("    primary.disabled = true;", form.indexOf('  const save = async () => {')));
+
+assert.doesNotMatch(form, /segmentControl\(\[/);
+assert.doesNotMatch(form, /inventoryShape/);
+assert.match(form, /<details/);
+assert.match(form, /<summary/);
+assert.match(disclosure, /<details data-inventory-order-excluded/);
+assert.match(card, /label: 'Номинал'|inventory-editor-label">Номинал/);
+assert.match(card, /label: 'Ед. прихода'/);
+assert.doesNotMatch(card, /label: 'Поставщик'/);
+assert.doesNotMatch(save, /supplier: String\(data.get\('supplier'\)/);
+assert.match(form, /data-inventory-disposal-row/);
+assert.match(form, /data-inventory-package-fields hidden/);
+assert.match(form, /contentRow\.appendChild\(pack\)/);
+assert.match(form, /inventory-editor-row--three/);
+assert.match(form, /receipt === 'уп\.' \? 'В упаковке'/);
+assert.match(form, /const derived = fromWeight \?\? fromNominal/);
+assert.match(form, /packageInput\.readOnly/);
+assert.match(form, /const packageQuantity = unit === 'уп\.'/);
+assert.match(form, /measuredPack \?\? nominalPack \?\? packed/);
+assert.match(form, /receiptUnit !== unit/);
+assert.doesNotMatch(form, /data-inventory-conversion/);
+assert.match(form, /data-inventory-gross-net-tare/);
+assert.match(form, /data-inventory-net-only/);
+assert.match(form, /data-inventory-usage-check="sale"/);
+assert.match(sharedCheck, /border-radius:8px/);
+assert.match(sharedCheck, /color:var\(--text\);font-size:19px/);
+assert.match(layout, /\[name="packageQuantity"\]\) input\[readonly\]/);
+assert.doesNotMatch(layout, /\.ui-compact-check__mark/);
+assert.doesNotMatch(layout, /\.accordion-chevron/);
+// Supplier row opens a data-only Q; only its independent compact check chooses it.
+assert.match(counterparties, /if \(row\) openCatalogProductDetails\(row, catalogLinkStatuses\.get/);
+assert.doesNotMatch(counterparties, /if \(check\) check\.click\(\);/);
+const details = counterparties.slice(counterparties.indexOf('function openCatalogProductDetails('),
+  counterparties.indexOf('function catalogItemList('));
+assert.match(details, /\['Артикул',/);
+assert.match(details, /\['Короткое название',/);
+assert.doesNotMatch(details, /data-company-selection-card|data-company-product-check/);
+assert.match(counterparties, /catalog\/link-status/);
+assert.match(counterparties, /function openSupplierAgreement\(/,
+  'Agreement discount belongs to Counterparty, not Stock card');
+assert.match(counterparties, /listPriceSample/);
+assert.match(counterparties, /purchasePriceSample/);
+assert.match(counterparties, /function openSupplierBatchPrices\(/);
+assert.match(counterparties, /catalog\/prices/);
+assert.match(counterparties, /function openSupplierProductEditor\(/);
+assert.match(counterparties, /data-company-product-edit/);
+assert.match(counterparties, /\['Цена со скидкой', money\(supplierEffectivePrice\(row, company\)\)\]/);
+const supplierQ = counterparties.slice(counterparties.indexOf('function openCatalogProductDetails('),
+  counterparties.indexOf('function catalogItemList('));
+assert.doesNotMatch(supplierQ, /row\.actualPrice|inventoryItem\.update/);
+assert.match(counterparties, /id: 'discount', label: 'Скидка по договору'/);
+assert.match(counterparties, /unitsPerOffer/);
+assert.match(classification, /createInventoryClassificationGroup/);
+assert.match(classification, /updateInventoryClassificationGroup/);
+assert.match(storage, /transferInventoryStock/);
+assert.match(storage, /updateInventoryStorageLocation/);
+console.log('PASS: compact inventory receipt/nominal/consumption UI and Core group/storage/supplier Q controls');

@@ -1,0 +1,146 @@
+.entity-visual-card{position:relative;isolation:isolate;box-sizing:border-box;width:min(338px,100%);max-width:338px;aspect-ratio:338/213;min-width:0;overflow:hidden;border:1px solid var(--border);border-radius:var(--radius-card);padding:0;background:var(--entity-visual-gradient);color:#fff;text-align:left}
+.entity-visual-card[type="button"]{appearance:none;-webkit-appearance:none;font:inherit;cursor:pointer}
+.entity-visual-card__surface{position:absolute;z-index:-2;inset:0;background:var(--entity-visual-gradient)}
+.entity-visual-card.has-image .entity-visual-card__surface{background-image:linear-gradient(180deg,rgba(0,0,0,.04),rgba(0,0,0,.18)),var(--entity-visual-image);background-size:cover;background-position:var(--entity-visual-image-position)}
+.entity-visual-card__grid{position:absolute;inset:12px 14px;display:grid;grid-template-rows:repeat(9,minmax(0,1fr));align-items:center}
+/* The card is always nine rows and three equal cells. Empty adjacent cells
+   provide natural spill space; a configured cell stops the spill. */
+.entity-visual-card__row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));min-width:0;height:100%;align-items:center;gap:0}
+.entity-visual-card__cell{position:relative;min-width:0;height:100%;overflow:visible;font-size:13px;line-height:1}
+.entity-visual-card__text{position:absolute;top:50%;display:block;width:max-content;max-width:calc(100% * var(--spill-width,1));white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transform:translateY(-50%)}
+.entity-visual-card__cell.is-align-left>.entity-visual-card__text{left:0;text-align:left}
+.entity-visual-card__cell.is-align-center>.entity-visual-card__text{left:50%;text-align:center;transform:translate(-50%,-50%)}
+.entity-visual-card__cell.is-align-right>.entity-visual-card__text{right:0;text-align:right}
+.entity-visual-card__cell.is-size-s{font-size:11px}
+.entity-visual-card__cell.is-size-m{font-size:13px}
+.entity-visual-card__cell.is-size-l{font-size:16px}
+.entity-visual-card__cell.is-size-xl{font-size:20px}
+.entity-visual-card__cell.is-bold{font-weight:800}
+.entity-visual-card__cell.is-italic{font-style:italic}
+.entity-visual-card__cell.is-underline{text-decoration:underline}
+
+.entity-card-appearance-q__selectors{display:grid;gap:var(--v2-surface-header-spacing);min-width:0;width:100%}
+.entity-card-appearance-q__selectors .ui-select{width:100%}
+
+.entity-card-editor{
+  /* The nine row buttons define the control height in every editor tab. */
+  --entity-card-control-gap:3px;
+  --entity-card-control-height:calc((100cqw - 8 * var(--entity-card-control-gap)) / 9);
+  container-type:inline-size;
+  display:grid;
+  gap:14px;
+  min-width:0;
+}
+.entity-card-editor__preview{display:flex;justify-content:center;min-width:0;margin-bottom:10px}
+.entity-card-editor__tabs{margin:0}
+.entity-card-editor__tabs button{min-height:38px}
+.entity-card-editor__workspace{min-height:236px}
+.entity-card-editor__photo{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.entity-card-editor__photo>.ui-button{
+  box-sizing:border-box;
+  min-width:0;
+  width:100%;
+  padding:0 6px;
+  white-space:nowrap;
+  font-size:clamp(12px,3.5vw,14px);
+}
+.entity-card-editor__photo>.ui-button:only-child{grid-column:1/-1}
+.entity-card-editor__background{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.entity-card-editor__background [data-card-gradient-color]{min-width:0}
+.entity-card-editor__background .color-picker__trigger{
+  box-sizing:border-box;
+  width:100%;
+  min-width:0;
+  min-height:0;
+  height:var(--entity-card-control-height);
+  padding:0 4px;
+  justify-content:center;
+}
+.entity-card-editor__background .color-picker__swatch{
+  max-height:calc(var(--entity-card-control-height) - 6px);
+}
+.entity-card-editor__background .color-picker__trigger>span:last-child{display:none}
+.entity-card-editor__direction{grid-column:1/-1}
+
+/* One height for every editor control: the square size of a nine-position row.
+   Widths are independently assigned by each group. */
+.entity-card-editor__card-tools{
+  container-type:inline-size;
+  min-width:0;
+}
+.entity-card-editor__line-picker{
+  display:grid;
+  grid-template-columns:repeat(9,minmax(0,1fr));
+  gap:var(--entity-card-control-gap);
+  min-width:0;
+}
+.entity-card-editor__columns{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:var(--entity-card-control-gap);
+  min-width:0;
+}
+.entity-card-editor__tools-line{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr)) 10px repeat(4,minmax(0,1fr));
+  gap:var(--entity-card-control-gap);
+  min-width:0;
+}
+/* The spacer after the third button distinguishes the two functions. */
+.entity-card-editor__tools-line--metrics>.entity-card-editor__tool:nth-child(4){grid-column:5}
+.entity-card-editor__tools-line--typography>.entity-card-editor__text-color{grid-column:1 / span 3}
+.entity-card-editor__tools-line--typography>.entity-card-editor__tool:nth-child(2){grid-column:5}
+.entity-card-editor__section{display:grid;gap:8px;min-width:0}
+.entity-card-editor__section + .entity-card-editor__section{margin-top:12px}
+.entity-card-editor__tool-captions{display:grid;grid-template-columns:3fr 4fr;gap:calc(10px + var(--entity-card-control-gap) * 2);color:var(--text-secondary);font-size:12px}
+.entity-card-editor__tool-captions span{min-width:0}
+.entity-card-editor__line-picker button{border:1px solid #111;background:#fff;color:#111;font:inherit;font-size:12px}
+.entity-card-editor__line-picker button.is-active{background:#111;color:#fff}
+
+.entity-card-editor__data{margin:0;min-width:0}
+.entity-card-editor__control-label{margin:0;font-size:12px;color:var(--text-secondary)}
+.entity-card-editor__data .ui-select{display:grid;gap:5px}
+.entity-card-editor__data .ui-select>span{color:var(--text-secondary);font-size:12px}
+
+.entity-card-editor__tool{border:1px solid #111;background:#fff;color:#111;font:inherit;font-size:12px;display:flex;align-items:center;justify-content:center}
+.entity-card-editor__line-picker button,
+.entity-card-editor__columns .entity-card-editor__tool,
+.entity-card-editor__tools-line .entity-card-editor__tool{
+  box-sizing:border-box;
+  min-width:0;
+  width:100%;
+  height:var(--entity-card-control-height);
+  min-height:0;
+  aspect-ratio:auto;
+  border-radius:0;
+  padding:0;
+}
+.entity-card-editor__tool.is-active{background:#111;color:#fff}
+.entity-card-editor__tool[aria-label="Курсив"]{font-style:italic}
+.entity-card-editor__tool[aria-label="Подчёркнутый"]{text-decoration:underline}
+.entity-card-editor__text-color{display:flex;align-items:center;justify-content:center}
+.entity-card-editor__text-color-swatch{
+  display:block;
+  flex:0 1 58px;
+  width:min(58px,calc(100% - 8px));
+  height:min(28px,calc(var(--entity-card-control-height) - 6px));
+  border:1px solid #111;
+  border-radius:4px;
+  box-sizing:border-box;
+}
+
+.v2-profile-workplaces>.entity-visual-card{flex:0 0 min(338px,100%);width:min(338px,100%);max-width:338px}
+.entity-card-rail{display:flex;gap:10px;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:none;padding:4px 0 12px}
+.entity-card-rail::-webkit-scrollbar{display:none}
+.entity-card-rail>.entity-visual-card{flex:0 0 min(338px,100%);width:min(338px,100%);max-width:338px}
+
+@media(max-width:360px){
+  .entity-visual-card__grid{inset:10px 12px}
+  .entity-card-editor{--entity-card-control-gap:2px}
+  .entity-card-editor__line-picker button{font-size:11px}
+  .entity-card-editor__tool{font-size:11px}
+}
+
+/* The iOS file picker is opened by its own native control, not JS input.click(). */
+.entity-card-editor__photo-select{position:relative;display:grid;place-items:center;cursor:pointer;overflow:hidden}
+.entity-card-editor__photo-select [data-card-photo-input]{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}

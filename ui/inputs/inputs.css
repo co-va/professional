@@ -1,0 +1,58 @@
+.form-grid{display:grid;gap:12px;align-content:start}.field{display:grid;gap:6px}.field>span{color:var(--text-secondary);font-size:13px}.field input,.field select,.field textarea,.array-row input,.array-row select{width:100%;min-height:var(--ui-field-height);border:1px solid var(--border);border-radius:0;padding:10px 12px;background:var(--white);color:var(--text);outline:none}.field input:not([type="range"]):not([type="file"]),.field select,.array-row input,.array-row select{height:var(--ui-field-height);min-height:var(--ui-field-height);max-height:var(--ui-field-height)}.field textarea{resize:vertical;min-height:96px;line-height:1.35}.field input:focus,.field select:focus,.field textarea:focus,.array-row input:focus,.array-row select:focus{border-color:var(--text-secondary)}input[type="number"]{-moz-appearance:textfield}input[type="number"]::-webkit-outer-spin-button,input[type="number"]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}.locked-value{height:var(--ui-field-height);min-height:var(--ui-field-height);max-height:var(--ui-field-height);padding:0 12px;border:1px solid var(--border);border-radius:0;display:flex;align-items:center;justify-content:space-between;background:var(--surface-soft);font-weight:700}.locked-value span{color:var(--text-muted);font-size:12px;font-weight:500}.phone-input{display:grid;grid-template-columns:60px minmax(0,1fr);gap:7px;align-items:center}.phone-input__country,.phone-input__national{min-width:0}.phone-input__country .ui-select__control{padding-left:6px;padding-right:20px}.phone-input__country .ui-select__chevron{right:6px}.phone-input__national{width:100%;height:var(--ui-field-height);min-height:var(--ui-field-height);max-height:var(--ui-field-height);border:1px solid var(--border);border-radius:0;padding:10px 12px;background:var(--white);color:var(--text);outline:none}.phone-input__national:focus{border-color:var(--text-secondary)}.array-group{display:grid;gap:8px;margin-top:10px}.array-label{color:var(--text-secondary);font-size:13px}.array-row{display:grid;grid-template-columns:minmax(0,1fr) 40px;gap:7px;align-items:center}.array-row.link-row{grid-template-columns:minmax(90px,.8fr) minmax(0,1.5fr) 40px}.array-row.link-row .ui-select{min-width:0}.photo-field{display:grid;gap:8px}.photo-field__label{color:var(--text-secondary);font-size:13px}.photo-field__control{position:relative;display:grid;min-height:150px;overflow:hidden;border:1px solid var(--border);border-radius:0;background:var(--surface-soft);cursor:pointer}.photo-field__preview{position:absolute;inset:0;background-size:cover;background-position:center}.photo-field__preview--empty{display:grid;place-items:center;background:var(--button-secondary);color:rgba(255,255,255,.8);font-size:30px;font-weight:700}.photo-field__action{position:absolute;left:12px;right:12px;bottom:12px;z-index:2;min-height:40px;padding:10px 13px;border-radius:0;background:rgba(255,255,255,.92);color:var(--text);text-align:center;font-size:13px;font-weight:650}.photo-field__control input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}.photo-field__remove{justify-self:start}.file-input{display:none}@media(max-width:360px){.array-row.link-row{grid-template-columns:minmax(80px,.75fr) minmax(0,1.25fr) 40px}}
+.password-field__control{position:relative;min-width:0}.password-field__control input{padding-right:48px}.password-field__toggle{position:absolute;top:50%;right:6px;width:38px;height:38px;transform:translateY(-50%);border:0;border-radius:0;display:grid;place-items:center;background:transparent;color:var(--text);padding:8px}.password-field__toggle svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+
+.v2-app .field input,.v2-app .field textarea,.v2-app .array-row input,.v2-app .array-row select,.v2-app .phone-input__national,.v2-app .locked-value,.v2-app .photo-field__control{border-radius:0}
+.v2-app .photo-field__action{border-radius:0}
+.photo-cropper{display:grid;gap:16px}.photo-cropper__preview{width:min(100%,320px);aspect-ratio:1;margin:0 auto;border-radius:50%;background-size:cover;background-position:center;background-color:var(--button-secondary);box-shadow:0 0 0 1px var(--border)}.photo-cropper input[type="range"]{width:100%}
+
+.array-row__add{justify-self:end}
+
+.photo-field__tools{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.photo-field__tools.is-hidden{display:none}.photo-field__crop-panel[hidden]{display:none!important}.photo-field__crop-panel{padding:12px 0 2px;border-top:1px solid var(--border)}
+
+.ui-links{display:grid;gap:8px}.ui-links [data-links-list]{display:grid;gap:8px}.link-row{display:grid;grid-template-columns:minmax(96px,.8fr) minmax(0,1.5fr) var(--ui-compact-size);gap:7px;align-items:end}.link-row .ui-select{min-width:0}.link-row__url{width:100%;min-width:0;height:var(--ui-field-height);min-height:var(--ui-field-height);max-height:var(--ui-field-height);border:1px solid var(--border);border-radius:0;padding:10px 12px;background:var(--white);color:var(--text);outline:none}.ui-links__add{justify-self:end}@media(max-width:360px){.link-row{grid-template-columns:minmax(82px,.75fr) minmax(0,1.25fr) var(--ui-compact-size)}}
+
+.field input[type="range"],.ui-range input[type="range"]{-webkit-appearance:none;appearance:none;box-sizing:border-box;width:100%;min-height:32px;height:32px;border:0!important;padding:0;background:transparent;outline:none;accent-color:#111}
+.field input[type="range"]::-webkit-slider-runnable-track,.ui-range input[type="range"]::-webkit-slider-runnable-track{height:4px;border:1px solid #111;background:#111}
+.field input[type="range"]::-webkit-slider-thumb,.ui-range input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:22px;height:22px;margin-top:-10px;border:2px solid #111;border-radius:50%;background:#ffff00;box-shadow:none}
+.field input[type="range"]::-moz-range-track,.ui-range input[type="range"]::-moz-range-track{height:4px;border:1px solid #111;background:#111}
+.field input[type="range"]::-moz-range-progress,.ui-range input[type="range"]::-moz-range-progress{height:4px;background:#111}
+.field input[type="range"]::-moz-range-thumb,.ui-range input[type="range"]::-moz-range-thumb{width:22px;height:22px;border:2px solid #111;border-radius:50%;background:#ffff00;box-shadow:none}
+.field input[type="range"]:focus-visible::-webkit-slider-thumb,.ui-range input[type="range"]:focus-visible::-webkit-slider-thumb{outline:2px solid #111;outline-offset:2px}
+
+.ui-search-field{padding:0 0 12px}
+.ui-search-field .field>span{display:none}
+.ui-search-divider{height:1px;margin:0 0 14px;background:#D7D7D7}
+
+.field input:disabled{background:var(--surface-soft);color:var(--text);opacity:1;cursor:default}
+
+.form-grid--relaxed{gap:14px}.input-action-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:7px;align-items:center}.field-inline-label{display:flex;align-items:center;justify-content:space-between;gap:8px;color:var(--text-secondary);font-size:13px}
+
+/* Repeated contacts: compact header add control, matching the shared User profile pattern. */
+.array-group[data-repeated-add-placement="header"] .array-group__header{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:28px}
+
+
+.array-group[data-repeated-add-placement="header"] [data-repeated-list]{display:grid;gap:7px;min-width:0}
+.array-group[data-repeated-add-placement="header"] .array-row--solo{grid-template-columns:minmax(0,1fr)}
+.array-group[data-repeated-add-placement="header"] .array-row:not(.array-row--solo){grid-template-columns:minmax(0,1fr) var(--ui-compact-size)}
+/* Workplace Q: link codes align with the 60px phone prefix; add/remove actions are plain glyphs. */
+.ui-links--compact{min-width:0}
+.ui-links--compact [data-links-list]{min-width:0}
+.ui-links--compact .link-row{grid-template-columns:60px minmax(0,1fr) var(--ui-compact-size);gap:7px;align-items:center}
+.ui-links--compact .link-row .ui-select{min-width:0}
+.ui-links--compact .link-row .ui-select__control{box-sizing:border-box;padding:0 15px 0 2px}
+.ui-links--compact .link-row .ui-select__selection{gap:0}
+.ui-links--compact .link-row .ui-select__value{font-size:15px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:clip}
+.ui-links--compact .link-row .ui-select__meta{display:none}
+.ui-links--compact .link-row .ui-select__chevron{right:3px;font-size:13px}
+
+
+.ui-links--compact[data-repeated-add-placement="header"] .array-group__header{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:28px}
+
+
+
+/* Reusable two-field row: keep both date controls on one line, including narrow iPhones. */
+.form-grid--two{grid-template-columns:repeat(2,minmax(0,1fr))}
+.form-grid--two>.field{min-width:0}
+.form-grid--two>[data-date-picker]>span:empty{display:none}
+.form-grid--two>[data-date-picker] .ui-select__control{box-sizing:border-box;width:100%;min-width:0;padding-inline:9px 20px}
+.form-grid--two>[data-date-picker] .ui-select__value{white-space:nowrap;overflow:hidden;text-overflow:clip}

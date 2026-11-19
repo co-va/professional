@@ -1,0 +1,218 @@
+.document-tiles{
+  width:100%;
+  display:grid;
+  justify-items:center;
+  gap:14px;
+  padding:4px 0 18px;
+}
+.document-tile{
+  position:relative;
+  width:238px;
+  min-height:158px;
+  box-sizing:border-box;
+  border:1px solid #c9c9c9;
+  border-radius:10px;
+  padding:18px 16px 14px;
+  display:grid;
+  grid-template-rows:1fr auto;
+  gap:12px;
+  overflow:hidden;
+  background:#f8f8f8;
+  color:var(--v2-ink,#111);
+  text-align:left;
+  font:inherit;
+  box-shadow:0 2px 8px rgba(0,0,0,.16);
+}
+button.document-tile,.document-tile__open,.document-tile__toggle{cursor:pointer}
+.document-tile__fold{
+  position:absolute;
+  z-index:2;
+  top:-1px;
+  right:-1px;
+  width:42px;
+  height:42px;
+  box-sizing:border-box;
+  clip-path:polygon(0 0,100% 100%,0 100%);
+  background:#fff;
+  border-left:1px solid #d3d3d3;
+  border-bottom:1px solid #d3d3d3;
+  border-bottom-left-radius:8px;
+  box-shadow:-3px 4px 8px rgba(0,0,0,.12);
+  pointer-events:none;
+}
+.document-tile__body{
+  position:relative;
+  z-index:1;
+  min-width:0;
+  padding-top:22px;
+  display:grid;
+  align-content:start;
+  gap:8px;
+}
+.document-tile__title{
+  max-width:100%;
+  display:grid;
+  gap:0;
+  font-size:var(--document-title-size,16px);
+  line-height:1.14;
+  font-weight:760;
+  letter-spacing:-.01em;
+}
+.document-tile__title span{
+  display:block;
+  min-width:0;
+  white-space:nowrap;
+}
+.document-tile__version,
+.document-tile__meta{
+  font-size:12px;
+  line-height:1.2;
+}
+.document-tile__version,
+.document-tile__meta{color:var(--v2-muted,#6f7478)}
+.document-tile__footer{
+  position:relative;
+  z-index:1;
+  min-width:0;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+}
+.document-tile__meta{
+  min-width:0;
+  white-space:normal;
+  overflow:visible;
+  text-overflow:clip;
+  overflow-wrap:normal;
+  word-break:normal;
+}
+.document-tile__status{
+  flex:0 0 auto;
+  display:grid;
+  place-items:center;
+}
+.document-tile__status-mark{
+  width:32px;
+  height:22px;
+  box-sizing:border-box;
+  border:1px solid var(--v2-ink,#111);
+  border-radius:7px;
+  display:grid;
+  place-items:center;
+  background:#fff;
+  color:var(--v2-ink,#111);
+  font-size:14px;
+  font-weight:850;
+  line-height:1;
+}
+.document-tile__status.is-signed .document-tile__status-mark,
+.document-tile__status.is-revoked .document-tile__status-mark,
+.document-tile__status.is-pending .document-tile__status-mark{
+  background:#fff;
+  color:var(--v2-ink,#111);
+}
+.document-tile--controlled{padding:0}
+.document-tile__open{
+  width:100%;
+  min-height:156px;
+  border:0;
+  padding:18px 16px 14px;
+  display:grid;
+  grid-template-rows:1fr auto;
+  gap:12px;
+  background:transparent;
+  color:inherit;
+  text-align:left;
+  font:inherit;
+}
+.document-tile--controlled .document-tile__footer{padding-right:54px}
+.document-tile__toggle{
+  position:absolute;
+  z-index:3;
+  right:16px;
+  bottom:13px;
+  width:42px;
+  height:24px;
+  box-sizing:border-box;
+  border:1px solid var(--v2-ink,#111);
+  border-radius:999px;
+  padding:3px;
+  background:#fff;
+  transition:background-color .16s ease,border-color .16s ease;
+}
+.document-tile__toggle span{
+  display:block;
+  width:16px;
+  height:16px;
+  border-radius:50%;
+  background:var(--v2-ink,#111);
+  transition:transform .16s ease,background-color .16s ease;
+}
+.document-tile__toggle.is-on{background:var(--v2-ink,#111);border-color:var(--v2-ink,#111)}
+.document-tile__toggle.is-on span{transform:translateX(18px);background:#fff}
+.document-tile__toggle:disabled{opacity:.45;cursor:default}
+/* Documents own only their typography and content formatting.
+   Technical panel bounds, H backdrop and fixed X belong to Shared UI. */
+.document-viewer__content{
+  width:100%;
+  min-height:0;
+  /* The shared technical body is the ONLY scroll container. */
+  overflow:visible;
+  background:transparent;
+}
+.document-page{
+  width:100%;
+  box-sizing:border-box;
+  margin:0;
+  padding:0;
+  background:transparent;
+  color:#111;
+}
+.document-viewer__content:has(.document-viewer__pdf){
+  height:100%;
+}
+.document-page__version{margin-bottom:12px;font-size:12px;color:#6f7478}
+.document-page h1{margin:0 0 24px;font-size:24px;line-height:1.15;overflow-wrap:anywhere}
+.document-page__body{font-size:15px;line-height:1.58;overflow-wrap:anywhere}
+.document-page__body p{margin:0 0 1em}
+.document-page__body p:last-child{margin-bottom:0}
+.document-viewer__pdf{
+  display:block;
+  width:100%;
+  height:100%;
+  min-height:0;
+  border:0;
+  background:#fff;
+}
+@media(max-width:360px){
+  .document-tile{width:238px}
+}
+
+.document-tiles--rail{
+  display:flex;
+  justify-items:initial;
+  justify-content:flex-start;
+  overflow-x:auto;
+  overflow-y:hidden;
+  gap:14px;
+  padding:4px 0 18px;
+  scroll-snap-type:x proximity;
+  -webkit-overflow-scrolling:touch;
+  scrollbar-width:none;
+}
+.document-tiles--rail::-webkit-scrollbar{display:none}
+.document-tiles--rail .document-tile{
+  flex:0 0 238px;
+  scroll-snap-align:start;
+}
+.documents-content{margin-top:16px}
+.document-group{width:100%;display:grid;gap:8px;margin:0 0 20px}
+.document-group__title{margin:0;font-size:14px;line-height:1.2;font-weight:700}
+.document-detail{width:100%;display:grid;gap:14px}
+.documents-signing-info{display:grid;gap:7px;min-width:0}
+.documents-signing-info__title{margin:0;font-size:18px;line-height:1.16;font-weight:760;text-wrap:balance}
+.documents-signing-info__version{color:var(--v2-muted,#6f7478);font-size:13px;line-height:1.2}
+.documents-signing-info__person{margin-top:5px;font-size:16px;line-height:1.2;font-weight:720}
+.documents-signing-info__moment,.documents-signing-info__status{font-size:14px;line-height:1.2}
+.documents-signing-info__status{font-weight:680}

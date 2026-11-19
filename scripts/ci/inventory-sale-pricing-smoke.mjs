@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+const service = readFileSync('core/service/products/data.js','utf8');
+const sale = readFileSync('core/sale/sale.js','utf8');
+assert.match(service,/pricePerUnit:/);
+assert.match(service,/getInventoryItems\(\)/);
+assert.match(service,/inventoryItemId: item.itemId/);
+assert.match(sale,/product\.pricePerUnit/);
+assert.match(sale,/cost: Math\.round\(unitPrice \* quantity \* 100\) \/ 100/);
+assert.match(sale,/quantity,/);
+console.log('PASS: stock-linked sales snapshot correct price and quantity');
