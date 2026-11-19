@@ -2051,7 +2051,7 @@ function openManufacturerStock(root, manufacturer, groupContext = null) {
       if (!action) return;
       choice.v2Close?.();
       if (action === 'edit') {
-        openInventoryAuditCriteria(layer, { mode: 'data', ids, onSaved: renderList });
+        openInventoryAuditCriteria(layer, { mode: 'data', ids, onSaved: renderList, keepOpen: true });
       } else if (action === 'audit') {
         openInventoryAuditCriteria(layer, { mode: 'stock', ids, onSaved: renderList });
       } else if (action === 'transfer') {
@@ -2597,7 +2597,7 @@ function inventoryAuditValueMatches(item, definition, expected) {
   return String(actual ?? '') === String(expected);
 }
 
-async function applyInventoryAuditDataChanges(layer, { items, definition, perItem, data, status, submit, onSaved, clearAll = false }) {
+async function applyInventoryAuditDataChanges(layer, { items, definition, perItem, data, status, submit, onSaved, clearAll = false, keepOpen = false, afterApplied = () => {} }) {
   if (!definition) {
     status.textContent = 'Выберите характеристику.';
     return false;
@@ -2713,9 +2713,15 @@ async function applyInventoryAuditDataChanges(layer, { items, definition, perIte
           + (examples ? ` ${examples}.` : '') + (detail ? ` ${detail}` : '');
         return;
       }
-      layer.v2Close?.();
-      onSaved();
-      openNotice({ title: 'Изменить данные', message: `Изменено ${changes.length} позиций.` });
+      if (keepOpen) {
+        onSaved();
+        afterApplied();
+        status.textContent = `Изменено ${changes.length} позиций.`;
+      } else {
+        layer.v2Close?.();
+        onSaved();
+        openNotice({ title: 'Изменить данные', message: `Изменено ${changes.length} позиций.` });
+      }
       return true;
     } catch (error) {
       status.textContent = error instanceof Error ? error.message : 'Не удалось сохранить данные.';
@@ -2725,7 +2731,7 @@ async function applyInventoryAuditDataChanges(layer, { items, definition, perIte
   return false;
 }
 
-function openInventoryAuditCriteria(root, { mode, ids = [], fieldName = 'category', onSaved = () => {} } = {}) {
+function openInventoryAuditCriteria(root, { mode, ids = [], fieldName = 'category', onSaved = () => {}, keepOpen = false } = {}) {
   const items = inventoryAuditItems(ids);
   if (!items.length) return openNotice({ title: 'Инвентаризация', message: 'Позиции не найдены.' });
   const isData = mode === 'data';
@@ -3031,6 +3037,11 @@ function openInventoryAuditCriteria(root, { mode, ids = [], fieldName = 'categor
     try {
       await applyInventoryAuditDataChanges(layer, {
         items, definition, perItem: !common, data, status, submit, onSaved, clearAll,
+        keepOpen: isData && keepOpen,
+        afterApplied: () => {
+          items.splice(0, items.length, ...inventoryAuditItems(ids));
+          renderDataFields();
+        },
       });
     } finally {
       saving = false;
