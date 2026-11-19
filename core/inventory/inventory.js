@@ -2597,7 +2597,7 @@ function inventoryAuditValueMatches(item, definition, expected) {
   return String(actual ?? '') === String(expected);
 }
 
-async function applyInventoryAuditDataChanges(layer, { items, definition, perItem, data, status, submit, onSaved }) {
+async function applyInventoryAuditDataChanges(layer, { items, definition, perItem, data, status, submit, onSaved, clearAll = false }) {
   if (!definition) {
     status.textContent = 'Выберите характеристику.';
     return false;
@@ -2614,17 +2614,30 @@ async function applyInventoryAuditDataChanges(layer, { items, definition, perIte
     let startingValue;
     try {
       if (!perItem) {
-        startingValue = inventoryAuditParseDataValue(definition, data.get('auditValue'));
-        if (startingValue === null) throw new Error('Укажите новое значение.');
+        if (clearAll) {
+          if (!inventoryAuditCanClear(definition)) throw new Error('Эту характеристику нельзя очистить.');
+          startingValue = definition.kind === 'decimal' ? null : '';
+        } else {
+          startingValue = inventoryAuditParseDataValue(definition, data.get('auditValue'));
+          if (startingValue === null) throw new Error('Укажите новое значение.');
+        }
         if (definition.value === 'position' && startingValue + items.length - 1 > 2147483647)
           throw new Error('Диапазон порядковых номеров слишком велик.');
       }
       for (const [index, item] of items.entries()) {
         if (perItem && definition.value === 'referencePrice' && itemPrimaryPrice(item) !== null) continue;
-        const raw = perItem ? data.get(`auditItem-${index}`) : data.get('auditValue');
-        const value = perItem ? inventoryAuditParseDataValue(definition, raw)
-          : definition.value === 'position' ? startingValue + index : startingValue;
-        if (value === null) continue;
+        const raw = perItem ? String(data.get(`auditItem-${index}`) ?? '').trim() : '';
+        if (perItem && raw === String(inventoryAuditCurrentValue(item, definition) ?? '').trim()) continue;
+        let value;
+        if (!perItem) {
+          value = definition.value === 'position' ? startingValue + index : startingValue;
+        } else if (raw) {
+          value = inventoryAuditParseDataValue(definition, raw);
+        } else {
+          if (!inventoryAuditCanClear(definition))
+            throw new Error('Нельзя очистить «' + definition.label + '»: ' + item.name);
+          value = definition.kind === 'decimal' ? null : '';
+        }
         if (definition.value === 'position') {
           const numberKey = `${manufacturerName(item)}::${value}`;
           if (uniqueNumbers.has(numberKey))
@@ -2702,7 +2715,7 @@ async function applyInventoryAuditDataChanges(layer, { items, definition, perIte
       }
       layer.v2Close?.();
       onSaved();
-      openNotice({ title: 'Инвентаризация', message: `Изменено ${changes.length} позиций.` });
+      openNotice({ title: 'Изменить данные', message: `Изменено ${changes.length} позиций.` });
       return true;
     } catch (error) {
       status.textContent = error instanceof Error ? error.message : 'Не удалось сохранить данные.';
