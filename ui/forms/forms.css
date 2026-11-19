@@ -22,14 +22,17 @@
 }
 /* Counterparty Q: use the existing 46px native disclosure row.
    Only prevent wrapping and position the canonical 28px check. */
-.inventory-editor-panel--catalog-choice:has(> .inventory-editor-heading__controls)>details>summary.inventory-editor-summary{
+.inventory-editor-panel--catalog-choice>details>summary.inventory-editor-summary{
   box-sizing:border-box;
   width:100%;
-  padding:0 70px 0 36px;
+  padding:0 8px 0 36px;
   font-size:13px;
   white-space:nowrap;
   overflow:hidden;
   text-overflow:ellipsis;
+}
+.inventory-editor-panel--catalog-choice:has(> .inventory-editor-heading__controls)>details>summary.inventory-editor-summary{
+  padding-right:70px;
 }
 .inventory-editor-panel--catalog-choice>.inventory-editor-heading__selection{
   position:absolute;left:0;top:9px;z-index:1;
