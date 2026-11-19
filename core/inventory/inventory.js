@@ -1946,7 +1946,6 @@ function openManufacturerStock(root, manufacturer, groupContext = null) {
   const selectedStockItems = new Set();
   const markup = `
     ${context(manufacturer, {
-      v: { data: 'data-inventory-item-controls', aria: 'Сортировка и фильтр товаров' },
       c: { label: '+', data: 'data-inventory-add-item', aria: 'Добавить позицию' },
     })}
     <div data-stock-selected-actions hidden>
@@ -2125,26 +2124,6 @@ function openManufacturerStock(root, manufacturer, groupContext = null) {
   };
 
   searchInput?.addEventListener('input', renderList);
-  layer.querySelector('[data-inventory-item-controls]')?.addEventListener('click', () => {
-    openSharedProfileSettingsMenu({
-      title: '',
-      actions: [
-        {
-          id: 'appearance',
-          label: 'Вид',
-          variant: 'secondary',
-          onSelect: () => {
-            // One shared inventory-item appearance for all products.
-            // This product supplies only preview values in the existing card constructor.
-            const sample = rowsProvider?.()[0] || getInventoryItems().find((item) => manufacturerName(item) === manufacturer);
-            if (sample) openInventoryProductAppearanceQ(sample.itemId, renderList, STOCK_VIEW.storageScope);
-          },
-        },
-        { id: 'sort', label: 'Сортировка', variant: 'secondary', onSelect: () => openStockControls(layer, 'items', manufacturer, renderList, 'sort') },
-        { id: 'filter', label: 'Фильтр', variant: 'secondary', onSelect: () => openStockControls(layer, 'items', manufacturer, renderList, 'filter') },
-      ],
-    });
-  });
   layer.querySelector('[data-inventory-add-item]')?.addEventListener('click', () => {
     const first=groupContext?.criteria?.[0];
     const value=first?.values?.find(entry=>entry.name===manufacturer);
@@ -3012,8 +2991,9 @@ function renderStock(root) {
           openInventoryClassificationGroups(refresh)},
         {id:'storage',label:'Склады',onSelect:()=>
           openInventoryStorageLocations(()=>renderStock(root))},
-        {id:'transfer',label:'Перемещение',onSelect:()=>
-          openInventoryTransfer(()=>renderStock(root))},
+        {id:'appearance',label:'Вид',onSelect:()=>
+          openInventoryProductAppearanceQ(getInventoryItems()[0]?.itemId || '',
+            ()=>renderStock(root), STOCK_VIEW.storageScope)},
       ],
     });
   });
