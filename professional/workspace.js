@@ -365,6 +365,7 @@ async function ensureWorkspaceState(section) {
   const needsAuxiliary = section === 'people'
     || section === 'loyalty'
     || section === 'service'
+    || section === 'inventory'
     || (section === 'finance' && secondary === 'cash')
     || (section === 'settings' && secondary === 'tags');
   if (needsAuxiliary) tasks.push(loadAuxiliaryState(section === 'service' ? 'service' : ''));
