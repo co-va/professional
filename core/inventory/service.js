@@ -197,12 +197,8 @@ export async function clearInventoryItemPositions(itemIds = []) {
     ? payload.clearedItemIds.map(String) : [];
   const positions = Array.isArray(payload?.positions) ? payload.positions : [];
   const byId = new Map(positions.map(row => [String(row.itemId), row.position]));
-  const affected = new Set(items.map(item => String(item.manufacturer || '')));
-  const localAffected = getInventoryItems().filter(item =>
-    affected.has(String(item.manufacturer || '')));
   if (confirmed.length !== ids.length || ids.some(id => !confirmed.includes(id))
-    || !positions.length || localAffected.some(item => !byId.has(String(item.itemId)))
-    || positions.some(row => !row?.itemId
+    || !positions.length || positions.some(row => !row?.itemId
       || !Number.isSafeInteger(row.position) || row.position < 0)
     || ids.some(id => byId.get(id) !== 0)) {
     invalidateInventoryNavigationCache();
