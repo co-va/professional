@@ -2687,6 +2687,7 @@ async function applyInventoryAuditDataChanges(layer, { items, definition, perIte
     }
     submit.disabled = true;
     const failed = new Map();
+    onProgress(0, changes.length);
     try {
       if (definition.value === 'position' && (clearAll || clearItems.size > 0)) {
         // One atomic Core operation clears selected numbers and compacts all
@@ -2758,7 +2759,7 @@ async function applyInventoryAuditDataChanges(layer, { items, definition, perIte
             const reason = error instanceof Error ? error.message : 'Ошибка сохранения';
             batch.forEach(entry => failed.set(entry.itemId, reason));
           }
-          status.textContent = `Обработано: ${Math.min(index + 100, changes.length)} из ${changes.length}`;
+          onProgress(Math.min(index + 100, changes.length), changes.length);
         }
         if (failed.size < changes.length) await loadInventory();
       }
@@ -2815,8 +2816,7 @@ function openInventoryAuditCriteria(root, {
     ${fields}
     <p class="form-error" role="status" data-inventory-audit-status></p>
     <div data-inventory-audit-actions${isData ? ' hidden' : ''}>
-      ${actionBlock((isData ? button('Очистить', { variant: 'secondary', data: 'data-inventory-audit-clear' }) : '') +
-        button(isData ? 'Применить' : 'Сохранить', { type:'submit', data:'data-inventory-audit-apply' }))}
+      ${actionBlock(button(isData ? 'Применить' : 'Сохранить', { type:'submit', data:'data-inventory-audit-apply' }))}
     </div>
   </form>`;
   const layer = mountModal(root, modal(markup, {
@@ -2826,7 +2826,6 @@ function openInventoryAuditCriteria(root, {
   if (!layer) return null;
   const form = layer.querySelector('[data-inventory-audit-criteria]');
   const submit = layer.querySelector('[data-inventory-audit-apply]');
-  const clearButton = layer.querySelector('[data-inventory-audit-clear]');
   const status = layer.querySelector('[data-inventory-audit-status]');
   const balances = new Map(items.map(item => [item.itemId, Number(item.balance) || 0]));
   const knownContainers = new Map(items.map(item => [item.itemId, item.containerCount == null ? null : Number(item.containerCount)]));
@@ -2845,6 +2844,7 @@ function openInventoryAuditCriteria(root, {
   let dataInitial = '';
   let dataUniform = true;
   const selectedDataIds = new Set();
+  let dataActionMode = '';
   let pendingInitialCommonValue = initialCommon && String(initialCommonValue).trim()
     ? String(initialCommonValue).trim() : null;
 
@@ -2880,14 +2880,15 @@ function openInventoryAuditCriteria(root, {
 
     const canApply = common ? commonApply : individualApply;
     const canClear = common ? commonClear : individualClear;
-    if (dataActions) dataActions.hidden = !canApply && !canClear;
+    // These are mutually exclusive operations: edited values take priority.
+    // Checking unchanged rows exposes Clear; typing exposes Apply instead.
+    dataActionMode = canApply ? 'apply' : canClear ? 'clear' : '';
+    if (dataActions) dataActions.hidden = !dataActionMode;
     if (submit) {
-      submit.hidden = !canApply;
-      submit.disabled = saving || !canApply;
-    }
-    if (clearButton) {
-      clearButton.hidden = !canClear;
-      clearButton.disabled = saving || !canClear;
+      submit.hidden = !dataActionMode;
+      submit.disabled = saving || !dataActionMode;
+      if (!saving) submit.textContent = dataActionMode === 'clear' ? 'Очистить' : 'Применить';
+      submit.classList.toggle('ui-button--secondary', dataActionMode === 'clear');
     }
   }
 
@@ -3083,17 +3084,17 @@ function openInventoryAuditCriteria(root, {
     });
   }
 
-  async function saveDataChange(clear = false) {
+  async function saveDataChange() {
     if (!isData || saving) return;
     syncDataActions();
-    if (clear ? clearButton?.hidden : submit.hidden) return;
+    if (!dataActionMode || submit.hidden) return;
+    const clear = dataActionMode === 'clear';
     const common = Boolean(dataMode?.checked);
     const selectedIndices = common ? null : checkedDataIndices();
     const clearAll = clear && common;
     const clearItems = clear && !common ? selectedIndices : new Set();
     const data = new FormData(form);
-    const action = clear ? clearButton : submit;
-    const initialLabel = action?.textContent || (clear ? 'Очистить' : 'Применить');
+    const action = submit;
     saving = true;
     syncDataActions();
     if (action) action.textContent = clear ? 'Очищаю…' : 'Применяю…';
@@ -3103,10 +3104,10 @@ function openInventoryAuditCriteria(root, {
         clearAll, clearItems, selectedIndices,
         keepOpen: isData && keepOpen,
         onProgress: (completed, total) => {
-          if (action?.isConnected) {
-            action.textContent = (clear ? 'Очистка' : 'Применение') +
-              ` · ${completed} из ${total}`;
-          }
+          const progress = (clear ? 'Очистка' : 'Применение') +
+            ` · ${completed} из ${total}`;
+          if (action?.isConnected) action.textContent = progress;
+          if (status?.isConnected) status.textContent = progress;
         },
         afterApplied: () => {
           // The same rows remain in the editor in their existing order,
@@ -3130,7 +3131,6 @@ function openInventoryAuditCriteria(root, {
       syncDataActions();
     }
   }
-  clearButton?.addEventListener('click', () => { void saveDataChange(true); });
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -3195,7 +3195,7 @@ function openInventoryAuditCriteria(root, {
       return;
     }
 
-    await saveDataChange(false);
+    await saveDataChange();
   });
   return layer;
 }
