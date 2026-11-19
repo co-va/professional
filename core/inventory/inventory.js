@@ -2709,20 +2709,40 @@ async function applyInventoryAuditDataChanges(layer, { items, definition, perIte
           || a.value - b.value);
         onProgress(0, ordered.length);
         let completed = 0;
+        let timedOut = false;
         for (const entry of ordered) {
           status.textContent = `Порядок: ${completed} из ${ordered.length} · ${entry.name}`;
           try {
             await updateInventoryItem(entry.itemId,
               inventoryAuditDataPayload(definition, entry.value, getInventoryItem(entry.itemId)));
           } catch (error) {
-            failed.set(entry.itemId, error instanceof Error
-              ? error.message : 'Ошибка сохранения');
+            const timeout = error?.name === 'AbortError';
+            failed.set(entry.itemId, timeout
+              ? 'Сервер не ответил. Проверьте сохранённые номера.'
+              : error instanceof Error ? error.message : 'Ошибка сохранения');
+            if (timeout) {
+              // A timed-out write might still commit. Stop before sending more
+              // position edits and reconcile the confirmed server snapshot.
+              timedOut = true;
+              break;
+            }
           }
           completed += 1;
           onProgress(completed, ordered.length);
         }
-        // No extra GET: every successful item mutation already refreshes the
-        // complete confirmed list. Verify all requested numbers below.
+        if (timedOut) {
+          try {
+            await loadInventory();
+            for (const entry of changes) {
+              if (inventoryAuditValueMatches(getInventoryItem(entry.itemId),
+                definition, entry.value)) failed.delete(entry.itemId);
+            }
+          } catch {
+            // Keep the visible timeout and entered numbers for a safe retry.
+          }
+        }
+        // Each successful item mutation already refreshes the complete stock
+        // snapshot. Verify all requested numbers below without an extra GET.
       } else {
         // Canonical Core batch update keeps every selected item in one
         // transaction per 100 entries. Only one inventory read verifies the
