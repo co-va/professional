@@ -272,7 +272,7 @@ async function openCatalog(company, { itemId = '', onLinked = () => {} } = {}) {
 
 // Stock can start with a supplier catalog without first creating a local item.
 // Reuses the same supplier catalog/row Q as the existing association flow.
-export async function openSupplierCatalogCreation(onSaved = () => {}) {
+export async function openSupplierCatalogCreation(onSaved = () => {}, onManual = null) {
   let companies;
   try { companies = await loadCompanies(); }
   catch (error) {
@@ -282,19 +282,21 @@ export async function openSupplierCatalogCreation(onSaved = () => {}) {
   const suppliers = (Array.isArray(companies) ? companies : [])
     .filter(company => Array.isArray(company.priceLists)
       && company.priceLists.some(entry => entry.parserStatus === 'READY'));
-  if (!suppliers.length) {
-    openNotice({ title: 'Ассортимент', message: 'Сначала загрузите прайс контрагента.' });
-    return;
-  }
   const layer = mountModal(document.body, modal(
-    entityCardStack(suppliers.map(company => entityVisualCard({
+    (suppliers.length ? entityCardStack(suppliers.map(company => entityVisualCard({
       appearance: counterpartyCardAppearance(), fields: counterpartyCardFields(company),
       interactive: true,
       data: 'data-stock-supplier-choose="' + escapeHtml(company.id) + '"',
       aria: 'Открыть контрагента ' + company.name,
-    }))),
-    { title: 'Из ассортимента', variant: 'q', surface: 'app' },
+    }))) : emptyState('Контрагенты', 'Нет загруженных прайсов.')) +
+    (onManual ? actionBlock(button('Своя позиция', {
+      variant: 'secondary', data: 'data-stock-create-manual' })) : ''),
+    { title: 'Контрагенты', variant: 'q', surface: 'app' },
   ));
+  layer?.querySelector('[data-stock-create-manual]')?.addEventListener('click', () => {
+    layer.v2Close?.();
+    onManual?.();
+  });
   layer?.querySelectorAll('[data-stock-supplier-choose]').forEach(node => {
     node.addEventListener('click', () => {
       const company = suppliers.find(entry => entry.id === node.dataset.stockSupplierChoose);
@@ -488,7 +490,8 @@ async function openCatalogRow(company, row, { itemId = '', onLinked = () => {} }
     const before = new Set(getInventoryItems().map(value => value.itemId));
     const { openItemEditor } = await import('./inventory.js');
     openItemEditor(layer, '', {
-      name: row.name, manufacturer: row.manufacturer, sku: row.supplierSku, barcode: row.barcode,
+      name: String(row.shortName || '').trim(), manufacturer: row.manufacturer,
+      sku: row.supplierSku, barcode: row.barcode,
     }, async createdId => {
       const resolved = createdId || getInventoryItems().find(value => !before.has(value.itemId))?.itemId;
       if (!resolved) { errorHost.textContent = 'Карточка создана, но её связь не подтверждена. Выберите её вручную.'; return; }
@@ -955,6 +958,13 @@ function openCatalogProductDetails(row, status = null, company = null, onSaved =
 }
 
 function catalogItemList(items = [], selectedCatalogIds = new Set(), linkedCatalogIds = null, matchedCatalogItems = null, statuses = new Map()) {
+  const stockNames = new Map(getInventoryItems().map(item => [String(item.itemId), item.name]));
+  const shownTitle = row => {
+    const id = String(row.id);
+    const stockId = statuses.get(id)?.itemId || matchedCatalogItems?.get(id);
+    // The local warehouse name is independent from the supplier's raw title.
+    return stockNames.get(String(stockId)) || row.shortName || row.name;
+  };
   // The link indicator belongs next to the supplier SKU, not before the title.
   // Only a persisted Core supplier offer is a confirmed link.
   return '<div class="inventory-counterparty-product-list">' + items.map(item =>
@@ -969,7 +979,7 @@ function catalogItemList(items = [], selectedCatalogIds = new Set(), linkedCatal
         items: [{
           className: item.supplierAvailable === true ? 'is-supplier-available'
             : item.supplierAvailable === false ? 'is-supplier-unavailable' : '',
-          title: item.name,
+          title: shownTitle(item),
           secondary: item.supplierSku || '—',
           secondaryIndicatorColor: linkedCatalogIds === null ? ''
             : linkedCatalogIds.has(String(item.id)) ? '#37B24D'
@@ -1175,7 +1185,8 @@ async function openSelectedCatalogCards(company, rows, onLinked = () => {}, sugg
     if (mode === 'new') {
       const { openItemEditor } = await import('./inventory.js');
       openItemEditor(document.body, '', {
-        name: row.name, manufacturer: row.manufacturer, sku: row.supplierSku, barcode: row.barcode,
+        name: String(row.shortName || '').trim(), manufacturer: row.manufacturer,
+      sku: row.supplierSku, barcode: row.barcode,
       }, async itemId => {
         finishLink(row, itemId, () => next(mode, index + 1));
       });
