@@ -1,12 +1,20 @@
-// E «Движения» owns the stock-transfer editor. Stock invokes the same
-// mechanism, never another inventory mutation implementation.
-import { actionBlock, button, field, modal, mountModal, select, twoColumnLayout, v2ListEntries, v2ListEntry } from '../../ui/ui.js';
+// E «Движения» owns the only transfer editor. «Остатки» passes its
+// selection to this editor; Core is the sole owner of quantities/movements.
+import { actionBlock, button, field, modal, mountModal, select, twoColumnLayout } from '../../ui/ui.js';
+import { escapeHtml } from '../../ui/utils/escape-html.js';
 import { getInventoryItem, getInventoryItems, getInventoryStorageLocations } from './data.js';
 import { transferInventoryStock } from './service.js';
+
+const EPS = 0.000001;
 const locations = () => getInventoryStorageLocations().filter(item => item && !item.archivedAt);
-const options = () => locations().map(location => ({
-  value: location.locationId, label: location.isPrimary ? 'Не распределено' : location.name,
+const options = () => locations().map(place => ({
+  value: place.locationId, label: place.isPrimary ? 'Не распределено' : place.name,
 }));
+const quantityLabel = value => Number(value || 0).toLocaleString('ru-RU', {
+  maximumFractionDigits: 3,
+});
+const stockAt = (item, locationId) => Number((item?.locationBalances || [])
+  .find(row => row.locationId === locationId)?.balance || 0);
 
 function transferUnits(item) {
   if (!item) return [];
@@ -21,80 +29,120 @@ function transferUnits(item) {
   return [...new Set([...(receipt && (receipt === stock || knownPack) ? [receipt] : []), stock])].filter(Boolean);
 }
 
+// In the overall view, infer a source only if it is unambiguous. In a
+// warehouse-scoped view the passed location is authoritative.
+function inferredSource(items, places) {
+  const candidates = new Set();
+  for (const item of items) {
+    const occupied = (item.locationBalances || [])
+      .filter(row => Number(row.balance) > EPS).map(row => row.locationId);
+    let origins = occupied;
+    if (!origins.length) {
+      origins = (item.assignedStorageLocations || [])
+        .filter(id => places.some(place => place.value === id));
+    }
+    if (!origins.length && item.location) {
+      origins = places.filter(place => place.label === item.location)
+        .map(place => place.value);
+    }
+    if (origins.length > 1) return '';
+    if (origins.length === 1) candidates.add(origins[0]);
+  }
+  return candidates.size === 1 ? [...candidates][0] : '';
+}
+
+function compactTransferRow(item, index, from) {
+  const balance = stockAt(item, from);
+  const unit = String(item.unit || 'шт.');
+  // Shared Inventory / Audit geometry: name and balance on the left,
+  // editable numerical quantity on the right. Never render V2 cards here.
+  return '<div class="data-edit-row inventory-transfer-row" data-inventory-transfer-row="' + index + '">' +
+    '<div class="data-edit-row__name inventory-transfer-row__name">' +
+      '<strong title="' + escapeHtml(item.name) + '">' + escapeHtml(item.name) + '</strong>' +
+      '<small>Остаток: ' + quantityLabel(balance) + ' ' + escapeHtml(unit) + '</small>' +
+    '</div>' +
+    '<div class="inventory-editor-number">' +
+      field({ label: '', name: 'transferQuantity-' + index,
+        value: '', placeholder: '—', type: 'number', min: '0',
+        step: ['шт.', 'уп.'].includes(unit) ? '1' : '0.001',
+        inputmode: 'decimal', autocomplete: 'off' }) +
+      '<span class="inventory-editor-number__suffix">' + escapeHtml(unit) + '</span>' +
+    '</div>' +
+  '</div>';
+}
+
 export function openInventoryTransfer(onSaved = () => {}, { selectedItemIds = [], fromLocationId = '' } = {}) {
   const stock = getInventoryItems();
-  // Both one-item and selected-item moves submit through the same canonical
-  // Core /inventory/transfers operation. A selected move uses the server-side
-  // exact remaining balance, including physical containers, at submit time.
   const selected = [...new Set(selectedItemIds)].map(id => getInventoryItem(id)).filter(Boolean);
   const batch = selected.length > 0;
   const places = options();
-  // One stable operation identifier per form; retries cannot duplicate stock.
+  const validLocation = id => places.some(place => place.value === id);
+  const fromDefault = validLocation(fromLocationId) ? fromLocationId
+    : batch ? inferredSource(selected, places) : '';
+  const toDefault = '';
   const transferId = globalThis.crypto?.randomUUID?.() || '';
   let pending = false;
   let submittedPayload = null;
-  const fromDefault = places.some(place => place.value === fromLocationId)
-    ? fromLocationId : batch ? '' : places.find(place => place.value === 'primary')?.value || places[0]?.value || '';
-  const toDefault = batch ? '' : places.find(place => place.value !== fromDefault)?.value || '';
-  // Do not preselect an arbitrary product for a stock-changing operation.
+
   const host = mountModal(document.body, modal(
     '<form data-inventory-transfer-form>' +
-    select({ label: 'Из места', name: 'fromLocationId', value: fromDefault,
-      options: [{ value: '', label: 'Выберите исходный склад' }, ...places] }) +
-    select({ label: 'В место', name: 'toLocationId', value: toDefault,
-      options: [{ value: '', label: 'Выберите склад назначения' }, ...places] }) +
-    (batch
-      ? '<p>Выбранные товары: ' + selected.length +
-        '. Перемещается весь фактический остаток каждого товара из исходного склада.</p>' +
-        '<div data-inventory-transfer-batch-preview></div>'
-      : select({ label: 'Товар', name: 'itemId', value: '',
-          options: [{ value: '', label: 'Выбрать товар' },
-            ...stock.map(item => ({
-              value: item.itemId, label: [item.manufacturer, item.name].filter(Boolean).join(' · '),
-            }))], searchable: true }) +
-        twoColumnLayout(
-          field({ label: 'Количество', name: 'quantity', value: '', type: 'number',
-            min: '0.001', step: 'any', required: true }),
-          '<div data-inventory-transfer-unit-picker></div>',
-          { ariaLabel: 'Количество и единица переноса' },
-        ) +
-        '<p class="ui-list__secondary" data-inventory-transfer-unit></p>') +
-    '<p class="form-error" role="alert" data-inventory-transfer-error></p>' +
-    actionBlock(button('Переместить', { type: 'submit' })) +
+      select({ label: 'Из места', name: 'fromLocationId', value: fromDefault,
+        options: [{ value: '', label: 'Выберите исходный склад' }, ...places] }) +
+      select({ label: 'В место', name: 'toLocationId', value: toDefault,
+        options: [{ value: '', label: 'Выберите склад назначения' }, ...places] }) +
+      (batch
+        ? '<p class="ui-list__secondary">Выбрано позиций: ' + selected.length + '</p>' +
+          '<div data-inventory-transfer-rows></div>' +
+          '<p class="ui-list__secondary">Без количества — только карточка в другом складе. С количеством — перемещение остатка.</p>'
+        : select({ label: 'Товар', name: 'itemId', value: '',
+            options: [{ value: '', label: 'Выбрать товар' },
+              ...stock.map(item => ({
+                value: item.itemId,
+                label: [item.manufacturer, item.name].filter(Boolean).join(' · '),
+              }))], searchable: true }) +
+          twoColumnLayout(
+            field({ label: 'Количество', name: 'quantity', value: '', type: 'number',
+              min: '0.001', step: 'any', required: true }),
+            '<div data-inventory-transfer-unit-picker></div>',
+            { ariaLabel: 'Количество и единица переноса' },
+          ) +
+          '<p class="ui-list__secondary" data-inventory-transfer-unit></p>') +
+      '<p class="form-error" role="alert" data-inventory-transfer-error></p>' +
+      '<div data-inventory-transfer-actions hidden>' +
+        actionBlock(button('Применить', { type: 'submit' })) +
+      '</div>' +
     '</form>',
     { title: 'Перемещение', variant: 'q', surface: 'app' },
   ));
   if (!host) return;
   const form = host.querySelector('[data-inventory-transfer-form]');
-  const unit = host.querySelector('[data-inventory-transfer-unit]');
-  const unitHost = host.querySelector('[data-inventory-transfer-unit-picker]');
-  const batchPreview = host.querySelector('[data-inventory-transfer-batch-preview]');
-  const available = () => {
-    const from = form.querySelector('[name="fromLocationId"]')?.value || '';
-    return selected.map(item => ({
-      item, balance: Number((getInventoryItem(item.itemId)?.locationBalances || [])
-        .find(row => row.locationId === from)?.balance || 0),
-    }));
+  const error = form.querySelector('[data-inventory-transfer-error]');
+  const unit = form.querySelector('[data-inventory-transfer-unit]');
+  const unitHost = form.querySelector('[data-inventory-transfer-unit-picker]');
+  const rowsHost = form.querySelector('[data-inventory-transfer-rows]');
+  const actions = form.querySelector('[data-inventory-transfer-actions]');
+  const submit = actions.querySelector('[type="submit"]');
+
+  const currentSource = () => String(form.elements.namedItem('fromLocationId')?.value || '');
+  const currentDestination = () => String(form.elements.namedItem('toLocationId')?.value || '');
+  const readBatch = () => selected.map((item, index) => ({
+    item,
+    input: String(form.elements.namedItem('transferQuantity-' + index)?.value ?? '').trim(),
+  }));
+  const renderBatch = () => {
+    if (!batch || !rowsHost) return;
+    const remembered = readBatch().map(row => row.input);
+    rowsHost.innerHTML = selected.map((item, index) =>
+      compactTransferRow(item, index, currentSource())).join('');
+    remembered.forEach((value, index) => {
+      const input = form.elements.namedItem('transferQuantity-' + index);
+      if (input) input.value = value;
+    });
   };
-  const previewBatch = () => {
-    if (!batch || !batchPreview) return;
-    const rows = available();
-    const movable = rows.filter(row => row.balance > 0.000001);
-    const skipped = rows.length - movable.length;
-    batchPreview.innerHTML =
-      '<p>Можно переместить: <strong>' + movable.length +
-        '</strong>' + (skipped ? ' · Без остатка: ' + skipped : '') + '</p>' +
-      v2ListEntries(rows.map(({ item, balance }) => v2ListEntry({
-        title: item.name, rightTop: balance.toLocaleString('ru-RU',
-          { maximumFractionDigits: 3 }) + ' ' + (item.unit || ''),
-        subtitle: balance > 0.000001 ? 'Весь остаток' : 'Нет остатка в выбранном складе',
-      })));
-  };
-  const updateUnit = () => {
-    if (batch) { previewBatch(); return; }
-    const item = getInventoryItem(form.querySelector('[name="itemId"]')?.value);
-    const from = form.querySelector('[name="fromLocationId"]')?.value;
-    const balance = item?.locationBalances?.find(loc => loc.locationId === from)?.balance ?? 0;
+  const updateSingleUnit = () => {
+    if (batch) return;
+    const item = getInventoryItem(form.elements.namedItem('itemId')?.value);
+    const balance = stockAt(item, currentSource());
     const units = transferUnits(item);
     const previous = unitHost.querySelector('[name="quantityUnit"]')?.value;
     unitHost.innerHTML = select({
@@ -104,57 +152,102 @@ export function openInventoryTransfer(onSaved = () => {}, { selectedItemIds = []
         ? units.map(value => ({ value, label: value }))
         : [{ value: '', label: '—' }],
     });
-    unit.textContent = item ? 'В выбранном складе: '
-      + Number(balance).toLocaleString('ru-RU', { maximumFractionDigits: 3 }) + ' ' + item.unit : '';
+    unit.textContent = item
+      ? 'В выбранном складе: ' + quantityLabel(balance) + ' ' + item.unit : '';
   };
+
+  function validate({ message = false } = {}) {
+    const from = currentSource();
+    const to = currentDestination();
+    let problem = '';
+    if (!validLocation(to)) problem = '';
+    else if (from && from === to) problem = 'Склады должны отличаться.';
+    else if (batch) {
+      for (const { item, input } of readBatch()) {
+        if (!input || input === '0') continue; // This row only assigns the card.
+        const quantity = Number(input.replace(',', '.'));
+        const stockUnit = String(item.unit || '');
+        if (!Number.isFinite(quantity) || quantity < 0 ||
+            Math.round(quantity * 1000) / 1000 !== quantity ||
+            (['шт.', 'уп.'].includes(stockUnit) && !Number.isSafeInteger(quantity))) {
+          problem = 'Проверьте количество для «' + item.name + '».';
+          break;
+        }
+        if (!validLocation(from)) {
+          problem = 'Выберите исходный склад для перемещения количества.';
+          break;
+        }
+        if (quantity > stockAt(item, from) + EPS) {
+          problem = 'Недостаточный остаток: ' + item.name + '.';
+          break;
+        }
+      }
+    } else if (validLocation(from)) {
+      const item = getInventoryItem(form.elements.namedItem('itemId')?.value);
+      const quantity = Number(form.elements.namedItem('quantity')?.value);
+      const chosenUnit = form.elements.namedItem('quantityUnit')?.value;
+      if (!(item && Number.isFinite(quantity) && quantity > 0 &&
+            transferUnits(item).includes(chosenUnit) &&
+            (!['шт.', 'уп.'].includes(chosenUnit) || Number.isSafeInteger(quantity)))) {
+        problem = '';
+      }
+    }
+    const ready = !pending && validLocation(to) && (!from || from !== to) &&
+      (batch ? !problem : validLocation(from) &&
+        Boolean(getInventoryItem(form.elements.namedItem('itemId')?.value)) &&
+        Number(form.elements.namedItem('quantity')?.value) > 0 &&
+        transferUnits(getInventoryItem(form.elements.namedItem('itemId')?.value))
+          .includes(form.elements.namedItem('quantityUnit')?.value));
+    actions.hidden = !ready;
+    submit.disabled = !ready;
+    if (message || problem) error.textContent = problem;
+    else error.textContent = '';
+    return ready;
+  }
+
   form.addEventListener('change', event => {
-    if (event.target.name === 'itemId' || event.target.name === 'fromLocationId') updateUnit();
+    if (event.target.name === 'fromLocationId') {
+      renderBatch();
+      updateSingleUnit();
+    } else if (event.target.name === 'itemId') updateSingleUnit();
+    validate();
   });
+  form.addEventListener('input', event => {
+    if (event.target.matches('input, select')) validate();
+  });
+
   form.addEventListener('submit', async event => {
     event.preventDefault();
-    if (pending) return;
-    const data = new FormData(form);
-    const from = String(data.get('fromLocationId') || '');
-    const to = String(data.get('toLocationId') || '');
-    const itemId = String(data.get('itemId') || '');
-    const quantity = Number(data.get('quantity'));
-    const quantityUnit = String(data.get('quantityUnit') || '');
-    const error = host.querySelector('[data-inventory-transfer-error]');
-    if (!from || !to || from === to) { error.textContent = 'Выберите два разных места.'; return; }
+    if (pending || !validate({ message: true })) return;
+    const from = currentSource(), to = currentDestination();
     let lines = [];
+    let assignmentItemIds = [];
     if (batch) {
-      lines = available().filter(row => row.balance > 0.000001).map(row => ({
-        itemId: row.item.itemId, fullBalance: true,
+      assignmentItemIds = selected.map(item => item.itemId);
+      lines = readBatch().filter(row => Number(row.input) > 0).map(row => ({
+        itemId: row.item.itemId, quantity: Number(row.input), unit: row.item.unit,
       }));
-      if (!lines.length) {
-        error.textContent = 'У выбранных товаров нет остатка в исходном складе.';
-        return;
-      }
     } else {
-      if (!getInventoryItem(itemId) || !(quantity > 0) || !Number.isFinite(quantity)) {
-        error.textContent = 'Выберите товар и положительное количество.'; return;
-      }
-      if (!transferUnits(getInventoryItem(itemId)).includes(quantityUnit)) {
-        error.textContent = 'Выберите единицу количества для товара.';
-        return;
-      }
-      if (['шт.', 'уп.'].includes(quantityUnit) && !Number.isSafeInteger(quantity)) {
-        error.textContent = 'Укажите целое число штук или упаковок.';
-        return;
-      }
-      lines = [{ itemId, quantity, unit: quantityUnit }];
+      const itemId = String(form.elements.namedItem('itemId')?.value || '');
+      const quantity = Number(form.elements.namedItem('quantity')?.value);
+      const unit = String(form.elements.namedItem('quantityUnit')?.value || '');
+      if (!(quantity > 0) || !Number.isFinite(quantity)) return;
+      if (['шт.', 'уп.'].includes(unit) && !Number.isSafeInteger(quantity)) return;
+      lines = [{ itemId, quantity, unit }];
     }
-    if (!transferId) { error.textContent = 'Не удалось подготовить идентификатор операции.'; return; }
-    const candidate = { transferId, fromLocationId: from, toLocationId: to, lines };
-    // A retry uses the same immutable request even if the first reply was lost.
+    if (!transferId) {
+      error.textContent = 'Не удалось подготовить идентификатор операции.';
+      return;
+    }
+    const candidate = { transferId, fromLocationId: from || 'primary',
+      toLocationId: to, lines, ...(batch ? { assignmentItemIds } : {}) };
     if (submittedPayload && JSON.stringify(submittedPayload) !== JSON.stringify(candidate)) {
-      error.textContent = 'Предыдущая попытка переноса не подтверждена. Обновите остатки перед новой операцией.';
+      error.textContent = 'Предыдущая попытка не подтверждена. Откройте перенос заново.';
       return;
     }
     submittedPayload = candidate;
-    const submit = form.querySelector('[type="submit"]');
     pending = true;
-    submit.disabled = true;
+    validate();
     try {
       await transferInventoryStock(submittedPayload);
       host.v2Close?.();
@@ -162,8 +255,10 @@ export function openInventoryTransfer(onSaved = () => {}, { selectedItemIds = []
     } catch (cause) {
       error.textContent = cause instanceof Error ? cause.message : 'Не удалось переместить товар.';
       pending = false;
-      submit.disabled = false;
+      validate();
     }
   });
-  updateUnit();
+  if (batch) renderBatch();
+  else updateSingleUnit();
+  validate();
 }
