@@ -17,18 +17,18 @@ const PATH = '/inventory/counterparties';
 // Session-bound view caches only. Never persist another account's suppliers
 // or their prices to disk, and never keep stale rows after an explicit write.
 const COMPANY_CACHE_MS = 15000;
-let companyCache = { token: '', rows: null, at: 0, inFlight: null };
+let companyCache = { token: '', rows: null, at: 0, inFlight: null, generation: 0 };
 const sharedCatalogCache = new Map();
 function currentCompanyCache() {
   const token = getAuthToken();
   if (companyCache.token !== token) {
-    companyCache = { token, rows: null, at: 0, inFlight: null };
+    companyCache = { token, rows: null, at: 0, inFlight: null, generation: 0 };
     sharedCatalogCache.clear();
   }
   return companyCache;
 }
 if (typeof window !== 'undefined') window.addEventListener('professional:auth-logout', () => {
-  companyCache = { token: '', rows: null, at: 0, inFlight: null };
+  companyCache = { token: '', rows: null, at: 0, inFlight: null, generation: 0 };
   sharedCatalogCache.clear();
 });
 const COUNTERPARTY_CARD_SCOPE = 'inventory-counterparty';
@@ -78,13 +78,14 @@ async function loadCompanies({ force = false } = {}) {
     return state.rows;
   if (!force && state.inFlight) return state.inFlight;
   const token = state.token;
+  const generation = state.generation;
   const promise = json();
   if (!force) state.inFlight = promise;
   try {
     const rows = await promise;
     if (getAuthToken() === token) {
       // A new account or a write may have invalidated the original state.
-      if (companyCache === state) {
+      if (companyCache === state && state.generation === generation) {
         state.rows = Array.isArray(rows) ? rows : [];
         state.at = Date.now();
       }
@@ -415,7 +416,7 @@ function openImportPreview(onSaved, file) {
   const check = async () => {
     preview.textContent = 'Проверяем Excel…';
     try {
-      const [parsed, companies] = await Promise.all([importExcel('/preview', file), json()]);
+      const [parsed, companies] = await Promise.all([importExcel('/preview', file), loadCompanies()]);
       if (!layer.isConnected) return;
       result = parsed;
       preview.innerHTML = '<p>' + escapeHtml(file.name) + ' · ' + parsed.count + ' поз.</p>' +
@@ -983,7 +984,7 @@ function findCatalogMatches(catalogRows = [], stockItems = []) {
 // silently create incorrect stock cards or duplicate supplier offers.
 async function openSelectedCatalogCards(company, rows, onLinked = () => {}, suggestedItemId = () => '') {
   if (!rows.length) return;
-  try { await loadInventory(); }
+  try { await loadInventory({ preferRecent: true }); }
   catch (error) { openNotice({ title: 'Остатки', message: errText(error) }); return; }
   const menu = mountModal(document.body, modal(
     list({
@@ -1446,20 +1447,24 @@ async function openCompany(companyId, root, onChanged = () => {}, { initialCompa
     try {
       // Independent link classification and catalog pages can load in parallel.
       const statusesPromise = refreshCatalogLinkStatuses(currentRun).catch(() => false);
-      const data = await json('/' + urlId(companyId) + '/catalog?skip=0');
+      const data = await json('/' + urlId(companyId) + '/catalog?skip=0&take=500');
       if (!layer.isConnected || !list.isConnected || currentRun !== revision) return;
       const entries = Array.isArray(data.items) ? [...data.items] : [];
       const count = Math.max(0, Number(data.count) || 0);
+      // Older Core returns the original 100-row page and no pageSize.
+      const pageSize = Math.max(1, Math.min(500, Number(data.pageSize) || 100));
       // The first page is already useful: show brand groups immediately,
       // instead of keeping the entire supplier catalog behind a spinner.
       renderCatalog(entries, list);
-      // Core pages at 100 items. Limit concurrency to four pages, keep order.
-      for (let skip = 100; skip < count; skip += 400) {
+      // Core supports up to 500 rows in one read. Use its explicit page size
+      // instead of issuing ten 100-row requests for a 1000-item supplier.
+      const parallel = 4;
+      for (let skip = pageSize; skip < count; skip += pageSize * parallel) {
         const offsets = [];
-        for (let offset = skip; offset < Math.min(count, skip + 400); offset += 100)
+        for (let offset = skip; offset < Math.min(count, skip + pageSize * parallel); offset += pageSize)
           offsets.push(offset);
         const pages = await Promise.all(offsets.map(offset =>
-          json('/' + urlId(companyId) + '/catalog?skip=' + offset)));
+          json('/' + urlId(companyId) + '/catalog?skip=' + offset + '&take=500')));
         if (!layer.isConnected || !list.isConnected || currentRun !== revision) return;
         pages.forEach(page => entries.push(...(Array.isArray(page.items) ? page.items : [])));
         // Incrementally add brands/products after each bounded batch.
@@ -1642,7 +1647,7 @@ export async function renderCounterparties(root) {
     '<div data-counterparties-list></div>',
   ]);
   const host = root.querySelector('[data-counterparties-list]');
-  // In-memory view cache lives only as long as this Counterparties page.
+  // In-memory supplier cache is bound to the current authenticated session.
   const catalogCache = sharedCatalogCache;
   let currentCompanies = [];
   const renderCards = () => {
@@ -1670,6 +1675,7 @@ export async function renderCounterparties(root) {
       const state = currentCompanyCache();
       state.rows = null;
       state.at = 0;
+      state.generation++;
     }
     if (!currentCompanies.length) host.innerHTML = emptyState('Контрагенты', 'Загружаем…');
     try {
@@ -1702,7 +1708,10 @@ export async function renderCounterparties(root) {
   // Run independent data requests together. Cards still wait for the
   // appearance template before rendering, without a serial network waterfall.
   const companiesPromise = loadCompanies();
-  await loadAuxiliaryState('service').catch(() => {});
+  const appearancePromise = loadAuxiliaryState('service').catch(() => {});
+  // Attach handlers to both immediately; even if either fails before the
+  // other finishes, no unhandled promise is left behind.
+  await Promise.allSettled([companiesPromise, appearancePromise]);
   await show(false, companiesPromise);
   window.dispatchEvent(new CustomEvent('va-tools:v2-context-changed'));
   return () => {};
