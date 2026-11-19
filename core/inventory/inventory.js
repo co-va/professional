@@ -3133,15 +3133,34 @@ function openInventoryAuditCriteria(root, {
 
 
 function openStockCreateOptions(root, onChanged, defaults = {}) {
-  // The Stock + opens Counterparty cards first. Manual entry remains available
-  // inside that same Q, not behind an extra intermediate choice modal.
-  void import('./counterparties.js').then(({ openSupplierCatalogCreation }) =>
-    openSupplierCatalogCreation(onChanged, () =>
-      openItemEditor(root, '', defaults, onChanged)))
-    .catch(error => openNotice({
-      title: 'Контрагенты',
-      message: error instanceof Error ? error.message : 'Не удалось открыть контрагентов.',
-    }));
+  // The first Stock + choice stays distinct from the supplier catalog.
+  // Creating a position must open the normal inventory editor directly.
+  const layer = mountModal(document.body, modal(
+    actionBlock(
+      button('Создать позицию', { data: 'data-stock-create-manual' }) +
+      button('Из ассортимента контрагента', {
+        variant: 'secondary', data: 'data-stock-create-supplier',
+      }),
+    ),
+    { title: 'Добавить товар', variant: 'q', surface: 'app' },
+  ));
+  if (!layer) return;
+  layer.querySelector('[data-stock-create-manual]')?.addEventListener('click', () => {
+    layer.v2Close?.();
+    openItemEditor(root, '', defaults, onChanged);
+  });
+  layer.querySelector('[data-stock-create-supplier]')?.addEventListener('click', async () => {
+    layer.v2Close?.();
+    try {
+      const { openSupplierCatalogCreation } = await import('./counterparties.js');
+      await openSupplierCatalogCreation(onChanged);
+    } catch (error) {
+      openNotice({
+        title: 'Контрагенты',
+        message: error instanceof Error ? error.message : 'Не удалось открыть контрагентов.',
+      });
+    }
+  });
 }
 
 function renderStock(root) {
