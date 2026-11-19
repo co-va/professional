@@ -314,7 +314,7 @@ async function openStockSupplierCatalog(company, { onLinked = () => {} } = {}) {
     field({ name: 'stockSupplierSearch', type: 'search',
       placeholder: 'Название, артикул, производитель…' }) +
     '<div data-stock-supplier-brands></div>',
-    { title: 'Ассортимент · ' + company.name, variant: 'q', surface: 'app' },
+    { title: 'Производители', variant: 'q', surface: 'app' },
   ));
   if (!layer) return;
   const host = layer.querySelector('[data-stock-supplier-brands]');
