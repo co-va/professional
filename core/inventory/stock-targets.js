@@ -19,6 +19,10 @@ export const itemLocationBalance = (item, locationId) =>
 export function inventoryItemBelongsToStorage(item, scope = INVENTORY_TOTAL_SCOPE) {
   if (scope === INVENTORY_TOTAL_SCOPE) return true;
   if (itemLocationBalance(item,scope) > 0.000001) return true;
+  // Catalog availability is not a movement: a zero-balance card can belong
+  // to several warehouses without fabricating grams or physical containers.
+  if (Array.isArray(item?.assignedStorageLocations)
+    && item.assignedStorageLocations.includes(scope)) return true;
   if (scope === 'primary') return false; // technical undistributed stock
   const place=inventoryLocations().find(row=>row.locationId===scope && !row.isPrimary);
   if(!place || String(item.location||'').trim().toLocaleLowerCase('ru-RU')
