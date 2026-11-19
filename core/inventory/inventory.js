@@ -71,6 +71,7 @@ import {
   loadInventory,
   loadInventoryCriteria,
   reorderInventoryCriterionValues,
+  reorderInventoryItems,
   updateInventoryItem,
 } from './service.js';
 
@@ -1789,6 +1790,44 @@ function stockListMarkup(manufacturer, query = '', rowsProvider = null, expanded
     : content;
 }
 
+// Prepare a category-local move. Other categories keep their numbered slots;
+// Core /items/reorder performs the exchange atomically in a single request.
+// It does not invent, compact or overwrite missing position numbers.
+function inventoryCategoryTailOrder(manufacturer, selectedIds, allItems = getInventoryItems()) {
+  const current = allItems.filter(item => manufacturerName(item) === manufacturer)
+    .sort(inventoryPositionComparator);
+  const ids = new Set(selectedIds.map(String));
+  const chosen = current.filter(item => ids.has(String(item.itemId)));
+  if (!chosen.length || chosen.length !== ids.size)
+    throw new Error('Список изменился. Обновите остатки и повторите выбор.');
+  const categories = new Set(chosen.map(item => String(item.category || '').trim()));
+  if (categories.size !== 1)
+    throw new Error('Выберите товары одной категории.');
+  const category = [...categories][0];
+  if (chosen.some(item => !(Number(item.position) > 0)))
+    throw new Error('Для перемещения сначала назначьте выбранным товарам номера.');
+  const grouped = current.filter(item => String(item.category || '').trim() === category);
+  if (grouped.some(item => !(Number(item.position) > 0)))
+    throw new Error('В категории есть товары без номера. Пока их нельзя корректно переставить.');
+  const numbered = current.filter(item => Number(item.position) > 0);
+  const positions = numbered.map(item => Number(item.position));
+  if (new Set(positions).size !== positions.length)
+    throw new Error('Есть повторяющиеся порядковые номера. Перемещение отменено.');
+  const ordered = grouped.filter(item => !ids.has(String(item.itemId)))
+    .concat(chosen);
+  let index = 0;
+  const sequence = current.map(item =>
+    String(item.category || '').trim() === category ? ordered[index++] : item);
+  const changed = sequence.some((item, i) => item.itemId !== current[i].itemId);
+  // Non-numbered entries cannot change order through the existing Core endpoint.
+  const originalUnnumbered = current.filter(item => !(Number(item.position) > 0));
+  const finalUnnumbered = sequence.filter(item => !(Number(item.position) > 0));
+  if (originalUnnumbered.some((item, i) => item.itemId !== finalUnnumbered[i]?.itemId))
+    throw new Error('Перемещение товаров без номера не поддерживается.');
+  const hasGaps = positions.some((value, i) => i > 0 && value !== positions[i - 1] + 1);
+  return { category, sequence: sequence.map(item => item.itemId), changed, hasGaps };
+}
+
 function stockSortOptions(level) {
   if (level === 'manufacturers') {
     return [
@@ -2042,6 +2081,7 @@ function openManufacturerStock(root, manufacturer, groupContext = null) {
       options: [
         { value: '', label: 'Действия' },
         { value: 'edit', label: 'Изменить данные' },
+        { value: 'to-category-end', label: 'В конец категории' },
         { value: 'audit', label: 'Инвентаризация остатков' },
         { value: 'transfer', label: 'Переместить' },
         { value: 'order', label: 'Создать заказ' },
@@ -2053,6 +2093,47 @@ function openManufacturerStock(root, manufacturer, groupContext = null) {
       choice.v2Close?.();
       if (action === 'edit') {
         openInventoryAuditCriteria(layer, { mode: 'data', ids, onSaved: renderList, keepOpen: true });
+      } else if (action === 'to-category-end') {
+        let order;
+        try {
+          order = inventoryCategoryTailOrder(manufacturer, ids);
+        } catch (error) {
+          openNotice({ title: 'Порядок товаров',
+            message: error instanceof Error ? error.message : 'Не удалось подготовить перестановку.' });
+          return;
+        }
+        if (!order.changed) {
+          openNotice({ title: 'Порядок товаров',
+            message: 'Выбранные товары уже находятся в конце категории.' });
+          return;
+        }
+        const confirm = mountModal(document.body, modal(
+          '<p>Переместить ' + ids.length + ' поз. в конец категории «' +
+            escapeHtml(order.category || 'Без категории') + '»?</p>' +
+          '<p class="ui-list__secondary">Остальные товары займут освободившиеся места. ' +
+            'Данные товаров и остатки не изменятся.</p>' +
+          (order.hasGaps
+            ? '<p class="form-error">В существующих номерах есть пропуски. ' +
+              'Перестановка сохранит их, но не создаст новые номера.</p>' : '') +
+          '<p class="form-error" role="alert" data-stock-tail-error></p>' +
+          actionBlock(button('Применить', { data: 'data-stock-tail-apply' })),
+          { title: 'Порядок товаров', variant: 'q', surface: 'app' },
+        ));
+        const apply = confirm?.querySelector('[data-stock-tail-apply]');
+        apply?.addEventListener('click', async () => {
+          apply.disabled = true;
+          try {
+            await reorderInventoryItems(manufacturer, order.sequence);
+            selectedStockItems.clear();
+            confirm.v2Close?.();
+            renderList();
+          } catch (error) {
+            const status = confirm.querySelector('[data-stock-tail-error]');
+            if (status) status.textContent = error instanceof Error
+              ? error.message : 'Не удалось сохранить порядок.';
+            apply.disabled = false;
+          }
+        });
       } else if (action === 'audit') {
         openInventoryAuditCriteria(layer, { mode: 'stock', ids, onSaved: renderList });
       } else if (action === 'transfer') {
