@@ -156,14 +156,24 @@ function toolButton(label,key,active=false,title='',className=''){
 
 function fieldControl(line,fields,appearance){
   const registry=entityCardFieldRegistry(fields);
-  const placed=new Set((appearance?.lines||[]).flatMap(row=>
-    COLUMNS.map(column=>String(row.cells?.[column]?.field||''))).filter(Boolean));
+  // Coordinates refer to the actual 9 × 3 card grid (A–C, rows 1–9).
+  // One field can occupy multiple cells; list every position.
+  const positions=new Map();
+  (appearance?.lines||[]).forEach((row,rowIndex)=>{
+    COLUMNS.forEach((column,columnIndex)=>{
+      const key=String(row.cells?.[column]?.field||'');
+      if(!key)return;
+      if(!positions.has(key))positions.set(key,[]);
+      positions.get(key).push(String.fromCharCode(65+columnIndex)+(rowIndex+1));
+    });
+  });
   return select({
     name:'entityCardLineField',
     value:line.field,
     options:[{value:'',label:'Пусто'},...registry.map((item)=>({
       value:item.value,label:item.label,
-      fieldState:item.value===line.field?'active':placed.has(item.value)?'placed':'unused',
+      meta:(positions.get(item.value)||[]).join(', '),
+      fieldState:item.value===line.field?'active':positions.has(item.value)?'placed':'unused',
     }))],
     data:'data-card-line-field',
     aria:'Показатель выбранной строки и столбца',
