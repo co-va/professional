@@ -497,7 +497,7 @@ function supplierDiscount(row = {}, company = {}) {
 }
 
 // Reuse the Inventory "Изменить данные" interaction and its shared UI primitives.
-// Core already owns editing a catalog item: do not add a second bulk-edit API.
+// Core owns both individual and selected edits through one shared validator.
 const SUPPLIER_CATALOG_EDIT_FIELDS = [
   { value: 'name', label: 'Наименование поставщика', kind: 'text', required: true },
   { value: 'supplierSku', label: 'Артикул', kind: 'text' },
@@ -672,24 +672,6 @@ function openSupplierBulkEditor(company, rows, onSaved = () => {}) {
     renderList();
   });
 
-  const loadSelected = async () => {
-    const base = '/' + urlId(company.id) + '/catalog?skip=';
-    const first = await json(base + '0');
-    const catalog = Array.isArray(first.items) ? [...first.items] : [];
-    const total = Number(first.count) || 0;
-    for (let offset = 100; offset < total; offset += 400) {
-      const offsets = [];
-      for (let skip = offset; skip < Math.min(offset + 400, total); skip += 100)
-        offsets.push(skip);
-      const pages = await Promise.all(offsets.map(skip => json(base + skip)));
-      pages.forEach(page => catalog.push(...(Array.isArray(page.items) ? page.items : [])));
-    }
-    const byId = new Map(catalog.map(row => [String(row.id), row]));
-    if (rows.some(row => !byId.has(String(row.id))))
-      throw new Error('Выбор устарел. Закройте редактор и обновите ассортимент.');
-    return byId;
-  };
-
   form.addEventListener('submit', async event => {
     event.preventDefault();
     if (busy || !selected.size) return;
@@ -712,26 +694,36 @@ function openSupplierBulkEditor(company, rows, onSaved = () => {}) {
     result.textContent = '';
     const failed = new Map();
     try {
-      for (let offset = 0; offset < targets.length; offset += 4) {
-        const batch = targets.slice(offset, offset + 4);
-        const responses = await Promise.allSettled(batch.map(row =>
-          json('/' + urlId(company.id) + '/catalog/' + urlId(row.id), {
-            method: 'PUT', body: { [def.value]: value },
-          })));
-        responses.forEach((response, index) => {
-          if (response.status === 'fulfilled') changed = true;
-          else failed.set(String(batch[index].id), errText(response.reason));
-        });
+      const saved = new Map();
+      // Single transaction per 100 selected rows, one compact response with
+      // updated rows. Do not re-download the entire price list after Apply.
+      for (let offset = 0; offset < targets.length; offset += 100) {
+        const batch = targets.slice(offset, offset + 100);
+        const ids = batch.map(row => String(row.id));
+        try {
+          const response = await json('/' + urlId(company.id) + '/catalog/bulk', {
+            method: 'POST', body: { rowIds: ids, field: def.value, value },
+          });
+          const returned = Array.isArray(response?.items) ? response.items : [];
+          if (returned.length !== ids.length ||
+            ids.some(id => !returned.some(row => String(row.id) === id)))
+            throw new Error('Сервер не подтвердил изменения выбранных позиций.');
+          returned.forEach(row => saved.set(String(row.id), row));
+          changed = true;
+        } catch (cause) {
+          batch.forEach(row => failed.set(String(row.id), errText(cause)));
+        }
         result.textContent = 'Обработано: ' +
-          Math.min(offset + 4, targets.length) + ' из ' + targets.length;
+          Math.min(offset + 100, targets.length) + ' из ' + targets.length;
       }
-      const saved = await loadSelected();
       const confirmed = targets.filter(row =>
         supplierCatalogValueMatches(saved.get(String(row.id))?.[def.value], value, def));
-      // Keep the same checked rows and refresh their right-column values after
-      // every Apply; the selector may then change to another field.
-      rows.forEach(row => Object.assign(row, saved.get(String(row.id))));
-      if (confirmed.length) changed = true;
+      // Keep the original selection for the next field and replace only the
+      // edited supplier rows with Core's authoritative returned values.
+      rows.forEach(row => {
+        const current = saved.get(String(row.id));
+        if (current) Object.assign(row, current);
+      });
       valueInput().value = '';
       renderList();
       if (confirmed.length !== targets.length || failed.size) {
