@@ -2477,10 +2477,10 @@ function inventoryAuditMeasure(item, index, data) {
 
 
 const INVENTORY_AUDIT_EDIT_FIELDS = [
-  { value: 'category', label: 'Категория', kind: 'text' },
-  { value: 'productType', label: 'Подкатегория', kind: 'text' },
+  { value: 'category', label: 'Категория', kind: 'criterion' },
+  { value: 'productType', label: 'Подкатегория', kind: 'criterion' },
   { value: 'name', label: 'Наименование', kind: 'text' },
-  { value: 'manufacturer', label: 'Производитель', kind: 'text' },
+  { value: 'manufacturer', label: 'Производитель', kind: 'criterion' },
   { value: 'position', label: 'Порядковый номер', kind: 'integer' },
   { value: 'sku', label: 'Артикул', kind: 'text' },
   { value: 'barcode', label: 'Штрихкод', kind: 'text' },
@@ -2520,6 +2520,16 @@ function inventoryAuditDataControl(definition, name, { shared = false, locked = 
     ? definition.value === 'position' ? 'Начальный номер (дальше по порядку)' : 'Новое значение'
     : '';
   if (locked) return field({ label, name, placeholder: 'Цена от поставщика', disabled: true });
+  if (definition.kind === 'criterion') {
+    // Same existing dropdown as the product card: choose a catalogued value,
+    // never create a new category/manufacturer by typing in bulk editor.
+    const group = inventoryCriterionGroups().find(row => row.legacyField === definition.value);
+    const current = String(value ?? '');
+    return select({
+      label, name, value: current, aria: definition.label,
+      options: group ? criterionOptions(group, current) : [{ value: '', label: 'Не указано' }],
+    });
+  }
   if (!shared && definition.kind === 'text') return textareaField({
     label, name, value: String(value ?? ''), rows: 1, placeholder: 'Не указано',
   });
@@ -2558,6 +2568,12 @@ function inventoryAuditDataRow(item, index, definition, includeManufacturer = fa
 function inventoryAuditParseDataValue(definition, raw) {
   const value = String(raw ?? '').trim();
   if (!value) return null; // Empty input means leave that item unchanged.
+  if (definition.kind === 'criterion') {
+    const group = inventoryCriterionGroups().find(row => row.legacyField === definition.value);
+    if (!group?.values?.some(entry => entry.name === value))
+      throw new Error('Выберите существующее значение из списка «' + definition.label + '».');
+    return value;
+  }
   if (definition.kind === 'unit') {
     if (!UNIT_OPTIONS.some(option => option.value === value)) throw new Error('Выберите допустимую единицу.');
     return value;
