@@ -154,12 +154,17 @@ function toolButton(label,key,active=false,title='',className=''){
   return `<button type="button" class="entity-card-editor__tool${active?' is-active':''}${className?` ${className}`:''}" data-card-tool="${escapeHtml(key)}"${title?` aria-label="${escapeHtml(title)}"`:''}>${label}</button>`;
 }
 
-function fieldControl(line,fields){
+function fieldControl(line,fields,appearance){
   const registry=entityCardFieldRegistry(fields);
+  const placed=new Set((appearance?.lines||[]).flatMap(row=>
+    COLUMNS.map(column=>String(row.cells?.[column]?.field||''))).filter(Boolean));
   return select({
     name:'entityCardLineField',
     value:line.field,
-    options:[{value:'',label:'Пусто'},...registry.map((item)=>({value:item.value,label:item.label}))],
+    options:[{value:'',label:'Пусто'},...registry.map((item)=>({
+      value:item.value,label:item.label,
+      fieldState:item.value===line.field?'active':placed.has(item.value)?'placed':'unused',
+    }))],
     data:'data-card-line-field',
     aria:'Показатель выбранной строки и столбца',
   });
@@ -203,7 +208,7 @@ function editorWorkspace(state,fields,allowPhoto=true){
       </div>
     </div>
     <div class="entity-card-editor__section entity-card-editor__section--data">
-      <div class="entity-card-editor__data">${fieldControl(cell,fields)}</div>
+      <div class="entity-card-editor__data">${fieldControl(cell,fields,state.appearance)}</div>
     </div>
     <div class="entity-card-editor__section entity-card-editor__section--format">
       <div class="entity-card-editor__tool-captions"><span>Выравнивание</span><span>Размер</span></div>
@@ -292,8 +297,10 @@ export function mountEntityCardConstructor(root,{appearance={},fields=[],photo='
 
     root.querySelector('input[data-card-line-field]')?.addEventListener('change',(event)=>{
       state.appearance.lines[state.line].cells[state.column].field=event.target.value;
-      updatePreview();
       markDirty();
+      // The next opening of this same picker must use the latest placement
+      // across all 27 cells, without reopening or losing the selected row.
+      rerenderWorkspace();
     });
 
     root.querySelectorAll('[data-card-tool]').forEach((control)=>control.addEventListener('click',()=>{
