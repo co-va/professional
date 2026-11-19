@@ -39,7 +39,7 @@ import {
   inventoryStockThresholdInput, inventoryStockThresholdStored, inventoryStockThresholdUnit,
 } from './completeness.js';
 import { openInventoryProductAppearanceQ, openInventoryProductOverview } from './product-overview.js';
-import { renderInventoryOrders } from './orders.js';
+import { renderInventoryOrders, openInventoryOrderFromSelection } from './orders.js';
 import { classificationOptions, openInventoryClassificationGroups,
   inventoryCriterionGroups, criterionOptions } from './classification.js';
 import { openInventoryStorageLocations, reconcileLegacyInventoryStorage } from './storage.js';
@@ -1951,7 +1951,7 @@ function openManufacturerStock(root, manufacturer, groupContext = null) {
     <div data-stock-selected-actions hidden>
       <p class="ui-list__secondary">Выбрано: <strong data-stock-selected-count>0</strong></p>
       ${actionBlock(
-        button('Переместить', { data: 'data-stock-selected-transfer' }) +
+        button('Действия', { data: 'data-stock-selected-action' }) +
         button('Удалить', { variant: 'delete-outline', data: 'data-stock-selected-delete' })
       )}
     </div>
@@ -2026,14 +2026,44 @@ function openManufacturerStock(root, manufacturer, groupContext = null) {
       }
     });
   };
-  layer.querySelector('[data-stock-selected-transfer]')?.addEventListener('click', () => {
+  layer.querySelector('[data-stock-selected-action]')?.addEventListener('click', () => {
     const ids = [...selectedStockItems].filter(id => Boolean(getInventoryItem(id)));
     if (!ids.length) return;
-    openInventoryTransfer(() => {
-      selectedStockItems.clear();
-      renderList();
-    }, { selectedItemIds: ids, fromLocationId: STOCK_VIEW.storageScope === INVENTORY_TOTAL_SCOPE
-      ? '' : STOCK_VIEW.storageScope });
+    const choice = mountModal(document.body, modal(
+      '<p class="ui-list__secondary">Выбрано позиций: ' + ids.length + '</p>',
+      { title: 'Действия', variant: 'q', surface: 'app' },
+    ));
+    if (!choice) return;
+    const header = choice.querySelector('[data-v2-q-header-content]');
+    if (!header) { choice.v2Close?.(); return; }
+    header.innerHTML = select({
+      label: '', name: 'stockSelectedAction', value: '',
+      options: [
+        { value: '', label: 'Действия' },
+        { value: 'edit', label: 'Изменить данные' },
+        { value: 'audit', label: 'Инвентаризация остатков' },
+        { value: 'transfer', label: 'Переместить' },
+        { value: 'order', label: 'Создать заказ' },
+      ],
+    });
+    header.querySelector('[name="stockSelectedAction"]')?.addEventListener('change', event => {
+      const action = event.target.value;
+      if (!action) return;
+      choice.v2Close?.();
+      if (action === 'edit') {
+        openInventoryAuditCriteria(layer, { mode: 'data', ids, onSaved: renderList });
+      } else if (action === 'audit') {
+        openInventoryAuditCriteria(layer, { mode: 'stock', ids, onSaved: renderList });
+      } else if (action === 'transfer') {
+        openInventoryTransfer(renderList, {
+          selectedItemIds: ids,
+          fromLocationId: STOCK_VIEW.storageScope === INVENTORY_TOTAL_SCOPE
+            ? '' : STOCK_VIEW.storageScope,
+        });
+      } else if (action === 'order') {
+        openInventoryOrderFromSelection(layer, ids, renderList);
+      }
+    });
   });
   layer.querySelector('[data-stock-selected-delete]')?.addEventListener('click', deleteSelected);
   let disposeCategoryReorder = () => {};
