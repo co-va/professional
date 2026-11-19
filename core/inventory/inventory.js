@@ -3020,13 +3020,21 @@ function openInventoryAuditCriteria(root, { mode, ids = [], fieldName = 'categor
       return;
     }
 
+    const common = Boolean(dataMode?.checked);
+    const clearing = Boolean(commonHost?.querySelector('[data-inventory-audit-clear-all]')?.checked);
+    const newValue = String(commonHost?.querySelector('[name="auditValue"]')?.value ?? '').trim();
+    // Erasing a prefilled identical value is an explicit clear, not "skip".
+    // Mixed values require the visible "Очистить у всех" choice to clear.
+    const clearAll = common && (clearing || (dataUniform && dataInitial !== '' && !newValue));
     saving = true;
+    syncDataActions();
     try {
       await applyInventoryAuditDataChanges(layer, {
-        items, definition, perItem: true, data, status, submit, onSaved,
+        items, definition, perItem: !common, data, status, submit, onSaved, clearAll,
       });
     } finally {
       saving = false;
+      syncDataActions();
     }
   });
   return layer;
