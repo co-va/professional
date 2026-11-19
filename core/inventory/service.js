@@ -1,5 +1,5 @@
 import { apiRequest, getAuthToken } from '../auth.js';
-import { applyInventorySnapshot, getInventoryItem, getInventoryItems, getInventoryCriteria, getInventorySnapshot, removeArchivedInventoryItems, setInventoryCriteriaCatalog } from './data.js';
+import { applyInventorySnapshot, applyInventoryPositionChanges, getInventoryItem, getInventoryItems, getInventoryCriteria, getInventorySnapshot, removeArchivedInventoryItems, setInventoryCriteriaCatalog } from './data.js';
 
 const SERVER_ORDER_UNAVAILABLE = 'Сервер склада ещё не обновлён. Порядок не сохранён.';
 // Navigation can reuse an already confirmed stock read briefly. Mutation
@@ -169,6 +169,48 @@ export async function updateInventoryItemsBatch(updates = []) {
   lastStockReadAt = 0;
   stockRead = null;
   return expected;
+}
+
+// Atomic Core operation: clear selected numbers and close the remaining gaps
+// for each manufacturer. The compact response avoids repeated stock snapshots.
+export async function clearInventoryItemPositions(itemIds = []) {
+  const ids = [...new Set((Array.isArray(itemIds) ? itemIds : []).map(String))];
+  if (!ids.length || ids.length > 10000)
+    throw new Error('Выберите от 1 до 10000 позиций для очистки.');
+  const items = ids.map(id => getInventoryItem(id));
+  if (items.some(item => !item)) throw new Error('Список изменился. Обновите остатки.');
+  const input = items.map(item => ({
+    itemId: item.itemId, expectedPosition: Number(item.position) || 0,
+  }));
+  const response = await apiRequest('/inventory/items/positions/clear', {
+    method: 'POST', body: JSON.stringify({ items: input }), timeoutMs: 60000,
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const message = Array.isArray(payload.message) ? payload.message.join('; ')
+      : typeof payload.message === 'string' ? payload.message.trim() : '';
+    throw new Error(message || (response.status === 404
+      ? 'Сервер ещё не поддерживает очистку с пересчётом номеров.'
+      : 'Не удалось очистить номера (HTTP ' + response.status + ').'));
+  }
+  const confirmed = Array.isArray(payload?.clearedItemIds)
+    ? payload.clearedItemIds.map(String) : [];
+  const positions = Array.isArray(payload?.positions) ? payload.positions : [];
+  const byId = new Map(positions.map(row => [String(row.itemId), row.position]));
+  const affected = new Set(items.map(item => String(item.manufacturer || '')));
+  const localAffected = getInventoryItems().filter(item =>
+    affected.has(String(item.manufacturer || '')));
+  if (confirmed.length !== ids.length || ids.some(id => !confirmed.includes(id))
+    || !positions.length || localAffected.some(item => !byId.has(String(item.itemId)))
+    || positions.some(row => !row?.itemId
+      || !Number.isSafeInteger(row.position) || row.position < 0)
+    || ids.some(id => byId.get(id) !== 0)) {
+    invalidateInventoryNavigationCache();
+    throw new Error('Сервер не подтвердил новый порядок. Обновите остатки.');
+  }
+  invalidateInventoryNavigationCache();
+  applyInventoryPositionChanges(positions);
+  return ids;
 }
 
 export async function archiveSelectedInventoryItems(itemIds) {
