@@ -63,6 +63,7 @@ import {
 } from './data.js';
 import {
   archiveSelectedInventoryItems,
+  updateInventoryItemsBatch,
   correctInventoryMovement,
   createInventoryItem,
   createInventoryMovement,
@@ -2627,18 +2628,23 @@ async function applyInventoryAuditDataChanges(layer, { items, definition, perIte
           status.textContent = `Проверено: ${changes.length - pending.length - failed.size} из ${changes.length}`;
         }
       } else {
-        // Existing item API accepts a patch of individual master-data fields.
-        for (let index = 0; index < changes.length; index += 4) {
-          const batch = changes.slice(index, index + 4);
-          const results = await Promise.allSettled(batch.map(entry =>
-            updateInventoryItem(entry.itemId, inventoryAuditDataPayload(definition, entry.value, getInventoryItem(entry.itemId)))));
-          results.forEach((result, offset) => {
-            if (result.status === 'rejected') failed.set(batch[offset].itemId,
-              result.reason instanceof Error ? result.reason.message : 'Ошибка сохранения');
-          });
-          status.textContent = `Обработано: ${Math.min(index + 4, changes.length)} из ${changes.length}`;
+        // Canonical Core batch update keeps every selected item in one
+        // transaction per 100 entries. Only one inventory read verifies the
+        // resulting values, not one entire snapshot per product.
+        for (let index = 0; index < changes.length; index += 100) {
+          const batch = changes.slice(index, index + 100);
+          try {
+            await updateInventoryItemsBatch(batch.map(entry => ({
+              itemId: entry.itemId,
+              patch: inventoryAuditDataPayload(definition, entry.value, getInventoryItem(entry.itemId)),
+            })));
+          } catch (error) {
+            const reason = error instanceof Error ? error.message : 'Ошибка сохранения';
+            batch.forEach(entry => failed.set(entry.itemId, reason));
+          }
+          status.textContent = `Обработано: ${Math.min(index + 100, changes.length)} из ${changes.length}`;
         }
-        await loadInventory();
+        if (failed.size < changes.length) await loadInventory();
       }
       const unresolved = changes.filter(entry =>
         !inventoryAuditValueMatches(getInventoryItem(entry.itemId), definition, entry.value));

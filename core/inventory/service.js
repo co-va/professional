@@ -138,6 +138,32 @@ export async function reorderInventoryItems(manufacturer, itemIds) {
   });
 }
 
+// All item validations remain on Core. One request/ack for a group of
+// field changes; the caller performs one canonical read after the batch.
+export async function updateInventoryItemsBatch(updates = []) {
+  if (!Array.isArray(updates) || !updates.length || updates.length > 100)
+    throw new Error('Выберите от 1 до 100 позиций для изменения.');
+  const response = await apiRequest('/inventory/items/bulk-update', {
+    method: 'POST',
+    body: JSON.stringify({ updates }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const reason = Array.isArray(payload?.message) ? payload.message.join('; ')
+      : typeof payload?.message === 'string' ? payload.message.trim() : '';
+    throw new Error(reason || 'Не удалось изменить выбранные позиции.');
+  }
+  const expected = updates.map(row => String(row.itemId));
+  if (!Array.isArray(payload?.updatedItemIds) ||
+      payload.updatedItemIds.length !== expected.length ||
+      expected.some(id => !payload.updatedItemIds.includes(id)))
+    throw new Error('Core не подтвердил изменения выбранных позиций.');
+  stockRevision++;
+  lastStockReadAt = 0;
+  stockRead = null;
+  return expected;
+}
+
 export async function archiveSelectedInventoryItems(itemIds) {
   const ids = [...new Set(Array.isArray(itemIds) ? itemIds.map(String) : [])];
   if (!ids.length || ids.length > 500) throw new Error('Выберите от 1 до 500 товаров.');
