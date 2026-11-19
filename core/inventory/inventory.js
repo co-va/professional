@@ -3049,8 +3049,9 @@ function openInventoryAuditCriteria(root, {
         clearAll, clearItems, selectedIndices,
         keepOpen: isData && keepOpen,
         afterApplied: () => {
-          // Every completed operation starts a fresh selection using saved values.
+          // Start a clean editing pass: no checked rows or common-mode selection.
           selectedDataIds.clear();
+          if (dataMode) dataMode.checked = false;
           items.splice(0, items.length, ...inventoryAuditItems(ids));
           renderDataFields();
         },
