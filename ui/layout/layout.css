@@ -9,6 +9,34 @@
 .data-edit-row>.field>span:empty{display:none}
 @media(max-width:360px){.data-edit-row{grid-template-columns:minmax(0,1fr) minmax(100px,38%);gap:8px}}
 
+/* Data editor: same compact product rows as Stocktake and Orders.
+   One existing compactCheck at left, title in the middle, value at right. */
+.inventory-audit-data-list{display:grid;gap:0;min-width:0}
+.data-edit-row.inventory-audit-data-row{
+  grid-template-columns:var(--ui-compact-size,28px) minmax(0,1fr) minmax(108px,38%);
+  align-items:center;gap:8px;min-height:var(--ui-field-height);
+  padding:5px 0;border-bottom:1px solid var(--border);
+}
+.inventory-audit-data-row>.ui-compact-check{align-self:center;justify-self:start;min-width:var(--ui-compact-size,28px)}
+.inventory-audit-data-row>.data-edit-row__name{
+  white-space:normal;overflow:visible;text-overflow:clip;
+  overflow-wrap:anywhere;line-height:1.3;font-size:14px;
+}
+.inventory-audit-data-row>.field{min-width:0;gap:0}
+.inventory-audit-data-row>.field>span:empty{display:none}
+.inventory-audit-data-row .field textarea{
+  box-sizing:border-box;width:100%;height:var(--ui-field-height);
+  min-height:var(--ui-field-height);max-height:78px;
+  resize:none;overflow-y:auto;line-height:1.3;padding:10px 9px;
+}
+[data-inventory-audit-actions] [hidden]{display:none!important}
+@media(max-width:360px){
+  .data-edit-row.inventory-audit-data-row{
+    grid-template-columns:var(--ui-compact-size,28px) minmax(0,1fr) minmax(104px,39%);
+    gap:6px;
+  }
+}
+
 /* Inventory data choice: one shared two-column row, no custom selector geometry. */
 .inventory-audit-value-cell{min-width:0;display:grid;gap:6px;align-content:start}
 .inventory-audit-value-heading{display:grid;grid-template-columns:minmax(0,1fr) var(--ui-field-height);align-items:end;gap:6px;font-size:13px;line-height:1.2;color:var(--text-secondary)}
