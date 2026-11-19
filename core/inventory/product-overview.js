@@ -6,7 +6,8 @@ import {
 } from '../../ui/ui.js';
 import { escapeHtml } from '../../ui/utils/escape-html.js';
 import { getCardAppearanceTemplate, saveCardAppearanceTemplate } from '../card-appearance-templates.js';
-import { flushBusinessPersistence } from '../business-persistence.js';
+import { flushBusinessPersistence, isBusinessServerReady } from '../business-persistence.js';
+import { loadBusinessState } from '../runtime/business-state.js';
 import { getInventoryItem, getInventoryMovements } from './data.js';
 import { inventoryCriterionGroups } from './classification.js';
 import { inventoryLocations, itemLocationBalance, storageName,
@@ -360,6 +361,10 @@ export function openInventoryProductAppearanceQ(itemId, onSaved = () => {}, stoc
       })(),
     }),
     save: async ({ appearance }) => {
+      // The Inventory section can open without loading Journal state.
+      // Never report a saved appearance while the persistence queue is offline.
+      if (!isBusinessServerReady()) await loadBusinessState();
+      if (!isBusinessServerReady()) throw new Error('Нет соединения для сохранения вида карты.');
       saveCardAppearanceTemplate(PRODUCT_APPEARANCE_SCOPE, { appearance });
       await flushBusinessPersistence();
     },
