@@ -2730,11 +2730,14 @@ function openInventoryAuditCriteria(root, { mode, ids = [], fieldName = 'categor
   if (!items.length) return openNotice({ title: 'Инвентаризация', message: 'Позиции не найдены.' });
   const isData = mode === 'data';
   const includesDifferentManufacturers = new Set(items.map(manufacturerName)).size > 1;
-  const definition = inventoryAuditFieldDefinition(fieldName);
+  let definition = inventoryAuditFieldDefinition(fieldName);
   if (isData && !definition) return openNotice({ title: 'Данные', message: 'Выберите характеристику.' });
   const fields = isData
-    ? `<div class="form-grid">${items.map((item, index) =>
-      inventoryAuditDataRow(item, index, definition, includesDifferentManufacturers)).join('')}</div>`
+    ? '<div data-inventory-audit-data-editor>' +
+      compactCheck({ label: 'Одно значение для всех', checked: true,
+        data: 'data-inventory-data-common' }) +
+      '<div data-inventory-audit-data-common></div>' +
+      '<div data-inventory-audit-data-individual hidden></div></div>'
     : `<details data-inventory-audit-excluded hidden>
          <summary data-inventory-audit-excluded-count>Исключено: 0</summary>
          <div class="form-grid" data-inventory-audit-excluded-list></div>
@@ -2744,10 +2747,12 @@ function openInventoryAuditCriteria(root, { mode, ids = [], fieldName = 'categor
     <p data-inventory-audit-included-count>${isData ? 'Выбрано' : 'В инвентаризации'}: ${items.length} позиций</p>
     ${fields}
     <p class="form-error" role="status" data-inventory-audit-status></p>
-    ${actionBlock(button(isData ? 'Применить' : 'Сохранить', { type:'submit', data:'data-inventory-audit-apply' }))}
+    <div data-inventory-audit-actions${isData ? ' hidden' : ''}>
+      ${actionBlock(button(isData ? 'Применить' : 'Сохранить', { type:'submit', data:'data-inventory-audit-apply' }))}
+    </div>
   </form>`;
   const layer = mountModal(root, modal(markup, {
-    title: isData ? 'Инвентаризация данных' : 'Инвентаризация остатков',
+    title: isData ? 'Изменить данные' : 'Инвентаризация остатков',
     variant: 'q',
   }));
   if (!layer) return null;
