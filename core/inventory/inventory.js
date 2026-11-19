@@ -2768,6 +2768,83 @@ function openInventoryAuditCriteria(root, { mode, ids = [], fieldName = 'categor
   const excludedList = form.querySelector('[data-inventory-audit-excluded-list]');
   const excludedCount = form.querySelector('[data-inventory-audit-excluded-count]');
   const includedCount = form.querySelector('[data-inventory-audit-included-count]');
+  const dataMode = form.querySelector('[data-inventory-data-common]');
+  const commonHost = form.querySelector('[data-inventory-audit-data-common]');
+  const individualHost = form.querySelector('[data-inventory-audit-data-individual]');
+  const dataActions = form.querySelector('[data-inventory-audit-actions]');
+  let dataCommonTouched = false;
+  let dataInitial = '';
+  let dataUniform = true;
+
+  function syncDataActions() {
+    if (!isData) return;
+    const common = Boolean(dataMode?.checked);
+    if (commonHost) commonHost.hidden = !common;
+    if (individualHost) individualHost.hidden = common;
+    const clearing = Boolean(commonHost?.querySelector('[data-inventory-audit-clear-all]')?.checked);
+    const valueInput = commonHost?.querySelector('[name="auditValue"]');
+    if (valueInput) valueInput.disabled = clearing;
+    const value = String(valueInput?.value ?? '').trim();
+    const commonDirty = clearing || (dataCommonTouched &&
+      (value !== '' || (dataUniform && dataInitial !== '')) && (
+        !dataUniform || value !== dataInitial));
+    const individualDirty = items.some((item, index) => {
+      const control = individualHost?.querySelector('[name="auditItem-' + index + '"]');
+      return control && String(control.value ?? '').trim() !==
+        String(inventoryAuditCurrentValue(item, definition) ?? '').trim();
+    });
+    const dirty = common ? commonDirty : individualDirty;
+    if (dataActions) dataActions.hidden = !dirty;
+    if (submit) submit.disabled = saving || !dirty;
+  }
+
+  function renderDataFields() {
+    if (!isData || !definition || !commonHost || !individualHost) return;
+    const values = items.map(item => String(inventoryAuditCurrentValue(item, definition) ?? '').trim());
+    dataUniform = new Set(values).size === 1;
+    dataInitial = dataUniform ? values[0] || '' : '';
+    dataCommonTouched = false;
+    commonHost.innerHTML = inventoryAuditDataControl(definition, 'auditValue', {
+      shared: true, value: dataInitial,
+      placeholder: dataUniform ? '' : 'Разные значения',
+    }) + (!dataUniform
+      ? '<p class="ui-list__secondary">Значения различаются. Укажите одно для всех или очистите.</p>'
+      : '') + (inventoryAuditCanClear(definition) && values.some(Boolean)
+      ? compactCheck({ label: 'Очистить у всех', data: 'data-inventory-audit-clear-all' })
+      : '');
+    individualHost.innerHTML = '<div class="form-grid">' + items.map((item, index) =>
+      inventoryAuditDataRow(item, index, definition, includesDifferentManufacturers)).join('') + '</div>';
+    status.textContent = '';
+    syncDataActions();
+  }
+
+  if (isData) {
+    const header = layer.querySelector('[data-v2-q-header-content]');
+    if (header) {
+      header.innerHTML = select({
+        label: 'Изменить данные', name: 'auditEditField', value: definition.value,
+        options: INVENTORY_AUDIT_EDIT_FIELDS.map(({ value, label }) => ({ value, label })),
+      });
+      header.querySelector('[name="auditEditField"]')?.addEventListener('change', event => {
+        const next = inventoryAuditFieldDefinition(event.target.value);
+        if (!next || saving) return;
+        definition = next;
+        renderDataFields();
+      });
+    }
+    dataMode?.addEventListener('change', syncDataActions);
+    commonHost?.addEventListener('input', event => {
+      if (event.target?.name === 'auditValue') dataCommonTouched = true;
+      syncDataActions();
+    });
+    commonHost?.addEventListener('change', event => {
+      if (event.target?.name === 'auditValue') dataCommonTouched = true;
+      syncDataActions();
+    });
+    individualHost?.addEventListener('input', syncDataActions);
+    individualHost?.addEventListener('change', syncDataActions);
+    renderDataFields();
+  }
 
   // Move existing nodes, not re-rendered fields. Typed measurements survive
   // exclude/restore, and excluded rows never participate in saving.
