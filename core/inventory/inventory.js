@@ -10,6 +10,7 @@ import {
   entityVisualCard,
   entityCardStack,
   field,
+  textareaField,
   modal,
   mountModal,
   mountV2ZLayer,
@@ -2520,6 +2521,9 @@ function inventoryAuditDataControl(definition, name, { shared = false, locked = 
     ? definition.value === 'position' ? 'Начальный номер (дальше по порядку)' : 'Новое значение'
     : '';
   if (locked) return field({ label, name, placeholder: 'Цена от поставщика', disabled: true });
+  if (!shared && definition.kind === 'text') return textareaField({
+    label, name, value: String(value ?? ''), rows: 1, placeholder: 'Не указано',
+  });
   if (definition.kind === 'unit' || definition.kind === 'usage') return select({
     label, name, value: String(value ?? ''),
     options: [{ value: '', label: shared ? 'Выберите значение' : 'Не указано' },
@@ -2537,24 +2541,18 @@ function inventoryAuditDataControl(definition, name, { shared = false, locked = 
   });
 }
 
-function inventoryAuditDataRow(item, index, definition, includeManufacturer = false) {
+function inventoryAuditDataRow(item, index, definition, includeManufacturer = false, selected = false) {
   const thresholdField = definition.value === 'minStock' || definition.value === 'targetStock';
   const name = inventoryAuditItemLabel(item, includeManufacturer)
     + (thresholdField ? ' · ' + inventoryStockThresholdUnit(item) : '');
   const current = inventoryAuditCurrentValue(item, definition);
-  const shown = definition.value === 'usage'
-    ? INVENTORY_AUDIT_USAGE.find(option => option.value === current)?.label || ''
-    : String(current ?? '');
   const locked = definition.value === 'referencePrice' && itemPrimaryPrice(item) !== null;
-  return `<div class="data-edit-row" role="group" aria-label="${escapeHtml(definition.label + ': ' + name)}">
-    <span class="data-edit-row__name" title="${escapeHtml(name)}"><strong>${escapeHtml(name)}</strong>${shown ? ` <small>· ${escapeHtml(shown)}</small>` : ''}</span>
-    <div class="inventory-audit-value-cell">
-      ${inventoryAuditDataControl(definition, `auditItem-${index}`, { locked, value: current ?? '' })}
-      ${!locked && inventoryAuditCanClear(definition) && String(current ?? '').trim()
-        ? compactCheck({ label: 'Очистить', data: `data-inventory-audit-clear-item="${index}"`,
-          aria: `Очистить «${definition.label}» у ${name}` })
-        : ''}
-    </div>
+  return `<div class="data-edit-row inventory-audit-data-row" role="group" aria-label="${escapeHtml(definition.label + ': ' + name)}">
+    ${compactCheck({ checked: selected, disabled: locked,
+      data: `data-inventory-audit-selected="${index}"`,
+      aria: `Выбрать ${definition.label}: ${name}` })}
+    <span class="data-edit-row__name" title="${escapeHtml(name)}"><strong>${escapeHtml(name)}</strong></span>
+    ${inventoryAuditDataControl(definition, `auditItem-${index}`, { locked, value: current ?? '' })}
   </div>`;
 }
 
@@ -2603,7 +2601,7 @@ function inventoryAuditValueMatches(item, definition, expected) {
   return String(actual ?? '') === String(expected);
 }
 
-async function applyInventoryAuditDataChanges(layer, { items, definition, perItem, data, status, submit, onSaved, clearAll = false, clearItems = new Set(), keepOpen = false, afterApplied = () => {} }) {
+async function applyInventoryAuditDataChanges(layer, { items, definition, perItem, data, status, submit, onSaved, clearAll = false, clearItems = new Set(), selectedIndices = null, keepOpen = false, afterApplied = () => {} }) {
   if (!definition) {
     status.textContent = 'Выберите характеристику.';
     return false;
@@ -2631,6 +2629,7 @@ async function applyInventoryAuditDataChanges(layer, { items, definition, perIte
           throw new Error('Диапазон порядковых номеров слишком велик.');
       }
       for (const [index, item] of items.entries()) {
+        if (perItem && selectedIndices && !selectedIndices.has(index)) continue;
         if (perItem && definition.value === 'referencePrice' && itemPrimaryPrice(item) !== null) continue;
         const raw = perItem ? String(data.get(`auditItem-${index}`) ?? '').trim() : '';
         const shouldClear = perItem && clearItems.has(index);
@@ -2748,11 +2747,10 @@ function openInventoryAuditCriteria(root, { mode, ids = [], fieldName = 'categor
   if (isData && !definition) return openNotice({ title: 'Данные', message: 'Выберите характеристику.' });
   const fields = isData
     ? '<div class="form-grid" data-inventory-audit-data-editor>' +
-      compactCheck({ label: 'Одно значение для всех', checked: true,
+      compactCheck({ label: 'Одно значение для всех',
         data: 'data-inventory-data-common' }) +
-      '<div data-inventory-audit-data-common></div>' +
-      '<p class="ui-list__secondary">Пустое поле не изменяет значение. Для удаления выберите «Очистить».</p>' +
-      '<div data-inventory-audit-data-individual hidden></div></div>'
+      '<div data-inventory-audit-data-common hidden></div>' +
+      '<div data-inventory-audit-data-individual></div></div>'
     : `<details data-inventory-audit-excluded hidden>
          <summary data-inventory-audit-excluded-count>Исключено: 0</summary>
          <div class="form-grid" data-inventory-audit-excluded-list></div>
@@ -2763,7 +2761,8 @@ function openInventoryAuditCriteria(root, { mode, ids = [], fieldName = 'categor
     ${fields}
     <p class="form-error" role="status" data-inventory-audit-status></p>
     <div data-inventory-audit-actions${isData ? ' hidden' : ''}>
-      ${actionBlock(button(isData ? 'Применить' : 'Сохранить', { type:'submit', data:'data-inventory-audit-apply' }))}
+      ${actionBlock((isData ? button('Очистить', { variant: 'secondary', data: 'data-inventory-audit-clear' }) : '') +
+        button(isData ? 'Применить' : 'Сохранить', { type:'submit', data:'data-inventory-audit-apply' }))}
     </div>
   </form>`;
   const layer = mountModal(root, modal(markup, {
@@ -2773,6 +2772,7 @@ function openInventoryAuditCriteria(root, { mode, ids = [], fieldName = 'categor
   if (!layer) return null;
   const form = layer.querySelector('[data-inventory-audit-criteria]');
   const submit = layer.querySelector('[data-inventory-audit-apply]');
+  const clearButton = layer.querySelector('[data-inventory-audit-clear]');
   const status = layer.querySelector('[data-inventory-audit-status]');
   const balances = new Map(items.map(item => [item.itemId, Number(item.balance) || 0]));
   const knownContainers = new Map(items.map(item => [item.itemId, item.containerCount == null ? null : Number(item.containerCount)]));
@@ -2790,35 +2790,51 @@ function openInventoryAuditCriteria(root, { mode, ids = [], fieldName = 'categor
   let dataCommonTouched = false;
   let dataInitial = '';
   let dataUniform = true;
+  const selectedDataIds = new Set();
+
+  function checkedDataIndices() {
+    return new Set([...individualHost?.querySelectorAll('[data-inventory-audit-selected]:checked') || []]
+      .map(check => Number(check.dataset.inventoryAuditSelected)));
+  }
+
+  function resizeDataText(control) {
+    if (control?.tagName !== 'TEXTAREA') return;
+    control.style.height = 'auto';
+    control.style.height = Math.min(control.scrollHeight, 78) + 'px';
+  }
 
   function syncDataActions() {
     if (!isData) return;
     const common = Boolean(dataMode?.checked);
     if (commonHost) commonHost.hidden = !common;
     if (individualHost) individualHost.hidden = common;
-    const clearing = Boolean(commonHost?.querySelector('[data-inventory-audit-clear-all]')?.checked);
-    const valueInput = commonHost?.querySelector('[name="auditValue"]');
-    if (valueInput) valueInput.disabled = clearing;
-    const value = String(valueInput?.value ?? '').trim();
-    const commonDirty = clearing || (dataCommonTouched && value !== '' &&
-      (!dataUniform || value !== dataInitial));
-    individualHost?.querySelectorAll('[data-inventory-audit-clear-item]').forEach(check => {
-      const index = Number(check.dataset.inventoryAuditClearItem);
-      const input = individualHost.querySelector('[name="auditItem-' + index + '"]');
-      if (input) input.disabled = check.checked;
-      const selectTrigger = input?.closest('.ui-select')?.querySelector('[data-ui-select-trigger]');
-      if (selectTrigger) selectTrigger.disabled = check.checked;
-    });
-    const individualDirty = items.some((item, index) => {
-      if (individualHost?.querySelector('[data-inventory-audit-clear-item="' + index + '"]')?.checked)
-        return true;
+    const value = String(commonHost?.querySelector('[name="auditValue"]')?.value ?? '').trim();
+    const commonApply = dataCommonTouched && value !== '' && (!dataUniform || value !== dataInitial);
+    const commonClear = inventoryAuditCanClear(definition) && items.some(item =>
+      String(inventoryAuditCurrentValue(item, definition) ?? '').trim() !== '');
+
+    const selected = checkedDataIndices();
+    const individualApply = items.some((item, index) => {
+      if (!selected.has(index)) return false;
       const control = individualHost?.querySelector('[name="auditItem-' + index + '"]');
-      const next = String(control?.value ?? '').trim();
-      return next !== '' && next !== String(inventoryAuditCurrentValue(item, definition) ?? '').trim();
+      const entered = String(control?.value ?? '').trim();
+      return entered !== '' &&
+        entered !== String(inventoryAuditCurrentValue(item, definition) ?? '').trim();
     });
-    const dirty = common ? commonDirty : individualDirty;
-    if (dataActions) dataActions.hidden = !dirty;
-    if (submit) submit.disabled = saving || !dirty;
+    const individualClear = inventoryAuditCanClear(definition) && items.some((item, index) =>
+      selected.has(index) && String(inventoryAuditCurrentValue(item, definition) ?? '').trim() !== '');
+
+    const canApply = common ? commonApply : individualApply;
+    const canClear = common ? commonClear : individualClear;
+    if (dataActions) dataActions.hidden = !canApply && !canClear;
+    if (submit) {
+      submit.hidden = !canApply;
+      submit.disabled = saving || !canApply;
+    }
+    if (clearButton) {
+      clearButton.hidden = !canClear;
+      clearButton.disabled = saving || !canClear;
+    }
   }
 
   function renderDataFields() {
@@ -2831,12 +2847,12 @@ function openInventoryAuditCriteria(root, { mode, ids = [], fieldName = 'categor
       shared: true, value: dataInitial,
       placeholder: dataUniform ? '' : 'Разные значения',
     }) + (!dataUniform
-      ? '<p class="ui-list__secondary">Значения различаются. Укажите одно для всех или очистите.</p>'
-      : '') + (inventoryAuditCanClear(definition) && values.some(Boolean)
-      ? compactCheck({ label: 'Очистить у всех', data: 'data-inventory-audit-clear-all' })
+      ? '<p class="ui-list__secondary">У выбранных товаров разные значения.</p>'
       : '');
-    individualHost.innerHTML = '<div class="form-grid">' + items.map((item, index) =>
-      inventoryAuditDataRow(item, index, definition, includesDifferentManufacturers)).join('') + '</div>';
+    individualHost.innerHTML = '<div class="inventory-audit-data-list">' + items.map((item, index) =>
+      inventoryAuditDataRow(item, index, definition, includesDifferentManufacturers,
+        selectedDataIds.has(item.itemId))).join('') + '</div>';
+    individualHost.querySelectorAll('textarea').forEach(resizeDataText);
     status.textContent = '';
     syncDataActions();
   }
@@ -2864,8 +2880,33 @@ function openInventoryAuditCriteria(root, { mode, ids = [], fieldName = 'categor
       if (event.target?.name === 'auditValue') dataCommonTouched = true;
       syncDataActions();
     });
-    individualHost?.addEventListener('input', syncDataActions);
-    individualHost?.addEventListener('change', syncDataActions);
+    const onIndividualEdit = event => {
+      const control = event.target;
+      resizeDataText(control);
+      const match = /^auditItem-(\d+)$/.exec(control?.name || '');
+      if (match && !saving) {
+        const index = Number(match[1]);
+        const item = items[index];
+        const previous = String(inventoryAuditCurrentValue(item, definition) ?? '').trim();
+        if (String(control.value ?? '').trim() !== previous) {
+          const check = individualHost.querySelector('[data-inventory-audit-selected="' + index + '"]');
+          if (check && !check.disabled) {
+            check.checked = true;
+            selectedDataIds.add(item.itemId);
+          }
+        }
+      }
+      if (control?.matches?.('[data-inventory-audit-selected]')) {
+        const item = items[Number(control.dataset.inventoryAuditSelected)];
+        if (item) {
+          if (control.checked) selectedDataIds.add(item.itemId);
+          else selectedDataIds.delete(item.itemId);
+        }
+      }
+      syncDataActions();
+    };
+    individualHost?.addEventListener('input', onIndividualEdit);
+    individualHost?.addEventListener('change', onIndividualEdit);
     renderDataFields();
   }
 
@@ -2980,6 +3021,34 @@ function openInventoryAuditCriteria(root, { mode, ids = [], fieldName = 'categor
     });
   }
 
+  async function saveDataChange(clear = false) {
+    if (!isData || saving) return;
+    syncDataActions();
+    if (clear ? clearButton?.hidden : submit.hidden) return;
+    const common = Boolean(dataMode?.checked);
+    const selectedIndices = common ? null : checkedDataIndices();
+    const clearAll = clear && common;
+    const clearItems = clear && !common ? selectedIndices : new Set();
+    const data = new FormData(form);
+    saving = true;
+    syncDataActions();
+    try {
+      await applyInventoryAuditDataChanges(layer, {
+        items, definition, perItem: !common, data, status, submit, onSaved,
+        clearAll, clearItems, selectedIndices,
+        keepOpen: isData && keepOpen,
+        afterApplied: () => {
+          items.splice(0, items.length, ...inventoryAuditItems(ids));
+          renderDataFields();
+        },
+      });
+    } finally {
+      saving = false;
+      syncDataActions();
+    }
+  }
+  clearButton?.addEventListener('click', () => { void saveDataChange(true); });
+
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     if (saving) return;
@@ -3043,29 +3112,7 @@ function openInventoryAuditCriteria(root, { mode, ids = [], fieldName = 'categor
       return;
     }
 
-    const common = Boolean(dataMode?.checked);
-    const clearing = Boolean(commonHost?.querySelector('[data-inventory-audit-clear-all]')?.checked);
-    // Only an explicitly checked clear action may erase stored data.
-    // Blank input fields, including edited blanks, always mean "leave unchanged".
-    const clearAll = common && clearing;
-    const clearItems = new Set([...individualHost?.querySelectorAll(
-      '[data-inventory-audit-clear-item]:checked') || []]
-      .map(input => Number(input.dataset.inventoryAuditClearItem)));
-    saving = true;
-    syncDataActions();
-    try {
-      await applyInventoryAuditDataChanges(layer, {
-        items, definition, perItem: !common, data, status, submit, onSaved, clearAll, clearItems,
-        keepOpen: isData && keepOpen,
-        afterApplied: () => {
-          items.splice(0, items.length, ...inventoryAuditItems(ids));
-          renderDataFields();
-        },
-      });
-    } finally {
-      saving = false;
-      syncDataActions();
-    }
+    await saveDataChange(false);
   });
   return layer;
 }
