@@ -2002,24 +2002,9 @@ function openManufacturerStock(root, manufacturer, groupContext = null) {
         openNotice({ title: 'Остатки', message: 'Удалено позиций: ' + safe.length +
           (skipped ? '. Не удалены позиции с остатками: ' + skipped + '.' : '.') });
       } catch (cause) {
-        // A committed delete can be followed by a failed response/snapshot.
-        // Read the authoritative active catalog before reporting an error.
-        let archived = false;
-        try {
-          await loadInventory();
-          archived = safe.every(item => !getInventoryItem(item.itemId));
-        } catch { /* Keep the original failure if Core cannot be read. */ }
-        if (archived) {
-          safe.forEach(item => selectedStockItems.delete(item.itemId));
-          dialog.v2Close?.();
-          renderList();
-          openNotice({ title: 'Остатки', message: 'Удалено позиций: ' + safe.length +
-            (skipped ? '. Не удалены позиции с остатками: ' + skipped + '.' : '.') });
-          return;
-        }
         const error = dialog.querySelector('[data-stock-bulk-delete-error]');
-        if (error) error.textContent = cause instanceof Error && cause.message !== 'Internal server error'
-          ? cause.message : 'Не удалось подтвердить удаление. Позиции остались в остатках.';
+        if (error) error.textContent = cause instanceof Error ? cause.message
+          : 'Не удалось удалить выбранные позиции.';
         submit.disabled = false;
         saving = false;
       }

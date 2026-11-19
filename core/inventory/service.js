@@ -1,5 +1,5 @@
 import { apiRequest } from '../auth.js';
-import { applyInventorySnapshot, getInventoryItem, getInventoryItems, getInventoryCriteria, getInventorySnapshot, setInventoryCriteriaCatalog } from './data.js';
+import { applyInventorySnapshot, getInventoryItem, getInventoryItems, getInventoryCriteria, getInventorySnapshot, removeArchivedInventoryItems, setInventoryCriteriaCatalog } from './data.js';
 
 const SERVER_ORDER_UNAVAILABLE = 'Сервер склада ещё не обновлён. Порядок не сохранён.';
 
@@ -40,6 +40,9 @@ export async function createInventoryItem(value = {}) {
 }
 
 export async function updateInventoryItem(itemId, value = {}) {
+  // A deletion is an ID operation, never a generic item update that returns
+  // and reparses the entire warehouse.
+  if (value?.archived === true) return archiveSelectedInventoryItems([itemId]);
   const previous = getInventoryItem(itemId);
   const expected = Number(value?.position);
   const positionChanged = Object.prototype.hasOwnProperty.call(value, 'position')
@@ -52,12 +55,6 @@ export async function updateInventoryItem(itemId, value = {}) {
       ? { ...value, expectedPosition: Number(previous?.position) || 0 } : value),
     verifySnapshot: payload => {
       const saved = snapshotItem(payload, itemId);
-      // Archived items intentionally disappear from the active stock snapshot.
-      // Their absence confirms that Core committed the archive operation.
-      if (value.archived === true) {
-        if (saved) throw new Error('Сервер не подтвердил удаление складской единицы.');
-        return;
-      }
       if (!saved) throw new Error('Сервер не подтвердил сохранение товара.');
       if (positionChanged && Number(saved.position) !== expected)
         throw new Error('Номер не сохранился. ' + SERVER_ORDER_UNAVAILABLE);
@@ -109,15 +106,22 @@ export async function reorderInventoryItems(manufacturer, itemIds) {
 export async function archiveSelectedInventoryItems(itemIds) {
   const ids = [...new Set(Array.isArray(itemIds) ? itemIds.map(String) : [])];
   if (!ids.length || ids.length > 500) throw new Error('Выберите от 1 до 500 товаров.');
-  return inventoryRequest('/items/archive-selection', {
+  // One compact request, one compact response; no GET /inventory after deletion.
+  const response = await apiRequest('/inventory/items/archive-selection', {
     method: 'POST',
     body: JSON.stringify({ itemIds: ids }),
-    verifySnapshot: payload => {
-      if (!Array.isArray(payload?.items) || ids.some(id =>
-        payload.items.some(item => String(item.itemId) === id)))
-        throw new Error('Сервер не подтвердил удаление выбранных позиций.');
-    },
   });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const message = Array.isArray(payload?.message) ? payload.message.join('; ')
+      : typeof payload?.message === 'string' ? payload.message.trim() : '';
+    throw new Error(message || 'Не удалось удалить выбранные позиции.');
+  }
+  if (!Array.isArray(payload?.archivedItemIds) ||
+      payload.archivedItemIds.length !== ids.length ||
+      ids.some(id => !payload.archivedItemIds.includes(id)))
+    throw new Error('Сервер не подтвердил удаление выбранных позиций.');
+  return removeArchivedInventoryItems(ids);
 }
 
 export async function createInventoryMovement(value = {}) {

@@ -41,6 +41,19 @@ export function applyInventorySnapshot(value = {}) {
   return snapshot;
 }
 
+// A confirmed archive changes the active item list only. Movements, orders,
+ // receipts and supplier catalogs remain untouched in the in-memory snapshot.
+export function removeArchivedInventoryItems(itemIds = []) {
+  const removed = new Set(itemIds.map(String));
+  if (!removed.size) return snapshot;
+  snapshot = {
+    ...snapshot,
+    items: snapshot.items.filter(item => !removed.has(String(item.itemId))),
+  };
+  window.dispatchEvent(new CustomEvent('professional:inventory-changed'));
+  return snapshot;
+}
+
 export function getInventorySnapshot() {
   return snapshot;
 }
