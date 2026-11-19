@@ -129,7 +129,7 @@ function productCardFields(item, stockScope = INVENTORY_TOTAL_SCOPE) {
     ['productType', inventoryFieldLabel('productType','Тип'), item.productType],
     ['sku', 'Артикул', item.sku],
     ['primarySupplier', 'Основной поставщик', primary?.supplier || item.primarySupplier || ''],
-    ['supplierListPrice', 'Цена по прайсу', money(supplierListPrice(item,primary))],
+    ['supplierListPrice', 'Цена', money(supplierListPrice(item,primary))],
     ['supplierDiscount', 'Скидка поставщика', discountText],
     ['basePrice', 'Закупочная цена со скидкой', money(purchasePrice)],
     ['storage', 'Склад', stockScopeName(stockScope)],
@@ -319,10 +319,29 @@ function openSupplierEditor(itemId, offerId = '', onSaved = () => {}) {
   return layer;
 }
 
+function stockCardPreviewExamples(item) {
+  // Examples communicate the future value's real size and units. They are
+  // used only in the View constructor, never on actual cards or in the DB.
+  const unit = String(item.unit || 'шт.');
+  return {
+    manufacturer: 'Бренд',
+    name: 'Товар',
+    category: 'Категория',
+    productType: 'Тип',
+    sku: 'А-001',
+    primarySupplier: 'Поставщик',
+    supplierListPrice: '1 000 ₽',
+    supplierDiscount: '10%',
+    basePrice: '900 ₽',
+    storage: 'Склад',
+    balance: '0 ' + unit,
+    consumption: '5 ' + unit,
+    baseUnitPrice: '10 ₽/' + unit,
+    saleIndicator: 'Продажа ☐',
+  };
+}
+
 export function openInventoryProductAppearanceQ(itemId, onSaved = () => {}, stockScope = INVENTORY_TOTAL_SCOPE) {
-  // The global Stock card layout is editable even before the first product
-  // exists. Missing product data is shown by its field name in the preview,
-  // never in the real product card or the persisted appearance.
   const item = getInventoryItem(itemId) || { itemId: '', name: '' };
   return openEntityCardAppearanceQ(document.body, {
     title: 'Вид',
@@ -332,11 +351,15 @@ export function openInventoryProductAppearanceQ(itemId, onSaved = () => {}, stoc
     allowPhoto: false,
     resolve: () => ({
       appearance: productCardAppearance(),
-      fields: productCardFields(getInventoryItem(itemId) || item, stockScope)
-        .map(field => ({
+      fields: (() => {
+        const current = getInventoryItem(itemId) || item;
+        const examples = stockCardPreviewExamples(current);
+        return productCardFields(current, stockScope).map(field => ({
           ...field,
-          text: String(field.text || '').trim() ? field.text : field.label,
-        })),
+          text: String(field.text || '').trim()
+            ? field.text : examples[field.value] || field.label,
+        }));
+      })(),
     }),
     save: async ({ appearance }) => {
       saveCardAppearanceTemplate(PRODUCT_APPEARANCE_SCOPE, { appearance });
