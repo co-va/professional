@@ -1,7 +1,24 @@
-import { apiRequest } from '../auth.js';
+import { apiRequest, getAuthToken } from '../auth.js';
 import { applyInventorySnapshot, getInventoryItem, getInventoryItems, getInventoryCriteria, getInventorySnapshot, removeArchivedInventoryItems, setInventoryCriteriaCatalog } from './data.js';
 
 const SERVER_ORDER_UNAVAILABLE = 'Сервер склада ещё не обновлён. Порядок не сохранён.';
+// Navigation can reuse an already confirmed stock read briefly. Mutation
+// verification and stocktake always request the server explicitly.
+const INVENTORY_NAVIGATION_FRESH_MS = 12000;
+let lastStockToken = '';
+let lastStockReadAt = 0;
+let stockRead = null;
+let stockRevision = 0;
+if (typeof window !== 'undefined') window.addEventListener('professional:auth-logout', () => {
+  lastStockToken = '';
+  lastStockReadAt = 0;
+  stockRead = null;
+  stockRevision++;
+});
+const rememberSnapshot = token => {
+  lastStockToken = token;
+  lastStockReadAt = Date.now();
+};
 
 function snapshotItem(payload, itemId) {
   return Array.isArray(payload?.items)
@@ -11,6 +28,9 @@ function snapshotItem(payload, itemId) {
 
 async function inventoryRequest(path = '', options = {}) {
   const { verifySnapshot, ...requestOptions } = options;
+  const token = getAuthToken();
+  const requestRevision = stockRevision;
+  const changing = !['GET','HEAD'].includes(String(requestOptions.method || 'GET').toUpperCase());
   const response = await apiRequest(`/inventory${path}`, requestOptions);
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
@@ -22,14 +42,29 @@ async function inventoryRequest(path = '', options = {}) {
       : typeof payload?.message === 'string' ? payload.message.trim() : '';
     throw new Error(message || `Не удалось сохранить склад (HTTP ${response.status})`);
   }
+  // Never apply a read that started before a successful warehouse mutation,
+  // or a response belonging to another login.
+  if (getAuthToken() !== token) return getInventorySnapshot();
+  if (!changing && requestRevision !== stockRevision) return getInventorySnapshot();
   // The older server accepts arbitrary item fields but silently ignores position.
-  // Verify the actual server snapshot before treating a number edit as saved.
   verifySnapshot?.(payload);
-  return applyInventorySnapshot(payload);
+  if (changing) stockRevision++;
+  const next = applyInventorySnapshot(payload);
+  rememberSnapshot(token);
+  return next;
 }
 
-export async function loadInventory() {
-  return inventoryRequest();
+export async function loadInventory({ preferRecent = false } = {}) {
+  const token = getAuthToken();
+  if (preferRecent && token === lastStockToken && lastStockReadAt
+      && Date.now() - lastStockReadAt < INVENTORY_NAVIGATION_FRESH_MS)
+    return getInventorySnapshot();
+  if (stockRead?.token === token) return stockRead.promise;
+  const promise = inventoryRequest();
+  const inFlight = { token, promise };
+  stockRead = inFlight;
+  try { return await promise; }
+  finally { if (stockRead === inFlight) stockRead = null; }
 }
 
 export async function createInventoryItem(value = {}) {
@@ -121,7 +156,11 @@ export async function archiveSelectedInventoryItems(itemIds) {
       payload.archivedItemIds.length !== ids.length ||
       ids.some(id => !payload.archivedItemIds.includes(id)))
     throw new Error('Сервер не подтвердил удаление выбранных позиций.');
-  return removeArchivedInventoryItems(ids);
+  // A successful mutation invalidates older in-flight stock reads.
+  stockRevision++;
+  const state = removeArchivedInventoryItems(ids);
+  rememberSnapshot(getAuthToken());
+  return state;
 }
 
 export async function createInventoryMovement(value = {}) {
