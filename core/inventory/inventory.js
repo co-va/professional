@@ -2512,7 +2512,7 @@ function inventoryAuditCurrentValue(item, definition) {
   return item[definition.value];
 }
 
-function inventoryAuditCanClear(definition) { return !['position', 'name', 'unit', 'usage'].includes(definition.value); }
+function inventoryAuditCanClear(definition) { return !['name', 'unit', 'usage'].includes(definition.value); }
 
 function inventoryAuditDataControl(definition, name, { shared = false, locked = false, value = '', placeholder = '' } = {}) {
   const label = shared
@@ -2541,8 +2541,7 @@ function inventoryAuditDataControl(definition, name, { shared = false, locked = 
 
 function inventoryAuditDataRow(item, index, definition, includeManufacturer = false, selected = false) {
   const thresholdField = definition.value === 'minStock' || definition.value === 'targetStock';
-  const name = inventoryAuditItemLabel(item, includeManufacturer)
-    + (thresholdField ? ' · ' + inventoryStockThresholdUnit(item) : '');
+  const name = String(item.name || 'Позиция');
   const current = inventoryAuditCurrentValue(item, definition);
   const locked = definition.value === 'referencePrice' && itemPrimaryPrice(item) !== null;
   return `<div class="data-edit-row inventory-audit-data-row" role="group" aria-label="${escapeHtml(definition.label + ': ' + name)}">
@@ -2550,7 +2549,9 @@ function inventoryAuditDataRow(item, index, definition, includeManufacturer = fa
       data: `data-inventory-audit-selected="${index}"`,
       aria: `Выбрать ${definition.label}: ${name}` })}
     <span class="data-edit-row__name" title="${escapeHtml(name)}"><strong>${escapeHtml(name)}</strong></span>
-    ${inventoryAuditDataControl(definition, `auditItem-${index}`, { locked, value: current ?? '' })}
+    ${inventoryAuditDataControl(definition, `auditItem-${index}`, {
+      locked, value: definition.value === 'position' && Number(current) === 0 ? '' : current ?? '',
+    })}
   </div>`;
 }
 
@@ -2618,12 +2619,14 @@ async function applyInventoryAuditDataChanges(layer, { items, definition, perIte
       if (!perItem) {
         if (clearAll) {
           if (!inventoryAuditCanClear(definition)) throw new Error('Эту характеристику нельзя очистить.');
-          startingValue = definition.kind === 'decimal' ? null : '';
+          startingValue = definition.value === 'position' ? 0
+            : definition.kind === 'decimal' ? null : '';
         } else {
           startingValue = inventoryAuditParseDataValue(definition, data.get('auditValue'));
           if (startingValue === null) throw new Error('Укажите новое значение.');
         }
-        if (definition.value === 'position' && startingValue + items.length - 1 > 2147483647)
+        if (definition.value === 'position' && !clearAll
+          && startingValue + items.length - 1 > 2147483647)
           throw new Error('Диапазон порядковых номеров слишком велик.');
       }
       for (const [index, item] of items.entries()) {
@@ -2635,15 +2638,16 @@ async function applyInventoryAuditDataChanges(layer, { items, definition, perIte
           (!raw || raw === String(inventoryAuditCurrentValue(item, definition) ?? '').trim())) continue;
         let value;
         if (!perItem) {
-          value = definition.value === 'position' ? startingValue + index : startingValue;
+          value = definition.value === 'position' && !clearAll ? startingValue + index : startingValue;
         } else if (shouldClear) {
           if (!inventoryAuditCanClear(definition))
             throw new Error('Нельзя очистить «' + definition.label + '»: ' + item.name);
-          value = definition.kind === 'decimal' ? null : '';
+          value = definition.value === 'position' ? 0
+            : definition.kind === 'decimal' ? null : '';
         } else {
           value = inventoryAuditParseDataValue(definition, raw);
         }
-        if (definition.value === 'position') {
+        if (definition.value === 'position' && value > 0) {
           const numberKey = `${manufacturerName(item)}::${value}`;
           if (uniqueNumbers.has(numberKey))
             throw new Error(`Номер ${value} повторяется у производителя «${manufacturerName(item)}».`);
@@ -2813,8 +2817,7 @@ function openInventoryAuditCriteria(root, {
     if (individualHost) individualHost.hidden = common;
     const value = String(commonHost?.querySelector('[name="auditValue"]')?.value ?? '').trim();
     const commonApply = dataCommonTouched && value !== '' && (!dataUniform || value !== dataInitial);
-    const commonClear = inventoryAuditCanClear(definition) && items.some(item =>
-      String(inventoryAuditCurrentValue(item, definition) ?? '').trim() !== '');
+    const commonClear = inventoryAuditCanClear(definition) && items.length > 0;
 
     const selected = checkedDataIndices();
     const individualApply = items.some((item, index) => {
@@ -2824,11 +2827,10 @@ function openInventoryAuditCriteria(root, {
       return entered !== '' &&
         entered !== String(inventoryAuditCurrentValue(item, definition) ?? '').trim();
     });
-    const individualClear = inventoryAuditCanClear(definition) && items.some((item, index) =>
-      selected.has(index) && String(inventoryAuditCurrentValue(item, definition) ?? '').trim() !== '');
+    const individualClear = inventoryAuditCanClear(definition) && selected.size > 0;
 
     const canApply = common ? commonApply : individualApply;
-    const canClear = common ? commonClear : individualClear;
+    const canClear = !canApply && (common ? commonClear : individualClear);
     if (dataActions) dataActions.hidden = !canApply && !canClear;
     if (submit) {
       submit.hidden = !canApply;
