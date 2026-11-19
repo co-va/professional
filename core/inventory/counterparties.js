@@ -287,12 +287,11 @@ export async function openSupplierCatalogCreation(onSaved = () => {}) {
     return;
   }
   const layer = mountModal(document.body, modal(
-    v2ListEntries(suppliers.map(company => v2ListEntry({
-      title: company.name,
-      rightTop: (company.priceLists || []).length + ' загрузок',
-      interactive: true, initial: '',
+    entityCardStack(suppliers.map(company => entityVisualCard({
+      appearance: counterpartyCardAppearance(), fields: counterpartyCardFields(company),
+      interactive: true,
       data: 'data-stock-supplier-choose="' + escapeHtml(company.id) + '"',
-      aria: 'Выбрать ассортимент ' + company.name,
+      aria: 'Открыть контрагента ' + company.name,
     }))),
     { title: 'Из ассортимента', variant: 'q', surface: 'app' },
   ));
@@ -301,9 +300,130 @@ export async function openSupplierCatalogCreation(onSaved = () => {}) {
       const company = suppliers.find(entry => entry.id === node.dataset.stockSupplierChoose);
       if (!company) return;
       layer.v2Close?.();
-      openCatalog(company, { onLinked: onSaved });
+      openStockSupplierCatalog(company, { onLinked: onSaved });
     });
   });
+}
+
+// Stock "+" follows the existing Counterparty UI: cards -> brands -> native
+// collapsed categories -> dense two-line product rows. No full-height V2 products.
+async function openStockSupplierCatalog(company, { onLinked = () => {} } = {}) {
+  const layer = mountModal(document.body, modal(
+    field({ name: 'stockSupplierSearch', type: 'search',
+      placeholder: 'Название, артикул, производитель…' }) +
+    '<div data-stock-supplier-brands></div>',
+    { title: 'Ассортимент · ' + company.name, variant: 'q', surface: 'app' },
+  ));
+  if (!layer) return;
+  const host = layer.querySelector('[data-stock-supplier-brands]');
+  const search = layer.querySelector('[name="stockSupplierSearch"]');
+  let entries = [];
+  let loaded = false;
+  const render = () => {
+    if (!loaded || !layer.isConnected) return;
+    const needle = String(search?.value || '').trim().toLocaleLowerCase('ru-RU');
+    const visible = needle ? entries.filter(row =>
+      [row.name, row.shortName, row.supplierSku, row.brand, row.manufacturer,
+       row.category, row.barcode].some(value =>
+        String(value || '').toLocaleLowerCase('ru-RU').includes(needle))) : entries;
+    const brands = catalogBrands(visible);
+    host.innerHTML = visible.length ? catalogGroupsMarkup(brands)
+      : emptyState('Товары не найдены', 'Измените поиск.');
+    host.querySelectorAll('[data-company-brand]').forEach(node => {
+      node.addEventListener('click', () => {
+        const brand = node.dataset.companyBrand;
+        const categories = brands.get(brand);
+        if (!categories) return;
+        const allRows = [...categories.values()].flat();
+        const byId = new Map(allRows.map(row => [String(row.id), row]));
+        const selected = new Set();
+        const brandLayer = mountModal(document.body, modal(
+          catalogCategoryRowsMarkup(categories, selected) +
+          actionBlock(button('Создать карточку', {
+            data: 'data-stock-supplier-create-selected' }),
+            { className: 'inventory-counterparty-selection-actions' }),
+          { title: brand, variant: 'q', surface: 'app' },
+        ));
+        if (!brandLayer) return;
+        const actions = brandLayer.querySelector('.inventory-counterparty-selection-actions');
+        const create = brandLayer.querySelector('[data-stock-supplier-create-selected]');
+        const sync = () => {
+          brandLayer.querySelectorAll('[data-company-product-check]').forEach(input => {
+            input.checked = selected.has(String(input.dataset.companyProductCheck));
+          });
+          brandLayer.querySelectorAll('[data-company-category-check]').forEach(input => {
+            const rows = categories.get(input.dataset.companyCategoryCheck) || [];
+            const count = rows.filter(row => selected.has(String(row.id))).length;
+            input.checked = rows.length > 0 && count === rows.length;
+            input.indeterminate = count > 0 && count < rows.length;
+          });
+          if (actions) {
+            if (selected.size) actions.removeAttribute('data-ui-action-hidden');
+            else actions.setAttribute('data-ui-action-hidden', '');
+          }
+          if (create) create.textContent = 'Создать карточку · ' + selected.size;
+        };
+        brandLayer.querySelectorAll('[data-company-category-check]').forEach(input => {
+          input.addEventListener('change', () => {
+            (categories.get(input.dataset.companyCategoryCheck) || []).forEach(row =>
+              input.checked ? selected.add(String(row.id)) : selected.delete(String(row.id)));
+            sync();
+          });
+        });
+        brandLayer.querySelectorAll('[data-company-product-check]').forEach(input => {
+          input.addEventListener('change', () => {
+            const id = String(input.dataset.companyProductCheck);
+            if (input.checked) selected.add(id); else selected.delete(id);
+            sync();
+          });
+        });
+        brandLayer.querySelectorAll('[data-company-product]').forEach(node => {
+          node.addEventListener('click', () => {
+            const row = byId.get(String(node.dataset.companyProduct));
+            if (row) openCatalogRow(company, row, { onLinked });
+          });
+        });
+        create?.addEventListener('click', () => {
+          const rows = allRows.filter(row => selected.has(String(row.id)));
+          if (rows.length) void openSelectedCatalogCards(company, rows, () => {
+            selected.clear();
+            sync();
+            onLinked();
+          });
+        });
+        sync();
+      });
+    });
+  };
+  search?.addEventListener('input', render);
+  host.innerHTML = emptyState('Ассортимент', 'Загружаем…');
+  try {
+    const key = String(company.id);
+    const cached = sharedCatalogCache.get(key);
+    if (cached && Array.isArray(cached.entries) && Date.now() - cached.at < 60000) {
+      entries = cached.entries;
+    } else {
+      const base = '/' + urlId(company.id) + '/catalog?take=500&skip=';
+      const first = await json(base + '0');
+      if (!layer.isConnected) return;
+      entries = Array.isArray(first.items) ? [...first.items] : [];
+      const count = Math.max(0, Number(first.count) || 0);
+      const pageSize = Math.max(1, Math.min(500, Number(first.pageSize) || entries.length || 100));
+      for (let skip = pageSize; skip < count; skip += pageSize * 4) {
+        const offsets = [];
+        for (let offset = skip; offset < Math.min(count, skip + pageSize * 4); offset += pageSize)
+          offsets.push(offset);
+        const batch = await Promise.all(offsets.map(offset => json(base + offset)));
+        if (!layer.isConnected) return;
+        batch.forEach(page => entries.push(...(Array.isArray(page.items) ? page.items : [])));
+      }
+    }
+    loaded = true;
+    render();
+  } catch (error) {
+    if (layer.isConnected) host.innerHTML =
+      emptyState('Ассортимент недоступен', errText(error));
+  }
 }
 
 async function openCatalogRow(company, row, { itemId = '', onLinked = () => {} } = {}) {
