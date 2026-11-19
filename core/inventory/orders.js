@@ -170,12 +170,17 @@ function suggestedPacks(row) {
 // Q1 owns selection criteria; Q2 owns the ready-to-fill order. The second Q
 // uses the same shared compactCheck and included/excluded row pattern as
 // Stocktake. A purchase order is persisted only on the Q2 confirmation.
-function initialOrderLines(catalog, recommendations, manufacturerFilter = '', existing = null) {
+function initialOrderLines(catalog, recommendations, manufacturerFilter = '', existing = null, seedItemIds = []) {
   const suggestionById = new Map(recommendations.map(row => [row.itemId, row]));
   const selected = new Map();
   if (existing) {
     for (const line of existing.lines || []) {
       selected.set(line.itemId, Number(line.packages) || 1);
+    }
+  } else if (seedItemIds.length) {
+    const seed = new Set(seedItemIds.map(String));
+    for (const item of catalog) {
+      if (seed.has(String(item.itemId))) selected.set(item.itemId, 1);
     }
   } else {
     for (const item of catalog) {
@@ -188,11 +193,11 @@ function initialOrderLines(catalog, recommendations, manufacturerFilter = '', ex
   return { suggestionById, selected };
 }
 
-function openInventoryOrderReview(root, { mode = 'target', supplier = '', manufacturerFilter = '', sorting = 'position' } = {}, existing = null, onSaved = () => {}) {
+function openInventoryOrderReview(root, { mode = 'target', supplier = '', manufacturerFilter = '', sorting = 'position' } = {}, existing = null, onSaved = () => {}, seedItemIds = []) {
   const catalog = getInventoryItems();
   let currentMode = mode;
   const recommendations = currentMode === 'all' ? [] : inventoryOrderSuggestions(currentMode);
-  const { suggestionById, selected } = initialOrderLines(catalog, recommendations, manufacturerFilter, existing);
+  const { suggestionById, selected } = initialOrderLines(catalog, recommendations, manufacturerFilter, existing, seedItemIds);
   const manuallyChanged = new Set((existing?.lines || []).map(line => line.itemId));
   const rows = sortedItems(catalog.map(item => ({
     ...item,
@@ -490,12 +495,12 @@ function openInventoryOrderReview(root, { mode = 'target', supplier = '', manufa
   return layer;
 }
 
-function openInventoryOrderSelection(root, existing = null, onSaved = () => {}) {
+function openInventoryOrderSelection(root, existing = null, onSaved = () => {}, seedItemIds = []) {
   const catalog = getInventoryItems();
   const manufacturers = [...new Set(catalog.map(manufacturer))].sort((a, b) => a.localeCompare(b, 'ru'));
   const markup = '<div class="form-grid" data-inventory-order-criteria>' +
     select({
-      label: 'Расчёт', name: 'orderThreshold', value: 'target', options: [
+      label: 'Расчёт', name: 'orderThreshold', value: seedItemIds.length ? 'all' : 'target', options: [
         ...ORDER_MODES,
       ],
     }) +
@@ -530,9 +535,16 @@ function openInventoryOrderSelection(root, existing = null, onSaved = () => {}) 
     }, existing, createdOrderId => {
       criteria.v2Close?.();
       onSaved(createdOrderId);
-    });
+    }, seedItemIds);
   });
   return criteria;
+}
+
+// Reuse the existing Q1/Q2 order workflow with the current stock selection.
+export function openInventoryOrderFromSelection(root, selectedItemIds = [], onSaved = () => {}) {
+  const ids = [...new Set(selectedItemIds.map(String))].filter(id => Boolean(getInventoryItem(id)));
+  if (!ids.length) return openNotice({ title: 'Заказ', message: 'Выберите позиции для заказа.' });
+  return openInventoryOrderSelection(root, null, onSaved, ids);
 }
 
 // A supplier invoice arrives after a purchase order was already formed.
