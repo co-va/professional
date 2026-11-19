@@ -2836,7 +2836,7 @@ function openInventoryAuditCriteria(root, {
     const individualClear = inventoryAuditCanClear(definition) && selected.size > 0;
 
     const canApply = common ? commonApply : individualApply;
-    const canClear = !canApply && (common ? commonClear : individualClear);
+    const canClear = common ? commonClear : individualClear;
     if (dataActions) dataActions.hidden = !canApply && !canClear;
     if (submit) {
       submit.hidden = !canApply;
