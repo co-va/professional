@@ -18,6 +18,9 @@
 .ui-selector__option[data-field-state="unused"] .ui-selector__option-label{color:var(--danger);font-weight:400}
 .ui-selector__option[data-field-state="placed"] .ui-selector__option-label{color:var(--text);font-weight:400}
 .ui-selector__option[data-field-state="active"] .ui-selector__option-label{color:var(--text);font-weight:700}
+/* Visible coordinates for placed fields; no additional picker component. */
+.ui-selector__option[data-field-state] .ui-selector__option-main small{font-size:13px;font-weight:600;line-height:1.2;color:var(--text-secondary)}
+.ui-selector__option[data-field-state="active"] .ui-selector__option-main small{color:var(--text);font-weight:700}
 .ui-selector__option:active{background:var(--surface-soft)}
 .ui-selector__option[hidden]{display:none!important}
 
