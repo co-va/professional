@@ -2701,24 +2701,28 @@ async function applyInventoryAuditDataChanges(layer, { items, definition, perIte
           changes.forEach(entry => failed.set(entry.itemId, reason));
         }
       } else if (definition.value === 'position') {
-        // Core shifts occupied slots when inserting a numbered product.
-        // Serial writes plus a fresh snapshot are needed to verify final order.
-        let pending = [...changes];
-        for (let pass = 0; pass < 4 && pending.length; pass++) {
-          for (const entry of pending.sort((a, b) =>
-            a.manufacturer.localeCompare(b.manufacturer, 'ru', { numeric: true }) || a.value - b.value)) {
-            if (failed.has(entry.itemId)) continue;
-            try {
-              await updateInventoryItem(entry.itemId, inventoryAuditDataPayload(definition, entry.value, getInventoryItem(entry.itemId)));
-            } catch (error) {
-              failed.set(entry.itemId, error instanceof Error ? error.message : 'Ошибка сохранения');
-            }
+        // Core currently provides only single-item writes for assigning
+        // numerical positions. Never silently repeat all writes four times:
+        // each PUT already returns a full verified stock snapshot.
+        const ordered = [...changes].sort((a, b) =>
+          a.manufacturer.localeCompare(b.manufacturer, 'ru', { numeric: true })
+          || a.value - b.value);
+        onProgress(0, ordered.length);
+        let completed = 0;
+        for (const entry of ordered) {
+          status.textContent = `Порядок: ${completed} из ${ordered.length} · ${entry.name}`;
+          try {
+            await updateInventoryItem(entry.itemId,
+              inventoryAuditDataPayload(definition, entry.value, getInventoryItem(entry.itemId)));
+          } catch (error) {
+            failed.set(entry.itemId, error instanceof Error
+              ? error.message : 'Ошибка сохранения');
           }
-          await loadInventory();
-          pending = changes.filter(entry => !failed.has(entry.itemId)
-            && !inventoryAuditValueMatches(getInventoryItem(entry.itemId), definition, entry.value));
-          status.textContent = `Проверено: ${changes.length - pending.length - failed.size} из ${changes.length}`;
+          completed += 1;
+          onProgress(completed, ordered.length);
         }
+        // No extra GET: every successful item mutation already refreshes the
+        // complete confirmed list. Verify all requested numbers below.
       } else {
         // Canonical Core batch update keeps every selected item in one
         // transaction per 100 entries. Only one inventory read verifies the
