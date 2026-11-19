@@ -2540,7 +2540,6 @@ function inventoryAuditDataControl(definition, name, { shared = false, locked = 
 }
 
 function inventoryAuditDataRow(item, index, definition, includeManufacturer = false, selected = false) {
-  const thresholdField = definition.value === 'minStock' || definition.value === 'targetStock';
   const name = String(item.name || 'Позиция');
   const current = inventoryAuditCurrentValue(item, definition);
   const locked = definition.value === 'referencePrice' && itemPrimaryPrice(item) !== null;
@@ -2669,6 +2668,13 @@ async function applyInventoryAuditDataChanges(layer, { items, definition, perIte
     const changes = targets.filter(entry =>
       !inventoryAuditValueMatches(getInventoryItem(entry.itemId), definition, entry.value));
     if (!changes.length) {
+      if (clearAll || clearItems.size) {
+        // An explicit clear is complete even when those fields were empty already.
+        if (keepOpen) afterApplied();
+        else layer.v2Close?.();
+        status.textContent = 'Значения уже очищены.';
+        return true;
+      }
       status.textContent = 'У выбранных позиций уже указаны эти значения.';
       return;
     }
