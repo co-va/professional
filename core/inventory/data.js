@@ -41,6 +41,20 @@ export function applyInventorySnapshot(value = {}) {
   return snapshot;
 }
 
+// Core confirms the entire affected manufacturer order in one compact
+// response. Patch only the position numbers; quantities, lots, movements and
+// every other item attribute stay exactly as they were.
+export function applyInventoryPositionChanges(positions = []) {
+  const byId = new Map(positions.map(row => [String(row.itemId), Number(row.position)]));
+  snapshot = {
+    ...snapshot,
+    items: snapshot.items.map(item => byId.has(String(item.itemId))
+      ? { ...item, position: byId.get(String(item.itemId)) } : item),
+  };
+  window.dispatchEvent(new CustomEvent('professional:inventory-changed'));
+  return snapshot;
+}
+
 // A confirmed archive changes the active item list only. Movements, orders,
  // receipts and supplier catalogs remain untouched in the in-memory snapshot.
 export function removeArchivedInventoryItems(itemIds = []) {
