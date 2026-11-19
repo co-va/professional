@@ -3003,7 +3003,9 @@ export async function renderInventory(root, section = 'stock') {
   root.innerHTML = emptyState('Склад', 'Загружаем данные…');
   try {
     await Promise.all([
-      loadInventory(),
+      // Reuse a confirmed stock read when navigating rapidly among its tabs.
+      // Explicit stocktake and correction still force a fresh read.
+      loadInventory({ preferRecent: true }),
       ...(section === 'stock' ? [
         // Older Core builds may not yet have deployed the criteria migration.
         // Never make the entire stock catalog disappear in that case.
