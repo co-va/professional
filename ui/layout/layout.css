@@ -47,3 +47,14 @@
 [data-inventory-order-review] .data-edit-row__name small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 [data-inventory-order-review] [data-inventory-order-excluded] {margin-bottom:16px}
 [data-inventory-order-review] [data-inventory-order-excluded][open] [data-inventory-order-excluded-list]{margin-top:10px;padding-bottom:4px}
+
+/* Stock and inventory audit share compact editable rows: labels remain on the
+   left, quantities on the right. The transfer editor never uses V2 cards. */
+[data-inventory-transfer-rows]{display:grid;gap:0;margin:8px 0 12px;min-width:0}
+[data-inventory-transfer-rows] .inventory-transfer-row{padding:8px 0;border-bottom:1px solid var(--border)}
+[data-inventory-transfer-rows] .inventory-transfer-row__name{display:grid;gap:3px}
+[data-inventory-transfer-rows] .inventory-transfer-row__name strong,
+[data-inventory-transfer-rows] .inventory-transfer-row__name small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+[data-inventory-transfer-rows] .inventory-editor-number .field>span:empty{display:none}
+[data-inventory-transfer-rows] .inventory-editor-number__suffix{bottom:17px}
+[data-inventory-transfer-actions][hidden]{display:none!important}
