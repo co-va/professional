@@ -2513,21 +2513,23 @@ function inventoryAuditCurrentValue(item, definition) {
   return item[definition.value];
 }
 
-function inventoryAuditDataControl(definition, name, { shared = false, locked = false } = {}) {
+function inventoryAuditCanClear(definition) { return !['position', 'name', 'unit', 'usage'].includes(definition.value); }
+
+function inventoryAuditDataControl(definition, name, { shared = false, locked = false, value = '', placeholder = '' } = {}) {
   const label = shared
     ? definition.value === 'position' ? 'Начальный номер (дальше по порядку)' : 'Новое значение'
     : '';
   if (locked) return field({ label, name, placeholder: 'Цена от поставщика', disabled: true });
   if (definition.kind === 'unit' || definition.kind === 'usage') return select({
-    label, name, value: '',
-    options: [{ value: '', label: shared ? 'Выберите значение' : 'Без изменения' },
+    label, name, value: String(value ?? ''),
+    options: [{ value: '', label: shared ? 'Выберите значение' : 'Не указано' },
       ...(definition.kind === 'unit' ? UNIT_OPTIONS : INVENTORY_AUDIT_USAGE)],
   });
   const integer = definition.kind === 'integer';
   const decimal = definition.kind === 'decimal';
   return field({
-    label, name, value: '',
-    placeholder: shared ? 'Введите значение' : 'Изменить',
+    label, name, value: String(value ?? ''),
+    placeholder: placeholder || (shared ? 'Введите значение' : 'Не указано'),
     type: integer || decimal ? 'number' : 'text',
     ...(integer ? { min: '1', max: '2147483647', step: '1', inputmode: 'numeric' } : {}),
     ...(decimal ? { min: '0', step: 'any', inputmode: 'decimal' } : {}),
@@ -2546,7 +2548,7 @@ function inventoryAuditDataRow(item, index, definition, includeManufacturer = fa
   const locked = definition.value === 'referencePrice' && itemPrimaryPrice(item) !== null;
   return `<div class="data-edit-row" role="group" aria-label="${escapeHtml(definition.label + ': ' + name)}">
     <span class="data-edit-row__name" title="${escapeHtml(name)}"><strong>${escapeHtml(name)}</strong>${shown ? ` <small>· ${escapeHtml(shown)}</small>` : ''}</span>
-    ${inventoryAuditDataControl(definition, `auditItem-${index}`, { locked })}
+    ${inventoryAuditDataControl(definition, `auditItem-${index}`, { locked, value: current ?? '' })}
   </div>`;
 }
 
@@ -2588,8 +2590,10 @@ function inventoryAuditDataPayload(definition, value, item = {}) {
 function inventoryAuditValueMatches(item, definition, expected) {
   if (!item) return false;
   const actual = inventoryAuditCurrentValue(item, definition);
-  if (definition.kind === 'decimal' || definition.kind === 'integer')
+  if (definition.kind === 'decimal' || definition.kind === 'integer') {
+    if (expected == null) return actual == null || actual === '';
     return actual != null && Math.abs(Number(actual) - Number(expected)) < 0.00000001;
+  }
   return String(actual ?? '') === String(expected);
 }
 
