@@ -2667,8 +2667,13 @@ async function applyInventoryAuditDataChanges(layer, { items, definition, perIte
       status.textContent = 'Введите значения хотя бы для одной позиции.';
       return;
     }
+    // Even a previously cleared number may leave legacy gaps behind.
+    // Explicit Clear always asks Core to normalize that manufacturer's order.
+    const clearingPositions = definition.value === 'position'
+      && (clearAll || clearItems.size > 0);
     const changes = targets.filter(entry =>
-      !inventoryAuditValueMatches(getInventoryItem(entry.itemId), definition, entry.value));
+      clearingPositions
+        || !inventoryAuditValueMatches(getInventoryItem(entry.itemId), definition, entry.value));
     if (!changes.length) {
       if (clearAll || clearItems.size) {
         // An explicit clear is complete even when those fields were empty already.
