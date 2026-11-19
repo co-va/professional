@@ -6,7 +6,7 @@ import {
 } from '../../ui/ui.js';
 import { escapeHtml } from '../../ui/utils/escape-html.js';
 import { compactCheck } from '../../ui/selection/check-list.js';
-import { apiRequest } from '../auth.js';
+import { apiRequest, getAuthToken } from '../auth.js';
 import { getInventoryItems } from './data.js';
 import { catalogDisclosure } from './catalog-ui.js';
 import { loadInventory } from './service.js';
@@ -14,6 +14,23 @@ import { getCardAppearanceTemplate, saveCardAppearanceTemplate } from '../card-a
 import { loadAuxiliaryState } from '../runtime/auxiliary-state.js';
 
 const PATH = '/inventory/counterparties';
+// Session-bound view caches only. Never persist another account's suppliers
+// or their prices to disk, and never keep stale rows after an explicit write.
+const COMPANY_CACHE_MS = 15000;
+let companyCache = { token: '', rows: null, at: 0, inFlight: null };
+const sharedCatalogCache = new Map();
+function currentCompanyCache() {
+  const token = getAuthToken();
+  if (companyCache.token !== token) {
+    companyCache = { token, rows: null, at: 0, inFlight: null };
+    sharedCatalogCache.clear();
+  }
+  return companyCache;
+}
+if (typeof window !== 'undefined') window.addEventListener('professional:auth-logout', () => {
+  companyCache = { token: '', rows: null, at: 0, inFlight: null };
+  sharedCatalogCache.clear();
+});
 const COUNTERPARTY_CARD_SCOPE = 'inventory-counterparty';
 // Same entity card/constructor used for company cards in Stock. This is
 // presentation inside Z1, not an F/E navigation card or a new UI primitive.
@@ -54,6 +71,28 @@ async function json(path = '', { method = 'GET', body } = {}) {
   const value = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(message(value, response.status));
   return value;
+}
+async function loadCompanies({ force = false } = {}) {
+  const state = currentCompanyCache();
+  if (!force && Array.isArray(state.rows) && Date.now() - state.at < COMPANY_CACHE_MS)
+    return state.rows;
+  if (!force && state.inFlight) return state.inFlight;
+  const token = state.token;
+  const promise = json();
+  if (!force) state.inFlight = promise;
+  try {
+    const rows = await promise;
+    if (getAuthToken() === token) {
+      // A new account or a write may have invalidated the original state.
+      if (companyCache === state) {
+        state.rows = Array.isArray(rows) ? rows : [];
+        state.at = Date.now();
+      }
+    }
+    return rows;
+  } finally {
+    if (state.inFlight === promise) state.inFlight = null;
+  }
 }
 async function importExcel(action, file, fields = {}) {
   const data = new FormData();
@@ -232,7 +271,7 @@ async function openCatalog(company, { itemId = '', onLinked = () => {} } = {}) {
 // Reuses the same supplier catalog/row Q as the existing association flow.
 export async function openSupplierCatalogCreation(onSaved = () => {}) {
   let companies;
-  try { companies = await json(); }
+  try { companies = await loadCompanies(); }
   catch (error) {
     openNotice({ title: 'Контрагенты', message: errText(error) });
     return;
@@ -265,7 +304,7 @@ export async function openSupplierCatalogCreation(onSaved = () => {}) {
 }
 
 async function openCatalogRow(company, row, { itemId = '', onLinked = () => {} } = {}) {
-  try { await loadInventory(); }
+  try { await loadInventory({ preferRecent: true }); }
   catch (cause) { return openNotice({ title: 'Остатки', message: errText(cause) }); }
   const items = getInventoryItems();
   const layer = mountModal(document.body, modal(`<div>
@@ -1259,8 +1298,8 @@ async function openCompany(companyId, root, onChanged = () => {}, { initialCompa
     });
   };
 
-  // The brand list is presentation only; it must not wait for a full stock reload.
-  // Cache is scoped to this Counterparties screen, never localStorage or another account.
+  // Brand lists reuse confirmed session data. The cache is keyed to the auth
+  // session and cleared on logout or any catalog mutation; never localStorage.
   const renderCatalog = (entries, list) => {
       const brands = catalogBrands(entries);
       list.innerHTML = entries.length
@@ -1411,6 +1450,9 @@ async function openCompany(companyId, root, onChanged = () => {}, { initialCompa
       if (!layer.isConnected || !list.isConnected || currentRun !== revision) return;
       const entries = Array.isArray(data.items) ? [...data.items] : [];
       const count = Math.max(0, Number(data.count) || 0);
+      // The first page is already useful: show brand groups immediately,
+      // instead of keeping the entire supplier catalog behind a spinner.
+      renderCatalog(entries, list);
       // Core pages at 100 items. Limit concurrency to four pages, keep order.
       for (let skip = 100; skip < count; skip += 400) {
         const offsets = [];
@@ -1420,11 +1462,11 @@ async function openCompany(companyId, root, onChanged = () => {}, { initialCompa
           json('/' + urlId(companyId) + '/catalog?skip=' + offset)));
         if (!layer.isConnected || !list.isConnected || currentRun !== revision) return;
         pages.forEach(page => entries.push(...(Array.isArray(page.items) ? page.items : [])));
+        // Incrementally add brands/products after each bounded batch.
+        renderCatalog(entries, list);
       }
       if (!layer.isConnected || !list.isConnected || currentRun !== revision) return;
-      // The assortment is independent of stock link classification. Display its
-      // ready brand groups now, even if the link-status service is still responding.
-      renderCatalog(entries, list);
+      // The link-status query runs independently and must not block listing.
       // The stock snapshot is expensive and unnecessary when Core has already
       // classified catalog links. Read it only for a legacy server fallback.
       if (!(await statusesPromise)) {
@@ -1478,7 +1520,14 @@ async function openCompany(companyId, root, onChanged = () => {}, { initialCompa
   layer.querySelector('[data-company-actions]')?.addEventListener('click', () => {
     openSharedProfileSettingsMenu({ title: 'Контрагент', actions: [
       { id: 'edit', label: 'Редактировать', variant: 'primary', onSelect: () =>
-        openCompanyEditor(company, () => { void refresh(); onChanged(); }) },
+        openCompanyEditor(company, saved => {
+          company = { ...company, ...saved };
+          // Display saved company details immediately, with only one parent
+          // list refresh. The old code started two separate full list GETs.
+          catalogCache?.delete(String(companyId));
+          displayCompany();
+          onChanged();
+        }) },
       { id: 'excluded', label: 'Скрытые', onSelect: () =>
         void openExcludedCatalogItems() },
     ] });
@@ -1491,7 +1540,7 @@ async function openCompany(companyId, root, onChanged = () => {}, { initialCompa
 
 export async function openSupplierAssociation(itemId, onSaved = () => {}) {
   let companies = [];
-  try { companies = await json(); }
+  try { companies = await loadCompanies(); }
   catch (cause) { return openNotice({ title: 'Контрагенты', message: errText(cause) }); }
   if (!companies.length) return openNotice({ title: 'Контрагенты', message: 'Сначала создайте контрагента в отдельном разделе склада.' });
   const layer = mountModal(document.body, modal(`
@@ -1594,7 +1643,7 @@ export async function renderCounterparties(root) {
   ]);
   const host = root.querySelector('[data-counterparties-list]');
   // In-memory view cache lives only as long as this Counterparties page.
-  const catalogCache = new Map();
+  const catalogCache = sharedCatalogCache;
   let currentCompanies = [];
   const renderCards = () => {
     if (!host?.isConnected) return;
@@ -1614,12 +1663,17 @@ export async function renderCounterparties(root) {
       });
     });
   };
-  const show = async () => {
-    // Called after create/edit/import; old cached catalogs must not survive writes.
-    catalogCache.clear();
-    host.innerHTML = emptyState('Контрагенты', 'Загружаем…');
+  const show = async (invalidate = true, prepared = null) => {
+    // Create/edit/import invalidates the cached list; navigation does not.
+    if (invalidate === true) {
+      catalogCache.clear();
+      const state = currentCompanyCache();
+      state.rows = null;
+      state.at = 0;
+    }
+    if (!currentCompanies.length) host.innerHTML = emptyState('Контрагенты', 'Загружаем…');
     try {
-      const companies = await json();
+      const companies = await (prepared || loadCompanies({ force: invalidate === true }));
       if (!root.isConnected) return;
       currentCompanies = Array.isArray(companies) ? companies : [];
       renderCards();
@@ -1645,9 +1699,11 @@ export async function renderCounterparties(root) {
     });
   });
   root.querySelector('[data-counterparty-add]')?.addEventListener('click', () => openCompanyEditor(null, () => { void show(); }));
-  // Existing service-scoped auxiliary API includes appearance templates.
+  // Run independent data requests together. Cards still wait for the
+  // appearance template before rendering, without a serial network waterfall.
+  const companiesPromise = loadCompanies();
   await loadAuxiliaryState('service').catch(() => {});
-  await show();
+  await show(false, companiesPromise);
   window.dispatchEvent(new CustomEvent('va-tools:v2-context-changed'));
   return () => {};
 }
