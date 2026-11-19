@@ -2223,10 +2223,10 @@ function inventoryAuditItems(ids) {
 }
 
 function inventoryAuditItemLabel(item, includeManufacturer = false) {
-  const number = Number(item.position);
-  const prefix = Number.isSafeInteger(number) && number > 0 ? `№ ${number}` : 'Без №';
-  const name = includeManufacturer ? `${manufacturerName(item)} · ${item.name}` : item.name;
-  return `${prefix} · ${name}`;
+  // Numbering is editable data, never part of a product's displayed name.
+  return includeManufacturer
+    ? `${manufacturerName(item)} · ${item.name}`
+    : String(item.name || 'Позиция');
 }
 
 function inventoryAuditFilters(items, manufacturer = '') {
