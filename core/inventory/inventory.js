@@ -34,7 +34,6 @@ import { compactCheck } from '../../ui/selection/check-list.js';
 import { canUseCapability } from '../access.js';
 import { setSharedActionVisible } from '../../ui/page/page.js';
 import { getCardAppearanceTemplate, saveCardAppearanceTemplate } from '../card-appearance-templates.js';
-import { loadAuxiliaryState } from '../runtime/auxiliary-state.js';
 import {
   inventoryManufacturerCompletion, isWeighedInventoryItem, netStocktakeGrams,
   inventoryStockThresholdInput, inventoryStockThresholdStored, inventoryStockThresholdUnit,
@@ -3006,7 +3005,6 @@ export async function renderInventory(root, section = 'stock') {
     await Promise.all([
       loadInventory(),
       ...(section === 'stock' ? [
-        loadAuxiliaryState('service'),
         // Older Core builds may not yet have deployed the criteria migration.
         // Never make the entire stock catalog disappear in that case.
         loadInventoryCriteria().catch(error=>{
