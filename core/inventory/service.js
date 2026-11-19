@@ -19,6 +19,13 @@ const rememberSnapshot = token => {
   lastStockToken = token;
   lastStockReadAt = Date.now();
 };
+// Supplier catalog and pricing updates use their own Core owner, but must
+// invalidate cached stock totals/prices without forcing an immediate reload.
+export function invalidateInventoryNavigationCache() {
+  stockRevision++;
+  lastStockReadAt = 0;
+  stockRead = null;
+}
 
 function snapshotItem(payload, itemId) {
   return Array.isArray(payload?.items)
