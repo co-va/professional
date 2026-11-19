@@ -320,8 +320,10 @@ function openSupplierEditor(itemId, offerId = '', onSaved = () => {}) {
 }
 
 export function openInventoryProductAppearanceQ(itemId, onSaved = () => {}, stockScope = INVENTORY_TOTAL_SCOPE) {
-  const item = getInventoryItem(itemId);
-  if (!item) return null;
+  // The global Stock card layout is editable even before the first product
+  // exists. Missing product data is shown by its field name in the preview,
+  // never in the real product card or the persisted appearance.
+  const item = getInventoryItem(itemId) || { itemId: '', name: '' };
   return openEntityCardAppearanceQ(document.body, {
     title: 'Вид',
     typeOptions: [{ value: PRODUCT_APPEARANCE_SCOPE, label: 'Складская единица' }],
@@ -330,7 +332,11 @@ export function openInventoryProductAppearanceQ(itemId, onSaved = () => {}, stoc
     allowPhoto: false,
     resolve: () => ({
       appearance: productCardAppearance(),
-      fields: productCardFields(getInventoryItem(itemId) || item, stockScope),
+      fields: productCardFields(getInventoryItem(itemId) || item, stockScope)
+        .map(field => ({
+          ...field,
+          text: String(field.text || '').trim() ? field.text : field.label,
+        })),
     }),
     save: async ({ appearance }) => {
       saveCardAppearanceTemplate(PRODUCT_APPEARANCE_SCOPE, { appearance });
