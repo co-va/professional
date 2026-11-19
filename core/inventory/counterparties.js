@@ -9,7 +9,7 @@ import { compactCheck } from '../../ui/selection/check-list.js';
 import { apiRequest, getAuthToken } from '../auth.js';
 import { getInventoryItems } from './data.js';
 import { catalogDisclosure } from './catalog-ui.js';
-import { loadInventory } from './service.js';
+import { invalidateInventoryNavigationCache, loadInventory } from './service.js';
 import { getCardAppearanceTemplate, saveCardAppearanceTemplate } from '../card-appearance-templates.js';
 import { loadAuxiliaryState } from '../runtime/auxiliary-state.js';
 
@@ -70,6 +70,7 @@ async function json(path = '', { method = 'GET', body } = {}) {
   });
   const value = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(message(value, response.status));
+  if (String(method).toUpperCase() !== 'GET') invalidateInventoryNavigationCache();
   return value;
 }
 async function loadCompanies({ force = false } = {}) {
@@ -106,6 +107,7 @@ async function importExcel(action, file, fields = {}) {
   });
   const value = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(message(value, response.status));
+  invalidateInventoryNavigationCache();
   return value;
 }
 async function download(path, filename) {
