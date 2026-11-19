@@ -183,12 +183,12 @@ function openCompanyEditor(company, onSaved) {
         method: company?.id ? 'PUT' : 'POST', body: input,
       });
       if (!company?.id) created = updated;
-      // An HTTP 200 is not evidence that every field was actually persisted.
-      // Read the authoritative Core record before closing the editor.
+      // The Core create/update endpoint returns the saved database row.
+      // Validate it directly: a second full company-list GET is unnecessary.
       const id = String(company?.id || updated?.id || '');
-      if (!id) throw new Error('Core не вернул идентификатор контрагента.');
-      const stored = (await json()).find(row => String(row.id) === id);
-      if (!stored) throw new Error('Core не подтвердил сохранение контрагента.');
+      if (!id || String(updated?.id || '') !== id)
+        throw new Error('Core не подтвердил идентификатор контрагента.');
+      const stored = { ...(company || {}), ...updated };
       const mismatch = counterpartyFieldMismatch(input, stored);
       if (mismatch) throw new Error('Core не сохранил поле «' + mismatch + '». Изменения не подтверждены.');
       layer.v2Close?.();
