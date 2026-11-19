@@ -12,6 +12,7 @@ function normalizeOptions(options = []) {
       label: String(item.label ?? item.value ?? ''),
       meta: String(item.meta ?? ''),
       indicatorColor: String(item.indicatorColor ?? '').trim(),
+      fieldState: ['unused', 'placed', 'active'].includes(item.fieldState) ? item.fieldState : '',
     };
   });
 }
@@ -117,7 +118,7 @@ function openSelector(trigger) {
   const currentValue = String(input.value ?? '');
   const selectedIndex = options.findIndex((option) => String(option.value ?? '') === currentValue);
   const optionMarkup = options.map((option, index) => `
-    <button type="button" class="ui-selector__option${index === selectedIndex ? ' is-current' : ''}" data-ui-select-option data-value="${escapeHtml(option.value)}" data-meta="${escapeHtml(option.meta || '')}" data-indicator-color="${escapeHtml(option.indicatorColor || '')}">
+    <button type="button" class="ui-selector__option${index === selectedIndex ? ' is-current' : ''}" data-ui-select-option data-value="${escapeHtml(option.value)}" data-meta="${escapeHtml(option.meta || '')}" data-indicator-color="${escapeHtml(option.indicatorColor || '')}"${option.fieldState ? ` data-field-state="${escapeHtml(option.fieldState)}"` : ''}>
       <span class="ui-selector__option-indicator"${option.indicatorColor ? ` style="--ui-select-indicator:${escapeHtml(option.indicatorColor)}"` : ' hidden'} aria-hidden="true"></span>
       <span class="ui-selector__option-main"><span class="ui-selector__option-label">${escapeHtml(option.label)}</span>${option.meta ? `<small>${escapeHtml(option.meta)}</small>` : ''}</span>
     </button>`).join('');
