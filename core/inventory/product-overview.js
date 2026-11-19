@@ -125,17 +125,15 @@ function productCardFields(item, stockScope = INVENTORY_TOTAL_SCOPE) {
   const entries = [
     ['manufacturer', inventoryFieldLabel('manufacturer','Производитель'), item.manufacturer],
     ['name', 'Наименование', item.name],
-    ['category', inventoryFieldLabel('category','Категория'), item.category],
-    ['productType', inventoryFieldLabel('productType','Тип'), item.productType],
     ['sku', 'Артикул', item.sku],
-    ['primarySupplier', 'Основной поставщик', primary?.supplier || item.primarySupplier || ''],
+    ['primarySupplier', 'Поставщик', primary?.supplier || item.primarySupplier || ''],
     ['supplierListPrice', 'Цена', money(supplierListPrice(item,primary))],
-    ['supplierDiscount', 'Скидка поставщика', discountText],
-    ['basePrice', 'Закупочная цена со скидкой', money(purchasePrice)],
+    ['supplierDiscount', 'Скидка', discountText],
+    ['basePrice', 'Стоимость', money(purchasePrice)],
     ['storage', 'Склад', stockScopeName(stockScope)],
     ['balance', 'Остаток', num(inventoryDisplayBalance(item, stockScope)) + ' ' + (item.unit||'')],
     ['consumption', 'Расход', actualInventoryConsumption(item, stockScope)],
-    ['baseUnitPrice', 'Себестоимость единицы расхода', consumptionUnitCost(item)],
+    ['baseUnitPrice', 'Себестоимость', consumptionUnitCost(item)],
     ['saleIndicator', 'Продажа', item.canSell===true ? 'Продажа ☑' : 'Продажа ☐'],
   ];
   return entries.map(([value, label, text]) => ({value,label,text:optionalText(text)}));
@@ -326,8 +324,6 @@ function stockCardPreviewExamples(item) {
   return {
     manufacturer: 'Бренд',
     name: 'Товар',
-    category: 'Категория',
-    productType: 'Тип',
     sku: 'А-001',
     primarySupplier: 'Поставщик',
     supplierListPrice: '1 000 ₽',
