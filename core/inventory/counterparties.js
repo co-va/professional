@@ -321,6 +321,9 @@ async function openStockSupplierCatalog(company, { onLinked = () => {} } = {}) {
   const search = layer.querySelector('[name="stockSupplierSearch"]');
   let entries = [];
   let loaded = false;
+  let matchedCatalogItems = new Map();
+  let linkedCatalogIds = new Set();
+  let catalogStatuses = new Map();
   const render = () => {
     if (!loaded || !layer.isConnected) return;
     const needle = String(search?.value || '').trim().toLocaleLowerCase('ru-RU');
@@ -340,7 +343,8 @@ async function openStockSupplierCatalog(company, { onLinked = () => {} } = {}) {
         const byId = new Map(allRows.map(row => [String(row.id), row]));
         const selected = new Set();
         const brandLayer = mountModal(document.body, modal(
-          catalogCategoryRowsMarkup(categories, selected) +
+          catalogCategoryRowsMarkup(categories, selected, linkedCatalogIds,
+            matchedCatalogItems, catalogStatuses) +
           actionBlock(button('Создать карточку', {
             data: 'data-stock-supplier-create-selected' }),
             { className: 'inventory-counterparty-selection-actions' }),
@@ -418,6 +422,18 @@ async function openStockSupplierCatalog(company, { onLinked = () => {} } = {}) {
         const batch = await Promise.all(offsets.map(offset => json(base + offset)));
         if (!layer.isConnected) return;
         batch.forEach(page => entries.push(...(Array.isArray(page.items) ? page.items : [])));
+      }
+    }
+    const stockItems = getInventoryItems();
+    matchedCatalogItems = findCatalogMatches(entries, stockItems);
+    catalogStatuses = new Map();
+    linkedCatalogIds = new Set();
+    for (const item of stockItems) {
+      for (const offer of Array.isArray(item.supplierOffers) ? item.supplierOffers : []) {
+        if (String(offer.counterpartyId || '') !== String(company.id) || !offer.catalogItemId) continue;
+        const id = String(offer.catalogItemId);
+        linkedCatalogIds.add(id);
+        catalogStatuses.set(id, { status: 'linked', itemId: item.itemId });
       }
     }
     loaded = true;
