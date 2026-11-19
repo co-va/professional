@@ -2308,7 +2308,7 @@ function openInventoryAuditSelection(root, { manufacturer = '', onSaved = () => 
     if (count) count.textContent = `Выбрано ${selected.size} из ${ids.length}`;
     if (next) {
       next.disabled = busy || !selected.size;
-      next.textContent = `${isCommon() ? 'Применить' : 'Продолжить'} · ${selected.size}`;
+      next.textContent = `Продолжить · ${selected.size}`;
     }
     if (all) {
       all.checked = visible.length > 0 && visible.every(id => selected.has(id));
@@ -2378,29 +2378,27 @@ function openInventoryAuditSelection(root, { manufacturer = '', onSaved = () => 
   });
   next?.addEventListener('click', async () => {
     if (busy || !selected.size) return;
-    const selectedItems = inventoryAuditItems([...selected]);
-    if (isCommon()) {
-      busy = true;
-      sync();
-      try {
-        const data = new FormData();
-        data.set('auditValue', valueHost?.querySelector('[name="auditValue"]')?.value ?? '');
-        await applyInventoryAuditDataChanges(layer, {
-          items: selectedItems,
-          definition: inventoryAuditFieldDefinition(fieldSelector?.value),
-          perItem: false, data, status, submit: next, onSaved,
-        });
-      } finally {
-        busy = false;
-        sync();
-      }
-      return;
-    }
+    const dataMode = isData();
+    const common = isCommon();
+    const initialCommonValue = common
+      ? String(valueHost?.querySelector('[name="auditValue"]')?.value ?? '').trim()
+      : '';
     openInventoryAuditCriteria(layer, {
-      mode: isData() ? 'data' : 'stock',
+      mode: dataMode ? 'data' : 'stock',
       ids: [...selected],
       fieldName: fieldSelector?.value || 'category',
-      onSaved: () => { layer.v2Close?.(); onSaved(); },
+      ...(dataMode ? { keepOpen: true, initialCommon: common, initialCommonValue } : {}),
+      onSaved: () => {
+        if (!dataMode) {
+          layer.v2Close?.();
+          onSaved();
+          return;
+        }
+        // A completed data operation refreshes Q1, but never closes its Q2 editor.
+        selected.clear();
+        render();
+        onSaved();
+      },
     });
   });
   renderValue();
@@ -2738,7 +2736,10 @@ async function applyInventoryAuditDataChanges(layer, { items, definition, perIte
   return false;
 }
 
-function openInventoryAuditCriteria(root, { mode, ids = [], fieldName = 'category', onSaved = () => {}, keepOpen = false } = {}) {
+function openInventoryAuditCriteria(root, {
+  mode, ids = [], fieldName = 'category', onSaved = () => {},
+  keepOpen = false, initialCommon = false, initialCommonValue = '',
+} = {}) {
   const items = inventoryAuditItems(ids);
   if (!items.length) return openNotice({ title: 'Инвентаризация', message: 'Позиции не найдены.' });
   const isData = mode === 'data';
@@ -2748,7 +2749,7 @@ function openInventoryAuditCriteria(root, { mode, ids = [], fieldName = 'categor
   const fields = isData
     ? '<div class="form-grid" data-inventory-audit-data-editor>' +
       compactCheck({ label: 'Одно значение для всех',
-        data: 'data-inventory-data-common' }) +
+        data: 'data-inventory-data-common', checked: initialCommon }) +
       '<div data-inventory-audit-data-common hidden></div>' +
       '<div data-inventory-audit-data-individual></div></div>'
     : `<details data-inventory-audit-excluded hidden>
@@ -2791,6 +2792,8 @@ function openInventoryAuditCriteria(root, { mode, ids = [], fieldName = 'categor
   let dataInitial = '';
   let dataUniform = true;
   const selectedDataIds = new Set();
+  let pendingInitialCommonValue = initialCommon && String(initialCommonValue).trim()
+    ? String(initialCommonValue).trim() : null;
 
   function checkedDataIndices() {
     return new Set([...individualHost?.querySelectorAll('[data-inventory-audit-selected]:checked') || []]
@@ -2853,6 +2856,14 @@ function openInventoryAuditCriteria(root, { mode, ids = [], fieldName = 'categor
       inventoryAuditDataRow(item, index, definition, includesDifferentManufacturers,
         selectedDataIds.has(item.itemId))).join('') + '</div>';
     individualHost.querySelectorAll('textarea').forEach(resizeDataText);
+    if (pendingInitialCommonValue !== null) {
+      const control = commonHost.querySelector('[name="auditValue"]');
+      if (control) {
+        control.value = pendingInitialCommonValue;
+        dataCommonTouched = true;
+      }
+      pendingInitialCommonValue = null;
+    }
     status.textContent = '';
     syncDataActions();
   }
@@ -3038,6 +3049,8 @@ function openInventoryAuditCriteria(root, { mode, ids = [], fieldName = 'categor
         clearAll, clearItems, selectedIndices,
         keepOpen: isData && keepOpen,
         afterApplied: () => {
+          // Every completed operation starts a fresh selection using saved values.
+          selectedDataIds.clear();
           items.splice(0, items.length, ...inventoryAuditItems(ids));
           renderDataFields();
         },
