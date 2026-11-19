@@ -1747,8 +1747,13 @@ function stockListMarkup(manufacturer, query = '', rowsProvider = null, expanded
 
   // Preserve existing group disclosure state after editing a product or
   // searching. Searching opens only matched groups for immediate access.
-  const disclosure = (label, content, key, nested = false, reorderId = '') =>
-    catalogDisclosure(label, content, nested, null, '', reorderId).replace('<details>',
+  const disclosure = (label, content, key, nested = false, reorderId = '', rows = []) =>
+    catalogDisclosure(label, content, nested, null,
+      compactCheck({
+        checked: rows.length > 0 && rows.every(item => selected.has(String(item.itemId))),
+        aria: 'Выбрать все позиции группы ' + label,
+        data: 'data-stock-group-check="' + escapeHtml(key) + '"',
+      }), reorderId).replace('<details>',
       '<details data-stock-disclosure="' + escapeHtml(key) + '"' +
       (needle || expanded.has(key) ? ' open' : '') + '>');
   const categories = new Map();
@@ -1771,10 +1776,11 @@ function stockListMarkup(manufacturer, query = '', rowsProvider = null, expanded
     || a.localeCompare(b,'ru',{numeric:true,sensitivity:'base'}));
   const content = grouped.map(([category,types])=>{
     const typeContent=[...types.entries()].map(([type,rows])=>
-      byType ? disclosure(type,itemList(rows),'t:'+category+'::'+type,true)
+      byType ? disclosure(type,itemList(rows),'t:'+category+'::'+type,true,'',rows)
         : itemList(rows)).join('');
     const reorderId=allowCategoryReorder ? ids.get(category) || '' : '';
-    return byCategory ? disclosure(category,typeContent,'c:'+category,false,reorderId)
+    const categoryRows = [...types.values()].flat();
+    return byCategory ? disclosure(category,typeContent,'c:'+category,false,reorderId,categoryRows)
       : typeContent;
   }).join('');
   return byCategory
@@ -1959,6 +1965,17 @@ function openManufacturerStock(root, manufacturer, groupContext = null) {
   const listHost = layer.querySelector('[data-inventory-company-list]');
   const selectionActions = layer.querySelector('[data-stock-selected-actions]');
   const selectedCount = layer.querySelector('[data-stock-selected-count]');
+  const syncGroupChecks = () => {
+    // Parent categories include all nested types. Partial selections
+    // remain distinct from fully selected groups.
+    listHost?.querySelectorAll('[data-stock-group-check]').forEach(check => {
+      const rows = [...(check.closest('.inventory-editor-panel')
+        ?.querySelectorAll('[data-stock-item-check]') || [])];
+      const chosen = rows.filter(row => selectedStockItems.has(String(row.dataset.stockItemCheck))).length;
+      check.checked = rows.length > 0 && chosen === rows.length;
+      check.indeterminate = chosen > 0 && chosen < rows.length;
+    });
+  };
   const syncSelected = () => {
     for (const id of selectedStockItems) if (!getInventoryItem(id)) selectedStockItems.delete(id);
     if (selectionActions) selectionActions.hidden = !selectedStockItems.size;
@@ -2044,7 +2061,22 @@ function openManufacturerStock(root, manufacturer, groupContext = null) {
         if(check.checked)selectedStockItems.add(id);
         else selectedStockItems.delete(id);
         syncSelected();
+        syncGroupChecks();
       }));
+    listHost?.querySelectorAll('[data-stock-group-check]').forEach(check =>
+      check.addEventListener('change', () => {
+        const rows = check.closest('.inventory-editor-panel')
+          ?.querySelectorAll('[data-stock-item-check]') || [];
+        rows.forEach(row => {
+          const id = String(row.dataset.stockItemCheck);
+          if (check.checked) selectedStockItems.add(id);
+          else selectedStockItems.delete(id);
+          row.checked = check.checked;
+        });
+        syncSelected();
+        syncGroupChecks();
+      }));
+    syncGroupChecks();
     if (allowCategoryReorder && listHost) {
       disposeCategoryReorder=initV2ListReorder(listHost,{
         selector:'[data-stock-category][data-reorder-id]',
