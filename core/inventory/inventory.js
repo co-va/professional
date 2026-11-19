@@ -2548,7 +2548,13 @@ function inventoryAuditDataRow(item, index, definition, includeManufacturer = fa
   const locked = definition.value === 'referencePrice' && itemPrimaryPrice(item) !== null;
   return `<div class="data-edit-row" role="group" aria-label="${escapeHtml(definition.label + ': ' + name)}">
     <span class="data-edit-row__name" title="${escapeHtml(name)}"><strong>${escapeHtml(name)}</strong>${shown ? ` <small>· ${escapeHtml(shown)}</small>` : ''}</span>
-    ${inventoryAuditDataControl(definition, `auditItem-${index}`, { locked, value: current ?? '' })}
+    <div class="inventory-audit-value-cell">
+      ${inventoryAuditDataControl(definition, `auditItem-${index}`, { locked, value: current ?? '' })}
+      ${!locked && inventoryAuditCanClear(definition) && String(current ?? '').trim()
+        ? compactCheck({ label: 'Очистить', data: `data-inventory-audit-clear-item="${index}"`,
+          aria: `Очистить «${definition.label}» у ${name}` })
+        : ''}
+    </div>
   </div>`;
 }
 
@@ -2597,7 +2603,7 @@ function inventoryAuditValueMatches(item, definition, expected) {
   return String(actual ?? '') === String(expected);
 }
 
-async function applyInventoryAuditDataChanges(layer, { items, definition, perItem, data, status, submit, onSaved, clearAll = false, keepOpen = false, afterApplied = () => {} }) {
+async function applyInventoryAuditDataChanges(layer, { items, definition, perItem, data, status, submit, onSaved, clearAll = false, clearItems = new Set(), keepOpen = false, afterApplied = () => {} }) {
   if (!definition) {
     status.textContent = 'Выберите характеристику.';
     return false;
@@ -2627,16 +2633,18 @@ async function applyInventoryAuditDataChanges(layer, { items, definition, perIte
       for (const [index, item] of items.entries()) {
         if (perItem && definition.value === 'referencePrice' && itemPrimaryPrice(item) !== null) continue;
         const raw = perItem ? String(data.get(`auditItem-${index}`) ?? '').trim() : '';
-        if (perItem && raw === String(inventoryAuditCurrentValue(item, definition) ?? '').trim()) continue;
+        const shouldClear = perItem && clearItems.has(index);
+        if (perItem && !shouldClear &&
+          (!raw || raw === String(inventoryAuditCurrentValue(item, definition) ?? '').trim())) continue;
         let value;
         if (!perItem) {
           value = definition.value === 'position' ? startingValue + index : startingValue;
-        } else if (raw) {
-          value = inventoryAuditParseDataValue(definition, raw);
-        } else {
+        } else if (shouldClear) {
           if (!inventoryAuditCanClear(definition))
             throw new Error('Нельзя очистить «' + definition.label + '»: ' + item.name);
           value = definition.kind === 'decimal' ? null : '';
+        } else {
+          value = inventoryAuditParseDataValue(definition, raw);
         }
         if (definition.value === 'position') {
           const numberKey = `${manufacturerName(item)}::${value}`;
@@ -2743,6 +2751,7 @@ function openInventoryAuditCriteria(root, { mode, ids = [], fieldName = 'categor
       compactCheck({ label: 'Одно значение для всех', checked: true,
         data: 'data-inventory-data-common' }) +
       '<div data-inventory-audit-data-common></div>' +
+      '<p class="ui-list__secondary">Пустое поле не изменяет значение. Для удаления выберите «Очистить».</p>' +
       '<div data-inventory-audit-data-individual hidden></div></div>'
     : `<details data-inventory-audit-excluded hidden>
          <summary data-inventory-audit-excluded-count>Исключено: 0</summary>
@@ -2791,13 +2800,14 @@ function openInventoryAuditCriteria(root, { mode, ids = [], fieldName = 'categor
     const valueInput = commonHost?.querySelector('[name="auditValue"]');
     if (valueInput) valueInput.disabled = clearing;
     const value = String(valueInput?.value ?? '').trim();
-    const commonDirty = clearing || (dataCommonTouched &&
-      (value !== '' || (dataUniform && dataInitial !== '')) && (
-        !dataUniform || value !== dataInitial));
+    const commonDirty = clearing || (dataCommonTouched && value !== '' &&
+      (!dataUniform || value !== dataInitial));
     const individualDirty = items.some((item, index) => {
+      if (individualHost?.querySelector('[data-inventory-audit-clear-item="' + index + '"]')?.checked)
+        return true;
       const control = individualHost?.querySelector('[name="auditItem-' + index + '"]');
-      return control && String(control.value ?? '').trim() !==
-        String(inventoryAuditCurrentValue(item, definition) ?? '').trim();
+      const next = String(control?.value ?? '').trim();
+      return next !== '' && next !== String(inventoryAuditCurrentValue(item, definition) ?? '').trim();
     });
     const dirty = common ? commonDirty : individualDirty;
     if (dataActions) dataActions.hidden = !dirty;
@@ -3028,15 +3038,17 @@ function openInventoryAuditCriteria(root, { mode, ids = [], fieldName = 'categor
 
     const common = Boolean(dataMode?.checked);
     const clearing = Boolean(commonHost?.querySelector('[data-inventory-audit-clear-all]')?.checked);
-    const newValue = String(commonHost?.querySelector('[name="auditValue"]')?.value ?? '').trim();
-    // Erasing a prefilled identical value is an explicit clear, not "skip".
-    // Mixed values require the visible "Очистить у всех" choice to clear.
-    const clearAll = common && (clearing || (dataUniform && dataInitial !== '' && !newValue));
+    // Only an explicitly checked clear action may erase stored data.
+    // Blank input fields, including edited blanks, always mean "leave unchanged".
+    const clearAll = common && clearing;
+    const clearItems = new Set([...individualHost?.querySelectorAll(
+      '[data-inventory-audit-clear-item]:checked') || []]
+      .map(input => Number(input.dataset.inventoryAuditClearItem)));
     saving = true;
     syncDataActions();
     try {
       await applyInventoryAuditDataChanges(layer, {
-        items, definition, perItem: !common, data, status, submit, onSaved, clearAll,
+        items, definition, perItem: !common, data, status, submit, onSaved, clearAll, clearItems,
         keepOpen: isData && keepOpen,
         afterApplied: () => {
           items.splice(0, items.length, ...inventoryAuditItems(ids));
