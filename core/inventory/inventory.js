@@ -2599,7 +2599,8 @@ function inventoryAuditValueMatches(item, definition, expected) {
   return String(actual ?? '') === String(expected);
 }
 
-async function applyInventoryAuditDataChanges(layer, { items, definition, perItem, data, status, submit, onSaved, clearAll = false, clearItems = new Set(), selectedIndices = null, keepOpen = false, afterApplied = () => {} }) {
+async function applyInventoryAuditDataChanges(layer, { items, definition, perItem, data, status, submit, onSaved, clearAll = false, clearItems = new Set(), selectedIndices = null, keepOpen = false,
+  afterApplied = () => {}, onProgress = () => {} }) {
   if (!definition) {
     status.textContent = 'Выберите характеристику.';
     return false;
@@ -2681,7 +2682,23 @@ async function applyInventoryAuditDataChanges(layer, { items, definition, perIte
     submit.disabled = true;
     const failed = new Map();
     try {
-      if (definition.value === 'position') {
+      if (definition.value === 'position' && (clearAll || clearItems.size > 0)) {
+        // Clearing an ordering number is not reordering. Zero means unnumbered.
+        // Unlike moving occupied slots, a clear needs exactly one verified write
+        // per item and no extra retry passes or whole-catalog read.
+        let completed = 0;
+        onProgress(completed, changes.length);
+        for (const entry of changes) {
+          try {
+            await updateInventoryItem(entry.itemId, { position: 0 });
+          } catch (error) {
+            failed.set(entry.itemId, error instanceof Error ? error.message : 'Ошибка сохранения');
+          }
+          completed++;
+          onProgress(completed, changes.length);
+          status.textContent = `Очистка: ${completed} из ${changes.length}`;
+        }
+      } else if (definition.value === 'position') {
         // Core shifts occupied slots when inserting a numbered product.
         // Serial writes plus a fresh snapshot are needed to verify final order.
         let pending = [...changes];
@@ -3049,22 +3066,40 @@ function openInventoryAuditCriteria(root, {
     const clearAll = clear && common;
     const clearItems = clear && !common ? selectedIndices : new Set();
     const data = new FormData(form);
+    const action = clear ? clearButton : submit;
+    const initialLabel = action?.textContent || (clear ? 'Очистить' : 'Применить');
     saving = true;
     syncDataActions();
+    if (action) action.textContent = clear ? 'Очищаю…' : 'Применяю…';
     try {
-      await applyInventoryAuditDataChanges(layer, {
+      const saved = await applyInventoryAuditDataChanges(layer, {
         items, definition, perItem: !common, data, status, submit, onSaved,
         clearAll, clearItems, selectedIndices,
         keepOpen: isData && keepOpen,
+        onProgress: (completed, total) => {
+          if (action?.isConnected) {
+            action.textContent = (clear ? 'Очистка' : 'Применение') +
+              ` · ${completed} из ${total}`;
+          }
+        },
         afterApplied: () => {
-          // Start a clean editing pass: no checked rows or common-mode selection.
+          // The same rows remain in the editor in their existing order,
+          // refreshed from confirmed server values; clear every checkmark.
           selectedDataIds.clear();
           if (dataMode) dataMode.checked = false;
-          items.splice(0, items.length, ...inventoryAuditItems(ids));
+          items.splice(0, items.length, ...items.map(item =>
+            getInventoryItem(item.itemId)).filter(Boolean));
           renderDataFields();
         },
       });
+      if (!saved && status?.textContent && layer.isConnected) {
+        openNotice({
+          title: clear ? 'Очистка не завершена' : 'Изменения не сохранены',
+          message: status.textContent,
+        });
+      }
     } finally {
+      if (action?.isConnected) action.textContent = initialLabel;
       saving = false;
       syncDataActions();
     }
