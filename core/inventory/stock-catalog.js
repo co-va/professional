@@ -138,9 +138,10 @@ export function openStockCatalogBrand(brand, options = {}) {
     const draw = () => {
       if (!products) return;
       const term=search.trim().toLocaleLowerCase('ru-RU');
+      const searchableGroups=stockNestedCriteria(options.criteria||baseCriteria);
       const items=term ? brand.items.filter(item=>
         [item.name,item.catalogName,item.sku,item.barcode,item.manufacturer,
-          item.category,item.productType].some(value=>
+          ...searchableGroups.map(group=>stockGroupValue(item,group))].some(value=>
           name(value).toLocaleLowerCase('ru-RU').includes(term))) : brand.items;
       products.innerHTML=items.length
         ? stockGroupedSections(items,selected,scope,options.criteria||baseCriteria)
