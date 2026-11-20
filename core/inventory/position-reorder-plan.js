@@ -38,3 +38,37 @@ export function planInventoryPositionReorder(allItems = [], assignments = []) {
   }
   return { manufacturer, itemIds:[...ordered,...unnumbered].map(item=>name(item.itemId)) };
 }
+
+
+// Moving a chosen set to the end is a permutation, not a deletion of numbers.
+// Core's existing reorder endpoint can persist this in one transaction when
+// every item in that manufacturer already has a unique positive position.
+export function planInventoryMoveToEnd(allItems = [], manufacturer = '', selectedIds = []) {
+  if (!Array.isArray(allItems) || !Array.isArray(selectedIds) || !selectedIds.length) return null;
+  const company = allItems.filter(item => name(item.manufacturer) === name(manufacturer));
+  if (!company.length || company.length > 10000) return null;
+  const ordered = [...company].sort((a, b) =>
+    Number(a.position) - Number(b.position) || name(a.itemId).localeCompare(name(b.itemId)));
+  if (ordered.some((item, index) => !Number.isSafeInteger(Number(item.position))
+      || Number(item.position) <= 0
+      || index > 0 && Number(item.position) === Number(ordered[index - 1].position))) return null;
+  const chosen = new Set(selectedIds.map(name));
+  if (chosen.size !== selectedIds.length || selectedIds.some(id =>
+      !ordered.some(row => name(row.itemId) === name(id)))) return null;
+  const remaining = ordered.filter(row => !chosen.has(name(row.itemId)));
+  const moved = ordered.filter(row => chosen.has(name(row.itemId)));
+  return { manufacturer: name(manufacturer),
+    itemIds: [...remaining, ...moved].map(item => name(item.itemId)) };
+}
+
+// Assign a concrete end position before creating a product or when moving an
+// existing product to the end. No blank/zero rank is ever submitted from UI.
+export function inventoryEndPosition(allItems = [], manufacturer = '', itemId = '') {
+  const company = allItems.filter(item => name(item.manufacturer) === name(manufacturer));
+  const maximum = Math.max(0, ...company.map(item =>
+    Number(item.position) > 0 ? Number(item.position) : 0));
+  const existing = company.find(item => name(item.itemId) === name(itemId));
+  return existing && Number(existing.position) > 0
+    ? maximum
+    : maximum + 1;
+}
