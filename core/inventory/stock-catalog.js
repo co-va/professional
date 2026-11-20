@@ -88,24 +88,33 @@ function stockRow(item, selected, scope) {
 export function stockGroupedSections(items, selected = new Set(), scope = INVENTORY_TOTAL_SCOPE) {
   const categories = new Map();
   for (const item of items) {
-    const category = name(item.category) || 'Без категории';
-    const type = name(item.productType) || 'Без типа';
-    if (!categories.has(category)) categories.set(category,new Map());
+    const category = name(item.category);
+    const type = name(item.productType);
+    if (!categories.has(category)) categories.set(category, new Map());
     const types = categories.get(category);
-    if (!types.has(type)) types.set(type,[]);
+    if (!types.has(type)) types.set(type, []);
     types.get(type).push(item);
   }
+  const productRows = rows => rows.map(item => stockRow(item, selected, scope)).join('');
+  const sections = [...categories.entries()].sort(([a],[b]) =>
+    a && !b ? -1 : !a && b ? 1 : compare(a,b));
   return '<div class="inventory-counterparty-product-list">' +
-    [...categories.entries()].sort(([a],[b])=>compare(a,b)).map(([category,types])=>{
-      const count=[...types.values()].reduce((sum,rows)=>sum+rows.length,0);
+    sections.map(([category,types]) => {
+      // No assigned category means direct product rows, never a fictitious
+      // "Без категории" section or a compulsory nested type.
+      if (!category) return productRows([...types.values()].flat());
+      const count = [...types.values()].reduce((sum, rows) => sum + rows.length, 0);
+      const content = [...types.entries()].sort(([a],[b]) =>
+        a && !b ? -1 : !a && b ? 1 : compare(a,b))
+        .map(([type,rows]) =>
+          (type
+            ? '<div class="inventory-stock-type-heading"><span>' + escapeHtml(type) +
+              '</span><small>' + rows.length + ' поз.</small></div>'
+            : '') + productRows(rows)).join('');
       return '<section class="inventory-stock-category">' +
         '<div class="inventory-stock-category-heading"><strong>' + escapeHtml(category) +
         '</strong><small>' + count + ' поз.</small></div>' +
-        [...types.entries()].sort(([a],[b])=>compare(a,b)).map(([type,rows])=>
-          '<div class="inventory-stock-type-heading"><span>'+escapeHtml(type)+
-          '</span><small>'+rows.length+' поз.</small></div>' +
-          rows.map(item=>stockRow(item,selected,scope)).join('')
-        ).join('') + '</section>';
+        content + '</section>';
     }).join('') + '</div>';
 }
 
