@@ -3,6 +3,7 @@ import {
   v2ListEntries, v2ListEntry, initV2ListReorder,
 } from '../../ui/ui.js';
 import { compactCheck } from '../../ui/selection/check-list.js';
+import { catalogDisclosure } from './catalog-ui.js';
 import { escapeHtml } from '../../ui/utils/escape-html.js';
 import { getInventoryItems } from './data.js';
 import {
@@ -98,23 +99,23 @@ export function stockGroupedSections(items, selected = new Set(), scope = INVENT
   const productRows = rows => rows.map(item => stockRow(item, selected, scope)).join('');
   const sections = [...categories.entries()].sort(([a],[b]) =>
     a && !b ? -1 : !a && b ? 1 : compare(a,b));
-  return '<div class="inventory-counterparty-product-list">' +
-    sections.map(([category,types]) => {
-      // No assigned category means direct product rows, never a fictitious
-      // "Без категории" section or a compulsory nested type.
+  const categoryCount = sections.filter(([category]) => Boolean(category)).length;
+  return '<div class="inventory-counterparty-product-list inventory-item-accordion">' +
+    sections.map(([category, types]) => {
       if (!category) return productRows([...types.values()].flat());
-      const count = [...types.values()].reduce((sum, rows) => sum + rows.length, 0);
-      const content = [...types.entries()].sort(([a],[b]) =>
-        a && !b ? -1 : !a && b ? 1 : compare(a,b))
-        .map(([type,rows]) =>
-          (type
-            ? '<div class="inventory-stock-type-heading"><span>' + escapeHtml(type) +
-              '</span><small>' + rows.length + ' поз.</small></div>'
-            : '') + productRows(rows)).join('');
-      return '<section class="inventory-stock-category">' +
-        '<div class="inventory-stock-category-heading"><strong>' + escapeHtml(category) +
-        '</strong><small>' + count + ' поз.</small></div>' +
-        content + '</section>';
+      const rows = [...types.values()].flat();
+      const entries = [...types.entries()].sort(([a],[b]) =>
+        a && !b ? -1 : !a && b ? 1 : compare(a,b));
+      const typeCount = entries.filter(([type]) => Boolean(type)).length;
+      const content = entries.map(([type, typeRows]) => {
+        if (!type) return productRows(typeRows);
+        const typeSection = catalogDisclosure(type, productRows(typeRows), true, typeRows.length);
+        return typeCount === 1
+          ? typeSection.replace('<details>', '<details open>') : typeSection;
+      }).join('');
+      const categorySection = catalogDisclosure(category, content, false, rows.length);
+      return categoryCount === 1
+        ? categorySection.replace('<details>', '<details open>') : categorySection;
     }).join('') + '</div>';
 }
 
