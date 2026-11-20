@@ -11,7 +11,7 @@ import { loadBusinessState } from '../runtime/business-state.js';
 import { getInventoryItem, getInventoryMovements } from './data.js';
 import { inventoryCriterionGroups } from './classification.js';
 import { inventoryLocations, itemLocationBalance, storageName,
-  openInventoryStockTargets, inventoryDisplayBalance, INVENTORY_TOTAL_SCOPE } from './stock-targets.js';
+  inventoryDisplayBalance, INVENTORY_TOTAL_SCOPE } from './stock-targets.js';
 import {
   archiveInventorySupplierOffer, createInventorySupplierOffer, setInventoryPrimarySupplierOffer,
   updateInventoryItem, updateInventorySupplierOffer,
@@ -497,11 +497,7 @@ export function openInventoryProductOverview(itemId, { edit = () => {}, onChange
         v: { data: 'data-inventory-product-menu', aria: 'Действия с товаром' },
       }),
       productCard(item, stockScope),
-      v2Section('Остатки', locationOverview(item) +
-        '<div class="profile-actions">' + button('Настроить', {
-          variant: 'secondary', data: 'data-inventory-product-targets',
-          aria: 'Настроить желаемые остатки по складам',
-        }) + '</div>'),
+      v2Section('Остатки', locationOverview(item)),
       supplierRows(item),
     ]);
     host.querySelector('[data-inventory-product-card]')?.addEventListener('click', () => {
@@ -510,9 +506,7 @@ export function openInventoryProductOverview(itemId, { edit = () => {}, onChange
         onChanged();
       });
     });
-    host.querySelector('[data-inventory-product-targets]')?.addEventListener('click', () => {
-      openInventoryStockTargets(itemId, () => { render(); onChanged(); });
-    });
+
     host.querySelector('[data-inventory-supplier-add]')?.addEventListener('click', async () => {
       const { openSupplierAssociation } = await import('./counterparties.js');
       openSupplierAssociation(itemId, () => { render(); onChanged(); });
