@@ -46,7 +46,8 @@ import { classificationOptions, openInventoryClassificationGroups,
   inventoryCriterionGroups, criterionOptions } from './classification.js';
 import { openInventoryStorageLocations, reconcileLegacyInventoryStorage } from './storage.js';
 import { openInventoryTransfer } from './movement-transfer.js';
-import { renderStockBrandList, buildStockCatalogGroups } from './stock-catalog.js';
+import { renderStockBrandList, buildStockCatalogGroups, stockRootCriterion, stockNestedCriteria } from './stock-catalog.js';
+import { stockGroupTree, sortedStockChildren } from './grouping.js';
 import { catalogDisclosure } from './catalog-ui.js';
 import { INVENTORY_TOTAL_SCOPE, inventoryDisplayBalance, inventoryDisplayTarget,
   inventoryItemBelongsToStorage, itemLocationBalance, inventoryLocations,
@@ -1742,15 +1743,10 @@ function stockListMarkup(manufacturer, query = '', rowsProvider = null, expanded
       list({className:'ui-list--dense',items:[itemRow(item)]}) +
     '</div>'
   ).join('');
-  const criteria = inventoryCriterionGroups();
-  const categoryCriterion = criteria.find(entry => entry.legacyField === 'category');
-  const byCategory = Boolean(categoryCriterion);
-  const byType = criteria.some(entry => entry.legacyField === 'productType');
-  if (!byCategory && !byType) return itemList(items);
-
-  // A classification only creates a disclosure when the value is assigned.
-  // A sole named category or type starts open, while multiple peer groups
-  // start collapsed. Explicit user toggles survive re-rendering and search.
+  const nestedCriteria = stockNestedCriteria(inventoryCriterionGroups());
+  const tree = stockGroupTree(items, nestedCriteria);
+  // The shared disclosure owns the appearance; only a named value becomes
+  // a folder. An empty assignment skips that level altogether.
   const disclosure = (label, content, key, nested = false, reorderId = '', rows = [], autoOpen = false) =>
     catalogDisclosure(label, content, nested, rows.length,
       compactCheck({
@@ -1760,46 +1756,22 @@ function stockListMarkup(manufacturer, query = '', rowsProvider = null, expanded
       }), reorderId).replace('<details>',
       '<details data-stock-disclosure="' + escapeHtml(key) + '"' +
       (needle || (expanded.has(key) ? expanded.get(key) : autoOpen) ? ' open' : '') + '>');
-  const categories = new Map();
-  for (const item of items) {
-    const category = byCategory ? String(item.category || '').trim() : '';
-    const type = byType ? String(item.productType || '').trim() : '';
-    if (!categories.has(category)) categories.set(category,new Map());
-    const types=categories.get(category);
-    if (!types.has(type)) types.set(type,[]);
-    types.get(type).push(item);
-  }
-  // Named categories appear first. Items with no category belong directly
-  // to the manufacturer and follow the category sections, with no folder.
-  // Position still orders individual items inside their section.
-  const order = new Map((categoryCriterion?.values || []).map((v,i)=>[v.name,i]));
-  const ids = new Map((categoryCriterion?.values || []).map(v=>[v.name,v.id]));
-  const grouped = [...categories.entries()].sort(([a],[b])=>
-    (a && !b ? -1 : !a && b ? 1 : 0)
-    || (order.get(a) ?? Number.MAX_SAFE_INTEGER) -
-      (order.get(b) ?? Number.MAX_SAFE_INTEGER)
-    || a.localeCompare(b,'ru',{numeric:true,sensitivity:'base'}));
-  // A direct (unclassified) row is another visible sibling. A named group
-  // opens by default only when it is the sole section at its level.
-  const soleCategory = grouped.length === 1 && Boolean(grouped[0][0]);
-  const content = grouped.map(([category,types])=>{
-    const categoryRows = [...types.values()].flat();
-    const entries = [...types.entries()].sort(([a],[b])=>
-      a && !b ? -1 : !a && b ? 1 : 0);
-    const soleType = entries.length === 1 && Boolean(entries[0][0]);
-    // Type still groups products even when no category was assigned.
-    // No category/type creates no disclosure; only real labels do.
-    const typeContent = entries.map(([type,rows])=>
-      byType && type
-        ? disclosure(type,itemList(rows),'t:'+category+'::'+type,true,'',rows,soleType)
-        : itemList(rows)).join('');
-    if (!byCategory || !category) return typeContent;
-    const reorderId=allowCategoryReorder ? ids.get(category) || '' : '';
-    return disclosure(category,typeContent,'c:'+category,false,reorderId,categoryRows,soleCategory);
-  }).join('');
-  return byCategory
-    ? '<div class="list-entries inventory-stock-category-sequence">' + content + '</div>'
-    : content;
+  const render = (node, depth = 0) => {
+    const children = sortedStockChildren(node, nestedCriteria);
+    // Direct products count as a visible sibling. A group with an ungrouped
+    // product beside it starts collapsed, while the direct product stays open.
+    const sole = children.length === 1 && node.direct.length === 0;
+    const folders = children.map(child => {
+      const id = child.group.values?.find(value =>
+        value.id === child.valueId || value.name === child.value)?.id || '';
+      const reorderId = allowCategoryReorder && depth === 0 ? id : '';
+      return disclosure(child.value, render(child, depth + 1),child.key,
+        depth > 0, reorderId, child.items, sole);
+    }).join('');
+    return folders + itemList(node.direct);
+  };
+  return '<div class="list-entries inventory-stock-category-sequence">' +
+    render(tree) + '</div>';
 }
 
 function stockSortOptions(level) {
@@ -2088,13 +2060,14 @@ function openManufacturerStock(root, manufacturer, groupContext = null) {
     disposeCategoryReorder();
     const query = searchInput?.value || '';
     const criteria = inventoryCriterionGroups();
-    const categoryCriterion = criteria.find(group=>group.legacyField==='category');
-    const categories = new Set((rowsProvider?.() ||
-      getInventoryItems().filter(item=>manufacturerName(item)===manufacturer))
-      .map(item=>String(item.category||'').trim()).filter(Boolean));
+    const nestedCriteria = stockNestedCriteria(criteria);
+    const allRows = rowsProvider?.() || getInventoryItems().filter(item=>manufacturerName(item)===manufacturer);
+    const topNodes = sortedStockChildren(stockGroupTree(allRows,nestedCriteria),nestedCriteria);
+    const reorderGroup = topNodes.length > 1 &&
+      topNodes.every(node=>node.group.id===topNodes[0].group.id)
+      ? topNodes[0].group : null;
     const allowCategoryReorder = !query.trim() && !hasStockFilters(STOCK_VIEW.itemsFilters)
-      && STOCK_VIEW.itemsSort==='position-asc'
-      && categoryCriterion?.values?.filter(value=>categories.has(value.name)).length>1;
+      && STOCK_VIEW.itemsSort==='position-asc' && Boolean(reorderGroup);
     if (listHost) listHost.innerHTML = stockListMarkup(
       manufacturer, query, rowsProvider, expandedStockGroups, selectedStockItems,
       allowCategoryReorder);
@@ -2126,7 +2099,7 @@ function openManufacturerStock(root, manufacturer, groupContext = null) {
         onReorder:async draggedIds=>{
           // The view may hide categories belonging to other manufacturers.
           // Persist the COMPLETE catalog sequence with hidden IDs unchanged.
-          const group=inventoryCriterionGroups().find(entry=>entry.id===categoryCriterion.id);
+          const group=inventoryCriterionGroups().find(entry=>entry.id===reorderGroup.id);
           if (!group) throw new Error('Группа категорий изменилась. Откройте список заново.');
           const all=group.values.map(entry=>entry.id);
           const visible=new Set(draggedIds);
@@ -3325,7 +3298,7 @@ function renderStock(root) {
     disposeBrandReorder();
     const locationId=STOCK_VIEW.storageScope;
     const criteria=inventoryCriterionGroups();
-    const first=criteria[0];
+    const first=stockRootCriterion(criteria);
     disposeBrandReorder=renderStockBrandList(listHost,visibleRows(),{
       scope:locationId,
       itemsForView:visibleRows,
