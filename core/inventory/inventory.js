@@ -2802,130 +2802,69 @@ async function applyInventoryAuditDataChanges(layer, { items, definition, perIte
     onProgress(0, changes.length);
     try {
       if (clearingPositions) {
-        // Clearing a position means a real move to the end, with a positive
-        // saved rank. Prefer one atomic full-company reorder when every row
-        // already has a number; legacy unnumbered rows use verified PUTs.
-        const groups = new Map();
-        for (const entry of changes) {
-          const manufacturer=String(getInventoryItem(entry.itemId)?.manufacturer || '');
-          if (!groups.has(manufacturer)) groups.set(manufacturer,[]);
-          groups.get(manufacturer).push(entry);
-        }
-        let completed=0;
-        let stopped=false;
-        for (const [manufacturer,entries] of groups) {
-          const plan=planInventoryMoveToEnd(getInventoryItems(),manufacturer,
-            entries.map(entry=>entry.itemId));
-          if (plan) {
-            try {
-              await reorderInventoryItems(plan.manufacturer,plan.itemIds);
-            } catch(error) {
-              const reason=error instanceof Error ? error.message : 'Ошибка перестановки';
-              entries.forEach(entry=>failed.set(entry.itemId,reason));
-              if (error?.name==='AbortError') stopped=true;
-            }
-            completed+=entries.length;
-            onProgress(completed,changes.length);
-            if (stopped) break;
-          } else {
-            // Do not send zero even when a legacy product had no rank.
-            for (const entry of entries) {
-              const now=getInventoryItem(entry.itemId);
-              if (!now) {
-                failed.set(entry.itemId,'Товар не найден в обновлённом списке.');
-                continue;
-              }
-              const position=inventoryEndPosition(getInventoryItems(),manufacturer,entry.itemId);
-              try {
-                if (Number(now.position)!==position)
-                  await updateInventoryItem(entry.itemId,{position});
-              } catch(error) {
-                failed.set(entry.itemId,error instanceof Error ? error.message : 'Ошибка перемещения');
-                if (error?.name==='AbortError') { stopped=true; break; }
-              }
-              completed++;
-              onProgress(completed,changes.length);
-            }
-            if (stopped) break;
-          }
-          // Verify not just a positive number but the requested end order.
-          const current=getInventoryItems().filter(item=>String(item.manufacturer || '')===manufacturer)
-            .filter(item=>Number(item.position)>0)
-            .sort((a,b)=>Number(a.position)-Number(b.position));
-          const suffix=current.slice(-entries.length).map(item=>String(item.itemId));
-          if (suffix.some((id,index)=>id!==String(entries[index].itemId)))
-            entries.forEach(entry=>failed.set(entry.itemId,'Перемещение в конец не подтверждено.'));
-        }
-        if (stopped) {
-          try { await loadInventory(); } catch {}
-        }
-      } else if (definition.value === 'position') {
-        // Use Core's existing ATOMIC full-manufacturer reorder when all
-        // requested destinations are already numbered slots. It can move
-        // 1 or 20 individually edited rows in a single confirmed write,
-        // including swaps and non-adjacent moves without overwriting earlier
-        // selections. Previously separate PUTs shifted one another.
+        // Empty rank means moving the selected items to the end of their
+        // manufacturer, in one atomic company reorder. No product receives 0.
         const groups = new Map();
         for (const entry of changes) {
           if (!groups.has(entry.manufacturer)) groups.set(entry.manufacturer, []);
           groups.get(entry.manufacturer).push(entry);
         }
+        const plans = [...groups].map(([manufacturer, entries]) => ({
+          entries,
+          plan: planInventoryMoveToEnd(getInventoryItems(),manufacturer,
+            entries.map(entry=>entry.itemId)),
+        }));
+        if (plans.some(({plan})=>!plan))
+          throw new Error('Невозможно построить перестановку. Обновите склад.');
         let completed = 0;
-        let timedOut = false;
-        for (const entries of groups.values()) {
-          const assignments = entries.map(entry => ({
-            itemId:entry.itemId, value:entry.value,
-            manufacturer:String(getInventoryItem(entry.itemId)?.manufacturer || ''),
-          }));
-          const plan = planInventoryPositionReorder(getInventoryItems(),assignments);
-          if (plan) {
-            status.textContent = 'Перестановка: ' + entries.length + ' поз.';
-            try {
-              await reorderInventoryItems(plan.manufacturer,plan.itemIds);
-            } catch (error) {
-              const reason = error instanceof Error ? error.message : 'Ошибка перестановки';
-              entries.forEach(entry=>failed.set(entry.itemId,reason));
-              if (error?.name === 'AbortError') timedOut = true;
-            }
-            completed += entries.length;
-            onProgress(completed,changes.length);
-            if (timedOut) break;
-            continue;
-          }
-          // Missing slot or initially unnumbered item: the existing Core
-          // single-item endpoint owns insertion and shifts. Its response
-          // verifies the exact resulting number; never send position via the
-          // generic bulk-update endpoint (which does not support the field).
-          for (const entry of [...entries].sort((a,b)=>a.value-b.value)) {
-            status.textContent = `Порядок: ${completed} из ${changes.length} · ${entry.name}`;
-            try {
-              await updateInventoryItem(entry.itemId,
-                inventoryAuditDataPayload(definition,entry.value,getInventoryItem(entry.itemId)));
-            } catch (error) {
-              const timeout = error?.name === 'AbortError';
-              failed.set(entry.itemId,timeout
-                ? 'Сервер не ответил. Проверьте сохранённые номера.'
-                : error instanceof Error ? error.message : 'Ошибка сохранения');
-              if (timeout) { timedOut = true; break; }
-            }
-            completed++;
-            onProgress(completed,changes.length);
-          }
-          if (timedOut) break;
-        }
-        if (timedOut) {
+        for (const {entries,plan} of plans) {
           try {
-            await loadInventory();
-            for (const entry of changes) {
-              if (inventoryAuditValueMatches(getInventoryItem(entry.itemId),
-                definition,entry.value)) failed.delete(entry.itemId);
-            }
-          } catch {
-            // Preserve the visible timeout and entered numbers for safe retry.
+            await reorderInventoryItems(plan.manufacturer,plan.itemIds);
+            const current = getInventoryItems().filter(item =>
+              String(item.manufacturer || '') === plan.manufacturer)
+              .sort(inventoryPositionComparator);
+            const suffix = current.slice(-entries.length).map(item=>String(item.itemId));
+            if (suffix.some((id,index)=>id!==String(entries[index].itemId)
+              || Number(current[current.length-entries.length+index]?.position) < 1))
+              throw new Error('Перемещение в конец не подтверждено сервером.');
+          } catch (error) {
+            const reason = error instanceof Error ? error.message : 'Ошибка перестановки';
+            entries.forEach(entry=>failed.set(entry.itemId,reason));
+            break;
           }
+          completed += entries.length;
+          onProgress(completed,changes.length);
         }
-        // Successful reorder and single-item writes both refresh the canonical
-        // inventory snapshot. Validate every requested target before success.
+      } else if (definition.value === 'position') {
+        // Prepare ALL final destinations before the first write. One scoped
+        // reorder per manufacturer prevents successive edits from undoing
+        // each other (including swaps, 20-row moves, and legacy blanks).
+        const groups = new Map();
+        for (const entry of changes) {
+          if (!groups.has(entry.manufacturer)) groups.set(entry.manufacturer, []);
+          groups.get(entry.manufacturer).push(entry);
+        }
+        const plans = [...groups.values()].map(entries => ({
+          entries,
+          plan:planInventoryPositionReorder(getInventoryItems(),entries.map(entry=>({
+            itemId:entry.itemId,manufacturer:entry.manufacturer,value:entry.value,
+          }))),
+        }));
+        if (plans.some(({plan})=>!plan))
+          throw new Error('Проверьте номера: они должны быть в пределах списка ' +
+            'производителя и не повторяться. Изменения не применены.');
+        let completed = 0;
+        for (const {entries,plan} of plans) {
+          try {
+            await reorderInventoryItems(plan.manufacturer,plan.itemIds);
+          } catch (error) {
+            const reason = error instanceof Error ? error.message : 'Ошибка перестановки';
+            entries.forEach(entry=>failed.set(entry.itemId,reason));
+            break;
+          }
+          completed += entries.length;
+          onProgress(completed,changes.length);
+        }
       } else {
         // Canonical Core batch update keeps every selected item in one
         // transaction per 100 entries. Only one inventory read verifies the
