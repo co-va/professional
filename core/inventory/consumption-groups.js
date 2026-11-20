@@ -61,9 +61,6 @@ function openGroupItemPicker(draft, onApply) {
       '<p class="ui-list__secondary" data-consumption-picker-status></p>',
       '<div data-consumption-picker-brand-list></div>',
       '<div data-consumption-picker-items hidden>',
-        '<div class="app-settings-panel">' +
-          button('Производители', { variant:'secondary', data:'data-consumption-picker-back' }) +
-        '</div>',
         '<div class="ui-search-field">' +
           field({ name:'consumptionItemSearch',type:'search',
             placeholder:'Название, артикул, категория…' }) +
@@ -83,6 +80,8 @@ function openGroupItemPicker(draft, onApply) {
   const search = layer.querySelector('[name="consumptionItemSearch"]');
   const status = layer.querySelector('[data-consumption-picker-status]');
   const apply = layer.querySelector('[data-consumption-picker-apply]');
+  const actions = apply?.closest('.modal-actions');
+  const title = layer.querySelector('.v2-q-title');
   const checked = new Set(draft.itemIds);
   const initial = new Set(draft.itemIds);
   let brand = null;
@@ -92,8 +91,9 @@ function openGroupItemPicker(draft, onApply) {
   const sync = () => {
     const changes = checked.size !== initial.size ||
       [...checked].some(id => !initial.has(id));
-    apply.hidden = !changes;
-    status.textContent = 'Выбрано: ' + checked.size;
+    if (actions) actions.hidden = !changes;
+    status.textContent = checked.size ? 'Выбрано: ' + checked.size : '';
+    status.hidden = checked.size === 0;
   };
   const renderBrandItems = () => {
     if (!brand) return;
@@ -126,20 +126,26 @@ function openGroupItemPicker(draft, onApply) {
     choice.dispatchEvent(new Event('change', { bubbles:true }));
   });
   search.addEventListener('input', renderBrandItems);
-  layer.querySelector('[data-consumption-picker-back]')?.addEventListener('click', () => {
-    // Preserve checked products while moving between manufacturers.
+  // The existing Q back arrow navigates to the manufacturer list first.
+  // No oversized "Производители" button or competing navigation controls.
+  layer.addEventListener('click', event => {
+    if (!brand || !event.target.closest('[data-modal-close]')) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
     showBrands();
-  });
+  }, true);
 
   // Groups are discovered first, precisely as in Stock Z1.
   const showBrands = () => {
     brand = null;
+    if (title) title.textContent = 'Складские позиции';
     itemSection.hidden = true;
     brandHost.hidden = false;
     renderStockBrandList(brandHost, allItems, {
       criteria,
       onBrandOpen: next => {
         brand = next;
+        if (title) title.textContent = next.name;
         brandHost.hidden = true;
         itemSection.hidden = false;
         search.value = '';
@@ -150,7 +156,7 @@ function openGroupItemPicker(draft, onApply) {
   };
 
   layer.querySelector('[data-consumption-picker-apply]')?.addEventListener('click', () => {
-    if (apply.hidden) return;
+    if (actions?.hidden) return;
     const ordered = allItems.filter(item => checked.has(String(item.itemId))).map(item => String(item.itemId));
     // Retain selections for archived / temporarily unavailable positions.
     const retained = draft.itemIds.filter(id => checked.has(id) && !ordered.includes(id));
@@ -172,7 +178,7 @@ function openGroupItemPicker(draft, onApply) {
     }
   };
   status.textContent = 'Загружаем склад…';
-  apply.hidden = true;
+  if (actions) actions.hidden = true;
   void load();
   return layer;
 }
@@ -182,17 +188,20 @@ function openGroupEditor(current, onSaved) {
   const panel = [
     '<div class="compact-form" data-consumption-group-form>',
       field({ label:'Название', name:'consumptionGroupName',value:draft.name,
-        placeholder:'Например, Шампунь',required:true }),
+        placeholder:'Название группы',required:true }),
       select({ label:'Единица расхода', name:'consumptionGroupUnit', value:draft.unit,
         options:UNIT_OPTIONS }),
       '<div class="inventory-consumption-group-items">',
-        '<strong>Складские позиции</strong>',
+        '<div class="ui-list__item">',
+          '<strong class="ui-list__title">Складские позиции</strong>',
+          compactButton({ kind:'add', data:'data-consumption-group-pick',
+            aria:'Выбрать складские позиции' }),
+        '</div>',
         '<div data-consumption-group-selected></div>',
       '</div>',
-      button('Добавить позиции', { data:'data-consumption-group-pick' }),
       '<div class="form-error" role="alert" data-consumption-group-error></div>',
     '</div>',
-    actionBlock(button('Сохранить', { data:'data-consumption-group-save' })),
+    actionBlock(button('Применить', { data:'data-consumption-group-save' })),
   ].join('');
   const layer = mountModal(document.body, modal(panel, {
     title:current?.name || 'Новая группа расхода', variant:'q',
@@ -203,6 +212,19 @@ function openGroupEditor(current, onSaved) {
   const unit = layer.querySelector('[name="consumptionGroupUnit"]');
   const selected = layer.querySelector('[data-consumption-group-selected]');
   const save = layer.querySelector('[data-consumption-group-save]');
+  const actions = save?.closest('.modal-actions');
+  const initialName = draft.name;
+  const initialUnit = draft.unit;
+  const initialIds = new Set(draft.itemIds);
+  const syncSave = () => {
+    const changed = text(name.value) !== initialName ||
+      text(unit.value) !== initialUnit ||
+      draft.itemIds.length !== initialIds.size ||
+      draft.itemIds.some(id => !initialIds.has(id));
+    if (actions) actions.hidden = !changed;
+  };
+  name.addEventListener('input', syncSave);
+  unit.addEventListener('change', syncSave);
   const errorNode = layer.querySelector('[data-consumption-group-error]');
   const options = () => new Map(getInventoryItems().map(item => [String(item.itemId), item]));
 
@@ -218,7 +240,8 @@ function openGroupEditor(current, onSaved) {
             escapeHtml(id) + '"', aria:'Убрать ' + label }) +
         '</div>';
       }).join('') + '</div>'
-      : emptyState('Позиции не выбраны','Добавьте позиции из склада.');
+      : '<p class="ui-list__secondary">Не выбраны</p>';
+    syncSave();
   };
   selected.addEventListener('click', event => {
     const target = event.target.closest('[data-consumption-group-remove]');
