@@ -64,7 +64,7 @@ assert.deepEqual(planInventoryMoveToEnd(company,'CHI',['b']).itemIds,['a','c','d
 assert.deepEqual(planInventoryMoveToEnd(company,'CHI',['b','d']).itemIds,['a','c','b','d']);
 assert.deepEqual(planInventoryMoveToEnd(company,'CHI',['d','b']).itemIds,['a','c','b','d'],
   'Moving several items to the end preserves their prior order, not checkbox order');
-assert.match(service, /Number\(item\.position\) !== index \+ 1/,
+assert.match(service, /Number\(item\.position\) !== index\s*\+\s*1/,
   'Reorder rejects any zero, duplicate or gapped Core response');
 assert.deepEqual(planInventoryPositionReorder(company,[
   {itemId:'b',manufacturer:'CHI',value:4},
