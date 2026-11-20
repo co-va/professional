@@ -2843,6 +2843,7 @@ function openStockCreateOptions(root, onChanged, defaults = {}) {
     actionBlock(
       button('+ Позиция', { data: 'data-stock-create-manual' }) +
       button('Из прайса', { variant: 'secondary', data: 'data-stock-create-supplier' }),
+      { className: 'stock-create-actions' },
     ),
     { title: 'Добавить', variant: 'x', xRole: 'action', surface: 'app' },
   ));
