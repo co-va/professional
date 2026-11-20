@@ -124,16 +124,15 @@ function openConsumablePicker(selected, onPick) {
 }
 
 export async function openProcedureConsumables(procedureId, onSaved = () => {}) {
-  try { await loadInventory({ preferRecent: true }); }
-  catch (error) {
-    openNotice({ title: 'Расходник',
-      message: error instanceof Error ? error.message : 'Не удалось открыть склад.' });
-    return null;
-  }
+  // Open Q before refreshing stock. Existing consumables remain editable.
   const current = getProcedures().find(item => String(item.id) === String(procedureId));
   if (!current) return openNotice({ title: 'Расходник', message: 'Услуга не найдена.' });
   let rows = normalizeProcedureConsumables(current.consumables);
-  const initial = JSON.stringify(rows);
+  const signature = value => {
+    try { return JSON.stringify(normalizeProcedureConsumables(value)); }
+    catch { return JSON.stringify(value); }
+  };
+  const initial = signature(rows);
   const panel = '<div data-procedure-consumable-items></div>' +
     '<p class="ui-list__secondary" data-procedure-consumable-cost></p>' +
     '<div class="app-settings-panel">' +
@@ -153,7 +152,7 @@ export async function openProcedureConsumables(procedureId, onSaved = () => {}) 
   let saving = false;
   const sync = () => {
     if (costNode) costNode.textContent = costSummaryText(rows, getInventoryItems());
-    setSharedActionVisible(actions, JSON.stringify(rows) !== initial);
+    setSharedActionVisible(actions, signature(rows) !== initial);
     if (save) save.disabled = saving;
   };
   const render = () => {
@@ -196,7 +195,14 @@ export async function openProcedureConsumables(procedureId, onSaved = () => {}) 
     rows.splice(index, 1);
     render();
   });
-  layer.querySelector('[data-procedure-consumable-add]')?.addEventListener('click', () => {
+  layer.querySelector('[data-procedure-consumable-add]')?.addEventListener('click', async () => {
+    try { await inventoryLoad; }
+    catch (error) {
+      openNotice({ title: 'Расходник',
+        message: error instanceof Error ? error.message : 'Не удалось открыть склад.' });
+      return;
+    }
+    if (!layer.isConnected) return;
     openConsumablePicker(new Set(rows.map(row => String(row.itemId))), item => {
       rows.push(item);
       render();
@@ -224,5 +230,13 @@ export async function openProcedureConsumables(procedureId, onSaved = () => {}) 
     }
   });
   render();
+  const inventoryLoad = loadInventory({ preferRecent: true }).then(() => {
+    if (!layer.isConnected) return;
+    // Preserve focus when a stock snapshot arrives while quantity is edited.
+    if (host.contains(document.activeElement)) sync();
+    else render();
+  });
+  // Only opening the product picker requires a successful stock refresh.
+  void inventoryLoad.catch(() => {});
   return layer;
 }
