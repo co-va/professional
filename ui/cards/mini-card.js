@@ -146,6 +146,7 @@ export function miniCard({
   initials = '',
   surface = 'default',
   actionLabel = '',
+  placeholderLabel = '',
   compactAction = null,
   recordLayout = null,
   interactive = false,
@@ -155,6 +156,21 @@ export function miniCard({
 } = {}) {
   if (recordLayout && typeof recordLayout === 'object') {
     return recordMarkup(recordLayout, { className, aria, interactive, data });
+  }
+  // An unfilled mini-card is a single action surface, not an empty data
+  // card with its header, divider and unused content rows.
+  if (placeholderLabel) {
+    const tag = interactive ? 'button' : 'section';
+    const attributes = interactive
+      ? ' type="button"' + attrs(data, aria || placeholderLabel)
+      : ' aria-label="' + escapeHtml(aria || placeholderLabel) + '"';
+    return '<' + tag + ' class="mini-card mini-card--placeholder' +
+      (interactive ? ' mini-card--interactive' : '') +
+      (className ? ' ' + escapeHtml(className) : '') +
+      '"' + attributes + '>' +
+      '<strong class="mini-card__placeholder-plus" aria-hidden="true">+</strong>' +
+      '<span class="mini-card__placeholder-label">' + escapeHtml(placeholderLabel) + '</span>' +
+      '</' + tag + '>';
   }
   const resolvedCompactAction = compactAction && typeof compactAction === 'object'
     ? compactAction
