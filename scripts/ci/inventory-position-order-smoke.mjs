@@ -108,4 +108,47 @@ assert.doesNotMatch(source, /await clearInventoryItemPositions\(/,
   'A clear action must never persist zero through the old endpoint');
 assert.match(source, /'В конец'/, 'The action is labelled as movement, not number deletion');
 
+
+// Run the actual Professional HTTP adapter with an isolated fake Core response:
+// an entire cross-manufacturer batch is ONE request, and an invalid rank
+// anywhere rejects the returned state.
+const batchStart=service.indexOf('export async function reorderInventoryItemsBatch(');
+const batchEnd=service.indexOf('// All item validations remain on Core.',batchStart);
+assert.ok(batchStart>0 && batchEnd>batchStart,'Canonical atomic adapter is available');
+const rawBatch=service.slice(batchStart,batchEnd).replaceAll('export async ','async ');
+const original=[
+  {itemId:'c1',manufacturer:'CHI',position:1},
+  {itemId:'c2',manufacturer:'CHI',position:2},
+  {itemId:'w1',manufacturer:'Wella',position:1},
+  {itemId:'w2',manufacturer:'Wella',position:2},
+];
+const reordered=[
+  {itemId:'c2',manufacturer:'CHI',position:1},
+  {itemId:'c1',manufacturer:'CHI',position:2},
+  {itemId:'w2',manufacturer:'Wella',position:1},
+  {itemId:'w1',manufacturer:'Wella',position:2},
+];
+const requests=[];
+let responseRows=reordered;
+const reorderBatch=new Function('getInventoryItem','inventoryRequest','SERVER_ORDER_UNAVAILABLE',
+  rawBatch+'\\nreturn reorderInventoryItemsBatch;')(
+  id=>original.find(row=>row.itemId===id),
+  async (path,options)=>{
+    requests.push({path,payload:JSON.parse(options.body)});
+    options.verifySnapshot({items:responseRows});
+    return responseRows;
+  },'Нет новой операции на сервере');
+const plans=[
+  {manufacturer:'CHI',itemIds:['c2','c1']},
+  {manufacturer:'Wella',itemIds:['w2','w1']},
+];
+await reorderBatch(plans);
+assert.equal(requests.length,1,'Both manufacturers are saved by one HTTP request');
+assert.equal(requests[0].path,'/items/reorder');
+assert.deepEqual(requests[0].payload.reorders[1].previousPositions,[2,1],
+  'Core receives correct original ranks for optimistic locking');
+responseRows=reordered.map(row=>row.itemId==='w1'?{...row,position:3}:row);
+await assert.rejects(()=>reorderBatch(plans),/не подтвердил непрерывный порядок/,
+  'A gapped rank in either manufacturer must be refused');
+
 console.log('PASS: manufacturer-local numbering, grouped stock and verified reorder/append');
