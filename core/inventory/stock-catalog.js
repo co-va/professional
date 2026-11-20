@@ -4,6 +4,7 @@ import {
 } from '../../ui/ui.js';
 import { compactCheck } from '../../ui/selection/check-list.js';
 import { catalogDisclosure } from './catalog-ui.js';
+import { stockGroupTree, sortedStockChildren, stockGroupValue } from './grouping.js';
 import { escapeHtml } from '../../ui/utils/escape-html.js';
 import { getInventoryItems } from './data.js';
 import {
@@ -16,44 +17,28 @@ const baseCriteria = [
   {id:'category',name:'Категория',legacyField:'category'},
   {id:'productType',name:'Тип',legacyField:'productType'},
 ];
-const groupValue = (item, group) => {
-  const field=group?.legacyField;
-  if(field) return name(item[field]);
-  const valueId=name(item.criteriaValues?.[group.id]);
-  return group.values?.find(value=>value.id===valueId)?.name || '';
-};
-const brandOf = (item,criterion=baseCriteria[0]) =>
-  groupValue(item,criterion) || 'Без ' + String(criterion.name||'группы').toLocaleLowerCase('ru-RU');
 const compare = (a,b) => String(a).localeCompare(String(b),'ru',{numeric:true,sensitivity:'base'});
 const quantity = value => Number(value || 0).toLocaleString('ru-RU',{
   maximumFractionDigits:3,
 }).replaceAll('\u00a0',' ');
 
-function hierarchyOf(item, criteria, root) {
-  // Only original Category and Type are navigation levels by default.
-  // User-created criteria never add compulsory extra accordion levels.
-  const fields=criteria.filter(group=>group.id!==root.id
-    && (group.legacyField==='category'||group.legacyField==='productType'));
-  const names=fields.map(group=>groupValue(item,group)).filter(Boolean);
-  return names.filter((value,index)=>!index||value!==names[index-1]);
+export function stockRootCriterion(criteria = []) {
+  // Manufacturer is the platform-owned, permanently first grouping level.
+  return criteria.find(group => group.legacyField === 'manufacturer' || group.id === 'manufacturer')
+    || baseCriteria[0];
+}
+export function stockNestedCriteria(criteria = []) {
+  return criteria.filter(group => group.id !== stockRootCriterion(criteria).id);
 }
 
 export function buildStockCatalogGroups(items = [], configured = null) {
-  const criteria=Array.isArray(configured)?configured:baseCriteria;
-  const root=criteria[0]||null;
-  const brands=new Map();
-  for(const item of items) {
-    const brand=root?brandOf(item,root):'Все товары';
-    if(!brands.has(brand)) brands.set(brand,{name:brand,items:[],children:new Map()});
-    const group=brands.get(brand);
-    group.items.push(item);
-    let node=group;
-    for(const part of (root?hierarchyOf(item,criteria,root):[])) {
-      if(!node.children.has(part))
-        node.children.set(part,{name:part,items:[],children:new Map()});
-      node=node.children.get(part);
-      node.items.push(item);
-    }
+  const criteria = Array.isArray(configured) ? configured : baseCriteria;
+  const root = stockRootCriterion(criteria);
+  const brands = new Map();
+  for (const item of items) {
+    const brand = stockGroupValue(item,root) || 'Без производителя';
+    if (!brands.has(brand)) brands.set(brand,{name:brand,items:[],children:new Map()});
+    brands.get(brand).items.push(item);
   }
   return [...brands.values()].sort((a,b)=>compare(a.name,b.name));
 }
@@ -83,41 +68,24 @@ function stockRow(item, selected, scope) {
 }
 
 /**
- * Visual sections only: category -> type -> visible item rows.
- * No disclosure state, extra category API, or change to persisted item data.
+ * Every assigned criterion forms one visible level in its configured order.
+ * Unassigned criteria form no folder. Direct items remain visible at the
+ * nearest actual parent; counts always include all descendants.
  */
-export function stockGroupedSections(items, selected = new Set(), scope = INVENTORY_TOTAL_SCOPE) {
-  const categories = new Map();
-  for (const item of items) {
-    const category = name(item.category);
-    const type = name(item.productType);
-    if (!categories.has(category)) categories.set(category, new Map());
-    const types = categories.get(category);
-    if (!types.has(type)) types.set(type, []);
-    types.get(type).push(item);
-  }
+export function stockGroupedSections(items, selected = new Set(), scope = INVENTORY_TOTAL_SCOPE, criteria = baseCriteria) {
+  const hierarchy = stockGroupTree(items,stockNestedCriteria(criteria));
   const productRows = rows => rows.map(item => stockRow(item, selected, scope)).join('');
-  const sections = [...categories.entries()].sort(([a],[b]) =>
-    a && !b ? -1 : !a && b ? 1 : compare(a,b));
-  const soleCategory = sections.length === 1 && Boolean(sections[0][0]);
+  const render = node => {
+    const children = sortedStockChildren(node,stockNestedCriteria(criteria));
+    const sole = children.length === 1 && node.direct.length === 0;
+    return children.map(child => {
+      const content = render(child);
+      const section = catalogDisclosure(child.value,content,Boolean(node.key),child.items.length);
+      return sole ? section.replace('<details>', '<details open>') : section;
+    }).join('') + productRows(node.direct);
+  };
   return '<div class="inventory-counterparty-product-list inventory-item-accordion">' +
-    sections.map(([category, types]) => {
-      const rows = [...types.values()].flat();
-      const entries = [...types.entries()].sort(([a],[b]) =>
-        a && !b ? -1 : !a && b ? 1 : compare(a,b));
-      const soleType = entries.length === 1 && Boolean(entries[0][0]);
-      const content = entries.map(([type, typeRows]) => {
-        if (!type) return productRows(typeRows);
-        const typeSection = catalogDisclosure(type, productRows(typeRows), true, typeRows.length);
-        return soleType
-          ? typeSection.replace('<details>', '<details open>') : typeSection;
-      }).join('');
-      // Missing category bypasses only that level; assigned types still group.
-      if (!category) return content;
-      const categorySection = catalogDisclosure(category, content, false, rows.length);
-      return soleCategory
-        ? categorySection.replace('<details>', '<details open>') : categorySection;
-    }).join('') + '</div>';
+    render(hierarchy) + '</div>';
 }
 
 export function openStockCatalogBrand(brand, options = {}) {
@@ -175,7 +143,7 @@ export function openStockCatalogBrand(brand, options = {}) {
           item.category,item.productType].some(value=>
           name(value).toLocaleLowerCase('ru-RU').includes(term))) : brand.items;
       products.innerHTML=items.length
-        ? stockGroupedSections(items,selected,scope)
+        ? stockGroupedSections(items,selected,scope,options.criteria||baseCriteria)
         : emptyState(term ? 'Товар не найден' : 'В этой группе пока нет товаров');
       products.querySelectorAll('[data-stock-item-check]').forEach(node=>{
         node.addEventListener('change',()=>{
