@@ -98,20 +98,17 @@ export async function repairInventoryPositions() {
 }
 
 export async function createInventoryItem(value = {}) {
-  // Any frontend creation route must assign a real position at the end.
-  // A deliberate positive insertion position is retained.
-  let position=value.position;
-  if (position == null || position === '' || Number(position) === 0) {
-    await loadInventory({preferRecent:true});
-    position=inventoryEndPosition(getInventoryItems(),String(value.manufacturer || ''));
-  }
-  if (!Number.isSafeInteger(Number(position)) || Number(position)<1
-    || Number(position)>2147483647)
+  // Core assigns the next position atomically. A user-entered insertion rank
+  // is still passed through; do not fetch the whole stock just to create a card.
+  const hasPosition = value.position != null && value.position !== '';
+  const position = hasPosition ? Number(value.position) : null;
+  if (hasPosition && (!Number.isSafeInteger(position) || position < 1
+    || position > 2147483647))
     throw new Error('Невозможно назначить положительный порядковый номер.');
   const previousIds = new Set(getInventoryItems().map(item => String(item.itemId)));
   return inventoryRequest('/items', {
     method: 'POST',
-    body: JSON.stringify({...value,position:Number(position)}),
+    body: JSON.stringify({...value, ...(hasPosition ? {position} : {})}),
     verifySnapshot:payload=>{
       if (!Array.isArray(payload?.items))
         throw new Error('Сервер не подтвердил создание товара.');
