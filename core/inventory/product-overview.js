@@ -119,8 +119,9 @@ function productCardFields(item, stockScope = INVENTORY_TOTAL_SCOPE) {
     offer.offerId && offer.offerId===item.primaryOfferId) || null;
   // The stock card shows the linked supplier's quote for this SKU as the
   // purchase cost of the catalog item; per-gram/unit costing is separate.
-  const purchasePrice=primary ? (candidatePrice(primary) ?? item.basePrice ?? item.referencePrice)
-    : (item.basePrice ?? item.referencePrice);
+  // Manual purchase price is independent of a linked supplier quote.
+  // If none was entered, show the actual linked supplier price for this SKU.
+  const purchasePrice=item.referencePrice ?? (primary ? candidatePrice(primary) : item.basePrice);
   const discount=primary?.discountPercent;
   const discountText=discount==null || discount==='' ? '' :
     num(Number(discount),2) + '%';
