@@ -477,7 +477,11 @@ export function openStockItemQEditor(itemId = '', defaults = {}, onSaved = () =>
           patch.saleMarkupValue = markup;
           patch.salePrice = optionalFinite(input('salePriceCalculated')?.value);
         }
-        if (saleNow !== initialChecks.sale || receiptNow !== originalReceipt) {
+        const saleEdited = markup !== optionalFinite(original.markup) || mode !== original.markupMode
+          || saleNow !== initialChecks.sale || receiptNow !== originalReceipt
+          || hasOwn(patch, 'referencePrice');
+        if (saleEdited && (item.saleUnit !== receiptNow || Number(item.saleQuantity) !== 1
+            || saleNow !== initialChecks.sale)) {
           patch.saleUnit = receiptNow;
           patch.saleQuantity = 1;
         }
