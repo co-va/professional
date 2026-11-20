@@ -3,7 +3,8 @@ import {
 } from '../../ui/ui.js';
 import { compactCheck } from '../../ui/selection/check-list.js';
 import { escapeHtml } from '../../ui/utils/escape-html.js';
-import { getInventoryItem, getInventoryItems } from './data.js';
+import { getInventoryItem, getInventoryItems, getInventorySnapshot } from './data.js';
+import { stockItemMetrics } from './stock-metrics.js';
 import { createInventoryItem, updateInventoryItem } from './service.js';
 import { inventoryCriterionGroups, criterionOptions } from './classification.js';
 import { stockNestedCriteria, stockRootCriterion } from './stock-catalog.js';
@@ -205,6 +206,22 @@ function numberField(label, name, value, unit = '', disabled = false) {
     '</div>';
 }
 
+function stockMetricField(label, name, value, unit) {
+  return '<div class="stock-position-number">' +
+    field({ label, name, value: value == null ? '—' :
+      Number(value).toLocaleString('ru-RU', { maximumFractionDigits: 3 }),
+      type: 'text', disabled: true }) +
+    '<span class="stock-position-unit">' + escapeHtml(unit) + '</span></div>';
+}
+
+// An operation owns the quantity and money; the position card only reads it.
+function stockMetricRow(key, label, metric, unit, moneyLabel = 'Стоимость') {
+  return '<div class="inventory-editor-row">' +
+    stockMetricField(label, key + 'Quantity', metric.quantity, unit) +
+    stockMetricField(moneyLabel, key + 'Amount', metric.amount, '₽') +
+    '</div>';
+}
+
 function supplierPurchase(item) {
   const linked = Boolean(item?.primaryOfferId);
   const priced = item?.basePriceSource === 'primary-offer' && item?.basePrice != null;
@@ -275,6 +292,7 @@ export function openStockItemQEditor(itemId = '', defaults = {}, onSaved = () =>
   const purchase = supplierPurchase(item);
   const count = packPieces(item);
   const contents = consumptionContents(item);
+  const accounting = stockItemMetrics(item, getInventorySnapshot());
   const allGroups = inventoryCriterionGroups();
   const root = stockRootCriterion(allGroups);
   const groups = stockNestedCriteria(allGroups);
@@ -336,6 +354,12 @@ export function openStockItemQEditor(itemId = '', defaults = {}, onSaved = () =>
       numberField('Критический остаток', 'minStock', original.minStock, stockUnit(item)) +
       numberField('Желаемый остаток', 'targetStock', original.targetStock, stockUnit(item)) +
     '</div></div>';
+  const accountingInfo = '<div class="inventory-editor-group">' +
+    stockMetricRow('receipt', 'Поступление', accounting.receipt, accounting.unit) +
+    stockMetricRow('consumption', 'Расход', accounting.consumption, accounting.unit) +
+    stockMetricRow('balance', 'Остаток', accounting.balance, accounting.unit) +
+    stockMetricRow('sale', 'Продажа', accounting.sale, accounting.unit, 'Выручка') +
+    '</div>';
   const position = '<div class="inventory-editor-group">' +
     field({ label: 'Короткое название', name: 'name', value: original.name,
       required: true, autocomplete: 'off' }) +
@@ -349,6 +373,7 @@ export function openStockItemQEditor(itemId = '', defaults = {}, onSaved = () =>
       panel('Расход', 'consume', consumption, { checked: original.consumeOn, info: true }) +
       panel('Продажа', 'sale', sale, { checked: original.saleOn, info: true }) +
       panel('Запас и контроль', 'stock', stock, { info: true }) +
+      panel('Учёт', 'accounting', accountingInfo) +
     '</div>' + actionBlock(button(creating ? 'Применить' : 'Сохранить',
       { data: 'data-stock-full-apply', type: 'submit' })) +
     '<p class="form-error" data-stock-position-error hidden role="alert"></p></form>';
