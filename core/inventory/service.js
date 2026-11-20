@@ -1,5 +1,6 @@
 import { apiRequest, getAuthToken } from '../auth.js';
 import { applyInventorySnapshot, applyInventoryPositionChanges, getInventoryItem, getInventoryItems, getInventoryCriteria, getInventorySnapshot, removeArchivedInventoryItems, setInventoryCriteriaCatalog } from './data.js';
+import { inventoryEndPosition } from './position-reorder-plan.js';
 
 const SERVER_ORDER_UNAVAILABLE = 'Сервер склада ещё не обновлён. Порядок не сохранён.';
 // Navigation can reuse an already confirmed stock read briefly. Mutation
@@ -75,9 +76,26 @@ export async function loadInventory({ preferRecent = false } = {}) {
 }
 
 export async function createInventoryItem(value = {}) {
+  // Any frontend creation route must assign a real position at the end.
+  // A deliberate positive insertion position is retained.
+  let position=value.position;
+  if (position == null || position === '' || Number(position) === 0) {
+    await loadInventory({preferRecent:true});
+    position=inventoryEndPosition(getInventoryItems(),String(value.manufacturer || ''));
+  }
+  if (!Number.isSafeInteger(Number(position)) || Number(position)<1
+    || Number(position)>2147483647)
+    throw new Error('Невозможно назначить положительный порядковый номер.');
   return inventoryRequest('/items', {
     method: 'POST',
-    body: JSON.stringify(value),
+    body: JSON.stringify({...value,position:Number(position)}),
+    verifySnapshot:payload=>{
+      const saved=snapshotItem(payload,value.itemId || '');
+      // Core may generate the ID. At minimum reject a successful response
+      // that still contains a zero-numbered product with the supplied ID.
+      if (saved && !(Number(saved.position)>0))
+        throw new Error('Core не подтвердил порядковый номер нового товара.');
+    },
   });
 }
 
@@ -86,6 +104,13 @@ export async function updateInventoryItem(itemId, value = {}) {
   // and reparses the entire warehouse.
   if (value?.archived === true) return archiveSelectedInventoryItems([itemId]);
   const previous = getInventoryItem(itemId);
+  // Never forward a historical clear-to-zero from any caller. Empty means
+  // move to the last positive rank, including legacy unnumbered records.
+  if (Object.prototype.hasOwnProperty.call(value,'position') &&
+    (value.position == null || value.position === '' || Number(value.position) === 0)) {
+    value = { ...value, position:inventoryEndPosition(getInventoryItems(),
+      String(value.manufacturer ?? previous?.manufacturer ?? ''),itemId) };
+  }
   const expected = Number(value?.position);
   const positionChanged = Object.prototype.hasOwnProperty.call(value, 'position')
     && Number.isSafeInteger(expected)
