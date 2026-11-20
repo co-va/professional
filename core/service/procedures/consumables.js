@@ -169,25 +169,28 @@ export async function openProcedureConsumables(procedureId, onSaved = () => {}) 
   };
   const render = () => {
     const inventory = new Map(getInventoryItems().map(item => [String(item.itemId), item]));
-    host.innerHTML = rows.length ? rows.map((row, index) => {
-      const item = inventory.get(String(row.itemId));
-      const title = item?.name || 'Товар недоступен';
-      const unit = row.unit || (item ? procedureConsumableUnit(item) : '');
-      return '<div class="inventory-editor-row" data-consumable-row="' + index + '">' +
-        '<div class="inventory-editor-group">' +
-          list({
-            className: 'ui-list--dense',
-            items: [{ title, secondary: item?.manufacturer || '' }],
-          }) +
-        '</div>' +
-        field({ label: 'Расход', name: 'consumableQuantity' + index,
-          type: 'number', min: '0.000001', step: 'any', inputmode: 'decimal',
-          placeholder: 'Не указано', value: row.quantity ?? '', data: 'data-consumable-quantity' }) +
-        '<span class="ui-list__secondary">' + escapeHtml(unit) + '</span>' +
-        compactButton({ kind: 'remove', data: 'data-consumable-remove="' + index + '"',
-          aria: 'Убрать ' + title }) +
-      '</div>';
-    }).join('') : emptyState('Расходников пока нет', 'Выберите товары, используемые в услуге.');
+    host.innerHTML = rows.length ? '<div class="ui-list ui-list--dense">' +
+      rows.map((row, index) => {
+        const item = inventory.get(String(row.itemId));
+        const title = item?.name || 'Товар недоступен';
+        const unit = row.unit || (item ? procedureConsumableUnit(item) : '');
+        return '<div class="ui-list__item" data-consumable-row="' + index + '">' +
+          '<span class="ui-list__main">' +
+            '<span class="ui-list__title">' + escapeHtml(title) + '</span>' +
+            (item?.manufacturer ? '<span class="ui-list__secondary">' +
+              escapeHtml(item.manufacturer) + '</span>' : '') +
+          '</span>' +
+          '<span class="ui-list__right-secondary service-consumable-quantity">' +
+            field({ label: 'Расход', name: 'consumableQuantity' + index,
+              type: 'number', min: '0.000001', step: 'any', inputmode: 'decimal',
+              placeholder: '—', value: row.quantity ?? '', data: 'data-consumable-quantity' }) +
+            '<span>' + escapeHtml(unit) + '</span>' +
+          '</span>' +
+          compactButton({ kind: 'remove', data: 'data-consumable-remove="' + index + '"',
+            aria: 'Убрать ' + title }) +
+        '</div>';
+      }).join('') + '</div>'
+      : emptyState('Расходников пока нет', 'Выберите товары, используемые в услуге.');
     sync();
   };
   host.addEventListener('input', event => {
