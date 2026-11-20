@@ -213,3 +213,12 @@
 
 .inventory-editor-number .field input{padding-right:52px}
 .inventory-editor-number:has([name="purchasePrice"]) input:disabled{background:transparent;border-color:transparent;color:var(--text);font-weight:650;opacity:1}
+
+
+/* Procedure consumables: canonical dense List with an unobtrusive quantity field. */
+[data-procedure-consumable-items] .ui-list__item{gap:8px}
+[data-procedure-consumable-items] .service-consumable-quantity{width:86px;flex:0 0 86px}
+[data-procedure-consumable-items] .service-consumable-quantity .field{width:100%;min-width:0;gap:2px}
+[data-procedure-consumable-items] .service-consumable-quantity .field input{
+  box-sizing:border-box;width:100%;min-width:0;padding:8px 6px;font-variant-numeric:tabular-nums
+}
