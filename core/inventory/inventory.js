@@ -47,7 +47,7 @@ import { classificationOptions, openInventoryClassificationGroups,
 import { openInventoryStorageLocations, reconcileLegacyInventoryStorage } from './storage.js';
 import { openInventoryTransfer } from './movement-transfer.js';
 import { renderStockBrandList, buildStockCatalogGroups, stockRootCriterion, stockNestedCriteria } from './stock-catalog.js';
-import { stockGroupTree, sortedStockChildren } from './grouping.js';
+import { stockGroupTree, sortedStockChildren, stockGroupValue } from './grouping.js';
 import { catalogDisclosure } from './catalog-ui.js';
 import { INVENTORY_TOTAL_SCOPE, inventoryDisplayBalance, inventoryDisplayTarget,
   inventoryItemBelongsToStorage, itemLocationBalance, inventoryLocations,
@@ -177,6 +177,7 @@ function itemSearchText(item = {}) {
     item.category,
     item.sku,
     item.barcode,
+    ...stockNestedCriteria(inventoryCriterionGroups()).map(group=>stockGroupValue(item,group)),
   ].filter(Boolean).join(' ').toLocaleLowerCase('ru-RU');
 }
 
