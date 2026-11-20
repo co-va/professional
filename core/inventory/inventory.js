@@ -2763,7 +2763,7 @@ async function applyInventoryAuditDataChanges(layer, { items, definition, perIte
           value = inventoryAuditParseDataValue(definition, raw);
         }
         if (definition.value === 'position' && value > 0) {
-          const numberKey = `${manufacturerName(item)}::${value}`;
+          const numberKey = `${String(item.manufacturer || '')}::${value}`;
           if (uniqueNumbers.has(numberKey))
             throw new Error(`Номер ${value} повторяется у производителя «${manufacturerName(item)}».`);
           uniqueNumbers.add(numberKey);
@@ -2771,7 +2771,10 @@ async function applyInventoryAuditDataChanges(layer, { items, definition, perIte
         if (definition.value === 'minStock' || definition.value === 'targetStock') {
           inventoryStockThresholdStored(item, value); // fail before any writes if tube size is absent
         }
-        targets.push({ itemId: item.itemId, manufacturer: manufacturerName(item), name: item.name, value });
+        // Use the persisted manufacturer ID/value, not its display fallback
+        // ("Без производителя"), when planning manufacturer-local order.
+        targets.push({ itemId: item.itemId, manufacturer: String(item.manufacturer || ''),
+          name: item.name, value });
       }
     } catch (error) {
       status.textContent = error instanceof Error ? error.message : 'Проверьте данные.';
