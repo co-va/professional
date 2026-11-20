@@ -1,7 +1,7 @@
 import {
-  actionBlock, button, compactButton, emptyState, entityCardDefaultRows, entityVisualCard, field,
+  actionBlock, button, compactButton, emptyState, entityCardDefaultRows, entityCardRail, entityVisualCard, field,
   modal, mountModal, openEntityCardAppearanceQ, openNotice, openSharedProfileSettingsMenu,
-  page, select, twoColumnLayout, v2ListEntries, v2ListEntry, v2Section,
+  page, select, twoColumnLayout,
   workspaceHeaderContext,
 } from '../../ui/ui.js';
 import { escapeHtml } from '../../ui/utils/escape-html.js';
@@ -10,11 +10,11 @@ import { flushBusinessPersistence, isBusinessServerReady } from '../business-per
 import { loadBusinessState } from '../runtime/business-state.js';
 import { getInventoryItem, getInventoryMovements } from './data.js';
 import { inventoryCriterionGroups } from './classification.js';
-import { inventoryLocations, itemLocationBalance, storageName,
+import { inventoryLocations, storageName,
   inventoryDisplayBalance, INVENTORY_TOTAL_SCOPE } from './stock-targets.js';
 import {
   archiveInventorySupplierOffer, createInventorySupplierOffer, setInventoryPrimarySupplierOffer,
-  updateInventoryItem, updateInventorySupplierOffer, createInventoryStorageLocation,
+  updateInventoryItem, updateInventorySupplierOffer,
 } from './service.js';
 
 const PRODUCT_APPEARANCE_SCOPE = 'inventory-item';
@@ -153,7 +153,7 @@ function productCard(item, stockScope = INVENTORY_TOTAL_SCOPE) {
     appearance: productCardAppearance(),
     fields: productCardFields(item, stockScope),
     interactive: true,
-    data: 'data-inventory-product-card',
+    data: 'data-inventory-product-card data-inventory-card-scope="' + escapeHtml(stockScope) + '"',
     aria: 'Редактировать складскую единицу ' + item.name,
   });
 }
@@ -450,97 +450,27 @@ function confirmProductDelete(itemId, overview, onChanged) {
   });
 }
 
-// The existing product cards form one horizontal, swipeable entity-card strip.
-// Total and undistributed are permanent; named warehouses belong to this item
-// only when they have stock or were explicitly assigned. No V2 stock list.
+// Only actual positive stock creates a warehouse card. A configured or
+// historically assigned zero-balance location is not an active stock card.
+// The aggregate card always exists; undistributed only while stock remains.
 function itemCardScopes(item) {
-  const assigned = new Set(Array.isArray(item.assignedStorageLocations)
-    ? item.assignedStorageLocations.map(String) : []);
-  const balances = new Set((item.locationBalances || [])
-    .filter(row => Math.abs(Number(row.balance) || 0) > 0.000001)
-    .map(row => String(row.locationId)));
-  return [INVENTORY_TOTAL_SCOPE, 'primary',
-    ...inventoryLocations().filter(place => !place.isPrimary &&
-      (assigned.has(String(place.locationId)) || balances.has(String(place.locationId))))
-      .map(place => place.locationId)];
+  const locations = inventoryLocations();
+  const primary = locations.find(place => place.isPrimary);
+  const primaryId = String(primary?.locationId || 'primary');
+  const balanceAt = locationId => Number(
+    (item.locationBalances || []).find(row =>
+      String(row.locationId) === String(locationId))?.balance || 0);
+  return [
+    INVENTORY_TOTAL_SCOPE,
+    ...(balanceAt(primaryId) > 0.000001 ? [primaryId] : []),
+    ...locations.filter(place => !place.isPrimary &&
+      balanceAt(place.locationId) > 0.000001).map(place => place.locationId),
+  ];
 }
 
+// Use the existing shared horizontal card rail; no local swipe or snap CSS.
 function productCardStrip(item) {
-  const cards = itemCardScopes(item).map((scope, index) =>
-    '<div class="inventory-product-card-slide" data-inventory-card-scope="' +
-      escapeHtml(scope) + '" style="flex:0 0 100%;min-width:0;scroll-snap-align:start">' +
-      productCard(item, scope).replace('data-inventory-product-card',
-        'data-inventory-product-card data-inventory-product-card-index="' + index + '"') +
-    '</div>').join('');
-  return '<div class="inventory-product-card-strip" data-inventory-card-strip ' +
-    'aria-label="Карты складской позиции" ' +
-    'style="display:flex;overflow-x:auto;overscroll-behavior-x:contain;' +
-    'scroll-snap-type:x mandatory;gap:12px;-webkit-overflow-scrolling:touch">' +
-    cards + '<div style="flex:0 0 100%;min-width:0;scroll-snap-align:start;' +
-    'display:flex;align-items:center;justify-content:center">' +
-    compactButton({ kind: 'add', data: 'data-inventory-add-card-location',
-      aria: 'Добавить склад к позиции' }) + '</div></div>';
-}
-
-function openItemStorageAssignment(itemId, onSaved) {
-  const item = getInventoryItem(itemId);
-  if (!item) return null;
-  const attached = new Set(itemCardScopes(item).map(String));
-  const available = inventoryLocations().filter(place =>
-    !place.isPrimary && !attached.has(String(place.locationId)));
-  const html = '<form data-inventory-location-assignment>' +
-    select({ label: 'Существующий склад', name: 'locationId',
-      options: [{ value: '', label: 'Выберите склад' },
-        ...available.map(place => ({ value: place.locationId, label: storageName(place) }))] }) +
-    field({ label: 'Или новый склад', name: 'newLocation', placeholder: 'Название' }) +
-    '<p class="form-error" role="alert" data-inventory-location-error></p>' +
-    actionBlock(button('Применить', { type: 'submit' })) + '</form>';
-  const layer = mountModal(document.body, modal(html, {
-    title: 'Добавить склад', variant: 'q', surface: 'app',
-  }));
-  if (!layer) return null;
-  const form = layer.querySelector('[data-inventory-location-assignment]');
-  form.addEventListener('submit', async event => {
-    event.preventDefault();
-    const submit = form.querySelector('[type="submit"]');
-    if (submit.disabled) return;
-    const name = String(form.elements.namedItem('newLocation')?.value || '').trim();
-    const existing = String(form.elements.namedItem('locationId')?.value || '').trim();
-    const error = form.querySelector('[data-inventory-location-error]');
-    if ((!name && !existing) || (name && existing)) {
-      error.textContent = 'Выберите существующий склад или укажите название нового.';
-      return;
-    }
-    submit.disabled = true;
-    error.textContent = '';
-    try {
-      let locationId = existing;
-      if (name) {
-        const before = new Set(inventoryLocations().map(place => String(place.locationId)));
-        await createInventoryStorageLocation({ name });
-        const created = inventoryLocations().find(place => !place.isPrimary &&
-          !before.has(String(place.locationId)) && storageName(place) === name);
-        if (!created) throw new Error('Склад создан, но его идентификатор не подтверждён. Обновите остатки.');
-        locationId = String(created.locationId);
-      }
-      const current = getInventoryItem(itemId);
-      const assigned = [...new Set([
-        ...(current.assignedStorageLocations || []).map(String), locationId,
-      ])];
-      await updateInventoryItem(itemId, { assignedStorageLocations: assigned });
-      const saved = getInventoryItem(itemId);
-      if (!Array.isArray(saved?.assignedStorageLocations)
-        || !saved.assignedStorageLocations.map(String).includes(locationId))
-        throw new Error('Core не подтвердил привязку склада к позиции.');
-      layer.v2Close?.();
-      onSaved(locationId);
-    } catch (cause) {
-      error.textContent = cause instanceof Error ? cause.message : 'Не удалось добавить склад.';
-    } finally {
-      if (submit.isConnected) submit.disabled = false;
-    }
-  });
-  return layer;
+  return entityCardRail(itemCardScopes(item).map(scope => productCard(item, scope)));
 }
 
 export function openInventoryProductOverview(itemId, { edit = () => {}, onChanged = () => {}, stockScope = INVENTORY_TOTAL_SCOPE } = {}) {
@@ -572,21 +502,12 @@ export function openInventoryProductOverview(itemId, { edit = () => {}, onChange
       supplierRows(item),
     ]);
     host.querySelectorAll('[data-inventory-product-card]').forEach(card => card.addEventListener('click', () => {
+      const scope = card.dataset.inventoryCardScope || INVENTORY_TOTAL_SCOPE;
       edit(() => {
         render();
         onChanged();
-      });
+      }, scope);
     }));
-    host.querySelector('[data-inventory-add-card-location]')?.addEventListener('click', () =>
-      openItemStorageAssignment(itemId, locationId => {
-        render();
-        const strip = host.querySelector('[data-inventory-card-strip]');
-        const target = [...(strip?.querySelectorAll('[data-inventory-card-scope]') || [])]
-          .find(card => card.dataset.inventoryCardScope === locationId);
-        target?.scrollIntoView({ block: 'nearest', inline: 'start' });
-        onChanged();
-      }));
-
     host.querySelector('[data-inventory-supplier-add]')?.addEventListener('click', async () => {
       const { openSupplierAssociation } = await import('./counterparties.js');
       openSupplierAssociation(itemId, () => { render(); onChanged(); });
