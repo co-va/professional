@@ -76,6 +76,7 @@ import {
   loadInventoryCriteria,
   reorderInventoryCriterionValues,
   reorderInventoryItems,
+  repairInventoryPositions,
   updateInventoryItem,
 } from './service.js';
 
@@ -3385,6 +3386,21 @@ function openStockCreateOptions(root, onChanged, defaults = {}) {
   });
 }
 
+let inventoryRankRepairAttempted = false;
+if (typeof window !== 'undefined') window.addEventListener('professional:auth-logout',
+  () => { inventoryRankRepairAttempted = false; });
+
+function inventoryNeedsPositionRepair(rows = []) {
+  const groups = new Map();
+  for (const item of rows) {
+    const manufacturer = String(item.manufacturer || '');
+    if (!groups.has(manufacturer)) groups.set(manufacturer, []);
+    groups.get(manufacturer).push(Number(item.position));
+  }
+  return [...groups.values()].some(numbers => numbers.sort((a,b)=>a-b)
+    .some((position,index)=>!Number.isSafeInteger(position) || position!==index+1));
+}
+
 function renderStock(root) {
   STOCK_VIEW.manufacturersType = '';
   // Root stock catalog must never inherit an invisible legacy filter.
@@ -3463,6 +3479,22 @@ function renderStock(root) {
   root.querySelector('[data-inventory-add-item]')?.addEventListener('click',()=>
     openStockCreateOptions(root,()=>renderStock(root)));
   refresh();
+  // Historical gaps and missing ranks are repaired once through a dedicated
+  // capability. Never call old Core's "clear" endpoint: it wrote actual 0s.
+  // The server changes ONLY manufacturer-local position values atomically.
+  if (!inventoryRankRepairAttempted && inventoryNeedsPositionRepair(getInventoryItems())) {
+    inventoryRankRepairAttempted = true;
+    void repairInventoryPositions().then(() => {
+      if (inventoryNeedsPositionRepair(getInventoryItems()))
+        throw new Error('Некоторые порядковые номера не восстановлены.');
+      if (root.isConnected) renderStock(root);
+    }).catch(error => {
+      if (root.isConnected) openNotice({
+        title:'Нумерация склада',
+        message:error instanceof Error ? error.message : 'Не удалось восстановить номера.',
+      });
+    });
+  }
   notifyContext();
 }
 
