@@ -1064,6 +1064,13 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
     }
     const name = String(data.get('name') || '').trim();
     if (!name) return openNotice({ title: 'Наименование', message: 'Укажите наименование позиции.' });
+    const shortNameKey = value => String(value || '').trim().replace(/\s+/g, ' ').toLocaleLowerCase('ru-RU');
+    if ((creating || shortNameKey(name) !== shortNameKey(item?.name))
+      && getInventoryItems().some(other => other.itemId !== item?.itemId
+        && shortNameKey(other.name) === shortNameKey(name))) {
+      return openNotice({ title: 'Наименование',
+        message: 'Такое короткое название уже есть на складе. Укажите другое.' });
+    }
     // A plain new card, with or without a manually entered purchase price,
     // is not a stock-unit calculation. Save its actual fields directly.
     if (creating && !draft.canSell) {
