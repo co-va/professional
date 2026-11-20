@@ -80,10 +80,11 @@ export function stockItemMetrics(item = {}, snapshot = {}) {
     }
   }
 
-  // Sales movement amounts are acquisition/FIFO costs, NOT sales receipts.
-  // Actual charged sale prices are not present in Core's inventory snapshot.
-  // Show zero for no sale; otherwise withhold unrecorded revenue.
-  metrics.sale.amount = metrics.sale.quantity === 0 ? 0 : null;
+  // Sale reporting is not connected yet. Neither quantity nor revenue is
+  // an established figure; keep both blank until the sale workflow supplies them.
+  // Inventory movement amounts reflect FIFO cost, not sales revenue.
+  metrics.sale.quantity = null;
+  metrics.sale.amount = null;
 
   // Active FIFO lots are the source of stock valuation, not the latest catalog
   // purchase price (which may differ from prices of items still in stock).
