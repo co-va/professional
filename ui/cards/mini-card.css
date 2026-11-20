@@ -19,6 +19,19 @@
 .mini-card--dual-action{position:relative}.mini-card--dual-action .mini-card__head{padding-right:38px}.mini-card--lines.mini-card--dual-action .mini-card__line:nth-child(-n+2){box-sizing:border-box;padding-right:38px}.mini-card__surface-action{position:absolute;inset:0;z-index:1;border:0;border-radius:inherit;padding:0;background:transparent;cursor:pointer}.mini-card__surface-action:focus-visible{outline:2px solid #111;outline-offset:-4px}.mini-card__compact-action{position:absolute;top:10px;right:10px;z-index:2}
 
 
+/* Shared mini-card detail layout: native fixed header, scrollable center,
+   and fixed footer. The article belongs beneath the title on the LEFT. */
+.mini-card--details .mini-card__record-head{min-width:0;align-content:start;gap:2px}
+.mini-card__details-heading{display:grid;gap:4px;min-width:0;text-align:left}
+.mini-card__details-title{font-size:13px;line-height:1.2;font-weight:750;overflow-wrap:anywhere}
+.mini-card__details-subtitle{font-size:11px;line-height:1.2;font-weight:600;color:#595959;text-align:left;overflow-wrap:anywhere}
+.mini-card__details-body{font-size:15px;line-height:1.25;font-weight:650;overflow-wrap:anywhere;white-space:normal;text-align:left}
+.mini-card--details .mini-card__record-footer{padding-top:6px}
+.mini-card__details-stats{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,.7fr) minmax(0,1.15fr);gap:6px;align-items:start}
+.mini-card__details-stat{display:grid;gap:3px;min-width:0;text-align:left}
+.mini-card__details-stat-label{font-size:10px;line-height:13px;font-weight:500;color:#595959}
+.mini-card__details-stat-value{font-size:13px;line-height:17px;font-weight:800;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+
 /* Shared MiniCard: all usages use the exact same 290×200 shell and three fixed/scroll regions. */
 .mini-card__record-head{display:grid;gap:3px;min-width:0;align-content:start;border-bottom:1px solid #c7c7c7;padding-bottom:5px}
 .mini-card__record-top{display:grid;grid-template-columns:44px minmax(0,1fr) 44px;gap:4px;align-items:center;min-height:44px}
