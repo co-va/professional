@@ -107,13 +107,18 @@ export function openInventoryBulkSupplierLink(selectedItems = [], onSaved = () =
   const status = layer.querySelector('[data-bulk-supplier-status]');
   const list = layer.querySelector('[data-bulk-supplier-list]');
   const apply = layer.querySelector('[data-bulk-supplier-apply]');
+  const actions = apply?.closest('.modal-actions');
+  const showApply = visible => {
+    if (actions) actions.hidden = !visible;
+    if (apply) apply.hidden = !visible;
+  };
   const startToken = getAuthToken();
   let companies = [];
   let selectedCompany = '';
   let preview = [];
   let requestVersion = 0;
   let saving = false;
-  apply.hidden = true;
+  showApply(false);
   const usable = () => layer.isConnected && startToken === getAuthToken();
 
   const showCompanySelector = () => {
@@ -132,7 +137,7 @@ export function openInventoryBulkSupplierLink(selectedItems = [], onSaved = () =
   const loadPreview = async () => {
     const version = ++requestVersion;
     preview = [];
-    apply.hidden = true;
+    showApply(false);
     list.innerHTML = '';
     if (!selectedCompany) {
       status.textContent = '';
@@ -161,7 +166,7 @@ export function openInventoryBulkSupplierLink(selectedItems = [], onSaved = () =
       list.innerHTML = preview.map(rowMarkup).join('');
       status.textContent = 'Найдено: ' + matches.length + ' из ' + preview.length
         + '. Не найденные и спорные товары не изменяются.';
-      apply.hidden = !matches.length;
+      showApply(Boolean(matches.length));
       apply.disabled = !matches.length;
     } catch (error) {
       if (!usable() || version !== requestVersion) return;
@@ -176,7 +181,6 @@ export function openInventoryBulkSupplierLink(selectedItems = [], onSaved = () =
     saving = true;
     apply.disabled = true;
     picker.querySelector('[name="bulkSupplierCompany"]')?.setAttribute('disabled', '');
-    let linked = 0;
     const failures = [];
     const company = selectedCompany;
     // Existing Core routes own supplier links, pricing and primary-offer logic.
@@ -203,7 +207,6 @@ export function openInventoryBulkSupplierLink(selectedItems = [], onSaved = () =
           // the short warehouse name or modify SKU, stock or classification.
           if (String(getInventoryItem(entry.itemId)?.catalogName || '') !== String(entry.row.name || ''))
             await inventoryApi(itemPath, 'PUT', { catalogName: entry.row.name }, 60000);
-          linked += 1;
         } catch (error) {
           failures.push(entry.item.name + ': ' + (error instanceof Error
             ? error.message : 'Не удалось сохранить'));
@@ -229,7 +232,7 @@ export function openInventoryBulkSupplierLink(selectedItems = [], onSaved = () =
         + '. Без совпадений: ' + (preview.length - matches.length) + '.';
       if (succeeded) onSaved();
       // Keep the report visible and avoid treating partial saves as complete.
-      apply.hidden = true;
+      showApply(false);
     } catch (error) {
       status.textContent = 'Сохранение не подтверждено: ' +
         (error instanceof Error ? error.message : 'Сервер не ответил') +
