@@ -625,14 +625,24 @@ function advancedItemFields(item = {}, defaults = {}) {
     }) +
     '</div>';
 
-  const criteriaFields = inventoryCriterionGroups().map(group=>{
-    const key=group.legacyField || 'criteriaValue:'+group.id;
-    const current=group.legacyField
-      ? String(item[group.legacyField] || defaults[group.legacyField] || '')
-      : String(item.criteriaValues?.[group.id] || defaults.criteriaValues?.[group.id] || '');
-    return select({label:group.name,name:key,value:current,
-      options:criterionOptions(group,current)});
-  }).join('');
+  const allCriteria = inventoryCriterionGroups();
+  const rootCriterion = stockRootCriterion(allCriteria);
+  const rootValue = String(item[rootCriterion.legacyField] || defaults[rootCriterion.legacyField] || '');
+  const criteriaFields =
+    select({label:'Производитель',name:'manufacturer',value:rootValue,
+      options:criterionOptions(rootCriterion,rootValue)}) +
+    // Canonical item fields remain the API payload; visible group/value
+    // selectors below only edit these values and never invent new DB keys.
+    stockNestedCriteria(allCriteria).map(group=>{
+      const key=group.legacyField || 'criteriaValue:'+group.id;
+      const current=group.legacyField
+        ? String(item[group.legacyField] || defaults[group.legacyField] || '')
+        : String(item.criteriaValues?.[group.id] || defaults.criteriaValues?.[group.id] || '');
+      return '<input type="hidden" name="'+escapeHtml(key)+'" value="'+escapeHtml(current)+'">';
+    }).join('') +
+    '<div data-inventory-criterion-slots></div>' +
+    compactButton({kind:'add',data:'data-inventory-criterion-slot-add',
+      aria:'Добавить уровень группировки',disabled:true});
   const classification = '<div class="inventory-editor-group">' +
     field({ label: 'Полное наименование', name: 'catalogName', value: item.catalogName || '' }) +
     criteriaFields +
@@ -658,6 +668,94 @@ function advancedItemFields(item = {}, defaults = {}) {
     editorPanel('Классификация', classification, 'classification', { opened: false }) +
     editorPanel('Запас и контроль', stock, 'stock', { opened: Boolean(item.itemId) }) +
     '</div>';
+}
+
+function initInventoryCriterionSlots(form, onChange = () => {}) {
+  const groups = stockNestedCriteria(inventoryCriterionGroups());
+  const host = form.querySelector('[data-inventory-criterion-slots]');
+  const add = form.querySelector('[data-inventory-criterion-slot-add]');
+  if (!host || !add) return;
+  const nameOf = group => group.legacyField || 'criteriaValue:' + group.id;
+  const initialValue = group => String(form.elements.namedItem(nameOf(group))?.value || '');
+  let slots = groups.filter(group=>initialValue(group))
+    .map(group=>({id:group.id,value:initialValue(group)}));
+  if (!slots.length) slots = [{id:'',value:''}];
+  const sortSlots = () => slots.sort((a,b) => {
+    const index = id => groups.findIndex(group=>group.id===id);
+    return (a.id ? index(a.id) : Number.MAX_SAFE_INTEGER) -
+      (b.id ? index(b.id) : Number.MAX_SAFE_INTEGER);
+  });
+  const syncHidden = () => {
+    const selection = new Map(slots.filter(slot=>slot.id).map(slot=>[slot.id,slot.value]));
+    for (const group of groups) {
+      const input = form.elements.namedItem(nameOf(group));
+      if (input) input.value = selection.get(group.id) || '';
+    }
+  };
+  const syncAdd = () => {
+    add.disabled = slots.length >= groups.length || !slots.every(slot=>slot.id && slot.value);
+    add.hidden = !groups.length || slots.length >= groups.length;
+  };
+  const render = () => {
+    sortSlots();
+    host.innerHTML = slots.map((slot,index)=>{
+      const group = groups.find(group=>group.id===slot.id);
+      const used = new Set(slots.filter((_,i)=>i!==index).map(row=>row.id));
+      const groupOptions = [{value:'',label:'Выберите группу'}, ...groups.filter(row=>
+        row.id===slot.id || !used.has(row.id)).map(row=>({value:row.id,label:row.name}))];
+      return '<div data-inventory-criterion-slot="'+index+'">' +
+        '<div class="inventory-editor-row">' +
+          select({label:'Группа '+(index+2),name:'inventoryCriterionSlot:'+index,
+            value:slot.id,options:groupOptions}) +
+          select({label:'Значение',name:'inventoryCriterionValue:'+index,
+            value:slot.value,options:group
+              ? criterionOptions(group,slot.value)
+              : [{value:'',label:'Выберите значение'}]}) +
+        '</div>' +
+        (slot.id ? compactButton({kind:'remove',data:'data-inventory-criterion-slot-remove="'+index+'"',
+          aria:'Убрать назначение группы'}) : '') +
+      '</div>';
+    }).join('');
+    syncAdd();
+  };
+  host.addEventListener('change',event=>{
+    const target = event.target;
+    const field = String(target?.name || '');
+    if (field.startsWith('inventoryCriterionSlot:')) {
+      const index = Number(field.slice('inventoryCriterionSlot:'.length));
+      if (!slots[index]) return;
+      const id = String(target.value || '');
+      if (id && !groups.some(group=>group.id===id)) return;
+      slots[index] = {id,value:''};
+      syncHidden();
+      render();
+      onChange();
+    } else if (field.startsWith('inventoryCriterionValue:')) {
+      const index = Number(field.slice('inventoryCriterionValue:'.length));
+      if (!slots[index] || !slots[index].id) return;
+      slots[index].value = String(target.value || '');
+      syncHidden();
+      syncAdd();
+      onChange();
+    }
+  });
+  host.addEventListener('click',event=>{
+    const control = event.target.closest?.('[data-inventory-criterion-slot-remove]');
+    if (!control) return;
+    const index = Number(control.dataset.inventoryCriterionSlotRemove);
+    if (!slots[index]) return;
+    slots.splice(index,1);
+    if (!slots.length) slots.push({id:'',value:''});
+    syncHidden();
+    render();
+    onChange();
+  });
+  add.addEventListener('click',()=>{
+    if (add.disabled || slots.length >= groups.length) return;
+    slots.push({id:'',value:''});
+    render();
+  });
+  render();
 }
 
 function collectOptionalNumber(form, name) {
@@ -706,13 +804,15 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
     : Boolean(form.querySelector('[data-inventory-usage-check="sale"]')?.checked);
   const extraOn = (kind) => Boolean(form.querySelector('[data-inventory-extra-check="' + kind + '"]')?.checked);
   const signature = () => JSON.stringify([...new FormData(form).entries()]
-    .filter(([name]) => name !== 'netWeight')
+    .filter(([name]) => name !== 'netWeight' && !name.startsWith('inventoryCriterionSlot:')
+      && !name.startsWith('inventoryCriterionValue:'))
     .map(([name, value]) => [name, typeof value === 'string' ? value : '']));
   let initialSignature = '';
   let initialFormFields = new Map();
   const syncDirty = () => {
     if (!creating) setSharedActionVisible(actions, signature() !== initialSignature);
   };
+  initInventoryCriterionSlots(form,syncDirty);
   const netInput = input('netWeight');
   const purchaseInput = input('purchasePrice');
   const markupInput = input('saleMarkup');
@@ -913,8 +1013,10 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
   // that legacy formula; preserve an intentionally entered manual price.
   // Keep the server value as the initial signature so Save remains available.
   initialSignature = signature();
-  initialFormFields = new Map([...new FormData(form).entries()].map(
-    ([key, value]) => [key, typeof value === 'string' ? value : '']));
+  initialFormFields = new Map([...new FormData(form).entries()]
+    .filter(([name])=>!name.startsWith('inventoryCriterionSlot:')
+      && !name.startsWith('inventoryCriterionValue:'))
+    .map(([key, value]) => [key, typeof value === 'string' ? value : '']));
   if (pressed('sale') && markupInput?.value.trim() && sellingInput) {
     try {
       const current = String(sellingInput.value || '').trim();
@@ -948,7 +1050,8 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
     // field-level updates; unrelated historical fields stay exactly as stored.
     if (!creating) {
       const changed = [...data.entries()].filter(([key, value]) =>
-        String(value ?? '') !== String(initialFormFields.get(key) ?? ''));
+        !key.startsWith('inventoryCriterionSlot:') && !key.startsWith('inventoryCriterionValue:')
+        && String(value ?? '') !== String(initialFormFields.get(key) ?? ''));
       const simpleFields = new Set([
         'name','catalogName','manufacturer','category','productType','sku','barcode','position',
       ]);
