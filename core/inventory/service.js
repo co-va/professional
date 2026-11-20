@@ -108,15 +108,23 @@ export async function createInventoryItem(value = {}) {
   if (!Number.isSafeInteger(Number(position)) || Number(position)<1
     || Number(position)>2147483647)
     throw new Error('Невозможно назначить положительный порядковый номер.');
+  const previousIds = new Set(getInventoryItems().map(item => String(item.itemId)));
   return inventoryRequest('/items', {
     method: 'POST',
     body: JSON.stringify({...value,position:Number(position)}),
     verifySnapshot:payload=>{
-      const saved=snapshotItem(payload,value.itemId || '');
-      // Core may generate the ID. At minimum reject a successful response
-      // that still contains a zero-numbered product with the supplied ID.
-      if (saved && !(Number(saved.position)>0))
-        throw new Error('Core не подтвердил порядковый номер нового товара.');
+      if (!Array.isArray(payload?.items))
+        throw new Error('Сервер не подтвердил создание товара.');
+      // A normal create may receive its itemId from Core. Verify the actual
+      // new row instead of treating an unknown ID as successful confirmation.
+      const created = value.itemId
+        ? snapshotItem(payload,value.itemId)
+        : payload.items.find(item => !previousIds.has(String(item.itemId))
+            && String(item.name || '') === String(value.name || '')
+            && String(item.manufacturer || '') === String(value.manufacturer || ''));
+      if (!created || !Number.isSafeInteger(Number(created.position))
+        || Number(created.position) < 1)
+        throw new Error('Сервер не подтвердил новый товар с порядковым номером.');
     },
   });
 }
