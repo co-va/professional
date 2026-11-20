@@ -177,9 +177,11 @@ function supplierRows(item) {
   }).join('');
   return '<div class="stock-supplier-area">' +
     '<div class="stock-supplier-strip" aria-label="Контрагенты">' + cards +
-    '<div class="stock-supplier-mini stock-supplier-mini--add">' +
-    compactButton({ kind: 'add', data: 'data-inventory-supplier-add',
-      aria: 'Добавить контрагента' }) + '</div></div></div>';
+    '<button type="button" class="stock-supplier-mini stock-supplier-mini--add" ' +
+    'data-inventory-supplier-add aria-label="Добавить контрагента">' +
+    '<strong class="stock-supplier-mini__plus" aria-hidden="true">+</strong>' +
+    '<span class="stock-supplier-mini__add-label">Добавить контрагента</span>' +
+    '</button></div></div>';
 }
 
 function openStockSupplierInfo(itemId, offerId, onSaved = () => {}) {
