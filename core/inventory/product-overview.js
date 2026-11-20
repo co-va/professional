@@ -55,17 +55,12 @@ const positive = value => {
   return value != null && value !== '' && Number.isFinite(n) && n > 0 ? n : null;
 };
 
-function supplierListPrice(item, offer) {
+function supplierListPrice(_item, offer) {
   if (offer?.listPrice == null) return null;
-  const price=Number(offer.listPrice);
-  if (!Number.isFinite(price) || price < 0) return null;
-  // Match Core's basePrice unit: one nominal item package rather than the
-  // supplier's potentially larger carton of purchasable units.
-  const ownSize = positive(item.packageQuantity);
-  const offerSize = positive(offer.unitsPerOffer);
-  // The supplier's quoted pack price is still stored, but cannot be
-  // normalized until both quantities have a verified conversion.
-  return ownSize != null && offerSize != null ? price * ownSize / offerSize : null;
+  const price = Number(offer.listPrice);
+  // A supplier's quoted price belongs to their catalog item. Its display
+  // never depends on known weight/pack conversion; only cost per stock unit does.
+  return Number.isFinite(price) && price >= 0 ? price : null;
 }
 
 function consumptionUnitCost(item) {
@@ -133,6 +128,7 @@ function productCardFields(item, stockScope = INVENTORY_TOTAL_SCOPE) {
     ['primarySupplier', 'Поставщик', primary?.supplier || item.primarySupplier || ''],
     ['supplierListPrice', 'Цена', money(supplierListPrice(item,primary))],
     ['supplierDiscount', 'Скидка', discountText],
+    ['supplierEffectivePrice', 'Цена со скидкой', money(primary ? candidatePrice(primary) : null)],
     ['basePrice', 'Стоимость', money(purchasePrice)],
     ['storage', 'Склад', stockScopeName(stockScope)],
     ['balance', 'Остаток', num(inventoryDisplayBalance(item, stockScope)) + ' ' + (item.unit||'')],
@@ -333,6 +329,7 @@ function stockCardPreviewExamples(item) {
     primarySupplier: 'Поставщик',
     supplierListPrice: '1 000 ₽',
     supplierDiscount: '10%',
+    supplierEffectivePrice: '900 ₽',
     basePrice: '900 ₽',
     storage: 'Склад',
     balance: '0 ' + unit,
