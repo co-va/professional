@@ -1,5 +1,5 @@
 import {
-  actionBlock, button, compactButton, emptyState, entityCardDefaultRows, entityCardRail, entityVisualCard, field,
+  actionBlock, button, emptyState, entityCardDefaultRows, entityCardRail, entityVisualCard, field,
   modal, mountModal, openEntityCardAppearanceQ, openNotice, openSharedProfileSettingsMenu,
   page, select, twoColumnLayout,
   workspaceHeaderContext,
