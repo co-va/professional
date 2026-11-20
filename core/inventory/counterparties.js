@@ -1065,15 +1065,25 @@ function catalogGroupsMarkup(brands) {
 // Shared assortment/hidden category layout: identical native disclosure,
 // compact selection and product rows. Only the action footer differs.
 function catalogCategoryRowsMarkup(categories, selectedCatalogIds, linkedCatalogIds, matchedCatalogItems, statuses, checkAttribute = 'data-company-category-check') {
+  // Use the same visibility rule as the Stock hierarchy. Missing category
+  // means a direct product row; exactly one named category starts expanded.
+  // Two or more named categories start collapsed but remain user-toggleable.
+  const groups = [...categories];
+  const namedCount = groups.filter(([category]) => Boolean(category)).length;
   return '<div class="inventory-item-accordion">' +
-    [...categories].map(([category, rows]) =>
-      category ? catalogDisclosure(category, catalogItemList(rows, selectedCatalogIds, linkedCatalogIds, matchedCatalogItems, statuses), false, rows.length,
+    groups.map(([category, rows]) => {
+      if (!category) return catalogItemList(rows, selectedCatalogIds,
+        linkedCatalogIds, matchedCatalogItems, statuses);
+      const section = catalogDisclosure(category,
+        catalogItemList(rows, selectedCatalogIds, linkedCatalogIds, matchedCatalogItems, statuses),
+        false, rows.length,
         compactCheck({
           checked: rows.length > 0 && rows.every(row => selectedCatalogIds.has(String(row.id))),
           aria: 'Выбрать все позиции категории ' + category,
           data: checkAttribute + '="' + escapeHtml(category) + '"',
-        })) : catalogItemList(rows, selectedCatalogIds, linkedCatalogIds, matchedCatalogItems, statuses),
-    ).join('') + '</div>';
+        }));
+      return namedCount === 1 ? section.replace('<details>', '<details open>') : section;
+    }).join('') + '</div>';
 }
 
 function catalogBrandMarkup(categories, selectedCatalogIds, linkedCatalogIds = null, matchedCatalogItems = null, statuses = new Map()) {
