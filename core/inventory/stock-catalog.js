@@ -99,22 +99,23 @@ export function stockGroupedSections(items, selected = new Set(), scope = INVENT
   const productRows = rows => rows.map(item => stockRow(item, selected, scope)).join('');
   const sections = [...categories.entries()].sort(([a],[b]) =>
     a && !b ? -1 : !a && b ? 1 : compare(a,b));
-  const categoryCount = sections.filter(([category]) => Boolean(category)).length;
+  const soleCategory = sections.length === 1 && Boolean(sections[0][0]);
   return '<div class="inventory-counterparty-product-list inventory-item-accordion">' +
     sections.map(([category, types]) => {
-      if (!category) return productRows([...types.values()].flat());
       const rows = [...types.values()].flat();
       const entries = [...types.entries()].sort(([a],[b]) =>
         a && !b ? -1 : !a && b ? 1 : compare(a,b));
-      const typeCount = entries.filter(([type]) => Boolean(type)).length;
+      const soleType = entries.length === 1 && Boolean(entries[0][0]);
       const content = entries.map(([type, typeRows]) => {
         if (!type) return productRows(typeRows);
         const typeSection = catalogDisclosure(type, productRows(typeRows), true, typeRows.length);
-        return typeCount === 1
+        return soleType
           ? typeSection.replace('<details>', '<details open>') : typeSection;
       }).join('');
+      // Missing category bypasses only that level; assigned types still group.
+      if (!category) return content;
       const categorySection = catalogDisclosure(category, content, false, rows.length);
-      return categoryCount === 1
+      return soleCategory
         ? categorySection.replace('<details>', '<details open>') : categorySection;
     }).join('') + '</div>';
 }
