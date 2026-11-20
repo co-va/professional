@@ -130,15 +130,70 @@ export function openQuickStockItemX(defaults = {}, onSaved = () => {}) {
   return layer;
 }
 
-function panel(title, key, contents, { checked = null, opened = false } = {}) {
-  const control = checked === null ? '' :
-    '<div class="inventory-editor-heading__controls">' +
-      compactCheck({ checked, aria: title + ': включить', data: 'data-stock-option="' + key + '"' }) +
-    '</div>';
+function stockInfoButton(key, title) {
+  return compactButton({ kind: 'info', data: 'data-stock-info="' + key + '"',
+    aria: 'Информация: ' + title });
+}
+
+function panel(title, key, contents, { checked = null, opened = false, info = false } = {}) {
+  // Controls are siblings of details: the checkbox and info never toggle disclosure.
+  const controls = (checked === null ? '' :
+    compactCheck({ checked, aria: title + ': включить', data: 'data-stock-option="' + key + '"' })) +
+    (info ? stockInfoButton(key, title) : '');
+  const actions = controls ? '<div class="inventory-editor-heading__controls">' +
+    controls + '</div>' : '';
   return '<section class="inventory-editor-panel" data-stock-panel="' + key + '">' +
     '<details' + (opened ? ' open' : '') + '><summary class="inventory-editor-summary">' +
     escapeHtml(title) + '</summary><div class="inventory-editor-panel__body">' +
-    contents + '</div></details>' + control + '</section>';
+    contents + '</div></details>' + actions + '</section>';
+}
+
+const STOCK_EDITOR_HELP = {
+  groups: {
+    title: 'Группы',
+    paragraphs: [
+      'Группы нужны для упорядочивания складских позиций. Например: категория «Уход», внутри неё тип «Шампунь».',
+      'В первой строке выберите группу и её значение. Нажатие «+» добавляет следующий уровень. Уровней может быть несколько — заполняйте только необходимые.',
+      'Пустые строки не создают группировку. Производитель и номер позиции заполняются отдельно.',
+    ],
+  },
+  consume: {
+    title: 'Расход',
+    paragraphs: [
+      'Включите расход галочкой, только если складская позиция используется в работе и её нужно списывать. Для позиции, которая просто хранится, заполнять раздел необязательно.',
+      'Если закупаете упаковку, число штук уже известно из раздела «Позиция». Укажите количество штук, расходуемых за одно использование. По умолчанию — 1.',
+      'Если закупаете отдельную штуку, укажите содержимое этой штуки и единицу — шт., г или мл. Затем укажите расходуемое количество. Себестоимость рассчитает система.',
+      'Для точного расхода в граммах необходимо учитывать массу нетто и брутто. Брутто — масса вместе с упаковкой, тара — масса пустой упаковки, нетто — масса самого продукта. Эти поля добавим отдельно; в текущем редакторе их пока нет.',
+    ],
+  },
+  sale: {
+    title: 'Продажа',
+    paragraphs: [
+      'Включите продажу галочкой, если позиция продаётся. Если она не продаётся, раздел можно оставить выключенным.',
+      'Продаётся одна приходная единица целиком: штука или упаковка. Дополнительное количество выбирать не нужно.',
+      'Укажите наценку и её тип: в процентах (%) или фиксированной суммой в рублях (₽). Цена продажи автоматически рассчитывается от текущей закупочной цены.',
+      'Если закупочная цена пока неизвестна, рассчитать цену продажи автоматически нельзя.',
+    ],
+  },
+  stock: {
+    title: 'Запас и контроль',
+    paragraphs: [
+      'Критический остаток — нижний уровень запаса. Он помогает понять, когда позицию пора пополнить.',
+      'Желаемый остаток — количество, которое вы хотите поддерживать на складе.',
+      'Укажите нужные значения в двух полях. Можно заполнить одно, оба или оставить их пустыми. Единица учёта показывается рядом с количеством.',
+    ],
+  },
+};
+
+function openStockEditorTechnicalInfo(key) {
+  const info = STOCK_EDITOR_HELP[key];
+  if (!info) return null;
+  const html = '<div class="modal-title"><h2>' + escapeHtml(info.title) + '</h2>' +
+    info.paragraphs.map(paragraph => '<p>' + escapeHtml(paragraph) + '</p>').join('') +
+    '</div>';
+  return mountModal(document.body, modal(html, {
+    title: info.title, variant: 'technical', surface: 'app',
+  }));
 }
 
 function numberField(label, name, value, unit = '', disabled = false) {
@@ -241,8 +296,10 @@ export function openStockItemQEditor(itemId = '', defaults = {}, onSaved = () =>
         type: 'number', min: '1', step: '1', inputmode: 'numeric' }) +
     '</div>' +
     '<div class="stock-position-group-heading"><span>Группы</span>' +
-      compactButton({ kind: 'add', data: 'data-stock-group-add',
-        aria: 'Добавить подгруппу' }) + '</div>' +
+      '<div class="inventory-editor-extra-toggles">' +
+        compactButton({ kind: 'add', data: 'data-stock-group-add',
+          aria: 'Добавить подгруппу' }) +
+        stockInfoButton('groups', 'Группы') + '</div></div>' +
     '<div data-stock-groups></div>' +
     '<div class="inventory-editor-row">' +
       field({ label: 'Артикул', name: 'sku', value: original.sku }) +
@@ -278,9 +335,9 @@ export function openStockItemQEditor(itemId = '', defaults = {}, onSaved = () =>
     '<div class="inventory-item-accordion">' +
       panel('Позиция', 'position', position, { opened: true }) +
       panel('Классификация', 'classification', classification) +
-      panel('Расход', 'consume', consumption, { checked: original.consumeOn }) +
-      panel('Продажа', 'sale', sale, { checked: original.saleOn }) +
-      panel('Запас и контроль', 'stock', stock) +
+      panel('Расход', 'consume', consumption, { checked: original.consumeOn, info: true }) +
+      panel('Продажа', 'sale', sale, { checked: original.saleOn, info: true }) +
+      panel('Запас и контроль', 'stock', stock, { info: true }) +
     '</div>' + actionBlock(button(creating ? 'Применить' : 'Сохранить',
       { data: 'data-stock-full-apply', type: 'submit' })) +
     '<p class="form-error" data-stock-position-error hidden role="alert"></p></form>';
@@ -293,6 +350,11 @@ export function openStockItemQEditor(itemId = '', defaults = {}, onSaved = () =>
   const read = name => textValue(input(name)?.value);
   const enabled = type => Boolean(form.querySelector('[data-stock-option="' + type + '"]')?.checked);
   const initialChecks = { consume: original.consumeOn, sale: original.saleOn };
+  form.querySelectorAll('[data-stock-info]').forEach(control => {
+    control.addEventListener('click', () => {
+      openStockEditorTechnicalInfo(control.dataset.stockInfo);
+    });
+  });
   registerReceiptToggle(form, () => { drawContent(); updatePrices(); });
   const drawGroups = () => {
     const host = form.querySelector('[data-stock-groups]');
