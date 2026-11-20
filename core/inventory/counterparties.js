@@ -506,7 +506,7 @@ async function openCatalogRow(company, row, { itemId = '', onLinked = () => {} }
     const before = new Set(getInventoryItems().map(value => value.itemId));
     const { openItemEditor } = await import('./inventory.js');
     openItemEditor(layer, '', {
-      name: String(row.shortName || '').trim(), manufacturer: row.manufacturer,
+      name: '', manufacturer: row.manufacturer,
       sku: row.supplierSku, barcode: row.barcode,
     }, async createdId => {
       const resolved = createdId || getInventoryItems().find(value => !before.has(value.itemId))?.itemId;
@@ -979,7 +979,7 @@ function catalogItemList(items = [], selectedCatalogIds = new Set(), linkedCatal
     const id = String(row.id);
     const stockId = statuses.get(id)?.itemId || matchedCatalogItems?.get(id);
     // The local warehouse name is independent from the supplier's raw title.
-    return stockNames.get(String(stockId)) || row.shortName || row.name;
+    return stockNames.get(String(stockId)) || row.name;
   };
   // The link indicator belongs next to the supplier SKU, not before the title.
   // Only a persisted Core supplier offer is a confirmed link.
@@ -1211,7 +1211,7 @@ async function openSelectedCatalogCards(company, rows, onLinked = () => {}, sugg
     if (mode === 'new') {
       const { openItemEditor } = await import('./inventory.js');
       openItemEditor(document.body, '', {
-        name: String(row.shortName || '').trim(), manufacturer: row.manufacturer,
+        name: '', manufacturer: row.manufacturer,
       sku: row.supplierSku, barcode: row.barcode,
       }, async itemId => {
         finishLink(row, itemId, () => next(mode, index + 1));
