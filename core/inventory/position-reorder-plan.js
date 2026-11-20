@@ -32,7 +32,7 @@ export function planInventoryMoveToEnd(allItems = [], manufacturer = '', itemIds
   const chosen = new Set(ids);
   return {manufacturer:name(manufacturer),
     itemIds:[...current.filter(item=>!chosen.has(name(item.itemId))),
-      ...ids.map(id=>byId.get(id))].map(item=>name(item.itemId))};
+      ...current.filter(item=>chosen.has(name(item.itemId)))].map(item=>name(item.itemId))};
 }
 
 export function planInventoryPositionReorder(allItems = [], assignments = []) {
