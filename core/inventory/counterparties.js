@@ -1743,16 +1743,13 @@ function uniqueSupplierMatches(item, rows, companyId) {
 async function confirmSupplierCatalogLink(company, row, itemId) {
   const original = getInventoryItems().find(item => String(item.itemId) === String(itemId));
   if (!original) throw new Error('Складская позиция не найдена.');
-  const linked = (original.supplierOffers || []).find(offer =>
-    String(offer.counterpartyId) === String(company.id)
-    && String(offer.catalogItemId) === String(row.id));
-  if (!linked) {
-    const response = await json('/' + urlId(company.id) + '/catalog/' + urlId(row.id) + '/link', {
-      method: 'POST', body: { itemId },
-    });
-    if (String(response?.itemId || '') !== String(itemId) || !response?.offerId)
-      throw new Error('Core не подтвердил привязку товара.');
-  }
+  // Repeat the canonical transaction even for an existing association:
+  // Core updates supplier price/discount and makes this offer primary.
+  const response = await json('/' + urlId(company.id) + '/catalog/' + urlId(row.id) + '/link', {
+    method: 'POST', body: { itemId },
+  });
+  if (String(response?.itemId || '') !== String(itemId) || !response?.offerId)
+    throw new Error('Core не подтвердил привязку товара.');
   await loadInventory();
   const saved = getInventoryItems().find(item => String(item.itemId) === String(itemId));
   const offer = (saved?.supplierOffers || []).find(entry =>
