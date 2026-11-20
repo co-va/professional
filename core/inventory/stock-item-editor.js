@@ -216,6 +216,7 @@ export function openStockItemQEditor(itemId = '', defaults = {}, onSaved = () =>
   let slots = groupChoices(item, groups);
   const originalSlots = JSON.stringify(slots);
   const originalReceipt = receipt;
+  const missingLegacyPackCount = !creating && receipt === 'уп.' && !count;
   const originalCount = count;
   const originalPrice = purchase.value;
   const original = {
@@ -376,10 +377,17 @@ export function openStockItemQEditor(itemId = '', defaults = {}, onSaved = () =>
     const n = Number(String(value).replace(',', '.'));
     return Number.isFinite(n) && n >= 0 ? n : null;
   }
+  const syncModes = () => {
+    for (const kind of ['consume', 'sale']) {
+      const body = form.querySelector('[data-stock-panel="' + kind + '"] .inventory-editor-panel__body');
+      body?.classList.toggle('is-inactive', !enabled(kind));
+    }
+  };
   form.addEventListener('input', updatePrices);
-  form.addEventListener('change', updatePrices);
+  form.addEventListener('change', () => { syncModes(); updatePrices(); });
   drawGroups();
   drawContent();
+  syncModes();
   const commit = async event => {
     event.preventDefault();
     const apply = form.querySelector('[data-stock-full-apply]');
@@ -390,13 +398,14 @@ export function openStockItemQEditor(itemId = '', defaults = {}, onSaved = () =>
       const receiptNow = read('receiptUnit');
       const packNow = receiptNow === 'уп.'
         ? optionalAmount(read('packPieces'), 'Шт. в упаковке', { integer: true, positive: true }) : 1;
-      if (receiptNow === 'уп.' && packNow == null)
+      if (receiptNow === 'уп.' && packNow == null && !missingLegacyPackCount)
         throw new Error('Укажите количество штук в упаковке.');
       const priceNow = purchase.locked ? null : optionalAmount(read('purchasePrice'), 'Закупка');
       const patch = {};
       if (name !== original.name) patch.name = name;
       if (receiptNow !== originalReceipt) patch.receiptUnit = receiptNow;
-      if (receiptNow !== originalReceipt || receiptNow === 'уп.' && String(packNow) !== String(originalCount))
+      if (receiptNow !== originalReceipt || receiptNow === 'уп.' && packNow != null
+          && String(packNow) !== String(originalCount))
         patch.packageQuantity = packNow;
       if (!purchase.locked && !same(priceNow, optionalFinite(originalPrice)))
         patch.referencePrice = priceNow;
@@ -424,10 +433,12 @@ export function openStockItemQEditor(itemId = '', defaults = {}, onSaved = () =>
       if (consumeNow) {
         const qty = optionalAmount(read('consumeQuantity'), 'Количество расхода', { positive: true });
         if (qty == null) throw new Error('Укажите количество расхода.');
-        if (qty !== Number(original.consumeQuantity) || consumeNow !== initialChecks.consume)
+        const quantityEdited = qty !== Number(original.consumeQuantity);
+        if (quantityEdited || consumeNow !== initialChecks.consume)
           patch.consumeQuantity = qty;
         const consumeUnit = receiptNow === 'уп.' ? 'шт.' : read('contentUnit');
-        if (receiptNow !== originalReceipt || consumeUnit !== item.consumeUnit || consumeNow !== initialChecks.consume)
+        if ((receiptNow !== originalReceipt || quantityEdited || consumeNow !== initialChecks.consume
+            || read('contentUnit') !== original.contentUnit) && consumeUnit !== item.consumeUnit)
           patch.consumeUnit = consumeUnit;
         if (receiptNow === 'шт.') {
           const contentQty = optionalAmount(read('contentQuantity'), 'Содержимое', { positive: true });
@@ -435,6 +446,13 @@ export function openStockItemQEditor(itemId = '', defaults = {}, onSaved = () =>
           if (read('contentQuantity') !== original.contentQuantity || read('contentUnit') !== original.contentUnit) {
             patch.nominalQuantity = contentQty;
             patch.nominalUnit = contentQty == null ? null : consumeUnit;
+            if (contentQty != null && item.unit === 'шт.' && consumeUnit !== 'шт.') {
+              patch.conversionRules = [
+                ...(Array.isArray(item.conversionRules) ? item.conversionRules : [])
+                  .filter(rule => rule.unit !== consumeUnit),
+                { unit: consumeUnit, stockPerUnit: 1 / contentQty },
+              ];
+            }
           }
         }
       }
