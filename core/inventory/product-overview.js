@@ -175,8 +175,7 @@ function supplierRows(item) {
     });
   });
   cards.push(miniCard({
-    title: 'Добавить контрагента',
-    value: '+',
+    placeholderLabel: 'Добавить контрагента',
     interactive: true,
     data: 'data-inventory-supplier-add',
     aria: 'Добавить контрагента',
