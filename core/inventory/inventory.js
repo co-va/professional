@@ -2828,7 +2828,8 @@ async function applyInventoryAuditDataChanges(layer, { items, definition, perIte
               String(item.manufacturer || '') === plan.manufacturer)
               .sort(inventoryPositionComparator);
             const suffix = current.slice(-entries.length).map(item=>String(item.itemId));
-            if (suffix.some((id,index)=>id!==String(entries[index].itemId)
+            const expected = plan.itemIds.slice(-entries.length);
+            if (suffix.some((id,index)=>id!==expected[index]
               || Number(current[current.length-entries.length+index]?.position) < 1))
               throw new Error('Перемещение в конец не подтверждено сервером.');
           } catch (error) {
