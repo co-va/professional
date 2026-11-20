@@ -1779,23 +1779,23 @@ function stockListMarkup(manufacturer, query = '', rowsProvider = null, expanded
     || (order.get(a) ?? Number.MAX_SAFE_INTEGER) -
       (order.get(b) ?? Number.MAX_SAFE_INTEGER)
     || a.localeCompare(b,'ru',{numeric:true,sensitivity:'base'}));
-  const namedCategoryCount = grouped.filter(([category]) => Boolean(category)).length;
+  // A direct (unclassified) row is another visible sibling. A named group
+  // opens by default only when it is the sole section at its level.
+  const soleCategory = grouped.length === 1 && Boolean(grouped[0][0]);
   const content = grouped.map(([category,types])=>{
     const categoryRows = [...types.values()].flat();
-    // No category means no intermediate level, even if a type is specified.
-    if (byCategory && !category) return itemList(items.filter(item=>!String(item.category || '').trim()));
-    const namedTypeCount = [...types.keys()].filter(Boolean).length;
-    // Items with no subcategory appear after the named subcategories,
-    // directly inside their category rather than under a fake disclosure.
-    const typeContent = [...types.entries()].sort(([a],[b])=>
-      a && !b ? -1 : !a && b ? 1 : 0).map(([type,rows])=>
+    const entries = [...types.entries()].sort(([a],[b])=>
+      a && !b ? -1 : !a && b ? 1 : 0);
+    const soleType = entries.length === 1 && Boolean(entries[0][0]);
+    // Type still groups products even when no category was assigned.
+    // No category/type creates no disclosure; only real labels do.
+    const typeContent = entries.map(([type,rows])=>
       byType && type
-        ? disclosure(type,itemList(rows),'t:'+category+'::'+type,true,'',rows,namedTypeCount===1)
+        ? disclosure(type,itemList(rows),'t:'+category+'::'+type,true,'',rows,soleType)
         : itemList(rows)).join('');
+    if (!byCategory || !category) return typeContent;
     const reorderId=allowCategoryReorder ? ids.get(category) || '' : '';
-    return byCategory
-      ? disclosure(category,typeContent,'c:'+category,false,reorderId,categoryRows,namedCategoryCount===1)
-      : typeContent;
+    return disclosure(category,typeContent,'c:'+category,false,reorderId,categoryRows,soleCategory);
   }).join('');
   return byCategory
     ? '<div class="list-entries inventory-stock-category-sequence">' + content + '</div>'
