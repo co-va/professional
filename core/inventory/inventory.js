@@ -2686,8 +2686,9 @@ function inventoryAuditParseDataValue(definition, raw) {
     const number = Number(value.replace(',', '.').replace(/\s/g, ''));
     if (!Number.isFinite(number) || number < 0
       || (definition.kind === 'integer' && (!Number.isSafeInteger(number) || number < 1 || number > 2147483647))) {
-      throw new Error('Укажите корректное неотрицательное число' +
-        (definition.kind === 'integer' ? ' (целый номер от 1)' : '') + '.');
+      throw new Error(definition.kind === 'integer'
+        ? 'Укажите целый положительный порядковый номер от 1.'
+        : 'Укажите корректное неотрицательное число.');
     }
     return number;
   }
