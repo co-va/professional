@@ -5,7 +5,6 @@ const numeric = value => value == null || value === '' ? null
   : Number.isFinite(Number(value)) ? Number(value) : null;
 const rounded = value => Math.round((value + Number.EPSILON) * 1000) / 1000;
 const direction = line => line?.direction === 'OUT' ? -1 : 1;
-const allKinds = new Set(['RECEIPT', 'CONSUMPTION', 'SALE']);
 
 function movementKind(movement, byId) {
   if (movement?.kind !== 'CORRECTION') return movement?.kind || '';
