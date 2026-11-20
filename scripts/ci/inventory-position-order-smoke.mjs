@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { inventoryEndPosition, planInventoryMoveToEnd, planInventoryPositionReorder }
+  from '../../core/inventory/position-reorder-plan.js';
 
 const source = readFileSync('core/inventory/inventory.js', 'utf8');
 const service = readFileSync('core/inventory/service.js', 'utf8');
@@ -22,10 +24,10 @@ assert.deepEqual(rows.sort(compare).map(item=>item.itemId),
   ['chi2','chi1','chi3','wella1','wella2'],
   'Companies are grouped before local manual numbers; duplicate company numbers are allowed');
 assert.equal(rows.find(row=>row.itemId==='chi3').position,0,
-  'Unnumbered products remain blank');
+  'Legacy unnumbered records must remain detectable for repair');
 assert.match(source, /itemsSort: \['position-asc'/, 'Manual order is a distinct sort mode');
 assert.match(source, /value: Number\(item\.position\) > 0 \? item\.position : ''/,
-  'Marking number is blank until entered');
+  'Legacy missing positions remain visible as incomplete data until written');
 assert.match(source, /field\(\{ label: '№', name: 'position'/,
   'Small number field is in the Marking row');
 assert.match(source, /columns: 3, ariaLabel: 'Порядок, артикул и штрихкод'/,
@@ -48,4 +50,33 @@ assert.match(source, /inventoryAuditScope[\s\S]*?sort\(inventoryPositionComparat
   'Inventory count shares manual order');
 assert.match(source, /getInventoryItems\(\)[\s\S]*?\.sort\(inventoryPositionComparator\)/,
   'Movement selection shares manual order');
+
+// Regression: a number is a physical insertion point; a blank value is
+// a move to the tail with a real positive number, never position = 0.
+const company = [
+  {itemId:'a',manufacturer:'CHI',name:'A',position:1},
+  {itemId:'b',manufacturer:'CHI',name:'B',position:2},
+  {itemId:'c',manufacturer:'CHI',name:'C',position:3},
+  {itemId:'d',manufacturer:'CHI',name:'D',position:4},
+];
+assert.deepEqual(planInventoryMoveToEnd(company,'CHI',['b']).itemIds,['a','c','d','b']);
+assert.deepEqual(planInventoryMoveToEnd(company,'CHI',['b','d']).itemIds,['a','c','b','d']);
+assert.deepEqual(planInventoryPositionReorder(company,[
+  {itemId:'b',manufacturer:'CHI',value:4},
+  {itemId:'d',manufacturer:'CHI',value:2},
+]).itemIds,['a','d','c','b']);
+assert.equal(inventoryEndPosition(company,'CHI'),5, 'A new item gets last+1');
+assert.equal(inventoryEndPosition(company,'CHI','b'),4, 'Clearing a numbered item goes to last');
+assert.equal(inventoryEndPosition([...company,
+  {itemId:'old',manufacturer:'CHI',name:'Legacy',position:0}],'CHI','old'),5,
+  'A legacy zero gets a positive number at the tail');
+assert.match(source, /const requestedPosition = requestedPositionText === ''[\s\S]*?inventoryEndPosition\(/,
+  'Blank card number resolves to the end');
+assert.match(source, /position: requestedPosition,/, 'New cards explicitly send a positive position');
+assert.match(source, /planInventoryMoveToEnd\(getInventoryItems\(\)/,
+  'Multi-row tail move uses the canonical reorder');
+assert.doesNotMatch(source, /await clearInventoryItemPositions\(/,
+  'A clear action must never persist zero through the old endpoint');
+assert.match(source, /'В конец'/, 'The action is labelled as movement, not number deletion');
+
 console.log('PASS: manufacturer-local numbering, shared drag, one batch save and stable Z');
