@@ -147,6 +147,7 @@ export function miniCard({
   surface = 'default',
   actionLabel = '',
   placeholderLabel = '',
+  detailsLayout = null,
   compactAction = null,
   recordLayout = null,
   interactive = false,
@@ -156,6 +157,31 @@ export function miniCard({
 } = {}) {
   if (recordLayout && typeof recordLayout === 'object') {
     return recordMarkup(recordLayout, { className, aria, interactive, data });
+  }
+  // Same canonical mini-card, with its fixed header, scrollable center,
+  // and fixed footer. Layout values are supplied by the invoking feature.
+  if (detailsLayout && typeof detailsLayout === 'object') {
+    const tag = interactive ? 'button' : 'section';
+    const attributes = interactive ? ' type="button"' + attrs(data, aria || detailsLayout.heading)
+      : ' aria-label="' + escapeHtml(aria || detailsLayout.heading || 'Мини-карта') + '"';
+    const stats = Array.isArray(detailsLayout.stats) ? detailsLayout.stats : [];
+    const heading = '<div class="mini-card__details-heading">' +
+      '<strong class="mini-card__details-title">' + escapeHtml(detailsLayout.heading || '') + '</strong>' +
+      (detailsLayout.subheading
+        ? '<span class="mini-card__details-subtitle">' + escapeHtml(detailsLayout.subheading) + '</span>'
+        : '') + '</div>';
+    const center = '<div class="mini-card__details-body">' +
+      escapeHtml(detailsLayout.body || '') + '</div>';
+    const footer = '<div class="mini-card__details-stats">' +
+      stats.map(stat => '<span class="mini-card__details-stat">' +
+        '<span class="mini-card__details-stat-label">' + escapeHtml(stat.label || '') + '</span>' +
+        '<strong class="mini-card__details-stat-value">' + escapeHtml(stat.value || '—') + '</strong>' +
+        '</span>').join('') + '</div>';
+    return cardShell({
+      tag, classes: ['mini-card', 'mini-card--details',
+        interactive ? 'mini-card--interactive' : '', className].filter(Boolean).join(' '),
+      attributes, head: heading, center, footer, scrollFocus: !interactive,
+    });
   }
   // An unfilled mini-card is a single action surface, not an empty data
   // card with its header, divider and unused content rows.
