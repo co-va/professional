@@ -1,5 +1,5 @@
 import {
-  actionBlock, button, emptyState, entityCardDefaultRows, entityVisualCard, field,
+  actionBlock, button, compactButton, emptyState, entityCardDefaultRows, entityVisualCard, field,
   modal, mountModal, openEntityCardAppearanceQ, openNotice, openSharedProfileSettingsMenu,
   page, select, twoColumnLayout, v2ListEntries, v2ListEntry, v2Section,
   workspaceHeaderContext,
@@ -121,7 +121,7 @@ function productCardFields(item, stockScope = INVENTORY_TOTAL_SCOPE) {
   // purchase cost of the catalog item; per-gram/unit costing is separate.
   // Manual purchase price is independent of a linked supplier quote.
   // If none was entered, show the actual linked supplier price for this SKU.
-  const purchasePrice=item.referencePrice ?? (primary ? candidatePrice(primary) : item.basePrice);
+  const purchasePrice=primary ? candidatePrice(primary) : item.referencePrice;
   const discount=primary?.discountPercent;
   const discountText=discount==null || discount==='' ? '' :
     num(Number(discount),2) + '%';
@@ -160,22 +160,62 @@ function productCard(item, stockScope = INVENTORY_TOTAL_SCOPE) {
 
 function supplierRows(item) {
   const offers = Array.isArray(item.supplierOffers) ? item.supplierOffers : [];
-  if (!offers.length) return emptyState('Поставщиков пока нет', 'Выберите компанию из раздела «Контрагенты».');
-  return v2ListEntries(offers.map((offer) => {
+  const cards = offers.map(offer => {
     const primary = item.primaryOfferId === offer.offerId;
-    const amount = candidatePrice(offer);
-    const pack = positive(offer.unitsPerOffer);
-    return v2ListEntry({
-      title: offer.supplier || 'Место покупки',
-      subtitle: primary ? 'Основной' : '',
-      rightTop: money(amount) || '—',
-      rightBottom: pack != null ? num(pack) + ' ' + item.unit : '',
-      initial: '',
-      interactive: true,
-      data: 'data-inventory-supplier-offer="' + escapeHtml(offer.offerId) + '"',
-      aria: 'Изменить предложение ' + (offer.supplier || ''),
-    });
+    const discount = offer.discountPercent == null ? '' : num(offer.discountPercent, 2) + '%';
+    return '<button type="button" class="stock-supplier-mini' +
+      (primary ? ' is-primary' : '') + '" data-inventory-supplier-offer="' +
+      escapeHtml(offer.offerId) + '" aria-label="Открыть предложение ' +
+      escapeHtml(offer.supplier || 'Контрагент') + '">' +
+      '<strong>' + escapeHtml(offer.supplier || 'Контрагент') + '</strong>' +
+      '<span class="stock-supplier-mini__price">' + escapeHtml(money(candidatePrice(offer)) || '—') + '</span>' +
+      '<span class="stock-supplier-mini__meta">' +
+        escapeHtml([primary ? 'Основной' : '', discount ? 'Скидка ' + discount : ''].filter(Boolean).join(' · ') || '—') +
+      '</span>' +
+      (offer.supplierSku ? '<small>' + escapeHtml(offer.supplierSku) + '</small>' : '') +
+      '</button>';
+  }).join('');
+  return '<div class="stock-supplier-area">' +
+    '<div class="stock-supplier-strip" aria-label="Контрагенты">' + cards +
+    '<div class="stock-supplier-mini stock-supplier-mini--add">' +
+    compactButton({ kind: 'add', data: 'data-inventory-supplier-add',
+      aria: 'Добавить контрагента' }) + '</div></div></div>';
+}
+
+function openStockSupplierInfo(itemId, offerId, onSaved = () => {}) {
+  const item = getInventoryItem(itemId);
+  const offer = item?.supplierOffers?.find(row => row.offerId === offerId);
+  if (!offer) return null;
+  const primary = item.primaryOfferId === offer.offerId;
+  const detail = (label, value) => '<div class="stock-supplier-info-line"><span>' +
+    escapeHtml(label) + '</span><strong>' + escapeHtml(value || '—') + '</strong></div>';
+  const html = '<div class="stock-supplier-info">' +
+    detail('Контрагент', offer.supplier) +
+    detail('Наименование', offer.catalogName || item.catalogName) +
+    detail('Артикул', offer.supplierSku) +
+    detail('Цена', money(offer.listPrice)) +
+    detail('Скидка', offer.discountPercent == null ? '' : num(offer.discountPercent, 2) + '%') +
+    detail('Закупка', money(candidatePrice(offer))) +
+    (primary ? '<p>Основной контрагент</p>' :
+      actionBlock(button('Выбрать основным', { data: 'data-stock-supplier-primary' }))) +
+    '<p class="form-error" data-stock-supplier-error hidden role="alert"></p></div>';
+  const layer = mountModal(document.body, modal(html, {
+    title: 'Контрагент', variant: 'x', surface: 'app', xRole: 'editor',
   }));
+  layer?.querySelector('[data-stock-supplier-primary]')?.addEventListener('click', async event => {
+    event.currentTarget.disabled = true;
+    try {
+      await setInventoryPrimarySupplierOffer(itemId, offerId);
+      layer.v2Close?.();
+      onSaved();
+    } catch (error) {
+      event.currentTarget.disabled = false;
+      const host = layer.querySelector('[data-stock-supplier-error]');
+      if (host) { host.hidden = false; host.textContent = error instanceof Error
+        ? error.message : 'Не удалось сменить контрагента.'; }
+    }
+  });
+  return layer;
 }
 
 function offerValue(data, name, { required = false, positive = false, max = Infinity } = {}) {
@@ -462,10 +502,7 @@ export function openInventoryProductOverview(itemId, { edit = () => {}, onChange
           variant: 'secondary', data: 'data-inventory-product-targets',
           aria: 'Настроить желаемые остатки по складам',
         }))),
-      v2Section('Поставщики', supplierRows(item)),
-      actionBlock(button('Добавить', {
-        variant: 'secondary', data: 'data-inventory-supplier-add', aria: 'Связать с контрагентом',
-      })),
+      supplierRows(item),
     ]);
     host.querySelector('[data-inventory-product-card]')?.addEventListener('click', () => {
       edit(() => {
@@ -481,7 +518,7 @@ export function openInventoryProductOverview(itemId, { edit = () => {}, onChange
       openSupplierAssociation(itemId, () => { render(); onChanged(); });
     });
     host.querySelectorAll('[data-inventory-supplier-offer]').forEach((row) => row.addEventListener('click', () => {
-      openSupplierEditor(itemId, row.dataset.inventorySupplierOffer, () => {
+      openStockSupplierInfo(itemId, row.dataset.inventorySupplierOffer, () => {
         render();
         onChanged();
       });
