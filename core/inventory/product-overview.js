@@ -8,7 +8,7 @@ import { escapeHtml } from '../../ui/utils/escape-html.js';
 import { getCardAppearanceTemplate, saveCardAppearanceTemplate } from '../card-appearance-templates.js';
 import { flushBusinessPersistence, isBusinessServerReady } from '../business-persistence.js';
 import { loadBusinessState } from '../runtime/business-state.js';
-import { getInventoryItem, getInventoryMovements } from './data.js';
+import { getInventoryItem, getInventoryMovements, getInventorySnapshot } from './data.js';
 import { inventoryCriterionGroups } from './classification.js';
 import { inventoryLocations, storageName,
   inventoryDisplayBalance, INVENTORY_TOTAL_SCOPE } from './stock-targets.js';
@@ -63,23 +63,56 @@ function supplierListPrice(_item, offer) {
   return Number.isFinite(price) && price >= 0 ? price : null;
 }
 
-function consumptionUnitCost(item) {
-  const base=item.baseUnitPrice == null ? null : Number(item.baseUnitPrice);
-  if (base == null || !Number.isFinite(base) || base < 0) return '';
-  const stock=String(item.unit || '').trim();
-  const usage=String(item.consumeUnit || stock).trim();
-  if (!stock || !usage) return '';
-  let factor = stock===usage ? 1 : null;
-  const metric = {'кг>г':0.001,'г>кг':1000,'л>мл':0.001,'мл>л':1000};
-  // Each factor is the number of stock units per one consumption unit.
-  if (factor==null) factor=metric[stock+'>'+usage] ?? null;
-  if (factor==null) {
-    const rule=(item.conversionRules || []).find(row=>row.unit===usage &&
-      positive(row.stockPerUnit) != null);
-    factor=rule ? Number(rule.stockPerUnit) : null;
+// Entity card prices must come from actual inventory costs, never from a
+// counterparty's current offer, which belongs exclusively to its mini-card.
+function inventoryUnitCost(item, stockScope = INVENTORY_TOTAL_SCOPE) {
+  const lots = (getInventorySnapshot()?.lots || []).filter(lot =>
+    String(lot.itemId) === String(item.itemId) &&
+    (stockScope === INVENTORY_TOTAL_SCOPE ||
+      String(lot.storageLocationId || 'primary') === String(stockScope)));
+  let quantity = 0, totalCost = 0;
+  for (const lot of lots) {
+    const count = Number(lot.quantityRemaining);
+    const cost = lot.unitCost == null ? NaN : Number(lot.unitCost);
+    if (!Number.isFinite(count) || count < 0 ||
+      (count > 0 && (!Number.isFinite(cost) || cost < 0))) return null;
+    quantity += count;
+    totalCost += count * (count > 0 ? cost : 0);
   }
-  // Never guess gram/ml or pack/piece equivalence for unknown conversions.
-  return factor==null ? '' : money(base*factor) + '/' + usage;
+  if (quantity > 0) return totalCost / quantity;
+  // A last recorded actual purchase remains useful once the last lot is sold.
+  const last = item.lastPurchasePrice == null ? NaN : Number(item.lastPurchasePrice);
+  return Number.isFinite(last) && last >= 0 ? last : null;
+}
+
+function inventoryReceiptCost(item, stockScope = INVENTORY_TOTAL_SCOPE) {
+  const cost = inventoryUnitCost(item, stockScope);
+  if (cost == null) return null;
+  const packageSize = Number(item.packageQuantity);
+  const nominal = Number(item.nominalQuantity);
+  const pack = Number.isFinite(packageSize) && packageSize > 0
+    ? packageSize
+    : Number.isFinite(nominal) && nominal > 0 &&
+      String(item.nominalUnit || '') === String(item.unit || '')
+      ? nominal : 1;
+  return cost * pack;
+}
+
+function consumptionUnitCost(item, stockScope = INVENTORY_TOTAL_SCOPE) {
+  const base = inventoryUnitCost(item, stockScope);
+  if (base == null) return '';
+  const stock = String(item.unit || '').trim();
+  const usage = String(item.consumeUnit || stock).trim();
+  if (!stock || !usage) return '';
+  let factor = stock === usage ? 1 : null;
+  const metric = {'кг>г':0.001,'г>кг':1000,'л>мл':0.001,'мл>л':1000};
+  if (factor == null) factor = metric[stock+'>'+usage] ?? null;
+  if (factor == null) {
+    const rule = (item.conversionRules || []).find(row =>
+      row.unit === usage && positive(row.stockPerUnit) != null);
+    factor = rule ? Number(rule.stockPerUnit) : null;
+  }
+  return factor == null ? '' : money(base * factor) + '/' + usage;
 }
 
 function actualInventoryConsumption(item, stockScope = INVENTORY_TOTAL_SCOPE) {
@@ -114,38 +147,37 @@ function stockScopeName(scope) {
   return /^склад(?:\s|$)/i.test(label) ? label : 'Склад ' + label;
 }
 
+const ENTITY_SUPPLIER_FIELDS = new Set([
+  'primarySupplier', 'supplierListPrice', 'supplierDiscount', 'supplierEffectivePrice',
+]);
+
 function productCardFields(item, stockScope = INVENTORY_TOTAL_SCOPE) {
-  const primary=(item.supplierOffers || []).find(offer =>
-    offer.offerId && offer.offerId===item.primaryOfferId) || null;
-  // The stock card shows the linked supplier's quote for this SKU as the
-  // purchase cost of the catalog item; per-gram/unit costing is separate.
-  // Manual purchase price is independent of a linked supplier quote.
-  // If none was entered, show the actual linked supplier price for this SKU.
-  const purchasePrice=primary ? candidatePrice(primary) : item.referencePrice;
-  const discount=primary?.discountPercent;
-  const discountText=discount==null || discount==='' ? '' :
-    num(Number(discount),2) + '%';
   const entries = [
-    ['manufacturer', inventoryFieldLabel('manufacturer','Производитель'), item.manufacturer],
+    ['manufacturer', inventoryFieldLabel('manufacturer', 'Производитель'), item.manufacturer],
     ['name', 'Наименование', item.name],
     ['sku', 'Артикул', item.sku],
-    ['primarySupplier', 'Поставщик', primary?.supplier || item.primarySupplier || ''],
-    ['supplierListPrice', 'Цена', money(supplierListPrice(item,primary))],
-    ['supplierDiscount', 'Скидка', discountText],
-    ['supplierEffectivePrice', 'Цена со скидкой', money(primary ? candidatePrice(primary) : null)],
-    ['basePrice', 'Стоимость', money(purchasePrice)],
+    ['basePrice', 'Стоимость', money(inventoryReceiptCost(item, stockScope))],
     ['storage', 'Склад', stockScopeName(stockScope)],
-    ['balance', 'Остаток', num(inventoryDisplayBalance(item, stockScope)) + ' ' + (item.unit||'')],
+    ['balance', 'Остаток', num(inventoryDisplayBalance(item, stockScope)) + ' ' + (item.unit || '')],
     ['consumption', 'Расход', actualInventoryConsumption(item, stockScope)],
-    ['baseUnitPrice', 'Себестоимость', consumptionUnitCost(item)],
-    ['saleIndicator', 'Продажа', item.canSell===true ? 'Продажа ☑' : 'Продажа ☐'],
-    ['salePrice', 'Цена продажи', item.canSell===true ? money(item.salePrice) : ''],
+    ['baseUnitPrice', 'Себестоимость', consumptionUnitCost(item, stockScope)],
+    ['saleIndicator', 'Продажа', item.canSell === true ? 'Продажа ☑' : 'Продажа ☐'],
+    ['salePrice', 'Цена продажи', item.canSell === true ? money(item.salePrice) : ''],
   ];
-  return entries.map(([value, label, text]) => ({value,label,text:optionalText(text)}));
+  return entries.map(([value, label, text]) =>
+    ({ value, label, text: optionalText(text) }));
 }
 
 function productCardAppearance() {
-  return getCardAppearanceTemplate(PRODUCT_APPEARANCE_SCOPE)?.appearance || DEFAULT_PRODUCT_APPEARANCE;
+  const saved = getCardAppearanceTemplate(PRODUCT_APPEARANCE_SCOPE)?.appearance || DEFAULT_PRODUCT_APPEARANCE;
+  // Keep every existing cell in its place; only retire supplier-owned fields
+  // from older saved "Вид" templates without changing their other styling.
+  return { ...saved, lines: (saved.lines || []).map(row => ({
+    ...row,
+    ...(ENTITY_SUPPLIER_FIELDS.has(row.field) ? { field: '' } : {}),
+    ...(row.cells ? { cells: Object.fromEntries(Object.entries(row.cells).map(([column, cell]) =>
+      [column, ENTITY_SUPPLIER_FIELDS.has(cell?.field) ? { ...cell, field: '' } : cell])) } : {}),
+  })) };
 }
 
 function productCard(item, stockScope = INVENTORY_TOTAL_SCOPE) {
@@ -188,40 +220,23 @@ function supplierRows(item) {
   return miniCardRail(cards);
 }
 
-function openStockSupplierInfo(itemId, offerId, onSaved = () => {}) {
+function openStockSupplierInfo(itemId, offerId) {
   const item = getInventoryItem(itemId);
   const offer = item?.supplierOffers?.find(row => row.offerId === offerId);
   if (!offer) return null;
-  const primary = item.primaryOfferId === offer.offerId;
   const detail = (label, value) => '<div class="stock-supplier-info-line"><span>' +
     escapeHtml(label) + '</span><strong>' + escapeHtml(value || '—') + '</strong></div>';
   const html = '<div class="stock-supplier-info">' +
     detail('Контрагент', offer.supplier) +
-    detail('Наименование', offer.catalogName || item.catalogName) +
     detail('Артикул', offer.supplierSku) +
+    detail('Наименование', offer.catalogName || (item.primaryOfferId === offer.offerId
+      ? item.catalogName : '')) +
     detail('Цена', money(offer.listPrice)) +
     detail('Скидка', offer.discountPercent == null ? '' : num(offer.discountPercent, 2) + '%') +
-    detail('Закупка', money(candidatePrice(offer))) +
-    (primary ? '<p>Основной контрагент</p>' :
-      actionBlock(button('Выбрать основным', { data: 'data-stock-supplier-primary' }))) +
-    '<p class="form-error" data-stock-supplier-error hidden role="alert"></p></div>';
-  const layer = mountModal(document.body, modal(html, {
-    title: 'Контрагент', variant: 'x', surface: 'app', xRole: 'editor',
+    detail('Цена со скидкой', money(candidatePrice(offer))) + '</div>';
+  return mountModal(document.body, modal(html, {
+    title: 'Контрагент', variant: 's', surface: 'app',
   }));
-  layer?.querySelector('[data-stock-supplier-primary]')?.addEventListener('click', async event => {
-    event.currentTarget.disabled = true;
-    try {
-      await setInventoryPrimarySupplierOffer(itemId, offerId);
-      layer.v2Close?.();
-      onSaved();
-    } catch (error) {
-      event.currentTarget.disabled = false;
-      const host = layer.querySelector('[data-stock-supplier-error]');
-      if (host) { host.hidden = false; host.textContent = error instanceof Error
-        ? error.message : 'Не удалось сменить контрагента.'; }
-    }
-  });
-  return layer;
 }
 
 function offerValue(data, name, { required = false, positive = false, max = Infinity } = {}) {
@@ -376,10 +391,6 @@ function stockCardPreviewExamples(item) {
     manufacturer: 'Бренд',
     name: 'Товар',
     sku: 'А-001',
-    primarySupplier: 'Поставщик',
-    supplierListPrice: '1 000 ₽',
-    supplierDiscount: '10%',
-    supplierEffectivePrice: '900 ₽',
     basePrice: '900 ₽',
     storage: 'Склад',
     balance: '0 ' + unit,
@@ -519,10 +530,7 @@ export function openInventoryProductOverview(itemId, { edit = () => {}, onChange
       openSupplierAssociation(itemId, () => { render(); onChanged(); });
     });
     host.querySelectorAll('[data-inventory-supplier-offer]').forEach((row) => row.addEventListener('click', () => {
-      openStockSupplierInfo(itemId, row.dataset.inventorySupplierOffer, () => {
-        render();
-        onChanged();
-      });
+      openStockSupplierInfo(itemId, row.dataset.inventorySupplierOffer);
     }));
     host.querySelector('[data-inventory-product-menu]')?.addEventListener('click', () => {
       openSharedProfileSettingsMenu({
