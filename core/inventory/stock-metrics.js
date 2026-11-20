@@ -18,10 +18,16 @@ function movementKind(movement, byId) {
   return original?.kind || '';
 }
 
-export function stockItemMetrics(item = {}, snapshot = {}) {
+export function stockItemMetrics(item = {}, snapshot = {}, scope = 'total') {
   const itemId = String(item.itemId || '');
   const unit = String(item.unit || 'шт.');
-  const balance = numeric(item.balance);
+  const selectedScope = String(scope || 'total');
+  const overall = selectedScope === 'total';
+  const belongsToScope = entry => overall ||
+    String(entry?.storageLocationId || 'primary') === selectedScope;
+  const balance = overall ? numeric(item.balance) :
+    numeric((item.locationBalances || []).find(row =>
+      String(row.locationId) === selectedScope)?.balance);
   const movements = Array.isArray(snapshot.movements) ? snapshot.movements : null;
   const complete = !!movements && movements.length < 600;
 
@@ -36,7 +42,8 @@ export function stockItemMetrics(item = {}, snapshot = {}) {
   if (complete) {
     const movementsById = new Map(movements.map(movement => [movement.movementId, movement]));
     for (const movement of movements) {
-      const relevant = (movement.lines || []).filter(line => String(line.itemId) === itemId);
+      const relevant = (movement.lines || []).filter(line =>
+        String(line.itemId) === itemId && belongsToScope(line));
       if (!relevant.length) continue;
       const kind = movementKind(movement, movementsById);
       // A record-linked product return reverses a previous sale, not a receipt.
@@ -90,7 +97,7 @@ export function stockItemMetrics(item = {}, snapshot = {}) {
   // purchase price (which may differ from prices of items still in stock).
   if (balance != null) {
     const lots = (Array.isArray(snapshot.lots) ? snapshot.lots : [])
-      .filter(lot => String(lot.itemId || '') === itemId);
+      .filter(lot => String(lot.itemId || '') === itemId && belongsToScope(lot));
     let lotQuantity = 0, lotValue = 0, valued = true;
     for (const lot of lots) {
       const quantity = numeric(lot.quantityRemaining);
