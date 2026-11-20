@@ -76,6 +76,7 @@ import {
   loadInventoryCriteria,
   reorderInventoryCriterionValues,
   reorderInventoryItems,
+  reorderInventoryItemsBatch,
   repairInventoryPositions,
   updateInventoryItem,
 } from './service.js';
@@ -2805,70 +2806,40 @@ async function applyInventoryAuditDataChanges(layer, { items, definition, perIte
     const failed = new Map();
     onProgress(0, changes.length);
     try {
-      if (clearingPositions) {
-        // Empty rank means moving the selected items to the end of their
-        // manufacturer, in one atomic company reorder. No product receives 0.
-        const groups = new Map();
+      if (definition.value === 'position') {
+        // Compute all final manufacturer orders BEFORE saving anything.
+        // One Core transaction commits the entire multi-selection, including
+        // selected rows from several manufacturers; no partial writes.
+        const groups=new Map();
         for (const entry of changes) {
           if (!groups.has(entry.manufacturer)) groups.set(entry.manufacturer, []);
           groups.get(entry.manufacturer).push(entry);
         }
-        const plans = [...groups].map(([manufacturer, entries]) => ({
+        const plans=[...groups].map(([manufacturer,entries])=>({
           entries,
-          plan: planInventoryMoveToEnd(getInventoryItems(),manufacturer,
-            entries.map(entry=>entry.itemId)),
+          plan:clearingPositions
+            ? planInventoryMoveToEnd(getInventoryItems(),manufacturer,
+              entries.map(entry=>entry.itemId))
+            : planInventoryPositionReorder(getInventoryItems(),entries.map(entry=>({
+              itemId:entry.itemId,manufacturer,value:entry.value,
+            }))),
         }));
         if (plans.some(({plan})=>!plan))
-          throw new Error('Невозможно построить перестановку. Обновите склад.');
-        let completed = 0;
-        for (const {entries,plan} of plans) {
-          try {
-            await reorderInventoryItems(plan.manufacturer,plan.itemIds);
-            const current = getInventoryItems().filter(item =>
-              String(item.manufacturer || '') === plan.manufacturer)
+          throw new Error('Невозможно определить порядковые номера. Обновите склад ' +
+            'и укажите номера в пределах списка каждого производителя.');
+        await reorderInventoryItemsBatch(plans.map(({plan})=>plan));
+        onProgress(changes.length,changes.length);
+        if (clearingPositions) {
+          for (const {entries,plan} of plans) {
+            const current=getInventoryItems()
+              .filter(item=>String(item.manufacturer||'')===plan.manufacturer)
               .sort(inventoryPositionComparator);
-            const suffix = current.slice(-entries.length).map(item=>String(item.itemId));
-            const expected = plan.itemIds.slice(-entries.length);
-            if (suffix.some((id,index)=>id!==expected[index]
-              || Number(current[current.length-entries.length+index]?.position) < 1))
+            const actual=current.slice(-entries.length).map(item=>String(item.itemId));
+            const expected=plan.itemIds.slice(-entries.length);
+            if (actual.length!==expected.length ||
+              actual.some((id,index)=>id!==expected[index]))
               throw new Error('Перемещение в конец не подтверждено сервером.');
-          } catch (error) {
-            const reason = error instanceof Error ? error.message : 'Ошибка перестановки';
-            entries.forEach(entry=>failed.set(entry.itemId,reason));
-            break;
           }
-          completed += entries.length;
-          onProgress(completed,changes.length);
-        }
-      } else if (definition.value === 'position') {
-        // Prepare ALL final destinations before the first write. One scoped
-        // reorder per manufacturer prevents successive edits from undoing
-        // each other (including swaps, 20-row moves, and legacy blanks).
-        const groups = new Map();
-        for (const entry of changes) {
-          if (!groups.has(entry.manufacturer)) groups.set(entry.manufacturer, []);
-          groups.get(entry.manufacturer).push(entry);
-        }
-        const plans = [...groups.values()].map(entries => ({
-          entries,
-          plan:planInventoryPositionReorder(getInventoryItems(),entries.map(entry=>({
-            itemId:entry.itemId,manufacturer:entry.manufacturer,value:entry.value,
-          }))),
-        }));
-        if (plans.some(({plan})=>!plan))
-          throw new Error('Проверьте номера: они должны быть в пределах списка ' +
-            'производителя и не повторяться. Изменения не применены.');
-        let completed = 0;
-        for (const {entries,plan} of plans) {
-          try {
-            await reorderInventoryItems(plan.manufacturer,plan.itemIds);
-          } catch (error) {
-            const reason = error instanceof Error ? error.message : 'Ошибка перестановки';
-            entries.forEach(entry=>failed.set(entry.itemId,reason));
-            break;
-          }
-          completed += entries.length;
-          onProgress(completed,changes.length);
         }
       } else {
         // Canonical Core batch update keeps every selected item in one
