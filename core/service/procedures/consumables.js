@@ -1,6 +1,6 @@
 import {
   actionBlock, button, compactButton, emptyState, escapeHtml, field,
-  modal, mountModal, openNotice, v2ListEntry, v2ListEntries,
+  list, modal, mountModal, openNotice,
 } from '../../../ui/ui.js';
 import { setSharedActionVisible } from '../../../ui/page/page.js';
 import { getInventoryItems } from '../../inventory/data.js';
@@ -105,14 +105,22 @@ function openConsumablePicker(selected, onPick) {
     const items = getInventoryItems().filter(item => !selected.has(String(item.itemId))
       && [item.name, item.manufacturer, item.sku].some(value =>
         String(value || '').toLocaleLowerCase('ru-RU').includes(needle)));
-    host.innerHTML = items.length ? v2ListEntries(items.map(item => v2ListEntry({
-      title: item.name || 'Товар',
-      subtitle: item.manufacturer || '',
-      rightTop: item.sku || '',
-      interactive: true,
-      data: 'data-consumable-pick="' + escapeHtml(item.itemId) + '"',
-      aria: 'Добавить ' + (item.name || 'товар'),
-    }))) : emptyState('Товары не найдены', 'Измените поиск или добавьте товар на склад.');
+    // Stock products use the canonical dense List, not full-size V2 cards.
+    // Keep huge catalogues responsive: searching reveals further matches.
+    const visible = items.slice(0, 80);
+    host.innerHTML = items.length ? list({
+      className: 'ui-list--dense',
+      items: visible.map(item => ({
+        title: item.name || 'Товар',
+        secondary: [item.manufacturer, item.sku].filter(Boolean).join(' · '),
+        interactive: true,
+        data: 'data-consumable-pick="' + escapeHtml(item.itemId) + '"',
+        aria: 'Добавить ' + (item.name || 'товар'),
+      })),
+    }) + (items.length > visible.length
+      ? '<p class="ui-list__secondary">Показано ' + visible.length +
+        ' из ' + items.length + '. Уточните поиск.</p>' : '')
+      : emptyState('Товары не найдены', 'Измените поиск или добавьте товар на склад.');
     host.querySelectorAll('[data-consumable-pick]').forEach(node =>
       node.addEventListener('click', () => {
         const itemId = node.dataset.consumablePick;
@@ -167,11 +175,10 @@ export async function openProcedureConsumables(procedureId, onSaved = () => {}) 
       const unit = row.unit || (item ? procedureConsumableUnit(item) : '');
       return '<div class="inventory-editor-row" data-consumable-row="' + index + '">' +
         '<div class="inventory-editor-group">' +
-          v2ListEntries([v2ListEntry({
-            title,
-            subtitle: item?.manufacturer || '',
-            interactive: false,
-          })]) +
+          list({
+            className: 'ui-list--dense',
+            items: [{ title, secondary: item?.manufacturer || '' }],
+          }) +
         '</div>' +
         field({ label: 'Расход', name: 'consumableQuantity' + index,
           type: 'number', min: '0.000001', step: 'any', inputmode: 'decimal',
