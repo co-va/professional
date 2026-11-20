@@ -48,7 +48,8 @@ import { openInventoryStorageLocations, reconcileLegacyInventoryStorage } from '
 import { openInventoryTransfer } from './movement-transfer.js';
 import { renderStockBrandList, buildStockCatalogGroups, stockRootCriterion, stockNestedCriteria } from './stock-catalog.js';
 import { stockGroupTree, sortedStockChildren, stockGroupValue } from './grouping.js';
-import { planInventoryPositionReorder } from './position-reorder-plan.js';
+import { planInventoryPositionReorder, planInventoryMoveToEnd,
+  inventoryEndPosition } from './position-reorder-plan.js';
 import { catalogDisclosure } from './catalog-ui.js';
 import { INVENTORY_TOTAL_SCOPE, inventoryDisplayBalance, inventoryDisplayTarget,
   inventoryItemBelongsToStorage, itemLocationBalance, inventoryLocations,
@@ -74,7 +75,6 @@ import {
   loadInventory,
   loadInventoryCriteria,
   reorderInventoryCriterionValues,
-  clearInventoryItemPositions,
   reorderInventoryItems,
   updateInventoryItem,
 } from './service.js';
@@ -1067,9 +1067,11 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
             if (id) (edits.criteriaValues ||= {})[id] = String(value ?? '');
           } else if (key === 'position') {
             const raw = String(value ?? '').trim();
-            const number = raw ? Number(raw) : 0;
-            if (!Number.isSafeInteger(number) || number < 0)
-              throw new Error('Порядковый номер должен быть целым неотрицательным числом.');
+            const manufacturer = String(data.get('manufacturer') || item.manufacturer || '');
+            const number = raw ? Number(raw)
+              : inventoryEndPosition(getInventoryItems(),manufacturer,item.itemId);
+            if (!Number.isSafeInteger(number) || number < 1 || number > 2147483647)
+              throw new Error('Порядковый номер должен быть положительным целым числом.');
             edits.position = number;
           } else {
             edits[key] = String(value ?? '').trim();
@@ -1083,9 +1085,12 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
       }
     }
     const requestedPositionText = String(data.get('position') ?? '').trim();
-    const requestedPosition = requestedPositionText === '' ? 0 : Number(requestedPositionText);
-    if (!creating && (!Number.isSafeInteger(requestedPosition) || requestedPosition < 0)) {
-      openNotice({ title: 'Порядок', message: 'Укажите целый положительный номер или оставьте поле пустым.' });
+    const positionManufacturer=String(data.get('manufacturer') || item?.manufacturer || '');
+    const requestedPosition = requestedPositionText === ''
+      ? inventoryEndPosition(getInventoryItems(),positionManufacturer,item?.itemId || '')
+      : Number(requestedPositionText);
+    if (!Number.isSafeInteger(requestedPosition) || requestedPosition < 1 || requestedPosition > 2147483647) {
+      openNotice({ title: 'Порядок', message: 'Укажите целый положительный номер. Пустое поле означает конец списка.' });
       return;
     }
     const unit = String(data.get('calculationUnit') || 'шт.');
@@ -1228,7 +1233,7 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
       })(),
       sku: String(data.get('sku') || '').trim(),
       barcode: String(data.get('barcode') || '').trim(),
-      ...(!creating ? { position: requestedPosition } : {}),
+      position: requestedPosition,
       grossWeight: gross,
       tareWeight: tare,
       canConsume: consumption,
@@ -2728,7 +2733,7 @@ async function applyInventoryAuditDataChanges(layer, { items, definition, perIte
       if (!perItem) {
         if (clearAll) {
           if (!inventoryAuditCanClear(definition)) throw new Error('Эту характеристику нельзя очистить.');
-          startingValue = definition.value === 'position' ? 0
+          startingValue = definition.value === 'position' ? 'end'
             : definition.kind === 'decimal' ? null : '';
         } else {
           startingValue = inventoryAuditParseDataValue(definition, data.get('auditValue'));
@@ -2751,7 +2756,7 @@ async function applyInventoryAuditDataChanges(layer, { items, definition, perIte
         } else if (shouldClear) {
           if (!inventoryAuditCanClear(definition))
             throw new Error('Нельзя очистить «' + definition.label + '»: ' + item.name);
-          value = definition.value === 'position' ? 0
+          value = definition.value === 'position' ? 'end'
             : definition.kind === 'decimal' ? null : '';
         } else {
           value = inventoryAuditParseDataValue(definition, raw);
@@ -2775,8 +2780,7 @@ async function applyInventoryAuditDataChanges(layer, { items, definition, perIte
       status.textContent = 'Введите значения хотя бы для одной позиции.';
       return;
     }
-    // Even a previously cleared number may leave legacy gaps behind.
-    // Explicit Clear always asks Core to normalize that manufacturer's order.
+    // A blank number means moving the item to the tail, never writing zero.
     const clearingPositions = definition.value === 'position'
       && (clearAll || clearItems.size > 0);
     const changes = targets.filter(entry =>
@@ -2787,7 +2791,7 @@ async function applyInventoryAuditDataChanges(layer, { items, definition, perIte
         // An explicit clear is complete even when those fields were empty already.
         if (keepOpen) afterApplied();
         else layer.v2Close?.();
-        status.textContent = 'Значения уже очищены.';
+        status.textContent = clearingPositions ? 'Позиции уже в конце списка.' : 'Значения уже очищены.';
         return true;
       }
       status.textContent = 'У выбранных позиций уже указаны эти значения.';
@@ -2797,17 +2801,63 @@ async function applyInventoryAuditDataChanges(layer, { items, definition, perIte
     const failed = new Map();
     onProgress(0, changes.length);
     try {
-      if (definition.value === 'position' && (clearAll || clearItems.size > 0)) {
-        // One atomic Core operation clears selected numbers and compacts all
-        // remaining ranks for the affected manufacturer(s), without any
-        // separate per-product updates or full stock snapshots.
-        onProgress(0, changes.length);
-        try {
-          await clearInventoryItemPositions(changes.map(entry => entry.itemId));
-          onProgress(changes.length, changes.length);
-        } catch (error) {
-          const reason = error instanceof Error ? error.message : 'Ошибка очистки';
-          changes.forEach(entry => failed.set(entry.itemId, reason));
+      if (clearingPositions) {
+        // Clearing a position means a real move to the end, with a positive
+        // saved rank. Prefer one atomic full-company reorder when every row
+        // already has a number; legacy unnumbered rows use verified PUTs.
+        const groups = new Map();
+        for (const entry of changes) {
+          const manufacturer=String(getInventoryItem(entry.itemId)?.manufacturer || '');
+          if (!groups.has(manufacturer)) groups.set(manufacturer,[]);
+          groups.get(manufacturer).push(entry);
+        }
+        let completed=0;
+        let stopped=false;
+        for (const [manufacturer,entries] of groups) {
+          const plan=planInventoryMoveToEnd(getInventoryItems(),manufacturer,
+            entries.map(entry=>entry.itemId));
+          if (plan) {
+            try {
+              await reorderInventoryItems(plan.manufacturer,plan.itemIds);
+            } catch(error) {
+              const reason=error instanceof Error ? error.message : 'Ошибка перестановки';
+              entries.forEach(entry=>failed.set(entry.itemId,reason));
+              if (error?.name==='AbortError') stopped=true;
+            }
+            completed+=entries.length;
+            onProgress(completed,changes.length);
+            if (stopped) break;
+          } else {
+            // Do not send zero even when a legacy product had no rank.
+            for (const entry of entries) {
+              const now=getInventoryItem(entry.itemId);
+              if (!now) {
+                failed.set(entry.itemId,'Товар не найден в обновлённом списке.');
+                continue;
+              }
+              const position=inventoryEndPosition(getInventoryItems(),manufacturer,entry.itemId);
+              try {
+                if (Number(now.position)!==position)
+                  await updateInventoryItem(entry.itemId,{position});
+              } catch(error) {
+                failed.set(entry.itemId,error instanceof Error ? error.message : 'Ошибка перемещения');
+                if (error?.name==='AbortError') { stopped=true; break; }
+              }
+              completed++;
+              onProgress(completed,changes.length);
+            }
+            if (stopped) break;
+          }
+          // Verify not just a positive number but the requested end order.
+          const current=getInventoryItems().filter(item=>String(item.manufacturer || '')===manufacturer)
+            .filter(item=>Number(item.position)>0)
+            .sort((a,b)=>Number(a.position)-Number(b.position));
+          const suffix=current.slice(-entries.length).map(item=>String(item.itemId));
+          if (suffix.some((id,index)=>id!==String(entries[index].itemId)))
+            entries.forEach(entry=>failed.set(entry.itemId,'Перемещение в конец не подтверждено.'));
+        }
+        if (stopped) {
+          try { await loadInventory(); } catch {}
         }
       } else if (definition.value === 'position') {
         // Use Core's existing ATOMIC full-manufacturer reorder when all
@@ -2895,8 +2945,9 @@ async function applyInventoryAuditDataChanges(layer, { items, definition, perIte
         }
         if (failed.size < changes.length) await loadInventory();
       }
-      const unresolved = changes.filter(entry =>
-        !inventoryAuditValueMatches(getInventoryItem(entry.itemId), definition, entry.value));
+      const unresolved = changes.filter(entry => clearingPositions
+        ? !(Number(getInventoryItem(entry.itemId)?.position) > 0)
+        : !inventoryAuditValueMatches(getInventoryItem(entry.itemId), definition, entry.value));
       if (unresolved.length || failed.size) {
         const examples = unresolved.slice(0, 2).map(entry => entry.name).join(', ');
         const detail = [...failed.values()][0];
@@ -3025,7 +3076,8 @@ function openInventoryAuditCriteria(root, {
     if (submit) {
       submit.hidden = !dataActionMode;
       submit.disabled = saving || !dataActionMode;
-      if (!saving) submit.textContent = dataActionMode === 'clear' ? 'Очистить' : 'Применить';
+      if (!saving) submit.textContent = dataActionMode === 'clear'
+        ? definition.value === 'position' ? 'В конец' : 'Очистить' : 'Применить';
       submit.classList.toggle('ui-button--secondary', dataActionMode === 'clear');
     }
   }
@@ -3256,14 +3308,16 @@ function openInventoryAuditCriteria(root, {
     const action = submit;
     saving = true;
     syncDataActions();
-    if (action) action.textContent = clear ? 'Очищаю…' : 'Применяю…';
+    if (action) action.textContent = clear
+      ? definition.value === 'position' ? 'Перемещаю…' : 'Очищаю…' : 'Применяю…';
     try {
       const saved = await applyInventoryAuditDataChanges(layer, {
         items, definition, perItem: !common, data, status, submit, onSaved,
         clearAll, clearItems, selectedIndices,
         keepOpen: isData && keepOpen,
         onProgress: (completed, total) => {
-          const progress = (clear ? 'Очистка' : 'Применение') +
+          const progress = (clear
+            ? definition.value === 'position' ? 'Перемещение' : 'Очистка' : 'Применение') +
             ` · ${completed} из ${total}`;
           if (action?.isConnected) action.textContent = progress;
           if (status?.isConnected) status.textContent = progress;
@@ -3280,7 +3334,8 @@ function openInventoryAuditCriteria(root, {
       });
       if (!saved && status?.textContent && layer.isConnected) {
         openNotice({
-          title: clear ? 'Очистка не завершена' : 'Изменения не сохранены',
+          title: clear ? definition.value === 'position'
+            ? 'Перестановка не завершена' : 'Очистка не завершена' : 'Изменения не сохранены',
           message: status.textContent,
         });
       }
