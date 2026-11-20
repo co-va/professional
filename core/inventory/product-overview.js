@@ -162,13 +162,18 @@ function supplierRows(item) {
   const offers = Array.isArray(item.supplierOffers) ? item.supplierOffers : [];
   const cards = offers.map(offer => {
     const primary = item.primaryOfferId === offer.offerId;
-    const discount = offer.discountPercent == null ? '' : num(offer.discountPercent, 2) + '%';
     return miniCard({
-      title: offer.supplier || 'Контрагент',
-      value: money(candidatePrice(offer)) || '—',
-      subtitle: [primary ? 'Основной' : '', discount ? 'Скидка ' + discount : '']
-        .filter(Boolean).join(' · '),
-      rows: offer.supplierSku ? [{ label: 'Артикул', value: offer.supplierSku }] : [],
+      detailsLayout: {
+        heading: offer.supplier || 'Контрагент',
+        subheading: offer.supplierSku ? 'Артикул: ' + offer.supplierSku : '',
+        body: offer.catalogName || (primary ? item.catalogName : '') || '',
+        stats: [
+          { label: 'Цена', value: money(supplierListPrice(item, offer)) || '—' },
+          { label: 'Скидка', value: offer.discountPercent == null
+            ? '—' : num(offer.discountPercent, 2) + '%' },
+          { label: 'Со скидкой', value: money(candidatePrice(offer)) || '—' },
+        ],
+      },
       interactive: true,
       data: 'data-inventory-supplier-offer="' + escapeHtml(offer.offerId) + '"',
       aria: 'Открыть предложение ' + (offer.supplier || 'Контрагент'),
