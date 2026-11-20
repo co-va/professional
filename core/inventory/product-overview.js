@@ -1,5 +1,5 @@
 import {
-  actionBlock, button, emptyState, entityCardDefaultRows, entityCardRail, entityVisualCard, field,
+  actionBlock, button, emptyState, entityCardDefaultRows, entityCardRail, entityVisualCard, miniCard, miniCardRail, field,
   modal, mountModal, openEntityCardAppearanceQ, openNotice, openSharedProfileSettingsMenu,
   page, select, twoColumnLayout,
   workspaceHeaderContext,
@@ -163,25 +163,25 @@ function supplierRows(item) {
   const cards = offers.map(offer => {
     const primary = item.primaryOfferId === offer.offerId;
     const discount = offer.discountPercent == null ? '' : num(offer.discountPercent, 2) + '%';
-    return '<button type="button" class="stock-supplier-mini' +
-      (primary ? ' is-primary' : '') + '" data-inventory-supplier-offer="' +
-      escapeHtml(offer.offerId) + '" aria-label="Открыть предложение ' +
-      escapeHtml(offer.supplier || 'Контрагент') + '">' +
-      '<strong>' + escapeHtml(offer.supplier || 'Контрагент') + '</strong>' +
-      '<span class="stock-supplier-mini__price">' + escapeHtml(money(candidatePrice(offer)) || '—') + '</span>' +
-      '<span class="stock-supplier-mini__meta">' +
-        escapeHtml([primary ? 'Основной' : '', discount ? 'Скидка ' + discount : ''].filter(Boolean).join(' · ') || '—') +
-      '</span>' +
-      (offer.supplierSku ? '<small>' + escapeHtml(offer.supplierSku) + '</small>' : '') +
-      '</button>';
-  }).join('');
-  return '<div class="stock-supplier-area">' +
-    '<div class="stock-supplier-strip" aria-label="Контрагенты">' + cards +
-    '<button type="button" class="stock-supplier-mini stock-supplier-mini--add" ' +
-    'data-inventory-supplier-add aria-label="Добавить контрагента">' +
-    '<strong class="stock-supplier-mini__plus" aria-hidden="true">+</strong>' +
-    '<span class="stock-supplier-mini__add-label">Добавить контрагента</span>' +
-    '</button></div></div>';
+    return miniCard({
+      title: offer.supplier || 'Контрагент',
+      value: money(candidatePrice(offer)) || '—',
+      subtitle: [primary ? 'Основной' : '', discount ? 'Скидка ' + discount : '']
+        .filter(Boolean).join(' · '),
+      rows: offer.supplierSku ? [{ label: 'Артикул', value: offer.supplierSku }] : [],
+      interactive: true,
+      data: 'data-inventory-supplier-offer="' + escapeHtml(offer.offerId) + '"',
+      aria: 'Открыть предложение ' + (offer.supplier || 'Контрагент'),
+    });
+  });
+  cards.push(miniCard({
+    title: 'Добавить контрагента',
+    value: '+',
+    interactive: true,
+    data: 'data-inventory-supplier-add',
+    aria: 'Добавить контрагента',
+  }));
+  return miniCardRail(cards);
 }
 
 function openStockSupplierInfo(itemId, offerId, onSaved = () => {}) {
