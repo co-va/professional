@@ -161,9 +161,10 @@ const STOCK_EDITOR_HELP = {
     title: 'Расход',
     paragraphs: [
       'Включите расход галочкой, только если складская позиция используется в работе и её нужно списывать. Для позиции, которая просто хранится, заполнять раздел необязательно.',
-      'Если закупаете упаковку, число штук уже известно из раздела «Позиция». Укажите количество штук, расходуемых за одно использование. По умолчанию — 1.',
-      'Если закупаете отдельную штуку, укажите содержимое этой штуки и единицу — шт., г или мл. Затем укажите расходуемое количество. Себестоимость рассчитает система.',
-      'Для точного расхода в граммах необходимо учитывать массу нетто и брутто. Брутто — масса вместе с упаковкой, тара — масса пустой упаковки, нетто — масса самого продукта. Эти поля добавим отдельно; в текущем редакторе их пока нет.',
+      'В поле «Масса брутто» укажите количество вместе с тарой. Справа выберите единицу расхода: г, мл или шт. Для упаковки количество штук подставляется автоматически.',
+      'Если выбраны граммы, можно указать массу тары. Масса нетто рассчитывается автоматически: брутто минус тара. Если тара не указана, нетто равно брутто.',
+      'При выборе мл или шт. поле тары недоступно, нетто совпадает с введённым количеством.',
+      'Укажите количество расхода. Изначально стоит 1. Себестоимость рассчитывается автоматически из закупочной цены и количества, доступного для расхода.',
     ],
   },
   sale: {
@@ -224,11 +225,20 @@ function packPieces(item) {
 }
 
 function consumptionContents(item) {
-  if (item?.receiptUnit === 'уп.') return { quantity: packPieces(item), unit: 'шт.' };
-  return {
-    quantity: item?.nominalQuantity ?? '',
-    unit: item?.nominalUnit || 'г',
-  };
+  if (item?.receiptUnit === 'уп.') return { quantity: packPieces(item), unit: 'шт.', tare: '' };
+  const unit = ['г', 'мл', 'шт.'].includes(item?.nominalUnit) ? item.nominalUnit
+    : ['г', 'мл', 'шт.'].includes(item?.consumeUnit) ? item.consumeUnit
+    : item?.grossWeight != null ? 'г' : 'г';
+  const quantity = unit === 'г' && item?.grossWeight != null
+    ? item.grossWeight : item?.nominalQuantity ?? '';
+  return { quantity, unit, tare: unit === 'г' ? item?.tareWeight ?? '' : '' };
+}
+
+function netContents(gross, tare, unit) {
+  if (gross == null) return null;
+  if (unit !== 'г' || tare == null) return gross;
+  if (tare > gross) return null;
+  return Math.round((gross - tare) * 1000) / 1000;
 }
 
 function supplierLinkedText(item) {
@@ -280,8 +290,9 @@ export function openStockItemQEditor(itemId = '', defaults = {}, onSaved = () =>
     sku: item.sku || '', barcode: item.barcode || '',
     consumeOn: item.canConsume === true,
     consumeQuantity: numberValue(item.consumeQuantity ?? 1),
-    contentQuantity: numberValue(receipt === 'шт.' ? contents.quantity : item.nominalQuantity),
-    contentUnit: receipt === 'шт.' ? contents.unit : item.nominalUnit || 'г',
+    grossQuantity: numberValue(contents.quantity),
+    grossUnit: contents.unit,
+    tareQuantity: numberValue(contents.tare),
     saleOn: item.canSell === true,
     markup: numberValue(item.saleMarkupValue),
     markupMode: item.saleMarkupMode || 'percent',
@@ -308,7 +319,7 @@ export function openStockItemQEditor(itemId = '', defaults = {}, onSaved = () =>
   const consumption = '<div class="inventory-editor-group">' +
     '<div data-stock-content-fields></div>' +
     '<div class="inventory-editor-row">' +
-      numberField('Количество расхода', 'consumeQuantity', original.consumeQuantity) +
+      numberField('Количество расхода', 'consumeQuantity', original.consumeQuantity, original.grossUnit) +
       numberField('Себестоимость', 'consumeCost', '', '₽', true) +
     '</div></div>';
   const sale = '<div class="inventory-editor-group">' +
@@ -393,45 +404,56 @@ export function openStockItemQEditor(itemId = '', defaults = {}, onSaved = () =>
       drawGroups();
     }
   });
-  let pieceContentQuantity = original.contentQuantity;
-  let pieceContentUnit = original.contentUnit;
+  let pieceGross = original.grossQuantity;
+  let pieceUnit = original.grossUnit;
+  let pieceTare = original.tareQuantity;
   const drawContent = () => {
     const host = form.querySelector('[data-stock-content-fields]');
+    if (!host) return;
     const isPack = read('receiptUnit') === 'уп.';
-    if (isPack) {
-      host.innerHTML = '<div class="stock-position-static-content">' +
-        '<span class="inventory-editor-label">Содержимое</span>' +
-        '<span data-stock-pack-content></span></div>';
-    } else {
-      const n = pieceContentQuantity;
-      const u = pieceContentUnit;
-      host.innerHTML = '<div class="inventory-editor-row">' +
-        field({ label: 'Содержимое', name: 'contentQuantity', value: n, type: 'number',
-          min: '0', step: 'any', inputmode: 'decimal' }) +
-        select({ label: 'Единица', name: 'contentUnit', value: u,
+    host.innerHTML = '<div class="inventory-editor-row">' +
+      numberField('Масса брутто', 'grossQuantity',
+        isPack ? read('packPieces') : pieceGross, '', isPack) +
+      (isPack
+        ? field({ label: 'Единица', name: 'grossUnitLocked', value: 'шт.', disabled: true }) +
+          '<input type="hidden" name="grossUnit" value="шт.">'
+        : select({ label: 'Единица', name: 'grossUnit', value: pieceUnit,
           options: [{ value: 'г', label: 'г' }, { value: 'мл', label: 'мл' },
-            { value: 'шт.', label: 'шт.' }] }) + '</div>';
-    }
+            { value: 'шт.', label: 'шт.' }] })) +
+      '</div>' +
+      '<div class="inventory-editor-row">' +
+        numberField('Масса тары', 'tareQuantity', isPack ? '' : pieceTare, '',
+          isPack || pieceUnit !== 'г') +
+        numberField('Масса нетто', 'netQuantity', '', isPack ? 'шт.' : pieceUnit, true) +
+      '</div>';
     updatePrices();
   };
   const updatePrices = () => {
+    const isPack = read('receiptUnit') === 'уп.';
+    const unit = isPack ? 'шт.' : read('grossUnit');
+    const grossInput = input('grossQuantity');
+    if (isPack && grossInput) grossInput.value = read('packPieces');
+    const gross = optionalFinite(isPack ? read('packPieces') : read('grossQuantity'));
+    const tareInput = input('tareQuantity');
+    if (tareInput) tareInput.disabled = isPack || unit !== 'г';
+    // An unknown tare counts as zero only for the visible net/cost calculation.
+    const tare = unit === 'г' && !isPack ? optionalFinite(read('tareQuantity')) : null;
+    const net = netContents(gross, tare, unit);
+    if (input('netQuantity')) input('netQuantity').value = net == null ? '' : formatPrice(net);
+    for (const name of ['netQuantity', 'consumeQuantity']) {
+      const suffix = input(name)?.closest('.stock-position-number')?.querySelector('.stock-position-unit');
+      if (suffix) suffix.textContent = unit;
+    }
     const price = optionalFinite(read('purchasePrice'));
-    const countNow = Number(read('packPieces'));
-    const content = read('receiptUnit') === 'уп.' ? countNow
-      : Number(read('contentQuantity'));
-    const unit = read('receiptUnit') === 'уп.' ? 'шт.' : read('contentUnit');
-    const quantity = Number(read('consumeQuantity') || 1);
-    const expense = price == null || !Number.isFinite(quantity) || quantity < 0 ? null
-      : content > 0 ? price * quantity / content
-      : read('receiptUnit') === 'шт.' && unit === 'шт.' ? price * quantity : null;
+    const quantity = optionalFinite(read('consumeQuantity'));
+    const denominator = net != null && net > 0 ? net
+      : gross == null && unit === 'шт.' && !isPack ? 1 : null;
+    const expense = price == null || quantity == null || denominator == null ? null
+      : price * quantity / denominator;
     if (input('consumeCost')) input('consumeCost').value = expense == null ? '' : formatPrice(expense);
-    const packText = form.querySelector('[data-stock-pack-content]');
-    if (packText) packText.textContent = countNow > 0 && Number.isSafeInteger(countNow)
-      ? countNow + ' шт.' : '—';
     const markup = optionalFinite(read('markup'));
-    const retail = saleCost(price, read('receiptUnit'), countNow);
-    const salePrice = retail == null || markup == null ? null
-      : read('markupMode') === 'amount' ? retail + markup : retail * (1 + markup / 100);
+    const salePrice = price == null || markup == null ? null
+      : read('markupMode') === 'amount' ? price + markup : price * (1 + markup / 100);
     if (input('salePriceCalculated')) input('salePriceCalculated').value =
       salePrice == null ? '' : formatPrice(salePrice);
   };
@@ -448,11 +470,18 @@ export function openStockItemQEditor(itemId = '', defaults = {}, onSaved = () =>
     }
   };
   form.addEventListener('input', event => {
-    if (event.target?.name === 'contentQuantity') pieceContentQuantity = event.target.value;
+    if (read('receiptUnit') !== 'уп.' && event.target?.name === 'grossQuantity')
+      pieceGross = event.target.value;
+    if (read('receiptUnit') !== 'уп.' && event.target?.name === 'tareQuantity')
+      pieceTare = event.target.value;
     updatePrices();
   });
   form.addEventListener('change', event => {
-    if (event.target?.name === 'contentUnit') pieceContentUnit = event.target.value;
+    if (event.target?.name === 'grossUnit' && read('receiptUnit') !== 'уп.') {
+      pieceUnit = event.target.value;
+      const tare = input('tareQuantity');
+      if (tare) tare.value = pieceUnit === 'г' ? pieceTare : '';
+    }
     syncModes();
     updatePrices();
   });
@@ -504,24 +533,36 @@ export function openStockItemQEditor(itemId = '', defaults = {}, onSaved = () =>
       if (consumeNow) {
         const qty = optionalAmount(read('consumeQuantity'), 'Количество расхода', { positive: true });
         if (qty == null) throw new Error('Укажите количество расхода.');
-        const quantityEdited = qty !== Number(original.consumeQuantity);
-        if (quantityEdited || consumeNow !== initialChecks.consume)
+        if (qty !== Number(original.consumeQuantity) || consumeNow !== initialChecks.consume)
           patch.consumeQuantity = qty;
-        const consumeUnit = receiptNow === 'уп.' ? 'шт.' : read('contentUnit');
-        if ((receiptNow !== originalReceipt || quantityEdited || consumeNow !== initialChecks.consume
-            || read('contentUnit') !== original.contentUnit) && consumeUnit !== item.consumeUnit)
-          patch.consumeUnit = consumeUnit;
-        if (receiptNow === 'шт.') {
-          const contentQty = optionalAmount(read('contentQuantity'), 'Содержимое', { positive: true });
-          if (contentQty != null && !consumeUnit) throw new Error('Укажите единицу содержимого.');
-          if (read('contentQuantity') !== original.contentQuantity || read('contentUnit') !== original.contentUnit) {
-            patch.nominalQuantity = contentQty;
-            patch.nominalUnit = contentQty == null ? null : consumeUnit;
-            if (contentQty != null && item.unit === 'шт.' && consumeUnit !== 'шт.') {
+        const isPack = receiptNow === 'уп.';
+        const unit = isPack ? 'шт.' : read('grossUnit');
+        if (unit !== item.consumeUnit) patch.consumeUnit = unit;
+        if (!isPack) {
+          const gross = optionalAmount(read('grossQuantity'), 'Масса брутто', { positive: true });
+          const tare = unit === 'г'
+            ? optionalAmount(read('tareQuantity'), 'Масса тары') : null;
+          if (unit === 'г' && gross != null && tare != null && tare > gross)
+            throw new Error('Масса тары не может превышать массу брутто.');
+          const net = netContents(gross, tare, unit);
+          const grossEdited = read('grossQuantity') !== original.grossQuantity;
+          const unitEdited = unit !== original.grossUnit;
+          const tareEdited = unit === 'г' && read('tareQuantity') !== original.tareQuantity;
+          if (grossEdited || unitEdited || tareEdited) {
+            // Gross/tare are physical gram weights. For ml/pieces only the
+            // nominal amount/unit is recorded; never store millilitres as grams.
+            if (unit === 'г') {
+              patch.grossWeight = gross;
+              patch.tareWeight = gross == null ? null : tare ?? 0;
+            }
+            patch.nominalQuantity = net;
+            patch.nominalUnit = net == null ? null : unit;
+            if (item.unit === 'шт.') {
+              const prev = Array.isArray(item.conversionRules) ? item.conversionRules : [];
               patch.conversionRules = [
-                ...(Array.isArray(item.conversionRules) ? item.conversionRules : [])
-                  .filter(rule => rule.unit !== consumeUnit),
-                { unit: consumeUnit, stockPerUnit: 1 / contentQty },
+                ...prev.filter(rule => !['г', 'мл'].includes(rule.unit)),
+                ...(net != null && net > 0 && unit !== 'шт.'
+                  ? [{ unit, stockPerUnit: 1 / net }] : []),
               ];
             }
           }
