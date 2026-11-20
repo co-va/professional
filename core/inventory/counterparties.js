@@ -1003,7 +1003,7 @@ function catalogItemList(items = [], selectedCatalogIds = new Set(), linkedCatal
           secondaryIndicatorLabel: linkedCatalogIds === null ? ''
             : linkedCatalogIds.has(String(item.id)) ? 'Связан с карточкой склада'
               : matchedCatalogItems?.has(String(item.id))
-                ? 'Совпадает артикул или штрихкод; связь не подтверждена'
+                ? 'Совпадает артикул; связь не подтверждена'
                 : statuses.get(String(item.id))?.status === 'conflict'
                   ? 'Неоднозначная связь: выберите карточку вручную'
                   : 'Не найдено совпадений с карточками склада',
@@ -1099,8 +1099,8 @@ function catalogBrandMarkup(categories, selectedCatalogIds, linkedCatalogIds = n
     );
 }
 
-// Matching is a hint, never a substitute for a persisted Core supplier link.
-// An ambiguous SKU/barcode on either side is not treated as a match.
+// Matching is only a hint, never a substitute for a persisted Core supplier link.
+// The sole automatic match key is the unique supplier article (SKU).
 function findCatalogMatches(catalogRows = [], stockItems = []) {
   const normalize = value => String(value || '').trim().toLocaleUpperCase('ru-RU');
   const index = (rows, field) => {
@@ -1114,17 +1114,13 @@ function findCatalogMatches(catalogRows = [], stockItems = []) {
     }
     return ids;
   };
-  const skuStock = index(stockItems, 'sku'), barcodeStock = index(stockItems, 'barcode');
-  const skuCatalog = index(catalogRows, 'supplierSku'), barcodeCatalog = index(catalogRows, 'barcode');
+  const skuStock = index(stockItems, 'sku');
+  const skuCatalog = index(catalogRows, 'supplierSku');
   const matches = new Map();
   for (const row of catalogRows) {
-    const candidates = new Set();
-    const sku = normalize(row.supplierSku), barcode = normalize(row.barcode);
+    const sku = normalize(row.supplierSku);
     if (sku && skuCatalog.get(sku)?.length === 1 && skuStock.get(sku)?.length === 1)
-      candidates.add(skuStock.get(sku)[0].itemId);
-    if (barcode && barcodeCatalog.get(barcode)?.length === 1 && barcodeStock.get(barcode)?.length === 1)
-      candidates.add(barcodeStock.get(barcode)[0].itemId);
-    if (candidates.size === 1) matches.set(String(row.id), [...candidates][0]);
+      matches.set(String(row.id), skuStock.get(sku)[0].itemId);
   }
   return matches;
 }
@@ -1694,8 +1690,8 @@ async function openCompany(companyId, root, onChanged = () => {}, { initialCompa
   return layer;
 }
 
-// A compact X selects an existing counterparty. Barcode/SKU matches are
-// only hints until Core confirms the exact catalog-to-stock association.
+// A compact X selects an existing counterparty. Only the article (SKU)
+// can suggest a match; Core confirms the catalog-to-stock association.
 const supplierMatchKey = value => String(value || '').trim().toLocaleUpperCase('ru-RU');
 
 async function supplierCatalogRows(company) {
@@ -1720,20 +1716,15 @@ async function supplierCatalogRows(company) {
 }
 
 function uniqueSupplierMatches(item, rows, companyId) {
-  const barcode = supplierMatchKey(item?.barcode);
   const sku = supplierMatchKey(item?.sku);
-  if (!barcode && !sku) return [];
+  if (!item?.itemId || !sku) return [];
   const stockItems = getInventoryItems();
-  const uniqueStockCode = (field, value) => !value || stockItems.filter(entry =>
-    supplierMatchKey(entry[field]) === value).length === 1;
-  // Duplicate stock identifiers or a supplier row already linked to a
-  // different item require explicit manual selection, never an auto-link.
-  if (!uniqueStockCode('barcode', barcode) || !uniqueStockCode('sku', sku)) return [];
-  const barcodeMatches = barcode
-    ? rows.filter(row => supplierMatchKey(row.barcode) === barcode) : [];
-  const candidates = barcodeMatches.length ? barcodeMatches
-    : sku ? rows.filter(row => supplierMatchKey(row.supplierSku) === sku) : [];
-  if (candidates.length !== 1) return []; // never resolve an ambiguous supplier catalog automatically
+  // A repeated article on either side is ambiguous; barcode and name
+  // must never be used as fallback identity.
+  if (stockItems.filter(entry => supplierMatchKey(entry.sku) === sku).length !== 1)
+    return [];
+  const candidates = rows.filter(row => supplierMatchKey(row.supplierSku) === sku);
+  if (candidates.length !== 1) return [];
   return candidates.filter(row => !stockItems.some(entry =>
     String(entry.itemId) !== String(item.itemId) && (entry.supplierOffers || []).some(offer =>
       String(offer.counterpartyId) === String(companyId) &&
