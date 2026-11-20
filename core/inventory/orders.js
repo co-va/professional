@@ -89,9 +89,13 @@ const orderSupplierQuote = (item, supplier = '') => {
   const offeredSize = Number(offer.unitsPerOffer);
   const pricePerPack = sourcePrice => {
     const amount = sourcePrice == null ? null : Number(sourcePrice);
-    if (stockPerPack == null || !Number.isFinite(offeredSize) || offeredSize <= 0
-      || amount == null || !Number.isFinite(amount) || amount < 0) return null;
-    return Math.round((amount / offeredSize * stockPerPack + Number.EPSILON) * 100) / 100;
+    if (amount == null || !Number.isFinite(amount) || amount < 0) return null;
+    // Normalize only when the supplier pack and stock pack are both known.
+    if (stockPerPack != null && Number.isFinite(offeredSize) && offeredSize > 0)
+      return Math.round((amount / offeredSize * stockPerPack + Number.EPSILON) * 100) / 100;
+    // The exact SKU quote is still available for an order. Show that quoted
+    // amount unchanged, never divide or multiply by an invented quantity.
+    return amount;
   };
   // Base price and previously negotiated purchase price are different facts.
   // Invoice edits never update the supplier's base price.
