@@ -9,7 +9,7 @@ import { compactCheck } from '../../ui/selection/check-list.js';
 import { apiRequest, getAuthToken } from '../auth.js';
 import { getInventoryItems } from './data.js';
 import { catalogDisclosure } from './catalog-ui.js';
-import { invalidateInventoryNavigationCache, loadInventory } from './service.js';
+import { invalidateInventoryNavigationCache, loadInventory, setInventoryPrimarySupplierOffer, updateInventoryItem } from './service.js';
 import { getCardAppearanceTemplate, saveCardAppearanceTemplate } from '../card-appearance-templates.js';
 import { loadAuxiliaryState } from '../runtime/auxiliary-state.js';
 
@@ -1694,38 +1694,213 @@ async function openCompany(companyId, root, onChanged = () => {}, { initialCompa
   return layer;
 }
 
+// A compact X selects an existing counterparty. Barcode/SKU matches are
+// only hints until Core confirms the exact catalog-to-stock association.
+const supplierMatchKey = value => String(value || '').trim().toLocaleUpperCase('ru-RU');
+const supplierUnitKey = value => String(value || '').trim().toLocaleLowerCase('ru-RU').replace(/\\.$/, '');
+
+async function supplierCatalogRows(company) {
+  const key = String(company.id);
+  const cached = sharedCatalogCache.get(key);
+  if (cached && Array.isArray(cached.entries) && Date.now() - cached.at < 60000)
+    return cached.entries;
+  const base = '/' + urlId(key) + '/catalog?take=500&skip=';
+  const first = await json(base + '0');
+  const entries = Array.isArray(first.items) ? [...first.items] : [];
+  const count = Math.max(0, Number(first.count) || 0);
+  const pageSize = Math.max(1, Math.min(500, Number(first.pageSize) || entries.length || 100));
+  for (let skip = pageSize; skip < count; skip += pageSize * 4) {
+    const offsets = [];
+    for (let at = skip; at < Math.min(count, skip + pageSize * 4); at += pageSize)
+      offsets.push(at);
+    const pages = await Promise.all(offsets.map(at => json(base + at)));
+    pages.forEach(page => entries.push(...(Array.isArray(page.items) ? page.items : [])));
+  }
+  sharedCatalogCache.set(key, { at: Date.now(), entries });
+  return entries;
+}
+
+function uniqueSupplierMatches(item, rows) {
+  const barcode = supplierMatchKey(item?.barcode);
+  const sku = supplierMatchKey(item?.sku);
+  if (!barcode && !sku) return [];
+  const barcodeMatches = barcode
+    ? rows.filter(row => supplierMatchKey(row.barcode) === barcode) : [];
+  // A barcode takes precedence. An ambiguous barcode must not silently
+  // fall back to SKU and associate the wrong supplier product.
+  if (barcodeMatches.length) return barcodeMatches;
+  return sku ? rows.filter(row => supplierMatchKey(row.supplierSku) === sku) : [];
+}
+
+function supplierNeedsUnits(item, row) {
+  const source = supplierUnitKey(row?.unit);
+  const target = supplierUnitKey(item?.unit);
+  return Boolean(source && target && source !== target);
+}
+
+async function confirmSupplierCatalogLink(company, row, itemId, unitsPerOffer = null) {
+  const item = getInventoryItems().find(entry => String(entry.itemId) === String(itemId));
+  if (!item) throw new Error('Складская позиция не найдена.');
+  if (supplierNeedsUnits(item, row) && !(Number(unitsPerOffer) > 0))
+    throw new Error('Необходимо указать количество единиц склада в предложении.');
+  const already = (item.supplierOffers || []).find(offer =>
+    String(offer.counterpartyId) === String(company.id)
+      && String(offer.catalogItemId) === String(row.id));
+  if (!already) {
+    const result = await json('/' + urlId(company.id) + '/catalog/' + urlId(row.id) + '/link', {
+      method: 'POST',
+      body: { itemId, ...(unitsPerOffer > 0 ? { unitsPerOffer } : {}) },
+    });
+    if (String(result?.itemId || '') !== String(itemId) || !result?.offerId)
+      throw new Error('Core не подтвердил связь товара с прайсом.');
+    await loadInventory();
+  }
+  const saved = getInventoryItems().find(entry => String(entry.itemId) === String(itemId));
+  const offer = (saved?.supplierOffers || []).find(entry =>
+    String(entry.counterpartyId) === String(company.id)
+      && String(entry.catalogItemId) === String(row.id));
+  if (!offer?.offerId) throw new Error('Core не подтвердил сохранение поставщика.');
+  if (String(saved.primaryOfferId || '') !== String(offer.offerId))
+    await setInventoryPrimarySupplierOffer(itemId, offer.offerId);
+  if (row.name && String(getInventoryItems().find(entry =>
+    String(entry.itemId) === String(itemId))?.catalogName || '') !== String(row.name))
+    await updateInventoryItem(itemId, { catalogName: row.name });
+  const verified = getInventoryItems().find(entry => String(entry.itemId) === String(itemId));
+  if (String(verified?.primaryOfferId || '') !== String(offer.offerId))
+    throw new Error('Core не подтвердил основного поставщика.');
+  return verified;
+}
+
+// A Q is needed only when the supplier product cannot be matched uniquely.
+// It contains the supplier product list, not a second supplier picker or
+// controls for creating counterparties.
+function openSupplierProductMatchQ(company, itemId, entries, onSaved = () => {}) {
+  const layer = mountModal(document.body, modal(
+    field({ name: 'supplierProductSearch', type: 'search',
+      placeholder: 'Найти товар по названию, артикулу или штрихкоду' }) +
+    '<div data-supplier-product-match-results></div>' +
+    '<p class="form-error" data-supplier-product-match-error role="alert"></p>',
+    { title: 'Товары поставщика', variant: 'q', surface: 'app' },
+  ));
+  if (!layer) return;
+  const search = layer.querySelector('[name="supplierProductSearch"]');
+  const results = layer.querySelector('[data-supplier-product-match-results]');
+  const error = layer.querySelector('[data-supplier-product-match-error]');
+  let linking = false;
+  const render = () => {
+    const needle = String(search?.value || '').trim().toLocaleLowerCase('ru-RU');
+    const visible = needle ? entries.filter(row =>
+      [row.name, row.supplierSku, row.barcode, row.brand, row.manufacturer]
+        .some(value => String(value || '').toLocaleLowerCase('ru-RU').includes(needle))) : entries;
+    results.innerHTML = visible.length
+      ? v2ListEntries(visible.map(row => v2ListEntry({
+          title: row.name || 'Товар',
+          subtitle: [row.supplierSku && 'Арт. ' + row.supplierSku,
+            row.barcode && 'Штрихкод ' + row.barcode].filter(Boolean).join(' · '),
+          rightTop: money(row.effectivePrice ?? row.listPrice),
+          interactive: true, data: 'data-supplier-product-match="' + escapeHtml(row.id) + '"',
+          aria: 'Связать ' + (row.name || 'Товар'),
+        })))
+      : emptyState('Товары не найдены', entries.length
+        ? 'Измените поиск.' : 'У этого контрагента нет товаров в прайсе.');
+    results.querySelectorAll('[data-supplier-product-match]').forEach(control =>
+      control.addEventListener('click', async () => {
+        if (linking) return;
+        const row = visible.find(value => String(value.id) === control.dataset.supplierProductMatch);
+        if (!row) return;
+        const item = getInventoryItems().find(entry => String(entry.itemId) === String(itemId));
+        if (supplierNeedsUnits(item, row)) {
+          // A unit mismatch must be resolved explicitly. Never assume one
+          // package equals one gram or piece.
+          const unitLayer = mountModal(document.body, modal(
+            field({ label: 'Единиц склада в предложении', name: 'unitsPerOffer',
+              type: 'number', step: 'any', min: '0.001', required: true }) +
+            '<p class="form-error" data-supplier-match-units-error role="alert"></p>' +
+            actionBlock(button('Применить', { data: 'data-supplier-match-units-apply' })),
+            { variant: 'x', surface: 'app', xRole: 'editor' },
+          ));
+          unitLayer?.querySelector('[data-supplier-match-units-apply]')?.addEventListener('click', async event => {
+            const amount = Number(unitLayer.querySelector('[name="unitsPerOffer"]')?.value);
+            const status = unitLayer.querySelector('[data-supplier-match-units-error]');
+            if (!(amount > 0) || !Number.isFinite(amount)) {
+              status.textContent = 'Укажите количество больше нуля.'; return;
+            }
+            event.currentTarget.disabled = true;
+            try {
+              linking = true;
+              await confirmSupplierCatalogLink(company, row, itemId, amount);
+              unitLayer.v2Close?.(); layer.v2Close?.(); onSaved();
+            } catch (cause) { status.textContent = errText(cause); }
+            finally { linking = false; if (event.currentTarget.isConnected) event.currentTarget.disabled = false; }
+          });
+          return;
+        }
+        linking = true;
+        control.disabled = true;
+        error.textContent = '';
+        try {
+          await confirmSupplierCatalogLink(company, row, itemId);
+          layer.v2Close?.(); onSaved();
+        } catch (cause) {
+          error.textContent = errText(cause);
+        } finally {
+          linking = false;
+          if (control.isConnected) control.disabled = false;
+        }
+      }));
+  };
+  search?.addEventListener('input', render);
+  render();
+  return layer;
+}
+
 export async function openSupplierAssociation(itemId, onSaved = () => {}) {
   let companies = [];
   try { companies = await loadCompanies(); }
   catch (cause) { return openNotice({ title: 'Контрагенты', message: errText(cause) }); }
-  if (!companies.length) return openNotice({ title: 'Контрагенты', message: 'Сначала создайте контрагента в отдельном разделе склада.' });
-  const layer = mountModal(document.body, modal(`
-    ${select({ label: 'Контрагент', name: 'counterpartyId', value: '', searchable: true,
-      options: [{ value: '', label: 'Выберите компанию' },
-        ...companies.map(company => ({ value: company.id, label: company.name }))] })}
-    <p class="form-error" data-supplier-association-error role="alert"></p>
-    ${actionBlock(button('Связать компанию', { data: 'data-associate-company' }) +
-      button('Выбрать из прайса', { variant: 'secondary', data: 'data-associate-catalog' }))}`,
-    { title: 'Подключить поставщика', variant: 'q', surface: 'app' }));
-  if (!layer) return;
-  const getCompany = () => companies.find(company => company.id === layer.querySelector('[name="counterpartyId"]')?.value);
-  const fail = err => { layer.querySelector('[data-supplier-association-error]').textContent = errText(err); };
-  layer.querySelector('[data-associate-company]')?.addEventListener('click', async event => {
-    const company = getCompany();
-    if (!company) return fail(new Error('Выберите контрагента'));
-    event.currentTarget.disabled = true;
-    try {
-      await json('/' + urlId(company.id) + '/link-item', { method: 'POST', body: { itemId } });
-      await loadInventory();
-      layer.v2Close?.(); onSaved();
-    } catch (cause) { fail(cause); event.currentTarget.disabled = false; }
+  if (!companies.length) return openNotice({
+    title: 'Контрагенты', message: 'Нет существующих контрагентов для выбора.',
   });
-  layer.querySelector('[data-associate-catalog]')?.addEventListener('click', () => {
-    const company = getCompany();
-    if (!company) return fail(new Error('Выберите контрагента'));
-    void openCatalog(company, { itemId, onLinked: () => { layer.v2Close?.(); onSaved(); } });
+  const item = getInventoryItems().find(entry => String(entry.itemId) === String(itemId));
+  if (!item) return openNotice({ title: 'Склад', message: 'Товар не найден.' });
+  const layer = mountModal(document.body, modal(
+    select({ label: 'Контрагент', name: 'counterpartyId', value: '', searchable: true,
+      options: [{ value: '', label: 'Выберите контрагента' },
+        ...companies.map(company => ({ value: company.id, label: company.name }))] }) +
+    '<p class="form-error" data-supplier-association-error role="alert"></p>' +
+    actionBlock(button('Применить', { data: 'data-associate-company' })),
+    { variant: 'x', surface: 'app', xRole: 'picker' },
+  ));
+  if (!layer) return;
+  const apply = layer.querySelector('[data-associate-company]');
+  const error = layer.querySelector('[data-supplier-association-error]');
+  apply?.addEventListener('click', async () => {
+    if (apply.disabled) return;
+    const companyId = String(layer.querySelector('[name="counterpartyId"]')?.value || '');
+    const company = companies.find(row => String(row.id) === companyId);
+    if (!company) { error.textContent = 'Выберите контрагента.'; return; }
+    apply.disabled = true;
+    error.textContent = '';
+    try {
+      const rows = await supplierCatalogRows(company);
+      if (!layer.isConnected) return;
+      const fresh = getInventoryItems().find(entry => String(entry.itemId) === String(itemId));
+      const candidates = uniqueSupplierMatches(fresh, rows);
+      if (candidates.length === 1 && !supplierNeedsUnits(fresh, candidates[0])) {
+        await confirmSupplierCatalogLink(company, candidates[0], itemId);
+        layer.v2Close?.(); onSaved();
+        return;
+      }
+      layer.v2Close?.();
+      openSupplierProductMatchQ(company, itemId, rows, onSaved);
+    } catch (cause) {
+      if (layer.isConnected) error.textContent = errText(cause);
+    } finally {
+      if (apply.isConnected) apply.disabled = false;
+    }
   });
 }
+
 function counterpartyCardFields(company = {}) {
   const files = Array.isArray(company.priceLists) ? company.priceLists : [];
   const ready = files.find(file => file.parserStatus === 'READY');
