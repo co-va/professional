@@ -329,8 +329,8 @@ function inventoryTodayForDate(date) {
 }
 
 
-export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () => {}) {
-  return openStockItemQEditor(itemId, defaults, onSaved);
+export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () => {}, stockScope = INVENTORY_TOTAL_SCOPE) {
+  return openStockItemQEditor(itemId, defaults, onSaved, stockScope);
 }
 
 function openInventoryItemFilters(root, availableFilters, values, onApplied) {
@@ -1277,7 +1277,7 @@ function openManufacturerStock(root, manufacturer, groupContext = null) {
         const itemId = control.dataset.inventoryItem;
         openInventoryProductOverview(itemId, {
           stockScope: STOCK_VIEW.storageScope,
-          edit: onSaved => openItemEditor(root, itemId, {}, onSaved),
+          edit: (onSaved, scope) => openItemEditor(root, itemId, {}, onSaved, scope),
           onChanged: renderList,
         });
       }));
