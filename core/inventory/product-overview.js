@@ -61,8 +61,11 @@ function supplierListPrice(item, offer) {
   if (!Number.isFinite(price) || price < 0) return null;
   // Match Core's basePrice unit: one nominal item package rather than the
   // supplier's potentially larger carton of purchasable units.
-  return price * (positive(item.packageQuantity) ?? 1) /
-    (positive(offer.unitsPerOffer) ?? 1);
+  const ownSize = positive(item.packageQuantity);
+  const offerSize = positive(offer.unitsPerOffer);
+  // The supplier's quoted pack price is still stored, but cannot be
+  // normalized until both quantities have a verified conversion.
+  return ownSize != null && offerSize != null ? price * ownSize / offerSize : null;
 }
 
 function consumptionUnitCost(item) {
@@ -161,12 +164,12 @@ function supplierRows(item) {
   return v2ListEntries(offers.map((offer) => {
     const primary = item.primaryOfferId === offer.offerId;
     const amount = candidatePrice(offer);
-    const pack = Number(offer.unitsPerOffer) || 1;
+    const pack = positive(offer.unitsPerOffer);
     return v2ListEntry({
       title: offer.supplier || 'Место покупки',
       subtitle: primary ? 'Основной' : '',
       rightTop: money(amount) || '—',
-      rightBottom: pack > 0 ? num(pack) + ' ' + item.unit : '',
+      rightBottom: pack != null ? num(pack) + ' ' + item.unit : '',
       initial: '',
       interactive: true,
       data: 'data-inventory-supplier-offer="' + escapeHtml(offer.offerId) + '"',
@@ -202,7 +205,7 @@ function openSupplierEditor(itemId, offerId = '', onSaved = () => {}) {
     )}
     ${twoColumnLayout(
       field({ label: 'Скидка, %', name: 'discountPercent', value: offer?.discountPercent ?? '', type: 'number', min: '0', max: '100', step: '0.01', inputmode: 'decimal' }),
-      field({ label: 'Содержимое, ' + item.unit, name: 'unitsPerOffer', value: offer?.unitsPerOffer ?? item.packageQuantity ?? 1, type: 'number', min: '0.001', step: '0.001', inputmode: 'decimal' }),
+      field({ label: 'Содержимое, ' + item.unit, name: 'unitsPerOffer', value: offer?.unitsPerOffer ?? '', type: 'number', min: '0.001', step: '0.001', inputmode: 'decimal' }),
       { ariaLabel: 'Скидка и содержимое закупаемой упаковки' },
     )}
     <p data-inventory-offer-calculated-discount></p>
@@ -257,7 +260,7 @@ function openSupplierEditor(itemId, offerId = '', onSaved = () => {}) {
         listPrice: offerValue(data, 'listPrice'),
         actualPrice: offerValue(data, 'actualPrice'),
         discountPercent: offerValue(data, 'discountPercent', { max: 100 }),
-        unitsPerOffer: offerValue(data, 'unitsPerOffer', { required: true, positive: true }),
+        unitsPerOffer: offerValue(data, 'unitsPerOffer', { positive: true }),
         supplierSku: String(data.get('supplierSku') || '').trim(),
         note: String(data.get('note') || '').trim(),
       };
