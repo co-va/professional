@@ -248,19 +248,6 @@
 .stock-position-form .inventory-editor-heading__controls{right:0}
 
 
-/* Supplier quotes are separate from the stock editor. A horizontal strip
-   keeps every company visible without mixing its price into stock fields. */
-.stock-supplier-area{margin:8px 0 14px;min-width:0}
-.stock-supplier-strip{display:flex;align-items:stretch;gap:8px;max-width:100%;overflow-x:auto;overscroll-behavior-x:contain;padding:2px 0 8px;scroll-snap-type:x proximity}
-.stock-supplier-mini{flex:0 0 146px;min-height:92px;display:flex;flex-direction:column;justify-content:center;align-items:flex-start;gap:5px;padding:10px;text-align:left;border:1px solid var(--border);border-radius:0;background:var(--white);color:var(--text);scroll-snap-align:start}
-.stock-supplier-mini>strong{font-size:13px;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.stock-supplier-mini__price{font-size:17px;font-weight:700;font-variant-numeric:tabular-nums}
-.stock-supplier-mini__meta,.stock-supplier-mini>small{color:var(--text-secondary);font-size:11px;line-height:1.25}
-.stock-supplier-mini.is-primary{border-color:var(--text)}
-.stock-supplier-mini--add{appearance:none;-webkit-appearance:none;flex:0 0 146px;align-items:center;justify-content:center;text-align:center;gap:5px;cursor:pointer}
-.stock-supplier-mini--add .stock-supplier-mini__plus{font-size:32px;font-weight:800;line-height:1;color:var(--text)}
-.stock-supplier-mini--add .stock-supplier-mini__add-label{font-size:11px;line-height:1.2;font-weight:650;color:var(--text-secondary)}
-.stock-supplier-mini--add:active{background:var(--surface-soft)}
 .stock-supplier-info{display:grid;gap:12px}
 .stock-supplier-info-line{display:flex;justify-content:space-between;gap:12px;align-items:start;font-size:13px}
 .stock-supplier-info-line>span{color:var(--text-secondary);flex:0 0 38%}
