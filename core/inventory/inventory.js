@@ -40,6 +40,7 @@ import {
   inventoryStockThresholdInput, inventoryStockThresholdStored, inventoryStockThresholdUnit,
 } from './completeness.js';
 import { openInventoryProductAppearanceQ, openInventoryProductOverview } from './product-overview.js';
+import { openInventoryBulkSupplierLink } from './supplier-bulk-link.js';
 import { renderInventoryOrders, openInventoryOrderFromSelection } from './orders.js';
 import { classificationOptions, openInventoryClassificationGroups,
   inventoryCriterionGroups, criterionOptions } from './classification.js';
@@ -2484,7 +2485,7 @@ const INVENTORY_AUDIT_EDIT_FIELDS = [
   { value: 'position', label: 'Порядковый номер', kind: 'integer' },
   { value: 'sku', label: 'Артикул', kind: 'text' },
   { value: 'barcode', label: 'Штрихкод', kind: 'text' },
-  { value: 'supplier', label: 'Поставщик', kind: 'text' },
+  { value: 'supplier', label: 'Поставщик', kind: 'association' },
   { value: 'referencePrice', label: 'Цена', kind: 'decimal' },
   { value: 'unit', label: 'Единица', kind: 'unit' },
   { value: 'packageQuantity', label: 'Упаковка', kind: 'decimal' },
@@ -2877,6 +2878,12 @@ function openInventoryAuditCriteria(root, {
 
   function syncDataActions() {
     if (!isData) return;
+    if (definition.value === 'supplier') {
+      dataActionMode = '';
+      if (dataActions) dataActions.hidden = true;
+      if (submit) submit.hidden = true;
+      return;
+    }
     const common = Boolean(dataMode?.checked);
     if (commonHost) commonHost.hidden = !common;
     if (individualHost) individualHost.hidden = common;
@@ -2910,6 +2917,25 @@ function openInventoryAuditCriteria(root, {
 
   function renderDataFields() {
     if (!isData || !definition || !commonHost || !individualHost) return;
+    if (dataMode?.closest('.ui-compact-check'))
+      dataMode.closest('.ui-compact-check').hidden = definition.value === 'supplier';
+    if (definition.value === 'supplier') {
+      commonHost.hidden = false;
+      individualHost.hidden = true;
+      individualHost.innerHTML = '';
+      commonHost.innerHTML = '<p class="ui-list__secondary">Выберите контрагента. Товары будут сопоставлены с его прайсом по артикулам.</p>' +
+        actionBlock(button('Выбрать поставщика', { data: 'data-inventory-bulk-supplier-open' }));
+      commonHost.querySelector('[data-inventory-bulk-supplier-open]')?.addEventListener('click', () => {
+        openInventoryBulkSupplierLink(items, () => {
+          items.splice(0, items.length,
+            ...items.map(item => getInventoryItem(item.itemId)).filter(Boolean));
+          onSaved();
+        });
+      });
+      status.textContent = '';
+      syncDataActions();
+      return;
+    }
     const values = items.map(item => String(inventoryAuditCurrentValue(item, definition) ?? '').trim());
     dataUniform = new Set(values).size === 1;
     dataInitial = dataUniform ? values[0] || '' : '';
@@ -2948,6 +2974,8 @@ function openInventoryAuditCriteria(root, {
         if (!next || saving) return;
         definition = next;
         renderDataFields();
+        if (definition.value === 'supplier')
+          commonHost.querySelector('[data-inventory-bulk-supplier-open]')?.click();
       });
     }
     dataMode?.addEventListener('change', syncDataActions);
