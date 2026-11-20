@@ -2917,8 +2917,8 @@ function openInventoryAuditCriteria(root, {
 
   function renderDataFields() {
     if (!isData || !definition || !commonHost || !individualHost) return;
-    if (dataMode?.closest('.ui-compact-check'))
-      dataMode.closest('.ui-compact-check').hidden = definition.value === 'supplier';
+    const commonToggle = dataMode?.closest('.ui-compact-check');
+    if (commonToggle) commonToggle.style.display = definition.value === 'supplier' ? 'none' : '';
     if (definition.value === 'supplier') {
       commonHost.hidden = false;
       individualHost.hidden = true;
