@@ -12,7 +12,6 @@ import {
   modal,
   mountModal,
   openNotice,
-  openSharedProfileSettingsMenu,
   mountV2ZLayer,
   page,
   v2ListEntries,
@@ -181,28 +180,19 @@ function renderProcedureOverview(layer, baseRoot, id, { onChanged = () => {}, st
   }
   layer.dataset.serviceOverview = 'procedure:' + id;
   layer.innerHTML = page([
-    serviceHeaderContext({
-      title: procedure.name || 'Услуга',
-      settingsData: 'data-procedure-consumables-menu',
-      settingsAria: 'Меню услуги',
-    }),
+    serviceHeaderContext({ title: procedure.name || 'Услуга' }),
     procedureOverviewCard(procedure, statistics),
     procedureWorkplaceCards(procedure, statistics),
+    '<div class="app-settings-panel">' +
+      button('Расходник', { variant: 'secondary', data: 'data-procedure-open-consumables' }) +
+    '</div>',
   ]);
-  layer.querySelector('[data-procedure-consumables-menu]')?.addEventListener('click', () => {
-    openSharedProfileSettingsMenu({
-      title: 'Услуга',
-      actions: [{
-        id: 'consumables',
-        label: 'Расходник',
-        onSelect: async () => {
-          const { openProcedureConsumables } = await import('./consumables.js');
-          openProcedureConsumables(id, () => {
-            if (layer.isConnected) renderProcedureOverview(layer, baseRoot, id, { onChanged });
-            onChanged();
-          });
-        },
-      }],
+  layer.querySelector('[data-procedure-open-consumables]')?.addEventListener('click', async () => {
+    const { openProcedureConsumables } = await import('./consumables.js');
+    if (!layer.isConnected) return;
+    openProcedureConsumables(id, () => {
+      if (layer.isConnected) renderProcedureOverview(layer, baseRoot, id, { onChanged });
+      onChanged();
     });
   });
   layer.querySelector('[data-procedure-open-editor]')?.addEventListener('click', () => {
