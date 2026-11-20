@@ -16,10 +16,22 @@ const LEGACY = [
 ];
 const valueText = value => String(value ?? '').trim();
 const compare = (a,b) => String(a).localeCompare(String(b),'ru',{numeric:true,sensitivity:'base'});
+export const isFixedManufacturerCriterion = group =>
+  group?.id === 'manufacturer' || group?.legacyField === 'manufacturer';
+
+export function orderedInventoryCriteria(groups = []) {
+  // Manufacturer is the immutable platform-owned root. Only subsequent
+  // user-defined groups participate in hierarchy order.
+  return [...groups].sort((a,b) =>
+    (isFixedManufacturerCriterion(a) ? -1 : isFixedManufacturerCriterion(b) ? 1 : 0)
+    || (Number(a.position) || 0) - (Number(b.position) || 0)
+    || compare(a.name,b.name));
+}
+
 
 export function inventoryCriterionGroups() {
   const stored = getInventoryCriteria();
-  return Array.isArray(stored) ? stored : LEGACY.map(seed=>({
+  return Array.isArray(stored) ? orderedInventoryCriteria(stored) : LEGACY.map(seed=>({
     ...seed,values:[...new Set(getInventoryItems().map(item=>valueText(item[seed.legacyField])).filter(Boolean))]
       .sort(compare).map(name=>({id:name,name})),
   }));
@@ -144,7 +156,7 @@ export function openInventoryClassificationGroups(onSaved = () => {}) {
   };
   const removeGroup = id => {
     const group=current.find(row=>row.id===id);
-    if(!group)return;
+    if(!group || isFixedManufacturerCriterion(group))return;
     confirmRemove({
       title:'Удалить группу',
       description:'Группа «'+group.name+'» исчезнет из списка. Товары и остатки сохранятся.',
@@ -156,6 +168,7 @@ export function openInventoryClassificationGroups(onSaved = () => {}) {
     });
   };
   const editName = (group = null, onFinished = () => {}) => {
+    if (isFixedManufacturerCriterion(group)) return;
     const editor = mountModal(document.body, modal(
       '<form data-inventory-criterion-form>' +
       field({label:'Название группы',name:'name',value:group?.name||'',required:true}) +
@@ -249,7 +262,8 @@ export function openInventoryClassificationGroups(onSaved = () => {}) {
     const layer=mountModal(document.body,modal(
       '<div data-inventory-criterion-values></div>'+
       actionBlock(button('Добавить значение',{data:'data-inventory-add-criterion-value'})+
-        button('Изменить группу',{variant:'secondary',data:'data-inventory-edit-criterion'})),
+        (isFixedManufacturerCriterion(group) ? '' :
+          button('Изменить группу',{variant:'secondary',data:'data-inventory-edit-criterion'}))),
       {title:group.name,variant:'q',surface:'app'},
     ));
     if(!layer)return;
@@ -289,12 +303,13 @@ export function openInventoryClassificationGroups(onSaved = () => {}) {
   };
   const refresh=()=>{
     if(!main)return;
-    main.innerHTML=current.length?v2ListEntries(current.map(group=>v2ListEntry({
+    main.innerHTML=current.length?v2ListEntries(orderedInventoryCriteria(current).map(group=>v2ListEntry({
       title:group.name,rightTop:group.values.length+' знач.',
       interactive:true,initial:'',omitEmptySubtitle:true,
       aria:'Открыть значения '+group.name,
       data:'data-inventory-criterion-group="'+escapeHtml(group.id)+'"',
-      deleteData:group.id,deleteAria:'Удалить группу '+group.name,
+      deleteData:isFixedManufacturerCriterion(group) ? '' : group.id,
+      deleteAria:'Удалить группу '+group.name,
     }))):emptyState('Групп пока нет');
     main.querySelectorAll('[data-inventory-criterion-group]').forEach(node=>
       node.addEventListener('click',event=>{
