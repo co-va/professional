@@ -498,10 +498,10 @@ export function openInventoryProductOverview(itemId, { edit = () => {}, onChange
       }),
       productCard(item, stockScope),
       v2Section('Остатки', locationOverview(item) +
-        actionBlock(button('Настроить', {
+        '<div class="profile-actions">' + button('Настроить', {
           variant: 'secondary', data: 'data-inventory-product-targets',
           aria: 'Настроить желаемые остатки по складам',
-        }))),
+        }) + '</div>'),
       supplierRows(item),
     ]);
     host.querySelector('[data-inventory-product-card]')?.addEventListener('click', () => {
