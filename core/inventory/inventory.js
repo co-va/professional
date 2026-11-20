@@ -3361,9 +3361,9 @@ function openStockCreateOptions(root, onChanged, defaults = {}) {
   });
 }
 
-let inventoryRankRepairAttempted = false;
+let inventoryRankRepairPending = false;
 if (typeof window !== 'undefined') window.addEventListener('professional:auth-logout',
-  () => { inventoryRankRepairAttempted = false; });
+  () => { inventoryRankRepairPending = false; });
 
 function inventoryNeedsPositionRepair(rows = []) {
   const groups = new Map();
@@ -3457,8 +3457,8 @@ function renderStock(root) {
   // Historical gaps and missing ranks are repaired once through a dedicated
   // capability. Never call old Core's "clear" endpoint: it wrote actual 0s.
   // The server changes ONLY manufacturer-local position values atomically.
-  if (!inventoryRankRepairAttempted && inventoryNeedsPositionRepair(getInventoryItems())) {
-    inventoryRankRepairAttempted = true;
+  if (!inventoryRankRepairPending && inventoryNeedsPositionRepair(getInventoryItems())) {
+    inventoryRankRepairPending = true;
     void repairInventoryPositions().then(() => {
       if (inventoryNeedsPositionRepair(getInventoryItems()))
         throw new Error('Некоторые порядковые номера не восстановлены.');
@@ -3468,7 +3468,7 @@ function renderStock(root) {
         title:'Нумерация склада',
         message:error instanceof Error ? error.message : 'Не удалось восстановить номера.',
       });
-    });
+    }).finally(() => { inventoryRankRepairPending = false; });
   }
   notifyContext();
 }
