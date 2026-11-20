@@ -542,8 +542,8 @@ export function openStockItemQEditor(itemId = '', defaults = {}, onSaved = () =>
           const gross = optionalAmount(read('grossQuantity'), 'Масса брутто', { positive: true });
           const tare = unit === 'г'
             ? optionalAmount(read('tareQuantity'), 'Масса тары') : null;
-          if (unit === 'г' && gross != null && tare != null && tare > gross)
-            throw new Error('Масса тары не может превышать массу брутто.');
+          if (unit === 'г' && gross != null && tare != null && tare >= gross)
+            throw new Error('Масса тары должна быть меньше массы брутто.');
           const net = netContents(gross, tare, unit);
           const grossEdited = read('grossQuantity') !== original.grossQuantity;
           const unitEdited = unit !== original.grossUnit;
