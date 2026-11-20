@@ -857,10 +857,16 @@ function initStockCategoryDragPreview(sequence) {
   };
 }
 
-function stockListMarkup(manufacturer, query = '', rowsProvider = null, expanded = new Map(), selected = new Set(), allowCategoryReorder = false) {
+function stockListMarkup(manufacturer, query = '', rowsProvider = null, expanded = new Map(), selected = new Set(), allowCategoryReorder = false, scopeRowsProvider = null) {
   const needle = normalizedSearch(query);
-  const group = typeof rowsProvider === 'function'
-    ? rowsProvider() : getInventoryItems().filter(item => manufacturerName(item) === manufacturer);
+  // Manufacturers and nested categories are navigation only. Active search
+  // and filters match every item in the current storage scope, not merely
+  // those belonging to the manufacturer that originally opened this Z.
+  const flat = Boolean(needle) || hasStockFilters(STOCK_VIEW.itemsFilters);
+  const group = flat
+    ? (typeof scopeRowsProvider === 'function' ? scopeRowsProvider() : getInventoryItems())
+    : typeof rowsProvider === 'function'
+      ? rowsProvider() : getInventoryItems().filter(item => manufacturerName(item) === manufacturer);
   const classificationGroups = getInventoryClassificationGroups();
   const storageLocations = getInventoryStorageLocations();
   const items = sortItems(group.filter(item => {
@@ -893,6 +899,8 @@ function stockListMarkup(manufacturer, query = '', rowsProvider = null, expanded
       list({className:'ui-list--dense',items:[itemRow(item)]}) +
     '</div>'
   ).join('');
+  if (flat) return '<div class="list-entries inventory-stock-category-sequence">' +
+    itemList(items) + '</div>';
   const nestedCriteria = stockNestedCriteria(inventoryCriterionGroups());
   const tree = stockGroupTree(items, nestedCriteria);
   // The shared disclosure owns the appearance; only a named value becomes
@@ -1077,11 +1085,17 @@ function openManufacturerStock(root, manufacturer, groupContext = null) {
       groupContext.itemsForView?.() || getInventoryItems(),groupContext.criteria)
       .find(entry => entry.name === manufacturer)?.items || []
     : null;
+  // Shared scope owner: filtering must not reintroduce items from other
+  // physical warehouses when the user is viewing one specific location.
+  const scopeRowsProvider = groupContext?.itemsForView ||
+    (() => getInventoryItems().filter(item =>
+      inventoryItemBelongsToStorage(item, STOCK_VIEW.storageScope)));
   const expandedStockGroups = new Map();
   // One selection drives both actions; no separate stock mutation owner.
   const selectedStockItems = new Set();
   const markup = `
     ${context(manufacturer, {
+      v: { data: 'data-inventory-company-v', aria: 'Фильтр и сортировка позиций' },
       c: { label: '+', data: 'data-inventory-add-item', aria: 'Добавить позицию' },
     })}
     <div data-stock-selected-actions hidden>
@@ -1091,7 +1105,7 @@ function openManufacturerStock(root, manufacturer, groupContext = null) {
         button('Удалить', { variant: 'delete-outline', data: 'data-stock-selected-delete' })
       )}
     </div>
-    <div data-inventory-company-list>${stockListMarkup(manufacturer, '', rowsProvider, expandedStockGroups)}</div>`;
+    <div data-inventory-company-list>${stockListMarkup(manufacturer, '', rowsProvider, expandedStockGroups, selectedStockItems, false, scopeRowsProvider)}</div>`;
   const layer = mountV2ZLayer(root, v2ZLayer(markup, { className: 'inventory-manufacturer-z' }), { stack: true });
   if (!layer) return;
   const [searchRow] = setV2ZHeaderRows(layer, [stockSearchField('', 'data-inventory-company-search')]);
@@ -1220,7 +1234,7 @@ function openManufacturerStock(root, manufacturer, groupContext = null) {
       && STOCK_VIEW.itemsSort==='position-asc' && Boolean(reorderGroup);
     if (listHost) listHost.innerHTML = stockListMarkup(
       manufacturer, query, rowsProvider, expandedStockGroups, selectedStockItems,
-      allowCategoryReorder);
+      allowCategoryReorder, scopeRowsProvider);
     listHost?.querySelectorAll('[data-stock-item-check]').forEach(check=>
       check.addEventListener('change',()=>{
         const id=String(check.dataset.stockItemCheck);
@@ -1292,6 +1306,17 @@ function openManufacturerStock(root, manufacturer, groupContext = null) {
   };
 
   searchInput?.addEventListener('input', renderList);
+  layer.querySelector('[data-inventory-company-v]')?.addEventListener('click', () => {
+    openSharedProfileSettingsMenu({
+      title: 'Складские позиции',
+      actions: [
+        { id: 'filter', label: 'Фильтр', onSelect: () =>
+          openStockControls(document.body, 'items', '', renderList, 'filter') },
+        { id: 'sort', label: 'Сортировка', onSelect: () =>
+          openStockControls(document.body, 'items', '', renderList, 'sort') },
+      ],
+    });
+  });
   layer.querySelector('[data-inventory-add-item]')?.addEventListener('click', () => {
     const first=groupContext?.criteria?.[0];
     const value=first?.values?.find(entry=>entry.name===manufacturer);
