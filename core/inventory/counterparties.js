@@ -9,7 +9,7 @@ import { compactCheck } from '../../ui/selection/check-list.js';
 import { apiRequest, getAuthToken } from '../auth.js';
 import { getInventoryItems } from './data.js';
 import { catalogDisclosure } from './catalog-ui.js';
-import { invalidateInventoryNavigationCache, loadInventory, setInventoryPrimarySupplierOffer, updateInventoryItem } from './service.js';
+import { invalidateInventoryNavigationCache, loadInventory } from './service.js';
 import { getCardAppearanceTemplate, saveCardAppearanceTemplate } from '../card-appearance-templates.js';
 import { loadAuxiliaryState } from '../runtime/auxiliary-state.js';
 
@@ -1697,7 +1697,6 @@ async function openCompany(companyId, root, onChanged = () => {}, { initialCompa
 // A compact X selects an existing counterparty. Barcode/SKU matches are
 // only hints until Core confirms the exact catalog-to-stock association.
 const supplierMatchKey = value => String(value || '').trim().toLocaleUpperCase('ru-RU');
-const supplierUnitKey = value => String(value || '').trim().toLocaleLowerCase('ru-RU').replace(/\.$/, '');
 
 async function supplierCatalogRows(company) {
   const key = String(company.id);
@@ -1741,43 +1740,45 @@ function uniqueSupplierMatches(item, rows, companyId) {
       String(offer.catalogItemId) === String(row.id))));
 }
 
-function supplierNeedsUnits(item, row) {
-  const source = supplierUnitKey(row?.unit);
-  const target = supplierUnitKey(item?.unit);
-  return Boolean(source && target && source !== target);
-}
-
-async function confirmSupplierCatalogLink(company, row, itemId, unitsPerOffer = null) {
-  const item = getInventoryItems().find(entry => String(entry.itemId) === String(itemId));
-  if (!item) throw new Error('Складская позиция не найдена.');
-  if (supplierNeedsUnits(item, row) && !(Number(unitsPerOffer) > 0))
-    throw new Error('Необходимо указать количество единиц склада в предложении.');
-  const already = (item.supplierOffers || []).find(offer =>
+async function confirmSupplierCatalogLink(company, row, itemId) {
+  const original = getInventoryItems().find(item => String(item.itemId) === String(itemId));
+  if (!original) throw new Error('Складская позиция не найдена.');
+  const linked = (original.supplierOffers || []).find(offer =>
     String(offer.counterpartyId) === String(company.id)
-      && String(offer.catalogItemId) === String(row.id));
-  if (!already) {
-    const result = await json('/' + urlId(company.id) + '/catalog/' + urlId(row.id) + '/link', {
-      method: 'POST',
-      body: { itemId, ...(unitsPerOffer > 0 ? { unitsPerOffer } : {}) },
+    && String(offer.catalogItemId) === String(row.id));
+  if (!linked) {
+    const response = await json('/' + urlId(company.id) + '/catalog/' + urlId(row.id) + '/link', {
+      method: 'POST', body: { itemId },
     });
-    if (String(result?.itemId || '') !== String(itemId) || !result?.offerId)
-      throw new Error('Core не подтвердил связь товара с прайсом.');
-    await loadInventory();
+    if (String(response?.itemId || '') !== String(itemId) || !response?.offerId)
+      throw new Error('Core не подтвердил привязку товара.');
   }
-  const saved = getInventoryItems().find(entry => String(entry.itemId) === String(itemId));
+  await loadInventory();
+  const saved = getInventoryItems().find(item => String(item.itemId) === String(itemId));
   const offer = (saved?.supplierOffers || []).find(entry =>
     String(entry.counterpartyId) === String(company.id)
-      && String(entry.catalogItemId) === String(row.id));
-  if (!offer?.offerId) throw new Error('Core не подтвердил сохранение поставщика.');
-  if (String(saved.primaryOfferId || '') !== String(offer.offerId))
-    await setInventoryPrimarySupplierOffer(itemId, offer.offerId);
-  if (row.name && String(getInventoryItems().find(entry =>
-    String(entry.itemId) === String(itemId))?.catalogName || '') !== String(row.name))
-    await updateInventoryItem(itemId, { catalogName: row.name });
-  const verified = getInventoryItems().find(entry => String(entry.itemId) === String(itemId));
-  if (String(verified?.primaryOfferId || '') !== String(offer.offerId))
-    throw new Error('Core не подтвердил основного поставщика.');
-  return verified;
+    && String(entry.catalogItemId) === String(row.id));
+  if (!offer?.offerId || String(saved?.primaryOfferId || '') !== String(offer.offerId)
+    || String(saved?.catalogName || '') !== String(row.name || ''))
+    throw new Error('Связь с товаром поставщика не подтверждена. Обновите склад.');
+  return saved;
+}
+
+// Company-only linking also works without an uploaded catalog. Core persists
+// the supplier offer; never send the user to an empty product list.
+async function confirmSupplierCompanyLink(company, itemId) {
+  const result = await json('/' + urlId(company.id) + '/link-item', {
+    method: 'POST', body: { itemId },
+  });
+  if (String(result?.itemId || '') !== String(itemId) || !result?.offerId)
+    throw new Error('Core не подтвердил привязку контрагента.');
+  await loadInventory();
+  const saved = getInventoryItems().find(item => String(item.itemId) === String(itemId));
+  const offer = (saved?.supplierOffers || []).find(entry =>
+    String(entry.counterpartyId) === String(company.id)
+    && String(entry.offerId) === String(result.offerId));
+  if (!offer) throw new Error('Сохранённая связь с контрагентом не найдена.');
+  return saved;
 }
 
 // A Q is needed only when the supplier product cannot be matched uniquely.
@@ -1817,33 +1818,6 @@ function openSupplierProductMatchQ(company, itemId, entries, onSaved = () => {})
         if (linking) return;
         const row = visible.find(value => String(value.id) === control.dataset.supplierProductMatch);
         if (!row) return;
-        const item = getInventoryItems().find(entry => String(entry.itemId) === String(itemId));
-        if (supplierNeedsUnits(item, row)) {
-          // A unit mismatch must be resolved explicitly. Never assume one
-          // package equals one gram or piece.
-          const unitLayer = mountModal(document.body, modal(
-            field({ label: 'Единиц склада в предложении', name: 'unitsPerOffer',
-              type: 'number', step: 'any', min: '0.001', required: true }) +
-            '<p class="form-error" data-supplier-match-units-error role="alert"></p>' +
-            actionBlock(button('Применить', { data: 'data-supplier-match-units-apply' })),
-            { variant: 'x', surface: 'app', xRole: 'editor' },
-          ));
-          unitLayer?.querySelector('[data-supplier-match-units-apply]')?.addEventListener('click', async event => {
-            const amount = Number(unitLayer.querySelector('[name="unitsPerOffer"]')?.value);
-            const status = unitLayer.querySelector('[data-supplier-match-units-error]');
-            if (!(amount > 0) || !Number.isFinite(amount)) {
-              status.textContent = 'Укажите количество больше нуля.'; return;
-            }
-            event.currentTarget.disabled = true;
-            try {
-              linking = true;
-              await confirmSupplierCatalogLink(company, row, itemId, amount);
-              unitLayer.v2Close?.(); layer.v2Close?.(); onSaved();
-            } catch (cause) { status.textContent = errText(cause); }
-            finally { linking = false; if (event.currentTarget.isConnected) event.currentTarget.disabled = false; }
-          });
-          return;
-        }
         linking = true;
         control.disabled = true;
         error.textContent = '';
@@ -1895,7 +1869,12 @@ export async function openSupplierAssociation(itemId, onSaved = () => {}) {
       if (!layer.isConnected) return;
       const fresh = getInventoryItems().find(entry => String(entry.itemId) === String(itemId));
       const candidates = uniqueSupplierMatches(fresh, rows, company.id);
-      if (candidates.length === 1 && !supplierNeedsUnits(fresh, candidates[0])) {
+      if (!rows.length) {
+        await confirmSupplierCompanyLink(company, itemId);
+        layer.v2Close?.(); onSaved();
+        return;
+      }
+      if (candidates.length === 1) {
         await confirmSupplierCatalogLink(company, candidates[0], itemId);
         layer.v2Close?.(); onSaved();
         return;
