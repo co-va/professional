@@ -286,11 +286,19 @@ export async function archiveSelectedInventoryItems(itemIds) {
       payload.archivedItemIds.length !== ids.length ||
       ids.some(id => !payload.archivedItemIds.includes(id)))
     throw new Error('Сервер не подтвердил удаление выбранных позиций.');
-  // A successful mutation invalidates older in-flight stock reads.
+  // An archive also renumbers its manufacturer(s). Refuse a legacy
+  // response that gives no rank confirmation: old Core left gaps on removal.
+  if (!Array.isArray(payload?.positions) || payload.positions.some(row =>
+    !row || !row.itemId || !Number.isSafeInteger(row.position) || row.position < 1)) {
+    invalidateInventoryNavigationCache();
+    await loadInventory();
+    throw new Error('Сервер не подтвердил непрерывную нумерацию после удаления.');
+  }
   stockRevision++;
-  const state = removeArchivedInventoryItems(ids);
+  removeArchivedInventoryItems(ids);
+  applyInventoryPositionChanges(payload.positions);
   rememberSnapshot(getAuthToken());
-  return state;
+  return getInventorySnapshot();
 }
 
 export async function createInventoryMovement(value = {}) {
