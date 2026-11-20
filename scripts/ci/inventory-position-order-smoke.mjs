@@ -40,7 +40,7 @@ assert.match(source, /stockGroupTree\(items, nestedCriteria\)/,
 assert.match(source, /initV2ListReorder\(listHost/, 'Shared gesture handler is used');
 assert.match(source, /await reorderInventoryItems\(plan\.manufacturer,plan\.itemIds\)/,
   'Multi-selection uses one scoped Core reorder request');
-assert.match(source, /planInventoryPositionReorder\(getInventoryItems\(\),assignments\)/,
+assert.match(source, /planInventoryPositionReorder\(getInventoryItems\(\),entries\.map/,
   'Manual assignments plan one deterministic position permutation');
 assert.match(source, /inventoryAuditValueMatches\(getInventoryItem\(entry\.itemId\)/,
   'Every requested position is checked against the Core snapshot');
@@ -66,6 +66,30 @@ assert.deepEqual(planInventoryPositionReorder(company,[
   {itemId:'b',manufacturer:'CHI',value:4},
   {itemId:'d',manufacturer:'CHI',value:2},
 ]).itemIds,['a','d','c','b']);
+// Twenty rank edits must be planned as ONE final permutation, not twenty
+// writes which would shift one another. The same applies to one rank 49.
+const sixty=Array.from({length:60},(_,index)=>({
+  itemId:'sku'+(index+1),manufacturer:'CHI',name:'Position '+(index+1),position:index+1,
+}));
+const one=planInventoryPositionReorder(sixty,[
+  {itemId:'sku12',manufacturer:'CHI',value:49},
+]);
+assert.equal(one.itemIds[48],'sku12','A single bulk-editor row moves to requested rank 49');
+assert.equal(new Set(one.itemIds).size,60,'No item is duplicated or dropped');
+const twenty=planInventoryPositionReorder(sixty,Array.from({length:20},(_,i)=>({
+  itemId:'sku'+(i+1),manufacturer:'CHI',value:41+i,
+})));
+assert.deepEqual(twenty.itemIds.slice(40),Array.from({length:20},(_,i)=>'sku'+(i+1)),
+  'Twenty items occupy requested slots 41–60 in one reorder');
+assert.equal(new Set(twenty.itemIds).size,60,'All unaffected items remain');
+const legacy=[...sixty.slice(0,4),{itemId:'old',manufacturer:'CHI',name:'Old',position:0}];
+assert.equal(planInventoryPositionReorder(legacy,[
+  {itemId:'old',manufacturer:'CHI',value:2},
+]).itemIds[1],'old','Legacy unnumbered items can be assigned a real rank');
+assert.equal(planInventoryPositionReorder(sixty,[
+  {itemId:'sku1',manufacturer:'CHI',value:61},
+]),null,'Out-of-range target never triggers N competing PUTs');
+
 assert.equal(inventoryEndPosition(company,'CHI'),5, 'A new item gets last+1');
 assert.equal(inventoryEndPosition(company,'CHI','b'),4, 'Clearing a numbered item goes to last');
 assert.equal(inventoryEndPosition([...company,
