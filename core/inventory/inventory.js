@@ -1748,9 +1748,10 @@ function stockListMarkup(manufacturer, query = '', rowsProvider = null, expanded
   const byType = criteria.some(entry => entry.legacyField === 'productType');
   if (!byCategory && !byType) return itemList(items);
 
-  // Preserve existing group disclosure state after editing a product or
-  // searching. Searching opens only matched groups for immediate access.
-  const disclosure = (label, content, key, nested = false, reorderId = '', rows = []) =>
+  // A classification only creates a disclosure when the value is assigned.
+  // A sole named category or type starts open, while multiple peer groups
+  // start collapsed. Explicit user toggles survive re-rendering and search.
+  const disclosure = (label, content, key, nested = false, reorderId = '', rows = [], autoOpen = false) =>
     catalogDisclosure(label, content, nested, null,
       compactCheck({
         checked: rows.length > 0 && rows.every(item => selected.has(String(item.itemId))),
@@ -1758,32 +1759,38 @@ function stockListMarkup(manufacturer, query = '', rowsProvider = null, expanded
         data: 'data-stock-group-check="' + escapeHtml(key) + '"',
       }), reorderId).replace('<details>',
       '<details data-stock-disclosure="' + escapeHtml(key) + '"' +
-      (needle || expanded.has(key) ? ' open' : '') + '>');
+      (needle || (expanded.has(key) ? expanded.get(key) : autoOpen) ? ' open' : '') + '>');
   const categories = new Map();
   for (const item of items) {
-    const category = byCategory ? String(item.category || '').trim() || 'Без категории' : '';
-    const type = byType ? String(item.productType || '').trim() || 'Без типа' : '';
+    const category = byCategory ? String(item.category || '').trim() : '';
+    const type = byType ? String(item.productType || '').trim() : '';
     if (!categories.has(category)) categories.set(category,new Map());
     const types=categories.get(category);
     if (!types.has(type)) types.set(type,[]);
     types.get(type).push(item);
   }
-  // Position numbers control rows INSIDE each category; persisted criterion
-  // value order controls the category sections themselves. These two orders
-  // must never overwrite one another.
+  // Unclassified products live directly in this manufacturer's list.
+  // Named categories retain their configured order; position controls rows.
   const order = new Map((categoryCriterion?.values || []).map((v,i)=>[v.name,i]));
   const ids = new Map((categoryCriterion?.values || []).map(v=>[v.name,v.id]));
   const grouped = [...categories.entries()].sort(([a],[b])=>
-    (order.get(a) ?? Number.MAX_SAFE_INTEGER) -
-    (order.get(b) ?? Number.MAX_SAFE_INTEGER)
+    (!a ? -1 : !b ? 1 : 0)
+    || (order.get(a) ?? Number.MAX_SAFE_INTEGER) -
+      (order.get(b) ?? Number.MAX_SAFE_INTEGER)
     || a.localeCompare(b,'ru',{numeric:true,sensitivity:'base'}));
+  const namedCategoryCount = grouped.filter(([category]) => Boolean(category)).length;
   const content = grouped.map(([category,types])=>{
-    const typeContent=[...types.entries()].map(([type,rows])=>
-      byType ? disclosure(type,itemList(rows),'t:'+category+'::'+type,true,'',rows)
+    const categoryRows = [...types.values()].flat();
+    // No category means no intermediate level, even if a type is specified.
+    if (byCategory && !category) return itemList(items.filter(item=>!String(item.category || '').trim()));
+    const namedTypeCount = [...types.keys()].filter(Boolean).length;
+    const typeContent = [...types.entries()].map(([type,rows])=>
+      byType && type
+        ? disclosure(type,itemList(rows),'t:'+category+'::'+type,true,'',rows,namedTypeCount===1)
         : itemList(rows)).join('');
     const reorderId=allowCategoryReorder ? ids.get(category) || '' : '';
-    const categoryRows = [...types.values()].flat();
-    return byCategory ? disclosure(category,typeContent,'c:'+category,false,reorderId,categoryRows)
+    return byCategory
+      ? disclosure(category,typeContent,'c:'+category,false,reorderId,categoryRows,namedCategoryCount===1)
       : typeContent;
   }).join('');
   return byCategory
@@ -1944,7 +1951,7 @@ function openManufacturerStock(root, manufacturer, groupContext = null) {
       groupContext.itemsForView?.() || getInventoryItems(),groupContext.criteria)
       .find(entry => entry.name === manufacturer)?.items || []
     : null;
-  const expandedStockGroups = new Set();
+  const expandedStockGroups = new Map();
   // One selection drives both actions; no separate stock mutation owner.
   const selectedStockItems = new Set();
   const markup = `
@@ -2151,8 +2158,7 @@ function openManufacturerStock(root, manufacturer, groupContext = null) {
       details.addEventListener('toggle', () => {
         if (!details.isConnected || (searchInput?.value || '').trim()) return;
         const key = details.dataset.stockDisclosure;
-        if (details.open) expandedStockGroups.add(key);
-        else expandedStockGroups.delete(key);
+        expandedStockGroups.set(key, details.open);
       }));
   };
 
