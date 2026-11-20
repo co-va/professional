@@ -388,12 +388,6 @@ const RESOURCE_UNIT_OPTIONS = [
   { value: 'дн.', label: 'дн.' }, { value: 'км', label: 'км' },
 ];
 
-function itemPrimaryPrice(item = {}) {
-  const price = Number(item.basePrice);
-  return item.primaryOfferId && item.basePriceSource === 'primary-offer'
-    && item.basePrice != null && Number.isFinite(price) ? price : null;
-}
-
 function editorDate(value) {
   return value ? String(value).slice(0, 10) : '';
 }
@@ -547,8 +541,8 @@ function itemPackageFields(item = {}) {
 }
 
 function advancedItemFields(item = {}, defaults = {}) {
-  const primaryPrice = itemPrimaryPrice(item);
-  const price = primaryPrice ?? item.referencePrice ?? '';
+  // Own purchase price is optional and never locked to a supplier agreement.
+  const price = item.referencePrice ?? '';
   const receipt = item.receiptUnit || (item.itemId ? '' : 'шт.');
   const threshold = item.thresholdUnit || receipt || inventoryStockThresholdUnit(item);
   const isResource = item.resourceLimit != null && Boolean(item.resourceUnit);
@@ -573,7 +567,7 @@ function advancedItemFields(item = {}, defaults = {}) {
           field({ name: 'nominalQuantity', value: item.nominalQuantity ?? '', type: 'number', min: '0.001', step: 'any', inputmode: 'decimal' }) +
           select({ name: 'nominalUnit', aria: 'Единица номинала', value: item.nominalUnit || '', options: [{ value: '', label: '—' }, ...retainLegacyUnit(INVENTORY_PIECE_NOMINAL_UNITS, item.nominalUnit)] }) +
         '</div></div>' +
-      editorNumber({ label: 'Закупка', name: 'purchasePrice', value: price, unit: '₽', disabled: primaryPrice !== null }) +
+      editorNumber({ label: 'Закупка', name: 'purchasePrice', value: price, unit: '₽' }) +
     '</div>' +
     (!item.itemId ? '<p class="inventory-editor-label">Остальные сведения можно заполнить позже.</p>' : '') +
     '</div>';
@@ -862,12 +856,6 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
   // An explicit choice of a different consumption unit always wins.
   let consumptionUnitEdited = !creating;
   let thresholdUnitEdited = !creating;
-  const primaryOffer = item?.supplierOffers?.find((offer) => offer.offerId === item.primaryOfferId);
-  const primaryOfferPrice = primaryOffer?.effectivePrice == null
-    ? (primaryOffer?.actualPrice ?? (primaryOffer?.listPrice == null ? null
-      : Number(primaryOffer.listPrice) * (1 - Number(primaryOffer.discountPercent || 0) / 100)))
-    : primaryOffer.effectivePrice;
-
   const setNumberUnit = (name, unit) => {
     const suffix = form.querySelector('[data-inventory-unit-for="' + name + '"]');
     if (suffix) suffix.textContent = unit || '';
@@ -897,16 +885,6 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
       && gross > tare && tare >= 0 ? gross - tare : null;
     if (netInput) netInput.value = net === null ? '' : numberText(net);
     return net;
-  };
-  const updatePrimaryPrice = () => {
-    if (!purchaseInput?.disabled || primaryOfferPrice == null) return;
-    const packSize = Number(primaryOffer?.unitsPerOffer) || 1;
-    const entered = Number(input('packageQuantity')?.value);
-    const net = updateNet();
-    const quantity = entered > 0 ? entered : net > 0 ? net : 1;
-    const price = Number(primaryOfferPrice) / packSize * quantity;
-    purchaseInput.value = Number.isFinite(price)
-      ? String(Math.round((price + Number.EPSILON) * 10000) / 10000) : '';
   };
   const saleCost = (purchasePrice) => salePurchaseCost({
     purchasePrice,
@@ -1002,7 +980,7 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
     input('resourceEnabled').value = resource ? '1' : '0';
     input('periodEnabled').value = period ? '1' : '0';
     setNumberUnit('resourceLimit', String(input('resourceUnit')?.value || 'проц.'));
-    updatePrimaryPrice();
+
   };
 
   for (const checkbox of form.querySelectorAll('[data-inventory-usage-check], [data-inventory-extra-check]')) {
