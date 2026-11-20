@@ -75,7 +75,6 @@ import {
   loadInventory,
   loadInventoryCriteria,
   reorderInventoryCriterionValues,
-  reorderInventoryItems,
   reorderInventoryItemsBatch,
   repairInventoryPositions,
   updateInventoryItem,
