@@ -131,7 +131,7 @@ const reordered=[
 const requests=[];
 let responseRows=reordered;
 const reorderBatch=new Function('getInventoryItem','inventoryRequest','SERVER_ORDER_UNAVAILABLE',
-  rawBatch+'\\nreturn reorderInventoryItemsBatch;')(
+  rawBatch+'\nreturn reorderInventoryItemsBatch;')(
   id=>original.find(row=>row.itemId===id),
   async (path,options)=>{
     requests.push({path,payload:JSON.parse(options.body)});
