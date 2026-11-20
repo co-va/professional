@@ -47,7 +47,11 @@ export function procedureConsumableCost(item = {}, unit = '') {
   const usage = String(unit || stock).trim();
   if (!stock || !usage) return null;
   let price = number(item.baseUnitPrice);
-  if (price == null && (stock === 'шт.' || stock === 'уп.'))
+  // An unconverted pack price is not the price of one glove or one gram.
+  // A direct per-piece/pack quote is usable only when receipt and stock units
+  // are explicitly the same physical unit.
+  if (price == null && (stock === 'шт.' || stock === 'уп.')
+    && String(item.receiptUnit || '').trim() === stock)
     price = number(item.basePrice);
   if (price == null || !(price >= 0)) return null;
   const metric = { 'кг>г': 0.001, 'г>кг': 1000, 'л>мл': 0.001, 'мл>л': 1000 };
