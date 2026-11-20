@@ -179,8 +179,8 @@ export async function reorderInventoryItems(manufacturer, itemIds) {
     body: JSON.stringify({ manufacturer, itemIds, previousPositions }),
     verifySnapshot: payload => {
       if (!Array.isArray(payload?.items)) throw new Error(SERVER_ORDER_UNAVAILABLE);
-      // Confirm the physical user-defined order, including partial numbering;
-      // zeros remain unassigned instead of getting invented sequential ranks.
+      // Every item must have a real, contiguous position in this company.
+      // A reorder that still returns a legacy blank/zero is NOT complete.
       const group = payload.items.filter(item =>
         String(item.manufacturer || '').trim() === String(manufacturer || '').trim());
       const sorted = [...group].sort((a, b) => {
@@ -189,8 +189,9 @@ export async function reorderInventoryItems(manufacturer, itemIds) {
           || String(a.name || '').localeCompare(String(b.name || ''), 'ru', { numeric: true, sensitivity: 'base' })
           || String(a.itemId || '').localeCompare(String(b.itemId || ''));
       });
-      if (sorted.length !== itemIds.length || sorted.some((item, index) => item.itemId !== itemIds[index]))
-        throw new Error('Сервер вернул другой порядок. Обновите склад.');
+      if (sorted.length !== itemIds.length || sorted.some((item, index) =>
+        item.itemId !== itemIds[index] || Number(item.position) !== index + 1))
+        throw new Error('Сервер не подтвердил порядковые номера 1…N. Обновите склад.');
     },
   });
 }
@@ -221,8 +222,8 @@ export async function updateInventoryItemsBatch(updates = []) {
   return expected;
 }
 
-// Atomic Core operation: clear selected numbers and close the remaining gaps
-// for each manufacturer. The compact response avoids repeated stock snapshots.
+// Compatibility entry point: "clear" now means move selected products to
+// the end, with positive 1..N ranks. The compact response confirms the order.
 export async function clearInventoryItemPositions(itemIds = []) {
   const ids = [...new Set((Array.isArray(itemIds) ? itemIds : []).map(String))];
   if (!ids.length || ids.length > 10000)
@@ -249,8 +250,8 @@ export async function clearInventoryItemPositions(itemIds = []) {
   const byId = new Map(positions.map(row => [String(row.itemId), row.position]));
   if (confirmed.length !== ids.length || ids.some(id => !confirmed.includes(id))
     || !positions.length || positions.some(row => !row?.itemId
-      || !Number.isSafeInteger(row.position) || row.position < 0)
-    || ids.some(id => byId.get(id) !== 0)) {
+      || !Number.isSafeInteger(row.position) || row.position < 1)
+    || ids.some(id => !(byId.get(id) > 0))) {
     invalidateInventoryNavigationCache();
     throw new Error('Сервер не подтвердил новый порядок. Обновите остатки.');
   }
