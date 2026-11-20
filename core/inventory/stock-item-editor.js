@@ -225,8 +225,8 @@ export function openStockItemQEditor(itemId = '', defaults = {}, onSaved = () =>
     sku: item.sku || '', barcode: item.barcode || '',
     consumeOn: item.canConsume === true,
     consumeQuantity: numberValue(item.consumeQuantity ?? 1),
-    contentQuantity: numberValue(contents.quantity),
-    contentUnit: contents.unit,
+    contentQuantity: numberValue(receipt === 'шт.' ? contents.quantity : item.nominalQuantity),
+    contentUnit: receipt === 'шт.' ? contents.unit : item.nominalUnit || 'г',
     saleOn: item.canSell === true,
     markup: numberValue(item.saleMarkupValue),
     markupMode: item.saleMarkupMode || 'percent',
@@ -331,6 +331,8 @@ export function openStockItemQEditor(itemId = '', defaults = {}, onSaved = () =>
       drawGroups();
     }
   });
+  let pieceContentQuantity = original.contentQuantity;
+  let pieceContentUnit = original.contentUnit;
   const drawContent = () => {
     const host = form.querySelector('[data-stock-content-fields]');
     const isPack = read('receiptUnit') === 'уп.';
@@ -339,8 +341,8 @@ export function openStockItemQEditor(itemId = '', defaults = {}, onSaved = () =>
         '<span class="inventory-editor-label">Содержимое</span>' +
         '<span data-stock-pack-content></span></div>';
     } else {
-      const n = input('contentQuantity')?.value ?? original.contentQuantity;
-      const u = input('contentUnit')?.value ?? original.contentUnit;
+      const n = pieceContentQuantity;
+      const u = pieceContentUnit;
       host.innerHTML = '<div class="inventory-editor-row">' +
         field({ label: 'Содержимое', name: 'contentQuantity', value: n, type: 'number',
           min: '0', step: 'any', inputmode: 'decimal' }) +
@@ -383,8 +385,15 @@ export function openStockItemQEditor(itemId = '', defaults = {}, onSaved = () =>
       body?.classList.toggle('is-inactive', !enabled(kind));
     }
   };
-  form.addEventListener('input', updatePrices);
-  form.addEventListener('change', () => { syncModes(); updatePrices(); });
+  form.addEventListener('input', event => {
+    if (event.target?.name === 'contentQuantity') pieceContentQuantity = event.target.value;
+    updatePrices();
+  });
+  form.addEventListener('change', event => {
+    if (event.target?.name === 'contentUnit') pieceContentUnit = event.target.value;
+    syncModes();
+    updatePrices();
+  });
   drawGroups();
   drawContent();
   syncModes();
