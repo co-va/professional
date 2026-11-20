@@ -75,6 +75,28 @@ export async function loadInventory({ preferRecent = false } = {}) {
   finally { if (stockRead === inFlight) stockRead = null; }
 }
 
+// A dedicated staging Core operation repairs historical gaps/blank ranks.
+// Do not call the old "clear" endpoint for this: older deployed servers
+// deliberately persisted 0 and would damage the order again.
+export async function repairInventoryPositions() {
+  const token = getAuthToken();
+  const response = await apiRequest('/inventory/items/positions/repair', {
+    method: 'POST', body: JSON.stringify({}), timeoutMs: 130000,
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(response.status === 404
+    ? 'Сервер склада пока не поддерживает восстановление порядковых номеров.'
+    : typeof payload.message === 'string' ? payload.message
+      : 'Не удалось восстановить номера (HTTP ' + response.status + ').');
+  if (!Array.isArray(payload.repairedManufacturers) || !Array.isArray(payload.positions)
+    || payload.positions.some(row => !row?.itemId ||
+      !Number.isSafeInteger(row.position) || row.position < 1))
+    throw new Error('Сервер не подтвердил исправление порядка.');
+  if (getAuthToken() !== token) return getInventorySnapshot();
+  invalidateInventoryNavigationCache();
+  return loadInventory();
+}
+
 export async function createInventoryItem(value = {}) {
   // Any frontend creation route must assign a real position at the end.
   // A deliberate positive insertion position is retained.
