@@ -35,14 +35,15 @@ assert.match(source, /columns: 3, ariaLabel: 'Порядок, артикул и 
 assert.match(source, /position: requestedPosition/, 'Number is saved with the item');
 assert.doesNotMatch(source, /function openInventoryPositionEditor\(/, 'No additional position dialog');
 assert.match(source, /function stockListMarkup\(/, 'Existing stock list remains the owner');
-assert.match(source, /reorderHandle: canReorder/, 'Same shared handle used in stock list');
+assert.match(source, /stockGroupTree\(items, nestedCriteria\)/,
+  'Current grouped stock view uses the ordered classification hierarchy');
 assert.match(source, /initV2ListReorder\(listHost/, 'Shared gesture handler is used');
-assert.match(source, /await reorderInventoryItems\(manufacturer === EMPTY_MANUFACTURER \? '' : manufacturer, ids\)/,
-  'One scoped reorder is saved only after drop');
-assert.match(source, /STOCK_VIEW\.itemsSort !== 'position-asc' \|\| STOCK_VIEW\.itemsType \|\| normalizedSearch\(query\)/,
-  'Dragging is disabled for filtered/sorted partial lists');
-assert.match(source, /querySelector\('\.list-entry__text > strong'\)/,
-  'Only numbering text is updated after ACK, not the whole Z');
+assert.match(source, /await reorderInventoryItems\(plan\.manufacturer,plan\.itemIds\)/,
+  'Multi-selection uses one scoped Core reorder request');
+assert.match(source, /planInventoryPositionReorder\(getInventoryItems\(\),assignments\)/,
+  'Manual assignments plan one deterministic position permutation');
+assert.match(source, /inventoryAuditValueMatches\(getInventoryItem\(entry\.itemId\)/,
+  'Every requested position is checked against the Core snapshot');
 assert.match(service, /export async function reorderInventoryItems\(manufacturer, itemIds\)/,
   'Stock sends single reorder request');
 assert.match(service, /\/items\/reorder/, 'Company order endpoint is used');
@@ -79,4 +80,4 @@ assert.doesNotMatch(source, /await clearInventoryItemPositions\(/,
   'A clear action must never persist zero through the old endpoint');
 assert.match(source, /'В конец'/, 'The action is labelled as movement, not number deletion');
 
-console.log('PASS: manufacturer-local numbering, shared drag, one batch save and stable Z');
+console.log('PASS: manufacturer-local numbering, grouped stock and verified reorder/append');
