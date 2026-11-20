@@ -1697,7 +1697,7 @@ async function openCompany(companyId, root, onChanged = () => {}, { initialCompa
 // A compact X selects an existing counterparty. Barcode/SKU matches are
 // only hints until Core confirms the exact catalog-to-stock association.
 const supplierMatchKey = value => String(value || '').trim().toLocaleUpperCase('ru-RU');
-const supplierUnitKey = value => String(value || '').trim().toLocaleLowerCase('ru-RU').replace(/\\.$/, '');
+const supplierUnitKey = value => String(value || '').trim().toLocaleLowerCase('ru-RU').replace(/\.$/, '');
 
 async function supplierCatalogRows(company) {
   const key = String(company.id);
@@ -1720,16 +1720,24 @@ async function supplierCatalogRows(company) {
   return entries;
 }
 
-function uniqueSupplierMatches(item, rows) {
+function uniqueSupplierMatches(item, rows, companyId) {
   const barcode = supplierMatchKey(item?.barcode);
   const sku = supplierMatchKey(item?.sku);
   if (!barcode && !sku) return [];
+  const stockItems = getInventoryItems();
+  const uniqueStockCode = (field, value) => !value || stockItems.filter(entry =>
+    supplierMatchKey(entry[field]) === value).length === 1;
+  // Duplicate stock identifiers or a supplier row already linked to a
+  // different item require explicit manual selection, never an auto-link.
+  if (!uniqueStockCode('barcode', barcode) || !uniqueStockCode('sku', sku)) return [];
   const barcodeMatches = barcode
     ? rows.filter(row => supplierMatchKey(row.barcode) === barcode) : [];
-  // A barcode takes precedence. An ambiguous barcode must not silently
-  // fall back to SKU and associate the wrong supplier product.
-  if (barcodeMatches.length) return barcodeMatches;
-  return sku ? rows.filter(row => supplierMatchKey(row.supplierSku) === sku) : [];
+  const candidates = barcodeMatches.length ? barcodeMatches
+    : sku ? rows.filter(row => supplierMatchKey(row.supplierSku) === sku) : [];
+  return candidates.filter(row => !stockItems.some(entry =>
+    String(entry.itemId) !== String(item.itemId) && (entry.supplierOffers || []).some(offer =>
+      String(offer.counterpartyId) === String(companyId) &&
+      String(offer.catalogItemId) === String(row.id))));
 }
 
 function supplierNeedsUnits(item, row) {
@@ -1793,7 +1801,7 @@ function openSupplierProductMatchQ(company, itemId, entries, onSaved = () => {})
       [row.name, row.supplierSku, row.barcode, row.brand, row.manufacturer]
         .some(value => String(value || '').toLocaleLowerCase('ru-RU').includes(needle))) : entries;
     results.innerHTML = visible.length
-      ? v2ListEntries(visible.map(row => v2ListEntry({
+      ? v2ListEntries(visible.slice(0, 100).map(row => v2ListEntry({
           title: row.name || 'Товар',
           subtitle: [row.supplierSku && 'Арт. ' + row.supplierSku,
             row.barcode && 'Штрихкод ' + row.barcode].filter(Boolean).join(' · '),
@@ -1885,7 +1893,7 @@ export async function openSupplierAssociation(itemId, onSaved = () => {}) {
       const rows = await supplierCatalogRows(company);
       if (!layer.isConnected) return;
       const fresh = getInventoryItems().find(entry => String(entry.itemId) === String(itemId));
-      const candidates = uniqueSupplierMatches(fresh, rows);
+      const candidates = uniqueSupplierMatches(fresh, rows, company.id);
       if (candidates.length === 1 && !supplierNeedsUnits(fresh, candidates[0])) {
         await confirmSupplierCatalogLink(company, candidates[0], itemId);
         layer.v2Close?.(); onSaved();
