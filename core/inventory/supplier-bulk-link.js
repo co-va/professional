@@ -64,19 +64,13 @@ export function matchSupplierCatalog(stockItems = [], catalogRows = [], selected
     const owners = rowOwners.get(String(row.id));
     if (owners && (owners.size !== 1 || !owners.has(itemId)))
       return no('Уже связан с другим товаром');
-    // SKU match is independent of packaging and accounting units.
+    // Catalog identity is the exact SKU; missing units never prevent linking.
     const supplierUnit = unitKey(row.unit);
     const stockUnit = unitKey(item.unit);
-    const differentUnits = Boolean(supplierUnit && stockUnit && supplierUnit !== stockUnit);
-    // The currently deployed Core link API still requires unitsPerOffer.
-    // Never invent a conversion to make a confirmed SKU match persist.
-    const unitsPerOffer = differentUnits ? null
-      : Number(row.packageQuantity) > 0 ? Number(row.packageQuantity)
-      : Number(item.packageQuantity) > 0 ? Number(item.packageQuantity)
-      : stockUnit === 'шт' ? 1 : null;
-    const reason = differentUnits ? 'Неизвестен пересчёт между единицами'
-      : unitsPerOffer > 0 ? '' : 'Неизвестен пересчёт цены на единицу склада';
-    return { itemId, item, row, unitsPerOffer, reason };
+    const supplierSize = row.packageQuantity == null ? null : Number(row.packageQuantity);
+    const unitsPerOffer = supplierUnit && supplierUnit === stockUnit
+      && Number.isFinite(supplierSize) && supplierSize > 0 ? supplierSize : null;
+    return { itemId, item, row, unitsPerOffer, reason: '' };
   });
 }
 
@@ -85,16 +79,15 @@ function rowMarkup(entry) {
   const lines = ['Арт. ' + (item.sku || '—')];
   if (entry.row) {
     const row = entry.row;
-    const percent = Number(row.appliedDiscountPercent ?? row.discountPercent ?? 0);
+    const rawDiscount = row.appliedDiscountPercent ?? row.discountPercent;
+    const percent = rawDiscount == null ? null : Number(rawDiscount);
     lines.push('Прайс: ' + (row.name || '—'));
     lines.push('Арт. поставщика: ' + (row.supplierSku || '—'));
     lines.push('Цена поставщика: ' + money(row.listPrice));
-    lines.push('Скидка: ' + (Number.isFinite(percent)
+    lines.push('Скидка: ' + (percent != null && Number.isFinite(percent)
       ? percent.toLocaleString('ru-RU') + '%' : '—'));
     lines.push('Цена со скидкой: ' + money(row.effectivePrice));
-    lines.push(entry.reason
-      ? 'Артикул совпал · ' + entry.reason
-      : 'Артикул совпал · Готово к привязке');
+    lines.push('Артикул совпал · Готово к привязке');
   } else {
     lines.push(entry.reason || 'Артикул не найден в прайсе');
   }
@@ -177,15 +170,10 @@ export function openInventoryBulkSupplierLink(selectedItems = [], onSaved = () =
       if (!usable() || version !== requestVersion) return;
       preview = matchSupplierCatalog(getInventoryItems(), catalog, selectedIds, selectedCompany);
       const found = preview.filter(entry => entry.row);
-      const ready = found.filter(entry => !entry.reason && entry.unitsPerOffer > 0);
       list.innerHTML = preview.map(rowMarkup).join('');
-      status.textContent = 'Артикул совпал: ' + found.length + ' из ' + preview.length
-        + '. Готово к привязке: ' + ready.length
-        + (found.length > ready.length
-          ? '. Остальным для сохранения связи сервер пока требует пересчёт единиц.'
-          : '');
-      showApply(Boolean(ready.length));
-      apply.disabled = !ready.length;
+      status.textContent = 'Артикул совпал: ' + found.length + ' из ' + preview.length + '.';
+      showApply(Boolean(found.length));
+      apply.disabled = !found.length;
     } catch (error) {
       if (!usable() || version !== requestVersion) return;
       status.textContent = error instanceof Error ? error.message : 'Не удалось загрузить прайс.';
@@ -194,7 +182,7 @@ export function openInventoryBulkSupplierLink(selectedItems = [], onSaved = () =
 
   apply.addEventListener('click', async () => {
     if (saving || !usable() || !selectedCompany) return;
-    const matches = preview.filter(entry => entry.row && !entry.reason && entry.unitsPerOffer > 0);
+    const matches = preview.filter(entry => entry.row);
     if (!matches.length) return;
     saving = true;
     apply.disabled = true;
@@ -213,7 +201,8 @@ export function openInventoryBulkSupplierLink(selectedItems = [], onSaved = () =
         try {
           const linkedOffer = await inventoryApi(
             '/counterparties/' + urlPart(company) + '/catalog/' + urlPart(entry.row.id) + '/link',
-            'POST', { itemId: entry.itemId, unitsPerOffer: entry.unitsPerOffer }, 45000);
+            'POST', { itemId: entry.itemId,
+              ...(entry.unitsPerOffer == null ? {} : { unitsPerOffer: entry.unitsPerOffer }) }, 45000);
           const offerId = String(linkedOffer.offerId || '');
           if (!offerId || String(linkedOffer.itemId || '') !== entry.itemId)
             throw new Error('Сервер не подтвердил связь');
@@ -247,8 +236,7 @@ export function openInventoryBulkSupplierLink(selectedItems = [], onSaved = () =
       const succeeded = confirmed.length;
       status.textContent = 'Подтверждено: ' + succeeded + ' из ' + matches.length
         + (failures.length ? '. Ошибки: ' + failures.slice(0, 2).join('; ') : '')
-        + '. Без совпадений: ' + preview.filter(entry => !entry.row).length
-        + '. Ожидают пересчёта: ' + preview.filter(entry => entry.row && entry.reason).length + '.';
+        + '. Без совпадений: ' + preview.filter(entry => !entry.row).length + '.';
       if (succeeded) onSaved();
       // Keep the report visible and avoid treating partial saves as complete.
       showApply(false);
