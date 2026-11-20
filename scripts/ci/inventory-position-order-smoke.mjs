@@ -38,14 +38,14 @@ assert.match(source, /function stockListMarkup\(/, 'Existing stock list remains 
 assert.match(source, /stockGroupTree\(items, nestedCriteria\)/,
   'Current grouped stock view uses the ordered classification hierarchy');
 assert.match(source, /initV2ListReorder\(listHost/, 'Shared gesture handler is used');
-assert.match(source, /await reorderInventoryItems\(plan\.manufacturer,plan\.itemIds\)/,
-  'Multi-selection uses one scoped Core reorder request');
+assert.match(source, /await reorderInventoryItemsBatch\(plans\.map/,
+  'Multi-selection uses ONE atomic Core request across all manufacturers');
 assert.match(source, /planInventoryPositionReorder\(getInventoryItems\(\),entries\.map/,
   'Manual assignments plan one deterministic position permutation');
 assert.match(source, /inventoryAuditValueMatches\(getInventoryItem\(entry\.itemId\)/,
   'Every requested position is checked against the Core snapshot');
-assert.match(service, /export async function reorderInventoryItems\(manufacturer, itemIds\)/,
-  'Stock sends single reorder request');
+assert.match(service, /export async function reorderInventoryItemsBatch\(plans/,
+  'Stock sends one atomic multi-manufacturer reorder request');
 assert.match(service, /\/items\/reorder/, 'Company order endpoint is used');
 assert.match(source, /inventoryAuditScope[\s\S]*?sort\(inventoryPositionComparator\)/,
   'Inventory count shares manual order');
