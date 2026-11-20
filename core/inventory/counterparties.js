@@ -1734,6 +1734,7 @@ function uniqueSupplierMatches(item, rows, companyId) {
     ? rows.filter(row => supplierMatchKey(row.barcode) === barcode) : [];
   const candidates = barcodeMatches.length ? barcodeMatches
     : sku ? rows.filter(row => supplierMatchKey(row.supplierSku) === sku) : [];
+  if (candidates.length !== 1) return []; // never resolve an ambiguous supplier catalog automatically
   return candidates.filter(row => !stockItems.some(entry =>
     String(entry.itemId) !== String(item.itemId) && (entry.supplierOffers || []).some(offer =>
       String(offer.counterpartyId) === String(companyId) &&
