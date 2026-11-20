@@ -180,28 +180,40 @@ export async function updateInventoryItem(itemId, value = {}) {
   });
 }
 
-export async function reorderInventoryItems(manufacturer, itemIds) {
-  const previousPositions = itemIds.map(id => Number(getInventoryItem(id)?.position) || 0);
+// A single server transaction can reorder one or many manufacturers.
+// No batch can partially succeed; old ranks are checked before any change.
+export async function reorderInventoryItemsBatch(plans = []) {
+  if (!Array.isArray(plans) || !plans.length || plans.length > 100)
+    throw new Error('Выберите производителей для изменения порядка.');
+  const reorders = plans.map(plan => {
+    const manufacturer=String(plan.manufacturer || '');
+    const itemIds = Array.isArray(plan.itemIds) ? plan.itemIds.map(String) : [];
+    if (!itemIds.length || itemIds.some(id => !getInventoryItem(id)))
+      throw new Error('Состав склада изменился. Обновите список.');
+    return {manufacturer,itemIds,
+      previousPositions:itemIds.map(id=>Number(getInventoryItem(id)?.position)||0)};
+  });
+  if (new Set(reorders.map(plan=>plan.manufacturer)).size !== reorders.length)
+    throw new Error('Повторяющийся производитель при перестановке.');
   return inventoryRequest('/items/reorder', {
-    method: 'POST',
-    body: JSON.stringify({ manufacturer, itemIds, previousPositions }),
-    verifySnapshot: payload => {
+    method:'POST',
+    body:JSON.stringify({reorders}),
+    verifySnapshot:payload=>{
       if (!Array.isArray(payload?.items)) throw new Error(SERVER_ORDER_UNAVAILABLE);
-      // Every item must have a real, contiguous position in this company.
-      // A reorder that still returns a legacy blank/zero is NOT complete.
-      const group = payload.items.filter(item =>
-        String(item.manufacturer || '').trim() === String(manufacturer || '').trim());
-      const sorted = [...group].sort((a, b) => {
-        const rank = item => Number(item.position) > 0 ? Number(item.position) : Number.MAX_SAFE_INTEGER;
-        return rank(a) - rank(b)
-          || String(a.name || '').localeCompare(String(b.name || ''), 'ru', { numeric: true, sensitivity: 'base' })
-          || String(a.itemId || '').localeCompare(String(b.itemId || ''));
-      });
-      if (sorted.length !== itemIds.length || sorted.some((item, index) =>
-        item.itemId !== itemIds[index] || Number(item.position) !== index + 1))
-        throw new Error('Сервер не подтвердил порядковые номера 1…N. Обновите склад.');
+      for (const {manufacturer,itemIds} of reorders) {
+        const rows=payload.items.filter(item =>
+          String(item.manufacturer || '')===manufacturer);
+        const sorted=[...rows].sort((a,b)=>Number(a.position)-Number(b.position));
+        if (sorted.length !== itemIds.length || sorted.some((item,index)=>
+          item.itemId !== itemIds[index] || Number(item.position) !== index+1))
+          throw new Error('Сервер не подтвердил непрерывный порядок производителя.');
+      }
     },
   });
+}
+
+export async function reorderInventoryItems(manufacturer, itemIds) {
+  return reorderInventoryItemsBatch([{manufacturer,itemIds}]);
 }
 
 // All item validations remain on Core. One request/ack for a group of
