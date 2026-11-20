@@ -1706,7 +1706,7 @@ function initStockCategoryDragPreview(sequence) {
   };
 }
 
-function stockListMarkup(manufacturer, query = '', rowsProvider = null, expanded = new Set(), selected = new Set(), allowCategoryReorder = false) {
+function stockListMarkup(manufacturer, query = '', rowsProvider = null, expanded = new Map(), selected = new Set(), allowCategoryReorder = false) {
   const needle = normalizedSearch(query);
   const group = typeof rowsProvider === 'function'
     ? rowsProvider() : getInventoryItems().filter(item => manufacturerName(item) === manufacturer);
@@ -1774,7 +1774,7 @@ function stockListMarkup(manufacturer, query = '', rowsProvider = null, expanded
   const order = new Map((categoryCriterion?.values || []).map((v,i)=>[v.name,i]));
   const ids = new Map((categoryCriterion?.values || []).map(v=>[v.name,v.id]));
   const grouped = [...categories.entries()].sort(([a],[b])=>
-    (!a ? -1 : !b ? 1 : 0)
+    (!a && b ? -1 : a && !b ? 1 : 0)
     || (order.get(a) ?? Number.MAX_SAFE_INTEGER) -
       (order.get(b) ?? Number.MAX_SAFE_INTEGER)
     || a.localeCompare(b,'ru',{numeric:true,sensitivity:'base'}));
@@ -1784,7 +1784,8 @@ function stockListMarkup(manufacturer, query = '', rowsProvider = null, expanded
     // No category means no intermediate level, even if a type is specified.
     if (byCategory && !category) return itemList(items.filter(item=>!String(item.category || '').trim()));
     const namedTypeCount = [...types.keys()].filter(Boolean).length;
-    const typeContent = [...types.entries()].map(([type,rows])=>
+    const typeContent = [...types.entries()].sort(([a],[b])=>
+      !a && b ? -1 : a && !b ? 1 : 0).map(([type,rows])=>
       byType && type
         ? disclosure(type,itemList(rows),'t:'+category+'::'+type,true,'',rows,namedTypeCount===1)
         : itemList(rows)).join('');
@@ -2154,11 +2155,13 @@ function openManufacturerStock(root, manufacturer, groupContext = null) {
           onChanged: renderList,
         });
       }));
+    // Only an intentional summary click changes the remembered state.
+    // Native initial <details open> toggle events must not override the
+    // default rule when a formerly single group later gains siblings.
     listHost?.querySelectorAll('[data-stock-disclosure]').forEach(details =>
-      details.addEventListener('toggle', () => {
+      details.querySelector(':scope > summary')?.addEventListener('click', () => {
         if (!details.isConnected || (searchInput?.value || '').trim()) return;
-        const key = details.dataset.stockDisclosure;
-        expandedStockGroups.set(key, details.open);
+        expandedStockGroups.set(details.dataset.stockDisclosure, !details.open);
       }));
   };
 
