@@ -61,6 +61,9 @@ function openGroupItemPicker(draft, onApply) {
       '<p class="ui-list__secondary" data-consumption-picker-status></p>',
       '<div data-consumption-picker-brand-list></div>',
       '<div data-consumption-picker-items hidden>',
+        '<div class="app-settings-panel">' +
+          button('Производители', { variant:'secondary', data:'data-consumption-picker-back' }) +
+        '</div>',
         '<div class="ui-search-field">' +
           field({ name:'consumptionItemSearch',type:'search',
             placeholder:'Название, артикул, категория…' }) +
@@ -123,6 +126,10 @@ function openGroupItemPicker(draft, onApply) {
     choice.dispatchEvent(new Event('change', { bubbles:true }));
   });
   search.addEventListener('input', renderBrandItems);
+  layer.querySelector('[data-consumption-picker-back]')?.addEventListener('click', () => {
+    // Preserve checked products while moving between manufacturers.
+    showBrands();
+  });
 
   // Groups are discovered first, precisely as in Stock Z1.
   const showBrands = () => {
