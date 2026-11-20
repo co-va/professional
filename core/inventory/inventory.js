@@ -767,6 +767,43 @@ function collectOptionalNumber(form, name) {
   return raw === '' ? null : Number(raw.replace(',', '.'));
 }
 
+/**
+ * Save only what was entered when a new stock card has basic identity and/or
+ * its own price. No package, usage, supplier or unit-cost computation is
+ * relevant to these fields; optional detail remains editable afterwards.
+ */
+function basicInventoryCreateValue(data, initialFields) {
+  const simpleFields = new Set([
+    'name', 'manufacturer', 'catalogName', 'sku', 'barcode', 'position', 'purchasePrice',
+  ]);
+  const changed = [...data.entries()].filter(([key, value]) =>
+    key !== 'netWeight'
+    && !key.startsWith('inventoryCriterionSlot:')
+    && !key.startsWith('inventoryCriterionValue:')
+    && String(value ?? '') !== String(initialFields.get(key) ?? ''));
+  if (changed.some(([key]) => !simpleFields.has(key))) return null;
+  const value = { name: String(data.get('name') || '').trim() };
+  for (const key of ['manufacturer', 'catalogName', 'sku', 'barcode']) {
+    const input = String(data.get(key) || '').trim();
+    if (input) value[key] = input;
+  }
+  const priceText = String(data.get('purchasePrice') || '').trim();
+  if (priceText) {
+    const price = Number(priceText.replace(',', '.'));
+    if (!Number.isFinite(price) || price < 0)
+      throw new Error('Укажите корректную цену закупки.');
+    value.referencePrice = price;
+  }
+  const orderText = String(data.get('position') || '').trim();
+  if (orderText) {
+    const position = Number(orderText);
+    if (!Number.isSafeInteger(position) || position < 1 || position > 2147483647)
+      throw new Error('Порядковый номер должен быть положительным целым числом.');
+    value.position = position;
+  }
+  return value;
+}
+
 export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () => {}) {
   const item = itemId ? getInventoryItem(itemId) : null;
   const creating = !item;
@@ -1049,6 +1086,20 @@ export function openItemEditor(root, itemId = '', defaults = {}, onSaved = () =>
     }
     const name = String(data.get('name') || '').trim();
     if (!name) return openNotice({ title: 'Наименование', message: 'Укажите наименование позиции.' });
+    // A plain new card, with or without a manually entered purchase price,
+    // is not a stock-unit calculation. Save its actual fields directly.
+    if (creating && !draft.canSell) {
+      const basicValue = basicInventoryCreateValue(data, initialFormFields);
+      if (basicValue) {
+        primary.disabled = true;
+        const previousIds = new Set(getInventoryItems().map(row => row.itemId));
+        await createInventoryItem(basicValue);
+        const savedId = getInventoryItems().find(row => !previousIds.has(row.itemId))?.itemId;
+        layer.v2Close?.();
+        onSaved(savedId);
+        return;
+      }
+    }
     // Editing only classification, name or identifiers must not resubmit
     // untouched legacy packaging, quantities and sale settings. Core accepts
     // field-level updates; unrelated historical fields stay exactly as stored.
