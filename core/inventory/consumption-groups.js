@@ -7,6 +7,7 @@ import { getInventoryItems } from './data.js';
 import { loadInventory } from './service.js';
 import { inventoryCriterionGroups } from './classification.js';
 import { buildStockCatalogGroups, renderStockBrandList, stockGroupedSections } from './stock-catalog.js';
+import { compactCheck } from '../../ui/selection/check-list.js';
 
 const PATH = '/inventory/consumption-groups';
 const UNIT_OPTIONS = [
@@ -65,6 +66,10 @@ function openGroupItemPicker(draft, onApply) {
           field({ name:'consumptionItemSearch',type:'search',
             placeholder:'Название, артикул, категория…' }) +
         '</div>',
+        '<div class="ui-list__item">' +
+          compactCheck({ label:'Выбрать все', data:'data-consumption-picker-select-all',
+            aria:'Выбрать все позиции производителя' }) +
+        '</div>',
         '<div data-consumption-picker-product-list></div>',
       '</div>',
     '</div>',
@@ -78,6 +83,7 @@ function openGroupItemPicker(draft, onApply) {
   const itemSection = layer.querySelector('[data-consumption-picker-items]');
   const itemHost = layer.querySelector('[data-consumption-picker-product-list]');
   const search = layer.querySelector('[name="consumptionItemSearch"]');
+  const selectAll = layer.querySelector('[data-consumption-picker-select-all]');
   const status = layer.querySelector('[data-consumption-picker-status]');
   const apply = layer.querySelector('[data-consumption-picker-apply]');
   const actions = apply?.closest('.modal-actions');
@@ -87,6 +93,7 @@ function openGroupItemPicker(draft, onApply) {
   let brand = null;
   let allItems = [];
   let criteria = [];
+  let renderedItems = [];
 
   const sync = () => {
     const changes = checked.size !== initial.size ||
@@ -94,6 +101,22 @@ function openGroupItemPicker(draft, onApply) {
     if (actions) actions.hidden = !changes;
     status.textContent = checked.size ? 'Выбрано: ' + checked.size : '';
     status.hidden = checked.size === 0;
+    itemHost.querySelectorAll('[data-stock-item-check]').forEach(input => {
+      input.checked = checked.has(String(input.dataset.stockItemCheck));
+    });
+    itemHost.querySelectorAll('[data-stock-group-check]').forEach(input => {
+      const descendants = [...input.closest('.inventory-editor-panel')
+        .querySelectorAll('[data-stock-item-check]')];
+      const chosen = descendants.filter(child => child.checked).length;
+      input.checked = descendants.length > 0 && chosen === descendants.length;
+      input.indeterminate = chosen > 0 && chosen < descendants.length;
+    });
+    const chosenVisible = renderedItems.filter(item => checked.has(String(item.itemId))).length;
+    if (selectAll) {
+      selectAll.checked = renderedItems.length > 0 && chosenVisible === renderedItems.length;
+      selectAll.indeterminate = chosenVisible > 0 && chosenVisible < renderedItems.length;
+      selectAll.disabled = renderedItems.length === 0;
+    }
   };
   const renderBrandItems = () => {
     if (!brand) return;
@@ -101,12 +124,37 @@ function openGroupItemPicker(draft, onApply) {
     const rows = (brand.items || []).filter(item => !phrase ||
       [item.name, item.catalogName, item.sku, item.barcode, item.category, item.productType]
         .some(value => text(value).toLocaleLowerCase('ru-RU').includes(phrase)));
+    renderedItems = rows;
     itemHost.innerHTML = rows.length
-      ? stockGroupedSections(rows, checked, undefined, criteria)
+      ? stockGroupedSections(rows, checked, undefined, criteria, { selectGroups:true })
       : emptyState('Позиции не найдены','Измените поиск.');
+    const selectAllLabel = selectAll?.closest('.ui-compact-check')
+      ?.querySelector('.ui-compact-check__label');
+    if (selectAllLabel) selectAllLabel.textContent = phrase ? 'Выбрать найденные' : 'Выбрать все';
+    if (selectAll) selectAll.setAttribute('aria-label',
+      phrase ? 'Выбрать найденные позиции' : 'Выбрать все позиции производителя');
     sync();
   };
+  selectAll?.addEventListener('change', () => {
+    renderedItems.forEach(item => {
+      const id = String(item.itemId);
+      if (selectAll.checked) checked.add(id);
+      else checked.delete(id);
+    });
+    sync();
+  });
   itemHost.addEventListener('change', event => {
+    const groupCheck = event.target.closest('[data-stock-group-check]');
+    if (groupCheck) {
+      groupCheck.closest('.inventory-editor-panel')
+        ?.querySelectorAll('[data-stock-item-check]').forEach(input => {
+          const id = String(input.dataset.stockItemCheck);
+          if (groupCheck.checked) checked.add(id);
+          else checked.delete(id);
+        });
+      sync();
+      return;
+    }
     const input = event.target.closest('[data-stock-item-check]');
     if (!input) return;
     const id = input.dataset.stockItemCheck;
@@ -138,6 +186,7 @@ function openGroupItemPicker(draft, onApply) {
   // Groups are discovered first, precisely as in Stock Z1.
   const showBrands = () => {
     brand = null;
+    renderedItems = [];
     if (title) title.textContent = 'Складские позиции';
     itemSection.hidden = true;
     brandHost.hidden = false;

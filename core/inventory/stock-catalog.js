@@ -72,7 +72,7 @@ function stockRow(item, selected, scope) {
  * Unassigned criteria form no folder. Direct items remain visible at the
  * nearest actual parent; counts always include all descendants.
  */
-export function stockGroupedSections(items, selected = new Set(), scope = INVENTORY_TOTAL_SCOPE, criteria = baseCriteria) {
+export function stockGroupedSections(items, selected = new Set(), scope = INVENTORY_TOTAL_SCOPE, criteria = baseCriteria, { selectGroups = false } = {}) {
   const hierarchy = stockGroupTree(items,stockNestedCriteria(criteria));
   const productRows = rows => rows.map(item => stockRow(item, selected, scope)).join('');
   const render = node => {
@@ -80,7 +80,13 @@ export function stockGroupedSections(items, selected = new Set(), scope = INVENT
     const sole = children.length === 1 && node.direct.length === 0;
     return children.map(child => {
       const content = render(child);
-      const section = catalogDisclosure(child.value,content,Boolean(node.key),child.items.length);
+      const groupCheck = selectGroups ? compactCheck({
+        checked:child.items.length > 0 &&
+          child.items.every(item => selected.has(String(item.itemId))),
+        aria:'Выбрать все позиции группы ' + child.value,
+        data:'data-stock-group-check',
+      }) : '';
+      const section = catalogDisclosure(child.value,content,Boolean(node.key),child.items.length,groupCheck);
       return sole ? section.replace('<details>', '<details open>') : section;
     }).join('') + productRows(node.direct);
   };
