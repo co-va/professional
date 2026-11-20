@@ -268,4 +268,4 @@
 
 /* The first X has two short actions, never full-width primary buttons. */
 .stock-create-actions{display:flex;justify-content:center;align-items:center;gap:8px}
-.stock-create-actions>.ui-button{width:auto;min-width:0;height:36px;min-height:36px;max-inline-size:none;padding:0 12px;border-radius:8px;font-size:13px;margin:0}
+.stock-create-actions>.ui-button{width:max-content;min-width:0;max-inline-size:none;padding-inline:12px;margin:0}
