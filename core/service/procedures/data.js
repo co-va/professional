@@ -112,6 +112,29 @@ export async function commitProcedure(item) {
   return item;
 }
 
+// Consumables are attributes of the existing Procedure, not a second catalogue.
+// Preserve concurrent edits to price, workplaces, description and other fields.
+export async function commitProcedureConsumables(procedureId, consumables = []) {
+  const id = String(procedureId || '');
+  return commitServiceCollection({
+    read: readRawProcedures,
+    persist: values => queueOperationalDataset('procedures', values),
+    hydrate: hydrateCurrentProceduresFromServer,
+    mutate: values => {
+      const found = values.find(item => String(item.id) === id && !item.deletedAt);
+      if (!found) throw new Error('Услуга не найдена.');
+      const saved = (Array.isArray(consumables) ? consumables : []).map(row => ({
+        itemId: String(row.itemId),
+        quantity: row.quantity == null ? null : Number(row.quantity),
+        unit: String(row.unit || ''),
+      }));
+      return values.map(item => String(item.id) === id
+        ? { ...item, consumables: saved, updatedAt: new Date().toISOString() }
+        : item);
+    },
+  });
+}
+
 export async function commitProcedureWorkplace(entityId, workplaceId, assignment) {
   await commitServiceCollection({
     read: readRawProcedures,
