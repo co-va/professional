@@ -48,6 +48,7 @@ import { openInventoryStorageLocations, reconcileLegacyInventoryStorage } from '
 import { openInventoryTransfer } from './movement-transfer.js';
 import { renderStockBrandList, buildStockCatalogGroups, stockRootCriterion, stockNestedCriteria } from './stock-catalog.js';
 import { stockGroupTree, sortedStockChildren, stockGroupValue } from './grouping.js';
+import { planInventoryPositionReorder } from './position-reorder-plan.js';
 import { catalogDisclosure } from './catalog-ui.js';
 import { INVENTORY_TOTAL_SCOPE, inventoryDisplayBalance, inventoryDisplayTarget,
   inventoryItemBelongsToStorage, itemLocationBalance, inventoryLocations,
@@ -74,6 +75,7 @@ import {
   loadInventoryCriteria,
   reorderInventoryCriterionValues,
   clearInventoryItemPositions,
+  reorderInventoryItems,
   updateInventoryItem,
 } from './service.js';
 
@@ -2808,48 +2810,72 @@ async function applyInventoryAuditDataChanges(layer, { items, definition, perIte
           changes.forEach(entry => failed.set(entry.itemId, reason));
         }
       } else if (definition.value === 'position') {
-        // Core currently provides only single-item writes for assigning
-        // numerical positions. Never silently repeat all writes four times:
-        // each PUT already returns a full verified stock snapshot.
-        const ordered = [...changes].sort((a, b) =>
-          a.manufacturer.localeCompare(b.manufacturer, 'ru', { numeric: true })
-          || a.value - b.value);
-        onProgress(0, ordered.length);
+        // Use Core's existing ATOMIC full-manufacturer reorder when all
+        // requested destinations are already numbered slots. It can move
+        // 1 or 20 individually edited rows in a single confirmed write,
+        // including swaps and non-adjacent moves without overwriting earlier
+        // selections. Previously separate PUTs shifted one another.
+        const groups = new Map();
+        for (const entry of changes) {
+          if (!groups.has(entry.manufacturer)) groups.set(entry.manufacturer, []);
+          groups.get(entry.manufacturer).push(entry);
+        }
         let completed = 0;
         let timedOut = false;
-        for (const entry of ordered) {
-          status.textContent = `Порядок: ${completed} из ${ordered.length} · ${entry.name}`;
-          try {
-            await updateInventoryItem(entry.itemId,
-              inventoryAuditDataPayload(definition, entry.value, getInventoryItem(entry.itemId)));
-          } catch (error) {
-            const timeout = error?.name === 'AbortError';
-            failed.set(entry.itemId, timeout
-              ? 'Сервер не ответил. Проверьте сохранённые номера.'
-              : error instanceof Error ? error.message : 'Ошибка сохранения');
-            if (timeout) {
-              // A timed-out write might still commit. Stop before sending more
-              // position edits and reconcile the confirmed server snapshot.
-              timedOut = true;
-              break;
+        for (const entries of groups.values()) {
+          const assignments = entries.map(entry => ({
+            itemId:entry.itemId, value:entry.value,
+            manufacturer:String(getInventoryItem(entry.itemId)?.manufacturer || ''),
+          }));
+          const plan = planInventoryPositionReorder(getInventoryItems(),assignments);
+          if (plan) {
+            status.textContent = 'Перестановка: ' + entries.length + ' поз.';
+            try {
+              await reorderInventoryItems(plan.manufacturer,plan.itemIds);
+            } catch (error) {
+              const reason = error instanceof Error ? error.message : 'Ошибка перестановки';
+              entries.forEach(entry=>failed.set(entry.itemId,reason));
+              if (error?.name === 'AbortError') timedOut = true;
             }
+            completed += entries.length;
+            onProgress(completed,changes.length);
+            if (timedOut) break;
+            continue;
           }
-          completed += 1;
-          onProgress(completed, ordered.length);
+          // Missing slot or initially unnumbered item: the existing Core
+          // single-item endpoint owns insertion and shifts. Its response
+          // verifies the exact resulting number; never send position via the
+          // generic bulk-update endpoint (which does not support the field).
+          for (const entry of [...entries].sort((a,b)=>a.value-b.value)) {
+            status.textContent = `Порядок: ${completed} из ${changes.length} · ${entry.name}`;
+            try {
+              await updateInventoryItem(entry.itemId,
+                inventoryAuditDataPayload(definition,entry.value,getInventoryItem(entry.itemId)));
+            } catch (error) {
+              const timeout = error?.name === 'AbortError';
+              failed.set(entry.itemId,timeout
+                ? 'Сервер не ответил. Проверьте сохранённые номера.'
+                : error instanceof Error ? error.message : 'Ошибка сохранения');
+              if (timeout) { timedOut = true; break; }
+            }
+            completed++;
+            onProgress(completed,changes.length);
+          }
+          if (timedOut) break;
         }
         if (timedOut) {
           try {
             await loadInventory();
             for (const entry of changes) {
               if (inventoryAuditValueMatches(getInventoryItem(entry.itemId),
-                definition, entry.value)) failed.delete(entry.itemId);
+                definition,entry.value)) failed.delete(entry.itemId);
             }
           } catch {
-            // Keep the visible timeout and entered numbers for a safe retry.
+            // Preserve the visible timeout and entered numbers for safe retry.
           }
         }
-        // Each successful item mutation already refreshes the complete stock
-        // snapshot. Verify all requested numbers below without an extra GET.
+        // Successful reorder and single-item writes both refresh the canonical
+        // inventory snapshot. Validate every requested target before success.
       } else {
         // Canonical Core batch update keeps every selected item in one
         // transaction per 100 entries. Only one inventory read verifies the
