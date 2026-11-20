@@ -857,16 +857,13 @@ function initStockCategoryDragPreview(sequence) {
   };
 }
 
-function stockListMarkup(manufacturer, query = '', rowsProvider = null, expanded = new Map(), selected = new Set(), allowCategoryReorder = false, scopeRowsProvider = null) {
+function stockListMarkup(manufacturer, query = '', rowsProvider = null, expanded = new Map(), selected = new Set(), allowCategoryReorder = false) {
   const needle = normalizedSearch(query);
-  // Manufacturers and nested categories are navigation only. Active search
-  // and filters match every item in the current storage scope, not merely
-  // those belonging to the manufacturer that originally opened this Z.
+  // Z2 always belongs to its manufacturer. Filtering/searching removes only
+  // the nested disclosure presentation, never the manufacturer boundary.
   const flat = Boolean(needle) || hasStockFilters(STOCK_VIEW.itemsFilters);
-  const group = flat
-    ? (typeof scopeRowsProvider === 'function' ? scopeRowsProvider() : getInventoryItems())
-    : typeof rowsProvider === 'function'
-      ? rowsProvider() : getInventoryItems().filter(item => manufacturerName(item) === manufacturer);
+  const group = typeof rowsProvider === 'function'
+    ? rowsProvider() : getInventoryItems().filter(item => manufacturerName(item) === manufacturer);
   const classificationGroups = getInventoryClassificationGroups();
   const storageLocations = getInventoryStorageLocations();
   const items = sortItems(group.filter(item => {
@@ -951,11 +948,12 @@ function stockSortOptions(level) {
   ];
 }
 
-function openStockControls(trigger, level, manufacturer, onChange, mode = 'sort') {
+function openStockControls(trigger, level, manufacturer, onChange, mode = 'sort', rowsProvider = null) {
   const sortKey = level === 'manufacturers' ? 'manufacturersSort' : 'itemsSort';
   const isFilter = level === 'items' && mode === 'filter';
-  const currentItems = getInventoryItems().filter(item =>
-    !manufacturer || manufacturerName(item) === manufacturer);
+  const currentItems = typeof rowsProvider === 'function' ? rowsProvider()
+    : getInventoryItems().filter(item =>
+      !manufacturer || manufacturerName(item) === manufacturer);
   const presence = [
     { value: STOCK_FILLED, label: 'Заполнено' },
     { value: STOCK_EMPTY, label: 'Не заполнено' },
@@ -1085,11 +1083,6 @@ function openManufacturerStock(root, manufacturer, groupContext = null) {
       groupContext.itemsForView?.() || getInventoryItems(),groupContext.criteria)
       .find(entry => entry.name === manufacturer)?.items || []
     : null;
-  // Shared scope owner: filtering must not reintroduce items from other
-  // physical warehouses when the user is viewing one specific location.
-  const scopeRowsProvider = groupContext?.itemsForView ||
-    (() => getInventoryItems().filter(item =>
-      inventoryItemBelongsToStorage(item, STOCK_VIEW.storageScope)));
   const expandedStockGroups = new Map();
   // One selection drives both actions; no separate stock mutation owner.
   const selectedStockItems = new Set();
@@ -1105,7 +1098,7 @@ function openManufacturerStock(root, manufacturer, groupContext = null) {
         button('Удалить', { variant: 'delete-outline', data: 'data-stock-selected-delete' })
       )}
     </div>
-    <div data-inventory-company-list>${stockListMarkup(manufacturer, '', rowsProvider, expandedStockGroups, selectedStockItems, false, scopeRowsProvider)}</div>`;
+    <div data-inventory-company-list>${stockListMarkup(manufacturer, '', rowsProvider, expandedStockGroups, selectedStockItems, false)}</div>`;
   const layer = mountV2ZLayer(root, v2ZLayer(markup, { className: 'inventory-manufacturer-z' }), { stack: true });
   if (!layer) return;
   const [searchRow] = setV2ZHeaderRows(layer, [stockSearchField('', 'data-inventory-company-search')]);
@@ -1234,7 +1227,7 @@ function openManufacturerStock(root, manufacturer, groupContext = null) {
       && STOCK_VIEW.itemsSort==='position-asc' && Boolean(reorderGroup);
     if (listHost) listHost.innerHTML = stockListMarkup(
       manufacturer, query, rowsProvider, expandedStockGroups, selectedStockItems,
-      allowCategoryReorder, scopeRowsProvider);
+      allowCategoryReorder);
     listHost?.querySelectorAll('[data-stock-item-check]').forEach(check=>
       check.addEventListener('change',()=>{
         const id=String(check.dataset.stockItemCheck);
@@ -1311,9 +1304,9 @@ function openManufacturerStock(root, manufacturer, groupContext = null) {
       title: 'Складские позиции',
       actions: [
         { id: 'filter', label: 'Фильтр', onSelect: () =>
-          openStockControls(document.body, 'items', '', renderList, 'filter') },
+          openStockControls(document.body, 'items', manufacturer, renderList, 'filter', rowsProvider) },
         { id: 'sort', label: 'Сортировка', onSelect: () =>
-          openStockControls(document.body, 'items', '', renderList, 'sort') },
+          openStockControls(document.body, 'items', manufacturer, renderList, 'sort', rowsProvider) },
       ],
     });
   });
