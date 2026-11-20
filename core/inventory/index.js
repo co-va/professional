@@ -5,6 +5,7 @@ const INVENTORY_NAVIGATION = [
   { id: 'movements', label: 'Движения', capability: 'inventory.movements.access' },
   { id: 'orders', label: 'Заказы', capability: 'inventory.order.access' },
   { id: 'counterparties', label: 'Контрагенты', capability: 'inventory.counterparties.access' },
+  { id: 'consumption-groups', label: 'Группы расхода', capability: 'inventory.consumption_groups.access' },
 ];
 
 export function inventoryNavigationItems() {
@@ -15,6 +16,10 @@ export async function renderInventorySection(root, section = 'stock') {
   const allowed = inventoryNavigationItems();
   const target = allowed.some((item) => item.id === section) ? section : allowed[0]?.id;
   if (!target) { root.replaceChildren(); return; }
+  if (target === 'consumption-groups') {
+    const { renderConsumptionGroups } = await import('./consumption-groups.js');
+    return renderConsumptionGroups(root);
+  }
   if (target === 'counterparties') {
     const { renderCounterparties } = await import('./counterparties.js');
     return renderCounterparties(root);
