@@ -100,7 +100,8 @@ export async function repairInventoryPositions() {
 export async function createInventoryItem(value = {}) {
   // Core assigns the next position atomically. A user-entered insertion rank
   // is still passed through; do not fetch the whole stock just to create a card.
-  const hasPosition = value.position != null && value.position !== '';
+  const hasPosition = value.position != null && value.position !== ''
+    && Number(value.position) !== 0;
   const position = hasPosition ? Number(value.position) : null;
   if (hasPosition && (!Number.isSafeInteger(position) || position < 1
     || position > 2147483647))
@@ -108,7 +109,7 @@ export async function createInventoryItem(value = {}) {
   const previousIds = new Set(getInventoryItems().map(item => String(item.itemId)));
   return inventoryRequest('/items', {
     method: 'POST',
-    body: JSON.stringify({...value, ...(hasPosition ? {position} : {})}),
+    body: JSON.stringify({...value, position:hasPosition ? position : undefined}),
     verifySnapshot:payload=>{
       if (!Array.isArray(payload?.items))
         throw new Error('Сервер не подтвердил создание товара.');
