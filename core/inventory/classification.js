@@ -1,5 +1,5 @@
 import { actionBlock, button, emptyState, field, modal, mountModal, openNotice,
-  v2ListEntry, v2ListEntries } from '../../ui/ui.js';
+  v2ListEntry, v2ListEntries, initV2ListReorder } from '../../ui/ui.js';
 import { getInventoryCriteria, getInventoryItems, getInventoryClassificationGroups } from './data.js';
 import { loadInventoryCriteria, loadInventory, createInventoryCriterion, updateInventoryCriterion,
   createInventoryCriterionValue, updateInventoryCriterionValue,
@@ -91,6 +91,7 @@ export function openInventoryClassificationGroups(onSaved = () => {}) {
   const main = host.querySelector('[data-inventory-criteria-list]');
   const error = host.querySelector('[data-inventory-criteria-error]');
   let current = getInventoryCriteria() || [];
+  let disposeReorder = () => {};
   const showError = cause => {
     error.textContent = cause instanceof Error ? cause.message : 'Не удалось сохранить группу.';
   };
@@ -303,11 +304,16 @@ export function openInventoryClassificationGroups(onSaved = () => {}) {
   };
   const refresh=()=>{
     if(!main)return;
+    disposeReorder();
     main.innerHTML=current.length?v2ListEntries(orderedInventoryCriteria(current).map(group=>v2ListEntry({
       title:group.name,rightTop:group.values.length+' знач.',
       interactive:true,initial:'',omitEmptySubtitle:true,
       aria:'Открыть значения '+group.name,
-      data:'data-inventory-criterion-group="'+escapeHtml(group.id)+'"',
+      data:'data-inventory-criterion-group="'+escapeHtml(group.id)+'"' +
+        (isFixedManufacturerCriterion(group) ? '' :
+          ' data-reorder-id="'+escapeHtml(group.id)+'"'),
+      reorderHandle:!isFixedManufacturerCriterion(group),
+      reorderAria:'Изменить порядок группы '+group.name,
       deleteData:isFixedManufacturerCriterion(group) ? '' : group.id,
       deleteAria:'Удалить группу '+group.name,
     }))):emptyState('Групп пока нет');
@@ -317,6 +323,52 @@ export function openInventoryClassificationGroups(onSaved = () => {}) {
         openValues(node.dataset.inventoryCriterionGroup);
       }));
     wireRemove(main,'[data-inventory-criterion-group] [data-delete-action]',removeGroup);
+    // The immutable Manufacturer is never draggable. Other group positions
+    // are persisted using the existing Core criterion.position field.
+    disposeReorder=initV2ListReorder(main,{
+      selector:'[data-inventory-criterion-group][data-reorder-id]',
+      onReorder:async ids=>{
+        const ordered=orderedInventoryCriteria(current).filter(group=>!isFixedManufacturerCriterion(group));
+        const original=ordered.map(group=>group.id);
+        if (ids.length!==original.length || new Set(ids).size!==original.length
+          || ids.some(id=>!original.includes(id)))
+          throw new Error('Состав групп изменился. Откройте список заново.');
+        if (ids.every((id,index)=>id===original[index])) return;
+        const previous=new Map(ordered.map(group=>[group.id,Number(group.position)||0]));
+        const offset=Math.max(0,...current.map(group=>Number(group.position)||0)) + 1;
+        if (!Number.isSafeInteger(offset+ids.length))
+          throw new Error('Невозможно сохранить порядок групп.');
+        const changed=[];
+        try {
+          // Unique increasing positions keep the visible order deterministic
+          // without touching Manufacturer or product assignments.
+          for (const [index,id] of ids.entries()) {
+            current=await updateInventoryCriterion(id,{position:offset+index});
+            changed.push(id);
+          }
+        } catch(error) {
+          // The existing Core API has no multi-group reorder transaction.
+          // Restore earlier positions if a partial write failed.
+          let rollbackFailed=false;
+          for (const id of changed.reverse()) {
+            try {current=await updateInventoryCriterion(id,{position:previous.get(id)});}
+            catch {rollbackFailed=true;}
+          }
+          refresh();
+          throw new Error(rollbackFailed
+            ? 'Не удалось полностью восстановить прежний порядок. Обновите список групп.'
+            : error instanceof Error ? error.message : 'Порядок групп не сохранился.');
+        }
+        onSaved();
+        refresh();
+      },
+      onError:error=>{
+        showError(error);
+        openNotice({title:'Порядок групп',message:error instanceof Error
+          ? error.message : 'Порядок групп не сохранился.'});
+        refresh();
+      },
+    });
   };
   host.querySelector('[data-inventory-criteria-add]')?.addEventListener('click',()=>editName());
   host.querySelector('[data-inventory-criteria-recovery]')?.addEventListener('click',()=>
