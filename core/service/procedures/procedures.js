@@ -12,6 +12,7 @@ import {
   modal,
   mountModal,
   openNotice,
+  openSharedProfileSettingsMenu,
   mountV2ZLayer,
   page,
   v2ListEntries,
@@ -180,10 +181,30 @@ function renderProcedureOverview(layer, baseRoot, id, { onChanged = () => {}, st
   }
   layer.dataset.serviceOverview = 'procedure:' + id;
   layer.innerHTML = page([
-    serviceHeaderContext({ title: procedure.name || 'Услуга' }),
+    serviceHeaderContext({
+      title: procedure.name || 'Услуга',
+      settingsData: 'data-procedure-consumables-menu',
+      settingsAria: 'Меню услуги',
+    }),
     procedureOverviewCard(procedure, statistics),
     procedureWorkplaceCards(procedure, statistics),
   ]);
+  layer.querySelector('[data-procedure-consumables-menu]')?.addEventListener('click', () => {
+    openSharedProfileSettingsMenu({
+      title: 'Услуга',
+      actions: [{
+        id: 'consumables',
+        label: 'Расходник',
+        onSelect: async () => {
+          const { openProcedureConsumables } = await import('./consumables.js');
+          openProcedureConsumables(id, () => {
+            if (layer.isConnected) renderProcedureOverview(layer, baseRoot, id, { onChanged });
+            onChanged();
+          });
+        },
+      }],
+    });
+  });
   layer.querySelector('[data-procedure-open-editor]')?.addEventListener('click', () => {
     openProcedureEditor(baseRoot, procedure, {
       onSaved: (saved) => {
