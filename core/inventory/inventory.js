@@ -1752,7 +1752,7 @@ function stockListMarkup(manufacturer, query = '', rowsProvider = null, expanded
   // A sole named category or type starts open, while multiple peer groups
   // start collapsed. Explicit user toggles survive re-rendering and search.
   const disclosure = (label, content, key, nested = false, reorderId = '', rows = [], autoOpen = false) =>
-    catalogDisclosure(label, content, nested, null,
+    catalogDisclosure(label, content, nested, rows.length,
       compactCheck({
         checked: rows.length > 0 && rows.every(item => selected.has(String(item.itemId))),
         aria: 'Выбрать все позиции группы ' + label,
@@ -1769,12 +1769,13 @@ function stockListMarkup(manufacturer, query = '', rowsProvider = null, expanded
     if (!types.has(type)) types.set(type,[]);
     types.get(type).push(item);
   }
-  // Unclassified products live directly in this manufacturer's list.
-  // Named categories retain their configured order; position controls rows.
+  // Named categories appear first. Items with no category belong directly
+  // to the manufacturer and follow the category sections, with no folder.
+  // Position still orders individual items inside their section.
   const order = new Map((categoryCriterion?.values || []).map((v,i)=>[v.name,i]));
   const ids = new Map((categoryCriterion?.values || []).map(v=>[v.name,v.id]));
   const grouped = [...categories.entries()].sort(([a],[b])=>
-    (!a && b ? -1 : a && !b ? 1 : 0)
+    (a && !b ? -1 : !a && b ? 1 : 0)
     || (order.get(a) ?? Number.MAX_SAFE_INTEGER) -
       (order.get(b) ?? Number.MAX_SAFE_INTEGER)
     || a.localeCompare(b,'ru',{numeric:true,sensitivity:'base'}));
@@ -1784,8 +1785,10 @@ function stockListMarkup(manufacturer, query = '', rowsProvider = null, expanded
     // No category means no intermediate level, even if a type is specified.
     if (byCategory && !category) return itemList(items.filter(item=>!String(item.category || '').trim()));
     const namedTypeCount = [...types.keys()].filter(Boolean).length;
+    // Items with no subcategory appear after the named subcategories,
+    // directly inside their category rather than under a fake disclosure.
     const typeContent = [...types.entries()].sort(([a],[b])=>
-      !a && b ? -1 : a && !b ? 1 : 0).map(([type,rows])=>
+      a && !b ? -1 : !a && b ? 1 : 0).map(([type,rows])=>
       byType && type
         ? disclosure(type,itemList(rows),'t:'+category+'::'+type,true,'',rows,namedTypeCount===1)
         : itemList(rows)).join('');
