@@ -64,31 +64,45 @@ export function matchSupplierCatalog(stockItems = [], catalogRows = [], selected
     const owners = rowOwners.get(String(row.id));
     if (owners && (owners.size !== 1 || !owners.has(itemId)))
       return no('Уже связан с другим товаром');
+    // SKU match is independent of packaging and accounting units.
     const supplierUnit = unitKey(row.unit);
     const stockUnit = unitKey(item.unit);
-    if (supplierUnit && stockUnit && supplierUnit !== stockUnit)
-      return no('Единицы товара различаются — проверьте вручную');
-    // Core needs the number of inventory units represented by one supplier offer.
-    // Never guess a conversion between different units.
-    const unitsPerOffer = Number(row.packageQuantity) > 0 ? Number(row.packageQuantity)
+    const differentUnits = Boolean(supplierUnit && stockUnit && supplierUnit !== stockUnit);
+    // The currently deployed Core link API still requires unitsPerOffer.
+    // Never invent a conversion to make a confirmed SKU match persist.
+    const unitsPerOffer = differentUnits ? null
+      : Number(row.packageQuantity) > 0 ? Number(row.packageQuantity)
       : Number(item.packageQuantity) > 0 ? Number(item.packageQuantity)
       : stockUnit === 'шт' ? 1 : null;
-    if (!(unitsPerOffer > 0)) return no('Не указано количество в упаковке');
-    return { itemId, item, row, unitsPerOffer, reason: '' };
+    const reason = differentUnits ? 'Неизвестен пересчёт между единицами'
+      : unitsPerOffer > 0 ? '' : 'Неизвестен пересчёт цены на единицу склада';
+    return { itemId, item, row, unitsPerOffer, reason };
   });
 }
 
 function rowMarkup(entry) {
-  const name = escapeHtml(entry.item?.name || 'Товар');
-  const sku = escapeHtml(entry.item?.sku || '—');
-  const description = entry.row
-    ? escapeHtml(entry.row.name) + ' · ' + money(entry.row.listPrice)
-      + ' · ' + (Number(entry.row.appliedDiscountPercent ?? entry.row.discountPercent ?? 0))
-        .toLocaleString('ru-RU') + '% · ' + money(entry.row.effectivePrice)
-    : escapeHtml(entry.reason);
-  return '<div class="data-edit-row inventory-audit-data-row">' +
-    '<span class="data-edit-row__name"><strong>' + name + '</strong><small>Арт. ' + sku + '</small></span>' +
-    '<span class="ui-list__secondary">' + description + '</span></div>';
+  const item = entry.item || {};
+  const lines = ['Арт. ' + (item.sku || '—')];
+  if (entry.row) {
+    const row = entry.row;
+    const percent = Number(row.appliedDiscountPercent ?? row.discountPercent ?? 0);
+    lines.push('Прайс: ' + (row.name || '—'));
+    lines.push('Арт. поставщика: ' + (row.supplierSku || '—'));
+    lines.push('Цена поставщика: ' + money(row.listPrice));
+    lines.push('Скидка: ' + (Number.isFinite(percent)
+      ? percent.toLocaleString('ru-RU') + '%' : '—'));
+    lines.push('Цена со скидкой: ' + money(row.effectivePrice));
+    lines.push(entry.reason
+      ? 'Артикул совпал · ' + entry.reason
+      : 'Артикул совпал · Готово к привязке');
+  } else {
+    lines.push(entry.reason || 'Артикул не найден в прайсе');
+  }
+  // Use shared dense list layout: no narrow side column for product names.
+  return '<div class="ui-list__item"><span class="ui-list__main">' +
+    '<span class="ui-list__title">' + escapeHtml(item.name || 'Товар') + '</span>' +
+    lines.map(line => '<span class="ui-list__secondary">' + escapeHtml(line) + '</span>').join('') +
+    '</span></div>';
 }
 
 export function openInventoryBulkSupplierLink(selectedItems = [], onSaved = () => {}) {
@@ -97,8 +111,8 @@ export function openInventoryBulkSupplierLink(selectedItems = [], onSaved = () =
   const layer = mountModal(document.body, modal(
     '<div data-bulk-supplier-select></div>' +
     '<p class="ui-list__secondary">Совпадения определяются только по уникальному артикулу. Короткое название товара не меняется.</p>' +
-    '<p class="form-error" role="status" data-bulk-supplier-status></p>' +
-    '<div data-bulk-supplier-list class="inventory-audit-data-list"></div>' +
+    '<p class="ui-list__secondary" role="status" data-bulk-supplier-status></p>' +
+    '<div data-bulk-supplier-list class="ui-list ui-list--dense"></div>' +
     actionBlock(button('Применить', { data: 'data-bulk-supplier-apply' })),
     { title: 'Привязать поставщика', variant: 'q', surface: 'app' },
   ));
@@ -162,12 +176,16 @@ export function openInventoryBulkSupplierLink(selectedItems = [], onSaved = () =
       }
       if (!usable() || version !== requestVersion) return;
       preview = matchSupplierCatalog(getInventoryItems(), catalog, selectedIds, selectedCompany);
-      const matches = preview.filter(entry => entry.row);
+      const found = preview.filter(entry => entry.row);
+      const ready = found.filter(entry => !entry.reason && entry.unitsPerOffer > 0);
       list.innerHTML = preview.map(rowMarkup).join('');
-      status.textContent = 'Найдено: ' + matches.length + ' из ' + preview.length
-        + '. Не найденные и спорные товары не изменяются.';
-      showApply(Boolean(matches.length));
-      apply.disabled = !matches.length;
+      status.textContent = 'Артикул совпал: ' + found.length + ' из ' + preview.length
+        + '. Готово к привязке: ' + ready.length
+        + (found.length > ready.length
+          ? '. Остальным для сохранения связи сервер пока требует пересчёт единиц.'
+          : '');
+      showApply(Boolean(ready.length));
+      apply.disabled = !ready.length;
     } catch (error) {
       if (!usable() || version !== requestVersion) return;
       status.textContent = error instanceof Error ? error.message : 'Не удалось загрузить прайс.';
@@ -176,7 +194,7 @@ export function openInventoryBulkSupplierLink(selectedItems = [], onSaved = () =
 
   apply.addEventListener('click', async () => {
     if (saving || !usable() || !selectedCompany) return;
-    const matches = preview.filter(entry => entry.row);
+    const matches = preview.filter(entry => entry.row && !entry.reason && entry.unitsPerOffer > 0);
     if (!matches.length) return;
     saving = true;
     apply.disabled = true;
@@ -229,7 +247,8 @@ export function openInventoryBulkSupplierLink(selectedItems = [], onSaved = () =
       const succeeded = confirmed.length;
       status.textContent = 'Подтверждено: ' + succeeded + ' из ' + matches.length
         + (failures.length ? '. Ошибки: ' + failures.slice(0, 2).join('; ') : '')
-        + '. Без совпадений: ' + (preview.length - matches.length) + '.';
+        + '. Без совпадений: ' + preview.filter(entry => !entry.row).length
+        + '. Ожидают пересчёта: ' + preview.filter(entry => entry.row && entry.reason).length + '.';
       if (succeeded) onSaved();
       // Keep the report visible and avoid treating partial saves as complete.
       showApply(false);
