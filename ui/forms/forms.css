@@ -257,7 +257,10 @@
 .stock-supplier-mini__price{font-size:17px;font-weight:700;font-variant-numeric:tabular-nums}
 .stock-supplier-mini__meta,.stock-supplier-mini>small{color:var(--text-secondary);font-size:11px;line-height:1.25}
 .stock-supplier-mini.is-primary{border-color:var(--text)}
-.stock-supplier-mini--add{flex:0 0 64px;align-items:center}
+.stock-supplier-mini--add{appearance:none;-webkit-appearance:none;flex:0 0 146px;align-items:center;justify-content:center;text-align:center;gap:5px;cursor:pointer}
+.stock-supplier-mini--add .stock-supplier-mini__plus{font-size:32px;font-weight:800;line-height:1;color:var(--text)}
+.stock-supplier-mini--add .stock-supplier-mini__add-label{font-size:11px;line-height:1.2;font-weight:650;color:var(--text-secondary)}
+.stock-supplier-mini--add:active{background:var(--surface-soft)}
 .stock-supplier-info{display:grid;gap:12px}
 .stock-supplier-info-line{display:flex;justify-content:space-between;gap:12px;align-items:start;font-size:13px}
 .stock-supplier-info-line>span{color:var(--text-secondary);flex:0 0 38%}
