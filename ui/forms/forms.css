@@ -262,3 +262,5 @@
 .stock-supplier-info-line{display:flex;justify-content:space-between;gap:12px;align-items:start;font-size:13px}
 .stock-supplier-info-line>span{color:var(--text-secondary);flex:0 0 38%}
 .stock-supplier-info-line>strong{text-align:right;overflow-wrap:anywhere}
+
+.stock-position-form .inventory-editor-panel__body.is-inactive{opacity:.48;pointer-events:none}
