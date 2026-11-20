@@ -281,7 +281,7 @@ function saleCost(purchase, receipt, count) {
   return purchase;
 }
 
-export function openStockItemQEditor(itemId = '', defaults = {}, onSaved = () => {}) {
+export function openStockItemQEditor(itemId = '', defaults = {}, onSaved = () => {}, stockScope = 'total') {
   const current = itemId ? getInventoryItem(itemId) : null;
   const creating = !current;
   const item = current || {
@@ -292,7 +292,7 @@ export function openStockItemQEditor(itemId = '', defaults = {}, onSaved = () =>
   const purchase = supplierPurchase(item);
   const count = packPieces(item);
   const contents = consumptionContents(item);
-  const accounting = stockItemMetrics(item, getInventorySnapshot());
+  const accounting = stockItemMetrics(item, getInventorySnapshot(), stockScope);
   const allGroups = inventoryCriterionGroups();
   const root = stockRootCriterion(allGroups);
   const groups = stockNestedCriteria(allGroups);
