@@ -81,7 +81,7 @@
 
 /* Saved expense: no controls or empty control columns in reading mode. */
 [data-record-consumption-services] .record-consumption-read-title{
-  font-size:14px;font-weight:500;line-height:1.3;padding:8px 0 4px
+  font-size:16px;font-weight:550;line-height:1.3;padding:8px 0 4px
 }
 [data-record-consumption-services] .record-consumption-read-list{border:0;background:transparent}
 [data-record-consumption-services] .record-consumption-read-list .ui-list__item{
@@ -90,8 +90,11 @@
 }
 [data-record-consumption-services] .record-consumption-read-list .ui-list__main{flex:1 1 0;min-width:0}
 [data-record-consumption-services] .record-consumption-read-list .ui-list__right-secondary{
-  flex:0 0 auto;white-space:nowrap;text-align:right;color:var(--text);font-variant-numeric:tabular-nums
+  flex:0 0 auto;white-space:nowrap;text-align:right;color:var(--text);font-variant-numeric:tabular-nums;font-size:18px;font-weight:600;line-height:1.2
 }
 [data-record-consumption-services] .record-consumption-read-list .ui-list__right-secondary span{white-space:nowrap;overflow-wrap:normal}
 [data-record-consumption-edit].ui-button--outline{background:var(--white);color:var(--text);border-color:var(--text)}
 [data-record-consumption-edit][hidden],[data-record-consumption-apply][hidden]{display:none!important}
+
+/* Recorded actual consumption: stronger service/group hierarchy, no selector. */
+[data-record-consumption-services] .record-consumption-service-title{font-size:20px;font-weight:650;line-height:1.25}

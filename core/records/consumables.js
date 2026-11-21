@@ -36,6 +36,7 @@ export function openRecordConsumptionEditor(record, services = [], { onSaved = (
     ...service, groups: actualGroups(record, service.id), expanded: false, templateChoice: '',
   }));
   let editing = false;
+  let posted = record.consumablesPosted === true;
   const signature = () => JSON.stringify(data.map(({ id, groups }) => ({
     procedureId: id,
     groups: groups.filter(group => group.items?.length).map(group => ({
@@ -49,7 +50,7 @@ export function openRecordConsumptionEditor(record, services = [], { onSaved = (
   // restore a previous individual expense. Only new/unset records get a copy.
   const history = getRecords();
   const datesFor = service => previousTemplates(record, service.id, history);
-  if (!Array.isArray(record.consumableTemplates)) {
+  if (!posted && !Array.isArray(record.consumableTemplates)) {
     for (const service of data) {
       const latest = datesFor(service)[0];
       if (service.groups.length || !latest) continue;
@@ -77,7 +78,7 @@ export function openRecordConsumptionEditor(record, services = [], { onSaved = (
   const draft = () => data.map(({ id, groups }) => ({ procedureId: id, groups }));
   const sync = () => {
     const changed = signature() !== initial;
-    const hasOpen = data.some(service => service.expanded || service.groups.length);
+    const hasOpen = posted || data.some(service => service.expanded || service.groups.length);
     setSharedActionVisible(actions, hasOpen || editing || changed);
     edit.hidden = editing || !hasOpen;
     save.hidden = !editing && !changed;
@@ -118,7 +119,10 @@ export function openRecordConsumptionEditor(record, services = [], { onSaved = (
     const items = stock();
     host.innerHTML = data.map((service, si) => {
       const dates = datesFor(service);
+      const factualRead = posted && !editing;
       const norm = service.rows.filter(row => row?.itemId);
+      const hasGroups = service.groups.some(group => group.items?.length);
+      if (factualRead && !hasGroups && !norm.length) return '';
       const normMarkup = norm.length ? list({
         className: 'ui-list--dense', items: norm.map(row => ({
           title: items.get(text(row.itemId))?.name || (loaded ? 'Товар недоступен' : '…'),
@@ -159,7 +163,13 @@ export function openRecordConsumptionEditor(record, services = [], { onSaved = (
           '</div>' + products + '</section>';
       }).join('');
       const expanded = service.expanded || service.groups.length > 0;
-      return '<section class="record-consumption-service"><strong class="ui-list__title">' + escapeHtml(service.name) + '</strong>' +
+      const serviceTitle = '<strong class="ui-list__title record-consumption-service-title">' + escapeHtml(service.name) + '</strong>';
+      if (factualRead) {
+        return '<section class="record-consumption-service record-consumption-service--posted">' + serviceTitle +
+          (normMarkup ? '<p class="ui-list__secondary">Расчётный расход</p>' + normMarkup : '') +
+          groups + '<p class="ui-list__secondary" data-record-consumption-cost="' + si + '"></p></section>';
+      }
+      return '<section class="record-consumption-service">' + serviceTitle +
         normMarkup +
         (!expanded ? list({ className: 'ui-list--dense', items: [{
           title: 'Расход не задан',
@@ -288,6 +298,7 @@ export function openRecordConsumptionEditor(record, services = [], { onSaved = (
         service.groups = actualGroups({ consumableTemplates: payload.templates }, service.id);
       }
       initial = signature();
+      posted = payload.posted === true;
       editing = false;
       if (layer.isConnected) render();
       if (payload.posted === true) await loadInventory().catch(() => null);
