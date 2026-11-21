@@ -78,9 +78,11 @@ export function matchSupplierCatalog(stockItems = [], catalogRows = [], selected
 function previewMarkup(matches) {
   return list({
     className: 'ui-list--dense',
-    items: matches.map(entry => ({
+    items: matches.map((entry, index) => ({
       title: entry.item?.name || 'Позиция',
       secondary: entry.row?.name || 'Не найдено в прайсе поставщика',
+      right: entry.row ? 'Найдено' : 'Не применено',
+      data: 'data-bulk-supplier-row="' + index + '"',
     })),
   });
 }
@@ -167,6 +169,32 @@ export function openInventoryBulkSupplierLink(
   const usable = () => layer.isConnected && list.isConnected
     && startToken === getAuthToken();
 
+  // Report a saved result on its existing List row. Never rebuild, reorder
+  // or replace the selected-item list after the operation.
+  const showRowResult = (index, result, reason = '') => {
+    const row = list.querySelector('[data-bulk-supplier-row="' + index + '"]');
+    const label = row?.querySelector('.ui-list__right-secondary > span');
+    if (!label) return;
+    label.textContent = result;
+    if (reason) label.title = reason;
+    else label.removeAttribute('title');
+  };
+  const reportResults = (confirmedIds = null, failuresById = new Map()) => {
+    preview.forEach((entry, index) => {
+      if (!entry.row) {
+        showRowResult(index, 'Не применено', entry.reason);
+      } else if (confirmedIds === null) {
+        showRowResult(index, 'Не подтверждено',
+          failuresById.get(String(entry.itemId)) || 'Не удалось проверить сохранение');
+      } else if (confirmedIds.has(String(entry.itemId))) {
+        showRowResult(index, 'Применено');
+      } else {
+        showRowResult(index, 'Не применено',
+          failuresById.get(String(entry.itemId)) || 'Сервер не подтвердил привязку');
+      }
+    });
+  };
+
   const loadPreview = async () => {
     const version = ++requestVersion;
     preview = [];
@@ -212,7 +240,9 @@ export function openInventoryBulkSupplierLink(
     saving = true;
     apply.disabled = true;
     const failures = [];
+    const failuresById = new Map();
     const company = selectedCompany;
+    let verified = false;
     // Existing Core routes own supplier links, pricing and primary-offer logic.
     // Perform no blind item-name edits and never touch unrelated products.
     try {
@@ -239,8 +269,9 @@ export function openInventoryBulkSupplierLink(
           if (String(getInventoryItem(entry.itemId)?.catalogName || '') !== String(entry.row.name || ''))
             await inventoryApi(itemPath, 'PUT', { catalogName: entry.row.name }, 60000);
         } catch (error) {
-          failures.push(entry.item.name + ': ' + (error instanceof Error
-            ? error.message : 'Не удалось сохранить'));
+          const reason = error instanceof Error ? error.message : 'Не удалось сохранить';
+          failuresById.set(String(entry.itemId), reason);
+          failures.push(entry.item.name + ': ' + reason);
           if (error?.name === 'AbortError') {
             failures.push('Сервер не ответил вовремя. Проверьте результат перед повтором.');
             break;
@@ -258,13 +289,17 @@ export function openInventoryBulkSupplierLink(
           && item.catalogName === entry.row.name);
       });
       const succeeded = confirmed.length;
-      status.textContent = 'Подтверждено: ' + succeeded + ' из ' + matches.length
+      const confirmedIds = new Set(confirmed.map(entry => String(entry.itemId)));
+      verified = true;
+      if (usable()) reportResults(confirmedIds, failuresById);
+      status.textContent = 'Применено: ' + succeeded + ' из ' + preview.length
         + (failures.length ? '. Ошибки: ' + failures.slice(0, 2).join('; ') : '')
         + '. Без совпадений: ' + preview.filter(entry => !entry.row).length + '.';
       if (succeeded) onSaved();
       // Keep the report visible and avoid treating partial saves as complete.
       showApply(false);
     } catch (error) {
+      if (usable() && !verified) reportResults(null, failuresById);
       status.textContent = 'Сохранение не подтверждено: ' +
         (error instanceof Error ? error.message : 'Сервер не ответил') +
         '. Проверьте склад перед повтором.';
