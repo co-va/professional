@@ -98,9 +98,49 @@ function rowMarkup(entry) {
     '</span></div>';
 }
 
-export function openInventoryBulkSupplierLink(selectedItems = [], onSaved = () => {}) {
+export function openInventoryBulkSupplierLink(selectedItems = [], onSaved = () => {}, initialCompanyId = '') {
   const selectedIds = [...new Set(selectedItems.map(item => String(item.itemId || '')).filter(Boolean))];
   if (!selectedIds.length) return null;
+
+  // Choosing one supplier is a short X action. Only the actual per-item
+  // matching report needs the full Q work surface.
+  if (!initialCompanyId) {
+    const chooser = mountModal(document.body, modal(
+      '<div class="modal-title"><h2>Привязать поставщика</h2></div>' +
+      '<div data-bulk-supplier-select></div>' +
+      '<p class="ui-list__secondary">Выбрано позиций: ' + selectedIds.length + '</p>' +
+      '<p class="ui-list__secondary" role="status" data-bulk-supplier-status>Загружаю поставщиков…</p>',
+      { title: 'Привязать поставщика', variant: 'x', xRole: 'picker', surface: 'app' },
+    ));
+    if (!chooser) return null;
+    const picker = chooser.querySelector('[data-bulk-supplier-select]');
+    const status = chooser.querySelector('[data-bulk-supplier-status]');
+    const startToken = getAuthToken();
+    const usable = () => chooser.isConnected && startToken === getAuthToken();
+    void inventoryApi('/counterparties').then(rows => {
+      if (!usable()) return;
+      const companies = Array.isArray(rows) ? rows.filter(row => row.id && row.name) : [];
+      picker.innerHTML = select({
+        label: 'Поставщик', name: 'bulkSupplierCompany', value: '',
+        options: [{ value: '', label: 'Выберите поставщика' },
+          ...companies.map(company => ({ value: String(company.id), label: company.name }))],
+        searchable: true,
+      });
+      picker.querySelector('[name="bulkSupplierCompany"]')?.addEventListener('change', event => {
+        if (!usable()) return;
+        const companyId = String(event.target.value || '');
+        if (!companyId) return;
+        chooser.v2Close?.();
+        openInventoryBulkSupplierLink(selectedItems, onSaved, companyId);
+      });
+      status.textContent = companies.length ? '' : 'Сначала добавьте поставщика с прайсом.';
+    }).catch(error => {
+      if (usable()) status.textContent = error instanceof Error
+        ? error.message : 'Не удалось загрузить поставщиков.';
+    });
+    return chooser;
+  }
+
   const layer = mountModal(document.body, modal(
     '<div data-bulk-supplier-select></div>' +
     '<p class="ui-list__secondary">Совпадения определяются только по уникальному артикулу. Короткое название товара не меняется.</p>' +
@@ -114,14 +154,14 @@ export function openInventoryBulkSupplierLink(selectedItems = [], onSaved = () =
   const status = layer.querySelector('[data-bulk-supplier-status]');
   const list = layer.querySelector('[data-bulk-supplier-list]');
   const apply = layer.querySelector('[data-bulk-supplier-apply]');
-  const actions = apply?.closest('.modal-actions');
-  const showApply = visible => {
-    if (actions) actions.hidden = !visible;
-    if (apply) apply.hidden = !visible;
+  // Never make the confirmation disappear. No SKU matches means a visible
+  // but disabled action and an explicit reason, not an empty modal footer.
+  const showApply = enabled => {
+    if (apply) apply.disabled = !enabled;
   };
   const startToken = getAuthToken();
   let companies = [];
-  let selectedCompany = '';
+  let selectedCompany = String(initialCompanyId);
   let preview = [];
   let requestVersion = 0;
   let saving = false;
@@ -171,9 +211,11 @@ export function openInventoryBulkSupplierLink(selectedItems = [], onSaved = () =
       preview = matchSupplierCatalog(getInventoryItems(), catalog, selectedIds, selectedCompany);
       const found = preview.filter(entry => entry.row);
       list.innerHTML = preview.map(rowMarkup).join('');
-      status.textContent = 'Артикул совпал: ' + found.length + ' из ' + preview.length + '.';
+      status.textContent = found.length
+        ? 'Артикул совпал: ' + found.length + ' из ' + preview.length + '.'
+        : 'Совпадений нет: 0 из ' + preview.length +
+          '. Проверьте артикулы позиций и прайс поставщика.';
       showApply(Boolean(found.length));
-      apply.disabled = !found.length;
     } catch (error) {
       if (!usable() || version !== requestVersion) return;
       status.textContent = error instanceof Error ? error.message : 'Не удалось загрузить прайс.';
@@ -246,7 +288,8 @@ export function openInventoryBulkSupplierLink(selectedItems = [], onSaved = () =
         '. Проверьте склад перед повтором.';
     } finally {
       saving = false;
-      apply.disabled = false;
+      // Once a save was attempted, require a fresh preview before any retry.
+      apply.disabled = true;
       apply.textContent = 'Применить';
       picker.querySelector('[name="bulkSupplierCompany"]')?.removeAttribute('disabled');
     }
@@ -258,6 +301,7 @@ export function openInventoryBulkSupplierLink(selectedItems = [], onSaved = () =
     companies = Array.isArray(rows) ? rows.filter(row => row.id && row.name) : [];
     showCompanySelector();
     status.textContent = companies.length ? '' : 'Сначала добавьте поставщика с прайсом.';
+    if (selectedCompany) void loadPreview();
   }).catch(error => {
     if (usable()) status.textContent = error instanceof Error
       ? error.message : 'Не удалось загрузить поставщиков.';
