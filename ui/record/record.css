@@ -48,3 +48,33 @@
 .record-consumables-sticker__head{display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:0}
 .record-consumables-sticker__head>span{font-size:22px;line-height:1}
 .record-consumables-sticker>.ui-list__secondary{margin:0}
+
+
+/* Record expense composition: use the shared data-edit row, field,
+   number+unit and Compact controls directly on the modal surface.
+   Do not change the global 46px field or 28px Compact geometry. */
+[data-record-consumption-services] .record-consumption-service{display:grid;gap:8px;min-width:0}
+[data-record-consumption-services] .record-consumption-group{display:grid;gap:0;min-width:0}
+[data-record-consumption-services] .record-consumption-group-header{
+  grid-template-columns:minmax(0,1fr) var(--ui-compact-size) var(--ui-compact-size);gap:6px
+}
+[data-record-consumption-services] .record-consumption-group-header>.field{min-width:0;gap:0}
+[data-record-consumption-services] .record-consumption-group-header>.field input{
+  box-sizing:border-box;min-width:0;padding:0;border-color:transparent;background:transparent;font-weight:500;font-size:14px
+}
+[data-record-consumption-services] .record-consumption-group-header>.field input:focus{border-bottom-color:var(--text-secondary)}
+[data-record-consumption-services] .record-consumption-product{
+  grid-template-columns:minmax(0,1fr) 86px var(--ui-compact-size);gap:6px;
+  padding:2px 0;border-bottom:1px solid var(--border);background:transparent
+}
+[data-record-consumption-services] .record-consumption-product>.data-edit-row__name{
+  white-space:normal;overflow-wrap:anywhere;overflow:visible;text-overflow:clip
+}
+[data-record-consumption-services] .record-consumption-product .field{gap:0;min-width:0;margin:0}
+[data-record-consumption-services] .field>span:empty{display:none}
+[data-record-consumption-services] .record-consumption-product .inventory-editor-number .field input{
+  box-sizing:border-box;padding-left:6px;padding-right:34px;text-align:left
+}
+[data-record-consumption-services] .record-consumption-product .inventory-editor-number__suffix{right:5px}
+[data-record-consumption-services] .record-consumption-add-group{min-height:var(--ui-compact-size);background:transparent;border:0;padding:0;margin:0}
+[data-record-consumption-services] [data-record-consumption-cost]:empty{display:none}

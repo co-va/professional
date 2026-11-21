@@ -20,7 +20,7 @@ function actualGroups(record, procedureId) {
 
 export function openRecordConsumptionEditor(record, services = [], { onSaved = () => {} } = {}) {
   const data = services.map(service => ({
-    ...service, groups: actualGroups(record, service.id), expanded: false,
+    ...service, groups: actualGroups(record, service.id), expanded: false, templateChoice: '',
   }));
   const initial = JSON.stringify(data.map(({ id, groups }) => ({ procedureId: id, groups })));
   const panel = '<div class="form-grid" data-record-consumption-services></div>' +
@@ -51,11 +51,14 @@ export function openRecordConsumptionEditor(record, services = [], { onSaved = (
   const datesFor = service => key(record) ? getRecords().filter(previous =>
     text(previous.id) !== text(record.id) && key(previous) === key(record) &&
     text(previous.date) <= text(record.date) && actualGroups(previous, service.id).length &&
-    (previous.completed || previous.payment?.state === 'paid'))
+    previous.status !== 'cancelled' && previous.attendance !== 'no-show' &&
+    (text(previous.date) + text(previous.from)) < (text(record.date) + text(record.from)) &&
+    (previous.consumablesPosted === true || previous.completed || previous.payment?.state === 'paid'))
     .sort((a,b) => (text(b.date) + text(b.from)).localeCompare(text(a.date) + text(a.from))) : [];
   const addGroup = (service, name = '') => {
     const group = { name, items: [] };
     service.groups.push(group);
+    if (service.templateChoice === 'standard') service.templateChoice = '';
     service.expanded = true;
     return group;
   };
@@ -89,39 +92,41 @@ export function openRecordConsumptionEditor(record, services = [], { onSaved = (
         const products = (group.items || []).map((row, ri) => {
           const product = items.get(text(row.itemId));
           const k = si + ':' + gi + ':' + ri;
-          return '<div class="ui-list__item">' +
-            '<span class="ui-list__main"><span class="ui-list__title">' + escapeHtml(product?.name || 'Товар недоступен') + '</span></span>' +
-            '<span class="ui-list__right-secondary service-consumable-quantity">' +
+          const title = product?.name || 'Товар недоступен';
+          return '<div class="data-edit-row record-consumption-product">' +
+            '<span class="data-edit-row__name" title="' + escapeHtml(title) + '">' + escapeHtml(title) + '</span>' +
+            '<div class="inventory-editor-number">' +
             field({ label: '', name: 'recordConsumptionQuantity' + k, type: 'number', min: '0.000001', step: 'any',
-              inputmode: 'decimal', placeholder: '—', value: row.quantity ?? '', data: 'data-record-consumption-quantity="' + k + '"' }) +
-            '<span>' + escapeHtml(row.unit || procedureConsumableUnit(product)) + '</span></span>' +
+              inputmode: 'decimal', placeholder: '—', value: row.quantity ?? '', data: 'aria-label="' + escapeHtml('Расход: ' + title) + '" data-record-consumption-quantity="' + k + '"' }) +
+            '<span class="inventory-editor-number__suffix">' + escapeHtml(row.unit || (product ? procedureConsumableUnit(product) : '')) + '</span></div>' +
             compactButton({ kind: 'remove', data: 'data-record-consumption-remove="' + k + '"', aria: 'Убрать товар' }) +
             '</div>';
         }).join('');
-        return '<section class="form-grid">' +
-          '<div class="ui-list__item"><div class="ui-list__main">' +
+        return '<section class="record-consumption-group">' +
+          '<div class="data-edit-row record-consumption-group-header">' +
           field({ label: '', name: 'recordConsumptionName' + si + ':' + gi, value: group.name,
-            placeholder: 'Название группы', data: 'data-record-consumption-name="' + si + ':' + gi + '"' }) +
-          '</div>' + compactButton({ kind: 'add', data: 'data-record-consumption-pick="' + si + ':' + gi + '"', aria: 'Добавить товар' }) +
+            placeholder: 'Название группы', data: 'aria-label="Название группы" data-record-consumption-name="' + si + ':' + gi + '"' }) +
+          compactButton({ kind: 'add', data: 'data-record-consumption-pick="' + si + ':' + gi + '"', aria: 'Добавить товар' }) +
           compactButton({ kind: 'remove', data: 'data-record-consumption-remove-group="' + si + ':' + gi + '"', aria: 'Удалить группу' }) +
-          '</div><div class="ui-list ui-list--dense">' + products + '</div></section>';
+          '</div>' + products + '</section>';
       }).join('');
-      return '<section class="form-grid"><strong class="ui-list__title">' + escapeHtml(service.name) + '</strong>' +
+      const expanded = service.expanded || service.groups.length > 0;
+      return '<section class="record-consumption-service"><strong class="ui-list__title">' + escapeHtml(service.name) + '</strong>' +
         normMarkup +
-        list({ className: 'ui-list--dense', items: [{
-          title: service.groups.length ? 'Шаблон' : 'Расход не задан',
-          interactive: true, right: service.groups.length ? String(service.groups.length) + ' гр.' : '+',
+        (!expanded ? list({ className: 'ui-list--dense', items: [{
+          title: 'Расход не задан',
+          interactive: true, right: '+',
           data: 'data-record-consumption-open="' + si + '"',
-          aria: 'Добавить расход: ' + service.name,
-        }] }) +
-        (service.expanded || service.groups.length ? (
-          (dates.length ? select({ label: '', name: 'recordConsumptionHistory' + si, value: '',
-            options: [{ value: '', label: 'Выбрать шаблон' }, ...dates.map(previous => ({ value: text(previous.id), label: dateText(previous.date) }))],
-            data: 'data-record-consumption-history="' + si + '"' }) : '') +
-          groups + '<div class="ui-list__item"><span class="ui-list__main">Добавить группу</span>' +
+          aria: 'Открыть расход: ' + service.name,
+        }] }) :
+          select({ label: '', name: 'recordConsumptionHistory' + si, value: service.templateChoice,
+            options: [{ value: '', label: 'Шаблон' }, { value: 'standard', label: 'Стандартный шаблон' },
+              ...dates.map(previous => ({ value: 'record:' + text(previous.id), label: dateText(previous.date) + (previous.from ? ' · ' + text(previous.from) : '') }))],
+            data: 'data-record-consumption-history="' + si + '"', aria: 'Выбрать шаблон: ' + service.name }) +
+          groups + '<div class="field-inline-label record-consumption-add-group"><span>Добавить группу</span>' +
           compactButton({ kind: 'add', data: 'data-record-consumption-add="' + si + '"', aria: 'Добавить группу' }) + '</div>' +
           '<p class="ui-list__secondary" data-record-consumption-cost="' + si + '"></p>'
-        ) : '') + '</section>';
+        ) + '</section>';
     }).join('');
     sync();
   }
@@ -133,8 +138,7 @@ export function openRecordConsumptionEditor(record, services = [], { onSaved = (
       const i = Number(d.recordConsumptionOpen), service = data[i];
       if (!service) return;
       service.expanded = true;
-      if (!service.groups.length) { addGroup(service); render(); void pick(i, 0); }
-      else render();
+      render();
     } else if (d.recordConsumptionAdd !== undefined) {
       addGroup(data[Number(d.recordConsumptionAdd)]);
       render();
@@ -166,9 +170,17 @@ export function openRecordConsumptionEditor(record, services = [], { onSaved = (
     const name = String(event.target.name || '');
     if (!name.startsWith('recordConsumptionHistory') || busy) return;
     const service = data[Number(name.slice('recordConsumptionHistory'.length))];
-    const previous = service && datesFor(service).find(row => text(row.id) === text(event.target.value));
-    if (!previous) return;
-    service.groups = actualGroups(previous, service.id);
+    if (!service) return;
+    const choice = text(event.target.value);
+    if (!choice) return;
+    if (choice === 'standard') {
+      service.groups = [];
+    } else {
+      const previous = datesFor(service).find(row => 'record:' + text(row.id) === choice);
+      if (!previous) return;
+      service.groups = actualGroups(previous, service.id);
+    }
+    service.templateChoice = choice;
     service.expanded = true;
     render();
   });
