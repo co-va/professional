@@ -32,3 +32,19 @@
 /* The existing payment button indicates available Tips without showing the amount. */
 .record-payment-button--has-tips{position:relative}
 .record-payment-button--has-tips::after{content:'';position:absolute;right:14px;top:50%;width:6px;height:6px;border-radius:50%;background:currentColor;transform:translateY(-50%);pointer-events:none}
+
+
+/* Inline composition of the existing rectangular V2 sticker in Record.
+   Width follows the approved mini-card; its own shadow keeps it floating.
+   The additional two states are reserved for persisted individual templates. */
+.record-screen--record-view>.record-consumables-sticker{
+  box-sizing:border-box;align-self:center;width:min(290px,100%);max-width:290px;
+  min-height:58px;padding:10px 12px;gap:4px;border:0;border-radius:0;
+  background:var(--button-secondary);color:var(--text);font:inherit;
+  text-align:left;cursor:pointer;box-shadow:0 16px 26px -20px rgba(17,17,17,.48),0 8px 14px -12px rgba(17,17,17,.4)
+}
+.record-screen--record-view>.record-consumables-sticker[data-record-consumption-state="individual"]{background:#EFFFBB}
+.record-screen--record-view>.record-consumables-sticker[data-record-consumption-state="paid"]{background:#DDE8D7}
+.record-consumables-sticker__head{display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:0}
+.record-consumables-sticker__head>span{font-size:22px;line-height:1}
+.record-consumables-sticker>.ui-list__secondary{margin:0}

@@ -1,7 +1,9 @@
 import {
   actionBlock,
   emptyState,
+  escapeHtml,
   field,
+  list,
   bindRecordSettings,
   button,
   durationText,
@@ -217,6 +219,7 @@ const RECORD_VIEW_CAPABILITIES = Object.freeze({
     procedureSettings: true,
     zReport: true,
     sale: true,
+    consumables: true,
     payment: true,
     confirmation: true,
     attendance: true,
@@ -230,6 +233,7 @@ const RECORD_VIEW_CAPABILITIES = Object.freeze({
     procedureSettings: false,
     zReport: false,
     sale: false,
+    consumables: false,
     payment: false,
     confirmation: false,
     attendance: false,
@@ -271,6 +275,76 @@ function actionSheet({ cancelled = false } = {}) {
     button('Удалить', { variant: 'critical', data: 'data-record-view-delete' }),
     button('История', { variant: 'secondary', data: 'data-record-view-history' }),
   ].filter(Boolean).join(''));
+}
+
+// The calculated service norm is not a stock movement or an individual template.
+// Older paid records must not be presented as if the current service norm
+// were the actual quantity used at that visit.
+function recordCalculatedConsumables(record = {}) {
+  const services = new Map(getProcedures().map(item => [String(item.id), item]));
+  return (Array.isArray(record.procedures) ? record.procedures : []).map(procedure => {
+    const service = services.get(String(procedure.id || ''));
+    const rows = Array.isArray(procedure.consumables)
+      ? procedure.consumables
+      : Array.isArray(service?.consumables) ? service.consumables : [];
+    return { name: procedure.name || service?.name || 'Услуга', rows };
+  }).filter(group => group.rows.some(row => row?.itemId));
+}
+
+function recordConsumablesSticker(record) {
+  const groups = recordCalculatedConsumables(record);
+  const subtitle = groups.length ? 'Расчётный расход' : 'Шаблон не задан';
+  return `<button type="button" class="v2-sticker record-consumables-sticker" data-record-view-consumables data-record-consumption-state="calculated">
+    <span class="record-consumables-sticker__head"><strong class="ui-list__title">Расходники</strong><span aria-hidden="true">›</span></span>
+    <span class="ui-list__secondary">${escapeHtml(subtitle)}</span>
+  </button>`;
+}
+
+async function openRecordConsumables(record) {
+  const groups = recordCalculatedConsumables(record);
+  const layer = mountModal(document.body, modal(
+    '<div data-record-consumables-body></div>',
+    { title: 'Расходники', variant: 'q', surface: 'app' },
+  ));
+  if (!layer) return;
+  const host = layer.querySelector('[data-record-consumables-body]');
+  if (!host) return;
+  if (!groups.length) {
+    host.innerHTML = emptyState('Шаблон не задан', 'Для услуг записи расчётный расход не настроен.');
+    return;
+  }
+  host.innerHTML = '<p class="ui-list__secondary">Загрузка…</p>';
+  try {
+    const [{ getInventoryItems }, { loadInventory }, { procedureConsumableSummary, procedureConsumableUnit }] =
+      await Promise.all([
+        import('../inventory/data.js'),
+        import('../inventory/service.js'),
+        import('../service/procedures/consumables.js'),
+      ]);
+    await loadInventory({ preferRecent: true });
+    if (!layer.isConnected) return;
+    const items = getInventoryItems();
+    const byId = new Map(items.map(item => [String(item.itemId), item]));
+    host.innerHTML = '<div class="form-grid">' + groups.map(group => {
+      const rows = group.rows.filter(row => row?.itemId);
+      const summary = procedureConsumableSummary(rows, items);
+      return '<section><h3>' + escapeHtml(group.name) + '</h3>' +
+        '<p class="ui-list__secondary">Расчётный расход</p>' +
+        list({ className: 'ui-list--dense', items: rows.map(row => {
+          const item = byId.get(String(row.itemId));
+          const quantity = row.quantity == null || row.quantity === ''
+            ? '—' : formatReportNumber(row.quantity);
+          const unit = row.unit || (item ? procedureConsumableUnit(item) : '');
+          return { title: item?.name || 'Товар недоступен', right: [quantity, unit].filter(Boolean).join(' ') };
+        }) }) +
+        (summary.calculated > 0
+          ? '<p class="ui-list__secondary">Расчётная себестоимость: ' + escapeHtml(formatMoney(summary.total)) +
+            (summary.complete ? '' : ' · неполная') + '</p>'
+          : '') + '</section>';
+    }).join('') + '</div>';
+  } catch (error) {
+    if (layer.isConnected) host.innerHTML = emptyState('Расходники недоступны', String(error?.message || 'Не удалось получить данные склада.'));
+  }
 }
 
 export function openRecordView(record, {
@@ -688,6 +762,7 @@ export function openRecordView(record, {
       : `${recordHasEnded(source) ? 'Задолженность' : 'К оплате'}: ${formatMoney(payment.remaining)}`;
     root.innerHTML = `<div class="record-screen record-screen--state-view record-screen--record-view">
       ${card}
+      ${capabilities.consumables && !readOnlyHistory && !cancelled && procedures.length ? recordConsumablesSticker(source) : ''}
       ${programSelector}
       ${readOnlyHistory ? '' : actionBlock([
         capabilities.sale && !payment.hasPayments ? button('Продажа', { variant: 'secondary', data: 'data-record-view-sale' }) : '',
@@ -786,6 +861,10 @@ export function openRecordView(record, {
           },
         }));
       });
+    });
+    root.querySelector('[data-record-view-consumables]')?.addEventListener('click', () => {
+      if (!capabilities.consumables) return;
+      void openRecordConsumables(syncCurrent());
     });
     root.querySelector('[data-record-view-sale]')?.addEventListener('click', () => {
       if (!capabilities.sale) return;
