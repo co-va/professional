@@ -83,7 +83,10 @@ function previewMarkup(matches) {
   });
 }
 
-export function openInventoryBulkSupplierLink(selectedItems = [], onSaved = () => {}, initialCompanyId = '', initialCompanyName = '') {
+export function openInventoryBulkSupplierLink(
+  selectedItems = [], onSaved = () => {}, initialCompanyId = '', initialCompanyName = '',
+  existingLayer = null,
+) {
   const selectedIds = [...new Set(selectedItems.map(item => String(item.itemId || '')).filter(Boolean))];
   if (!selectedIds.length) return null;
 
@@ -117,7 +120,7 @@ export function openInventoryBulkSupplierLink(selectedItems = [], onSaved = () =
         if (!companyId) return;
         const companyName = companies.find(company => String(company.id) === companyId)?.name || '';
         chooser.v2Close?.();
-        openInventoryBulkSupplierLink(selectedItems, onSaved, companyId, companyName);
+        openInventoryBulkSupplierLink(selectedItems, onSaved, companyId, companyName, existingLayer);
       });
       status.textContent = companies.length ? '' : 'Сначала добавьте поставщика с прайсом.';
     }).catch(error => {
@@ -127,16 +130,22 @@ export function openInventoryBulkSupplierLink(selectedItems = [], onSaved = () =
     return chooser;
   }
 
-  const layer = mountModal(document.body, modal(
-    (initialCompanyName
-      ? '<p class="ui-list__secondary">' + escapeHtml(initialCompanyName) + '</p>'
-      : '') +
+  const markup = (initialCompanyName
+    ? '<p class="ui-list__secondary">' + escapeHtml(initialCompanyName) + '</p>'
+    : '') +
     '<p class="ui-list__secondary" role="status" data-bulk-supplier-status></p>' +
     '<div data-bulk-supplier-list></div>' +
-    actionBlock(button('Применить', { data: 'data-bulk-supplier-apply' })),
-    { title: 'Привязать поставщика', variant: 'q', surface: 'app' },
-  ));
+    actionBlock(button('Применить', { data: 'data-bulk-supplier-apply' }));
+  const layer = existingLayer?.isConnected ? existingLayer
+    : mountModal(document.body, modal(markup, {
+      title: 'Привязать поставщика', variant: 'q', surface: 'app',
+    }));
   if (!layer) return null;
+  if (existingLayer) {
+    const body = layer.querySelector('[data-v2-q-body]');
+    if (!body) return null;
+    body.innerHTML = markup;
+  }
   const status = layer.querySelector('[data-bulk-supplier-status]');
   const list = layer.querySelector('[data-bulk-supplier-list]');
   const apply = layer.querySelector('[data-bulk-supplier-apply]');
@@ -151,7 +160,10 @@ export function openInventoryBulkSupplierLink(selectedItems = [], onSaved = () =
   let requestVersion = 0;
   let saving = false;
   showApply(false);
-  const usable = () => layer.isConnected && startToken === getAuthToken();
+  // A parent Q can be reused for a new action while requests are pending.
+  // Ignore stale preview/save callbacks after this report leaves its body.
+  const usable = () => layer.isConnected && list.isConnected
+    && startToken === getAuthToken();
 
   const loadPreview = async () => {
     const version = ++requestVersion;
