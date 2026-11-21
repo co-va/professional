@@ -124,7 +124,7 @@ export function openInventoryBulkSupplierLink(selectedItems = [], onSaved = () =
         label: 'Поставщик', name: 'bulkSupplierCompany', value: '',
         options: [{ value: '', label: 'Выберите поставщика' },
           ...companies.map(company => ({ value: String(company.id), label: company.name }))],
-        searchable: true,
+        searchable: companies.length > 10,
       });
       picker.querySelector('[name="bulkSupplierCompany"]')?.addEventListener('change', event => {
         if (!usable()) return;
@@ -173,7 +173,7 @@ export function openInventoryBulkSupplierLink(selectedItems = [], onSaved = () =
       label: 'Поставщик', name: 'bulkSupplierCompany', value: selectedCompany,
       options: [{ value: '', label: 'Выберите поставщика' },
         ...companies.map(company => ({ value: String(company.id), label: company.name }))],
-      searchable: true,
+      searchable: companies.length > 10,
     });
     picker.querySelector('[name="bulkSupplierCompany"]')?.addEventListener('change', event => {
       if (saving) return;
