@@ -29,6 +29,20 @@
   min-height:var(--ui-field-height);max-height:78px;
   resize:none;overflow-y:auto;line-height:1.3;padding:10px 9px;
 }
+/* The supplier's name is supplementary data in the same frozen data row,
+   never a new product card or modal. Both result and name remain in place. */
+.inventory-audit-data-row--supplier .inventory-audit-supplier-caption{
+  grid-column:2/-1;display:flex;align-items:flex-start;gap:8px;min-width:0;
+  font-size:13px;line-height:1.2;color:var(--text-secondary);
+}
+.inventory-audit-supplier-caption>[data-inventory-supplier-name]{
+  flex:1 1 auto;min-width:0;overflow:hidden;overflow-wrap:anywhere;
+  display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;
+}
+.inventory-audit-supplier-caption>[data-inventory-supplier-result]{
+  flex:0 0 auto;max-width:42%;text-align:right;white-space:nowrap;
+}
+
 [data-inventory-audit-actions] [hidden]{display:none!important}
 @media(max-width:360px){
   .data-edit-row.inventory-audit-data-row{
