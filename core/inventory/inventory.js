@@ -36,7 +36,7 @@ import { canUseCapability } from '../access.js';
 import { setSharedActionVisible } from '../../ui/page/page.js';
 import { getCardAppearanceTemplate, saveCardAppearanceTemplate } from '../card-appearance-templates.js';
 import {
-  inventoryManufacturerCompletion, isWeighedInventoryItem, netStocktakeGrams,
+  inventoryItemCompletion, inventoryManufacturerCompletion, isWeighedInventoryItem, netStocktakeGrams,
   inventoryStockThresholdInput, inventoryStockThresholdStored, inventoryStockThresholdUnit,
 } from './completeness.js';
 import { openInventoryProductAppearanceQ, openInventoryProductOverview } from './product-overview.js';
@@ -876,26 +876,33 @@ function stockListMarkup(manufacturer, query = '', rowsProvider = null, expanded
   }), STOCK_VIEW.itemsSort);
   if (!items.length) return emptyState('Ничего не найдено', 'Измените поиск или фильтр.');
 
-  const itemRow = item => ({
-    // Actual Core offer relationship, not a manually typed supplier label.
-    indicatorColor: item.primaryOfferId ||
+  const itemRow = item => {
+    const hasSupplier = Boolean(item.primaryOfferId ||
       (Array.isArray(item.supplierOffers) && item.supplierOffers.some(offer =>
-        offer.counterpartyId && offer.catalogItemId))
-      ? '#39805F' : '#C48637',
-    indicatorLabel: item.primaryOfferId ||
-      (Array.isArray(item.supplierOffers) && item.supplierOffers.some(offer =>
-        offer.counterpartyId && offer.catalogItemId))
-      ? 'Поставщик привязан' : 'Поставщик не привязан',
-    title: `${Number(item.position) > 0 ? `${item.position} · ` : ''}${item.name}`,
-    secondary: [item.sku, productTypeText(item)].filter(Boolean).join(' · '),
-    right: [
-      `${numberText(inventoryDisplayBalance(item,STOCK_VIEW.storageScope))} ${item.unit || ''}`,
-      item.lastPurchasePrice == null ? '' : moneyText(item.lastPurchasePrice),
-    ].filter(Boolean),
-    interactive: true,
-    data: `data-inventory-item="${escapeHtml(item.itemId)}"`,
-    aria: `Открыть ${item.name}`,
-  });
+        offer.counterpartyId && offer.catalogItemId)));
+    const completion = inventoryItemCompletion(item);
+    return {
+      // One existing Shared List indicator by the name: linked supplier.
+      indicatorColor: hasSupplier ? '#39805F' : '#989898',
+      indicatorLabel: hasSupplier ? 'Поставщик привязан' : 'Поставщик не привязан',
+      // Second existing Shared List indicator next to the product metadata:
+      // inventory-card completeness, per the canonical Inventory audit.
+      secondaryIndicatorColor: completion.complete ? '#39805F' : '#C48637',
+      secondaryIndicatorLabel: completion.complete
+        ? 'Карточка заполнена'
+        : 'Карточка заполнена на ' + completion.percentage + '%. ' +
+          'Не заполнено: ' + completion.missing.join(', '),
+      title: `${Number(item.position) > 0 ? `${item.position} · ` : ''}${item.name}`,
+      secondary: [item.sku, productTypeText(item)].filter(Boolean).join(' · '),
+      right: [
+        `${numberText(inventoryDisplayBalance(item,STOCK_VIEW.storageScope))} ${item.unit || ''}`,
+        item.lastPurchasePrice == null ? '' : moneyText(item.lastPurchasePrice),
+      ].filter(Boolean),
+      interactive: true,
+      data: `data-inventory-item="${escapeHtml(item.itemId)}"`,
+      aria: `Открыть ${item.name}. ${hasSupplier ? 'Поставщик привязан' : 'Поставщик не привязан'}. ${completion.complete ? 'Карточка заполнена' : 'Карточка заполнена на ' + completion.percentage + ' процентов'}`,
+    };
+  };
   // The compact selector is a sibling of the clickable stock row, never a
   // child of its button. Checking an item does not open its Q overview.
   const itemList = rows => rows.map(item =>
