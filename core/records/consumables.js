@@ -193,14 +193,15 @@ export function openRecordConsumptionEditor(record, services = [], { onSaved = (
     try {
       // Dedicated Core contract. Never send these as product sales, write
       // local-only facts, or issue manual movements from the frontend.
-      const response = await apiRequest('/inventory/records/' + encodeURIComponent(record.id) + '/consumables', {
+      const response = await apiRequest('/business-state/records/' + encodeURIComponent(record.id) + '/consumables', {
         method: 'PUT', body: JSON.stringify({ templates }), timeoutMs: 60000,
       });
       const payload = await response.json().catch(() => ({}));
-      if (response.status === 404) throw new Error('Сохранение расхода ещё не подключено на сервере.');
+      if (response.status === 404) throw new Error('Сервер ещё не обновлён до версии сохранения расхода.');
       if (!response.ok) throw new Error(Array.isArray(payload.message) ? payload.message.join('; ') : text(payload.message) || 'Не удалось сохранить расход.');
       if (text(payload.recordId) !== text(record.id) || !Array.isArray(payload.templates))
         throw new Error('Сервер не подтвердил сохранение шаблона.');
+      if (payload.posted === true) await loadInventory().catch(() => null);
       await onSaved();
       layer.v2Close?.();
     } catch(e) {

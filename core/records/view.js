@@ -296,7 +296,7 @@ function recordConsumablesSticker(record, payment) {
   const groups = recordCalculatedConsumables(record);
   const hasActual = Array.isArray(record.consumableTemplates) &&
     record.consumableTemplates.some(template => template.groups?.some(group => group.items?.length));
-  const status = hasActual ? (payment?.fullyPaid ? 'paid' : 'individual') : 'calculated';
+  const status = hasActual ? (record.consumablesPosted === true && payment?.fullyPaid ? 'paid' : 'individual') : 'calculated';
   const subtitle = hasActual ? 'Индивидуальный шаблон' :
     groups.some(group => group.rows.length) ? 'Расчётный расход' : 'Расход не задан';
   return `<button type="button" class="v2-sticker record-consumables-sticker" data-record-view-consumables data-record-consumption-state="${status}">
