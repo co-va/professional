@@ -41,7 +41,10 @@ import {
 } from './completeness.js';
 import { openInventoryProductAppearanceQ, openInventoryProductOverview } from './product-overview.js';
 import { openQuickStockItemX, openStockItemQEditor } from './stock-item-editor.js';
-import { openInventoryBulkSupplierLink } from './supplier-bulk-link.js';
+import {
+  openInventoryBulkSupplierLink, prepareInventorySupplierLinks, applyInventorySupplierLinks,
+} from './supplier-bulk-link.js';
+import { getAuthToken as getInventorySupplierAuthToken } from '../auth.js';
 import { renderInventoryOrders, openInventoryOrderFromSelection } from './orders.js';
 import { classificationOptions, openInventoryClassificationGroups,
   inventoryCriterionGroups, criterionOptions } from './classification.js';
@@ -2036,6 +2039,10 @@ function openInventoryAuditCriteria(root, {
   let dataUniform = true;
   const selectedDataIds = new Set();
   let dataActionMode = '';
+  let supplierPreview = null;
+  let supplierCompanyId = '';
+  let supplierRequestVersion = 0;
+  let supplierApplied = false;
   let pendingInitialCommonValue = initialCommon && String(initialCommonValue).trim()
     ? String(initialCommonValue).trim() : null;
 
@@ -2053,9 +2060,14 @@ function openInventoryAuditCriteria(root, {
   function syncDataActions() {
     if (!isData) return;
     if (definition.value === 'supplier') {
-      dataActionMode = '';
-      if (dataActions) dataActions.hidden = true;
-      if (submit) submit.hidden = true;
+      if (commonHost) commonHost.hidden = false;
+      if (individualHost) individualHost.hidden = false;
+      if (dataActions) dataActions.hidden = false;
+      if (submit) {
+        submit.hidden = false;
+        submit.textContent = 'Применить';
+        submit.disabled = saving || supplierApplied || !supplierPreview?.some(entry => entry.row);
+      }
       return;
     }
     const common = Boolean(dataMode?.checked);
@@ -2093,24 +2105,91 @@ function openInventoryAuditCriteria(root, {
   function renderDataFields() {
     if (!isData || !definition || !commonHost || !individualHost) return;
     const commonToggle = dataMode?.closest('.ui-compact-check');
-    if (commonToggle) commonToggle.style.display = definition.value === 'supplier' ? 'none' : '';
+    if (commonToggle) commonToggle.style.display = '';
+    if (dataMode) {
+      dataMode.disabled = definition.value === 'supplier';
+      if (definition.value === 'supplier') dataMode.checked = true;
+    }
     if (definition.value === 'supplier') {
+      supplierRequestVersion++;
+      supplierPreview = null;
+      supplierCompanyId = '';
+      supplierApplied = false;
       commonHost.hidden = false;
-      individualHost.hidden = true;
-      individualHost.innerHTML = '';
-      commonHost.innerHTML = '<p class="ui-list__secondary">Выберите контрагента. Товары будут сопоставлены с его прайсом по артикулам.</p>' +
-        actionBlock(button('Выбрать поставщика', { data: 'data-inventory-bulk-supplier-open' }));
+      individualHost.hidden = false;
+      // These are the same compact data-edit rows as for every other field.
+      // The right-hand editor is frozen; the supplier's actual catalog name
+      // appears on a single secondary line without changing row identity.
+      individualHost.innerHTML = '<div class="inventory-audit-data-list">' +
+        items.map((item, index) => {
+          const name = String(item.name || 'Позиция');
+          return '<div class="data-edit-row inventory-audit-data-row inventory-audit-data-row--supplier" ' +
+            'data-inventory-supplier-item="' + index + '">' +
+            compactCheck({ checked: true, disabled: true,
+              aria: 'Выбрано: ' + name }) +
+            '<span class="data-edit-row__name" title="' + escapeHtml(name) + '">' +
+              '<strong>' + escapeHtml(name) + '</strong></span>' +
+            field({ label: '', name: 'auditSupplier-' + index,
+              value: String(item.supplier || ''), disabled: true }) +
+            '<span class="inventory-audit-supplier-caption">' +
+              '<span data-inventory-supplier-name="' + index + '"></span>' +
+              '<span data-inventory-supplier-result="' + index + '"></span>' +
+            '</span></div>';
+        }).join('') + '</div>';
+      commonHost.innerHTML = actionBlock(button('Выбрать поставщика', {
+        data: 'data-inventory-bulk-supplier-open',
+      })) + '<p data-inventory-supplier-company class="ui-list__secondary"></p>';
+      const companyHost = commonHost.querySelector('[data-inventory-supplier-company]');
       commonHost.querySelector('[data-inventory-bulk-supplier-open]')?.addEventListener('click', () => {
-        openInventoryBulkSupplierLink(items, () => {
-          items.splice(0, items.length,
-            ...items.map(item => getInventoryItem(item.itemId)).filter(Boolean));
-          onSaved();
-        }, '', '', existingLayer);
+        if (saving) return;
+        // X selects a company; the same Q rows remain mounted throughout
+        // preview and confirmed writes. No Q is opened or replaced.
+        openInventoryBulkSupplierLink(items, onSaved, '', '', null, (companyId, companyName) => {
+          const version = ++supplierRequestVersion;
+          const startingToken = getInventorySupplierAuthToken();
+          supplierPreview = null;
+          supplierCompanyId = companyId;
+          supplierApplied = false;
+          companyHost.textContent = companyName;
+          const usable = () => form.isConnected && definition.value === 'supplier'
+            && version === supplierRequestVersion
+            && startingToken === getInventorySupplierAuthToken();
+          items.forEach((item, index) => {
+            const caption = individualHost.querySelector('[data-inventory-supplier-name="' + index + '"]');
+            const result = individualHost.querySelector('[data-inventory-supplier-result="' + index + '"]');
+            if (caption) caption.textContent = '';
+            if (result) { result.textContent = ''; result.removeAttribute('title'); }
+          });
+          status.textContent = 'Сопоставление…';
+          syncDataActions();
+          void prepareInventorySupplierLinks(items.map(item => item.itemId), companyId, usable)
+            .then(matches => {
+              if (!usable() || !matches) return;
+              supplierPreview = matches;
+              matches.forEach((entry, index) => {
+                const caption = individualHost.querySelector('[data-inventory-supplier-name="' + index + '"]');
+                if (caption) caption.textContent = entry.row?.name || '';
+                const row = individualHost.querySelector('[data-inventory-supplier-item="' + index + '"]');
+                if (row && entry.reason) row.title = entry.reason;
+              });
+              status.textContent = 'Найдено: ' +
+                matches.filter(entry => entry.row).length + ' из ' + matches.length;
+              syncDataActions();
+            }).catch(error => {
+              if (!usable()) return;
+              status.textContent = error instanceof Error ? error.message : 'Не удалось сопоставить позиции.';
+              syncDataActions();
+            });
+        });
       });
       status.textContent = '';
       syncDataActions();
       return;
     }
+    supplierRequestVersion++;
+    supplierPreview = null;
+    supplierCompanyId = '';
+    supplierApplied = false;
     const values = items.map(item => String(inventoryAuditCurrentValue(item, definition) ?? '').trim());
     dataUniform = new Set(values).size === 1;
     dataInitial = dataUniform ? values[0] || '' : '';
@@ -2359,6 +2438,43 @@ function openInventoryAuditCriteria(root, {
     event.preventDefault();
     if (saving) return;
     const data = new FormData(form);
+    if (isData && definition.value === 'supplier') {
+      if (saving || supplierApplied || !supplierCompanyId || !supplierPreview?.some(entry => entry.row)) return;
+      saving = true;
+      syncDataActions();
+      const version = supplierRequestVersion;
+      const startingToken = getInventorySupplierAuthToken();
+      const usable = () => form.isConnected && version === supplierRequestVersion
+        && definition.value === 'supplier'
+        && startingToken === getInventorySupplierAuthToken();
+      try {
+        const result = await applyInventorySupplierLinks(supplierPreview, supplierCompanyId, {
+          usable,
+          onProgress: (completed, total) => {
+            if (usable()) status.textContent = 'Применение · ' + completed + ' из ' + total;
+          },
+        });
+        if (!usable() || !result) return;
+        supplierApplied = true;
+        supplierPreview.forEach((entry, index) => {
+          const outcome = individualHost.querySelector('[data-inventory-supplier-result="' + index + '"]');
+          if (!outcome) return;
+          const success = result.confirmedIds.has(String(entry.itemId));
+          outcome.textContent = success ? 'Применено' : 'Не применено';
+          const failure = result.failuresById.get(String(entry.itemId)) || entry.reason;
+          if (!success && failure) outcome.title = failure;
+        });
+        status.textContent = 'Применено: ' + result.confirmedIds.size + ' из ' + supplierPreview.length;
+        if (result.confirmedIds.size) onSaved();
+      } catch (error) {
+        if (usable()) status.textContent = 'Сохранение не подтверждено: ' +
+          (error instanceof Error ? error.message : 'Ошибка сервера');
+      } finally {
+        saving = false;
+        if (usable()) syncDataActions();
+      }
+      return;
+    }
     if (!isData) {
       const review = calculate();
       if (review.invalid) {
