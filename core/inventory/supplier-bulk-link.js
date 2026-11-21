@@ -71,6 +71,72 @@ export function matchSupplierCatalog(stockItems = [], catalogRows = [], selected
   });
 }
 
+// Shared server-backed operation for both the standalone supplier report and
+// the persistent bulk-data editor. SKU matching and confirmed writes live here.
+export async function prepareInventorySupplierLinks(selectedIds, companyId, usable = () => true) {
+  await loadInventory();
+  if (!usable()) return null;
+  const base = '/counterparties/' + urlPart(companyId) + '/catalog?take=500&skip=';
+  const first = await inventoryApi(base + '0');
+  if (!usable()) return null;
+  const catalog = [...(Array.isArray(first.items) ? first.items : [])];
+  const count = Math.max(0, Number(first.count) || 0);
+  const step = Math.max(1, Number(first.pageSize) || 500);
+  for (let offset = step; offset < count; offset += step * 3) {
+    const pages = [];
+    for (let at = offset; at < Math.min(count, offset + step * 3); at += step)
+      pages.push(inventoryApi(base + at));
+    const results = await Promise.all(pages);
+    if (!usable()) return null;
+    results.forEach(page => catalog.push(...(Array.isArray(page.items) ? page.items : [])));
+  }
+  return matchSupplierCatalog(getInventoryItems(), catalog, selectedIds, companyId);
+}
+
+export async function applyInventorySupplierLinks(
+  entries, companyId, { usable = () => true, onProgress = () => {} } = {},
+) {
+  const matches = entries.filter(entry => entry.row);
+  const failuresById = new Map();
+  let completed = 0;
+  // All writes and the final verification use existing Core routes. A failed
+  // row never counts as saved merely because its SKU matched.
+  for (const entry of matches) {
+    if (!usable()) throw new Error('Операция остановлена: окно закрыто или изменился аккаунт.');
+    onProgress(++completed, matches.length, entry);
+    try {
+      const itemPath = '/items/' + urlPart(entry.itemId);
+      const linkedOffer = await inventoryApi(
+        '/counterparties/' + urlPart(companyId) + '/catalog/' + urlPart(entry.row.id) + '/link',
+        'POST', { itemId: entry.itemId,
+          ...(entry.unitsPerOffer == null ? {} : { unitsPerOffer: entry.unitsPerOffer }) }, 45000);
+      const offerId = String(linkedOffer.offerId || '');
+      if (!offerId || String(linkedOffer.itemId || '') !== String(entry.itemId))
+        throw new Error('Сервер не подтвердил связь');
+      if (String(getInventoryItem(entry.itemId)?.primaryOfferId || '') !== offerId)
+        await inventoryApi(itemPath + '/primary-offer', 'PUT', { offerId }, 60000);
+      if (String(getInventoryItem(entry.itemId)?.catalogName || '') !== String(entry.row.name || ''))
+        await inventoryApi(itemPath, 'PUT', { catalogName: entry.row.name }, 60000);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Не удалось сохранить';
+      failuresById.set(String(entry.itemId), message);
+      if (error?.name === 'AbortError') break;
+    }
+  }
+  invalidateInventoryNavigationCache();
+  await loadInventory();
+  if (!usable()) return null;
+  const confirmedIds = new Set(matches.filter(entry => {
+    const item = getInventoryItem(entry.itemId);
+    const offer = item?.supplierOffers?.find(value =>
+      String(value.counterpartyId || '') === String(companyId)
+      && String(value.catalogItemId || '') === String(entry.row.id));
+    return Boolean(offer && item.primaryOfferId === offer.offerId
+      && item.catalogName === entry.row.name);
+  }).map(entry => String(entry.itemId)));
+  return { confirmedIds, failuresById, matchedCount: matches.length };
+}
+
 // One shared compact List row per selected stock item. The original short
 // stock name stays primary; the matched supplier's full catalog name stays
 // directly underneath in the standard secondary style. Neither is editable
@@ -89,7 +155,7 @@ function previewMarkup(matches) {
 
 export function openInventoryBulkSupplierLink(
   selectedItems = [], onSaved = () => {}, initialCompanyId = '', initialCompanyName = '',
-  existingLayer = null,
+  existingLayer = null, onCompanySelected = null,
 ) {
   const selectedIds = [...new Set(selectedItems.map(item => String(item.itemId || '')).filter(Boolean))];
   if (!selectedIds.length) return null;
@@ -124,6 +190,10 @@ export function openInventoryBulkSupplierLink(
         if (!companyId) return;
         const companyName = companies.find(company => String(company.id) === companyId)?.name || '';
         chooser.v2Close?.();
+        if (typeof onCompanySelected === 'function') {
+          onCompanySelected(companyId, companyName);
+          return;
+        }
         openInventoryBulkSupplierLink(selectedItems, onSaved, companyId, companyName, existingLayer);
       });
       status.textContent = companies.length ? '' : 'Сначала добавьте поставщика с прайсом.';
