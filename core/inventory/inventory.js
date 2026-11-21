@@ -1172,24 +1172,24 @@ function openManufacturerStock(root, manufacturer, groupContext = null) {
   layer.querySelector('[data-stock-selected-action]')?.addEventListener('click', () => {
     const ids = [...selectedStockItems].filter(id => Boolean(getInventoryItem(id)));
     if (!ids.length) return;
+    // A single action picker belongs to the compact X, not an empty full-height Q.
     const choice = mountModal(document.body, modal(
+      '<div class="modal-title"><h2>Действия</h2></div>' +
+      select({
+        label: '', name: 'stockSelectedAction', value: '',
+        options: [
+          { value: '', label: 'Выберите действие' },
+          { value: 'edit', label: 'Изменить данные' },
+          { value: 'audit', label: 'Инвентаризация остатков' },
+          { value: 'transfer', label: 'Переместить' },
+          { value: 'order', label: 'Создать заказ' },
+        ],
+      }) +
       '<p class="ui-list__secondary">Выбрано позиций: ' + ids.length + '</p>',
-      { title: 'Действия', variant: 'q', surface: 'app' },
+      { title: 'Действия', variant: 'x', xRole: 'picker', surface: 'app' },
     ));
     if (!choice) return;
-    const header = choice.querySelector('[data-v2-q-header-content]');
-    if (!header) { choice.v2Close?.(); return; }
-    header.innerHTML = select({
-      label: '', name: 'stockSelectedAction', value: '',
-      options: [
-        { value: '', label: 'Действия' },
-        { value: 'edit', label: 'Изменить данные' },
-        { value: 'audit', label: 'Инвентаризация остатков' },
-        { value: 'transfer', label: 'Переместить' },
-        { value: 'order', label: 'Создать заказ' },
-      ],
-    });
-    header.querySelector('[name="stockSelectedAction"]')?.addEventListener('change', event => {
+    choice.querySelector('[name="stockSelectedAction"]')?.addEventListener('change', event => {
       const action = event.target.value;
       if (!action) return;
       choice.v2Close?.();
