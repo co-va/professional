@@ -22,14 +22,27 @@ export function openRecordConsumptionEditor(record, services = [], { onSaved = (
   const data = services.map(service => ({
     ...service, groups: actualGroups(record, service.id), expanded: false, templateChoice: '',
   }));
-  const initial = JSON.stringify(data.map(({ id, groups }) => ({ procedureId: id, groups })));
+  let editing = false;
+  const signature = () => JSON.stringify(data.map(({ id, groups }) => ({
+    procedureId: id,
+    groups: groups.filter(group => group.items?.length).map(group => ({
+      name: text(group.name), items: group.items.map(row => ({
+        itemId: text(row.itemId), quantity: row.quantity == null || row.quantity === '' ? null : Number(String(row.quantity).replace(',', '.')), unit: text(row.unit),
+      })),
+    })),
+  })));
+  let initial = signature();
   const panel = '<div class="form-grid" data-record-consumption-services></div>' +
     '<div class="form-error" role="alert" data-record-consumption-error></div>' +
-    actionBlock(button('Применить', { data: 'data-record-consumption-apply' }));
+    actionBlock(
+      button('Редактировать', { variant: 'secondary', data: 'data-record-consumption-edit' }) +
+      button('Применить', { data: 'data-record-consumption-apply' }),
+    );
   const layer = mountModal(document.body, modal(panel, { title: 'Расходники', variant: 'q', surface: 'app' }));
   if (!layer) return null;
   const host = layer.querySelector('[data-record-consumption-services]');
   const save = layer.querySelector('[data-record-consumption-apply]');
+  const edit = layer.querySelector('[data-record-consumption-edit]');
   const error = layer.querySelector('[data-record-consumption-error]');
   const actions = save?.closest('.modal-actions');
   let busy = false;
@@ -37,7 +50,12 @@ export function openRecordConsumptionEditor(record, services = [], { onSaved = (
   const stock = () => new Map(getInventoryItems().map(item => [text(item.itemId), item]));
   const draft = () => data.map(({ id, groups }) => ({ procedureId: id, groups }));
   const sync = () => {
-    setSharedActionVisible(actions, JSON.stringify(draft()) !== initial);
+    const changed = signature() !== initial;
+    const hasOpen = data.some(service => service.expanded || service.groups.length);
+    setSharedActionVisible(actions, hasOpen || editing || changed);
+    edit.hidden = editing || !hasOpen;
+    save.hidden = !editing && !changed;
+    edit.disabled = busy;
     save.disabled = busy;
     host.querySelectorAll('[data-record-consumption-cost]').forEach(node => {
       const service = data[Number(node.dataset.recordConsumptionCost)];
@@ -64,14 +82,14 @@ export function openRecordConsumptionEditor(record, services = [], { onSaved = (
   };
   const pick = async (si, gi) => {
     const service = data[si];
-    if (!service || busy) return;
+    if (!service || busy || !editing) return;
     const group = service.groups[gi];
     if (!group) return;
     try { await inventoryLoad; }
     catch (e) { openNotice({ title: 'Расходники', message: text(e?.message) || 'Не удалось загрузить склад.' }); return; }
     if (!layer.isConnected) return;
     openConsumablePicker(new Set(group.items.map(row => text(row.itemId))), row => {
-      if (!layer.isConnected || !service.groups.includes(group)) return;
+      if (!layer.isConnected || !editing || !service.groups.includes(group)) return;
       group.items.push(row);
       render();
     });
@@ -85,7 +103,7 @@ export function openRecordConsumptionEditor(record, services = [], { onSaved = (
       const normMarkup = norm.length ? list({
         className: 'ui-list--dense', items: norm.map(row => ({
           title: items.get(text(row.itemId))?.name || (loaded ? 'Товар недоступен' : '…'),
-          right: [row.quantity == null ? '—' : row.quantity, row.unit || procedureConsumableUnit(items.get(text(row.itemId)))].filter(Boolean).join(' '),
+          right: [row.quantity == null ? '—' : row.quantity, row.unit || (items.has(text(row.itemId)) ? procedureConsumableUnit(items.get(text(row.itemId))) : '')].filter(Boolean).join(' '),
         })),
       }) : '';
       const groups = service.groups.map((group, gi) => {
@@ -93,15 +111,22 @@ export function openRecordConsumptionEditor(record, services = [], { onSaved = (
           const product = items.get(text(row.itemId));
           const k = si + ':' + gi + ':' + ri;
           const title = product?.name || 'Товар недоступен';
+          const unit = row.unit || (product ? procedureConsumableUnit(product) : '');
+          if (!editing) return '<div class="data-edit-row record-consumption-product record-consumption-product--read">' +
+            '<span class="data-edit-row__name" title="' + escapeHtml(title) + '">' + escapeHtml(title) + '</span>' +
+            '<span class="record-consumption-read-quantity">' + escapeHtml([row.quantity ?? '—', unit].filter(Boolean).join(' ')) + '</span></div>';
           return '<div class="data-edit-row record-consumption-product">' +
             '<span class="data-edit-row__name" title="' + escapeHtml(title) + '">' + escapeHtml(title) + '</span>' +
             '<div class="inventory-editor-number">' +
             field({ label: '', name: 'recordConsumptionQuantity' + k, type: 'number', min: '0.000001', step: 'any',
               inputmode: 'decimal', placeholder: '—', value: row.quantity ?? '', data: 'aria-label="' + escapeHtml('Расход: ' + title) + '" data-record-consumption-quantity="' + k + '"' }) +
-            '<span class="inventory-editor-number__suffix">' + escapeHtml(row.unit || (product ? procedureConsumableUnit(product) : '')) + '</span></div>' +
+            '<span class="inventory-editor-number__suffix">' + escapeHtml(unit) + '</span></div>' +
             compactButton({ kind: 'remove', data: 'data-record-consumption-remove="' + k + '"', aria: 'Убрать товар' }) +
             '</div>';
         }).join('');
+        if (!editing) return '<section class="record-consumption-group">' +
+          (text(group.name) ? '<div class="record-consumption-read-title">' + escapeHtml(group.name) + '</div>' : '') +
+          products + '</section>';
         return '<section class="record-consumption-group">' +
           '<div class="data-edit-row record-consumption-group-header">' +
           field({ label: '', name: 'recordConsumptionName' + si + ':' + gi, value: group.name,
@@ -123,8 +148,8 @@ export function openRecordConsumptionEditor(record, services = [], { onSaved = (
             options: [{ value: '', label: 'Шаблон' }, { value: 'standard', label: 'Стандартный шаблон' },
               ...dates.map(previous => ({ value: 'record:' + text(previous.id), label: dateText(previous.date) + (previous.from ? ' · ' + text(previous.from) : '') }))],
             data: 'data-record-consumption-history="' + si + '"', aria: 'Выбрать шаблон: ' + service.name }) +
-          groups + '<div class="field-inline-label record-consumption-add-group"><span>Добавить группу</span>' +
-          compactButton({ kind: 'add', data: 'data-record-consumption-add="' + si + '"', aria: 'Добавить группу' }) + '</div>' +
+          groups + (editing ? '<div class="field-inline-label record-consumption-add-group"><span>Добавить группу</span>' +
+          compactButton({ kind: 'add', data: 'data-record-consumption-add="' + si + '"', aria: 'Добавить группу' }) + '</div>' : '') +
           '<p class="ui-list__secondary" data-record-consumption-cost="' + si + '"></p>'
         ) + '</section>';
     }).join('');
@@ -138,8 +163,11 @@ export function openRecordConsumptionEditor(record, services = [], { onSaved = (
       const i = Number(d.recordConsumptionOpen), service = data[i];
       if (!service) return;
       service.expanded = true;
+      editing = true;
+      if (!service.groups.length) addGroup(service);
       render();
-    } else if (d.recordConsumptionAdd !== undefined) {
+    } else if (!editing) return;
+    else if (d.recordConsumptionAdd !== undefined) {
       addGroup(data[Number(d.recordConsumptionAdd)]);
       render();
     } else if (d.recordConsumptionPick !== undefined) {
@@ -155,6 +183,7 @@ export function openRecordConsumptionEditor(record, services = [], { onSaved = (
     }
   });
   host.addEventListener('input', event => {
+    if (!editing || busy) return;
     const d = event.target.dataset;
     if (d.recordConsumptionQuantity !== undefined) {
       const [si,gi,ri] = d.recordConsumptionQuantity.split(':').map(Number);
@@ -182,10 +211,27 @@ export function openRecordConsumptionEditor(record, services = [], { onSaved = (
     }
     service.templateChoice = choice;
     service.expanded = true;
+    editing = false;
+    error.textContent = '';
+    render();
+  });
+  edit.addEventListener('click', () => {
+    if (busy) return;
+    editing = true;
+    for (const service of data) {
+      if (service.expanded && !service.groups.length) addGroup(service);
+    }
     render();
   });
   save.addEventListener('click', async () => {
     if (busy) return;
+    if (signature() === initial) {
+      editing = false;
+      for (const service of data) service.groups = service.groups.filter(group => group.items?.length);
+      error.textContent = '';
+      render();
+      return;
+    }
     let templates;
     try {
       templates = draft().map(template => ({
@@ -213,9 +259,16 @@ export function openRecordConsumptionEditor(record, services = [], { onSaved = (
       if (!response.ok) throw new Error(Array.isArray(payload.message) ? payload.message.join('; ') : text(payload.message) || 'Не удалось сохранить расход.');
       if (text(payload.recordId) !== text(record.id) || !Array.isArray(payload.templates))
         throw new Error('Сервер не подтвердил сохранение шаблона.');
+      // The server is the owner of the saved template. Switch immediately
+      // to plain reading mode only after the acknowledgement.
+      for (const service of data) {
+        service.groups = actualGroups({ consumableTemplates: payload.templates }, service.id);
+      }
+      initial = signature();
+      editing = false;
+      if (layer.isConnected) render();
       if (payload.posted === true) await loadInventory().catch(() => null);
-      await onSaved();
-      layer.v2Close?.();
+      await Promise.resolve().then(onSaved).catch(() => null);
     } catch(e) {
       if (layer.isConnected) error.textContent = text(e.message) || 'Расход не сохранён.';
     } finally { busy = false; if (layer.isConnected) sync(); }
