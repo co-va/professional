@@ -1172,41 +1172,72 @@ function openManufacturerStock(root, manufacturer, groupContext = null) {
   layer.querySelector('[data-stock-selected-action]')?.addEventListener('click', () => {
     const ids = [...selectedStockItems].filter(id => Boolean(getInventoryItem(id)));
     if (!ids.length) return;
-    // A single action picker belongs to the compact X, not an empty full-height Q.
+    // One persistent Q work area for this selection. The shared Select in
+    // the header opens its own compact X picker; it never replaces the Q list.
     const choice = mountModal(document.body, modal(
-      '<div class="modal-title"><h2>Действия</h2></div>' +
-      select({
-        label: '', name: 'stockSelectedAction', value: '',
-        options: [
-          { value: '', label: 'Выберите действие' },
-          { value: 'edit', label: 'Изменить данные' },
-          { value: 'audit', label: 'Инвентаризация остатков' },
-          { value: 'transfer', label: 'Переместить' },
-          { value: 'order', label: 'Создать заказ' },
-        ],
-      }) +
-      '<p class="ui-list__secondary">Выбрано позиций: ' + ids.length + '</p>',
-      { title: 'Действия', variant: 'x', xRole: 'picker', surface: 'app' },
+      '<div data-stock-bulk-workspace></div>',
+      { title: 'Действия', variant: 'q', surface: 'app' },
     ));
     if (!choice) return;
-    choice.querySelector('[name="stockSelectedAction"]')?.addEventListener('change', event => {
-      const action = event.target.value;
-      if (!action) return;
-      choice.v2Close?.();
-      if (action === 'edit') {
-        openInventoryAuditCriteria(layer, { mode: 'data', ids, onSaved: renderList, keepOpen: true });
-      } else if (action === 'audit') {
-        openInventoryAuditCriteria(layer, { mode: 'stock', ids, onSaved: renderList });
+    const body = choice.querySelector('[data-v2-q-body]');
+    const header = choice.querySelector('[data-v2-q-header-content]');
+    if (!body || !header) { choice.v2Close?.(); return; }
+    const showSelection = (message = '') => {
+      const selectedItems = ids.map(id => getInventoryItem(id)).filter(Boolean);
+      body.innerHTML =
+        '<p class="ui-list__secondary">Выбрано позиций: ' + selectedItems.length + '</p>' +
+        (message ? '<p role="status" class="ui-list__secondary">' + escapeHtml(message) + '</p>' : '') +
+        '<div class="ui-list ui-list--dense">' +
+        selectedItems.map(item =>
+          '<div class="ui-list__item"><span class="ui-list__main">' +
+          '<span class="ui-list__title">' + escapeHtml(inventoryAuditItemLabel(item)) + '</span>' +
+          '<span class="ui-list__secondary">' + escapeHtml(
+            (item.sku ? 'Арт. ' + item.sku + ' · ' : '') +
+            numberText(item.balance) + ' ' + (item.unit || '')) +
+          '</span></span></div>').join('') + '</div>';
+    };
+    header.innerHTML = select({
+      label: '', name: 'stockSelectedAction', value: '',
+      options: [
+        { value: '', label: 'Действия' },
+        { value: 'edit', label: 'Изменить данные' },
+        { value: 'audit', label: 'Инвентаризация остатков' },
+        { value: 'transfer', label: 'Переместить' },
+        { value: 'order', label: 'Создать заказ' },
+      ],
+    });
+    const changeAction = action => {
+      if (!choice.isConnected) return;
+      if (action === 'edit' || action === 'audit') {
+        openInventoryAuditCriteria(choice, {
+          mode: action === 'edit' ? 'data' : 'stock',
+          ids, onSaved: renderList, keepOpen: true, existingLayer: choice,
+        });
       } else if (action === 'transfer') {
-        openInventoryTransfer(renderList, {
+        openInventoryTransfer(() => {
+          renderList();
+          showSelection('Перемещение выполнено.');
+        }, {
           selectedItemIds: ids,
           fromLocationId: STOCK_VIEW.storageScope === INVENTORY_TOTAL_SCOPE
             ? '' : STOCK_VIEW.storageScope,
+          existingLayer: choice,
         });
       } else if (action === 'order') {
-        openInventoryOrderFromSelection(layer, ids, renderList);
-      }
+        // Orders have their own multi-step Q1/Q2 transaction. Keep the
+        // original selection available underneath that business workflow.
+        showSelection();
+        openInventoryOrderFromSelection(choice, ids, () => {
+          renderList();
+          showSelection('Заказ сформирован.');
+        });
+      } else showSelection();
+    };
+    header.addEventListener('change', event => {
+      if (event.target?.name === 'stockSelectedAction')
+        changeAction(String(event.target.value || ''));
     });
+    showSelection();
   });
   layer.querySelector('[data-stock-selected-delete]')?.addEventListener('click', deleteSelected);
   let disposeCategoryReorder = () => {};
@@ -1947,6 +1978,7 @@ async function applyInventoryAuditDataChanges(layer, { items, definition, perIte
 function openInventoryAuditCriteria(root, {
   mode, ids = [], fieldName = 'category', onSaved = () => {},
   keepOpen = false, initialCommon = false, initialCommonValue = '',
+  existingLayer = null,
 } = {}) {
   const items = inventoryAuditItems(ids);
   if (!items.length) return openNotice({ title: 'Инвентаризация', message: 'Позиции не найдены.' });
@@ -1966,18 +1998,27 @@ function openInventoryAuditCriteria(root, {
        </details>
        <div class="form-grid" data-inventory-audit-active>${items.map(inventoryAuditInput).join('')}</div>`;
   const markup = `<form data-inventory-audit-criteria>
+    ${isData && existingLayer ? select({
+      label: 'Что изменить', name: 'auditEditField', value: definition.value,
+      options: INVENTORY_AUDIT_EDIT_FIELDS.map(({ value, label }) => ({ value, label })),
+    }) : ''}
     <p data-inventory-audit-included-count>${isData ? 'Выбрано' : 'В инвентаризации'}: ${items.length} позиций</p>
     ${fields}
     <p class="form-error" role="status" data-inventory-audit-status></p>
-    <div data-inventory-audit-actions${isData ? ' hidden' : ''}>
-      ${actionBlock(button(isData ? 'Применить' : 'Сохранить', { type:'submit', data:'data-inventory-audit-apply' }))}
+    <div data-inventory-audit-actions>
+      ${actionBlock(button('Применить', { type:'submit', data:'data-inventory-audit-apply' }))}
     </div>
   </form>`;
-  const layer = mountModal(root, modal(markup, {
+  const layer = existingLayer?.isConnected ? existingLayer : mountModal(root, modal(markup, {
     title: isData ? 'Изменить данные' : 'Инвентаризация остатков',
     variant: 'q',
   }));
   if (!layer) return null;
+  if (existingLayer) {
+    const body = layer.querySelector('[data-v2-q-body]');
+    if (!body) return null;
+    body.innerHTML = markup;
+  }
   const form = layer.querySelector('[data-inventory-audit-criteria]');
   const submit = layer.querySelector('[data-inventory-audit-apply]');
   const status = layer.querySelector('[data-inventory-audit-status]');
@@ -2043,9 +2084,9 @@ function openInventoryAuditCriteria(root, {
     // These are mutually exclusive operations: edited values take priority.
     // Checking unchanged rows exposes Clear; typing exposes Apply instead.
     dataActionMode = canApply ? 'apply' : canClear ? 'clear' : '';
-    if (dataActions) dataActions.hidden = !dataActionMode;
+    if (dataActions) dataActions.hidden = false;
     if (submit) {
-      submit.hidden = !dataActionMode;
+      submit.hidden = false;
       submit.disabled = saving || !dataActionMode;
       if (!saving) submit.textContent = dataActionMode === 'clear'
         ? definition.value === 'position' ? 'В конец' : 'Очистить' : 'Применить';
@@ -2101,13 +2142,13 @@ function openInventoryAuditCriteria(root, {
   }
 
   if (isData) {
-    const header = layer.querySelector('[data-v2-q-header-content]');
-    if (header) {
-      header.innerHTML = select({
+    const fieldHost = existingLayer ? form : layer.querySelector('[data-v2-q-header-content]');
+    if (fieldHost) {
+      if (!existingLayer) fieldHost.innerHTML = select({
         label: 'Изменить данные', name: 'auditEditField', value: definition.value,
         options: INVENTORY_AUDIT_EDIT_FIELDS.map(({ value, label }) => ({ value, label })),
       });
-      header.querySelector('[name="auditEditField"]')?.addEventListener('change', event => {
+      fieldHost.querySelector('[name="auditEditField"]')?.addEventListener('change', event => {
         const next = inventoryAuditFieldDefinition(event.target.value);
         if (!next || saving) return;
         definition = next;
@@ -2277,6 +2318,7 @@ function openInventoryAuditCriteria(root, {
     const clearItems = clear && !common ? selectedIndices : new Set();
     const data = new FormData(form);
     const action = submit;
+    const initialLabel = action?.textContent || 'Применить';
     saving = true;
     syncDataActions();
     if (action) action.textContent = clear
@@ -2336,7 +2378,8 @@ function openInventoryAuditCriteria(root, {
         return;
       }
       if (!review.lines.length) {
-        layer.v2Close?.();
+        if (!keepOpen) layer.v2Close?.();
+        else status.textContent = 'Изменений остатков нет.';
         onSaved();
         return;
       }
@@ -2368,9 +2411,18 @@ function openInventoryAuditCriteria(root, {
           kind: 'ADJUSTMENT', sourceType: 'inventory-count',
           note: 'Инвентаризация фактических остатков', lines: review.lines,
         });
-        layer.v2Close?.();
-        onSaved();
-        openNotice({ title: 'Инвентаризация', message: 'Остатки сохранены.' });
+        if (keepOpen && existingLayer) {
+          onSaved();
+          openInventoryAuditCriteria(root, {
+            mode: 'stock', ids, onSaved, keepOpen: true, existingLayer: layer,
+          });
+          const resultStatus = layer.querySelector('[data-inventory-audit-status]');
+          if (resultStatus) resultStatus.textContent = 'Остатки сохранены.';
+        } else {
+          layer.v2Close?.();
+          onSaved();
+          openNotice({ title: 'Инвентаризация', message: 'Остатки сохранены.' });
+        }
       } catch(error) {
         status.textContent = error instanceof Error ? error.message : 'Не удалось сохранить остатки.';
       } finally {
