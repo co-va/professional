@@ -10,7 +10,20 @@ const clone = value => JSON.parse(JSON.stringify(value));
 const text = value => String(value ?? '').trim();
 const dateText = value => text(value).slice(0,10).split('-').reverse().join(' ');
 const money = value => Number(value).toLocaleString('ru-RU', { maximumFractionDigits: 2 }) + ' ₽';
-const key = record => text(record?.person?.key || record?.person?.id);
+const personKeys = record => [record?.person?.key, record?.person?.id].map(text).filter(Boolean);
+const samePerson = (left, right) => {
+  const ids = new Set(personKeys(left));
+  return ids.size > 0 && personKeys(right).some(id => ids.has(id));
+};
+const visitMoment = record => text(record?.date).slice(0,10) + 'T' + (text(record?.from) || '00:00');
+function previousTemplates(record, procedureId, records) {
+  return records.filter(previous =>
+    text(previous.id) !== text(record.id) && samePerson(previous, record) &&
+    visitMoment(previous) < visitMoment(record) &&
+    previous.status !== 'cancelled' && previous.attendance !== 'no-show' &&
+    actualGroups(previous, procedureId).some(group => group.items?.length)
+  ).sort((left, right) => visitMoment(right).localeCompare(visitMoment(left)));
+}
 
 function actualGroups(record, procedureId) {
   const template = (Array.isArray(record?.consumableTemplates) ? record.consumableTemplates : [])
@@ -32,10 +45,23 @@ export function openRecordConsumptionEditor(record, services = [], { onSaved = (
     })),
   })));
   let initial = signature();
+  // A stored empty array is an explicit saved choice, not an invitation to
+  // restore a previous individual expense. Only new/unset records get a copy.
+  const history = getRecords();
+  const datesFor = service => previousTemplates(record, service.id, history);
+  if (!Array.isArray(record.consumableTemplates)) {
+    for (const service of data) {
+      const latest = datesFor(service)[0];
+      if (service.groups.length || !latest) continue;
+      service.groups = actualGroups(latest, service.id);
+      service.templateChoice = 'record:' + text(latest.id);
+      service.expanded = true;
+    }
+  }
   const panel = '<div class="form-grid" data-record-consumption-services></div>' +
     '<div class="form-error" role="alert" data-record-consumption-error></div>' +
     actionBlock(
-      button('Редактировать', { variant: 'secondary', data: 'data-record-consumption-edit' }) +
+      button('Редактировать', { variant: 'outline', data: 'data-record-consumption-edit' }) +
       button('Применить', { data: 'data-record-consumption-apply' }),
     );
   const layer = mountModal(document.body, modal(panel, { title: 'Расходники', variant: 'q', surface: 'app' }));
@@ -66,13 +92,6 @@ export function openRecordConsumptionEditor(record, services = [], { onSaved = (
         (result.complete ? '' : ' · неполная') : '';
     });
   };
-  const datesFor = service => key(record) ? getRecords().filter(previous =>
-    text(previous.id) !== text(record.id) && key(previous) === key(record) &&
-    text(previous.date) <= text(record.date) && actualGroups(previous, service.id).length &&
-    previous.status !== 'cancelled' && previous.attendance !== 'no-show' &&
-    (text(previous.date) + text(previous.from)) < (text(record.date) + text(record.from)) &&
-    (previous.consumablesPosted === true || previous.completed || previous.payment?.state === 'paid'))
-    .sort((a,b) => (text(b.date) + text(b.from)).localeCompare(text(a.date) + text(a.from))) : [];
   const addGroup = (service, name = '') => {
     const group = { name, items: [] };
     service.groups.push(group);
@@ -107,14 +126,21 @@ export function openRecordConsumptionEditor(record, services = [], { onSaved = (
         })),
       }) : '';
       const groups = service.groups.map((group, gi) => {
+        if (!editing) {
+          const rows = (group.items || []).map(row => {
+            const item = items.get(text(row.itemId));
+            return { title: item?.name || 'Товар недоступен',
+              right: [row.quantity ?? '—', row.unit || (item ? procedureConsumableUnit(item) : '')].filter(Boolean).join('\u00a0') };
+          });
+          return '<section class="record-consumption-group">' +
+            (text(group.name) ? '<div class="record-consumption-read-title">' + escapeHtml(group.name) + '</div>' : '') +
+            list({ className: 'ui-list--dense record-consumption-read-list', items: rows }) + '</section>';
+        }
         const products = (group.items || []).map((row, ri) => {
           const product = items.get(text(row.itemId));
           const k = si + ':' + gi + ':' + ri;
           const title = product?.name || 'Товар недоступен';
           const unit = row.unit || (product ? procedureConsumableUnit(product) : '');
-          if (!editing) return '<div class="data-edit-row record-consumption-product record-consumption-product--read">' +
-            '<span class="data-edit-row__name" title="' + escapeHtml(title) + '">' + escapeHtml(title) + '</span>' +
-            '<span class="record-consumption-read-quantity">' + escapeHtml([row.quantity ?? '—', unit].filter(Boolean).join(' ')) + '</span></div>';
           return '<div class="data-edit-row record-consumption-product">' +
             '<span class="data-edit-row__name" title="' + escapeHtml(title) + '">' + escapeHtml(title) + '</span>' +
             '<div class="inventory-editor-number">' +
@@ -124,9 +150,6 @@ export function openRecordConsumptionEditor(record, services = [], { onSaved = (
             compactButton({ kind: 'remove', data: 'data-record-consumption-remove="' + k + '"', aria: 'Убрать товар' }) +
             '</div>';
         }).join('');
-        if (!editing) return '<section class="record-consumption-group">' +
-          (text(group.name) ? '<div class="record-consumption-read-title">' + escapeHtml(group.name) + '</div>' : '') +
-          products + '</section>';
         return '<section class="record-consumption-group">' +
           '<div class="data-edit-row record-consumption-group-header">' +
           field({ label: '', name: 'recordConsumptionName' + si + ':' + gi, value: group.name,
