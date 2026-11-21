@@ -1187,14 +1187,10 @@ function openManufacturerStock(root, manufacturer, groupContext = null) {
       body.innerHTML =
         '<p class="ui-list__secondary">Выбрано позиций: ' + selectedItems.length + '</p>' +
         (message ? '<p role="status" class="ui-list__secondary">' + escapeHtml(message) + '</p>' : '') +
-        '<div class="ui-list ui-list--dense">' +
-        selectedItems.map(item =>
-          '<div class="ui-list__item"><span class="ui-list__main">' +
-          '<span class="ui-list__title">' + escapeHtml(inventoryAuditItemLabel(item)) + '</span>' +
-          '<span class="ui-list__secondary">' + escapeHtml(
-            (item.sku ? 'Арт. ' + item.sku + ' · ' : '') +
-            numberText(item.balance) + ' ' + (item.unit || '')) +
-          '</span></span></div>').join('') + '</div>';
+        list({
+          className: 'ui-list--dense',
+          items: selectedItems.map(item => ({ title: inventoryAuditItemLabel(item) })),
+        });
     };
     header.innerHTML = select({
       label: '', name: 'stockSelectedAction', value: '',
@@ -2109,7 +2105,7 @@ function openInventoryAuditCriteria(root, {
           items.splice(0, items.length,
             ...items.map(item => getInventoryItem(item.itemId)).filter(Boolean));
           onSaved();
-        });
+        }, '', '', existingLayer);
       });
       status.textContent = '';
       syncDataActions();
