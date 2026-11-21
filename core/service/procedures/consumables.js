@@ -90,7 +90,7 @@ function costSummaryText(rows, inventory) {
     : 'Рассчитано: ' + money(result.total) + ' · не все расходы указаны';
 }
 
-function openConsumablePicker(selected, onPick) {
+export function openConsumablePicker(selected, onPick) {
   const panel = field({ label: 'Поиск', name: 'consumableSearch',
     type: 'search', placeholder: 'Товар, производитель или артикул' }) +
     '<div data-consumable-choices></div>';

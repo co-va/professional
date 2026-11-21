@@ -284,67 +284,30 @@ function recordCalculatedConsumables(record = {}) {
   const services = new Map(getProcedures().map(item => [String(item.id), item]));
   return (Array.isArray(record.procedures) ? record.procedures : []).map(procedure => {
     const service = services.get(String(procedure.id || ''));
-    const rows = Array.isArray(procedure.consumables)
+    const rows = service?.consumablesEnabled === false ? [] :
+      Array.isArray(procedure.consumables) && procedure.consumables.length
       ? procedure.consumables
       : Array.isArray(service?.consumables) ? service.consumables : [];
-    return { name: procedure.name || service?.name || 'Услуга', rows };
-  }).filter(group => group.rows.some(row => row?.itemId));
+    return { id: String(procedure.id || ''), name: procedure.name || service?.name || 'Услуга', rows };
+  });
 }
 
-function recordConsumablesSticker(record) {
+function recordConsumablesSticker(record, payment) {
   const groups = recordCalculatedConsumables(record);
-  const subtitle = groups.length ? 'Расчётный расход' : 'Шаблон не задан';
-  return `<button type="button" class="v2-sticker record-consumables-sticker" data-record-view-consumables data-record-consumption-state="calculated">
+  const hasActual = Array.isArray(record.consumableTemplates) &&
+    record.consumableTemplates.some(template => template.groups?.some(group => group.items?.length));
+  const status = hasActual ? (payment?.fullyPaid ? 'paid' : 'individual') : 'calculated';
+  const subtitle = hasActual ? 'Индивидуальный шаблон' :
+    groups.some(group => group.rows.length) ? 'Расчётный расход' : 'Расход не задан';
+  return `<button type="button" class="v2-sticker record-consumables-sticker" data-record-view-consumables data-record-consumption-state="${status}">
     <span class="record-consumables-sticker__head"><strong class="ui-list__title">Расходники</strong><span aria-hidden="true">›</span></span>
     <span class="ui-list__secondary">${escapeHtml(subtitle)}</span>
   </button>`;
 }
 
-async function openRecordConsumables(record) {
-  const groups = recordCalculatedConsumables(record);
-  const layer = mountModal(document.body, modal(
-    '<div data-record-consumables-body></div>',
-    { title: 'Расходники', variant: 'q', surface: 'app' },
-  ));
-  if (!layer) return;
-  const host = layer.querySelector('[data-record-consumables-body]');
-  if (!host) return;
-  if (!groups.length) {
-    host.innerHTML = emptyState('Шаблон не задан', 'Для услуг записи расчётный расход не настроен.');
-    return;
-  }
-  host.innerHTML = '<p class="ui-list__secondary">Загрузка…</p>';
-  try {
-    const [{ getInventoryItems }, { loadInventory }, { procedureConsumableSummary, procedureConsumableUnit }] =
-      await Promise.all([
-        import('../inventory/data.js'),
-        import('../inventory/service.js'),
-        import('../service/procedures/consumables.js'),
-      ]);
-    await loadInventory({ preferRecent: true });
-    if (!layer.isConnected) return;
-    const items = getInventoryItems();
-    const byId = new Map(items.map(item => [String(item.itemId), item]));
-    host.innerHTML = '<div class="form-grid">' + groups.map(group => {
-      const rows = group.rows.filter(row => row?.itemId);
-      const summary = procedureConsumableSummary(rows, items);
-      return '<section><h3>' + escapeHtml(group.name) + '</h3>' +
-        '<p class="ui-list__secondary">Расчётный расход</p>' +
-        list({ className: 'ui-list--dense', items: rows.map(row => {
-          const item = byId.get(String(row.itemId));
-          const quantity = row.quantity == null || row.quantity === ''
-            ? '—' : formatReportNumber(row.quantity);
-          const unit = row.unit || (item ? procedureConsumableUnit(item) : '');
-          return { title: item?.name || 'Товар недоступен', right: [quantity, unit].filter(Boolean).join(' ') };
-        }) }) +
-        (summary.calculated > 0
-          ? '<p class="ui-list__secondary">Расчётная себестоимость: ' + escapeHtml(formatMoney(summary.total)) +
-            (summary.complete ? '' : ' · неполная') + '</p>'
-          : '') + '</section>';
-    }).join('') + '</div>';
-  } catch (error) {
-    if (layer.isConnected) host.innerHTML = emptyState('Расходники недоступны', String(error?.message || 'Не удалось получить данные склада.'));
-  }
+async function openRecordConsumables(record, { onSaved = () => {} } = {}) {
+  const { openRecordConsumptionEditor } = await import('./consumables.js');
+  return openRecordConsumptionEditor(record, recordCalculatedConsumables(record), { onSaved });
 }
 
 export function openRecordView(record, {
@@ -762,7 +725,7 @@ export function openRecordView(record, {
       : `${recordHasEnded(source) ? 'Задолженность' : 'К оплате'}: ${formatMoney(payment.remaining)}`;
     root.innerHTML = `<div class="record-screen record-screen--state-view record-screen--record-view">
       ${card}
-      ${capabilities.consumables && !readOnlyHistory && !cancelled && procedures.length ? recordConsumablesSticker(source) : ''}
+      ${capabilities.consumables && !readOnlyHistory && !cancelled && procedures.length ? recordConsumablesSticker(source, payment) : ''}
       ${programSelector}
       ${readOnlyHistory ? '' : actionBlock([
         capabilities.sale && !payment.hasPayments ? button('Продажа', { variant: 'secondary', data: 'data-record-view-sale' }) : '',
@@ -864,7 +827,11 @@ export function openRecordView(record, {
     });
     root.querySelector('[data-record-view-consumables]')?.addEventListener('click', () => {
       if (!capabilities.consumables) return;
-      void openRecordConsumables(syncCurrent());
+      void openRecordConsumables(syncCurrent(), { onSaved: async () => {
+        await refreshRecordsFromServer();
+        syncCurrent();
+        render();
+      } }).catch(error => openNotice({ title: 'Расходники', message: String(error?.message || 'Не удалось открыть расходники.') }));
     });
     root.querySelector('[data-record-view-sale]')?.addEventListener('click', () => {
       if (!capabilities.sale) return;
