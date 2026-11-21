@@ -71,14 +71,16 @@ export function matchSupplierCatalog(stockItems = [], catalogRows = [], selected
   });
 }
 
-// The preview is a compact status list. Supplier pricing and names are
-// applied through Core but must not expand every stock row into a detail card.
+// One shared compact List row per selected stock item. The original short
+// stock name stays primary; the matched supplier's full catalog name stays
+// directly underneath in the standard secondary style. Neither is editable
+// from this linking action.
 function previewMarkup(matches) {
   return list({
     className: 'ui-list--dense',
     items: matches.map(entry => ({
       title: entry.item?.name || 'Позиция',
-      right: entry.row ? 'Совпало' : 'Не совпало',
+      secondary: entry.row?.name || 'Не найдено в прайсе поставщика',
     })),
   });
 }
