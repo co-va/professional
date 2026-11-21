@@ -847,7 +847,20 @@ export function openRecordView(record, {
       openRecordPayment(syncCurrent(), {
         onCompleted: () => {
           syncCurrent();
-          render();
+          if (layer.isConnected) render();
+          // Finance acknowledges payment and Core posts the existing stock
+          // movement together. Refresh the Record/Inventory owners, rather
+          // than guessing that payment created a movement on the client.
+          if (currentRecord.consumableTemplates?.length) {
+            void refreshRecordsFromServer().then(async () => {
+              syncCurrent();
+              if (layer.isConnected) render();
+              if (currentRecord.consumablesPosted === true) {
+                const { loadInventory } = await import('../inventory/service.js');
+                await loadInventory();
+              }
+            }).catch(() => null);
+          }
         },
       });
     });
