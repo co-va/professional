@@ -877,6 +877,15 @@ function stockListMarkup(manufacturer, query = '', rowsProvider = null, expanded
   if (!items.length) return emptyState('Ничего не найдено', 'Измените поиск или фильтр.');
 
   const itemRow = item => ({
+    // Actual Core offer relationship, not a manually typed supplier label.
+    indicatorColor: item.primaryOfferId ||
+      (Array.isArray(item.supplierOffers) && item.supplierOffers.some(offer =>
+        offer.counterpartyId && offer.catalogItemId))
+      ? '#39805F' : '#C48637',
+    indicatorLabel: item.primaryOfferId ||
+      (Array.isArray(item.supplierOffers) && item.supplierOffers.some(offer =>
+        offer.counterpartyId && offer.catalogItemId))
+      ? 'Поставщик привязан' : 'Поставщик не привязан',
     title: `${Number(item.position) > 0 ? `${item.position} · ` : ''}${item.name}`,
     secondary: [item.sku, productTypeText(item)].filter(Boolean).join(' · '),
     right: [
@@ -1175,68 +1184,82 @@ function openManufacturerStock(root, manufacturer, groupContext = null) {
   layer.querySelector('[data-stock-selected-action]')?.addEventListener('click', () => {
     const ids = [...selectedStockItems].filter(id => Boolean(getInventoryItem(id)));
     if (!ids.length) return;
-    // One persistent Q work area for this selection. The shared Select in
-    // the header opens its own compact X picker; it never replaces the Q list.
-    const choice = mountModal(document.body, modal(
-      '<div data-stock-bulk-workspace></div>',
-      { title: 'Действия', variant: 'q', surface: 'app' },
+    const options = [
+      { value: '', label: 'Выберите действие' },
+      { value: 'edit', label: 'Изменить данные' },
+      { value: 'audit', label: 'Инвентаризация остатков' },
+      { value: 'transfer', label: 'Переместить' },
+      { value: 'order', label: 'Создать заказ' },
+    ];
+    // One short X choice, then a persistent Q for exactly these item IDs.
+    const chooser = mountModal(document.body, modal(
+      '<div class="modal-title"><h2>Действия</h2></div>' +
+      select({ label: '', name: 'stockSelectedActionPicker', value: '', options }) +
+      '<p class="ui-list__secondary">Выбрано позиций: ' + ids.length + '</p>',
+      { title: 'Действия', variant: 'x', xRole: 'picker', surface: 'app' },
     ));
-    if (!choice) return;
-    const body = choice.querySelector('[data-v2-q-body]');
-    const header = choice.querySelector('[data-v2-q-header-content]');
-    if (!body || !header) { choice.v2Close?.(); return; }
-    const showSelection = (message = '') => {
-      const selectedItems = ids.map(id => getInventoryItem(id)).filter(Boolean);
-      body.innerHTML =
-        '<p class="ui-list__secondary">Выбрано позиций: ' + selectedItems.length + '</p>' +
-        (message ? '<p role="status" class="ui-list__secondary">' + escapeHtml(message) + '</p>' : '') +
-        list({
-          className: 'ui-list--dense',
-          items: selectedItems.map(item => ({ title: inventoryAuditItemLabel(item) })),
-        });
+    if (!chooser) return;
+    const openWorkspace = initialAction => {
+      const choice = mountModal(document.body, modal(
+        '<div data-stock-bulk-workspace></div>',
+        { title: 'Действия', variant: 'q', surface: 'app' },
+      ));
+      if (!choice) return;
+      const body = choice.querySelector('[data-v2-q-body]');
+      const header = choice.querySelector('[data-v2-q-header-content]');
+      if (!body || !header) { choice.v2Close?.(); return; }
+      const showSelection = (message = '') => {
+        const selectedItems = ids.map(id => getInventoryItem(id)).filter(Boolean);
+        body.innerHTML =
+          '<p class="ui-list__secondary">Выбрано позиций: ' + selectedItems.length + '</p>' +
+          (message ? '<p role="status" class="ui-list__secondary">' + escapeHtml(message) + '</p>' : '') +
+          list({
+            className: 'ui-list--dense',
+            items: selectedItems.map(item => ({ title: inventoryAuditItemLabel(item) })),
+          });
+      };
+      header.innerHTML = select({
+        label: '', name: 'stockSelectedAction', value: initialAction, options,
+      });
+      const changeAction = action => {
+        if (!choice.isConnected) return;
+        if (action === 'edit' || action === 'audit') {
+          openInventoryAuditCriteria(choice, {
+            mode: action === 'edit' ? 'data' : 'stock',
+            ids, onSaved: renderList, keepOpen: true, existingLayer: choice,
+          });
+        } else if (action === 'transfer') {
+          openInventoryTransfer(() => {
+            renderList();
+            showSelection('Перемещение выполнено.');
+          }, {
+            selectedItemIds: ids,
+            fromLocationId: STOCK_VIEW.storageScope === INVENTORY_TOTAL_SCOPE
+              ? '' : STOCK_VIEW.storageScope,
+            existingLayer: choice,
+          });
+        } else if (action === 'order') {
+          // Order creation is a separate, persisted multi-step transaction.
+          // The selected positions remain available in the parent Q.
+          showSelection();
+          openInventoryOrderFromSelection(choice, ids, () => {
+            renderList();
+            showSelection('Заказ сформирован.');
+          });
+        } else showSelection();
+      };
+      header.addEventListener('change', event => {
+        if (event.target?.name === 'stockSelectedAction')
+          changeAction(String(event.target.value || ''));
+      });
+      changeAction(initialAction);
     };
-    header.innerHTML = select({
-      label: '', name: 'stockSelectedAction', value: '',
-      options: [
-        { value: '', label: 'Действия' },
-        { value: 'edit', label: 'Изменить данные' },
-        { value: 'audit', label: 'Инвентаризация остатков' },
-        { value: 'transfer', label: 'Переместить' },
-        { value: 'order', label: 'Создать заказ' },
-      ],
+    chooser.querySelector('[name="stockSelectedActionPicker"]')?.addEventListener('change', event => {
+      const action = String(event.target.value || '');
+      if (!action) return;
+      chooser.v2Close?.();
+      openWorkspace(action);
     });
-    const changeAction = action => {
-      if (!choice.isConnected) return;
-      if (action === 'edit' || action === 'audit') {
-        openInventoryAuditCriteria(choice, {
-          mode: action === 'edit' ? 'data' : 'stock',
-          ids, onSaved: renderList, keepOpen: true, existingLayer: choice,
-        });
-      } else if (action === 'transfer') {
-        openInventoryTransfer(() => {
-          renderList();
-          showSelection('Перемещение выполнено.');
-        }, {
-          selectedItemIds: ids,
-          fromLocationId: STOCK_VIEW.storageScope === INVENTORY_TOTAL_SCOPE
-            ? '' : STOCK_VIEW.storageScope,
-          existingLayer: choice,
-        });
-      } else if (action === 'order') {
-        // Orders have their own multi-step Q1/Q2 transaction. Keep the
-        // original selection available underneath that business workflow.
-        showSelection();
-        openInventoryOrderFromSelection(choice, ids, () => {
-          renderList();
-          showSelection('Заказ сформирован.');
-        });
-      } else showSelection();
-    };
-    header.addEventListener('change', event => {
-      if (event.target?.name === 'stockSelectedAction')
-        changeAction(String(event.target.value || ''));
-    });
-    showSelection();
   });
   layer.querySelector('[data-stock-selected-delete]')?.addEventListener('click', deleteSelected);
   let disposeCategoryReorder = () => {};
