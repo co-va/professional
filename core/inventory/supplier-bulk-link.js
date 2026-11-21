@@ -1,4 +1,4 @@
-import { actionBlock, button, modal, mountModal, select } from '../../ui/ui.js';
+import { actionBlock, button, list, modal, mountModal, select } from '../../ui/ui.js';
 import { escapeHtml } from '../../ui/utils/escape-html.js';
 import { apiRequest, getAuthToken } from '../auth.js';
 import { getInventoryItem, getInventoryItems } from './data.js';
@@ -7,9 +7,6 @@ import { invalidateInventoryNavigationCache, loadInventory } from './service.js'
 const urlPart = value => encodeURIComponent(String(value || ''));
 const skuKey = value => String(value || '').trim().toLocaleUpperCase('ru-RU');
 const unitKey = value => String(value || '').trim().toLocaleLowerCase('ru-RU').replace(/\.$/, '');
-const money = value => value == null ? '—' : Number(value).toLocaleString('ru-RU', {
-  maximumFractionDigits: 2,
-}) + ' ₽';
 
 async function inventoryApi(path, method = 'GET', body = null, timeoutMs = 30000) {
   const response = await apiRequest('/inventory' + path, {
@@ -74,31 +71,19 @@ export function matchSupplierCatalog(stockItems = [], catalogRows = [], selected
   });
 }
 
-function rowMarkup(entry) {
-  const item = entry.item || {};
-  const lines = ['Арт. ' + (item.sku || '—')];
-  if (entry.row) {
-    const row = entry.row;
-    const rawDiscount = row.appliedDiscountPercent ?? row.discountPercent;
-    const percent = rawDiscount == null ? null : Number(rawDiscount);
-    lines.push('Прайс: ' + (row.name || '—'));
-    lines.push('Арт. поставщика: ' + (row.supplierSku || '—'));
-    lines.push('Цена поставщика: ' + money(row.listPrice));
-    lines.push('Скидка: ' + (percent != null && Number.isFinite(percent)
-      ? percent.toLocaleString('ru-RU') + '%' : '—'));
-    lines.push('Цена со скидкой: ' + money(row.effectivePrice));
-    lines.push('Артикул совпал · Готово к привязке');
-  } else {
-    lines.push(entry.reason || 'Артикул не найден в прайсе');
-  }
-  // Use shared dense list layout: no narrow side column for product names.
-  return '<div class="ui-list__item"><span class="ui-list__main">' +
-    '<span class="ui-list__title">' + escapeHtml(item.name || 'Товар') + '</span>' +
-    lines.map(line => '<span class="ui-list__secondary">' + escapeHtml(line) + '</span>').join('') +
-    '</span></div>';
+// The preview is a compact status list. Supplier pricing and names are
+// applied through Core but must not expand every stock row into a detail card.
+function previewMarkup(matches) {
+  return list({
+    className: 'ui-list--dense',
+    items: matches.map(entry => ({
+      title: entry.item?.name || 'Позиция',
+      right: entry.row ? 'Совпало' : 'Не совпало',
+    })),
+  });
 }
 
-export function openInventoryBulkSupplierLink(selectedItems = [], onSaved = () => {}, initialCompanyId = '') {
+export function openInventoryBulkSupplierLink(selectedItems = [], onSaved = () => {}, initialCompanyId = '', initialCompanyName = '') {
   const selectedIds = [...new Set(selectedItems.map(item => String(item.itemId || '')).filter(Boolean))];
   if (!selectedIds.length) return null;
 
@@ -130,8 +115,9 @@ export function openInventoryBulkSupplierLink(selectedItems = [], onSaved = () =
         if (!usable()) return;
         const companyId = String(event.target.value || '');
         if (!companyId) return;
+        const companyName = companies.find(company => String(company.id) === companyId)?.name || '';
         chooser.v2Close?.();
-        openInventoryBulkSupplierLink(selectedItems, onSaved, companyId);
+        openInventoryBulkSupplierLink(selectedItems, onSaved, companyId, companyName);
       });
       status.textContent = companies.length ? '' : 'Сначала добавьте поставщика с прайсом.';
     }).catch(error => {
@@ -142,15 +128,15 @@ export function openInventoryBulkSupplierLink(selectedItems = [], onSaved = () =
   }
 
   const layer = mountModal(document.body, modal(
-    '<div data-bulk-supplier-select></div>' +
-    '<p class="ui-list__secondary">Совпадения определяются только по уникальному артикулу. Короткое название товара не меняется.</p>' +
+    (initialCompanyName
+      ? '<p class="ui-list__secondary">' + escapeHtml(initialCompanyName) + '</p>'
+      : '') +
     '<p class="ui-list__secondary" role="status" data-bulk-supplier-status></p>' +
-    '<div data-bulk-supplier-list class="ui-list ui-list--dense"></div>' +
+    '<div data-bulk-supplier-list></div>' +
     actionBlock(button('Применить', { data: 'data-bulk-supplier-apply' })),
     { title: 'Привязать поставщика', variant: 'q', surface: 'app' },
   ));
   if (!layer) return null;
-  const picker = layer.querySelector('[data-bulk-supplier-select]');
   const status = layer.querySelector('[data-bulk-supplier-status]');
   const list = layer.querySelector('[data-bulk-supplier-list]');
   const apply = layer.querySelector('[data-bulk-supplier-apply]');
@@ -160,27 +146,13 @@ export function openInventoryBulkSupplierLink(selectedItems = [], onSaved = () =
     if (apply) apply.disabled = !enabled;
   };
   const startToken = getAuthToken();
-  let companies = [];
-  let selectedCompany = String(initialCompanyId);
+  const selectedCompany = String(initialCompanyId);
   let preview = [];
   let requestVersion = 0;
   let saving = false;
   showApply(false);
   const usable = () => layer.isConnected && startToken === getAuthToken();
 
-  const showCompanySelector = () => {
-    picker.innerHTML = select({
-      label: 'Поставщик', name: 'bulkSupplierCompany', value: selectedCompany,
-      options: [{ value: '', label: 'Выберите поставщика' },
-        ...companies.map(company => ({ value: String(company.id), label: company.name }))],
-      searchable: companies.length > 10,
-    });
-    picker.querySelector('[name="bulkSupplierCompany"]')?.addEventListener('change', event => {
-      if (saving) return;
-      selectedCompany = String(event.target.value || '');
-      void loadPreview();
-    });
-  };
   const loadPreview = async () => {
     const version = ++requestVersion;
     preview = [];
@@ -210,11 +182,8 @@ export function openInventoryBulkSupplierLink(selectedItems = [], onSaved = () =
       if (!usable() || version !== requestVersion) return;
       preview = matchSupplierCatalog(getInventoryItems(), catalog, selectedIds, selectedCompany);
       const found = preview.filter(entry => entry.row);
-      list.innerHTML = preview.map(rowMarkup).join('');
-      status.textContent = found.length
-        ? 'Артикул совпал: ' + found.length + ' из ' + preview.length + '.'
-        : 'Совпадений нет: 0 из ' + preview.length +
-          '. Проверьте артикулы позиций и прайс поставщика.';
+      list.innerHTML = previewMarkup(preview);
+      status.textContent = 'Совпало: ' + found.length + ' из ' + preview.length;
       showApply(Boolean(found.length));
     } catch (error) {
       if (!usable() || version !== requestVersion) return;
@@ -228,7 +197,6 @@ export function openInventoryBulkSupplierLink(selectedItems = [], onSaved = () =
     if (!matches.length) return;
     saving = true;
     apply.disabled = true;
-    picker.querySelector('[name="bulkSupplierCompany"]')?.setAttribute('disabled', '');
     const failures = [];
     const company = selectedCompany;
     // Existing Core routes own supplier links, pricing and primary-offer logic.
@@ -291,20 +259,9 @@ export function openInventoryBulkSupplierLink(selectedItems = [], onSaved = () =
       // Once a save was attempted, require a fresh preview before any retry.
       apply.disabled = true;
       apply.textContent = 'Применить';
-      picker.querySelector('[name="bulkSupplierCompany"]')?.removeAttribute('disabled');
     }
   });
 
-  status.textContent = 'Загружаю поставщиков…';
-  void inventoryApi('/counterparties').then(rows => {
-    if (!usable()) return;
-    companies = Array.isArray(rows) ? rows.filter(row => row.id && row.name) : [];
-    showCompanySelector();
-    status.textContent = companies.length ? '' : 'Сначала добавьте поставщика с прайсом.';
-    if (selectedCompany) void loadPreview();
-  }).catch(error => {
-    if (usable()) status.textContent = error instanceof Error
-      ? error.message : 'Не удалось загрузить поставщиков.';
-  });
+  void loadPreview();
   return layer;
 }
