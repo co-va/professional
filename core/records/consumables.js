@@ -1,4 +1,4 @@
-import { actionBlock, button, compactButton, escapeHtml, field, list, modal, mountModal, openNotice, select } from '../../ui/ui.js';
+import { actionBlock, button, compactButton, escapeHtml, field, list, modal, mountModal, openNotice, select, segmentControl, initSegmentControls, initV2ListReorder } from '../../ui/ui.js';
 import { setSharedActionVisible } from '../../ui/page/page.js';
 import { apiRequest } from '../auth.js';
 import { getInventoryItems } from '../inventory/data.js';
@@ -36,6 +36,8 @@ export function openRecordConsumptionEditor(record, services = [], { onSaved = (
     ...service, groups: actualGroups(record, service.id), expanded: false, templateChoice: '',
   }));
   let editing = false;
+  let grouping = 'service';
+  let disposeReorders = [];
   let posted = record.consumablesPosted === true;
   const signature = () => JSON.stringify(data.map(({ id, groups }) => ({
     procedureId: id,
@@ -100,7 +102,7 @@ export function openRecordConsumptionEditor(record, services = [], { onSaved = (
     service.expanded = true;
     return group;
   };
-  const pick = async (si, gi) => {
+  const pick = async (si, gi, ri = null) => {
     const service = data[si];
     if (!service || busy || !editing) return;
     const group = service.groups[gi];
@@ -108,16 +110,27 @@ export function openRecordConsumptionEditor(record, services = [], { onSaved = (
     try { await inventoryLoad; }
     catch (e) { openNotice({ title: 'Расходники', message: text(e?.message) || 'Не удалось загрузить склад.' }); return; }
     if (!layer.isConnected) return;
-    openConsumablePicker(new Set(group.items.map(row => text(row.itemId))), row => {
+    const excluded = new Set(group.items.filter((_, index) => index !== ri).map(row => text(row.itemId)));
+    openConsumablePicker(excluded, selected => {
       if (!layer.isConnected || !editing || !service.groups.includes(group)) return;
-      group.items.push(row);
+      if (ri !== null) {
+        const current = group.items[ri];
+        if (!current) return;
+        // Keep the quantity only if the stock consumption unit is unchanged.
+        group.items[ri] = {
+          ...selected, quantity: text(current.unit) === text(selected.unit) ? current.quantity : null,
+        };
+      } else group.items.push(selected);
+      error.textContent = '';
       render();
     });
   };
 
   function render() {
+    for (const dispose of disposeReorders) dispose();
+    disposeReorders = [];
     const items = stock();
-    host.innerHTML = data.map((service, si) => {
+    const byService = data.map((service, si) => {
       const dates = datesFor(service);
       const factualRead = posted && !editing;
       const norm = service.rows.filter(row => row?.itemId);
@@ -145,8 +158,9 @@ export function openRecordConsumptionEditor(record, services = [], { onSaved = (
           const k = si + ':' + gi + ':' + ri;
           const title = product?.name || 'Товар недоступен';
           const unit = row.unit || (product ? procedureConsumableUnit(product) : '');
-          return '<div class="data-edit-row record-consumption-product">' +
-            '<span class="data-edit-row__name" title="' + escapeHtml(title) + '">' + escapeHtml(title) + '</span>' +
+          return '<div class="list-entry data-edit-row record-consumption-product" data-record-consumption-row data-reorder-id="' + ri + '">' +
+            '<span class="list-entry__reorder-handle" data-reorder-handle role="button" tabindex="0" aria-label="' + escapeHtml('Переместить ' + title) + '"><span aria-hidden="true">⋮⋮</span></span>' +
+            '<button type="button" class="data-edit-row__name record-consumption-product-name" data-record-consumption-replace="' + k + '" title="' + escapeHtml(title) + '" aria-label="' + escapeHtml('Заменить ' + title) + '">' + escapeHtml(title) + '</button>' +
             '<div class="inventory-editor-number">' +
             field({ label: '', name: 'recordConsumptionQuantity' + k, type: 'number', min: '0.000001', step: 'any',
               inputmode: 'decimal', placeholder: '—', value: row.quantity ?? '', data: 'aria-label="' + escapeHtml('Расход: ' + title) + '" data-record-consumption-quantity="' + k + '"' }) +
@@ -160,7 +174,7 @@ export function openRecordConsumptionEditor(record, services = [], { onSaved = (
             placeholder: 'Название группы', data: 'aria-label="Название группы" data-record-consumption-name="' + si + ':' + gi + '"' }) +
           compactButton({ kind: 'add', data: 'data-record-consumption-pick="' + si + ':' + gi + '"', aria: 'Добавить товар' }) +
           compactButton({ kind: 'remove', data: 'data-record-consumption-remove-group="' + si + ':' + gi + '"', aria: 'Удалить группу' }) +
-          '</div>' + products + '</section>';
+          '</div><div class="list-entries record-consumption-reorder-list" data-record-consumption-reorder="' + si + ':' + gi + '">' + products + '</div></section>';
       }).join('');
       const expanded = service.expanded || service.groups.length > 0;
       const serviceTitle = '<strong class="ui-list__title record-consumption-service-title">' + escapeHtml(service.name) + '</strong>';
@@ -186,6 +200,67 @@ export function openRecordConsumptionEditor(record, services = [], { onSaved = (
           '<p class="ui-list__secondary" data-record-consumption-cost="' + si + '"></p>'
         ) + '</section>';
     }).join('');
+    const hasRows = data.some(service => service.groups.some(group => group.items?.length));
+    const groupMarkup = () => {
+      const buckets = new Map();
+      const append = (name, serviceName, rows, calculated = false) => {
+        const heading = text(name) || 'Без группы';
+        const id = (calculated ? 'norm:' : 'actual:') + heading.toLocaleLowerCase('ru-RU');
+        if (!buckets.has(id)) buckets.set(id, { heading, sections: [] });
+        buckets.get(id).sections.push({ serviceName, rows, calculated });
+      };
+      for (const service of data) {
+        for (const group of service.groups) {
+          if (group.items?.length) append(group.name, service.name, group.items);
+        }
+        const norm = service.rows.filter(row => row?.itemId);
+        if (norm.length) append('Расчётный расход', service.name, norm, true);
+      }
+      return [...buckets.values()].map(bucket =>
+        '<section class="record-consumption-group record-consumption-group--pivot">' +
+          '<div class="record-consumption-read-title">' + escapeHtml(bucket.heading) + '</div>' +
+          bucket.sections.map(section => {
+            const rows = section.rows.map(row => {
+              const item = items.get(text(row.itemId));
+              return {
+                title: item?.name || (loaded ? 'Товар недоступен' : '…'),
+                right: [row.quantity ?? '—', row.unit || (item ? procedureConsumableUnit(item) : '')].filter(Boolean).join('\u00a0'),
+              };
+            });
+            return '<div class="record-consumption-group-source">' + escapeHtml(section.serviceName) + '</div>' +
+              list({ className: 'ui-list--dense record-consumption-read-list' +
+                (section.calculated ? ' record-consumption-read-list--calculated' : ''), items: rows });
+          }).join('') + '</section>'
+      ).join('');
+    };
+    // Grouping is a read-only presentation. It is never shown in editing.
+    host.innerHTML = (!editing && hasRows
+      ? segmentControl([{ value: 'service', label: 'По услуге' }, { value: 'group', label: 'По группе' }],
+          { value: grouping, name: 'recordConsumptionGrouping', aria: 'Группирование расхода' }) +
+        (grouping === 'group' ? groupMarkup() : byService)
+      : byService);
+    if (!editing && hasRows) initSegmentControls(host);
+    if (editing) {
+      host.querySelectorAll('[data-record-consumption-reorder]').forEach(reorderHost => {
+        const [si, gi] = reorderHost.dataset.recordConsumptionReorder.split(':').map(Number);
+        const group = data[si]?.groups[gi];
+        if (!group) return;
+        disposeReorders.push(initV2ListReorder(reorderHost, {
+          selector: '[data-record-consumption-row][data-reorder-id]',
+          onReorder: ids => {
+            const original = group.items.slice();
+            const indices = ids.map(Number);
+            if (indices.length !== original.length || new Set(indices).size !== original.length ||
+                indices.some(i => !Number.isInteger(i) || i < 0 || i >= original.length)) return false;
+            group.items = indices.map(i => original[i]);
+            error.textContent = '';
+            sync();
+            return true;
+          },
+          onError: e => { error.textContent = text(e?.message) || 'Не удалось переместить товар.'; },
+        }));
+      });
+    }
     sync();
   }
   host.addEventListener('click', event => {
@@ -205,6 +280,8 @@ export function openRecordConsumptionEditor(record, services = [], { onSaved = (
       render();
     } else if (d.recordConsumptionPick !== undefined) {
       void pick(...d.recordConsumptionPick.split(':').map(Number));
+    } else if (d.recordConsumptionReplace !== undefined) {
+      void pick(...d.recordConsumptionReplace.split(':').map(Number));
     } else if (d.recordConsumptionRemove !== undefined) {
       const [si,gi,ri] = d.recordConsumptionRemove.split(':').map(Number);
       data[si]?.groups[gi]?.items.splice(ri,1);
@@ -230,6 +307,14 @@ export function openRecordConsumptionEditor(record, services = [], { onSaved = (
   });
   host.addEventListener('change', event => {
     const name = String(event.target.name || '');
+    if (name === 'recordConsumptionGrouping' && !editing && !busy) {
+      const next = text(event.target.value);
+      if (next === 'service' || next === 'group') {
+        grouping = next;
+        render();
+      }
+      return;
+    }
     if (!name.startsWith('recordConsumptionHistory') || busy) return;
     const service = data[Number(name.slice('recordConsumptionHistory'.length))];
     if (!service) return;
