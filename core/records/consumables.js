@@ -61,19 +61,17 @@ export function openRecordConsumptionEditor(record, services = [], { onSaved = (
       service.expanded = true;
     }
   }
-  const panel = '<div class="form-grid" data-record-consumption-services></div>' +
+  const panel = '<div class="record-consumption-grouping" data-record-consumption-grouping></div>' +
+    '<div class="form-grid" data-record-consumption-services></div>' +
     '<div class="form-error" role="alert" data-record-consumption-error></div>' +
-    actionBlock(
-      button('Редактировать', { variant: 'outline', data: 'data-record-consumption-edit' }) +
-      button('Применить', { data: 'data-record-consumption-apply' }),
-    );
+    actionBlock(button('Редактировать', { variant: 'outline', data: 'data-record-consumption-action' }));
   const layer = mountModal(document.body, modal(panel, { title: 'Расходники', variant: 'q', surface: 'app' }));
   if (!layer) return null;
   const host = layer.querySelector('[data-record-consumption-services]');
-  const save = layer.querySelector('[data-record-consumption-apply]');
-  const edit = layer.querySelector('[data-record-consumption-edit]');
+  const groupHost = layer.querySelector('[data-record-consumption-grouping]');
+  const action = layer.querySelector('[data-record-consumption-action]');
   const error = layer.querySelector('[data-record-consumption-error]');
-  const actions = save?.closest('.modal-actions');
+  const actions = action?.closest('.modal-actions');
   let busy = false;
   let loaded = false;
   const stock = () => new Map(getInventoryItems().map(item => [text(item.itemId), item]));
@@ -82,10 +80,10 @@ export function openRecordConsumptionEditor(record, services = [], { onSaved = (
     const changed = signature() !== initial;
     const hasOpen = posted || data.some(service => service.expanded || service.groups.length);
     setSharedActionVisible(actions, hasOpen || editing || changed);
-    edit.hidden = editing || !hasOpen;
-    save.hidden = !editing && !changed;
-    edit.disabled = busy;
-    save.disabled = busy;
+    const applying = editing || changed;
+    action.textContent = applying ? 'Применить' : 'Редактировать';
+    action.classList.toggle('ui-button--outline', !applying);
+    action.disabled = busy;
     host.querySelectorAll('[data-record-consumption-cost]').forEach(node => {
       const service = data[Number(node.dataset.recordConsumptionCost)];
       if (!service) return;
@@ -234,12 +232,12 @@ export function openRecordConsumptionEditor(record, services = [], { onSaved = (
       ).join('');
     };
     // Grouping is a read-only presentation. It is never shown in editing.
-    host.innerHTML = (!editing && hasRows
+    groupHost.innerHTML = !editing && hasRows
       ? segmentControl([{ value: 'service', label: 'По услуге' }, { value: 'group', label: 'По группе' }],
-          { value: grouping, name: 'recordConsumptionGrouping', aria: 'Группирование расхода' }) +
-        (grouping === 'group' ? groupMarkup() : byService)
-      : byService);
-    if (!editing && hasRows) initSegmentControls(host);
+          { value: grouping, name: 'recordConsumptionGrouping', aria: 'Группирование расхода' })
+      : '';
+    host.innerHTML = !editing && hasRows && grouping === 'group' ? groupMarkup() : byService;
+    if (!editing && hasRows) initSegmentControls(groupHost);
     if (editing) {
       host.querySelectorAll('[data-record-consumption-reorder]').forEach(reorderHost => {
         const [si, gi] = reorderHost.dataset.recordConsumptionReorder.split(':').map(Number);
@@ -305,16 +303,15 @@ export function openRecordConsumptionEditor(record, services = [], { onSaved = (
     } else return;
     error.textContent = ''; sync();
   });
+  groupHost.addEventListener('change', event => {
+    if (event.target.name !== 'recordConsumptionGrouping' || editing || busy) return;
+    const next = text(event.target.value);
+    if (next !== 'service' && next !== 'group') return;
+    grouping = next;
+    render();
+  });
   host.addEventListener('change', event => {
     const name = String(event.target.name || '');
-    if (name === 'recordConsumptionGrouping' && !editing && !busy) {
-      const next = text(event.target.value);
-      if (next === 'service' || next === 'group') {
-        grouping = next;
-        render();
-      }
-      return;
-    }
     if (!name.startsWith('recordConsumptionHistory') || busy) return;
     const service = data[Number(name.slice('recordConsumptionHistory'.length))];
     if (!service) return;
@@ -333,16 +330,16 @@ export function openRecordConsumptionEditor(record, services = [], { onSaved = (
     error.textContent = '';
     render();
   });
-  edit.addEventListener('click', () => {
+  action.addEventListener('click', async () => {
     if (busy) return;
-    editing = true;
-    for (const service of data) {
-      if (service.expanded && !service.groups.length) addGroup(service);
+    if (!editing && signature() === initial) {
+      editing = true;
+      for (const service of data) {
+        if (service.expanded && !service.groups.length) addGroup(service);
+      }
+      render();
+      return;
     }
-    render();
-  });
-  save.addEventListener('click', async () => {
-    if (busy) return;
     if (signature() === initial) {
       editing = false;
       for (const service of data) service.groups = service.groups.filter(group => group.items?.length);

@@ -94,7 +94,7 @@
 }
 [data-record-consumption-services] .record-consumption-read-list .ui-list__right-secondary span{white-space:nowrap;overflow-wrap:normal}
 [data-record-consumption-edit].ui-button--outline{background:var(--white);color:var(--text);border-color:var(--text)}
-[data-record-consumption-edit][hidden],[data-record-consumption-apply][hidden]{display:none!important}
+/* Record consumption uses one mode-dependent action button. */
 
 /* Recorded actual consumption: stronger service/group hierarchy, no selector. */
 [data-record-consumption-services] .record-consumption-service-title{font-size:20px;font-weight:650;line-height:1.25}
@@ -135,4 +135,8 @@
 [data-record-consumption-services] .record-consumption-group-source{
   padding-top:6px;color:var(--text-secondary);font-size:13px;font-weight:550;line-height:1.3
 }
-[data-record-consumption-services] [name="recordConsumptionGrouping"]{display:none}
+[data-record-consumption-grouping] [name="recordConsumptionGrouping"]{display:none}
+
+/* Read grouping is sticky within the existing Q scroll surface. */
+.record-consumption-grouping:not(:empty){position:sticky;top:0;z-index:4;padding:2px 0 10px;background:var(--v2-inner-surface,#F5F5F3)}
+.record-consumption-grouping .segment-control{margin:0}
