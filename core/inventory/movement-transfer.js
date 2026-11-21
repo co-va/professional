@@ -71,7 +71,9 @@ function compactTransferRow(item, index, from) {
   '</div>';
 }
 
-export function openInventoryTransfer(onSaved = () => {}, { selectedItemIds = [], fromLocationId = '' } = {}) {
+export function openInventoryTransfer(onSaved = () => {}, {
+  selectedItemIds = [], fromLocationId = '', existingLayer = null,
+} = {}) {
   const stock = getInventoryItems();
   const selected = [...new Set(selectedItemIds)].map(id => getInventoryItem(id)).filter(Boolean);
   const batch = selected.length > 0;
@@ -84,8 +86,7 @@ export function openInventoryTransfer(onSaved = () => {}, { selectedItemIds = []
   let pending = false;
   let submittedPayload = null;
 
-  const host = mountModal(document.body, modal(
-    '<form data-inventory-transfer-form>' +
+  const markup = '<form data-inventory-transfer-form>' +
       select({ label: 'Из места', name: 'fromLocationId', value: fromDefault,
         options: [{ value: '', label: 'Выберите исходный склад' }, ...places] }) +
       select({ label: 'В место', name: 'toLocationId', value: toDefault,
@@ -111,10 +112,16 @@ export function openInventoryTransfer(onSaved = () => {}, { selectedItemIds = []
       '<div data-inventory-transfer-actions hidden>' +
         actionBlock(button('Применить', { type: 'submit' })) +
       '</div>' +
-    '</form>',
-    { title: 'Перемещение', variant: 'q', surface: 'app' },
+    '</form>';
+  const host = existingLayer?.isConnected ? existingLayer : mountModal(document.body, modal(
+    markup, { title: 'Перемещение', variant: 'q', surface: 'app' },
   ));
   if (!host) return;
+  if (existingLayer) {
+    const body = host.querySelector('[data-v2-q-body]');
+    if (!body) return;
+    body.innerHTML = markup;
+  }
   const form = host.querySelector('[data-inventory-transfer-form]');
   const error = form.querySelector('[data-inventory-transfer-error]');
   const unit = form.querySelector('[data-inventory-transfer-unit]');
@@ -198,7 +205,8 @@ export function openInventoryTransfer(onSaved = () => {}, { selectedItemIds = []
         Number(form.elements.namedItem('quantity')?.value) > 0 &&
         transferUnits(getInventoryItem(form.elements.namedItem('itemId')?.value))
           .includes(form.elements.namedItem('quantityUnit')?.value));
-    actions.hidden = !ready;
+    // Keep the primary action visible; readiness only controls activation.
+    actions.hidden = false;
     submit.disabled = !ready;
     if (message || problem) error.textContent = problem;
     else error.textContent = '';
@@ -250,7 +258,7 @@ export function openInventoryTransfer(onSaved = () => {}, { selectedItemIds = []
     validate();
     try {
       await transferInventoryStock(submittedPayload);
-      host.v2Close?.();
+      if (!existingLayer) host.v2Close?.();
       onSaved();
     } catch (cause) {
       error.textContent = cause instanceof Error ? cause.message : 'Не удалось переместить товар.';
