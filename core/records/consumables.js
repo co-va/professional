@@ -1,4 +1,5 @@
-import { actionBlock, button, compactButton, escapeHtml, field, list, modal, mountModal, openNotice, select, segmentControl, initSegmentControls, initV2ListReorder } from '../../ui/ui.js';
+import { actionBlock, button, compactButton, escapeHtml, field, list, modal, mountModal, openNotice, select, initV2ListReorder } from '../../ui/ui.js';
+import { catalogDisclosure } from '../inventory/catalog-ui.js';
 import { setSharedActionVisible } from '../../ui/page/page.js';
 import { apiRequest } from '../auth.js';
 import { getInventoryItems } from '../inventory/data.js';
@@ -36,7 +37,7 @@ export function openRecordConsumptionEditor(record, services = [], { onSaved = (
     ...service, groups: actualGroups(record, service.id), expanded: false, templateChoice: '',
   }));
   let editing = false;
-  let grouping = 'service';
+  const expandedRead = new Set();
   let disposeReorders = [];
   let posted = record.consumablesPosted === true;
   const signature = () => JSON.stringify(data.map(({ id, groups }) => ({
@@ -61,14 +62,12 @@ export function openRecordConsumptionEditor(record, services = [], { onSaved = (
       service.expanded = true;
     }
   }
-  const panel = '<div class="record-consumption-grouping" data-record-consumption-grouping></div>' +
-    '<div class="form-grid" data-record-consumption-services></div>' +
+  const panel = '<div class="form-grid record-consumption-read-structure" data-record-consumption-services></div>' +
     '<div class="form-error" role="alert" data-record-consumption-error></div>' +
     actionBlock(button('Редактировать', { variant: 'outline', data: 'data-record-consumption-action' }));
   const layer = mountModal(document.body, modal(panel, { title: 'Расходники', variant: 'q', surface: 'app' }));
   if (!layer) return null;
   const host = layer.querySelector('[data-record-consumption-services]');
-  const groupHost = layer.querySelector('[data-record-consumption-grouping]');
   const action = layer.querySelector('[data-record-consumption-action]');
   const error = layer.querySelector('[data-record-consumption-error]');
   const actions = action?.closest('.modal-actions');
@@ -124,6 +123,13 @@ export function openRecordConsumptionEditor(record, services = [], { onSaved = (
     });
   };
 
+  // Reuse exactly the Stock's nested catalogDisclosure (including its triangle).
+  // Reading only: service → group → material rows, collapsed initially.
+  const readDisclosure = (key, title, content, nested = false) =>
+    catalogDisclosure(title, content, nested).replace('<details>',
+      '<details data-record-consumption-fold="' + escapeHtml(key) + '"' +
+        (expandedRead.has(key) ? ' open' : '') + '>');
+
   function render() {
     for (const dispose of disposeReorders) dispose();
     disposeReorders = [];
@@ -133,7 +139,6 @@ export function openRecordConsumptionEditor(record, services = [], { onSaved = (
       const factualRead = posted && !editing;
       const norm = service.rows.filter(row => row?.itemId);
       const hasGroups = service.groups.some(group => group.items?.length);
-      if (factualRead && !hasGroups && !norm.length) return '';
       const normMarkup = norm.length ? list({
         className: 'ui-list--dense', items: norm.map(row => ({
           title: items.get(text(row.itemId))?.name || (loaded ? 'Товар недоступен' : '…'),
@@ -147,9 +152,8 @@ export function openRecordConsumptionEditor(record, services = [], { onSaved = (
             return { title: item?.name || 'Товар недоступен',
               right: [row.quantity ?? '—', row.unit || (item ? procedureConsumableUnit(item) : '')].filter(Boolean).join('\u00a0') };
           });
-          return '<section class="record-consumption-group">' +
-            (text(group.name) ? '<div class="record-consumption-read-title">' + escapeHtml(group.name) + '</div>' : '') +
-            list({ className: 'ui-list--dense record-consumption-read-list', items: rows }) + '</section>';
+          return readDisclosure('group:' + si + ':' + gi, text(group.name) || 'Без группы',
+            list({ className: 'ui-list--dense record-consumption-read-list', items: rows }), true);
         }
         const products = (group.items || []).map((row, ri) => {
           const product = items.get(text(row.itemId));
@@ -176,10 +180,25 @@ export function openRecordConsumptionEditor(record, services = [], { onSaved = (
       }).join('');
       const expanded = service.expanded || service.groups.length > 0;
       const serviceTitle = '<strong class="ui-list__title record-consumption-service-title">' + escapeHtml(service.name) + '</strong>';
-      if (factualRead) {
-        return '<section class="record-consumption-service record-consumption-service--posted">' + serviceTitle +
-          (normMarkup ? '<p class="ui-list__secondary">Расчётный расход</p>' + normMarkup : '') +
-          groups + '<p class="ui-list__secondary" data-record-consumption-cost="' + si + '"></p></section>';
+      if (!editing) {
+        const estimate = normMarkup
+          ? readDisclosure('estimate:' + si, 'Расчётный расход', normMarkup, true) : '';
+        const materialGroups = hasGroups ? groups : '';
+        const body = factualRead
+          ? estimate + (hasGroups ? materialGroups : '<p class="ui-list__secondary">Расход не задан</p>')
+          : estimate + (
+            expanded ? select({ label: '', name: 'recordConsumptionHistory' + si, value: service.templateChoice,
+              options: [{ value: '', label: 'Шаблон' }, { value: 'standard', label: 'Стандартный шаблон' },
+                ...dates.map(previous => ({ value: 'record:' + text(previous.id), label: dateText(previous.date) + (previous.from ? ' · ' + text(previous.from) : '') }))],
+              data: 'data-record-consumption-history="' + si + '"', aria: 'Выбрать шаблон: ' + service.name }) +
+              materialGroups
+              : list({ className: 'ui-list--dense', items: [{
+                  title: 'Расход не задан', interactive: true, right: '+',
+                  data: 'data-record-consumption-open="' + si + '"',
+                  aria: 'Открыть расход: ' + service.name,
+                }] })
+          );
+        return readDisclosure('service:' + si, service.name, body);
       }
       return '<section class="record-consumption-service">' + serviceTitle +
         normMarkup +
@@ -193,51 +212,12 @@ export function openRecordConsumptionEditor(record, services = [], { onSaved = (
             options: [{ value: '', label: 'Шаблон' }, { value: 'standard', label: 'Стандартный шаблон' },
               ...dates.map(previous => ({ value: 'record:' + text(previous.id), label: dateText(previous.date) + (previous.from ? ' · ' + text(previous.from) : '') }))],
             data: 'data-record-consumption-history="' + si + '"', aria: 'Выбрать шаблон: ' + service.name }) +
-          groups + (editing ? '<div class="field-inline-label record-consumption-add-group"><span>Добавить группу</span>' +
-          compactButton({ kind: 'add', data: 'data-record-consumption-add="' + si + '"', aria: 'Добавить группу' }) + '</div>' : '') +
+          groups + '<div class="field-inline-label record-consumption-add-group"><span>Добавить группу</span>' +
+          compactButton({ kind: 'add', data: 'data-record-consumption-add="' + si + '"', aria: 'Добавить группу' }) + '</div>' +
           '<p class="ui-list__secondary" data-record-consumption-cost="' + si + '"></p>'
         ) + '</section>';
     }).join('');
-    const hasRows = data.some(service => service.groups.some(group => group.items?.length));
-    const groupMarkup = () => {
-      const buckets = new Map();
-      const append = (name, serviceName, rows, calculated = false) => {
-        const heading = text(name) || 'Без группы';
-        const id = (calculated ? 'norm:' : 'actual:') + heading.toLocaleLowerCase('ru-RU');
-        if (!buckets.has(id)) buckets.set(id, { heading, sections: [] });
-        buckets.get(id).sections.push({ serviceName, rows, calculated });
-      };
-      for (const service of data) {
-        for (const group of service.groups) {
-          if (group.items?.length) append(group.name, service.name, group.items);
-        }
-        const norm = service.rows.filter(row => row?.itemId);
-        if (norm.length) append('Расчётный расход', service.name, norm, true);
-      }
-      return [...buckets.values()].map(bucket =>
-        '<section class="record-consumption-group record-consumption-group--pivot">' +
-          '<div class="record-consumption-read-title">' + escapeHtml(bucket.heading) + '</div>' +
-          bucket.sections.map(section => {
-            const rows = section.rows.map(row => {
-              const item = items.get(text(row.itemId));
-              return {
-                title: item?.name || (loaded ? 'Товар недоступен' : '…'),
-                right: [row.quantity ?? '—', row.unit || (item ? procedureConsumableUnit(item) : '')].filter(Boolean).join('\u00a0'),
-              };
-            });
-            return '<div class="record-consumption-group-source">' + escapeHtml(section.serviceName) + '</div>' +
-              list({ className: 'ui-list--dense record-consumption-read-list' +
-                (section.calculated ? ' record-consumption-read-list--calculated' : ''), items: rows });
-          }).join('') + '</section>'
-      ).join('');
-    };
-    // Grouping is a read-only presentation. It is never shown in editing.
-    groupHost.innerHTML = !editing && hasRows
-      ? segmentControl([{ value: 'service', label: 'По услуге' }, { value: 'group', label: 'По группе' }],
-          { value: grouping, name: 'recordConsumptionGrouping', aria: 'Группирование расхода' })
-      : '';
-    host.innerHTML = !editing && hasRows && grouping === 'group' ? groupMarkup() : byService;
-    if (!editing && hasRows) initSegmentControls(groupHost);
+    host.innerHTML = byService;
     if (editing) {
       host.querySelectorAll('[data-record-consumption-reorder]').forEach(reorderHost => {
         const [si, gi] = reorderHost.dataset.recordConsumptionReorder.split(':').map(Number);
@@ -303,13 +283,14 @@ export function openRecordConsumptionEditor(record, services = [], { onSaved = (
     } else return;
     error.textContent = ''; sync();
   });
-  groupHost.addEventListener('change', event => {
-    if (event.target.name !== 'recordConsumptionGrouping' || editing || busy) return;
-    const next = text(event.target.value);
-    if (next !== 'service' && next !== 'group') return;
-    grouping = next;
-    render();
-  });
+  // Native details preserve their state across stock refresh and mode changes.
+  host.addEventListener('toggle', event => {
+    const details = event.target;
+    if (editing || !details?.matches?.('details[data-record-consumption-fold]')) return;
+    const key = details.dataset.recordConsumptionFold;
+    if (details.open) expandedRead.add(key);
+    else expandedRead.delete(key);
+  }, true);
   host.addEventListener('change', event => {
     const name = String(event.target.name || '');
     if (!name.startsWith('recordConsumptionHistory') || busy) return;

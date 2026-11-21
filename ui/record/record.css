@@ -131,12 +131,16 @@
 }
 [data-record-consumption-services] .record-consumption-product.is-reorder-target-before::before{top:0}
 [data-record-consumption-services] .record-consumption-product.is-reorder-target-after::after{bottom:0}
-[data-record-consumption-services] .record-consumption-group--pivot{margin-top:8px}
-[data-record-consumption-services] .record-consumption-group-source{
-  padding-top:6px;color:var(--text-secondary);font-size:13px;font-weight:550;line-height:1.3
-}
-[data-record-consumption-grouping] [name="recordConsumptionGrouping"]{display:none}
+[data-record-consumption-services] [data-record-consumption-services] 
 
-/* Read grouping is sticky within the existing Q scroll surface. */
-.record-consumption-grouping:not(:empty){position:sticky;top:0;z-index:4;padding:2px 0 10px;background:var(--v2-inner-surface,#F5F5F3)}
-.record-consumption-grouping .segment-control{margin:0}
+
+/* Stock's exact catalogDisclosure hierarchy inside Record's read-only Q.
+   Preserve Stock's native details triangles, surface, and nested behavior. */
+[data-record-consumption-services] > .inventory-editor-panel > details > .inventory-editor-summary{
+  font-size:20px;font-weight:650
+}
+[data-record-consumption-services] .inventory-editor-panel--nested > details > .inventory-editor-summary{
+  font-size:18px;font-weight:600
+}
+[data-record-consumption-services] .inventory-editor-panel__body{min-width:0}
+[data-record-consumption-services] .record-consumption-read-list{width:100%}
