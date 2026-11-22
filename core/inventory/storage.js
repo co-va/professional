@@ -99,7 +99,7 @@ export function openInventoryStorageLocations(onSaved = () => {}) {
     const current = locations().find(place => place.locationId === locationId);
     const initialName = String(current?.name || '').trim();
     const window = mountModal(document.body, modal(
-      '<form data-inventory-storage-form>' +
+      '<form class="compact-form" data-inventory-storage-form>' +
       field({ label: 'Название', name: 'name', value: initialName, required: true }) +
       '<p class="form-error" role="alert" data-inventory-storage-error></p>' +
       actionBlock(button(current ? 'Удалить' : 'Сохранить', {
