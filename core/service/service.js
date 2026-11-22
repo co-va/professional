@@ -8,6 +8,8 @@ import {
   viewNavigation,
 } from '../../ui/ui.js';
 import { loadOperationalState } from '../runtime/operational-state.js';
+import { loadAuxiliaryState } from '../runtime/auxiliary-state.js';
+import { openServiceGroupingQ } from './catalog-grouping.js';
 import { hasCurrentProceduresSnapshot } from './procedures/data.js';
 import { loadInventory } from '../inventory/service.js';
 import { serviceHeaderContext, notifyServiceContext } from './context.js';
@@ -48,6 +50,14 @@ function openServiceSettings(root, rerender) {
           const { openServiceAppearanceQ } = await loadAppearanceModule();
           if (!root?.isConnected) return;
           openServiceAppearanceQ(root, { onSaved: rerender });
+        },
+      },
+      {
+        id: 'grouping',
+        label: 'Группы',
+        onSelect: () => {
+          if (!root?.isConnected) return;
+          openServiceGroupingQ(activeView, { onSaved: rerender });
         },
       },
     ],
@@ -125,6 +135,14 @@ export function renderService(root, navigateBack = () => {}) {
 
     notifyServiceContext();
   };
+
+  // The grouped catalogue settings share the existing tenant-scoped Service
+  // auxiliary snapshot with retail product presentations. No new Core dataset.
+  void loadAuxiliaryState('service').then(() => {
+    if (!disposed) renderCurrent();
+  }).catch(error => {
+    console.error('Service grouping snapshot load failed', error);
+  });
 
   // Workspace already hydrates the operational Service snapshot on entry.
   // Do not run a second full hydration or delay catalog rendering.
