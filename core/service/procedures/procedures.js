@@ -3,10 +3,8 @@ import {
   button,
   costListParts,
   durationText,
-  emptyState,
   entityVisualCard,
   escapeHtml,
-  initV2ListReorder,
   miniCard,
   miniCardRail,
   modal,
@@ -14,7 +12,6 @@ import {
   openNotice,
   mountV2ZLayer,
   page,
-  v2ListEntries,
   v2ListEntry,
   v2ZLayer,
   workplaceCountText,
@@ -26,6 +23,7 @@ import { bindProcedureEditor, initialProcedure, procedureEditorForm } from './fo
 import { serviceWorkplaceAddButton } from '../workplace-selection.js';
 import { commitDeleteProcedure, getProcedures, commitReorderProcedures } from './data.js';
 import { scheduleServiceStatistics, serviceItemStatistics, serviceSpentText } from '../statistics.js';
+import { renderServiceCatalogList } from '../catalog-list.js';
 
 const money = (value) => `${new Intl.NumberFormat('ru-RU').format(Number(value || 0))} ₽`;
 
@@ -41,24 +39,32 @@ function procedureRow(procedure) {
     interactive: true,
     reorderHandle: true,
     reorderAria: 'Изменить порядок',
-    data: `data-procedure="${escapeHtml(procedure.id)}" data-reorder-id="${escapeHtml(procedure.id)}"`,
+    data: `data-procedure="${escapeHtml(procedure.id)}" data-service-catalog-id="${escapeHtml(procedure.id)}" data-reorder-id="${escapeHtml(procedure.id)}"`,
     aria: `Открыть услугу ${procedure.name || ''}`,
   });
 }
 
 export function renderProcedureCatalog(host, { root = host, onChanged = () => {} } = {}) {
   const items = getProcedures();
-  host.innerHTML = items.length
-    ? v2ListEntries(items.map(procedureRow))
-    : emptyState('Услуг пока нет', 'Добавьте первую услугу кнопкой «+».');
-
-  host.querySelectorAll('[data-procedure]').forEach((node) => {
-    node.addEventListener('click', () => openProcedureOverview(root, node.dataset.procedure, { onChanged }));
-  });
-
-  return initV2ListReorder(host, {
-    onReorder: (ids) => commitReorderProcedures(ids),
-    onError: (error) => openNotice({
+  return renderServiceCatalogList(host, {
+    items,
+    emptyTitle: 'Услуг пока нет',
+    renderV2: procedureRow,
+    renderDense: procedure => {
+      const cost = costListParts(procedure.cost);
+      return {
+        title: procedure.name || '',
+        secondary: durationText(procedure.duration) + ' · ' +
+          workplaceCountText((procedure.workplaces || []).length),
+        right: [cost.rightTop, cost.rightBottom].filter(Boolean),
+      };
+    },
+    searchText: procedure => [procedure.name, procedure.about,
+      procedure.description, (procedure.workplaces || []).map(item => item.name).join(' ')]
+      .filter(Boolean).join(' '),
+    onOpen: id => openProcedureOverview(root, id, { onChanged }),
+    onReorder: ids => commitReorderProcedures(ids),
+    onError: error => openNotice({
       title: 'Порядок',
       message: error instanceof Error ? error.message : 'Не удалось сохранить порядок услуг.',
     }),
