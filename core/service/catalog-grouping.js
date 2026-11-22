@@ -229,7 +229,7 @@ export function openServiceGroupingQ({ onSaved = () => {} } = {}) {
 
   const groupEditorX = (previous = null) => {
     const editor = mountModal(document.body, modal(
-      '<form data-service-group-editor-form>' +
+      '<form class="compact-form" data-service-group-editor-form>' +
         (previous ? '' : select({
           label: 'Раздел', name: 'groupKind', value: 'procedures',
           options: [
@@ -307,8 +307,8 @@ export function openServiceGroupingQ({ onSaved = () => {} } = {}) {
     const current = groupByKey(groupKey);
     if (!current) return null;
     const editor = mountModal(document.body, modal(
-      '<form data-service-value-editor-form>' +
-        field({ label: 'Название значения', name: 'name',
+      '<form class="compact-form" data-service-value-editor-form>' +
+        field({ label: 'Наименование значения', name: 'name',
           value: previous?.name || '', required: true, maxlength: 80 }) +
         '<div class="form-error" role="alert" data-service-value-editor-error></div>' +
         actionBlock(
@@ -444,8 +444,10 @@ export function openServiceGroupingQ({ onSaved = () => {} } = {}) {
     // Use the native Q arrow to return to the group directory. Group edits
     // remain in the Q bottom action area; no buttons above the value rows.
     detail.innerHTML =
-      '<div class="inventory-editor-label">' + kindLabel(active.kind) + '</div>' +
-      '<div data-service-group-value-list></div>';
+      '<div class="inventory-editor-group">' +
+        '<div class="inventory-editor-label">' + kindLabel(active.kind) + '</div>' +
+        '<div data-service-group-value-list></div>' +
+      '</div>';
     const listHost = detail.querySelector('[data-service-group-value-list]');
     const values = Array.isArray(active.values) ? active.values : [];
     listHost.innerHTML = values.length
