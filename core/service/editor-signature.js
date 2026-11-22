@@ -31,6 +31,7 @@ function workplaceSnapshot(workplaces = []) {
 export function procedureEditorSignature({
   name = '', duration = 0, breakDuration = 0, cost = {}, description = '',
   groupEnabled = false, groupCapacity = 2, visibleInPublicBooking = true, workplaces = [],
+  groupValues = null,
 } = {}) {
   const enabled = groupEnabled === true;
   const assignments = workplaceSnapshot(workplaces);
@@ -44,17 +45,19 @@ export function procedureEditorSignature({
     visibleInPublicBooking: visibleInPublicBooking !== false,
     groupCapacity: enabled ? Math.max(2, Math.floor(Number(groupCapacity) || 2)) : null,
     workplaces: assignments,
+    ...(groupValues && typeof groupValues === 'object' ? { groupValues } : {}),
   });
 }
 
 export function productEditorSignature({
-  name = '', cost = {}, description = '', workplaces = [],
+  name = '', cost = {}, description = '', workplaces = [], groupValues = null,
 } = {}) {
   return JSON.stringify({
     name: text(name),
     cost: costSnapshot(cost),
     description: text(description),
     workplaces: workplaceSnapshot(workplaces),
+    ...(groupValues && typeof groupValues === 'object' ? { groupValues } : {}),
   });
 }
 

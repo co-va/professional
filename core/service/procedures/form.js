@@ -78,7 +78,8 @@ export function bindProcedureEditor(root, {
       groupCapacity: data.get('procedureGroupCapacity'),
       visibleInPublicBooking: onlineCheck?.checked !== false,
       workplaces: draft.workplaces,
-    }) + JSON.stringify(readServiceGroupFields(form));
+      groupValues: readServiceGroupFields(form),
+    });
   };
   const onlineCheck = root.querySelector('[data-procedure-online-check]');
   let initialSignature = signature();

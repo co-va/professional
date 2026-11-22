@@ -413,7 +413,8 @@ export function openProductEditor(root, existing = null, {
       cost: collectCost(layer, 'productCost'),
       description: data.get('productAbout'),
       workplaces: draft.workplaces,
-    }) + JSON.stringify(readServiceGroupFields(form));
+      groupValues: readServiceGroupFields(form),
+    });
   };
   let initialSignature = signature();
   const actions = primary.closest('.modal-actions');
