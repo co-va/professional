@@ -41,7 +41,7 @@ try {
         <section class="v2-layer v2-layer--standard modal-sheet" id="q"
           style="top:72px;left:16px;right:0;bottom:0">
           <div data-v2-q-header>Profile</div>
-          <div data-v2-q-body id="q-body"><div style="height:1300px">Q content</div></div>
+          <div data-v2-q-body id="q-body"><div style="height:1300px">Q content</div><div class="modal-actions" style="height:48px"><button id="q-save" style="height:48px">Apply</button></div></div>
         </section>
       </div>
     </div>
@@ -66,7 +66,7 @@ try {
     return {
       h: rect('#h'), z: rect('#z'), q: rect('#q'),
       zBody: rect('#z-body'), qBody: rect('#q-body'),
-      x: rect('#x'), save: rect('#save'),
+      x: rect('#x'), save: rect('#save'), qSave: rect('#q-save'),
     };
   });
   const near = (actual, expected, label) =>
@@ -88,6 +88,10 @@ try {
   assert.ok(after.qBody.height < before.qBody.height, 'Q only shrinks its scrollable interior');
   near(after.z.bottom, before.z.bottom, 'Z white surface must keep its bottom');
   near(after.q.bottom, before.q.bottom, 'Q white surface must keep its bottom');
+  assert.ok(after.qSave.bottom <= 844 - 390 - 16,
+    'Q action must remain above keyboard without moving the white Q surface');
+  assert.ok(after.qSave.bottom < before.qSave.bottom,
+    'Q action moves into the visible work area when keyboard appears');
   near(after.z.right, before.z.right, 'Z white surface must keep its right edge');
   near(after.q.right, before.q.right, 'Q white surface must keep its right edge');
   near(after.x.bottom, before.x.bottom, 'X white background must remain attached to bottom under keyboard');
