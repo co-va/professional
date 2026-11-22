@@ -22,6 +22,8 @@ const keyboardProps = new Map();
 const keyboardClasses = new Set();
 let visibleHeight = 844;
 let focusedInput = false;
+let clock = 0;
+const keyboardEvents = new Map();
 class TestInput { matches() { return true; } }
 const rootStyle = {
   getPropertyValue: (key) => keyboardProps.get(key) || '',
@@ -39,7 +41,7 @@ const fakeDoc = {
   body: {},
   visibilityState: 'visible',
   get activeElement() { return focusedInput ? new TestInput() : null; },
-  addEventListener() {},
+  addEventListener(event, handler) { keyboardEvents.set(event, handler); },
   querySelectorAll() { return []; },
   querySelector() { return null; },
 };
@@ -63,7 +65,7 @@ const testRuntime = {
   MutationObserver: class { observe() {} },
   ResizeObserver: undefined,
   requestAnimationFrame() { return 1; },
-  performance: { now() { return 0; } },
+  performance: { now() { return clock; } },
 };
 runInNewContext(keyboardSource + '\nwindow.__testSync = syncViewport;', testRuntime);
 const keyboardState = () => ({
@@ -88,7 +90,23 @@ testRuntime.window.__testSync();
 assert.deepEqual(keyboardState(), keyboardBeforeTransition,
   'Last input focus must retain the same Z/Q keyboard inset');
 focusedInput = false;
+visibleHeight = 844; // even a FULL viewport rebound must not break focus transition
+clock = 100;
+keyboardEvents.get('focusout')();
+assert.deepEqual(keyboardState(), keyboardBeforeTransition,
+  'Full focusout rebound may not move Z/Q before the next field focuses');
+focusedInput = true;
+visibleHeight = 460;
+clock = 150;
+keyboardEvents.get('focusin')({ target: new TestInput() });
+assert.deepEqual(keyboardState(), keyboardBeforeTransition,
+  'Focusin after full rebound must retain the keyboard inset');
+focusedInput = false;
 visibleHeight = 844;
+clock = 500;
+keyboardEvents.get('focusout')();
+clock = 690; // no new focus arrived; native keyboard really closed
+// The existing viewport-following frame is responsible for the final reset.
 testRuntime.window.__testSync();
 assert.equal(keyboardState().inset, '0px', 'Actual keyboard close resets inset');
 assert.equal(keyboardState().open, false, 'Actual keyboard close resets class');
