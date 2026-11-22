@@ -86,8 +86,13 @@ export function bindServiceGroupFields(root) {
     const changed = () => section.dispatchEvent(new Event('change', { bubbles: true }));
     const onClick = event => {
       if (event.target.closest?.('[data-service-group-info]')) {
-        openNotice({ title: 'Группы',
-          message: 'Выберите группу и при необходимости её значение. Кнопка «+» добавляет ещё одну группу. Без выбора группировка не применяется.' });
+        const title = 'Группы';
+        const message = 'Выберите группу и при необходимости её значение. Кнопка «+» добавляет ещё одну группу. Без выбора группировка не применяется.';
+        mountModal(document.body, modal(
+          '<div class="modal-title"><h2>' + escapeHtml(title) + '</h2><p>' +
+            escapeHtml(message) + '</p></div>',
+          { title, variant: 'technical', surface: 'app' },
+        ));
         return;
       }
       const remove = event.target.closest?.('[data-service-group-remove]');
