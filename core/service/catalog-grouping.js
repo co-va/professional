@@ -44,7 +44,7 @@ export function renderServiceGroupTree(items = [], kind = 'procedures', renderRo
   const walk = node => {
     const children = sortedStockChildren(node, levels);
     return children.map(child => {
-      const content = walk(child) + directRows(child.direct);
+      const content = walk(child);
       const markup = catalogDisclosure(child.value, content, Boolean(node.key), child.items.length);
       // With one sole branch there is no navigation choice; reveal its content.
       return children.length === 1 && node.direct.length === 0
