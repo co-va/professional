@@ -8,6 +8,13 @@
   pointer-events:none;
 }
 .v2-v-host[hidden]{display:none}
+/* V is contextual navigation, not an input confirmation.
+   Hide the entire V host during keyboard entry; preserve its layout and
+   restore it automatically when the keyboard closes. */
+html.keyboard-open .v2-v-host{
+  visibility:hidden;
+  pointer-events:none;
+}
 .v2-v{
   position:absolute;
   left:36px;
