@@ -121,7 +121,7 @@ function measurableAction(surface) {
 // over the keyboard. Shared classification also handles a button whose caption
 // switches dynamically (e.g. "Редактировать" -> "Применить").
 // Explicit data-ui-keyboard-action="commit|auxiliary" on a button is authoritative.
-const COMMIT_CAPTION = /^(?:сохранить|применить|подтвердить|оплатить|отправить)(?:\\s|$|[.!,:])/iu;
+const COMMIT_CAPTION = /^(?:сохранить|применить|подтвердить|оплатить|отправить)(?:\s|$|[.!,:])/iu;
 function syncKeyboardFooterActions() {
   document.querySelectorAll('.modal-actions button').forEach((button) => {
     if (!button.hasAttribute('data-ui-keyboard-auto')
@@ -129,7 +129,7 @@ function syncKeyboardFooterActions() {
     const dangerous = button.classList.contains('ui-button--critical')
       || button.classList.contains('ui-button--danger')
       || button.classList.contains('ui-button--delete-outline');
-    const label = (button.textContent || '').trim().replace(/\\s+/g, ' ');
+    const label = (button.textContent || '').trim().replace(/\s+/g, ' ');
     const isCommit = !dangerous && (
       COMMIT_CAPTION.test(label) || button.type === 'submit'
     );
