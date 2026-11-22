@@ -61,7 +61,7 @@ function productRow(product) {
     rightTop: price.rightTop || '',
     rightBottom: price.rightBottom || '',
     interactive: true,
-    reorderHandle: !product.inventoryOwned,
+    reorderHandle: true,
     reorderAria: 'Изменить порядок',
     data: `data-product="${escapeHtml(product.id)}" data-reorder-id="${escapeHtml(product.id)}"`,
     aria: `Открыть товар ${product.name || ''}`,
@@ -83,9 +83,9 @@ export function renderProductCatalog(host, { root = host, onChanged = () => {} }
     });
   });
 
-  // Stock items follow Inventory ordering; the auxiliary Service ordering
-  // cannot reorder a combined catalog without dropping inventory identities.
-  if (items.some(item => item.inventoryOwned)) return () => {};
+  // Manual order belongs to Service, including stock-backed products.
+  // The reorder gesture and handles are the same as Service → Услуги.
+  // Persisted order never writes into Inventory or changes stock positions.
   return initV2ListReorder(host, {
     onReorder: (ids) => commitReorderProducts(ids),
     onError: (error) => openNotice({
