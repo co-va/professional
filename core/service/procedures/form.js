@@ -5,6 +5,7 @@ import { procedureEditorSignature, rebaseWorkplaceAssignmentSignature } from '..
 import { bindServiceWorkplaceAssignments, serviceWorkplaceAssignmentList } from '../workplace-selection.js';
 import { compactCheck } from '../../../ui/selection/check-list.js';
 import { procedureGroupBookingFields, bindProcedureGroupBooking } from './group-booking-ui.js';
+import { serviceGroupFields, readServiceGroupFields } from '../catalog-grouping.js';
 
 export function initialProcedure(existing = null, defaultWorkplace = null) {
   if (existing) return {
@@ -46,6 +47,7 @@ export function procedureEditorForm(procedure = initialProcedure()) {
       capacityName: 'procedureGroupCapacity',
     })}
     ${compactCheck({ label: 'Для онлайн-записи', checked: procedure.visibleInPublicBooking !== false, data: 'data-procedure-online-check' })}
+    ${serviceGroupFields('procedures', procedure.groupValues || {})}
     ${serviceWorkplaceAssignmentList()}
     <div class="form-error" data-procedure-editor-error></div>
   </form>`;
@@ -75,7 +77,7 @@ export function bindProcedureEditor(root, {
       groupCapacity: data.get('procedureGroupCapacity'),
       visibleInPublicBooking: onlineCheck?.checked !== false,
       workplaces: draft.workplaces,
-    });
+    }) + JSON.stringify(readServiceGroupFields(form));
   };
   const onlineCheck = root.querySelector('[data-procedure-online-check]');
   let initialSignature = signature();
@@ -186,6 +188,8 @@ export function bindProcedureEditor(root, {
         capacity: groupEnabled ? Math.min(999, groupCapacity) : Math.max(2, Math.floor(Number(draft.groupBooking?.capacity) || 2)),
       },
       workplaces: Array.isArray(draft.workplaces) ? draft.workplaces.map((item) => ({ ...item })) : [],
+      groupValues: Object.keys(readServiceGroupFields(form)).length || form.querySelector('[data-service-group-level]')
+        ? readServiceGroupFields(form) : (draft.groupValues || {}),
       createdAt: existing?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
