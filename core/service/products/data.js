@@ -74,6 +74,12 @@ export function inventorySaleProduct(item, linked = null) {
     groupValues: linked?.groupValues && typeof linked.groupValues === 'object' && !Array.isArray(linked.groupValues) ? clone(linked.groupValues) : {},
     workplaces: Array.isArray(linked?.workplaces) ? clone(linked.workplaces) : [],
     inventoryOwned: true,
+    // Display-only Stock facts for the readonly Cost block of Service's Q.
+    // Stock remains authoritative; editing the Service overlay never writes them.
+    stockPurchasePrice: item.basePrice == null && item.referencePrice == null
+      ? null : purchase,
+    stockMarkupValue: item.saleMarkupValue == null ? null : Number(item.saleMarkupValue),
+    stockMarkupMode: item.saleMarkupMode || 'percent',
     calculatedSalePrice: Number.isFinite(calculatedPrice) ? Math.round(calculatedPrice * 100) / 100 : null,
     retailPriceOverride: override,
     servicePosition: linked?.servicePosition ?? null,
