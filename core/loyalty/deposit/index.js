@@ -42,7 +42,6 @@ import { openLoyaltySettingsMenu } from '../shared.js';
 import {
   correctDepositFunding,
   deleteDeposit,
-  deleteDepositFunding,
   fundDeposit,
   fundExistingDeposit,
   getDepositInstances,
