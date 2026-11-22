@@ -56,3 +56,23 @@ button.ui-list__item:focus-visible{outline:2px solid var(--active);outline-offse
 .ui-list--dense .ui-list__item--group-start{border-top:2px solid var(--text)}
 .ui-list--dense .ui-list__item--group-start:first-child{border-top:0}
 .ui-list--dense .ui-list__item--group-header{min-height:42px;font-weight:650}
+
+/* Reuse the V2 reorder grip inside the canonical dense List.
+   The List keeps its stock-like 38px rows; only the active row moves. */
+.ui-list--dense .list-entry__reorder-handle{
+  flex:0 0 28px;width:28px;height:30px;margin:0 2px 0 -4px;
+}
+.ui-list--dense.is-reordering{user-select:none;-webkit-user-select:none}
+.ui-list--dense .ui-list__item{position:relative}
+.ui-list--dense .ui-list__item.is-reordering{
+  z-index:4;transform:translate3d(0,var(--list-entry-drag-y,0px),0);
+  transition:none;box-shadow:0 10px 24px rgba(0,0,0,.16);
+  pointer-events:none;will-change:transform;
+}
+.ui-list--dense .ui-list__item.is-reorder-target-before::before,
+.ui-list--dense .ui-list__item.is-reorder-target-after::after{
+  content:"";position:absolute;left:0;right:0;height:2px;
+  background:var(--text);z-index:5;pointer-events:none;
+}
+.ui-list--dense .ui-list__item.is-reorder-target-before::before{top:0}
+.ui-list--dense .ui-list__item.is-reorder-target-after::after{bottom:0}
