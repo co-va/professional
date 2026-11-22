@@ -26,6 +26,7 @@ import { bindProcedureEditor, initialProcedure, procedureEditorForm } from './fo
 import { serviceWorkplaceAddButton } from '../workplace-selection.js';
 import { commitDeleteProcedure, getProcedures, commitReorderProcedures } from './data.js';
 import { scheduleServiceStatistics, serviceItemStatistics, serviceSpentText } from '../statistics.js';
+import { renderServiceGroupTree } from '../catalog-grouping.js';
 
 const money = (value) => `${new Intl.NumberFormat('ru-RU').format(Number(value || 0))} ₽`;
 
@@ -48,14 +49,23 @@ function procedureRow(procedure) {
 
 export function renderProcedureCatalog(host, { root = host, onChanged = () => {} } = {}) {
   const items = getProcedures();
+  const grouped = items.length
+    ? renderServiceGroupTree(items, 'procedures', procedureRow,
+      ids => commitReorderProcedures(ids),
+      error => openNotice({
+        title: 'Порядок',
+        message: error instanceof Error ? error.message : 'Не удалось сохранить порядок услуг.',
+      }))
+    : null;
   host.innerHTML = items.length
-    ? v2ListEntries(items.map(procedureRow))
+    ? grouped?.html || v2ListEntries(items.map(procedureRow))
     : emptyState('Услуг пока нет', 'Добавьте первую услугу кнопкой «+».');
 
   host.querySelectorAll('[data-procedure]').forEach((node) => {
     node.addEventListener('click', () => openProcedureOverview(root, node.dataset.procedure, { onChanged }));
   });
 
+  if (grouped) return grouped.attach(host);
   return initV2ListReorder(host, {
     onReorder: (ids) => commitReorderProcedures(ids),
     onError: (error) => openNotice({
