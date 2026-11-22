@@ -22,14 +22,16 @@ html.keyboard-open:has([data-v2-layer-kind="bottom"]){
 }
 html.keyboard-open:has([data-v2-app]),
 html.keyboard-open body:has([data-v2-app]){
-  background-color:var(--surface-dark,#2F3338);
+  /* Warm fallback if native WebKit paints only background-color under keyboard. */
+  background-color:var(--v2-inner-surface,#F5F5F3);
   background-image:linear-gradient(to right,
     var(--surface-dark,#2F3338) 0 var(--ui-keyboard-paper-start),
     var(--v2-inner-surface,#F5F5F3) var(--ui-keyboard-paper-start) var(--ui-keyboard-paper-end),
     var(--surface-dark,#2F3338) var(--ui-keyboard-paper-end) 100%);
 }
 html.keyboard-open .app-shell:has([data-v2-app]){
-  background-color:var(--surface-dark,#2F3338);
+  /* Warm fallback if native WebKit paints only background-color under keyboard. */
+  background-color:var(--v2-inner-surface,#F5F5F3);
   background-image:linear-gradient(to right,
     var(--surface-dark,#2F3338) 0 var(--ui-keyboard-sheet-left),
     var(--v2-inner-surface,#F5F5F3) var(--ui-keyboard-sheet-left) 100%);
