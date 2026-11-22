@@ -15,6 +15,9 @@ let keyboardSession = false;
 // Keep the last real keyboard inset through WebKit's intermediate focusout /
 // focusin viewport rebounds. A short rebound must not move the Z/Q footer.
 let keyboardInset = 0;
+// WebKit sometimes briefly restores the entire viewport between two fields.
+// Confirm a blur before releasing keyboard geometry, never per field.
+let blurGraceUntil = 0;
 let actionsFrame = 0;
 let trackingFrame = 0;
 let trackThrough = 0;
@@ -54,21 +57,25 @@ function syncViewport() {
     keyboardInset = 0;
   }
   const focused = Boolean(activeEditable());
-  if (focused) keyboardSession = true;
+  if (focused) {
+    keyboardSession = true;
+    blurGraceUntil = 0;
+  }
+  const awaitingNextField = !focused && performance.now() < blurGraceUntil;
   // A transient viewport expansion between two editable fields must NEVER
   // replace the pre-keyboard shell height. Safari can deliver focusout,
   // resize and focusin in separate frames while the keyboard stays visible.
   if (!keyboardSession) {
     stableHeight = height;
     stableWidth = width;
-  } else if (!focused && height >= stableHeight - 10) {
+  } else if (!focused && !awaitingNextField && height >= stableHeight - 10) {
     // A real blur + restored viewport ends the keyboard session.
     keyboardSession = false;
     stableHeight = height;
     stableWidth = width;
   }
   const visibleInset = Math.max(0, stableHeight - height);
-  if (!keyboardSession || visibleInset < 10) keyboardInset = 0;
+  if (!keyboardSession || (visibleInset < 10 && !awaitingNextField)) keyboardInset = 0;
   else if (visibleInset >= 60) keyboardInset = visibleInset;
   // 10–59px can be a temporary Safari viewport rebound while moving to
   // another input. Hold the last keyboard inset instead of revealing H.
@@ -171,6 +178,7 @@ document.addEventListener('focusin', (event) => {
   ensureViewportTracking(800);
 });
 document.addEventListener('focusout', () => {
+  blurGraceUntil = performance.now() + 180;
   onViewportChange();
   ensureViewportTracking(500);
 });
