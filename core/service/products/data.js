@@ -229,17 +229,26 @@ export async function commitServiceGroupLevels(kind, entries = []) {
   if (!serviceKinds.has(kind)) throw new Error('Неизвестный раздел Сервиса.');
   const levels = Array.isArray(entries) ? entries : [];
   const ids = new Set();
+  const names = new Set();
   const normalized = levels.map((entry, index) => {
     const id = String(entry.id || '').trim();
     const name = String(entry.name || '').trim();
-    if (!id || !name || ids.has(id)) throw new Error('Укажите уникальное название группы.');
+    const nameKey = name.toLocaleLowerCase('ru-RU');
+    if (!id || !name || name.length > 80 || ids.has(id) || names.has(nameKey))
+      throw new Error('Группы должны иметь разные названия до 80 символов.');
     ids.add(id);
+    names.add(nameKey);
     const valueIds = new Set();
+    const valueNames = new Set();
     const values = (Array.isArray(entry.values) ? entry.values : []).map(value => {
       const valueId = String(value.id || '').trim();
       const valueName = String(value.name || '').trim();
-      if (!valueId || !valueName || valueIds.has(valueId)) throw new Error('Укажите уникальное значение группы.');
+      const valueKey = valueName.toLocaleLowerCase('ru-RU');
+      if (!valueId || !valueName || valueName.length > 80
+          || valueIds.has(valueId) || valueNames.has(valueKey))
+        throw new Error('Значения одной группы должны иметь разные названия.');
       valueIds.add(valueId);
+      valueNames.add(valueKey);
       return { id: valueId, name: valueName };
     });
     return { id, name, values, position: index + 1 };
