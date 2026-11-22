@@ -39,6 +39,9 @@ function viewportSize() {
 function syncViewport() {
   const { height, width } = viewportSize();
   if (!height || !width) return;
+  // LayoutViewport may exceed VisualViewport even before the keyboard
+  // (browser chrome / safe area). Never leave a dark H strip below Z.
+  const layoutHeight = Math.round(window.innerHeight || 0);
 
   // Only a changed layout width (rotation) may replace the shell's
   // baseline during keyboard interaction. A visual viewport shrink must
@@ -49,7 +52,7 @@ function syncViewport() {
   if (rotated) {
     // On rotation during input, VisualViewport.height is already reduced by
     // the keyboard on iOS. Prefer the layout height for the new baseline.
-    stableHeight = Math.max(height, Math.round(window.innerHeight || 0));
+    stableHeight = Math.max(height, layoutHeight);
     stableWidth = width;
     keyboardSession = focused;
   }
@@ -58,12 +61,12 @@ function syncViewport() {
   // replace the pre-keyboard shell height. Safari can deliver focusout,
   // resize and focusin in separate frames while the keyboard stays visible.
   if (!keyboardSession) {
-    stableHeight = height;
+    stableHeight = Math.max(height, layoutHeight);
     stableWidth = width;
   } else if (!focused && height >= stableHeight - 10) {
     // A real blur + restored viewport ends the keyboard session.
     keyboardSession = false;
-    stableHeight = height;
+    stableHeight = Math.max(height, layoutHeight);
     stableWidth = width;
   }
   const keyboardOpen = keyboardSession && height < stableHeight - 60;
@@ -167,11 +170,15 @@ function keepFocusedFieldVisible() {
     }
   }
   if (bottom <= top) return;
-  const delta = fieldRect.bottom > bottom + 2
-    ? fieldRect.bottom - bottom
-    : fieldRect.top < top - 2
-      ? fieldRect.top - top
-      : 0;
+  // Tall textareas cannot fit entirely. Anchor their top rather than
+  // alternating between the top and bottom on every animation frame.
+  const delta = fieldRect.height > bottom - top
+    ? fieldRect.top < top - 2 ? fieldRect.top - top : 0
+    : fieldRect.bottom > bottom + 2
+      ? fieldRect.bottom - bottom
+      : fieldRect.top < top - 2
+        ? fieldRect.top - top
+        : 0;
   if (delta) area.scrollTop += delta;
 }
 
