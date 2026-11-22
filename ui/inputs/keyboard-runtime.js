@@ -44,21 +44,25 @@ function syncViewport() {
   // baseline during keyboard interaction. A visual viewport shrink must
   // never shorten Z/Q, including when Safari blurs one input before focusing
   // the next or pans to the final field.
+  const focused = Boolean(activeEditable());
   const rotated = !stableHeight || !stableWidth || Math.abs(width - stableWidth) > 48;
   if (rotated) {
-    stableHeight = height;
+    // On rotation during input, VisualViewport.height is already reduced by
+    // the keyboard on iOS. Prefer the layout height for the new baseline.
+    stableHeight = Math.max(height, Math.round(window.innerHeight || 0));
     stableWidth = width;
-    keyboardSession = false;
+    keyboardSession = focused;
   }
-  const focused = Boolean(activeEditable());
   if (focused) keyboardSession = true;
-  const shrinking = height < stableHeight - 60;
-  if (!shrinking) {
+  // A transient viewport expansion between two editable fields must NEVER
+  // replace the pre-keyboard shell height. Safari can deliver focusout,
+  // resize and focusin in separate frames while the keyboard stays visible.
+  if (!keyboardSession) {
     stableHeight = height;
     stableWidth = width;
-    if (!focused) keyboardSession = false;
-  } else if (!keyboardSession) {
-    // An ordinary unfocused viewport resize is not a keyboard session.
+  } else if (!focused && height >= stableHeight - 10) {
+    // A real blur + restored viewport ends the keyboard session.
+    keyboardSession = false;
     stableHeight = height;
     stableWidth = width;
   }
@@ -133,10 +137,49 @@ function scheduleActionSync() {
 // Some WebKit versions dispatch visualViewport.scroll only AFTER a native pan.
  // During a keyboard interaction, read its offset once per animation frame.
  // This is the SAME root anchor, not a per-form scroll or animation.
+// Safari tries to reveal a focused input by panning the whole visual
+// viewport. In Z/Q/X, the existing inner scroll area owns that movement.
+// Do not call scrollIntoView(): it may scroll the app shell and expose H.
+function keepFocusedFieldVisible() {
+  if (!root.classList.contains('keyboard-open')) return;
+  const focused = activeEditable();
+  const app = focused?.closest('[data-v2-app]');
+  if (!app) return;
+  const area = focused.closest('[data-v2-z-body], [data-v2-q-body]')
+    || focused.closest('.v2-layer--bottom');
+  if (!area) return;
+  const areaRect = area.getBoundingClientRect();
+  const fieldRect = focused.getBoundingClientRect();
+  const top = areaRect.top + 12;
+  let bottom = areaRect.bottom - 12;
+
+  if (area.matches('.v2-layer--bottom')) {
+    // X keeps its white surface under the keyboard. Only the portion ABOVE
+    // the keyboard is available for its scrollable contents.
+    const keyboard = Number.parseFloat(getComputedStyle(root).getPropertyValue('--ui-keyboard-inset')) || 0;
+    bottom -= keyboard;
+  } else {
+    // When Z/Q has an action footer, keep the focused input above it.
+    const action = measurableAction(area);
+    if (action && !action.hidden && !action.hasAttribute('data-ui-action-hidden')) {
+      const footer = action.getBoundingClientRect();
+      if (footer.bottom > top && footer.top < bottom) bottom = Math.min(bottom, footer.top - 12);
+    }
+  }
+  if (bottom <= top) return;
+  const delta = fieldRect.bottom > bottom + 2
+    ? fieldRect.bottom - bottom
+    : fieldRect.top < top - 2
+      ? fieldRect.top - top
+      : 0;
+  if (delta) area.scrollTop += delta;
+}
+
 function followVisualViewport() {
   trackingFrame = 0;
   if (document.visibilityState === 'hidden') return;
   syncViewport();
+  keepFocusedFieldVisible();
   if ((activeEditable() && root.classList.contains('keyboard-open'))
     || performance.now() < trackThrough) {
     trackingFrame = requestAnimationFrame(followVisualViewport);
