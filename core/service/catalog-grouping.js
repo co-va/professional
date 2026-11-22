@@ -1,5 +1,5 @@
 import {
-  actionBlock, button, compactAddButton, compactRemoveButton, emptyState, field, initV2ListReorder,
+  actionBlock, button, compactAddButton, compactRemoveButton, compactButton, emptyState, field, initV2ListReorder,
   list, modal, mountModal, openNotice, select, v2ListEntries, v2ListEntry,
 } from '../../ui/ui.js';
 import { escapeHtml } from '../../ui/utils/escape-html.js';
@@ -19,49 +19,54 @@ const kindLabel = kind => kind === 'products' ? 'Группа товаров' : 
 // Explicit group-only selection must survive saved and rehydrated data.
 export const SERVICE_GROUP_ONLY = '__service_group_only__';
 
-function serviceGroupRow(group, value = SERVICE_GROUP_ONLY) {
-  const values = Array.isArray(group.values) ? group.values : [];
-  const choice = values.length
-    ? select({
-      name: 'serviceGroup_' + group.id,
-      value: values.some(item => item.id === value) ? value : '',
-      options: [{ value: '', label: 'Без значения' },
-        ...values.map(item => ({ value: item.id, label: item.name }))],
-      data: 'data-service-group-level="' + escapeHtml(group.id) + '"',
-    })
-    : '<input type="hidden" data-service-group-level="' + escapeHtml(group.id) +
-      '" name="serviceGroup_' + escapeHtml(group.id) + '" value="' + SERVICE_GROUP_ONLY + '">';
-  return '<div class="inventory-editor-group" data-service-group-row="' + escapeHtml(group.id) + '">' +
-    '<div class="field-inline-label"><span>' + escapeHtml(group.name) + '</span>' +
-      compactRemoveButton({ data: 'data-service-group-remove="' + escapeHtml(group.id) + '"',
-        aria: 'Снять группу ' + group.name }) +
-    '</div>' + choice + '</div>';
+function serviceGroupSlots(levels, selected = {}) {
+  const assigned = levels.filter(group => Object.prototype.hasOwnProperty.call(selected || {}, group.id)
+    && String(selected[group.id] || '').trim())
+    .map(group => ({ id: group.id, value: String(selected[group.id]) }));
+  return assigned.length ? assigned : [{ id: '', value: '' }];
+}
+
+function serviceGroupRow(slot, index, levels, used) {
+  const group = levels.find(entry => entry.id === slot.id);
+  const groupOptions = [{ value: '', label: 'Выберите группу' },
+    ...levels.filter(entry => entry.id === slot.id || !used.has(entry.id))
+      .map(entry => ({ value: entry.id, label: entry.name }))];
+  const valueOptions = [{ value: '', label: 'Не указано' },
+    ...(Array.isArray(group?.values) ? group.values : [])
+      .map(entry => ({ value: entry.id, label: entry.name }))];
+  return '<div class="stock-position-group-row stock-position-group-row--removable" data-service-group-row="' + index + '">' +
+    select({ name: 'serviceGroupKind' + index, aria: 'Группа ' + (index + 1),
+      value: slot.id, options: groupOptions }) +
+    select({ name: 'serviceGroupValue' + index, aria: 'Значение группы ' + (index + 1),
+      value: slot.value === SERVICE_GROUP_ONLY ? '' : slot.value, options: valueOptions }) +
+    compactRemoveButton({ data: 'data-service-group-remove="' + index + '"',
+      aria: 'Снять группу', disabled: !slot.id }) + '</div>';
 }
 
 export function serviceGroupFields(kind, selected = {}) {
   const levels = getServiceGroupLevels(kind);
-  const rows = levels.filter(group =>
-    Object.prototype.hasOwnProperty.call(selected || {}, group.id) && String(selected[group.id] || '').trim())
-    .map(group => serviceGroupRow(group, selected[group.id])).join('');
-  return '<section data-service-position-groups="' + escapeHtml(kind) + '">' +
-    '<div class="field-inline-label"><span>Группа</span>' +
-      compactAddButton({ data: 'data-service-group-add', aria: 'Добавить группу' }) +
-    '</div>' +
-    '<div class="inventory-editor-group" data-service-group-rows>' + rows + '</div>' +
-    '<div data-service-group-picker></div>' +
-  '</section>';
+  const slots = serviceGroupSlots(levels, selected);
+  const used = new Set(slots.map(slot => slot.id).filter(Boolean));
+  return '<section class="inventory-editor-group" data-service-position-groups="' + escapeHtml(kind) + '">' +
+    '<div class="stock-position-group-heading"><span>Группы</span>' +
+      '<div class="inventory-editor-extra-toggles">' +
+        compactAddButton({ data: 'data-service-group-add', aria: 'Добавить группу' }) +
+        compactButton({ kind: 'info', data: 'data-service-group-info', aria: 'О группировке' }) +
+      '</div></div>' +
+    '<div data-service-group-rows>' +
+      slots.map((slot, index) => serviceGroupRow(slot, index, levels, used)).join('') +
+    '</div></section>';
 }
 
-// Returns exactly the user-selected groups, never all configured groups.
-// A selected group without a value has a real marker; unselected groups have
-// NO entry. This distinction prevents phantom folders and accidental resets.
+// No chosen group means no assignment; an explicitly chosen group with no
+// value remains assigned to its top-level folder only.
 export function readServiceGroupFields(root) {
   return Object.fromEntries(
     [...(root?.querySelectorAll?.('[data-service-group-row]') || [])].map(row => {
-      const key = String(row.dataset.serviceGroupRow || '');
-      const value = String(row.querySelector('[data-service-group-level]')?.value || '');
-      return [key, value || SERVICE_GROUP_ONLY];
-    }).filter(([key]) => key),
+      const id = String(row.querySelector('[name^="serviceGroupKind"]')?.value || '');
+      const value = String(row.querySelector('[name^="serviceGroupValue"]')?.value || '');
+      return [id, value || SERVICE_GROUP_ONLY];
+    }).filter(([id]) => id),
   );
 }
 
@@ -70,61 +75,54 @@ export function bindServiceGroupFields(root) {
   const unsubscribers = sections.map(section => {
     const levels = getServiceGroupLevels(section.dataset.servicePositionGroups);
     const rows = section.querySelector('[data-service-group-rows]');
-    const picker = section.querySelector('[data-service-group-picker]');
     const plus = section.querySelector('[data-service-group-add]');
-    if (!rows || !picker || !plus) return () => {};
-    const refreshPlus = () => {
-      const assigned = new Set([...rows.querySelectorAll('[data-service-group-row]')]
-        .map(row => row.dataset.serviceGroupRow));
-      plus.disabled = levels.length > 0 && levels.every(group => assigned.has(group.id));
+    if (!rows || !plus) return () => {};
+    let slots = serviceGroupSlots(levels, readServiceGroupFields(section));
+    const draw = () => {
+      const used = new Set(slots.map(slot => slot.id).filter(Boolean));
+      rows.innerHTML = slots.map((slot, index) => serviceGroupRow(slot, index, levels, used)).join('');
+      plus.disabled = slots.length >= levels.length || !slots.every(slot => slot.id);
     };
     const changed = () => section.dispatchEvent(new Event('change', { bubbles: true }));
     const onClick = event => {
+      if (event.target.closest?.('[data-service-group-info]')) {
+        openNotice({ title: 'Группы',
+          message: 'Выберите группу и при необходимости её значение. Кнопка «+» добавляет ещё одну группу. Без выбора группировка не применяется.' });
+        return;
+      }
       const remove = event.target.closest?.('[data-service-group-remove]');
       if (remove && section.contains(remove)) {
-        rows.querySelectorAll('[data-service-group-row]').forEach(row => {
-          if (row.dataset.serviceGroupRow === remove.dataset.serviceGroupRemove) row.remove();
-        });
-        picker.innerHTML = '';
-        refreshPlus();
+        const index = Number(remove.dataset.serviceGroupRemove);
+        if (!Number.isSafeInteger(index) || index < 0 || index >= slots.length) return;
+        if (slots.length === 1) slots = [{ id: '', value: '' }];
+        else slots.splice(index, 1);
+        draw();
         changed();
         return;
       }
       if (!event.target.closest?.('[data-service-group-add]')) return;
-      if (!levels.length) {
-        openNotice({ title: 'Группы', message: 'Сначала создайте группу в настройках Сервиса.' });
-        return;
-      }
-      const assigned = new Set([...rows.querySelectorAll('[data-service-group-row]')]
-        .map(row => row.dataset.serviceGroupRow));
-      const remaining = levels.filter(group => !assigned.has(group.id));
-      if (!remaining.length) return;
-      picker.innerHTML = select({
-        name: 'serviceGroupToAdd', value: '',
-        options: [{ value: '', label: 'Выберите группу' },
-          ...remaining.map(group => ({ value: group.id, label: group.name }))],
-        data: 'data-service-group-pick',
-      });
-      picker.querySelector('[data-ui-select-trigger]')?.click();
+      if (slots.length >= levels.length || !slots.every(slot => slot.id)) return;
+      slots.push({ id: '', value: '' });
+      draw();
     };
-    const onInput = event => {
-      const candidate = event.target.closest?.('[data-service-group-pick]');
-      if (!candidate) return;
-      const group = levels.find(item => item.id === candidate.value);
-      if (group && ![...rows.querySelectorAll('[data-service-group-row]')]
-        .some(row => row.dataset.serviceGroupRow === group.id)) {
-        rows.insertAdjacentHTML('beforeend', serviceGroupRow(group));
-        refreshPlus();
-        changed();
-      }
-      picker.innerHTML = '';
+    const onChange = event => {
+      const name = String(event.target?.name || '');
+      const kind = name.match(/^serviceGroupKind(\d+)$/);
+      const value = name.match(/^serviceGroupValue(\d+)$/);
+      if (kind && slots[Number(kind[1])]) {
+        slots[Number(kind[1])] = { id: String(event.target.value || ''), value: '' };
+      } else if (value && slots[Number(value[1])]) {
+        slots[Number(value[1])].value = String(event.target.value || '');
+      } else return;
+      draw();
+      changed();
     };
     section.addEventListener('click', onClick);
-    section.addEventListener('change', onInput);
-    refreshPlus();
+    section.addEventListener('change', onChange);
+    draw();
     return () => {
       section.removeEventListener('click', onClick);
-      section.removeEventListener('change', onInput);
+      section.removeEventListener('change', onChange);
     };
   });
   return () => unsubscribers.forEach(dispose => dispose());

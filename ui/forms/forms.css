@@ -236,6 +236,8 @@
 .stock-position-two-fields .field>span{white-space:nowrap;font-size:12px}
 .stock-position-group-heading{display:flex;align-items:center;justify-content:space-between;min-height:28px;font-size:13px;font-weight:650}
 .stock-position-group-row{margin-bottom:8px}
+.stock-position-group-row--removable{grid-template-columns:minmax(0,1fr) minmax(0,1fr) var(--ui-compact-size);align-items:center}
+.stock-position-group-row--removable>.ui-compact-button{justify-self:center}
 .stock-position-group-row .ui-select{min-width:0}
 .stock-position-group-row .ui-select__control{box-sizing:border-box;width:100%;min-width:0}
 .stock-position-static-content{min-height:var(--ui-field-height);display:flex;align-items:center;justify-content:space-between;gap:8px}

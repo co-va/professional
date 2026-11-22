@@ -403,21 +403,32 @@ export function openStockItemQEditor(itemId = '', defaults = {}, onSaved = () =>
       const options = [{ value: '', label: 'Выберите группу' },
         ...groups.filter(row => row.id === slot.id || !used.has(row.id))
           .map(row => ({ value: row.id, label: row.name }))];
-      return '<div class="stock-position-group-row" data-stock-group-row="' + index + '">' +
+      return '<div class="stock-position-group-row stock-position-group-row--removable" data-stock-group-row="' + index + '">' +
         select({ name: 'groupKind' + index, aria: 'Группа ' + (index + 1),
           value: slot.id, options }) +
         select({ name: 'groupValue' + index, aria: 'Значение группы ' + (index + 1),
           value: slot.value, options: group ? criterionOptions(group, slot.value)
-            : [{ value: '', label: 'Выберите значение' }] }) +
+            : [{ value: '', label: 'Не указано' }] }) +
+        compactButton({ kind: 'remove', data: 'data-stock-group-remove="' + index + '"',
+          aria: 'Снять группу', disabled: !slot.id }) +
         '</div>';
     }).join('');
     const plus = form.querySelector('[data-stock-group-add]');
     if (plus) plus.disabled = slots.length >= groups.length ||
-      !slots.every(row => row.id && row.value);
+      !slots.every(row => row.id);
   };
   form.querySelector('[data-stock-group-add]')?.addEventListener('click', () => {
-    if (slots.length >= groups.length || !slots.every(row => row.id && row.value)) return;
+    if (slots.length >= groups.length || !slots.every(row => row.id)) return;
     slots.push({ id: '', value: '' });
+    drawGroups();
+  });
+  form.addEventListener('click', event => {
+    const remove = event.target.closest?.('[data-stock-group-remove]');
+    if (!remove) return;
+    const index = Number(remove.dataset.stockGroupRemove);
+    if (!Number.isSafeInteger(index) || index < 0 || index >= slots.length) return;
+    if (slots.length === 1) slots = [{ id: '', value: '' }];
+    else slots.splice(index, 1);
     drawGroups();
   });
   form.addEventListener('change', event => {
