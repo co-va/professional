@@ -1,15 +1,18 @@
 import {
   actionBlock, button, compactAddButton, compactRemoveButton, emptyState, field, initV2ListReorder,
-  modal, mountModal, openNotice, select, v2ListEntries, v2ListEntry,
+  list, modal, mountModal, openNotice, select, v2ListEntries, v2ListEntry,
 } from '../../ui/ui.js';
 import { escapeHtml } from '../../ui/utils/escape-html.js';
 import { catalogDisclosure } from '../inventory/catalog-ui.js';
 import { stockGroupTree, sortedStockChildren } from '../inventory/grouping.js';
-import { getServiceGroupLevels, commitServiceGroupLevels } from './products/data.js';
+import {
+  getServiceGroupLevels, commitServiceGroupLevels,
+  getServiceGroupEntries, commitServiceGroupOrder,
+} from './products/data.js';
 
 const id = () => crypto.randomUUID();
 const clean = value => String(value || '').trim();
-const kindName = kind => kind === 'products' ? 'товаров' : 'услуг';
+const kindLabel = kind => kind === 'products' ? 'Группа товаров' : 'Группа услуг';
 
 // A group definition is not an assignment. The owner chooses each group with
 // the compact + in the individual Service card, and may leave it unassigned.
@@ -173,209 +176,297 @@ export function renderServiceGroupTree(items = [], kind = 'procedures', renderRo
   return { html, attach };
 }
 
-export function openServiceGroupingQ(kind, { onSaved = () => {} } = {}) {
-  if (!['procedures', 'products'].includes(kind)) return null;
-  const layer = mountModal(document.body, modal(
-    '<div data-service-group-levels></div>' +
-      '<div class="form-error" role="alert" data-service-group-error></div>' +
-      actionBlock(button('Добавить группу', { data: 'data-service-add-level' })),
-    { title: 'Группы ' + kindName(kind), variant: 'q', surface: 'app' },
-  ));
-  if (!layer) return null;
-  let levels = getServiceGroupLevels(kind);
-  const error = layer.querySelector('[data-service-group-error]');
-  let dispose = () => {};
-  const fail = cause => {
-    const message = cause instanceof Error ? cause.message : 'Не удалось сохранить группировку.';
-    if (error) error.textContent = message;
-    openNotice({ title: 'Группы', message });
-  };
-  const save = async next => {
-    levels = await commitServiceGroupLevels(kind, next);
+// Shared V → Группы directory. A V2 row has the group name in the main line
+// and EXACTLY "Группа товаров" / "Группа услуг" in the small secondary line.
+// Groups and all their values share one existing Service auxiliary dataset.
+// Only creation/editing uses compact X. There is never a second Q for values.
+export function openServiceGroupingQ({ onSaved = () => {} } = {}) {
+  const initialEntries = getServiceGroupEntries();
+  let layer = null;
+  let activeKey = null;
+  let disposeDrag = () => {};
+
+  const fail = cause => openNotice({
+    title: 'Группы',
+    message: cause instanceof Error ? cause.message : 'Не удалось сохранить.',
+  });
+  const persist = async (kind, next) => {
+    await commitServiceGroupLevels(kind, next);
     onSaved();
-    repaint();
+    if (layer) repaint();
   };
-  // Removing a group or option detaches its classification only; source
-  // Services, Products, Stock and historical Records are never deleted.
+  const groupByKey = key => getServiceGroupEntries().find(item => item.key === key);
+
   const confirmRemove = (title, action) => {
-    const layerConfirm = mountModal(document.body, modal(
-      '<p>Позиции останутся в каталоге, изменится только группировка.</p>' +
-      '<div class="form-error" role="alert" data-service-group-remove-error></div>' +
-      actionBlock(button('Удалить', { type: 'button', variant: 'delete-outline',
-        data: 'data-service-group-remove-confirm' }) +
-        button('Отмена', { type: 'button', variant: 'secondary',
-          data: 'data-service-group-remove-cancel' })),
-      { title, variant: 'q', surface: 'app' },
+    const confirm = mountModal(document.body, modal(
+      '<p>Позиции останутся на месте, изменится только группировка.</p>' +
+        '<div class="form-error" role="alert" data-service-group-confirm-error></div>' +
+        actionBlock(button('Удалить', {
+          type: 'button', variant: 'danger', data: 'data-service-group-confirm-delete',
+        }) + button('Отмена', {
+          type: 'button', variant: 'secondary', data: 'data-service-group-confirm-cancel',
+        })),
+      { title, variant: 'x', xRole: 'action', surface: 'app' },
     ));
-    if (!layerConfirm) return;
-    layerConfirm.querySelector('[data-service-group-remove-cancel]')
-      ?.addEventListener('click', () => layerConfirm.v2Close?.());
-    layerConfirm.querySelector('[data-service-group-remove-confirm]')
+    if (!confirm) return;
+    confirm.querySelector('[data-service-group-confirm-cancel]')
+      ?.addEventListener('click', () => confirm.v2Close?.());
+    confirm.querySelector('[data-service-group-confirm-delete]')
       ?.addEventListener('click', async event => {
-        const btn = event.currentTarget;
-        if (btn.disabled) return;
-        btn.disabled = true;
+        const control = event.currentTarget;
+        if (control.disabled) return;
+        control.disabled = true;
         try {
           await action();
-          layerConfirm.v2Close?.();
+          confirm.v2Close?.();
         } catch (cause) {
-          const node = layerConfirm.querySelector('[data-service-group-remove-error]');
-          if (node) node.textContent = cause.message || 'Не удалось удалить.';
-          btn.disabled = false;
+          const error = confirm.querySelector('[data-service-group-confirm-error]');
+          if (error) error.textContent = cause?.message || 'Не удалось удалить.';
+          control.disabled = false;
         }
       });
   };
 
-  const valueEditor = (group, previous = null) => {
-    const valueLayer = mountModal(document.body, modal(
-      '<form data-service-value-form>' +
-        field({ label: 'Название значения', name: 'name', value: previous?.name || '', required: true }) +
-        '<div class="form-error" role="alert" data-service-value-error></div>' +
-        actionBlock(button('Сохранить', { type: 'submit' }) +
-          (previous ? button('Удалить', { type: 'button', variant: 'delete-outline', data: 'data-service-value-delete' }) : '')) +
-      '</form>',
-      { title: previous ? 'Значение' : 'Новое значение', variant: 'q', surface: 'app' },
-    ));
-    if (!valueLayer) return;
-    const form = valueLayer.querySelector('[data-service-value-form]');
-    let busy = false;
-    const persist = async remove => {
-      if (busy) return;
-      const name = clean(form.elements.namedItem('name')?.value);
-      if (!remove && !name) return;
-      busy = true;
-      try {
-        const changed = levels.map(level => level.id !== group.id ? level : {
-          ...level, values: remove
-            ? level.values.filter(value => value.id !== previous.id)
-            : previous
-              ? level.values.map(value => value.id === previous.id ? { ...value, name } : value)
-              : [...level.values, { id: id(), name }],
-        });
-        await save(changed);
-        valueLayer.v2Close?.();
-      } catch (cause) {
-        const output = valueLayer.querySelector('[data-service-value-error]');
-        if (output) output.textContent = cause.message || 'Не удалось сохранить.';
-      } finally { busy = false; }
-    };
-    form.addEventListener('submit', event => { event.preventDefault(); void persist(false); });
-    valueLayer.querySelector('[data-service-value-delete]')?.addEventListener('click', () =>
-      confirmRemove('Удалить значение?', () => persist(true)));
-  };
-  const levelEditor = (previous = null) => {
+  const groupEditorX = (previous = null) => {
     const editor = mountModal(document.body, modal(
-      '<form data-service-level-form>' +
-        field({ label: 'Название группы', name: 'name', value: previous?.name || '', required: true }) +
-        '<div class="form-error" role="alert" data-service-level-error></div>' +
-        actionBlock(button('Сохранить', { type: 'submit' }) +
-          (previous ? button('Удалить группу', { type: 'button', variant: 'delete-outline', data: 'data-service-level-delete' }) : '')) +
+      '<form data-service-group-editor-form>' +
+        (previous
+          ? '<div class="field-inline-label"><span>' + kindLabel(previous.kind) + '</span></div>'
+          : select({
+            label: 'Раздел', name: 'groupKind', value: 'procedures',
+            options: [
+              { value: 'procedures', label: 'Услуги' },
+              { value: 'products', label: 'Товары' },
+            ],
+          })) +
+        field({ label: 'Название группы', name: 'name',
+          value: previous?.name || '', required: true, maxlength: 80 }) +
+        '<div class="form-error" role="alert" data-service-group-editor-error></div>' +
+        actionBlock(button('Сохранить', { type: 'submit' })) +
+        (previous ? button('Удалить группу', {
+          type: 'button', variant: 'danger', data: 'data-service-group-editor-delete',
+        }) : '') +
       '</form>',
-      { title: previous ? 'Группа' : 'Новая группа', variant: 'q', surface: 'app' },
+      { title: previous ? 'Группа' : 'Добавить группу',
+        variant: 'x', xRole: 'editor', surface: 'app' },
     ));
-    if (!editor) return;
-    const form = editor.querySelector('[data-service-level-form]');
+    if (!editor) return null;
+    const form = editor.querySelector('[data-service-group-editor-form]');
     let busy = false;
-    const persist = async remove => {
+    form?.addEventListener('submit', async event => {
+      event.preventDefault();
       if (busy) return;
-      const name = clean(form.elements.namedItem('name')?.value);
+      const section = previous?.kind || String(new FormData(form).get('groupKind') || '');
+      const title = String(new FormData(form).get('name') || '').trim();
+      if (!title || !['procedures', 'products'].includes(section)) return;
+      busy = true;
+      try {
+        const existing = getServiceGroupLevels(section);
+        const next = previous
+          ? existing.map(group => group.id === previous.id
+            ? { ...group, name: title } : group)
+          : [...existing, { id: id(), name: title, values: [] }];
+        await persist(section, next);
+        editor.v2Close?.();
+        // With no groups, enter through X only. After the first save, show
+        // the same single combined Q instead of opening another blank form.
+        if (!layer) openServiceGroupingQ({ onSaved });
+      } catch (cause) {
+        const error = editor.querySelector('[data-service-group-editor-error]');
+        if (error) error.textContent = cause?.message || 'Не удалось сохранить.';
+      } finally { busy = false; }
+    });
+    editor.querySelector('[data-service-group-editor-delete]')
+      ?.addEventListener('click', () => {
+        if (!previous) return;
+        confirmRemove('Удалить группу?', async () => {
+          await persist(previous.kind, getServiceGroupLevels(previous.kind)
+            .filter(group => group.id !== previous.id));
+          editor.v2Close?.();
+          activeKey = null;
+          repaint();
+        });
+      });
+    return editor;
+  };
+
+  const valueEditorX = (groupKey, previous = null) => {
+    const current = groupByKey(groupKey);
+    if (!current) return null;
+    const editor = mountModal(document.body, modal(
+      '<form data-service-value-editor-form>' +
+        field({ label: 'Название значения', name: 'name',
+          value: previous?.name || '', required: true, maxlength: 80 }) +
+        '<div class="form-error" role="alert" data-service-value-editor-error></div>' +
+        actionBlock(button('Сохранить', { type: 'submit' })) +
+        (previous ? button('Удалить значение', {
+          type: 'button', variant: 'danger', data: 'data-service-value-editor-delete',
+        }) : '') +
+      '</form>',
+      { title: previous ? 'Значение' : 'Добавить значение',
+        variant: 'x', xRole: 'editor', surface: 'app' },
+    ));
+    if (!editor) return null;
+    const form = editor.querySelector('[data-service-value-editor-form]');
+    let busy = false;
+    const apply = async remove => {
+      if (busy) return;
+      const name = String(new FormData(form).get('name') || '').trim();
       if (!remove && !name) return;
       busy = true;
       try {
-        const changed = remove ? levels.filter(level => level.id !== previous.id)
-          : previous ? levels.map(level => level.id === previous.id ? { ...level, name } : level)
-            : [...levels, { id: id(), name, values: [] }];
-        await save(changed);
+        const next = getServiceGroupLevels(current.kind).map(group => {
+          if (group.id !== current.id) return group;
+          const values = Array.isArray(group.values) ? group.values : [];
+          return { ...group, values: remove
+            ? values.filter(value => value.id !== previous.id)
+            : previous ? values.map(value => value.id === previous.id
+              ? { ...value, name } : value)
+              : [...values, { id: id(), name }] };
+        });
+        await persist(current.kind, next);
         editor.v2Close?.();
       } catch (cause) {
-        const output = editor.querySelector('[data-service-level-error]');
-        if (output) output.textContent = cause.message || 'Не удалось сохранить.';
+        const error = editor.querySelector('[data-service-value-editor-error]');
+        if (error) error.textContent = cause?.message || 'Не удалось сохранить.';
       } finally { busy = false; }
     };
-    form.addEventListener('submit', event => { event.preventDefault(); void persist(false); });
-    editor.querySelector('[data-service-level-delete]')?.addEventListener('click', () =>
-      confirmRemove('Удалить группу?', () => persist(true)));
+    form?.addEventListener('submit', event => {
+      event.preventDefault();
+      void apply(false);
+    });
+    editor.querySelector('[data-service-value-editor-delete]')
+      ?.addEventListener('click', () => {
+        if (previous) confirmRemove('Удалить значение?', () => apply(true));
+      });
+    return editor;
   };
-  const openValues = key => {
-    const group = levels.find(row => row.id === key);
-    if (!group) return;
-    const valuesLayer = mountModal(document.body, modal(
-      '<div data-service-group-values></div>' +
-        actionBlock(button('Добавить значение', { data: 'data-service-add-value' }) +
-          button('Изменить группу', { variant: 'secondary', data: 'data-service-edit-level' })),
-      { title: group.name, variant: 'q', surface: 'app' },
-    ));
-    if (!valuesLayer) return;
-    let release = () => {};
-    const repaintValues = () => {
-      release();
-      const now = levels.find(level => level.id === key);
-      if (!now) { valuesLayer.v2Close?.(); return; }
-      const host = valuesLayer.querySelector('[data-service-group-values]');
-      host.innerHTML = now.values.length
-        ? v2ListEntries(now.values.map(value => v2ListEntry({
-          title: value.name, initial: '', interactive: true, omitEmptySubtitle: true,
-          data: 'data-service-value="' + escapeHtml(value.id) + '" data-reorder-id="' + escapeHtml(value.id) + '"',
-          reorderHandle: true, aria: 'Изменить значение ' + value.name,
+
+  // No definitions yet: only a compact X ("Добавить группу").
+  if (!initialEntries.length) return groupEditorX();
+
+  layer = mountModal(document.body, modal(
+    '<div data-service-group-directory></div>' +
+      '<div data-service-group-detail hidden></div>' +
+      '<div class="form-error" role="alert" data-service-groups-error></div>' +
+      actionBlock(button('Добавить группу', {
+        type: 'button', data: 'data-service-groups-main-action',
+      })),
+    { title: 'Группы', variant: 'q', surface: 'app' },
+  ));
+  if (!layer) return null;
+
+  const directory = layer.querySelector('[data-service-group-directory]');
+  const detail = layer.querySelector('[data-service-group-detail]');
+  const action = layer.querySelector('[data-service-groups-main-action]');
+  const error = layer.querySelector('[data-service-groups-error]');
+
+  function repaint() {
+    disposeDrag();
+    disposeDrag = () => {};
+    const entries = getServiceGroupEntries();
+    const active = activeKey ? entries.find(item => item.key === activeKey) : null;
+    if (activeKey && !active) activeKey = null;
+    const inDetail = Boolean(active && activeKey);
+    directory.hidden = inDetail;
+    detail.hidden = !inDetail;
+    action.textContent = inDetail ? 'Добавить значение' : 'Добавить группу';
+    if (error) error.textContent = '';
+    if (!inDetail) {
+      directory.innerHTML = entries.length
+        ? v2ListEntries(entries.map(group => v2ListEntry({
+          title: group.name,
+          subtitle: kindLabel(group.kind),
+          initial: '', interactive: true, reorderHandle: true,
+          reorderAria: 'Переместить ' + group.name,
+          data: 'data-service-group-directory-key="' + escapeHtml(group.key) +
+            '" data-reorder-id="' + escapeHtml(group.key) + '"',
+          aria: 'Открыть группу ' + group.name,
         })))
-        : emptyState('Значений пока нет');
-      host.querySelectorAll('[data-service-value]').forEach(node => {
+        : emptyState('Групп пока нет');
+      directory.querySelectorAll('[data-service-group-directory-key]').forEach(node => {
         node.addEventListener('click', event => {
-          if (event.target.closest('[data-reorder-handle]')) return;
-          const active = levels.find(level => level.id === key);
-          valueEditor(active, active?.values.find(value => value.id === node.dataset.serviceValue));
+          if (event.target.closest?.('[data-reorder-handle]')) return;
+          activeKey = node.dataset.serviceGroupDirectoryKey;
+          repaint();
         });
       });
-      release = initV2ListReorder(host, {
-        onReorder: ids => save(levels.map(level => level.id !== key ? level : {
-          ...level, values: ids.map(id => level.values.find(value => value.id === id)),
-        })),
+      disposeDrag = initV2ListReorder(directory, {
+        onReorder: async keys => {
+          await commitServiceGroupOrder(keys);
+          onSaved();
+        },
         onError: fail,
       });
-    };
-    // Values are re-read after each Q closes; the source remains the shared
-    // tenant-scoped config and not a duplicated local option list.
-    valuesLayer.querySelector('[data-service-add-value]')?.addEventListener('click', () => {
-      valueEditor(levels.find(level => level.id === key));
+      return;
+    }
+
+    detail.innerHTML =
+      '<div class="field-inline-label">' +
+        button('← Группы', {
+          type: 'button', variant: 'secondary', data: 'data-service-group-back',
+        }) +
+        button('Изменить группу', {
+          type: 'button', variant: 'secondary', data: 'data-service-group-edit',
+        }) +
+      '</div>' +
+      '<div class="field-inline-label"><span>' + escapeHtml(active.name) +
+        '</span><span>' + kindLabel(active.kind) + '</span></div>' +
+      '<div data-service-group-value-list></div>';
+
+    detail.querySelector('[data-service-group-back]')?.addEventListener('click', () => {
+      activeKey = null;
+      repaint();
     });
-    valuesLayer.querySelector('[data-service-edit-level]')?.addEventListener('click', () => {
-      levelEditor(levels.find(level => level.id === key));
+    detail.querySelector('[data-service-group-edit]')?.addEventListener('click', () => {
+      groupEditorX(active);
     });
-    repaintValues();
-    const listen = () => repaintValues();
-    layer.addEventListener('service-group-levels-changed', listen);
-    const close = valuesLayer.v2Close?.bind(valuesLayer);
-    if (close) valuesLayer.v2Close = () => {
-      release();
-      layer.removeEventListener('service-group-levels-changed', listen);
-      close();
-    };
-  };
-  const repaint = () => {
-    dispose();
-    const host = layer.querySelector('[data-service-group-levels]');
-    if (!host) return;
-    host.innerHTML = levels.length
-      ? v2ListEntries(levels.map(group => v2ListEntry({
-        title: group.name, rightTop: group.values.length + ' знач.',
-        interactive: true, initial: '', omitEmptySubtitle: true,
-        data: 'data-service-level="' + escapeHtml(group.id) + '" data-reorder-id="' + escapeHtml(group.id) + '"',
-        reorderHandle: true, aria: 'Открыть группу ' + group.name,
-      })))
-      : emptyState('Групп пока нет', 'Добавьте свой первый уровень.');
-    host.querySelectorAll('[data-service-level]').forEach(node =>
+    const listHost = detail.querySelector('[data-service-group-value-list]');
+    const values = Array.isArray(active.values) ? active.values : [];
+    listHost.innerHTML = values.length
+      ? list({ className: 'ui-list--dense list-entries',
+        items: values.map(value => ({
+          title: value.name, interactive: true, reorderHandle: true,
+          data: 'data-service-value="' + escapeHtml(value.id) +
+            '" data-reorder-id="' + escapeHtml(value.id) + '"',
+          aria: 'Изменить значение ' + value.name,
+        })),
+      })
+      : emptyState('Значений пока нет');
+
+    listHost.querySelectorAll('[data-service-value]').forEach(node => {
       node.addEventListener('click', event => {
-        if (!event.target.closest('[data-reorder-handle]')) openValues(node.dataset.serviceLevel);
-      }));
-    dispose = initV2ListReorder(host, {
-      onReorder: ids => save(ids.map(id => levels.find(level => level.id === id))),
+        if (event.target.closest?.('[data-reorder-handle]')) return;
+        const fresh = groupByKey(activeKey);
+        valueEditorX(activeKey, fresh?.values?.find(value =>
+          value.id === node.dataset.serviceValue));
+      });
+    });
+    disposeDrag = initV2ListReorder(listHost, {
+      onReorder: async ids => {
+        const fresh = groupByKey(activeKey);
+        if (!fresh) throw new Error('Группа больше не существует.');
+        const byId = new Map((fresh.values || []).map(value => [value.id, value]));
+        if (ids.length !== byId.size || ids.some(id => !byId.has(id))) {
+          throw new Error('Список значений изменился.');
+        }
+        const next = getServiceGroupLevels(fresh.kind).map(group =>
+          group.id === fresh.id ? {
+            ...group, values: ids.map(id => byId.get(id)),
+          } : group);
+        await commitServiceGroupLevels(fresh.kind, next);
+        onSaved();
+      },
       onError: fail,
     });
-    layer.dispatchEvent(new Event('service-group-levels-changed'));
-  };
-  layer.querySelector('[data-service-add-level]')?.addEventListener('click', () => levelEditor());
+  }
+
+  action.addEventListener('click', () => {
+    if (activeKey) valueEditorX(activeKey);
+    else groupEditorX();
+  });
   repaint();
   const close = layer.v2Close?.bind(layer);
-  if (close) layer.v2Close = () => { dispose(); close(); };
+  if (close) layer.v2Close = () => { disposeDrag(); close(); };
   return layer;
 }
