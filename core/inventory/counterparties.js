@@ -125,7 +125,7 @@ function companyForm(company = {}) {
   // Creating a company passes null; default arguments only cover undefined.
   // Normalise before reading fields so the Header + can always open its Q.
   company = company || {};
-  return `<form data-counterparty-form>
+  return `<form class="form-grid" data-counterparty-form>
     ${field({ label: 'Название', name: 'name', value: company.name || '', required: true })}
     ${select({ label: 'Тип', name: 'kind', value: company.kind || 'SUPPLIER', options: TYPES })}
     ${field({ label: 'Представитель', name: 'contactName', value: company.contactName || '' })}
@@ -716,7 +716,7 @@ function openSupplierBulkEditor(company, rows, onSaved = () => {}) {
   const selected = new Set(rows.map(row => String(row.id)));
   const rowsById = new Map(rows.map(row => [String(row.id), row]));
   const layer = mountModal(document.body, modal(
-    '<form data-company-bulk-editor>' +
+    '<form class="form-grid" data-company-bulk-editor>' +
       select({ label: 'Что изменить', name: 'supplierBulkField', value: 'category',
         options: SUPPLIER_CATALOG_EDIT_FIELDS.map(({ value, label }) => ({ value, label })) }) +
       '<div data-company-bulk-value></div>' +
@@ -893,7 +893,7 @@ function openSupplierProductEditor(company, row, onSaved = () => {}) {
         step: def.step, inputmode: 'decimal' } : {}),
     }));
   const layer = mountModal(document.body, modal(
-    '<form data-company-catalog-edit-form>' + fields.join('') +
+    '<form class="form-grid" data-company-catalog-edit-form>' + fields.join('') +
     '<p class="ui-list__secondary">Не указана — скидка по договору; 0% — без скидки.</p>' +
     '<p class="form-error" role="alert" data-company-catalog-edit-error></p>' +
     actionBlock(button('Применить', { type: 'submit' })) + '</form>',
