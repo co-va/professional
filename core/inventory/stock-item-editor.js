@@ -286,7 +286,10 @@ export function openStockItemQEditor(itemId = '', defaults = {}, onSaved = () =>
   const creating = !current;
   const item = current || {
     name: defaults.name || '', manufacturer: defaults.manufacturer || '',
-    receiptUnit: 'шт.', unit: 'шт.', canConsume: false, canSell: false,
+    receiptUnit: 'шт.', unit: 'шт.', canConsume: false,
+    // The same stock form is opened from Inventory or from Service → Товары.
+    // Only a new item created from Service starts with «Продажа» enabled.
+    canSell: defaults.usage === 'sale',
   };
   const receipt = item.receiptUnit || 'шт.';
   const purchase = supplierPurchase(item);
