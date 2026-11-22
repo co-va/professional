@@ -62,7 +62,7 @@ function openServiceSettings(root, rerender) {
             // write could overwrite saved stock-linked retail presentations.
             await loadAuxiliaryState('service');
             if (!root?.isConnected) return;
-            openServiceGroupingQ(activeView, { onSaved: rerender });
+            openServiceGroupingQ({ onSaved: rerender });
           } catch (cause) {
             openNotice({ title: 'Группы', message: cause instanceof Error
               ? cause.message : 'Не удалось загрузить группы.' });
