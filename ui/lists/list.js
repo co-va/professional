@@ -40,6 +40,11 @@ export function list({ items = [], className = '' } = {}) {
     const overline = item.overline
       ? `<span class="ui-list__overline">${escapeHtml(item.overline)}</span>`
       : '';
+    // An explicit opt-in grip reuses the existing V2 reorder controller.
+    // Other dense Lists keep their exact original UI and markup.
+    const reorderHandle = item.reorderHandle
+      ? '<span class="list-entry__reorder-handle" data-reorder-handle role="button" tabindex="0" aria-label="Переместить"><span aria-hidden="true">⋮⋮</span></span>'
+      : '';
     // Optional placement of the same canonical indicator AFTER secondary text.
     // Unspecified items retain their original markup and leading indicator.
     const secondaryIndicatorColor = String(item.secondaryIndicatorColor || '').trim();
@@ -52,7 +57,7 @@ export function list({ items = [], className = '' } = {}) {
       : escapeHtml(primarySecondary);
 
     return `<${tag} class="${classes}"${interactive ? ` type="button"` : ''}${attrs}>` +
-      indicator +
+      reorderHandle + indicator +
       `<span class="ui-list__main">${overline}<span class="ui-list__title">${escapeHtml(item.title ?? '')}</span>` +
       (primarySecondary || secondaryIndicator ? `<span class="ui-list__secondary">${secondaryMarkup}</span>` : '') +
       `</span>` +
