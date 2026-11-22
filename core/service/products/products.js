@@ -139,7 +139,7 @@ function productWorkplaceCards(product, statistics = null) {
 }
 
 function confirmDeleteProduct(product, onDeleted) {
-  const layer = mountModal(document.body, modal(`<div class="modal-title"><h2>Удалить товар?</h2><p>${escapeHtml(product.name || 'Товар')} будет исключён из прайса. История сохранится.</p></div><div class="form-error" role="alert" data-product-delete-error></div><div class="modal-actions">${button('Удалить', { variant: 'danger', data: 'data-confirm-delete-product' })}${button('Отмена', { variant: 'secondary', data: 'data-cancel-delete-product' })}</div>`, {
+  const layer = mountModal(document.body, modal(`<div class="modal-title"><h2>Убрать из продажи?</h2><p>${escapeHtml(product.name || 'Товар')} исчезнет из Сервиса. На Складе товар и остатки сохранятся. История продаж не изменится.</p></div><div class="form-error" role="alert" data-product-delete-error></div><div class="modal-actions">${button('Убрать из продажи', { variant: 'danger', data: 'data-confirm-delete-product' })}${button('Отмена', { variant: 'secondary', data: 'data-cancel-delete-product' })}</div>`, {
     variant: 'x',
     title: 'Удаление товара',
   }));
@@ -155,7 +155,16 @@ function confirmDeleteProduct(product, onDeleted) {
       // Service-specific retail settings remain intact for later reactivation.
       if (product.inventoryItemId) {
         const { updateInventoryItem } = await import('../../inventory/service.js');
+        const { getInventoryItem } = await import('../../inventory/data.js');
+        // The owner is Inventory: unpublish the item from Service, never
+        // delete/archive its warehouse row, balance, movements or history.
+        // Older Core versions can acknowledge an update without applying all
+        // fields, so do not close Q until the returned warehouse snapshot
+        // actually confirms canSell=false.
         await updateInventoryItem(product.inventoryItemId, { canSell: false });
+        if (getInventoryItem(product.inventoryItemId)?.canSell !== false) {
+          throw new Error('Склад не подтвердил снятие товара с продажи.');
+        }
       } else {
         await commitDeleteProduct(product.id);
       }
