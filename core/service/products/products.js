@@ -33,7 +33,6 @@ import { productEditorSignature, rebaseWorkplaceAssignmentSignature } from '../e
 import { scheduleServiceStatistics, serviceItemStatistics } from '../statistics.js';
 import { productCardAppearance, productCardFields, productCardPhoto } from '../card-presentation.js';
 import { commitDeleteProduct, getProducts, commitReorderProducts, commitProduct, commitProductWorkplace, commitInventoryRetailPrice } from './data.js';
-import { getInventoryItems } from '../../inventory/data.js';
 
 const money = (value) => `${new Intl.NumberFormat('ru-RU').format(Number(value || 0))} ₽`;
 
@@ -224,39 +223,19 @@ function productEditorForm(product) {
 
 // Stock catalog owns new products. A Service product must never create a
 // second inventory entity or overwrite inventory data through auxiliary-state.
-export async function openStockSalePicker(root, { onChanged = () => {} } = {}) {
+// Both entry points create ONE stock position. From Service → Товары the
+// existing Inventory Q opens directly with «Продажа» checked; there is no
+// second Service product form and no second item identity.
+export async function openStockSaleCreate(root, { onChanged = () => {} } = {}) {
   const { loadInventory } = await import('../../inventory/service.js');
   try { await loadInventory(); }
   catch (error) {
-    openNotice({ title: 'Остатки', message: error instanceof Error ? error.message : 'Не удалось загрузить склад.' });
+    openNotice({ title: 'Остатки', message: error instanceof Error
+      ? error.message : 'Не удалось загрузить склад.' });
     return null;
   }
-  const items = getInventoryItems();
-  const options = items.length ? v2ListEntries(items.map(item => v2ListEntry({
-    title: item.name,
-    subtitle: item.manufacturer || '',
-    rightTop: item.canSell ? 'В продаже' : '',
-    interactive: true,
-    data: `data-inventory-sale-choice="${escapeHtml(item.itemId)}"`,
-    aria: 'Выбрать со склада: ' + item.name,
-  }))) : emptyState('Нет товаров на складе', 'Создайте товар в Остатках.');
-  const layer = mountModal(document.body, modal(
-    `<div data-inventory-sale-choices>${options}</div>` +
-    actionBlock(button('Новый товар', { data: 'data-inventory-sale-new' })),
-    { title: 'Товары', variant: 'q', surface: 'app' },
-  ));
-  if (!layer) return null;
   const { openItemEditor } = await import('../../inventory/inventory.js');
-  layer.querySelectorAll('[data-inventory-sale-choice]').forEach(control => control.addEventListener('click', () => {
-    const id = control.dataset.inventorySaleChoice;
-    layer.v2Close?.();
-    openItemEditor(root, id, {}, () => onChanged());
-  }));
-  layer.querySelector('[data-inventory-sale-new]')?.addEventListener('click', () => {
-    layer.v2Close?.();
-    openItemEditor(root, '', { usage: 'sale' }, () => onChanged());
-  });
-  return layer;
+  return openItemEditor(root, '', { usage: 'sale' }, () => onChanged());
 }
 
 // One editor for legacy Service data; stocked items always open Inventory.
