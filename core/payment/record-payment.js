@@ -200,23 +200,24 @@ async function depositsForRecord(record, payment = null, verifiedPersonDeposits 
   const person = personForRecord(record);
   const key = String(person?.key || person?.id || '');
   if (!key) return [];
-  const deposits = Array.isArray(verifiedPersonDeposits) ? verifiedPersonDeposits : await listPersonDeposits(key);
+  const deposits = Array.isArray(verifiedPersonDeposits) ? verifiedPersonDeposits : await listPersonDeposits(key,record?.date);
   // A person's server-backed deposit is an available source of money even when
   // the Record has no explicit loyaltyProgram selection. Price rules remain in
   // the server-owned Settlement, never in this source picker.
   const allowedIds = new Set([
     ...currentIds,
-    ...deposits.filter((item) => isActiveDepositAssignment(item))
+    ...deposits.filter((item) => isActiveDepositAssignment(item,record?.date))
       .map((item) => String(item?.depositId || item?.id || '')),
   ]);
   const scoped = deposits.filter((item) => allowedIds.has(String(item?.depositId || item?.id || '')))
     .sort((left, right) => Number(String(right?.depositId || right?.id || '') === selectedDepositId)
       - Number(String(left?.depositId || left?.id || '') === selectedDepositId));
-  if (!current.length) return scoped;
   const used = new Map(current.map((item) => [String(item.depositId || ''), Number(item.amount || 0)]));
   return scoped.map((item) => ({
     ...item,
-    balance: Number(item.balance || 0) + Number(used.get(String(item.depositId || '')) || 0),
+    // "availableAt" belongs to the visit date; "balance" is current
+    // and can be zero for a deposit that expired after the historic visit.
+    balance: Number(item.availableAt ?? item.balance ?? 0) + Number(used.get(String(item.depositId || '')) || 0),
   }));
 }
 
@@ -292,7 +293,7 @@ async function openPaymentEntry(record, onCompleted = () => {}) {
     // Resolve the actual wallet catalog before rendering any source picker.
     [wallets, verifiedPersonDeposits] = await Promise.all([
       loadVerifiedPaymentSource(() => loadWalletCatalog(), 'Кошельки'),
-      key ? loadVerifiedPaymentSource(() => listPersonDeposits(key), 'Условия скидки') : Promise.resolve([]),
+      key ? loadVerifiedPaymentSource(() => listPersonDeposits(key,current?.date), 'Условия скидки') : Promise.resolve([]),
     ]);
     const verifiedRecord = getRecord(recordId) || current;
     settlement = settlementForRecord(verifiedRecord);
@@ -369,7 +370,7 @@ async function openPaymentEntry(record, onCompleted = () => {}) {
       // The payment X may stay open across a program expiry or a second-device
       // edit. Recheck before committing an irreversible financial operation.
       const personKey = String(personForRecord(latest)?.key || personForRecord(latest)?.id || '').trim();
-      if (personKey) await loadVerifiedPaymentSource(() => listPersonDeposits(personKey), 'Условия скидки');
+      if (personKey) await loadVerifiedPaymentSource(() => listPersonDeposits(personKey,latest?.date), 'Условия скидки');
       const checkedRecord = getRecord(recordId) || latest;
       const checkedSettlement = settlementForRecord(checkedRecord);
       const checkedPayment = paymentStateForRecord(checkedRecord);

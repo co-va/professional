@@ -88,7 +88,15 @@ function depositRate(deposit=null){
 
 // One date-aware active-assignment predicate for pricing and Record selection.
 export function isActiveDepositAssignment(deposit=null,at=new Date()){
-  return text(deposit?.status)==='active' && termsActive(deposit?.terms,at);
+  const status=text(deposit?.status);
+  const day=localDateKey(at);
+  const today=localDateKey();
+  const historical=Boolean(day && today && day<today);
+  const funded=text(deposit?.fundedAt).slice(0,10);
+  // Expired/closed now does not invalidate an already-funded historic visit.
+  return (status==='active' || (historical && ['expired','closed'].includes(status)))
+    && (!funded || funded<=day)
+    && termsActive(deposit?.terms,at);
 }
 
 export function getPersonDepositPriceConditions(personKey='',at=new Date()){
@@ -148,10 +156,12 @@ export async function saveDepositPrograms(next=[]){
   return getDepositPrograms();
 }
 
-export async function listPersonDeposits(personKey=''){
+export async function listPersonDeposits(personKey='',asOf=''){
   const key=text(personKey);
   if(!key)return [];
-  const values=await payload(await apiRequest(`/loyalty/deposits/person/${encodeURIComponent(key)}`),'Не удалось загрузить депозиты');
+  const date=localDateKey(asOf);
+  const query=asOf && date ? '?at='+encodeURIComponent(date) : '';
+  const values=await payload(await apiRequest(`/loyalty/deposits/person/${encodeURIComponent(key)}${query}`),'Не удалось загрузить депозиты');
   return replacePersonDeposits(key,values);
 }
 
