@@ -7,16 +7,32 @@
   --ui-bottom-safe:env(safe-area-inset-bottom);
 }
 html.keyboard-open{--ui-bottom-safe:0px}
-/* iOS owns the input accessory bar and the region behind its keyboard.
-   That native region can expose the document canvas even while the fixed
-   Z/Q/X surface remains correctly anchored. Match the active paper there,
-   never the dark H canvas; H's own header keeps its explicit dark colour. */
+/* The native iOS keyboard can expose the document canvas below the
+   app. Extend the actual H gutter and Z/Q paper together behind it:
+   the left H gutter remains graphite all the way to the phone bottom.
+   Use the Shared Z/Q edge, never an individual form's width or position. */
+html.keyboard-open{
+  --ui-keyboard-sheet-left:var(--v2-edge,16px);
+  --ui-keyboard-paper-start:max(var(--ui-keyboard-sheet-left),calc((100% - var(--app-max-width,390px)) / 2 + var(--ui-keyboard-sheet-left)));
+  --ui-keyboard-paper-end:min(100%,calc((100% + var(--app-max-width,390px)) / 2));
+}
+/* Bottom X occupies the whole app width; it has no left H gutter. */
+html.keyboard-open:has([data-v2-layer-kind="bottom"]){
+  --ui-keyboard-sheet-left:0px;
+}
 html.keyboard-open:has([data-v2-app]),
 html.keyboard-open body:has([data-v2-app]){
-  background:var(--v2-inner-surface,#F5F5F3);
+  background-color:var(--surface-dark,#2F3338);
+  background-image:linear-gradient(to right,
+    var(--surface-dark,#2F3338) 0 var(--ui-keyboard-paper-start),
+    var(--v2-inner-surface,#F5F5F3) var(--ui-keyboard-paper-start) var(--ui-keyboard-paper-end),
+    var(--surface-dark,#2F3338) var(--ui-keyboard-paper-end) 100%);
 }
 html.keyboard-open .app-shell:has([data-v2-app]){
-  background:var(--v2-inner-surface,#F5F5F3);
+  background-color:var(--surface-dark,#2F3338);
+  background-image:linear-gradient(to right,
+    var(--surface-dark,#2F3338) 0 var(--ui-keyboard-sheet-left),
+    var(--v2-inner-surface,#F5F5F3) var(--ui-keyboard-sheet-left) 100%);
 }
 
 /* Keyboard reduces only Z/Q scrollable content. The white Z/Q surfaces
