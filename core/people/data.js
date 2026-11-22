@@ -2,7 +2,7 @@ import { normalizePhoneForStorage, phonesMatch } from '../phone/index.js';
 import { getMembers, getUEI } from '../uei.js';
 import { flushBusinessPersistence, isBusinessServerReady, queuePersonDelete, queuePersonUpsert } from '../business-persistence.js';
 import { getTags } from '../../settings/tags/data.js';
-import { getPersonDepositPriceConditions } from '../loyalty/deposit/data.js';
+import { getDepositInstances, getPersonDepositPriceConditions } from '../loyalty/deposit/data.js';
 import { describePriceConditionConflict, resolvePersonPriceCondition } from '../loyalty/price-condition.js';
 
 let peopleState = [];
@@ -55,6 +55,7 @@ export function normalizePerson(person = {}) {
     links: Array.isArray(person.links) ? person.links : [],
     tags: normalizeTagAssignments(person.tags),
     discountPercent: normalizeDiscount(person),
+    discountAssignedAt: String(person.discountAssignedAt || ''),
     visits: Number(person.visits || 0),
     totalSpent: Number(person.totalSpent || 0),
     lastVisit: String(person.lastVisit || ''),
@@ -148,11 +149,28 @@ export function getPeopleCount() {
   return getPeople().length;
 }
 
-// One canonical calculation for pricing, the Person editor and its card.
-// Program percentage is derived from an active deposit; never persist it
-// as the Person's independent discountPercent (that would double-discount).
-export function getPersonPriceCondition(person = null) {
-  return resolvePersonPriceCondition(person, getPersonDepositPriceConditions(person?.key));
+// A deposit supersedes any manual percentage granted BEFORE its issue.
+// Legacy manual values have no timestamp: do not resurrect them when an old
+// deposit expires. A new manual grant gets discountAssignedAt after expiry.
+function manualDiscountSuperseded(person=null){
+  const key=String(person?.key || person?.id || '').trim();
+  if(!key)return false;
+  const assignedAt=Date.parse(String(person?.discountAssignedAt || ''));
+  return getDepositInstances().some(deposit=>{
+    const owner=deposit?.person&&typeof deposit.person==='object'?deposit.person:{};
+    if(String(owner.key || owner.personKey || owner.id || '')!==key)return false;
+    const fundedAt=Date.parse(String(deposit?.fundedAt || ''));
+    return !Number.isFinite(assignedAt) || !Number.isFinite(fundedAt) || fundedAt>=assignedAt;
+  });
+}
+
+// Canonical presentation condition: record visit date selects the deposit.
+// A paid Settlement retains its historical pricing independently.
+export function getPersonPriceCondition(person = null, at = new Date()) {
+  const manual=manualDiscountSuperseded(person)
+    ? {...(person||{}),discountPercent:0}
+    : person;
+  return resolvePersonPriceCondition(manual,getPersonDepositPriceConditions(person?.key,at));
 }
 
 function assertPersonalPricePercentAvailable(person = null, previous = null) {

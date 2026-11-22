@@ -1034,6 +1034,7 @@ function telegramEntries(person, all) {
 function personDataFields(person, all) {
   const discount = getPersonPriceCondition(person);
   const programDiscount = discount.sources.find((source) => source.type === 'program') || null;
+  const manualPercent = discount.sources.find((source) => source.type === 'personal')?.percent || 0;
   return [
     `<section class="v2-section"><div class="form-grid people-uei-editor">${uei(ueiData(person, all))}</div></section>`,
     v2Section('Персональные данные', `<div class="form-grid">
@@ -1045,7 +1046,7 @@ function personDataFields(person, all) {
         { value: 'male', label: 'Мужской' },
       ] })}
       ${monthDayPicker({ label: 'Дата рождения', name: 'birthDate', value: person.birthDate || '' })}
-      ${field({ label: 'Скидка %', name: 'discountPercent', value: programDiscount?.percent ?? (person.discountPercent || ''), type: 'number', inputmode: 'decimal', disabled: Boolean(programDiscount) })}
+      ${field({ label: 'Скидка %', name: 'discountPercent', value: programDiscount?.percent ?? (manualPercent || ''), type: 'number', inputmode: 'decimal', disabled: Boolean(programDiscount) })}
     </div>`),
     v2Section('Контактные данные',
       repeatedField({ label: 'Телефон', name: 'phones', values: businessEntries(person, all, 'phones'), type: 'tel', addInHeader: true })
@@ -1129,7 +1130,13 @@ function savePersonData(root, key) {
   } else {
     if (discountField?.disabled) throw new Error('Условия скидки изменились. Откройте данные клиента повторно.');
     const rawDiscount = Number(String(discountField?.value || '0').replace(',', '.'));
-    person.discountPercent = Number.isFinite(rawDiscount) ? Math.max(0, Math.min(100, rawDiscount)) : 0;
+    const nextDiscount = Number.isFinite(rawDiscount) ? Math.max(0, Math.min(100, rawDiscount)) : 0;
+    const effectiveBefore = getPersonPriceCondition(person).sources
+      .find((source) => source.type === 'personal')?.percent || 0;
+    if(nextDiscount!==effectiveBefore){
+      person.discountAssignedAt = nextDiscount>0 ? new Date().toISOString() : '';
+    }
+    person.discountPercent = nextDiscount;
   }
   saveBusinessEntries(all, key, 'phones', collectRepeatedEntries(root, 'phones'), memberKeys);
   saveBusinessEntries(all, key, 'telegrams', collectRepeatedEntries(root, 'telegrams'), memberKeys);
@@ -1207,7 +1214,8 @@ function openPersonEdit(baseRoot, key, callbacks = {}) {
   const actions = action?.closest('.modal-actions');
   const initialState = formSnapshot(form);
   const discountField = layer.querySelector('[name="discountPercent"]');
-  const initialManualDiscount = String(person.discountPercent || '');
+  let initialManualDiscount = String(getPersonPriceCondition(person).sources
+    .find((source) => source.type === 'personal')?.percent || '');
   let discountVerified = false;
   let saving = false;
   // A locked program discount is a view of the program, NOT a personal
@@ -1233,8 +1241,10 @@ function openPersonEdit(baseRoot, key, callbacks = {}) {
     const condition = getPersonPriceCondition(person);
     const programDiscount = condition.sources.find((source) => source.type === 'program') || null;
     if (discountField) {
-      discountField.value = String(programDiscount?.percent ?? (person.discountPercent || ''));
+      const manual = condition.sources.find((source) => source.type === 'personal')?.percent || 0;
+      discountField.value = String(programDiscount?.percent ?? (manual || ''));
       discountField.disabled = Boolean(programDiscount);
+      initialManualDiscount = String(manual || '');
     }
     discountVerified = true;
     syncAction();

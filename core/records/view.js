@@ -632,7 +632,7 @@ export function openRecordView(record, {
       .map((item) => [String(item?.sourceId || ''), item]));
     const personKey = String(source?.person?.key || source?.person?.id || '').trim();
     const programs = capabilities.loyaltyProgram && !readOnlyHistory
-      ? getRecordProgramOptions(personKey).sort((left, right) => Number(right.type === 'deposit') - Number(left.type === 'deposit'))
+      ? getRecordProgramOptions(personKey,source.date).sort((left, right) => Number(right.type === 'deposit') - Number(left.type === 'deposit'))
       : [];
     const programLabel = (program) => {
       const name = String(program?.name || 'Депозит');

@@ -882,6 +882,7 @@ export function openRecords({
       ? source.settlement(state)
       : resolveRecordSettlement({
         person: contact,
+        date: state.date,
         procedures: state.procedures.map((entry) => ({
           id: entry.id,
           name: entry.name,
@@ -889,7 +890,7 @@ export function openRecords({
           duration: entry.duration,
         })),
       });
-    const effectiveDiscount = getPersonPriceCondition(contact);
+    const effectiveDiscount = getPersonPriceCondition(contact,state.date || new Date());
     const contactDiscountPercent = Math.max(0, Math.min(100, Number(effectiveDiscount.percent) || 0));
     const discountMoney = Math.max(0, (Number(settlement?.serviceTotal) || 0) - (Number(settlement?.planTotal) || 0));
     const grossTotal = Number(settlement?.serviceTotal ?? (source.total ? source.total(state) : 0)) || 0;

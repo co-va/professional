@@ -56,7 +56,7 @@ export async function openPersonRecordCreation({ person, workplaceId = '', proce
         name: entry.name || '',
         cost: entry.cost,
       })), {
-        pricePercent: recordSettlementPricePercent(person),
+        pricePercent: recordSettlementPricePercent({person,date:state?.date}),
       });
       openRecordConfirmationNotice({
         date: state?.date || '',

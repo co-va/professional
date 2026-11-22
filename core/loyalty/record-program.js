@@ -28,9 +28,9 @@ function option({ type, typeLabel, assignmentId = '', programId = '', name = '',
   };
 }
 
-function depositOptions(personKey) {
+function depositOptions(personKey,at=new Date()) {
   return getDepositInstances()
-    .filter((deposit) => personKeyOf(deposit?.person) === personKey && isActiveDepositAssignment(deposit))
+    .filter((deposit) => personKeyOf(deposit?.person) === personKey && isActiveDepositAssignment(deposit,at))
     .map((deposit) => option({
       type: 'deposit',
       typeLabel: 'Депозит',
@@ -43,13 +43,13 @@ function depositOptions(personKey) {
     .filter(Boolean);
 }
 
-export function getRecordProgramOptions(personOrKey = '') {
+export function getRecordProgramOptions(personOrKey = '', at = new Date()) {
   const personKey = personKeyOf(personOrKey);
   if (!personKey) return [];
   // Only server-backed deposit instances are eligible at this stage.
   // Certificate, subscription, referral and bonus are not implemented yet;
   // their demo data must never create a Record discount.
-  const values = depositOptions(personKey);
+  const values = depositOptions(personKey,at);
   const seen = new Set();
   return values.filter((item) => {
     if (!item?.key || seen.has(item.key)) return false;

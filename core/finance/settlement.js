@@ -3,7 +3,7 @@
 // Canonical Settlement snapshots live in Finance. Record receives finance only as a read projection.
 import { getStoredSettlement } from './data.js';
 import { getActiveDDSMovements, getActiveDDSMovementsForSource } from './read.js';
-import { personalPricePercentSource, resolvePersonPriceCondition } from '../loyalty/price-condition.js';
+import { resolvePersonPriceCondition } from '../loyalty/price-condition.js';
 import { getAllPeople, getPersonPriceCondition } from '../people/data.js';
 import { getWorkplaces } from '../workplace-time.js';
 import { hasZonedIntervalEnded } from '../time/zone.js';
@@ -24,8 +24,9 @@ function currentPerson(person = null) {
   return getAllPeople().find((item) => String(item?.key || item?.id || '').trim() === key) || person || {};
 }
 
-function recordPersonalPricePercent(person = null) {
-  return clampFinancialPercent(personalPricePercentSource(currentPerson(person))?.percent || 0);
+function recordPersonalPricePercent(person = null, at = new Date()) {
+  const condition=getPersonPriceCondition(currentPerson(person),at);
+  return clampFinancialPercent(condition.sources.find(source=>source.type==='personal')?.percent||0);
 }
 
 function settlementItemsWithConditions(items = [], { programPercent = 0, personalPercent = 0, seedPersonal = false } = {}) {
@@ -71,7 +72,7 @@ export function resolveRecordSettlement(record = null, { pricePercent = null } =
   const programPercent = pricePercent == null
     ? condition.percent
     : clampFinancialPercent(pricePercent);
-  const personalPercent = recordPersonalPricePercent(record?.person);
+  const personalPercent = recordPersonalPricePercent(record?.person,record?.date || new Date());
   if (record?.id) {
     const owned = normalizeStoredSettlement(getStoredSettlement('record', record.id));
     if (owned) {
@@ -146,7 +147,7 @@ export function recordSettlementPriceCondition(record = null) {
     ? record.loyaltyProgram
     : null;
   const selectedPercent = clampFinancialPercent(selected?.pricePercent || 0);
-  const effective = getPersonPriceCondition(currentPerson(record?.person));
+  const effective = getPersonPriceCondition(currentPerson(record?.person),record?.date || new Date());
   if (selected && selectedPercent > 0 && String(selected.type || '') === 'deposit') {
     // Selected deposits cannot keep applying a frozen 20% after their term
     // ends or the assignment is cancelled. This is re-evaluated against the

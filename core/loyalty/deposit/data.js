@@ -11,12 +11,15 @@ function text(value){return String(value??'').trim();}
 function numberValue(value){const number=Number(String(value??'').replace(',','.'));return Number.isFinite(number)?number:0;}
 function percent(value){return Math.max(0,Math.min(100,numberValue(value)));}
 function localDateKey(value=new Date()){
+  // Appointment dates are civil YYYY-MM-DD keys, not UTC instants.
+  const raw=typeof value==='string'?value.trim():'';
+  if(/^\d{4}-\d{2}-\d{2}$/.test(raw))return raw;
   const date=value instanceof Date?value:new Date(value);
   if(!Number.isFinite(date.getTime()))return '';
   return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
 }
 function termsActive(terms={},at=new Date()){
-  if(text(terms?.termMode).toLowerCase()!=='dated')return true;
+  if(!['dated','fixed'].includes(text(terms?.termMode).toLowerCase()))return true;
   const day=localDateKey(at);
   const start=text(terms?.termStartDate).slice(0,10);
   const end=text(terms?.termEndDate).slice(0,10);
@@ -73,25 +76,34 @@ export function hydrateDepositInstances(values=[]){
   return getDepositInstances();
 }
 
-// One active-assignment predicate for pricing and the People filter.
-export function isActiveDepositAssignment(deposit=null){
-  return text(deposit?.status)==='active' && termsActive(deposit?.terms);
+// A deposit's right to a percentage belongs to its immutable terms. The
+// DTO's discountPercent is calculated for TODAY, and must not price a later visit.
+function depositRate(deposit=null){
+  const terms=deposit?.terms||{};
+  const mode=text(terms?.benefitType || deposit?.benefitMode).toLowerCase();
+  if(mode && mode!=='discount')return 0;
+  return percent(terms?.benefitValue ?? deposit?.discountPercent);
 }
 
-export function getPersonDepositPriceConditions(personKey=''){
+// One date-aware active-assignment predicate for pricing and Record selection.
+export function isActiveDepositAssignment(deposit=null,at=new Date()){
+  return text(deposit?.status)==='active' && termsActive(deposit?.terms,at);
+}
+
+export function getPersonDepositPriceConditions(personKey='',at=new Date()){
   const key=text(personKey);
   if(!key)return [];
   return deposits
     .filter((deposit)=>personKeyOf(deposit)===key
-      && isActiveDepositAssignment(deposit)
-      && percent(deposit?.discountPercent)>0)
+      && isActiveDepositAssignment(deposit,at)
+      && depositRate(deposit)>0)
     .map((deposit)=>({
       type:'program',
       programType:'deposit',
       depositId:text(deposit.depositId),
       programId:text(deposit.programId),
       name:text(deposit.programName)||'Депозит',
-      percent:percent(deposit.discountPercent),
+      percent:depositRate(deposit),
     }));
 }
 
@@ -152,8 +164,6 @@ async function assertPricePercentAvailable(programId='',person=null){
   if(incomingPercent<=0)return;
   const key=text(person?.key||person?.id);
   if(!key)return;
-  const { getAllPeople } = await import('../../people/data.js');
-  const owner=getAllPeople().find((item)=>text(item?.key||item?.id)===key)||person||{};
   await listPersonDeposits(key);
   const incoming={
     type:'program',
@@ -162,7 +172,10 @@ async function assertPricePercentAvailable(programId='',person=null){
     name:text(program?.name)||'Депозит',
     percent:incomingPercent,
   };
-  const condition=resolvePersonPriceCondition(owner,[...getPersonDepositPriceConditions(key),incoming]);
+  // The new deposit supersedes an earlier personal percentage. Reject only
+  // competing PROGRAM percentage sources; never treat the superseded manual
+  // field as a second program.
+  const condition=resolvePersonPriceCondition(null,[...getPersonDepositPriceConditions(key),incoming]);
   if(condition.conflict){
     throw new Error(`Процентная скидка задваивается: ${describePriceConditionConflict(condition)}. Оставьте один источник скидки и повторите оформление.`);
   }
