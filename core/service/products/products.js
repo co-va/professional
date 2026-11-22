@@ -32,9 +32,8 @@ import { setSharedActionVisible } from '../../../ui/page/page.js';
 import { productEditorSignature, rebaseWorkplaceAssignmentSignature } from '../editor-signature.js';
 import { scheduleServiceStatistics, serviceItemStatistics } from '../statistics.js';
 import { productCardAppearance, productCardFields, productCardPhoto } from '../card-presentation.js';
-import { commitDeleteProduct, getProducts, commitReorderProducts, commitProduct, commitProductWorkplace } from './data.js';
+import { commitDeleteProduct, getProducts, commitReorderProducts, commitProduct, commitProductWorkplace, commitInventoryRetailPrice } from './data.js';
 import { getInventoryItems } from '../../inventory/data.js';
-import { updateInventoryItem } from '../../inventory/service.js';
 
 const money = (value) => `${new Intl.NumberFormat('ru-RU').format(Number(value || 0))} ₽`;
 
@@ -79,18 +78,8 @@ export function renderProductCatalog(host, { root = host, onChanged = () => {} }
   host.querySelectorAll('[data-product]').forEach((node) => {
     node.addEventListener('click', async () => {
       const id = node.dataset.product;
-      if (id?.startsWith('inventory:')) {
-        const itemId = id.slice('inventory:'.length);
-        const [{ openInventoryProductOverview }, { openItemEditor }] = await Promise.all([
-          import('../../inventory/product-overview.js'),
-          import('../../inventory/inventory.js'),
-        ]);
-        openInventoryProductOverview(itemId, {
-          edit: (onSaved) => openItemEditor(root, itemId, {}, onSaved),
-          onChanged,
-        });
-        return;
-      }
+      // Sale catalog owns only the retail presentation. Editing here must
+      // never redirect to Inventory or change its calculated/stock prices.
       openProductOverview(root, id, { onChanged });
     });
   });
@@ -163,6 +152,66 @@ function confirmDeleteProduct(product, onDeleted) {
   return layer;
 }
 
+// The stock is the only product entity. Service stores a final retail price
+// overlay through its existing products dataset; no changes to Inventory.
+function openInventoryRetailPriceQ(itemId, { onSaved = () => {}, onChanged = () => {} } = {}) {
+  const product = getProducts().find(item => item.inventoryOwned
+    && String(item.inventoryItemId) === String(itemId));
+  if (!product) return openNotice({ title: 'Товары', message: 'Товар больше не находится в продаже.' });
+  const calculated = product.calculatedSalePrice;
+  const value = Number(product.cost?.amount || 0);
+  const content = '<form data-service-retail-price-form>' +
+    '<div class="inventory-editor-group">' +
+      '<div class="inventory-editor-row">' +
+        '<span class="inventory-editor-label">Расчётная цена (Склад)</span>' +
+        '<strong>' + escapeHtml(calculated == null ? '—' : money(calculated)) + '</strong>' +
+      '</div>' +
+      field({ label: 'Цена продажи, ₽', name: 'serviceRetailPrice',
+        type: 'number', min: '0', step: '0.01', inputmode: 'decimal',
+        value: String(value) }) +
+    '</div>' +
+    '<div class="form-error" data-service-retail-price-error role="alert"></div>' +
+    actionBlock(button('Применить', { type: 'submit', data: 'data-service-retail-price-apply' })) +
+  '</form>';
+  const layer = mountModal(document.body, modal(content, {
+    title: product.name || 'Цена продажи', variant: 'q', surface: 'app',
+  }));
+  if (!layer) return null;
+  const form = layer.querySelector('[data-service-retail-price-form]');
+  const input = form?.querySelector('[name="serviceRetailPrice"]');
+  const apply = layer.querySelector('[data-service-retail-price-apply]');
+  const actions = apply?.closest('.modal-actions');
+  const error = layer.querySelector('[data-service-retail-price-error]');
+  if (!form || !input || !apply) return layer;
+  let saving = false;
+  const initial = String(value);
+  const sync = () => setSharedActionVisible(actions, saving || input.value.trim() !== initial);
+  input.addEventListener('input', sync);
+  sync();
+  form.addEventListener('submit', async event => {
+    event.preventDefault();
+    if (saving) return;
+    saving = true;
+    apply.disabled = true;
+    if (error) error.textContent = '';
+    try {
+      await commitInventoryRetailPrice(itemId, input.value);
+      layer.v2Close?.();
+      const saved = getProducts().find(item => item.inventoryOwned
+        && String(item.inventoryItemId) === String(itemId));
+      onSaved(saved || product);
+      onChanged();
+    } catch (cause) {
+      if (error) error.textContent = cause instanceof Error
+        ? cause.message : 'Не удалось сохранить цену продажи.';
+      saving = false;
+      apply.disabled = false;
+      sync();
+    }
+  });
+  return layer;
+}
+
 function productEditorForm(product) {
   return `<form class="compact-form" data-product-editor-form>
     ${field({ label: 'Название', name: 'productName', value: product.name || '', placeholder: 'Название товара', required: true })}
@@ -218,9 +267,7 @@ export function openProductEditor(root, existing = null, {
   onDeleted = () => {},
 } = {}) {
   if (existing?.inventoryItemId) {
-    void import('../../inventory/inventory.js').then(({ openItemEditor }) =>
-      openItemEditor(root, existing.inventoryItemId, {}, () => { onSaved(existing); onChanged(); }));
-    return null;
+    return openInventoryRetailPriceQ(existing.inventoryItemId, { onSaved, onChanged });
   }
   const draft = initialProduct(existing);
   const body = [
