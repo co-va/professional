@@ -171,7 +171,7 @@ export function openInventoryClassificationGroups(onSaved = () => {}) {
   const editName = (group = null, onFinished = () => {}) => {
     if (isFixedManufacturerCriterion(group)) return;
     const editor = mountModal(document.body, modal(
-      '<form data-inventory-criterion-form>' +
+      '<form class="form-grid" data-inventory-criterion-form>' +
       field({label:'Название группы',name:'name',value:group?.name||'',required:true}) +
       '<p class="form-error" data-inventory-criterion-edit-error role="alert"></p>' +
       actionBlock(button('Сохранить',{type:'submit'}) +
@@ -221,7 +221,7 @@ export function openInventoryClassificationGroups(onSaved = () => {}) {
   };
   const valueEditor = (group, entry = null) => {
     const editor = mountModal(document.body, modal(
-      '<form data-inventory-criterion-value-form>' +
+      '<form class="form-grid" data-inventory-criterion-value-form>' +
       field({label:'Значение',name:'name',value:entry?.name||'',required:true}) +
       '<p class="form-error" role="alert" data-inventory-criterion-value-error></p>' +
       actionBlock(button('Сохранить',{type:'submit'}) +
