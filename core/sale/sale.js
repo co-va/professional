@@ -164,7 +164,9 @@ export function openSale({
         ? Number.isFinite(savedUnitPrice) && savedUnitPrice >= 0
           ? savedUnitPrice : Number.isFinite(previousTotal) && previousQuantity > 0
             ? previousTotal / previousQuantity : 0
-        : Number(product.inventoryItemId ? product.pricePerUnit
+        : Number(product.inventoryItemId
+          ? Number(productCost(product, workplaceId))
+            / (Number(product.quantity) > 0 ? Number(product.quantity) : 1)
           : productCost(product, workplaceId)) || 0;
       nextProducts.push({
         ...(existing || {}),
