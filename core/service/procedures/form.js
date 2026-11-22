@@ -31,7 +31,7 @@ export function initialProcedure(existing = null, defaultWorkplace = null) {
 }
 
 export function procedureEditorForm(procedure = initialProcedure()) {
-  return `<form class="compact-form" data-procedure-editor-form>
+  return `<form class="form-grid" data-procedure-editor-form>
     ${field({ label: 'Название', name: 'procedureName', value: procedure.name || '', placeholder: 'Название услуги', required: true })}
     <div class="work-time-row__fields">
       ${durationPicker({ label: 'Длительность', name: 'procedureDuration', value: procedure.duration || 0 })}

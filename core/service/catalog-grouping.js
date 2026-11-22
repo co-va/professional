@@ -11,7 +11,6 @@ import {
 } from './products/data.js';
 
 const id = () => crypto.randomUUID();
-const clean = value => String(value || '').trim();
 const kindLabel = kind => kind === 'products' ? 'Группа товаров' : 'Группа услуг';
 
 // A group definition is not an assignment. The owner chooses each group with

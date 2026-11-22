@@ -34,7 +34,7 @@ import { productEditorSignature, rebaseWorkplaceAssignmentSignature } from '../e
 import { scheduleServiceStatistics, serviceItemStatistics } from '../statistics.js';
 import { renderServiceGroupTree, serviceGroupFields, readServiceGroupFields, bindServiceGroupFields } from '../catalog-grouping.js';
 import { productCardAppearance, productCardFields, productCardPhoto } from '../card-presentation.js';
-import { commitDeleteProduct, getProducts, commitReorderProducts, commitProduct, commitProductWorkplace, commitInventoryRetailPrice, commitInventoryProductPresentation, commitInventoryProductWorkplace } from './data.js';
+import { commitDeleteProduct, getProducts, commitReorderProducts, commitProduct, commitProductWorkplace, commitInventoryProductPresentation, commitInventoryProductWorkplace } from './data.js';
 
 const money = (value) => `${new Intl.NumberFormat('ru-RU').format(Number(value || 0))} ₽`;
 
@@ -215,7 +215,7 @@ function openInventoryRetailEditorQ(itemId, {
     ? '—' : money(product.calculatedSalePrice);
 
   const content = [
-    '<form class="compact-form" data-service-retail-price-form>',
+    '<form class="form-grid" data-service-retail-price-form>',
     field({ label: 'Наименование товара', name: 'serviceRetailName',
       value: product.name || '', readonly: true }),
     '<div class="cost-field" data-service-price-section>',
@@ -344,7 +344,7 @@ function openInventoryRetailEditorQ(itemId, {
 }
 
 function productEditorForm(product) {
-  return `<form class="compact-form" data-product-editor-form>
+  return `<form class="form-grid" data-product-editor-form>
     ${field({ label: 'Название', name: 'productName', value: product.name || '', placeholder: 'Название товара', required: true })}
     ${costField({ value: product.cost || {}, name: 'productCost' })}
     ${textareaField({ label: 'Описание', name: 'productAbout', value: product.about || '', rows: 7, maxlength: 5000, placeholder: 'Описание товара' })}

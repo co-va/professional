@@ -109,7 +109,7 @@ export function bindServiceWorkplaceAssignments(root, {
       } : null,
     });
     const originalSignature = signature(values);
-    const content = `<div class="service-workplace-price-editor" data-service-workplace-editor>
+    const content = `<div class="compact-form service-workplace-price-editor" data-service-workplace-editor>
       <strong class="service-workplace-price-editor__title">${escapeHtml(space.name)}</strong>
       ${isProcedure ? `<div class="work-time-row__fields">
         ${durationPicker({ name: 'localDuration', label: 'Длительность', value: values.duration })}
@@ -128,7 +128,7 @@ export function bindServiceWorkplaceAssignments(root, {
         })}
       </div>` : ''}
       <div class="form-error" role="alert" data-service-workplace-error></div>
-      <div class="service-workplace-price-editor__actions">
+      <div class="modal-actions">
         <div data-service-workplace-apply-host${isNew ? '' : ' hidden'}>
           ${button('Применить', { data: 'data-service-workplace-apply' })}
         </div>
