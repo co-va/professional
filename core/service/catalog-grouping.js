@@ -338,7 +338,10 @@ export function openServiceGroupingQ({ onSaved = () => {} } = {}) {
     form?.addEventListener('change', syncSave);
     if (form) syncSave();
     const apply = async remove => {
-      if (busy) return;
+      if (busy) {
+        if (remove) throw new Error('Дождитесь завершения сохранения.');
+        return;
+      }
       const name = String(new FormData(form).get('name') || '').trim();
       if (!remove && !hasChange()) return;
       busy = true;
@@ -357,6 +360,8 @@ export function openServiceGroupingQ({ onSaved = () => {} } = {}) {
       } catch (cause) {
         const error = editor.querySelector('[data-service-value-editor-error]');
         if (error) error.textContent = cause?.message || 'Не удалось сохранить.';
+        // The confirming X must not close when deletion was rejected.
+        if (remove) throw cause;
       } finally { busy = false; }
     };
     form?.addEventListener('submit', event => {
