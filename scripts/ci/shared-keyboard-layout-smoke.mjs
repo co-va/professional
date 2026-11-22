@@ -247,7 +247,7 @@ try {
   for (const image of [nativeBackdrop.htmlImage, nativeBackdrop.bodyImage, nativeBackdrop.shellImage]) {
     assert.match(image, /linear-gradient/,
       'Native keyboard canvas and app shell must retain H gutter + warm Q paper');
-    assert.match(image, /rgb\\(47, 51, 56\\)|#2F3338/i,
+    assert.ok(image.includes('47, 51, 56') || /#2f3338/i.test(image),
       'H gutter must remain graphite inside keyboard backdrop');
   }
   assert.notEqual(nativeBackdrop.h, nativeBackdrop.q,
