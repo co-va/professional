@@ -110,10 +110,11 @@ export function initV2ListReorder(root, {
   selector = '[data-reorder-id]',
   idAttribute = 'reorderId',
   handleSelector = '[data-reorder-handle]',
+  hostSelector = '.list-entries',
   onReorder = () => {},
   onError = () => {},
 } = {}) {
-  const host = root?.matches?.('.list-entries') ? root : root?.querySelector?.('.list-entries');
+  const host = root?.matches?.(hostSelector) ? root : root?.querySelector?.(hostSelector);
   if (!host) return () => {};
 
   const entries = () => [...host.querySelectorAll(selector)];
