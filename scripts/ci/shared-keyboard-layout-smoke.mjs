@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { chromium } from 'playwright';
+import { runInNewContext } from 'node:vm';
 
 // Exercise the real Shared CSS with a fixed-size Z, Q and X fixture.
 // This guards geometry invariants; native iOS keyboard behavior still
@@ -12,6 +13,86 @@ const paths = [
   'ui/inputs/keyboard.css',
 ];
 const css = (await Promise.all(paths.map((path) => readFile(path, 'utf8')))).join('\n');
+// The actual Shared keyboard runtime must retain the same physical shell
+// through a transient iOS viewport rebound between two input fields.
+const keyboardSource = await readFile('ui/inputs/keyboard-runtime.js', 'utf8');
+assert.doesNotMatch(keyboardSource, /scrollTop|scrollIntoView/,
+  'Shared keyboard must never force per-field scroll');
+const keyboardProps = new Map();
+const keyboardClasses = new Set();
+let visibleHeight = 844;
+let focusedInput = false;
+class TestInput { matches() { return true; } }
+const rootStyle = {
+  getPropertyValue: (key) => keyboardProps.get(key) || '',
+  setProperty: (key, value) => keyboardProps.set(key, value),
+};
+const html = {
+  style: rootStyle,
+  classList: {
+    contains: (key) => keyboardClasses.has(key),
+    toggle: (key, enabled) => enabled ? keyboardClasses.add(key) : keyboardClasses.delete(key),
+  },
+};
+const fakeDoc = {
+  documentElement: html,
+  body: {},
+  visibilityState: 'visible',
+  get activeElement() { return focusedInput ? new TestInput() : null; },
+  addEventListener() {},
+  querySelectorAll() { return []; },
+  querySelector() { return null; },
+};
+const fakeVisualViewport = {
+  get height() { return visibleHeight; },
+  width: 390,
+  offsetTop: 0,
+  offsetLeft: 0,
+  addEventListener() {},
+};
+const fakeWindow = {
+  visualViewport: fakeVisualViewport,
+  innerWidth: 390,
+  innerHeight: 844,
+  addEventListener() {},
+};
+const testRuntime = {
+  window: fakeWindow,
+  document: fakeDoc,
+  HTMLElement: TestInput,
+  MutationObserver: class { observe() {} },
+  ResizeObserver: undefined,
+  requestAnimationFrame() { return 1; },
+  performance: { now() { return 0; } },
+};
+runInNewContext(keyboardSource + '\nwindow.__testSync = syncViewport;', testRuntime);
+const keyboardState = () => ({
+  shell: keyboardProps.get('--app-stable-vh'),
+  inset: keyboardProps.get('--ui-keyboard-inset'),
+  open: keyboardClasses.has('keyboard-open'),
+});
+focusedInput = true;
+testRuntime.window.__testSync();
+visibleHeight = 460;
+testRuntime.window.__testSync();
+const keyboardBeforeTransition = keyboardState();
+assert.equal(keyboardBeforeTransition.inset, '384px');
+focusedInput = false;
+visibleHeight = 790; // brief focusout/viewport rebound, keyboard is STILL open
+testRuntime.window.__testSync();
+assert.deepEqual(keyboardState(), keyboardBeforeTransition,
+  'Focusout rebound may not expose H or move Z/Q actions');
+focusedInput = true;
+visibleHeight = 460;
+testRuntime.window.__testSync();
+assert.deepEqual(keyboardState(), keyboardBeforeTransition,
+  'Last input focus must retain the same Z/Q keyboard inset');
+focusedInput = false;
+visibleHeight = 844;
+testRuntime.window.__testSync();
+assert.equal(keyboardState().inset, '0px', 'Actual keyboard close resets inset');
+assert.equal(keyboardState().open, false, 'Actual keyboard close resets class');
+
 const content = Array.from({ length: 12 }, (_, index) =>
   `<label style="display:block;height:104px">Field ${index + 1}<input style="width:100%;height:44px"></label>`).join('');
 const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
