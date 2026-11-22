@@ -25,8 +25,8 @@ function termsActive(terms={},at=new Date()){
   const end=text(terms?.termEndDate).slice(0,10);
   if(!/^\d{4}-\d{2}-\d{2}$/.test(day)||!/^\d{4}-\d{2}-\d{2}$/.test(end))return false;
   if(/^\d{4}-\d{2}-\d{2}$/.test(start)&&day<start)return false;
-  // The end date is exclusive: a term ending 01.12 is inactive on 01.12.
-  return day<end;
+  // The end date in the "По" field is included, just as in Core.
+  return day<=end;
 }
 async function payload(response,fallback){const value=await response.json().catch(()=>({}));if(!response.ok)throw new Error(value?.message||fallback);return value;}
 

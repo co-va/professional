@@ -374,24 +374,6 @@ function fundingEntries(deposit = {}) {
     .sort((a, b) => String(b?.occurredAt || '').localeCompare(String(a?.occurredAt || '')));
 }
 
-function fundingEntryLabel(entry = {}) {
-  return `${shortDateTime(entry?.occurredAt, '—')} · ${money(entry?.amount)}`;
-}
-
-function chooseFundingEntry(deposit, title, onSelect) {
-  const entries = fundingEntries(deposit);
-  if (!entries.length) return null;
-  if (entries.length === 1) return onSelect(entries[0]);
-  return openSharedProfileSettingsMenu({
-    title,
-    actions: entries.map((entry, index) => ({
-      id: `funding-${index}`,
-      label: fundingEntryLabel(entry),
-      onSelect: () => onSelect(entry),
-    })),
-  });
-}
-
 function issuedList(items = []) {
   if (!items.length) return emptyState('Депозитов пока нет', 'Оформленные депозиты этой программы появятся здесь.');
   return v2ListEntries(items.map((deposit) => v2ListEntry({
@@ -698,68 +680,12 @@ async function openFundQ(root, program, { person = null, onSaved = () => {} } = 
   return layer;
 }
 
-async function openFundingQ(root, deposit, { entry = null, onSaved = () => {} } = {}) {
-  const wallets = getWallets();
-  const editing = Boolean(entry?.operationId);
-  const terms = deposit?.terms && typeof deposit.terms === 'object' ? deposit.terms : {};
-  const target = Number(terms?.amount || 0);
-  const remaining = target > 0 ? Math.max(0, target - Number(deposit?.fundedAmount || 0)) : 0;
-  const selectedWallet = String(entry?.walletId || '');
-  const layer = mountModal(root, modal(`<form class="form-grid" data-deposit-existing-fund-form>
-    ${field({ label: 'Сумма', name: 'amount', type: 'number', min: '0.01', step: '0.01', inputmode: 'decimal', value: editing ? entry.amount : (remaining || '') })}
-    ${select({ label: 'Кошелёк приёма денег', name: 'walletId', value: selectedWallet, options: [{ value: '', label: 'Выберите кошелёк' }, ...wallets.map((wallet) => ({ value: wallet.id, label: wallet.name }))] })}
-    ${datePicker({ label: 'Дата внесения', name: 'occurredAt', value: editing ? String(entry.occurredAt || '').slice(0, 10) : new Date().toISOString().slice(0, 10), showYear: true, modalVariant: 'q', modalSurface: 'app', allowClear: false })}
-    <div class="form-error" data-deposit-existing-fund-error></div>
-    ${actionBlock(button(editing ? 'Сохранить' : 'Добавить платёж', { type: 'submit' }))}
-  </form>`, { variant: 'q', surface: 'app', title: editing ? 'Корректировать платёж' : 'Добавить платёж' }));
-  if (!layer) return null;
-  initDatePickers(layer);
-  const form = layer.querySelector('[data-deposit-existing-fund-form]');
-  form?.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const values = formObject(form);
-    const errorNode = layer.querySelector('[data-deposit-existing-fund-error]');
-    const wallet = wallets.find((item) => String(item?.id) === String(values.walletId));
-    const amount = Math.max(0, Number(String(values.amount || '0').replace(',', '.')) || 0);
-    if (!wallet || amount <= 0) {
-      if (errorNode) errorNode.textContent = 'Укажите сумму и кошелёк';
-      return;
-    }
-    try {
-      if (editing) {
-        await correctDepositFunding({
-          depositId: deposit.depositId,
-          operationId: entry.operationId,
-          amount,
-          walletId: wallet.id,
-          walletName: wallet.name,
-          occurredAt: new Date(`${values.occurredAt}T12:00:00`),
-        });
-      } else {
-        await fundExistingDeposit({
-          depositId: deposit.depositId,
-          amount,
-          walletId: wallet.id,
-          walletName: wallet.name,
-          occurredAt: new Date(`${values.occurredAt}T12:00:00`),
-        });
-      }
-      layer.v2Close?.();
-      openNotice({ title: editing ? 'Платёж исправлен' : 'Платёж добавлен', message: `${money(amount)} · ${values.occurredAt}` });
-      await onSaved?.();
-    } catch (error) {
-      if (errorNode) errorNode.textContent = error instanceof Error ? error.message : 'Не удалось сохранить платёж';
-    }
-  });
-  return layer;
-}
-
-function paymentForm(entry, wallets, { amount = '' } = {}) {
+function paymentForm(entry, wallets, { amount = '', max = null } = {}) {
   const operationId = String(entry?.operationId || '');
   const selectedWallet = String(entry?.walletId || '');
   const occurredAt = operationId ? String(entry?.occurredAt || '').slice(0, 10) : new Date().toISOString().slice(0, 10);
   return `<form class="form-grid" data-deposit-payment-form data-operation-id="${escapeHtml(operationId)}">
-    ${field({ label: 'Сумма', name: 'amount', type: 'number', min: '0.01', step: '0.01', inputmode: 'decimal', value: operationId ? entry.amount : amount })}
+    ${field({ label: 'Сумма', name: 'amount', type: 'number', min: '0.01', max: max == null ? undefined : Math.round(max * 100) / 100, step: '0.01', inputmode: 'decimal', value: operationId ? entry.amount : amount })}
     ${select({ label: 'Кошелёк', name: 'walletId', value: selectedWallet, options: [{ value: '', label: 'Выберите кошелёк' }, ...wallets.map((wallet) => ({ value: wallet.id, label: wallet.name }))] })}
     ${datePicker({ label: 'Дата', name: 'occurredAt', value: occurredAt, showYear: true, modalVariant: 'q', modalSurface: 'app', allowClear: false })}
     <div class="form-error" data-deposit-payment-error></div>
@@ -773,11 +699,17 @@ async function openPaymentsQ(root, deposit, { onSaved = () => {} } = {}) {
   const terms = deposit?.terms && typeof deposit.terms === 'object' ? deposit.terms : {};
   const target = Math.max(0, Number(terms?.amount || 0));
   const funded = Math.max(0, Number(deposit?.fundedAmount || 0));
-  const remaining = target > 0 ? Math.max(0, target - funded) : 0;
-  const sections = entries.map((entry) => paymentForm(entry, wallets));
-  if (!entries.length || remaining > 0.009) {
+  const isFixed = (String(terms.amountMode || (target > 0 ? 'fixed' : 'free')) === 'fixed') && target > 0;
+  const remaining = isFixed ? Math.max(0, target - funded) : 0;
+  const sections = entries.map((entry) => paymentForm(entry, wallets, {
+    max: isFixed ? remaining + Math.max(0, Number(entry.amount || 0)) : null,
+  }));
+  // A free-amount deposit accepts repeated payments; a fixed-amount deposit
+  // stops offering another payment when its nominal is fully funded.
+  if (!isFixed || remaining > 0.009) {
     sections.push(paymentForm(null, wallets, {
-      amount: remaining > 0.009 ? remaining : '',
+      amount: isFixed ? remaining : '',
+      max: isFixed ? remaining : null,
     }));
   }
   const layer = mountModal(root, modal(page(sections), {
@@ -799,6 +731,11 @@ async function openPaymentsQ(root, deposit, { onSaved = () => {} } = {}) {
         return;
       }
       const operationId = String(form.dataset.operationId || '');
+      const amountLimit = Number(form.querySelector('[name="amount"]')?.max);
+      if (isFixed && Number.isFinite(amountLimit) && amountLimit > 0 && amount > amountLimit + 0.009) {
+        if (errorNode) errorNode.textContent = 'Сумма превышает остаток по программе';
+        return;
+      }
       try {
         if (operationId) {
           await correctDepositFunding({
