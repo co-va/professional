@@ -48,7 +48,7 @@ export function openInventoryStockTargets(itemId, onSaved = () => {}) {
   const stored = new Map((item.locationTargets || [])
     .map(row => [row.locationId, row.targetStock]));
   const unit = item.thresholdUnit || item.receiptUnit || item.unit || 'шт.';
-  const markup = '<form data-inventory-targets-form>' +
+  const markup = '<form class="form-grid" data-inventory-targets-form>' +
     segmentControl([
       {value: 'overall',label: 'От общего'},
       {value: 'locations',label: 'По складам'},
