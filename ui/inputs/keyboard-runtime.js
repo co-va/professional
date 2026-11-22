@@ -45,53 +45,53 @@ function viewportSize() {
 function syncViewport() {
   const { height, width } = viewportSize();
   if (!height || !width) return;
-  // Only a changed layout width (rotation) may replace the shell's
-  // baseline during keyboard interaction. A visual viewport shrink must
-  // never shorten Z/Q, including when Safari blurs one input before focusing
-  // the next or pans to the final field.
+
+  // The keyboard changes VisualViewport, not the physical bottom of H/Z/Q/X.
+  // The layout viewport is an additional source of the pre-keyboard height.
+  // Neither a focusout nor an iOS viewport rebound may make this shell shorter.
+  const layoutHeight = Math.round(window.innerHeight || root.clientHeight || height);
+  const focused = Boolean(activeEditable());
   const rotated = !stableHeight || !stableWidth || Math.abs(width - stableWidth) > 48;
   if (rotated) {
-    stableHeight = height;
+    // A real orientation change starts a new coordinate space; an ordinary
+    // keyboard event never changes its layout width by this amount.
     stableWidth = width;
+    stableHeight = Math.max(height, layoutHeight);
     keyboardSession = false;
     keyboardInset = 0;
+  } else {
+    // Critical invariant: the containing block for Z/Q/X NEVER shrinks while
+    // the phone stays in the same orientation. In particular, do not replace
+    // it with VisualViewport.height after a delayed blur or keyboard event.
+    stableHeight = Math.max(stableHeight, height, layoutHeight);
   }
-  const focused = Boolean(activeEditable());
+
   if (focused) {
     keyboardSession = true;
     blurGraceUntil = 0;
   }
   const awaitingNextField = !focused && performance.now() < blurGraceUntil;
-  // A transient viewport expansion between two editable fields must NEVER
-  // replace the pre-keyboard shell height. Safari can deliver focusout,
-  // resize and focusin in separate frames while the keyboard stays visible.
-  if (!keyboardSession) {
-    stableHeight = height;
-    stableWidth = width;
-  } else if (!focused && !awaitingNextField && height >= stableHeight - 10) {
-    // A real blur + restored viewport ends the keyboard session.
+  if (keyboardSession && !focused && !awaitingNextField
+      && height >= stableHeight - 10) {
     keyboardSession = false;
-    stableHeight = height;
-    stableWidth = width;
   }
+
   const visibleInset = Math.max(0, stableHeight - height);
-  if (!keyboardSession || (visibleInset < 10 && !awaitingNextField)) keyboardInset = 0;
+  if (!keyboardSession) keyboardInset = 0;
   else if (visibleInset >= 60) keyboardInset = visibleInset;
-  // 10–59px can be a temporary Safari viewport rebound while moving to
-  // another input. Hold the last keyboard inset instead of revealing H.
+  // When WebKit briefly expands the viewport during a focus transition,
+  // keep the last real inset; do not expose the underlying H background.
   const keyboardOpen = keyboardSession && keyboardInset > 0;
 
   setRootPixel('--app-stable-vh', stableHeight);
   setRootPixel('--app-stable-vw', stableWidth);
-  // iOS can pan its visual viewport vertically AND horizontally when
-  // focusing an edge field. Apply both compensations only to the one app
-  // shell: Z, Q and X continue sharing its stable coordinate space.
+  // Compensate Safari's native visual viewport pan once at the app root,
+  // never independently at individual Q/X surfaces.
   const visualTop = Math.max(0, Math.round(Number(viewport()?.offsetTop || 0)));
   const visualLeft = Math.max(0, Math.round(Number(viewport()?.offsetLeft || 0)));
   setRootPixel('--ui-visual-top', visualTop);
   setRootPixel('--ui-visual-left', visualLeft);
-  const inset = keyboardOpen ? keyboardInset : 0;
-  setRootPixel('--ui-keyboard-inset', inset);
+  setRootPixel('--ui-keyboard-inset', keyboardOpen ? keyboardInset : 0);
   root.classList.toggle('keyboard-open', keyboardOpen);
 }
 
