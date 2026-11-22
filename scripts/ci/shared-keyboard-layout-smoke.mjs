@@ -24,7 +24,28 @@ let visibleHeight = 844;
 let focusedInput = false;
 let clock = 0;
 const keyboardEvents = new Map();
-class TestInput { matches() { return true; } }
+const testAction = {
+  hidden: false,
+  hasAttribute() { return false; },
+  getBoundingClientRect() { return { top: 394, bottom: 442, height: 48 }; },
+};
+const testArea = {
+  clientHeight: 220,
+  scrollHeight: 1600,
+  offset: 0,
+  getBoundingClientRect() { return { top: 180, bottom: 440, height: 260 }; },
+  matches() { return false; },
+  closest() { return { querySelectorAll() { return [testAction]; } }; },
+  scrollBy({ top }) { this.offset += top; },
+};
+class TestInput {
+  matches() { return true; }
+  get isConnected() { return true; }
+  closest(selector) { return selector.includes('data-v2-q-body') ? testArea : null; }
+  getBoundingClientRect() {
+    return { top: 740 - testArea.offset, bottom: 786 - testArea.offset, height: 46 };
+  }
+}
 const rootStyle = {
   getPropertyValue: (key) => keyboardProps.get(key) || '',
   setProperty: (key, value) => keyboardProps.set(key, value),
@@ -66,8 +87,9 @@ const testRuntime = {
   ResizeObserver: undefined,
   requestAnimationFrame() { return 1; },
   performance: { now() { return clock; } },
+  getComputedStyle() { return { display: 'grid' }; },
 };
-runInNewContext(keyboardSource + '\nwindow.__testSync = syncViewport;', testRuntime);
+runInNewContext(keyboardSource + '\nwindow.__testSync = syncViewport; window.__testFocus = keepFocusedFieldVisible;', testRuntime);
 const keyboardState = () => ({
   shell: keyboardProps.get('--app-stable-vh'),
   inset: keyboardProps.get('--ui-keyboard-inset'),
@@ -79,6 +101,12 @@ visibleHeight = 460;
 testRuntime.window.__testSync();
 const keyboardBeforeTransition = keyboardState();
 assert.equal(keyboardBeforeTransition.inset, '384px');
+testArea.offset = 0;
+testRuntime.window.__testFocus();
+const focusedBox = new TestInput().getBoundingClientRect();
+assert.ok(focusedBox.top >= 192 && focusedBox.bottom <= 382,
+  'Last input must be visible between fixed Q header and action button');
+assert.ok(testArea.offset > 0, 'Only Q scroll body must move to the last input');
 focusedInput = false;
 visibleHeight = 790; // brief focusout/viewport rebound, keyboard is STILL open
 testRuntime.window.__testSync();
@@ -203,6 +231,18 @@ try {
     html.classList.add('keyboard-open');
   });
   const after = await snapshot();
+  const nativeBackdrop = await page.evaluate(() => ({
+    html: getComputedStyle(document.documentElement).backgroundColor,
+    body: getComputedStyle(document.body).backgroundColor,
+    q: getComputedStyle(document.querySelector('#q')).backgroundColor,
+    h: getComputedStyle(document.querySelector('#h')).backgroundColor,
+  }));
+  assert.equal(nativeBackdrop.html, 'rgb(245, 245, 243)',
+    'iOS keyboard accessory backdrop must use warm Z/Q/X paper, never H');
+  assert.equal(nativeBackdrop.body, nativeBackdrop.q,
+    'Document canvas behind iOS keyboard accessory must match Q paper');
+  assert.notEqual(nativeBackdrop.h, nativeBackdrop.q,
+    'Actual H header keeps its graphite appearance');
 
   near(after.h.top, before.h.top, 'H top must stay fixed');
   near(after.z.top, before.z.top, 'Z top must stay fixed');
