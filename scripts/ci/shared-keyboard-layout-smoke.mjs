@@ -234,13 +234,22 @@ try {
   const nativeBackdrop = await page.evaluate(() => ({
     html: getComputedStyle(document.documentElement).backgroundColor,
     body: getComputedStyle(document.body).backgroundColor,
+    htmlImage: getComputedStyle(document.documentElement).backgroundImage,
+    bodyImage: getComputedStyle(document.body).backgroundImage,
+    shellImage: getComputedStyle(document.querySelector('.app-shell')).backgroundImage,
     q: getComputedStyle(document.querySelector('#q')).backgroundColor,
     h: getComputedStyle(document.querySelector('#h')).backgroundColor,
   }));
   assert.equal(nativeBackdrop.html, 'rgb(245, 245, 243)',
-    'iOS keyboard accessory backdrop must use warm Z/Q/X paper, never H');
+    'Native iOS keyboard fallback stays warm even without gradient rendering');
   assert.equal(nativeBackdrop.body, nativeBackdrop.q,
-    'Document canvas behind iOS keyboard accessory must match Q paper');
+    'Native keyboard backdrop must match warm Q paper');
+  for (const image of [nativeBackdrop.htmlImage, nativeBackdrop.bodyImage, nativeBackdrop.shellImage]) {
+    assert.match(image, /linear-gradient/,
+      'Native keyboard canvas and app shell must retain H gutter + warm Q paper');
+    assert.match(image, /rgb\\(47, 51, 56\\)|#2F3338/i,
+      'H gutter must remain graphite inside keyboard backdrop');
+  }
   assert.notEqual(nativeBackdrop.h, nativeBackdrop.q,
     'Actual H header keeps its graphite appearance');
 
