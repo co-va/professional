@@ -29,6 +29,7 @@ import { getWorkplaces } from '../../profile/workplaces/data.js';
 import { serviceHeaderContext, notifyServiceContext } from '../context.js';
 import { bindServiceWorkplaceAssignments, serviceWorkplaceAssignmentList, serviceWorkplaceAddButton } from '../workplace-selection.js';
 import { setSharedActionVisible } from '../../../ui/page/page.js';
+import { compactCheck } from '../../../ui/selection/check-list.js';
 import { productEditorSignature, rebaseWorkplaceAssignmentSignature } from '../editor-signature.js';
 import { scheduleServiceStatistics, serviceItemStatistics } from '../statistics.js';
 import { renderServiceGroupTree, serviceGroupFields, readServiceGroupFields } from '../catalog-grouping.js';
@@ -149,7 +150,15 @@ function confirmDeleteProduct(product, onDeleted) {
     if (confirm.disabled) return;
     confirm.disabled = true;
     try {
-      await commitDeleteProduct(product.id);
+      // A stock-backed product is removed from the Service sale catalogue
+      // by unchecking the canonical Stock sale flag. Its stock, history and
+      // Service-specific retail settings remain intact for later reactivation.
+      if (product.inventoryItemId) {
+        const { updateInventoryItem } = await import('../../inventory/service.js');
+        await updateInventoryItem(product.inventoryItemId, { canSell: false });
+      } else {
+        await commitDeleteProduct(product.id);
+      }
       layer.v2Close?.();
       onDeleted?.();
     } catch (error) {
@@ -168,58 +177,104 @@ function confirmDeleteProduct(product, onDeleted) {
 // A stocked product is edited in the standard Q, like a Procedure.
 // Stock still owns its identity/cost/stock. Service owns the final retail price,
 // future-facing promotional description and custom group selection.
-function openInventoryRetailEditorQ(itemId, { onSaved = () => {}, onChanged = () => {} } = {}) {
+function openInventoryRetailEditorQ(itemId, {
+  onSaved = () => {}, onChanged = () => {}, onDeleted = () => {},
+} = {}) {
   const product = getProducts().find(item => item.inventoryOwned
     && String(item.inventoryItemId) === String(itemId));
-  if (!product) return openNotice({ title: 'Товары', message: 'Товар больше не находится в продаже.' });
-  const calculated = product.calculatedSalePrice;
+  if (!product) return openNotice({
+    title: 'Товары', message: 'Товар больше не находится в продаже.',
+  });
+
   const value = Number(product.cost?.amount || 0);
-  const content = '<form data-service-retail-price-form>' +
-    '<div class="inventory-editor-row">' +
-      '<span class="inventory-editor-label">Расчётная цена (Склад)</span>' +
-      '<strong>' + escapeHtml(calculated == null ? '—' : money(calculated)) + '</strong>' +
-    '</div>' +
+  // These are read-only Stock facts, displayed with the SAME field geometry
+  // as Service → Услуги, not a second set of price editors.
+  const purchase = product.stockPurchasePrice == null
+    ? '—' : money(product.stockPurchasePrice);
+  const markup = product.stockMarkupValue == null
+    || !Number.isFinite(Number(product.stockMarkupValue))
+    ? '—' : product.stockMarkupMode === 'amount'
+      ? money(product.stockMarkupValue)
+      : String(product.stockMarkupValue) + ' %';
+  const estimated = product.calculatedSalePrice == null
+    ? '—' : money(product.calculatedSalePrice);
+
+  const content = [
+    '<form class="compact-form" data-service-retail-price-form>',
+    field({ label: 'Наименование товара', name: 'serviceRetailName',
+      value: product.name || '', readonly: true }),
+    '<div class="cost-field" data-service-price-section>',
+    '<span class="cost-field__label">Стоимость</span>',
+    '<div class="inventory-editor-row">',
+    field({ label: 'Закупка', value: purchase, readonly: true }),
+    field({ label: 'Наценка', value: markup, readonly: true }),
+    '</div>',
+    field({ label: 'Расчётная цена (Склад)', value: estimated, readonly: true }),
     field({ label: 'Цена продажи, ₽', name: 'serviceRetailPrice',
       type: 'number', min: '0', step: '0.01', inputmode: 'decimal',
-      value: String(value) }) +
+      value: String(value) }),
+    '</div>',
     textareaField({ label: 'Описание', name: 'serviceRetailAbout',
       value: product.about || '', rows: 5, maxlength: 5000,
-      placeholder: 'Описание товара для будущего публичного показа' }) +
-    serviceGroupFields('products', product.groupValues || {}) +
-    serviceWorkplaceAssignmentList() +
-    '<div class="app-settings-panel service-workplace-add-panel">' +
-      serviceWorkplaceAddButton() + '</div>' +
-    '<div class="form-error" data-service-retail-price-error role="alert"></div>' +
-    actionBlock(button('Применить', { type: 'submit', data: 'data-service-retail-price-apply' })) +
-  '</form>';
+      placeholder: 'Описание товара для будущего публичного показа' }),
+    serviceGroupFields('products', product.groupValues || {}),
+    '<div class="app-settings-panel">',
+    compactCheck({ label: 'Для онлайн-записи', checked: false, disabled: true }),
+    '</div>',
+    serviceWorkplaceAssignmentList(),
+    '<div class="form-error" data-service-retail-price-error role="alert"></div>',
+    '</form>',
+    actionBlock(button('Сохранить', {
+      type: 'button', data: 'data-service-retail-price-apply',
+    })),
+    '<div class="app-settings-panel service-workplace-add-panel">',
+    serviceWorkplaceAddButton(),
+    '</div>',
+    '<div class="app-settings-panel">',
+    button('Удалить товар', {
+      type: 'button', variant: 'danger', data: 'data-service-retail-product-delete',
+    }),
+    '</div>',
+  ].join('');
+
   const layer = mountModal(document.body, modal(content, {
-    title: product.name || 'Товар', variant: 'q', surface: 'app',
+    title: product.name || 'Товар',
+    variant: 'q', surface: 'app', className: 'service-product-editor-layer',
   }));
   if (!layer) return null;
   const form = layer.querySelector('[data-service-retail-price-form]');
   const input = form?.querySelector('[name="serviceRetailPrice"]');
   const about = form?.querySelector('[name="serviceRetailAbout"]');
-  const apply = layer.querySelector('[data-service-retail-price-apply]');
-  const actions = apply?.closest('.modal-actions');
+  const primary = layer.querySelector('[data-service-retail-price-apply]');
+  const actions = primary?.closest('.modal-actions');
   const error = layer.querySelector('[data-service-retail-price-error]');
-  if (!form || !input || !about || !apply) return layer;
-  const selectedGroups = () => {
-    const current = readServiceGroupFields(form);
-    return form.querySelector('[data-service-group-level]') ? current : product.groupValues || {};
-  };
+  if (!form || !input || !about || !primary) return layer;
+
+  const selectedGroups = () => form.querySelector('[data-service-group-level]')
+    ? readServiceGroupFields(form) : product.groupValues || {};
   const signature = () => JSON.stringify({
     price: input.value.trim().replace(',', '.'),
     about: about.value.trim(),
     groups: selectedGroups(),
   });
   const initial = signature();
-
+  let saving = false;
+  let visible = null;
+  const sync = () => {
+    const changed = signature() !== initial;
+    if (visible !== changed) setSharedActionVisible(actions, changed);
+    visible = changed;
+    setSharedProfilePrimary(primary, {
+      visible: changed, label: 'Сохранить', disabled: saving,
+    });
+  };
   const publish = () => {
     const saved = getProducts().find(item => item.inventoryOwned
       && String(item.inventoryItemId) === String(itemId));
     if (saved) onSaved(saved);
     onChanged();
   };
+
   bindServiceWorkplaceAssignments(layer, {
     kind: 'product',
     selected: product.workplaces,
@@ -234,16 +289,12 @@ function openInventoryRetailEditorQ(itemId, { onSaved = () => {}, onChanged = ()
     },
   });
 
-  let saving = false;
-  const sync = () => setSharedActionVisible(actions, saving || signature() !== initial);
   form.addEventListener('input', sync);
   form.addEventListener('change', sync);
-  sync();
-  form.addEventListener('submit', async event => {
-    event.preventDefault();
-    if (saving) return;
+  const save = async () => {
+    if (saving || signature() === initial) return;
     saving = true;
-    apply.disabled = true;
+    sync();
     if (error) error.textContent = '';
     try {
       await commitInventoryProductPresentation(itemId, {
@@ -254,11 +305,26 @@ function openInventoryRetailEditorQ(itemId, { onSaved = () => {}, onChanged = ()
     } catch (cause) {
       if (error) error.textContent = cause instanceof Error
         ? cause.message : 'Не удалось сохранить товар.';
+    } finally {
       saving = false;
-      apply.disabled = false;
-      sync();
+      if (layer.isConnected) sync();
     }
+  };
+  primary.addEventListener('click', () => { void save(); });
+  form.addEventListener('submit', event => {
+    event.preventDefault();
+    void save();
   });
+  layer.querySelector('[data-service-retail-product-delete]')?.addEventListener(
+    'click', () => {
+      confirmDeleteProduct(product, () => {
+        layer.v2Close?.();
+        onDeleted(product);
+        onChanged();
+      });
+    },
+  );
+  sync();
   return layer;
 }
 
@@ -298,7 +364,7 @@ export function openProductEditor(root, existing = null, {
   onDeleted = () => {},
 } = {}) {
   if (existing?.inventoryItemId) {
-    return openInventoryRetailEditorQ(existing.inventoryItemId, { onSaved, onChanged });
+    return openInventoryRetailEditorQ(existing.inventoryItemId, { onSaved, onChanged, onDeleted });
   }
   const draft = initialProduct(existing);
   const body = [
