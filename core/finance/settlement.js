@@ -4,7 +4,7 @@
 import { getStoredSettlement } from './data.js';
 import { getActiveDDSMovements, getActiveDDSMovementsForSource } from './read.js';
 import { resolvePersonPriceCondition } from '../loyalty/price-condition.js';
-import { getAllPeople, getPersonPriceCondition } from '../people/data.js';
+import { getAllPeople, getPersonPriceCondition, supersededPersonalPricePercent } from '../people/data.js';
 import { getWorkplaces } from '../workplace-time.js';
 import { hasZonedIntervalEnded } from '../time/zone.js';
 import {
@@ -55,14 +55,26 @@ function settlementItemsWithConditions(items = [], { programPercent = 0, persona
   });
 }
 
-function settlementWithCurrentConditions(settlement = null, { programPercent = 0, personalPercent = 0 } = {}) {
+function settlementWithCurrentConditions(settlement = null, { programPercent = 0, personalPercent = 0, supersededPercent = 0 } = {}) {
   if (!settlement) return null;
   const currentProgramPercent = clampFinancialPercent(programPercent);
   const previousProgramPercent = clampFinancialPercent(settlement?.pricePercent ?? 0);
+  const superseded = clampFinancialPercent(supersededPercent);
   const items = settlementItemsWithConditions(settlement.items, {
     programPercent: currentProgramPercent,
     personalPercent,
     seedPersonal: currentProgramPercent <= 0 && previousProgramPercent > 0,
+  }).map(item => {
+    // Old bookings can carry an auto-seeded Personal percentage as a saved
+    // correction. Do not revive that obsolete suggestion after a deposit.
+    // Preserve money corrections and nonmatching per-item adjustments.
+    const isLegacyPersonal = currentProgramPercent <= 0 && personalPercent <= 0
+      && superseded > 0
+      && item.correctionMode === 'percent'
+      && Math.abs(clampFinancialPercent(item.correctionPercent) - superseded) < 0.0001;
+    return isLegacyPersonal
+      ? { ...item, correctionMode: 'none', correctionPercent: '', correctionMoney: '' }
+      : item;
   });
   return calculateSettlement(items, { pricePercent: currentProgramPercent });
 }
@@ -82,7 +94,10 @@ export function resolveRecordSettlement(record = null, { pricePercent = null } =
       const movements = getActiveDDSMovementsForSource('record', record.id);
       return movements.length
         ? owned
-        : settlementWithCurrentConditions(owned, { programPercent, personalPercent });
+        : settlementWithCurrentConditions(owned, {
+          programPercent, personalPercent,
+          supersededPercent: supersededPersonalPricePercent(currentPerson(record?.person)),
+        });
     }
   }
   const items = settlementItemsWithConditions(recordSettlementItems(record), {

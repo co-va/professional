@@ -164,6 +164,13 @@ function manualDiscountSuperseded(person=null){
   });
 }
 
+// Legacy Personal percentages predating deposit issue were suggestions,
+// not permanently granted terms. Expose their old rate only for identifying
+// an unconfirmed saved suggestion in a still-unpaid Record.
+export function supersededPersonalPricePercent(person = null){
+  return manualDiscountSuperseded(person) ? normalizeDiscount(person || {}) : 0;
+}
+
 // Canonical presentation condition: record visit date selects the deposit.
 // A paid Settlement retains its historical pricing independently.
 export function getPersonPriceCondition(person = null, at = new Date()) {
