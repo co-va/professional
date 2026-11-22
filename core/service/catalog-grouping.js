@@ -108,7 +108,8 @@ export function bindServiceGroupFields(root) {
       const candidate = event.target.closest?.('[data-service-group-pick]');
       if (!candidate) return;
       const group = levels.find(item => item.id === candidate.value);
-      if (group && !rows.querySelector('[data-service-group-row="' + CSS.escape(group.id) + '"]')) {
+      if (group && ![...rows.querySelectorAll('[data-service-group-row]')]
+        .some(row => row.dataset.serviceGroupRow === group.id)) {
         rows.insertAdjacentHTML('beforeend', serviceGroupRow(group));
         refreshPlus();
         changed();
