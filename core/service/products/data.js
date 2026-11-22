@@ -1,5 +1,5 @@
 import { queueAuxiliaryDataset, isBusinessServerReady } from '../../../core/business-persistence.js';
-import { commitServiceCollection, replaceServiceItem, changeServiceItemWorkplace } from '../workplace-assignment.js';
+import { commitServiceCollection, replaceServiceItem, changeServiceItemWorkplace, changeWorkplaceAssignment } from '../workplace-assignment.js';
 import { getInventoryItems } from '../../inventory/data.js';
 
 let productsState = [];
@@ -70,7 +70,9 @@ export function inventorySaleProduct(item, linked = null) {
     // The price per base sale unit is used only to calculate the final bill.
     pricePerUnit: Number.isFinite(unitPrice) ? unitPrice / (Number(item.saleQuantity) > 0 ? Number(item.saleQuantity) : 1) : 0,
     cost: { mode: 'amount', amount: Number.isFinite(unitPrice) ? Math.round(unitPrice * 100) / 100 : 0, free: false },
-    about: '', workplaces: [], inventoryOwned: true,
+    about: '', 
+    workplaces: Array.isArray(linked?.workplaces) ? clone(linked.workplaces) : [],
+    inventoryOwned: true,
     calculatedSalePrice: Number.isFinite(calculatedPrice) ? Math.round(calculatedPrice * 100) / 100 : null,
     retailPriceOverride: override,
   };
@@ -205,6 +207,31 @@ export async function commitInventoryRetailPrice(itemId, price) {
       }];
       return values.map((item, i) => i === index
         ? { ...item, retailPriceOverride: value } : item);
+    },
+  });
+}
+
+// Stock identity and quantity remain in Inventory. Service owns only the
+// per-workplace sale assignments alongside its retail price overlay.
+// The shared assignment transformer is the same one used by Procedures.
+export async function commitInventoryProductWorkplace(itemId, workplaceId, assignment) {
+  const id = String(itemId || '').trim();
+  if (!getInventoryItems().some(item => String(item.itemId) === id && item.canSell === true)) {
+    throw new Error('Товар больше не находится в продаже.');
+  }
+  await commitServiceCollection({
+    read: readRawProducts,
+    persist: values => queueAuxiliaryDataset('products', values),
+    hydrate: values => { productsState = clone(values); },
+    mutate: values => {
+      const index = values.findIndex(item => !item.deletedAt
+        && String(item.inventoryItemId || '') === id);
+      if (index < 0) {
+        const base = { id: 'inventory:' + id, inventoryItemId: id, workplaces: [] };
+        return [...values, changeWorkplaceAssignment(base, workplaceId, assignment)];
+      }
+      return values.map((item, i) => i === index
+        ? changeWorkplaceAssignment(item, workplaceId, assignment) : item);
     },
   });
 }
