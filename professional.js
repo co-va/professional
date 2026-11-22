@@ -47,19 +47,13 @@ function renderWorkspaceUnavailable(account, cause) {
   app.querySelector('[data-workspace-load-error]').textContent =
     cause instanceof Error ? cause.message : 'Не удалось загрузить рабочий экран';
   app.querySelector('[data-workspace-logout]')?.addEventListener('click', logout);
-  app.querySelector('[data-workspace-retry]')?.addEventListener('click', async (event) => {
-    const button = event.currentTarget;
-    button.disabled = true;
-    try {
-      const current = account || await getCurrentAccount();
-      if (!current) {
-        renderLogin();
-        return;
-      }
-      await enterWorkspace(current);
-    } catch (error) {
-      renderWorkspaceUnavailable(account, error);
-    }
+  app.querySelector('[data-workspace-retry]')?.addEventListener('click', (event) => {
+    event.currentTarget.disabled = true;
+    // After deployment the cached shell can reference missing old asset URLs.
+    // Refresh the HTML version instead of retrying the same module import.
+    const url = new URL(location.href);
+    url.searchParams.set('workspace-refresh', String(Date.now()));
+    location.replace(url.toString());
   });
 }
 
