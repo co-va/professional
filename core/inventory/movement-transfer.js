@@ -86,7 +86,7 @@ export function openInventoryTransfer(onSaved = () => {}, {
   let pending = false;
   let submittedPayload = null;
 
-  const markup = '<form data-inventory-transfer-form>' +
+  const markup = '<form class="form-grid" data-inventory-transfer-form>' +
       select({ label: 'Из места', name: 'fromLocationId', value: fromDefault,
         options: [{ value: '', label: 'Выберите исходный склад' }, ...places] }) +
       select({ label: 'В место', name: 'toLocationId', value: toDefault,
