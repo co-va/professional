@@ -231,6 +231,58 @@ export function getServiceGroupLevels(kind) {
   return Array.isArray(config?.levels?.[kind]) ? clone(config.levels[kind]) : [];
 }
 
+// One combined Service group directory. Definitions stay separated by usage
+// (Services/Products) in the SAME existing config row, never separate menus.
+// Global ordering controls the mixed V2 directory; per-kind ordering controls
+// the group selectors inside Service cards.
+const serviceGroupKey = (kind, id) => kind + ':' + id;
+
+function serviceGroupConfig(values = readRawProducts()) {
+  return values.find(item => item.id === SERVICE_GROUP_CONFIG_ID
+    && item.kind === 'service-catalog-config' && !item.deletedAt) || null;
+}
+
+export function getServiceGroupEntries() {
+  const config = serviceGroupConfig();
+  const entries = [...serviceKinds].flatMap(kind =>
+    (Array.isArray(config?.levels?.[kind]) ? config.levels[kind] : []).map(group => ({
+      ...clone(group), kind, key: serviceGroupKey(kind, group.id),
+    })));
+  const order = new Map((Array.isArray(config?.order) ? config.order : [])
+    .map((key, index) => [String(key), index]));
+  return entries.map((group, index) => ({ group, index }))
+    .sort((a, b) => (order.get(a.group.key) ?? Number.MAX_SAFE_INTEGER) -
+      (order.get(b.group.key) ?? Number.MAX_SAFE_INTEGER) || a.index - b.index)
+    .map(row => row.group);
+}
+
+export async function commitServiceGroupOrder(keys = []) {
+  const existing = getServiceGroupEntries();
+  const expected = new Set(existing.map(entry => entry.key));
+  const nextKeys = (Array.isArray(keys) ? keys : []).map(String);
+  if (nextKeys.length !== expected.size || new Set(nextKeys).size !== expected.size
+      || nextKeys.some(key => !expected.has(key))) {
+    throw new Error('Список групп изменился. Откройте его повторно.');
+  }
+  const rank = new Map(nextKeys.map((key, index) => [key, index]));
+  await commitServiceCollection({
+    read: readRawProducts,
+    persist: values => queueAuxiliaryDataset('products', values),
+    hydrate: values => { productsState = clone(values); },
+    mutate: values => values.map(row => {
+      if (row.id !== SERVICE_GROUP_CONFIG_ID || row.kind !== 'service-catalog-config') return row;
+      const levels = Object.fromEntries([...serviceKinds].map(kind => [kind,
+        (row.levels?.[kind] || []).slice()
+          .sort((a, b) => (rank.get(serviceGroupKey(kind, a.id)) ?? Number.MAX_SAFE_INTEGER) -
+            (rank.get(serviceGroupKey(kind, b.id)) ?? Number.MAX_SAFE_INTEGER))
+          .map((entry, index) => ({ ...entry, position: index + 1 })),
+      ]));
+      return { ...row, levels: { ...row.levels, ...levels }, order: nextKeys };
+    }),
+  });
+  return getServiceGroupEntries();
+}
+
 export async function commitServiceGroupLevels(kind, entries = []) {
   if (!serviceKinds.has(kind)) throw new Error('Неизвестный раздел Сервиса.');
   const levels = Array.isArray(entries) ? entries : [];
@@ -266,9 +318,17 @@ export async function commitServiceGroupLevels(kind, entries = []) {
     mutate: values => {
       const old = values.find(item => item.id === SERVICE_GROUP_CONFIG_ID
         && item.kind === 'service-catalog-config');
+      const nextLevels = { ...(old?.levels || {}), [kind]: normalized };
+      const allKeys = [...serviceKinds].flatMap(section =>
+        (nextLevels[section] || []).map(group => serviceGroupKey(section, group.id)));
+      const order = [
+        ...(Array.isArray(old?.order) ? old.order : [])
+          .filter(key => allKeys.includes(key)),
+        ...allKeys.filter(key => !(old?.order || []).includes(key)),
+      ];
       const config = {
         id: SERVICE_GROUP_CONFIG_ID, kind: 'service-catalog-config',
-        levels: { ...(old?.levels || {}), [kind]: normalized },
+        ...old, levels: nextLevels, order,
       };
       return old ? values.map(item => item === old ? config : item)
         : [...values, config];
