@@ -12,6 +12,9 @@ let stableWidth = 0;
 // Keep the outer shell's pre-keyboard dimensions through input changes and
 // WebKit's staggered focus/viewport events. Only its work area may shrink.
 let keyboardSession = false;
+// Keep the last real keyboard inset through WebKit's intermediate focusout /
+// focusin viewport rebounds. A short rebound must not move the Z/Q footer.
+let keyboardInset = 0;
 let actionsFrame = 0;
 let trackingFrame = 0;
 let trackThrough = 0;
@@ -48,6 +51,7 @@ function syncViewport() {
     stableHeight = height;
     stableWidth = width;
     keyboardSession = false;
+    keyboardInset = 0;
   }
   const focused = Boolean(activeEditable());
   if (focused) keyboardSession = true;
@@ -63,7 +67,12 @@ function syncViewport() {
     stableHeight = height;
     stableWidth = width;
   }
-  const keyboardOpen = keyboardSession && height < stableHeight - 60;
+  const visibleInset = Math.max(0, stableHeight - height);
+  if (!keyboardSession || visibleInset < 10) keyboardInset = 0;
+  else if (visibleInset >= 60) keyboardInset = visibleInset;
+  // 10–59px can be a temporary Safari viewport rebound while moving to
+  // another input. Hold the last keyboard inset instead of revealing H.
+  const keyboardOpen = keyboardSession && keyboardInset > 0;
 
   setRootPixel('--app-stable-vh', stableHeight);
   setRootPixel('--app-stable-vw', stableWidth);
@@ -74,7 +83,7 @@ function syncViewport() {
   const visualLeft = Math.max(0, Math.round(Number(viewport()?.offsetLeft || 0)));
   setRootPixel('--ui-visual-top', visualTop);
   setRootPixel('--ui-visual-left', visualLeft);
-  const inset = keyboardOpen ? Math.max(0, stableHeight - height) : 0;
+  const inset = keyboardOpen ? keyboardInset : 0;
   setRootPixel('--ui-keyboard-inset', inset);
   root.classList.toggle('keyboard-open', keyboardOpen);
 }
