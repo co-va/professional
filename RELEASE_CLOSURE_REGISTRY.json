@@ -3,7 +3,7 @@
   "scope": "Техническое закрытие продукта, не тарифный каталог Core и не AdminToolReadiness",
   "repository": "co-va/professional",
   "branch": "staging",
-  "updatedAt": "2026-11-15",
+  "updatedAt": "2026-11-22",
   "rules": {
     "states": {
       "open": "Не принято",
@@ -545,16 +545,17 @@
         "visual": "15.11.2026: открыт общий дефект Z/Q/X на iPhone — при появлении клавиатуры сдвигается модальный слой и снизу подтягивается фон. Эталон: H-фон остаётся неподвижным, клавиатура не сдвигает Z; сохраняется общая геометрия Z/Q/X. Требует отдельной адресной приёмки.",
         "interaction": "не проверено",
         "data": "не проверено",
-        "regression": "не проверено",
-        "architecture": "не проверено"
+        "regression": "22.11.2026: проверка кода Shared keyboard-runtime на частичный и полный iOS viewport rebound между последними полями PASS; существующий smoke расширен проверками Q-футера и запретом принудительного скролла. Синтетическая проверка не заменяет браузерную и реальный iPhone; Amvera не проверена.",
+        "architecture": "22.11.2026: «Расходники» и «Данные клиента» используют общий Q через ui/modals/index.js, общий runtime ui/inputs/keyboard-runtime.js и общие Z/Q/X. Исправление без локальных правил отдельных форм. Основные JS-модули и экранные CSS просмотрены на конкурирующие обработчики клавиатуры."
       },
       "closure": {
-        "state": "open",
+        "state": "verifying",
         "approvedBy": null,
         "approvedAt": null,
         "baselineSha": null,
         "evidence": [
-          "Видеозапись ручной проверки от 15.11.2026 (в диалоге): нестабильность высоты/позиции общей модальной поверхности при клавиатуре. Не приписывать локально Журналу; общий shared.modal остаётся open."
+          "Видеозапись ручной проверки от 15.11.2026 (в диалоге): нестабильность высоты/позиции общей модальной поверхности при клавиатуре. Не приписывать локально Журналу; общий shared.modal остаётся open.",
+          "22.11.2026: в professional/staging исправлен iOS focusout/focusin viewport rebound с сохранением позиции Z/Q и футера: ui/inputs/keyboard-runtime.js + ui/modals/modal.css. Runtime mock PASS; единый smoke scripts/ci/shared-keyboard-layout-smoke.mjs расширен. Базовая фиксация SHA 240c5b2d94e326fda13f1ee4883bd35291bbd50a. Реальный iPhone/Amvera — НЕ проверено, approvedBy/approvedAt/baselineSha сохраняются null, locked не ставить."
         ]
       }
     },
