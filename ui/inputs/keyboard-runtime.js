@@ -96,7 +96,10 @@ function syncViewport() {
   const priorInset = Number.parseFloat(root.style.getPropertyValue('--ui-keyboard-inset')) || 0;
   setRootPixel('--ui-keyboard-inset', nextInset);
   root.classList.toggle('keyboard-open', keyboardOpen);
-  if (keyboardOpen && Math.abs(nextInset - priorInset) > 1) scheduleFocusedFieldVisibility();
+  if (keyboardOpen && Math.abs(nextInset - priorInset) > 1) {
+    scheduleActionSync();
+    scheduleFocusedFieldVisibility();
+  }
 }
 
 const observedActions = new Set();
@@ -113,8 +116,36 @@ function measurableAction(surface) {
     .find((node) => node.getBoundingClientRect().height > 0 && getComputedStyle(node).display !== 'none') || null;
 }
 
+// Keyboard footer actions have two semantic roles. Commit actions can finish
+// the current input; contextual/destructive/navigation actions must not float
+// over the keyboard. Shared classification also handles a button whose caption
+// switches dynamically (e.g. "Редактировать" -> "Применить").
+// Explicit data-ui-keyboard-action="commit|auxiliary" on a button is authoritative.
+const COMMIT_CAPTION = /^(?:сохранить|применить|подтвердить|оплатить|отправить)(?:\\s|$|[.!,:])/iu;
+function syncKeyboardFooterActions() {
+  document.querySelectorAll('.modal-actions button').forEach((button) => {
+    if (!button.hasAttribute('data-ui-keyboard-auto')
+        && /^(?:commit|auxiliary)$/.test(button.getAttribute('data-ui-keyboard-action') || '')) return;
+    const dangerous = button.classList.contains('ui-button--critical')
+      || button.classList.contains('ui-button--danger')
+      || button.classList.contains('ui-button--delete-outline');
+    const label = (button.textContent || '').trim().replace(/\\s+/g, ' ');
+    const isCommit = !dangerous && (
+      COMMIT_CAPTION.test(label) || button.type === 'submit'
+    );
+    const role = isCommit ? 'commit' : 'auxiliary';
+    if (button.getAttribute('data-ui-keyboard-action') !== role) {
+      button.setAttribute('data-ui-keyboard-action', role);
+    }
+    if (!button.hasAttribute('data-ui-keyboard-auto')) {
+      button.setAttribute('data-ui-keyboard-auto', '');
+    }
+  });
+}
+
 function syncActionHeights() {
   actionsFrame = 0;
+  syncKeyboardFooterActions();
   const areas = document.querySelectorAll('[data-v2-z-body], [data-v2-q-body]');
   const nextActions = new Set();
   areas.forEach((area) => {
