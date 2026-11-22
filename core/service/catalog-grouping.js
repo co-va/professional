@@ -349,9 +349,14 @@ export function openServiceGroupingQ({ onSaved = () => {} } = {}) {
     '<div data-service-group-directory></div>' +
       '<div data-service-group-detail hidden></div>' +
       '<div class="form-error" role="alert" data-service-groups-error></div>' +
-      actionBlock(button('Добавить группу', {
-        type: 'button', data: 'data-service-groups-main-action',
-      })),
+      actionBlock(
+        button('Изменить группу', {
+          type: 'button', variant: 'secondary', data: 'data-service-groups-edit-action',
+        }) +
+        button('Добавить группу', {
+          type: 'button', data: 'data-service-groups-main-action',
+        }),
+      ),
     { title: 'Группы', variant: 'q', surface: 'app' },
   ));
   if (!layer) return null;
@@ -359,6 +364,7 @@ export function openServiceGroupingQ({ onSaved = () => {} } = {}) {
   const directory = layer.querySelector('[data-service-group-directory]');
   const detail = layer.querySelector('[data-service-group-detail]');
   const action = layer.querySelector('[data-service-groups-main-action]');
+  const editAction = layer.querySelector('[data-service-groups-edit-action]');
   const error = layer.querySelector('[data-service-groups-error]');
 
   function repaint() {
@@ -371,13 +377,12 @@ export function openServiceGroupingQ({ onSaved = () => {} } = {}) {
     const headerTitle = layer.querySelector('[data-v2-q-header] .v2-q-title');
     if (headerTitle) {
       headerTitle.textContent = inDetail ? active.name : 'Группы';
-      headerTitle.style.cursor = inDetail ? 'pointer' : '';
-      headerTitle.setAttribute('aria-label', inDetail
-        ? 'Изменить группу ' + active.name : 'Группы');
+      // The heading is purely a heading. Editing is a bottom action.
     }
     directory.hidden = inDetail;
     detail.hidden = !inDetail;
     action.textContent = inDetail ? 'Добавить значение' : 'Добавить группу';
+    if (editAction) editAction.style.display = inDetail ? '' : 'none';
     if (error) error.textContent = '';
     if (!inDetail) {
       directory.innerHTML = entries.length
@@ -408,9 +413,8 @@ export function openServiceGroupingQ({ onSaved = () => {} } = {}) {
       return;
     }
 
-    // The native Q arrow handles back through layer.v2Back. No oversized
-    // navigation/action buttons above the value rows. The group name in the
-    // standard Q heading is tappable to edit its own name in compact X.
+    // Use the native Q arrow to return to the group directory. Group edits
+    // remain in the Q bottom action area; no buttons above the value rows.
     detail.innerHTML =
       '<div class="inventory-editor-label">' + kindLabel(active.kind) + '</div>' +
       '<div data-service-group-value-list></div>';
@@ -462,7 +466,7 @@ export function openServiceGroupingQ({ onSaved = () => {} } = {}) {
     repaint();
     return true;
   };
-  layer.querySelector('[data-v2-q-header] .v2-q-title')?.addEventListener('click', () => {
+  editAction?.addEventListener('click', () => {
     const active = activeKey ? groupByKey(activeKey) : null;
     if (active) groupEditorX(active);
   });
