@@ -368,6 +368,13 @@ export function openServiceGroupingQ({ onSaved = () => {} } = {}) {
     const active = activeKey ? entries.find(item => item.key === activeKey) : null;
     if (activeKey && !active) activeKey = null;
     const inDetail = Boolean(active && activeKey);
+    const headerTitle = layer.querySelector('[data-v2-q-header] .v2-q-title');
+    if (headerTitle) {
+      headerTitle.textContent = inDetail ? active.name : 'Группы';
+      headerTitle.style.cursor = inDetail ? 'pointer' : '';
+      headerTitle.setAttribute('aria-label', inDetail
+        ? 'Изменить группу ' + active.name : 'Группы');
+    }
     directory.hidden = inDetail;
     detail.hidden = !inDetail;
     action.textContent = inDetail ? 'Добавить значение' : 'Добавить группу';
@@ -401,26 +408,12 @@ export function openServiceGroupingQ({ onSaved = () => {} } = {}) {
       return;
     }
 
+    // The native Q arrow handles back through layer.v2Back. No oversized
+    // navigation/action buttons above the value rows. The group name in the
+    // standard Q heading is tappable to edit its own name in compact X.
     detail.innerHTML =
-      '<div class="field-inline-label">' +
-        button('← Группы', {
-          type: 'button', variant: 'secondary', data: 'data-service-group-back',
-        }) +
-        button('Изменить группу', {
-          type: 'button', variant: 'secondary', data: 'data-service-group-edit',
-        }) +
-      '</div>' +
-      '<div class="field-inline-label"><span>' + escapeHtml(active.name) +
-        '</span><span>' + kindLabel(active.kind) + '</span></div>' +
+      '<div class="inventory-editor-label">' + kindLabel(active.kind) + '</div>' +
       '<div data-service-group-value-list></div>';
-
-    detail.querySelector('[data-service-group-back]')?.addEventListener('click', () => {
-      activeKey = null;
-      repaint();
-    });
-    detail.querySelector('[data-service-group-edit]')?.addEventListener('click', () => {
-      groupEditorX(active);
-    });
     const listHost = detail.querySelector('[data-service-group-value-list]');
     const values = Array.isArray(active.values) ? active.values : [];
     listHost.innerHTML = values.length
@@ -461,6 +454,18 @@ export function openServiceGroupingQ({ onSaved = () => {} } = {}) {
     });
   }
 
+  // The shared Q surface already supports v2Back for its native arrow
+  // and swipe. Consume Back only inside a group; otherwise dismiss normally.
+  layer.v2Back = () => {
+    if (!activeKey) return false;
+    activeKey = null;
+    repaint();
+    return true;
+  };
+  layer.querySelector('[data-v2-q-header] .v2-q-title')?.addEventListener('click', () => {
+    const active = activeKey ? groupByKey(activeKey) : null;
+    if (active) groupEditorX(active);
+  });
   action.addEventListener('click', () => {
     if (activeKey) valueEditorX(activeKey);
     else groupEditorX();
