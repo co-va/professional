@@ -82,9 +82,10 @@ export function getProducts() {
     .map(item => [String(item.inventoryItemId), item]));
   const stock = getInventoryItems().filter(item => item.canSell === true)
     .map(item => inventorySaleProduct(item, overlays.get(String(item.itemId))));
-  const linked = new Set(stock.map(item => String(item.inventoryItemId)));
-  const legacy = raw.filter(item => !item.deletedAt
-    && (!item.inventoryItemId || !linked.has(String(item.inventoryItemId))));
+  // A linked stock item is visible in Service ONLY while Inventory marks it
+  // «Продажа». Price overlays and legacy linked rows never become phantom
+  // catalogue products when the sale flag is switched off.
+  const legacy = raw.filter(item => !item.deletedAt && !item.inventoryItemId);
   return [...stock, ...legacy];
 }
 
