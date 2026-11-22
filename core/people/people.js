@@ -1168,7 +1168,7 @@ function openPersonEdit(baseRoot, key, callbacks = {}) {
   const person = getAllPeople().find((item) => item.key === key);
   if (!person) return null;
   const all = getAllPeople();
-  const layer = mountModal(baseRoot, modal(`<form data-person-edit-form>
+  const layer = mountModal(baseRoot, modal(`<form class="form-grid" data-person-edit-form>
     ${personDataFields(person, all)}
     <div class="form-error" data-person-edit-error></div>
     ${actionBlock(button('Сохранить', { type: 'button', data: 'data-person-q-save', aria: 'Сохранить изменения' }))}
