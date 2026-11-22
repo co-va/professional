@@ -115,6 +115,12 @@ assert(vHost.includes("addEventListener('va-tools:v2-context-changed'"), 'V host
 // Shared keyboard geometry is one owner; never add per-field scroll handlers.
 assert(keyboardRuntime.includes('let keyboardSession = false;'), 'Shared keyboard session owner missing');
 assert(!keyboardRuntime.includes('scrollTop') && !keyboardRuntime.includes('scrollIntoView'), 'Keyboard controller must never scroll fields on a frame or focus event');
+assert(keyboardRuntime.includes('function keepFocusedFieldVisible()')
+  && keyboardRuntime.includes("field.closest('[data-v2-z-body], [data-v2-q-body], .v2-layer--bottom')")
+  && keyboardRuntime.includes("area.scrollBy({ top: delta, behavior: 'instant' })"),
+  'Keyboard focus must scroll only the shared Z/Q/X inner body to the active field');
+assert(keyboardStyle.includes('html.keyboard-open body:has([data-v2-app])'),
+  'iOS keyboard accessory background must be warm Z/Q/X paper, never H');
 assert(keyboardRuntime.includes("setRootPixel('--ui-visual-left', visualLeft)"), 'Horizontal Safari viewport compensation missing');
 assert(shellStyle.includes('transform:translateX(var(--ui-visual-left,0px))'), 'Shared application root must compensate Safari horizontal pan');
 assert(keyboardStyle.includes('.v2-layer--bottom{\\n  bottom:0;'.replace('\\n', '\n')), 'X inner surface must stay attached to bottom under keyboard');
