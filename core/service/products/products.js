@@ -32,7 +32,7 @@ import { setSharedActionVisible } from '../../../ui/page/page.js';
 import { productEditorSignature, rebaseWorkplaceAssignmentSignature } from '../editor-signature.js';
 import { scheduleServiceStatistics, serviceItemStatistics } from '../statistics.js';
 import { productCardAppearance, productCardFields, productCardPhoto } from '../card-presentation.js';
-import { commitDeleteProduct, getProducts, commitReorderProducts, commitProduct, commitProductWorkplace, commitInventoryRetailPrice } from './data.js';
+import { commitDeleteProduct, getProducts, commitReorderProducts, commitProduct, commitProductWorkplace, commitInventoryRetailPrice, commitInventoryProductWorkplace } from './data.js';
 
 const money = (value) => `${new Intl.NumberFormat('ru-RU').format(Number(value || 0))} ₽`;
 
@@ -153,27 +153,30 @@ function confirmDeleteProduct(product, onDeleted) {
 
 // The stock is the only product entity. Service stores a final retail price
 // overlay through its existing products dataset; no changes to Inventory.
-function openInventoryRetailPriceQ(itemId, { onSaved = () => {}, onChanged = () => {} } = {}) {
+// The main product card stays in Z. A compact X edits only the retail
+// price and the same workplace assignments used by Service → Услуги.
+function openInventoryRetailEditorX(itemId, { onSaved = () => {}, onChanged = () => {} } = {}) {
   const product = getProducts().find(item => item.inventoryOwned
     && String(item.inventoryItemId) === String(itemId));
   if (!product) return openNotice({ title: 'Товары', message: 'Товар больше не находится в продаже.' });
   const calculated = product.calculatedSalePrice;
   const value = Number(product.cost?.amount || 0);
   const content = '<form data-service-retail-price-form>' +
-    '<div class="inventory-editor-group">' +
-      '<div class="inventory-editor-row">' +
-        '<span class="inventory-editor-label">Расчётная цена (Склад)</span>' +
-        '<strong>' + escapeHtml(calculated == null ? '—' : money(calculated)) + '</strong>' +
-      '</div>' +
-      field({ label: 'Цена продажи, ₽', name: 'serviceRetailPrice',
-        type: 'number', min: '0', step: '0.01', inputmode: 'decimal',
-        value: String(value) }) +
+    '<div class="inventory-editor-row">' +
+      '<span class="inventory-editor-label">Расчётная цена (Склад)</span>' +
+      '<strong>' + escapeHtml(calculated == null ? '—' : money(calculated)) + '</strong>' +
     '</div>' +
+    field({ label: 'Цена продажи, ₽', name: 'serviceRetailPrice',
+      type: 'number', min: '0', step: '0.01', inputmode: 'decimal',
+      value: String(value) }) +
+    serviceWorkplaceAssignmentList() +
+    '<div class="app-settings-panel service-workplace-add-panel">' +
+      serviceWorkplaceAddButton() + '</div>' +
     '<div class="form-error" data-service-retail-price-error role="alert"></div>' +
     actionBlock(button('Применить', { type: 'submit', data: 'data-service-retail-price-apply' })) +
   '</form>';
   const layer = mountModal(document.body, modal(content, {
-    title: product.name || 'Цена продажи', variant: 'q', surface: 'app',
+    title: product.name || 'Цена продажи', variant: 'x', xRole: 'editor', surface: 'app',
   }));
   if (!layer) return null;
   const form = layer.querySelector('[data-service-retail-price-form]');
@@ -182,6 +185,27 @@ function openInventoryRetailPriceQ(itemId, { onSaved = () => {}, onChanged = () 
   const actions = apply?.closest('.modal-actions');
   const error = layer.querySelector('[data-service-retail-price-error]');
   if (!form || !input || !apply) return layer;
+
+  const publish = () => {
+    const saved = getProducts().find(item => item.inventoryOwned
+      && String(item.inventoryItemId) === String(itemId));
+    if (saved) onSaved(saved);
+    onChanged();
+  };
+  bindServiceWorkplaceAssignments(layer, {
+    kind: 'product',
+    selected: product.workplaces,
+    getBase: () => ({
+      cost: getProducts().find(item => item.inventoryOwned
+        && String(item.inventoryItemId) === String(itemId))?.cost || product.cost,
+      description: '',
+    }),
+    onPersistAssignment: async (workplaceId, assignment) => {
+      await commitInventoryProductWorkplace(itemId, workplaceId, assignment);
+      publish();
+    },
+  });
+
   let saving = false;
   const initial = String(value);
   const sync = () => setSharedActionVisible(actions, saving || input.value.trim() !== initial);
@@ -196,10 +220,7 @@ function openInventoryRetailPriceQ(itemId, { onSaved = () => {}, onChanged = () 
     try {
       await commitInventoryRetailPrice(itemId, input.value);
       layer.v2Close?.();
-      const saved = getProducts().find(item => item.inventoryOwned
-        && String(item.inventoryItemId) === String(itemId));
-      onSaved(saved || product);
-      onChanged();
+      publish();
     } catch (cause) {
       if (error) error.textContent = cause instanceof Error
         ? cause.message : 'Не удалось сохранить цену продажи.';
@@ -246,7 +267,7 @@ export function openProductEditor(root, existing = null, {
   onDeleted = () => {},
 } = {}) {
   if (existing?.inventoryItemId) {
-    return openInventoryRetailPriceQ(existing.inventoryItemId, { onSaved, onChanged });
+    return openInventoryRetailEditorX(existing.inventoryItemId, { onSaved, onChanged });
   }
   const draft = initialProduct(existing);
   const body = [
