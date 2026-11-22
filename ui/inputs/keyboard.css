@@ -7,6 +7,17 @@
   --ui-bottom-safe:env(safe-area-inset-bottom);
 }
 html.keyboard-open{--ui-bottom-safe:0px}
+/* iOS owns the input accessory bar and the region behind its keyboard.
+   That native region can expose the document canvas even while the fixed
+   Z/Q/X surface remains correctly anchored. Match the active paper there,
+   never the dark H canvas; H's own header keeps its explicit dark colour. */
+html.keyboard-open:has([data-v2-app]),
+html.keyboard-open body:has([data-v2-app]){
+  background:var(--v2-inner-surface,#F5F5F3);
+}
+html.keyboard-open .app-shell:has([data-v2-app]){
+  background:var(--v2-inner-surface,#F5F5F3);
+}
 
 /* Keyboard reduces only Z/Q scrollable content. The white Z/Q surfaces
    remain attached to the application's physical right and bottom edges. */
