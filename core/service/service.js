@@ -3,6 +3,8 @@ import {
   initViewNavigation,
   openSharedProfileSettingsMenu,
   page,
+  setV2ZHeaderRows,
+  clearV2ZHeaderRows,
   viewNavigation,
 } from '../../ui/ui.js';
 import { loadOperationalState } from '../runtime/operational-state.js';
@@ -75,13 +77,23 @@ export function renderService(root, navigateBack = () => {}) {
           aria: view === 'products' ? 'Добавить товар' : 'Добавить услугу',
         },
       }),
-      viewNavigation({ views, activeView: view, ariaLabel: 'Сервис' }),
       '<div data-service-catalog></div>',
     ]);
 
+    // Service mode is a navigation control, not scrollable catalogue content.
+    // Use the same stationary Z header slot as Inventory; do not alter Shared
+    // surface geometry or introduce a second header inside the Z body.
+    const navMarkup = viewNavigation({ views, activeView: view, ariaLabel: 'Сервис' });
+    const headerRows = setV2ZHeaderRows(root, [navMarkup]);
+    const navigationRoot = headerRows[0] || root;
+    if (!headerRows.length) {
+      // Direct-mounted previews without a Z surface retain a usable control.
+      root.querySelector('[data-service-catalog]')?.insertAdjacentHTML('beforebegin', navMarkup);
+    }
+
     root.querySelector('[data-service-settings]')?.addEventListener('click', () => openServiceSettings(root, renderCurrent));
 
-    initViewNavigation(root, {
+    initViewNavigation(navigationRoot, {
       views,
       activeView: view,
       onChange: (next) => {
@@ -136,6 +148,9 @@ export function renderService(root, navigateBack = () => {}) {
     disposed = true;
     renderVersion += 1;
     disposeCatalog?.();
+    const header = root?.closest?.('[data-v2-z],[data-v2-z-layer]')
+      ?.querySelector?.(':scope > [data-v2-z-header] > [data-v2-z-header-content]');
+    if (header?.querySelector('[data-view-navigation]')) clearV2ZHeaderRows(root);
   };
 }
 
