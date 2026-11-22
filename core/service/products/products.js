@@ -31,9 +31,9 @@ import { bindServiceWorkplaceAssignments, serviceWorkplaceAssignmentList, servic
 import { setSharedActionVisible } from '../../../ui/page/page.js';
 import { productEditorSignature, rebaseWorkplaceAssignmentSignature } from '../editor-signature.js';
 import { scheduleServiceStatistics, serviceItemStatistics } from '../statistics.js';
-import { renderServiceGroupTree } from '../catalog-grouping.js';
+import { renderServiceGroupTree, serviceGroupFields, readServiceGroupFields } from '../catalog-grouping.js';
 import { productCardAppearance, productCardFields, productCardPhoto } from '../card-presentation.js';
-import { commitDeleteProduct, getProducts, commitReorderProducts, commitProduct, commitProductWorkplace, commitInventoryRetailPrice, commitInventoryProductWorkplace } from './data.js';
+import { commitDeleteProduct, getProducts, commitReorderProducts, commitProduct, commitProductWorkplace, commitInventoryRetailPrice, commitInventoryProductPresentation, commitInventoryProductWorkplace } from './data.js';
 
 const money = (value) => `${new Intl.NumberFormat('ru-RU').format(Number(value || 0))} ₽`;
 
@@ -165,7 +165,10 @@ function confirmDeleteProduct(product, onDeleted) {
 // overlay through its existing products dataset; no changes to Inventory.
 // The main product card stays in Z. A compact X edits only the retail
 // price and the same workplace assignments used by Service → Услуги.
-function openInventoryRetailEditorX(itemId, { onSaved = () => {}, onChanged = () => {} } = {}) {
+// A stocked product is edited in the standard Q, like a Procedure.
+// Stock still owns its identity/cost/stock. Service owns the final retail price,
+// future-facing promotional description and custom group selection.
+function openInventoryRetailEditorQ(itemId, { onSaved = () => {}, onChanged = () => {} } = {}) {
   const product = getProducts().find(item => item.inventoryOwned
     && String(item.inventoryItemId) === String(itemId));
   if (!product) return openNotice({ title: 'Товары', message: 'Товар больше не находится в продаже.' });
@@ -179,6 +182,10 @@ function openInventoryRetailEditorX(itemId, { onSaved = () => {}, onChanged = ()
     field({ label: 'Цена продажи, ₽', name: 'serviceRetailPrice',
       type: 'number', min: '0', step: '0.01', inputmode: 'decimal',
       value: String(value) }) +
+    textareaField({ label: 'Описание', name: 'serviceRetailAbout',
+      value: product.about || '', rows: 5, maxlength: 5000,
+      placeholder: 'Описание товара для будущего публичного показа' }) +
+    serviceGroupFields('products', product.groupValues || {}) +
     serviceWorkplaceAssignmentList() +
     '<div class="app-settings-panel service-workplace-add-panel">' +
       serviceWorkplaceAddButton() + '</div>' +
@@ -186,15 +193,26 @@ function openInventoryRetailEditorX(itemId, { onSaved = () => {}, onChanged = ()
     actionBlock(button('Применить', { type: 'submit', data: 'data-service-retail-price-apply' })) +
   '</form>';
   const layer = mountModal(document.body, modal(content, {
-    title: product.name || 'Цена продажи', variant: 'x', xRole: 'editor', surface: 'app',
+    title: product.name || 'Товар', variant: 'q', surface: 'app',
   }));
   if (!layer) return null;
   const form = layer.querySelector('[data-service-retail-price-form]');
   const input = form?.querySelector('[name="serviceRetailPrice"]');
+  const about = form?.querySelector('[name="serviceRetailAbout"]');
   const apply = layer.querySelector('[data-service-retail-price-apply]');
   const actions = apply?.closest('.modal-actions');
   const error = layer.querySelector('[data-service-retail-price-error]');
-  if (!form || !input || !apply) return layer;
+  if (!form || !input || !about || !apply) return layer;
+  const selectedGroups = () => {
+    const current = readServiceGroupFields(form);
+    return form.querySelector('[data-service-group-level]') ? current : product.groupValues || {};
+  };
+  const signature = () => JSON.stringify({
+    price: input.value.trim().replace(',', '.'),
+    about: about.value.trim(),
+    groups: selectedGroups(),
+  });
+  const initial = signature();
 
   const publish = () => {
     const saved = getProducts().find(item => item.inventoryOwned
@@ -208,7 +226,7 @@ function openInventoryRetailEditorX(itemId, { onSaved = () => {}, onChanged = ()
     getBase: () => ({
       cost: getProducts().find(item => item.inventoryOwned
         && String(item.inventoryItemId) === String(itemId))?.cost || product.cost,
-      description: '',
+      description: about.value,
     }),
     onPersistAssignment: async (workplaceId, assignment) => {
       await commitInventoryProductWorkplace(itemId, workplaceId, assignment);
@@ -217,9 +235,9 @@ function openInventoryRetailEditorX(itemId, { onSaved = () => {}, onChanged = ()
   });
 
   let saving = false;
-  const initial = String(value);
-  const sync = () => setSharedActionVisible(actions, saving || input.value.trim() !== initial);
-  input.addEventListener('input', sync);
+  const sync = () => setSharedActionVisible(actions, saving || signature() !== initial);
+  form.addEventListener('input', sync);
+  form.addEventListener('change', sync);
   sync();
   form.addEventListener('submit', async event => {
     event.preventDefault();
@@ -228,12 +246,14 @@ function openInventoryRetailEditorX(itemId, { onSaved = () => {}, onChanged = ()
     apply.disabled = true;
     if (error) error.textContent = '';
     try {
-      await commitInventoryRetailPrice(itemId, input.value);
+      await commitInventoryProductPresentation(itemId, {
+        price: input.value, about: about.value, groupValues: selectedGroups(),
+      });
       layer.v2Close?.();
       publish();
     } catch (cause) {
       if (error) error.textContent = cause instanceof Error
-        ? cause.message : 'Не удалось сохранить цену продажи.';
+        ? cause.message : 'Не удалось сохранить товар.';
       saving = false;
       apply.disabled = false;
       sync();
@@ -247,6 +267,7 @@ function productEditorForm(product) {
     ${field({ label: 'Название', name: 'productName', value: product.name || '', placeholder: 'Название товара', required: true })}
     ${costField({ value: product.cost || {}, name: 'productCost' })}
     ${textareaField({ label: 'Описание', name: 'productAbout', value: product.about || '', rows: 7, maxlength: 5000, placeholder: 'Описание товара' })}
+    ${serviceGroupFields('products', product.groupValues || {})}
     ${serviceWorkplaceAssignmentList()}
     <div class="form-error" role="alert" data-product-editor-error></div>
   </form>`;
@@ -277,7 +298,7 @@ export function openProductEditor(root, existing = null, {
   onDeleted = () => {},
 } = {}) {
   if (existing?.inventoryItemId) {
-    return openInventoryRetailEditorX(existing.inventoryItemId, { onSaved, onChanged });
+    return openInventoryRetailEditorQ(existing.inventoryItemId, { onSaved, onChanged });
   }
   const draft = initialProduct(existing);
   const body = [
@@ -310,7 +331,7 @@ export function openProductEditor(root, existing = null, {
       cost: collectCost(layer, 'productCost'),
       description: data.get('productAbout'),
       workplaces: draft.workplaces,
-    });
+    }) + JSON.stringify(readServiceGroupFields(form));
   };
   let initialSignature = signature();
   const actions = primary.closest('.modal-actions');
@@ -385,6 +406,8 @@ export function openProductEditor(root, existing = null, {
       name,
       cost: price,
       about: String(data.get('productAbout') || '').trim(),
+      groupValues: form.querySelector('[data-service-group-level]')
+        ? readServiceGroupFields(form) : draft.groupValues || {},
       workplaces: Array.isArray(draft.workplaces) ? draft.workplaces.map((value) => ({ ...value })) : [],
       createdAt: existing?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
