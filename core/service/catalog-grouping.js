@@ -230,32 +230,45 @@ export function openServiceGroupingQ({ onSaved = () => {} } = {}) {
   const groupEditorX = (previous = null) => {
     const editor = mountModal(document.body, modal(
       '<form data-service-group-editor-form>' +
-        (previous
-          ? '<div class="field-inline-label"><span>' + kindLabel(previous.kind) + '</span></div>'
-          : select({
-            label: 'Раздел', name: 'groupKind', value: 'procedures',
-            options: [
-              { value: 'procedures', label: 'Услуги' },
-              { value: 'products', label: 'Товары' },
-            ],
-          })) +
-        field({ label: 'Название группы', name: 'name',
+        (previous ? '' : select({
+          label: 'Раздел', name: 'groupKind', value: 'procedures',
+          options: [
+            { value: 'procedures', label: 'Услуги' },
+            { value: 'products', label: 'Товары' },
+          ],
+        })) +
+        field({ label: 'Наименование группы', name: 'name',
           value: previous?.name || '', required: true, maxlength: 80 }) +
         '<div class="form-error" role="alert" data-service-group-editor-error></div>' +
-        actionBlock(button('Сохранить', { type: 'submit' })) +
-        (previous ? button('Удалить группу', {
-          type: 'button', variant: 'danger', data: 'data-service-group-editor-delete',
-        }) : '') +
+        actionBlock(
+          button('Сохранить', {
+            type: 'submit', data: 'data-service-group-editor-save',
+          }) +
+          (previous ? button('Удалить группу', {
+            type: 'button', variant: 'danger', data: 'data-service-group-editor-delete',
+          }) : ''),
+        ) +
       '</form>',
       { title: previous ? 'Группа' : 'Добавить группу',
         variant: 'x', xRole: 'editor', surface: 'app' },
     ));
     if (!editor) return null;
     const form = editor.querySelector('[data-service-group-editor-form]');
+    const saveButton = editor.querySelector('[data-service-group-editor-save]');
     let busy = false;
+    const hasChange = () => {
+      const name = String(new FormData(form).get('name') || '').trim();
+      return Boolean(name) && (!previous || name !== String(previous.name || '').trim());
+    };
+    const syncSave = () => {
+      if (saveButton) saveButton.style.display = hasChange() ? '' : 'none';
+    };
+    form?.addEventListener('input', syncSave);
+    form?.addEventListener('change', syncSave);
+    if (form) syncSave();
     form?.addEventListener('submit', async event => {
       event.preventDefault();
-      if (busy) return;
+      if (busy || !hasChange()) return;
       const section = previous?.kind || String(new FormData(form).get('groupKind') || '');
       const title = String(new FormData(form).get('name') || '').trim();
       if (!title || !['procedures', 'products'].includes(section)) return;
@@ -298,21 +311,36 @@ export function openServiceGroupingQ({ onSaved = () => {} } = {}) {
         field({ label: 'Название значения', name: 'name',
           value: previous?.name || '', required: true, maxlength: 80 }) +
         '<div class="form-error" role="alert" data-service-value-editor-error></div>' +
-        actionBlock(button('Сохранить', { type: 'submit' })) +
-        (previous ? button('Удалить значение', {
-          type: 'button', variant: 'danger', data: 'data-service-value-editor-delete',
-        }) : '') +
+        actionBlock(
+          button('Сохранить', {
+            type: 'submit', data: 'data-service-value-editor-save',
+          }) +
+          (previous ? button('Удалить значение', {
+            type: 'button', variant: 'danger', data: 'data-service-value-editor-delete',
+          }) : ''),
+        ) +
       '</form>',
       { title: previous ? 'Значение' : 'Добавить значение',
         variant: 'x', xRole: 'editor', surface: 'app' },
     ));
     if (!editor) return null;
     const form = editor.querySelector('[data-service-value-editor-form]');
+    const saveButton = editor.querySelector('[data-service-value-editor-save]');
     let busy = false;
+    const hasChange = () => {
+      const name = String(new FormData(form).get('name') || '').trim();
+      return Boolean(name) && (!previous || name !== String(previous.name || '').trim());
+    };
+    const syncSave = () => {
+      if (saveButton) saveButton.style.display = hasChange() ? '' : 'none';
+    };
+    form?.addEventListener('input', syncSave);
+    form?.addEventListener('change', syncSave);
+    if (form) syncSave();
     const apply = async remove => {
       if (busy) return;
       const name = String(new FormData(form).get('name') || '').trim();
-      if (!remove && !name) return;
+      if (!remove && !hasChange()) return;
       busy = true;
       try {
         const next = getServiceGroupLevels(current.kind).map(group => {
