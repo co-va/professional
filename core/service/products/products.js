@@ -32,7 +32,7 @@ import { setSharedActionVisible } from '../../../ui/page/page.js';
 import { compactCheck } from '../../../ui/selection/check-list.js';
 import { productEditorSignature, rebaseWorkplaceAssignmentSignature } from '../editor-signature.js';
 import { scheduleServiceStatistics, serviceItemStatistics } from '../statistics.js';
-import { renderServiceGroupTree, serviceGroupFields, readServiceGroupFields } from '../catalog-grouping.js';
+import { renderServiceGroupTree, serviceGroupFields, readServiceGroupFields, bindServiceGroupFields } from '../catalog-grouping.js';
 import { productCardAppearance, productCardFields, productCardPhoto } from '../card-presentation.js';
 import { commitDeleteProduct, getProducts, commitReorderProducts, commitProduct, commitProductWorkplace, commitInventoryRetailPrice, commitInventoryProductPresentation, commitInventoryProductWorkplace } from './data.js';
 
@@ -219,12 +219,12 @@ function openInventoryRetailEditorQ(itemId, {
     field({ label: 'Наименование товара', name: 'serviceRetailName',
       value: product.name || '', readonly: true }),
     '<div class="cost-field" data-service-price-section>',
-    '<span class="cost-field__label">Стоимость</span>',
+    '<div class="field-inline-label"><span class="cost-field__label">Стоимость</span>' +
+      '<span>Наценка: ' + escapeHtml(markup) + '</span></div>',
     '<div class="inventory-editor-row">',
     field({ label: 'Закупочная цена', value: purchase, disabled: true }),
     field({ label: 'Предполагаемая цена', value: estimated, disabled: true }),
     '</div>',
-    '<div class="inventory-editor-label">Наценка: ' + escapeHtml(markup) + '</div>',
     field({ label: 'Цена продажи, ₽', name: 'serviceRetailPrice',
       type: 'number', min: '0', step: '0.01', inputmode: 'decimal',
       value: String(value) }),
@@ -264,9 +264,9 @@ function openInventoryRetailEditorQ(itemId, {
   const actions = primary?.closest('.modal-actions');
   const error = layer.querySelector('[data-service-retail-price-error]');
   if (!form || !input || !about || !primary) return layer;
+  bindServiceGroupFields(form);
 
-  const selectedGroups = () => form.querySelector('[data-service-group-level]')
-    ? readServiceGroupFields(form) : product.groupValues || {};
+  const selectedGroups = () => readServiceGroupFields(form);
   const signature = () => JSON.stringify({
     price: input.value.trim().replace(',', '.'),
     about: about.value.trim(),
@@ -404,6 +404,7 @@ export function openProductEditor(root, existing = null, {
   const form = layer.querySelector('[data-product-editor-form]');
   const primary = layer.querySelector('[data-product-editor-primary]');
   if (!form || !primary) return layer;
+  bindServiceGroupFields(form);
 
   const signature = () => {
     const data = new FormData(form);
@@ -487,8 +488,7 @@ export function openProductEditor(root, existing = null, {
       name,
       cost: price,
       about: String(data.get('productAbout') || '').trim(),
-      groupValues: form.querySelector('[data-service-group-level]')
-        ? readServiceGroupFields(form) : draft.groupValues || {},
+      groupValues: readServiceGroupFields(form),
       workplaces: Array.isArray(draft.workplaces) ? draft.workplaces.map((value) => ({ ...value })) : [],
       createdAt: existing?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
