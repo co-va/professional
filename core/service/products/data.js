@@ -45,21 +45,19 @@ export function hydrateProductsFromServer({ products = [], productHistory = [] }
 // Store the final retail price as a Service-only overlay keyed by the
 // existing inventory identity. Inventory continues to own cost, markup,
 // stock quantity, and its own calculated sale price.
-function stockPriceOverride(itemId) {
-  const linked = readRawProducts().find(product =>
-    !product.deletedAt && String(product.inventoryItemId || '') === String(itemId));
+function stockPriceOverride(linked) {
   const value = linked?.retailPriceOverride;
   return value !== '' && value != null && Number.isFinite(Number(value)) && Number(value) >= 0
     ? Number(value) : null;
 }
 
-export function inventorySaleProduct(item) {
+export function inventorySaleProduct(item, linked = null) {
   const purchase = Number(item.basePrice ?? item.referencePrice ?? 0);
   const markup = Number(item.saleMarkupValue || 0);
   const calculatedPrice = item.salePrice == null
     ? item.saleMarkupMode === 'amount' ? purchase + markup : purchase * (1 + markup / 100)
     : Number(item.salePrice);
-  const override = stockPriceOverride(item.itemId);
+  const override = stockPriceOverride(linked);
   const unitPrice = override ?? calculatedPrice;
   return {
     id: 'inventory:' + item.itemId,
@@ -79,10 +77,14 @@ export function inventorySaleProduct(item) {
 }
 
 export function getProducts() {
-  const stock = getInventoryItems().filter(item => item.canSell === true).map(inventorySaleProduct);
+  const raw = readRawProducts();
+  const overlays = new Map(raw.filter(item => !item.deletedAt && item.inventoryItemId)
+    .map(item => [String(item.inventoryItemId), item]));
+  const stock = getInventoryItems().filter(item => item.canSell === true)
+    .map(item => inventorySaleProduct(item, overlays.get(String(item.itemId))));
   const linked = new Set(stock.map(item => String(item.inventoryItemId)));
-  const legacy = readRawProducts()
-    .filter(item => !item.deletedAt && (!item.inventoryItemId || !linked.has(String(item.inventoryItemId))));
+  const legacy = raw.filter(item => !item.deletedAt
+    && (!item.inventoryItemId || !linked.has(String(item.inventoryItemId))));
   return [...stock, ...legacy];
 }
 
