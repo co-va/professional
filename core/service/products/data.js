@@ -70,7 +70,8 @@ export function inventorySaleProduct(item, linked = null) {
     // The price per base sale unit is used only to calculate the final bill.
     pricePerUnit: Number.isFinite(unitPrice) ? unitPrice / (Number(item.saleQuantity) > 0 ? Number(item.saleQuantity) : 1) : 0,
     cost: { mode: 'amount', amount: Number.isFinite(unitPrice) ? Math.round(unitPrice * 100) / 100 : 0, free: false },
-    about: '', 
+    about: String(linked?.about || ''),
+    groupValues: linked?.groupValues && typeof linked.groupValues === 'object' && !Array.isArray(linked.groupValues) ? clone(linked.groupValues) : {},
     workplaces: Array.isArray(linked?.workplaces) ? clone(linked.workplaces) : [],
     inventoryOwned: true,
     calculatedSalePrice: Number.isFinite(calculatedPrice) ? Math.round(calculatedPrice * 100) / 100 : null,
@@ -88,7 +89,7 @@ export function getProducts() {
   // A linked stock item is visible in Service ONLY while Inventory marks it
   // «Продажа». Price overlays and legacy linked rows never become phantom
   // catalogue products when the sale flag is switched off.
-  const legacy = raw.filter(item => !item.deletedAt && !item.inventoryItemId);
+  const legacy = raw.filter(item => !item.deletedAt && !item.inventoryItemId && item.kind !== 'service-catalog-config');
   // Service owns its own catalogue order, independent of Stock ordering.
   // Entries without a saved position (including newly marketed stock items)
   // follow in their original order. Sorting never writes to Inventory.
@@ -211,6 +212,91 @@ async function commitProductHistory(previous, action = 'updated') {
 // An ACK-first write to Service's existing auxiliary products dataset.
 // A stocked item is not duplicated: its inventoryItemId remains the single
 // stable reference and only the price override is persisted here.
+// Service-only group definitions for BOTH catalogues live in one explicit
+// metadata entry of the existing tenant-scoped Service products dataset.
+// They are never inventory items, products, records, or public catalogue rows.
+const SERVICE_GROUP_CONFIG_ID = '__service:catalog-groups__';
+const serviceKinds = new Set(['procedures', 'products']);
+
+export function getServiceGroupLevels(kind) {
+  if (!serviceKinds.has(kind)) return [];
+  const config = readRawProducts().find(item => item.id === SERVICE_GROUP_CONFIG_ID
+    && item.kind === 'service-catalog-config' && !item.deletedAt);
+  return Array.isArray(config?.levels?.[kind]) ? clone(config.levels[kind]) : [];
+}
+
+export async function commitServiceGroupLevels(kind, entries = []) {
+  if (!serviceKinds.has(kind)) throw new Error('Неизвестный раздел Сервиса.');
+  const levels = Array.isArray(entries) ? entries : [];
+  const ids = new Set();
+  const normalized = levels.map((entry, index) => {
+    const id = String(entry.id || '').trim();
+    const name = String(entry.name || '').trim();
+    if (!id || !name || ids.has(id)) throw new Error('Укажите уникальное название группы.');
+    ids.add(id);
+    const valueIds = new Set();
+    const values = (Array.isArray(entry.values) ? entry.values : []).map(value => {
+      const valueId = String(value.id || '').trim();
+      const valueName = String(value.name || '').trim();
+      if (!valueId || !valueName || valueIds.has(valueId)) throw new Error('Укажите уникальное значение группы.');
+      valueIds.add(valueId);
+      return { id: valueId, name: valueName };
+    });
+    return { id, name, values, position: index + 1 };
+  });
+  await commitServiceCollection({
+    read: readRawProducts,
+    persist: values => queueAuxiliaryDataset('products', values),
+    hydrate: values => { productsState = clone(values); },
+    mutate: values => {
+      const old = values.find(item => item.id === SERVICE_GROUP_CONFIG_ID
+        && item.kind === 'service-catalog-config');
+      const config = {
+        id: SERVICE_GROUP_CONFIG_ID, kind: 'service-catalog-config',
+        levels: { ...(old?.levels || {}), [kind]: normalized },
+      };
+      return old ? values.map(item => item === old ? config : item)
+        : [...values, config];
+    },
+  });
+  return getServiceGroupLevels(kind);
+}
+
+// A stocked Service product is edited without touching its Stock owner.
+// Save the final retail price, future-facing description and group placement
+// in ONE ACK-first mutation so partial form edits cannot overwrite each other.
+export async function commitInventoryProductPresentation(itemId, { price, about = '', groupValues = {} } = {}) {
+  const id = String(itemId || '').trim();
+  const raw = price == null ? '' : String(price).trim().replace(',', '.');
+  const value = Number(raw);
+  if (!id || !raw || !Number.isFinite(value) || value < 0
+      || !/^\d+(?:\.\d{1,2})?$/.test(raw)) {
+    throw new Error('Укажите корректную цену продажи в рублях.');
+  }
+  const description = String(about || '').trim();
+  if (description.length > 5000) throw new Error('Описание слишком длинное.');
+  const normalizedGroups = Object.fromEntries(Object.entries(groupValues || {})
+    .filter(([key, selected]) => String(key).trim() && String(selected || '').trim())
+    .map(([key, selected]) => [String(key), String(selected)]));
+  if (!getInventoryItems().some(item => String(item.itemId) === id && item.canSell === true)) {
+    throw new Error('Товар больше не находится в продаже.');
+  }
+  await commitServiceCollection({
+    read: readRawProducts,
+    persist: values => queueAuxiliaryDataset('products', values),
+    hydrate: values => { productsState = clone(values); },
+    mutate: values => {
+      const index = values.findIndex(item => !item.deletedAt
+        && String(item.inventoryItemId || '') === id);
+      const update = { retailPriceOverride: value, about: description, groupValues: normalizedGroups };
+      if (index < 0) return [...values, {
+        id: 'inventory:' + id, inventoryItemId: id, ...update,
+      }];
+      return values.map((item, i) => i === index ? { ...item, ...update } : item);
+    },
+  });
+}
+
 export async function commitInventoryRetailPrice(itemId, price) {
   const id = String(itemId || '').trim();
   const raw = price == null ? '' : String(price).trim().replace(',', '.');
