@@ -110,6 +110,30 @@ clock = 690; // no new focus arrived; native keyboard really closed
 testRuntime.window.__testSync();
 assert.equal(keyboardState().inset, '0px', 'Actual keyboard close resets inset');
 assert.equal(keyboardState().open, false, 'Actual keyboard close resets class');
+assert.equal(keyboardState().shell, '844px',
+  'After closing keyboard the physical Z/Q/X shell is still full height');
+// Reproduce iOS delayed viewport resize when focus was already lost.
+// The old runtime incorrectly set --app-stable-vh to 460px here, making
+// ALL keyboard keys appear over the dark H background instead of over Q.
+visibleHeight = 460;
+clock = 800;
+testRuntime.window.__testSync();
+assert.equal(keyboardState().shell, '844px',
+  'An unfocused keyboard-size viewport must NEVER shorten the Z/Q/X shell');
+focusedInput = true;
+testRuntime.window.__testSync();
+assert.equal(keyboardState().shell, '844px',
+  'The last focused field must retain the physical Q bottom');
+assert.equal(keyboardState().inset, '384px',
+  'The visible field/action area uses keyboard inset, not the outer shell');
+focusedInput = false;
+visibleHeight = 844;
+clock = 900;
+keyboardEvents.get('focusout')();
+clock = 1100;
+testRuntime.window.__testSync();
+assert.equal(keyboardState().inset, '0px');
+
 
 const content = Array.from({ length: 12 }, (_, index) =>
   `<label style="display:block;height:104px">Field ${index + 1}<input style="width:100%;height:44px"></label>`).join('');
