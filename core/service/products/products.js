@@ -139,9 +139,15 @@ function productWorkplaceCards(product, statistics = null) {
 }
 
 function confirmDeleteProduct(product, onDeleted) {
-  const layer = mountModal(document.body, modal(`<div class="modal-title"><h2>Убрать из продажи?</h2><p>${escapeHtml(product.name || 'Товар')} исчезнет из Сервиса. На Складе товар и остатки сохранятся. История продаж не изменится.</p></div><div class="form-error" role="alert" data-product-delete-error></div><div class="modal-actions">${button('Убрать из продажи', { variant: 'danger', data: 'data-confirm-delete-product' })}${button('Отмена', { variant: 'secondary', data: 'data-cancel-delete-product' })}</div>`, {
+  const stockBacked = Boolean(product.inventoryItemId);
+  const actionLabel = stockBacked ? 'Снять с продажи' : 'Удалить товар';
+  const question = stockBacked ? 'Снять с продажи?' : 'Удалить товар?';
+  const explanation = stockBacked
+    ? ' исчезнет из Сервиса. На Складе товар и остатки сохранятся. История продаж не изменится.'
+    : ' исчезнет из Сервиса. История продаж сохранится.';
+  const layer = mountModal(document.body, modal(`<div class="modal-title"><h2>${question}</h2><p>${escapeHtml(product.name || 'Товар')}${explanation}</p></div><div class="form-error" role="alert" data-product-delete-error></div><div class="modal-actions">${button(actionLabel, { variant: 'danger', data: 'data-confirm-delete-product' })}${button('Отмена', { variant: 'secondary', data: 'data-cancel-delete-product' })}</div>`, {
     variant: 'x',
-    title: 'Удаление товара',
+    title: stockBacked ? 'Снятие с продажи' : 'Удаление товара',
   }));
   if (!layer) return null;
   layer.querySelector('[data-cancel-delete-product]')?.addEventListener('click', () => layer.v2Close?.());
@@ -240,7 +246,7 @@ function openInventoryRetailEditorQ(itemId, {
     serviceWorkplaceAddButton(),
     '</div>',
     '<div class="app-settings-panel">',
-    button('Удалить товар', {
+    button('Снять с продажи', {
       type: 'button', variant: 'danger', data: 'data-service-retail-product-delete',
     }),
     '</div>',
