@@ -4,6 +4,15 @@
 .modal-title--action{display:flex;align-items:center;justify-content:space-between;gap:12px}.modal-title--action .ui-info{flex:0 0 auto}
 .modal-actions{display:grid;gap:8px}.compact-form{display:grid;gap:12px}.compact-form .modal-title{margin-bottom:2px}
 
+/* While editing text/quantities, show only actions that confirm entered
+   values. The Shared keyboard controller assigns action roles for every modal
+   footer; V and contextual buttons never float above the keyboard. Inline
+   controls remain with their original form fields; this is footer-only. */
+html.keyboard-open .modal-actions button[data-ui-keyboard-action="auxiliary"]{
+  display:none!important;
+  pointer-events:none;
+}
+
 /* One measured action stack for all Z/Q surfaces; no button-count rules. */
 .modal-actions[hidden]{display:none!important}
 /* Shared action visibility retains the occupied footer height and scroll bounds. */
