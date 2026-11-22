@@ -24,16 +24,6 @@ function readHistory() {
   return clone(historyState);
 }
 
-function writeProducts(value) {
-  productsState = Array.isArray(value) ? clone(value) : [];
-  void queueAuxiliaryDataset('products', productsState);
-}
-
-function writeHistory(value) {
-  historyState = Array.isArray(value) ? clone(value) : [];
-  void queueAuxiliaryDataset('productHistory', historyState);
-}
-
 export function hydrateProductsFromServer({ products = [], productHistory = [] } = {}) {
   productsState = Array.isArray(products) ? clone(products) : [];
   historyState = Array.isArray(productHistory) ? clone(productHistory) : [];
@@ -41,7 +31,7 @@ export function hydrateProductsFromServer({ products = [], productHistory = [] }
 }
 
 // Inventory is the only source for stocked sale products. The legacy Service
-// catalog is retained read-only to preserve records made before this migration.
+// catalog is retained for compatibility; new sale products remain Inventory-backed.
 // Store the final retail price as a Service-only overlay keyed by the
 // existing inventory identity. Inventory continues to own cost, markup,
 // stock quantity, and its own calculated sale price.
@@ -113,40 +103,6 @@ export function getProducts() {
     const posB = Number.isSafeInteger(b) && b > 0 ? b : Number.MAX_SAFE_INTEGER;
     return posA - posB;
   });
-}
-
-export function saveProduct(item) {
-  const values = readRawProducts();
-  const exists = values.some((value) => value.id === item.id);
-  writeProducts(exists ? values.map((value) => value.id === item.id ? item : value) : [...values, item]);
-  return item;
-}
-
-export function pushProductHistory(record, action) {
-  const history = readHistory();
-  history.push({ ...record, historyAction: action, historyAt: new Date().toISOString() });
-  writeHistory(history);
-}
-
-export function deleteProduct(id) {
-  const values = readRawProducts();
-  const found = values.find((item) => item.id === id && !item.deletedAt);
-  if (!found) return false;
-  pushProductHistory(found, 'deleted');
-  writeProducts(values.map((item) => item.id === id ? { ...item, deletedAt: new Date().toISOString() } : item));
-  return true;
-}
-
-export function reorderProducts(ids = []) {
-  const order = (Array.isArray(ids) ? ids : []).map((value) => String(value || '')).filter(Boolean);
-  const values = readRawProducts();
-  const active = values.filter((item) => !item.deletedAt);
-  if (order.length !== active.length || new Set(order).size !== active.length) return false;
-  const byId = new Map(active.map((item) => [String(item.id || ''), item]));
-  if (order.some((id) => !byId.has(id))) return false;
-  const deleted = values.filter((item) => item.deletedAt);
-  writeProducts([...order.map((id) => byId.get(id)), ...deleted]);
-  return true;
 }
 
 // Reset all local overrides in one domain-owned write when a shared card
@@ -420,35 +376,6 @@ export async function commitInventoryProductPresentation(itemId, { price, about 
         id: 'inventory:' + id, inventoryItemId: id, ...update,
       }];
       return values.map((item, i) => i === index ? { ...item, ...update } : item);
-    },
-  });
-}
-
-export async function commitInventoryRetailPrice(itemId, price) {
-  const id = String(itemId || '').trim();
-  const raw = price == null ? '' : String(price).trim().replace(',', '.');
-  const value = Number(raw);
-  if (!id || !raw || !Number.isFinite(value) || value < 0
-      || !/^\d+(?:\.\d{1,2})?$/.test(raw)) {
-    throw new Error('Укажите корректную цену продажи в рублях.');
-  }
-  if (!getInventoryItems().some(item => String(item.itemId) === id && item.canSell === true)) {
-    throw new Error('Товар больше не находится в продаже.');
-  }
-  await commitServiceCollection({
-    read: readRawProducts,
-    persist: values => queueAuxiliaryDataset('products', values),
-    hydrate: values => { productsState = clone(values); },
-    mutate: values => {
-      const index = values.findIndex(item => !item.deletedAt
-        && String(item.inventoryItemId || '') === id);
-      if (index < 0) return [...values, {
-        id: 'inventory:' + id,
-        inventoryItemId: id,
-        retailPriceOverride: value,
-      }];
-      return values.map((item, i) => i === index
-        ? { ...item, retailPriceOverride: value } : item);
     },
   });
 }
