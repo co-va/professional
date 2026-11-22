@@ -542,20 +542,21 @@
       "requires": [],
       "external": [],
       "acceptance": {
-        "visual": "15.11.2026: открыт общий дефект Z/Q/X на iPhone — при появлении клавиатуры сдвигается модальный слой и снизу подтягивается фон. Эталон: H-фон остаётся неподвижным, клавиатура не сдвигает Z; сохраняется общая геометрия Z/Q/X. Требует отдельной адресной приёмки.",
+        "visual": "22.11.2026, повторный скриншот владельца: при появлении клавиатуры вся клавиатура оказывается на тёмном H-фоне; нижняя кромка Q становится видимой, что нарушает контракт. Предыдущая правка владельцем НЕ принята. Остаётся открытый дефект до подтверждённой проверки на iPhone.",
         "interaction": "не проверено",
         "data": "не проверено",
-        "regression": "22.11.2026: проверка кода Shared keyboard-runtime на частичный и полный iOS viewport rebound между последними полями PASS; существующий smoke расширен проверками Q-футера и запретом принудительного скролла. Синтетическая проверка не заменяет браузерную и реальный iPhone; Amvera не проверена.",
+        "regression": "22.11.2026: кодовый сценарий Safari с потерей фокуса, поздним уменьшением visualViewport и повторным открытием последнего поля — PASS на фиксации общего runtime. Проверка на нативном iPhone/Amvera не выполнена; численные smoke-проверки НЕ являются приёмкой.",
         "architecture": "22.11.2026: «Расходники» и «Данные клиента» используют общий Q через ui/modals/index.js, общий runtime ui/inputs/keyboard-runtime.js и общие Z/Q/X. Исправление без локальных правил отдельных форм. Основные JS-модули и экранные CSS просмотрены на конкурирующие обработчики клавиатуры."
       },
       "closure": {
-        "state": "verifying",
+        "state": "open",
         "approvedBy": null,
         "approvedAt": null,
         "baselineSha": null,
         "evidence": [
           "Видеозапись ручной проверки от 15.11.2026 (в диалоге): нестабильность высоты/позиции общей модальной поверхности при клавиатуре. Не приписывать локально Журналу; общий shared.modal остаётся open.",
-          "22.11.2026: в professional/staging исправлен iOS focusout/focusin viewport rebound с сохранением позиции Z/Q и футера: ui/inputs/keyboard-runtime.js + ui/modals/modal.css. Runtime mock PASS; единый smoke scripts/ci/shared-keyboard-layout-smoke.mjs расширен. Базовая фиксация SHA 240c5b2d94e326fda13f1ee4883bd35291bbd50a. Реальный iPhone/Amvera — НЕ проверено, approvedBy/approvedAt/baselineSha сохраняются null, locked не ставить."
+          "22.11.2026: в professional/staging исправлен iOS focusout/focusin viewport rebound с сохранением позиции Z/Q и футера: ui/inputs/keyboard-runtime.js + ui/modals/modal.css. Runtime mock PASS; единый smoke scripts/ci/shared-keyboard-layout-smoke.mjs расширен. Базовая фиксация SHA 240c5b2d94e326fda13f1ee4883bd35291bbd50a. Реальный iPhone/Amvera — НЕ проверено, approvedBy/approvedAt/baselineSha сохраняются null, locked не ставить.",
+          "22.11.2026: предыдущая попытка owner не принята (скриншот в диалоге — клавиатура поверх H). Причина в коде: stableHeight допускал замену на уменьшенный VisualViewport.height после потери фокуса. Исправление ui/inputs/keyboard-runtime.js commit 556419f4d30f6aa04b1b81065a74584f44451644, регрессия scripts/ci/shared-keyboard-layout-smoke.mjs commit 173d64c414b2ca63714a87117fd0a6d13f78a10e. Проверено синтетически, реальный runtime не подтверждён; state=open."
         ]
       }
     },
