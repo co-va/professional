@@ -39,34 +39,28 @@ function viewportSize() {
 function syncViewport() {
   const { height, width } = viewportSize();
   if (!height || !width) return;
-  // LayoutViewport may exceed VisualViewport even before the keyboard
-  // (browser chrome / safe area). Never leave a dark H strip below Z.
-  const layoutHeight = Math.round(window.innerHeight || 0);
-
   // Only a changed layout width (rotation) may replace the shell's
   // baseline during keyboard interaction. A visual viewport shrink must
   // never shorten Z/Q, including when Safari blurs one input before focusing
   // the next or pans to the final field.
-  const focused = Boolean(activeEditable());
   const rotated = !stableHeight || !stableWidth || Math.abs(width - stableWidth) > 48;
   if (rotated) {
-    // On rotation during input, VisualViewport.height is already reduced by
-    // the keyboard on iOS. Prefer the layout height for the new baseline.
-    stableHeight = Math.max(height, layoutHeight);
+    stableHeight = height;
     stableWidth = width;
-    keyboardSession = focused;
+    keyboardSession = false;
   }
+  const focused = Boolean(activeEditable());
   if (focused) keyboardSession = true;
   // A transient viewport expansion between two editable fields must NEVER
   // replace the pre-keyboard shell height. Safari can deliver focusout,
   // resize and focusin in separate frames while the keyboard stays visible.
   if (!keyboardSession) {
-    stableHeight = Math.max(height, layoutHeight);
+    stableHeight = height;
     stableWidth = width;
   } else if (!focused && height >= stableHeight - 10) {
     // A real blur + restored viewport ends the keyboard session.
     keyboardSession = false;
-    stableHeight = Math.max(height, layoutHeight);
+    stableHeight = height;
     stableWidth = width;
   }
   const keyboardOpen = keyboardSession && height < stableHeight - 60;
