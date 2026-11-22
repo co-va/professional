@@ -21,6 +21,7 @@ let blurGraceUntil = 0;
 let actionsFrame = 0;
 let trackingFrame = 0;
 let trackThrough = 0;
+let focusFrame = 0;
 
 function setRootPixel(name, value) {
   const next = `${Math.round(value)}px`;
@@ -91,8 +92,11 @@ function syncViewport() {
   const visualLeft = Math.max(0, Math.round(Number(viewport()?.offsetLeft || 0)));
   setRootPixel('--ui-visual-top', visualTop);
   setRootPixel('--ui-visual-left', visualLeft);
-  setRootPixel('--ui-keyboard-inset', keyboardOpen ? keyboardInset : 0);
+  const nextInset = keyboardOpen ? keyboardInset : 0;
+  const priorInset = Number.parseFloat(root.style.getPropertyValue('--ui-keyboard-inset')) || 0;
+  setRootPixel('--ui-keyboard-inset', nextInset);
   root.classList.toggle('keyboard-open', keyboardOpen);
+  if (keyboardOpen && Math.abs(nextInset - priorInset) > 1) scheduleFocusedFieldVisibility();
 }
 
 const observedActions = new Set();
@@ -147,6 +151,51 @@ function scheduleActionSync() {
   actionsFrame = requestAnimationFrame(syncActionHeights);
 }
 
+/* Shared keyboard focus contract:
+ * H, Z and Q headers are fixed. Only the existing Z/Q scroll body (or X
+ * content) may move to reveal the focused input. Never scroll window,
+ * document, app shell or the fixed modal surface itself.
+ */
+function keepFocusedFieldVisible() {
+  focusFrame = 0;
+  if (!root.classList.contains('keyboard-open')) return;
+  const field = activeEditable();
+  if (!field?.isConnected) return;
+  const area = field.closest('[data-v2-z-body], [data-v2-q-body], .v2-layer--bottom');
+  if (!area) return;
+  const bounds = area.getBoundingClientRect();
+  const fieldBounds = field.getBoundingClientRect();
+  const vv = viewport();
+  const visibleBottom = Number(vv?.offsetTop || 0) + Number(vv?.height || window.innerHeight || 0);
+  const upper = bounds.top + 12;
+  let lower = Math.min(bounds.bottom, visibleBottom) - 12;
+  // Z/Q actions float over the form; a field must never be covered by them.
+  if (!area.matches('.v2-layer--bottom')) {
+    const surface = area.closest('[data-v2-z], [data-v2-z-layer], .v2-layer--standard');
+    const actions = measurableAction(surface);
+    if (actions && !actions.hidden && !actions.hasAttribute('data-ui-action-hidden')) {
+      const actionsTop = actions.getBoundingClientRect().top;
+      if (actionsTop > upper) lower = Math.min(lower, actionsTop - 12);
+    }
+  }
+  if (lower <= upper) return;
+  // A tall textarea keeps its top visible; ordinary fields fit completely.
+  const tooTall = fieldBounds.height > lower - upper;
+  const delta = fieldBounds.top < upper - 1
+    ? fieldBounds.top - upper
+    : !tooTall && fieldBounds.bottom > lower + 1
+      ? fieldBounds.bottom - lower
+      : 0;
+  if (delta && area.scrollHeight > area.clientHeight) {
+    area.scrollBy({ top: delta, behavior: 'instant' });
+  }
+}
+
+function scheduleFocusedFieldVisibility() {
+  if (focusFrame) return;
+  focusFrame = requestAnimationFrame(keepFocusedFieldVisible);
+}
+
 // Some WebKit versions dispatch visualViewport.scroll only AFTER a native pan.
  // During a keyboard interaction, read its offset once per animation frame.
  // This is the SAME root anchor, not a per-form scroll or animation.
@@ -175,6 +224,7 @@ function onViewportChange() {
 document.addEventListener('focusin', (event) => {
   if (!event.target?.matches?.(EDITABLE_SELECTOR)) return;
   onViewportChange();
+  scheduleFocusedFieldVisibility();
   ensureViewportTracking(800);
 });
 document.addEventListener('focusout', () => {
