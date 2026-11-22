@@ -140,53 +140,10 @@ function scheduleActionSync() {
 // Some WebKit versions dispatch visualViewport.scroll only AFTER a native pan.
  // During a keyboard interaction, read its offset once per animation frame.
  // This is the SAME root anchor, not a per-form scroll or animation.
-// Safari tries to reveal a focused input by panning the whole visual
-// viewport. In Z/Q/X, the existing inner scroll area owns that movement.
-// Do not call scrollIntoView(): it may scroll the app shell and expose H.
-function keepFocusedFieldVisible() {
-  if (!root.classList.contains('keyboard-open')) return;
-  const focused = activeEditable();
-  const app = focused?.closest('[data-v2-app]');
-  if (!app) return;
-  const area = focused.closest('[data-v2-z-body], [data-v2-q-body]')
-    || focused.closest('.v2-layer--bottom');
-  if (!area) return;
-  const areaRect = area.getBoundingClientRect();
-  const fieldRect = focused.getBoundingClientRect();
-  const top = areaRect.top + 12;
-  let bottom = areaRect.bottom - 12;
-
-  if (area.matches('.v2-layer--bottom')) {
-    // X keeps its white surface under the keyboard. Only the portion ABOVE
-    // the keyboard is available for its scrollable contents.
-    const keyboard = Number.parseFloat(getComputedStyle(root).getPropertyValue('--ui-keyboard-inset')) || 0;
-    bottom -= keyboard;
-  } else {
-    // When Z/Q has an action footer, keep the focused input above it.
-    const action = measurableAction(area);
-    if (action && !action.hidden && !action.hasAttribute('data-ui-action-hidden')) {
-      const footer = action.getBoundingClientRect();
-      if (footer.bottom > top && footer.top < bottom) bottom = Math.min(bottom, footer.top - 12);
-    }
-  }
-  if (bottom <= top) return;
-  // Tall textareas cannot fit entirely. Anchor their top rather than
-  // alternating between the top and bottom on every animation frame.
-  const delta = fieldRect.height > bottom - top
-    ? fieldRect.top < top - 2 ? fieldRect.top - top : 0
-    : fieldRect.bottom > bottom + 2
-      ? fieldRect.bottom - bottom
-      : fieldRect.top < top - 2
-        ? fieldRect.top - top
-        : 0;
-  if (delta) area.scrollTop += delta;
-}
-
 function followVisualViewport() {
   trackingFrame = 0;
   if (document.visibilityState === 'hidden') return;
   syncViewport();
-  keepFocusedFieldVisible();
   if ((activeEditable() && root.classList.contains('keyboard-open'))
     || performance.now() < trackThrough) {
     trackingFrame = requestAnimationFrame(followVisualViewport);
