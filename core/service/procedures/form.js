@@ -5,7 +5,7 @@ import { procedureEditorSignature, rebaseWorkplaceAssignmentSignature } from '..
 import { bindServiceWorkplaceAssignments, serviceWorkplaceAssignmentList } from '../workplace-selection.js';
 import { compactCheck } from '../../../ui/selection/check-list.js';
 import { procedureGroupBookingFields, bindProcedureGroupBooking } from './group-booking-ui.js';
-import { serviceGroupFields, readServiceGroupFields } from '../catalog-grouping.js';
+import { serviceGroupFields, readServiceGroupFields, bindServiceGroupFields } from '../catalog-grouping.js';
 
 export function initialProcedure(existing = null, defaultWorkplace = null) {
   if (existing) return {
@@ -64,6 +64,7 @@ export function bindProcedureEditor(root, {
 
   initCostFields(root);
   initDurationPickers(root);
+  bindServiceGroupFields(form);
 
   const signature = () => {
     const data = new FormData(form);
@@ -188,8 +189,7 @@ export function bindProcedureEditor(root, {
         capacity: groupEnabled ? Math.min(999, groupCapacity) : Math.max(2, Math.floor(Number(draft.groupBooking?.capacity) || 2)),
       },
       workplaces: Array.isArray(draft.workplaces) ? draft.workplaces.map((item) => ({ ...item })) : [],
-      groupValues: Object.keys(readServiceGroupFields(form)).length || form.querySelector('[data-service-group-level]')
-        ? readServiceGroupFields(form) : (draft.groupValues || {}),
+      groupValues: readServiceGroupFields(form),
       createdAt: existing?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
