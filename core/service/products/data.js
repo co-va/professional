@@ -75,6 +75,7 @@ export function inventorySaleProduct(item, linked = null) {
     inventoryOwned: true,
     calculatedSalePrice: Number.isFinite(calculatedPrice) ? Math.round(calculatedPrice * 100) / 100 : null,
     retailPriceOverride: override,
+    servicePosition: linked?.servicePosition ?? null,
   };
 }
 
@@ -88,7 +89,17 @@ export function getProducts() {
   // «Продажа». Price overlays and legacy linked rows never become phantom
   // catalogue products when the sale flag is switched off.
   const legacy = raw.filter(item => !item.deletedAt && !item.inventoryItemId);
-  return [...stock, ...legacy];
+  // Service owns its own catalogue order, independent of Stock ordering.
+  // Entries without a saved position (including newly marketed stock items)
+  // follow in their original order. Sorting never writes to Inventory.
+  const combined = [...stock, ...legacy];
+  return combined.sort((left, right) => {
+    const a = Number(left.servicePosition);
+    const b = Number(right.servicePosition);
+    const posA = Number.isSafeInteger(a) && a > 0 ? a : Number.MAX_SAFE_INTEGER;
+    const posB = Number.isSafeInteger(b) && b > 0 ? b : Number.MAX_SAFE_INTEGER;
+    return posA - posB;
+  });
 }
 
 export function saveProduct(item) {
@@ -129,19 +140,37 @@ export function reorderProducts(ids = []) {
 // template is applied. No per-entity queue/serialization storm.
 
 export async function commitReorderProducts(ids = []) {
-  const order = (Array.isArray(ids) ? ids : []).map(id => String(id || '')).filter(Boolean);
+  const order = (Array.isArray(ids) ? ids : []).map(id => String(id || ''));
+  const current = getProducts();
+  const valid = new Set(current.map(item => String(item.id)));
+  if (order.length !== valid.size || new Set(order).size !== valid.size
+      || order.some(id => !valid.has(id))) {
+    throw new Error('Список изменился. Откройте раздел повторно.');
+  }
+  // A single ACK-first Service write stores positions for both linked Stock
+  // items and legacy Service products; no mutations or reorders in Inventory.
   await commitServiceCollection({
     read: readRawProducts,
-    persist: (values) => queueAuxiliaryDataset('products', values),
-    hydrate: (values) => { productsState = clone(values); },
-    mutate: (values) => {
-      const active = values.filter(item => !item.deletedAt);
-      const byId = new Map(active.map(item => [String(item.id || ''), item]));
-      if (order.length !== active.length || new Set(order).size !== active.length
-        || order.some(id => !byId.has(id))) throw new Error('Список изменился. Откройте раздел повторно.');
-      if (order.every((id, i) => String(active[i].id) === id)) return values;
-      const deleted = values.filter(item => item.deletedAt);
-      return [...order.map(id => byId.get(id)), ...deleted];
+    persist: values => queueAuxiliaryDataset('products', values),
+    hydrate: values => { productsState = clone(values); },
+    mutate: values => {
+      const positions = new Map(order.map((id, index) => [id, index + 1]));
+      const updated = values.map(item => {
+        if (item.deletedAt) return item;
+        const id = item.inventoryItemId ? 'inventory:' + item.inventoryItemId : String(item.id);
+        return positions.has(id) ? { ...item, servicePosition: positions.get(id) } : item;
+      });
+      const covered = new Set(updated.filter(item => !item.deletedAt)
+        .map(item => item.inventoryItemId ? 'inventory:' + item.inventoryItemId : String(item.id)));
+      for (const item of current) {
+        const id = String(item.id);
+        if (!item.inventoryOwned || covered.has(id)) continue;
+        updated.push({
+          id, inventoryItemId: item.inventoryItemId,
+          servicePosition: positions.get(id),
+        });
+      }
+      return updated;
     },
   });
 }
