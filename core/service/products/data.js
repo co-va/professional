@@ -42,12 +42,25 @@ export function hydrateProductsFromServer({ products = [], productHistory = [] }
 
 // Inventory is the only source for stocked sale products. The legacy Service
 // catalog is retained read-only to preserve records made before this migration.
+// Store the final retail price as a Service-only overlay keyed by the
+// existing inventory identity. Inventory continues to own cost, markup,
+// stock quantity, and its own calculated sale price.
+function stockPriceOverride(itemId) {
+  const linked = readRawProducts().find(product =>
+    !product.deletedAt && String(product.inventoryItemId || '') === String(itemId));
+  const value = linked?.retailPriceOverride;
+  return value !== '' && value != null && Number.isFinite(Number(value)) && Number(value) >= 0
+    ? Number(value) : null;
+}
+
 export function inventorySaleProduct(item) {
   const purchase = Number(item.basePrice ?? item.referencePrice ?? 0);
   const markup = Number(item.saleMarkupValue || 0);
-  const unitPrice = item.salePrice == null
+  const calculatedPrice = item.salePrice == null
     ? item.saleMarkupMode === 'amount' ? purchase + markup : purchase * (1 + markup / 100)
     : Number(item.salePrice);
+  const override = stockPriceOverride(item.itemId);
+  const unitPrice = override ?? calculatedPrice;
   return {
     id: 'inventory:' + item.itemId,
     inventoryItemId: item.itemId,
@@ -60,6 +73,8 @@ export function inventorySaleProduct(item) {
     pricePerUnit: Number.isFinite(unitPrice) ? unitPrice / (Number(item.saleQuantity) > 0 ? Number(item.saleQuantity) : 1) : 0,
     cost: { mode: 'amount', amount: Number.isFinite(unitPrice) ? Math.round(unitPrice * 100) / 100 : 0, free: false },
     about: '', workplaces: [], inventoryOwned: true,
+    calculatedSalePrice: Number.isFinite(calculatedPrice) ? Math.round(calculatedPrice * 100) / 100 : null,
+    retailPriceOverride: override,
   };
 }
 
@@ -157,6 +172,38 @@ async function commitProductHistory(previous, action = 'updated') {
     return false;
   }
   return true;
+}
+
+// An ACK-first write to Service's existing auxiliary products dataset.
+// A stocked item is not duplicated: its inventoryItemId remains the single
+// stable reference and only the price override is persisted here.
+export async function commitInventoryRetailPrice(itemId, price) {
+  const id = String(itemId || '').trim();
+  const raw = price == null ? '' : String(price).trim().replace(',', '.');
+  const value = Number(raw);
+  if (!id || !raw || !Number.isFinite(value) || value < 0
+      || !/^\\d+(?:\\.\\d{1,2})?$/.test(raw)) {
+    throw new Error('Укажите корректную цену продажи в рублях.');
+  }
+  if (!getInventoryItems().some(item => String(item.itemId) === id && item.canSell === true)) {
+    throw new Error('Товар больше не находится в продаже.');
+  }
+  await commitServiceCollection({
+    read: readRawProducts,
+    persist: values => queueAuxiliaryDataset('products', values),
+    hydrate: values => { productsState = clone(values); },
+    mutate: values => {
+      const index = values.findIndex(item => !item.deletedAt
+        && String(item.inventoryItemId || '') === id);
+      if (index < 0) return [...values, {
+        id: 'inventory:' + id,
+        inventoryItemId: id,
+        retailPriceOverride: value,
+      }];
+      return values.map((item, i) => i === index
+        ? { ...item, retailPriceOverride: value } : item);
+    },
+  });
 }
 
 export async function commitProduct(item) {
