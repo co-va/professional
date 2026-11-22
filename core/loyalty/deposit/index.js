@@ -33,6 +33,7 @@ import {
   workspaceHeaderContext,
 } from '../../../ui/ui.js';
 import { getFinanceOperation, getWallets, refreshFinanceState } from '../../finance/index.js';
+import { readOnlyReceipt } from '../../../ui/receipt/index.js';
 import { getProfile } from '../../profile/data.js';
 import { getAllPeople } from '../../people/data.js';
 import { personDisplay } from '../../people/presentation.js';
@@ -60,6 +61,7 @@ import {
   depositCardPhotoPosition,
   depositCardScope,
   depositCardStatusLabel,
+  depositFundingProgress,
   depositSpentAmount,
 } from './card-presentation.js';
 
@@ -224,11 +226,14 @@ function depositInfo(deposit = {}) {
   const terms = deposit?.terms && typeof deposit.terms === 'object' ? deposit.terms : {};
   const benefitBalance = Math.max(0, Number(deposit?.benefitBalance || 0));
   const refundableAmount = Math.max(0, Number(deposit?.refundableAmount ?? deposit?.principalBalance ?? 0));
+  const payment = depositFundingProgress(deposit);
   const rows = [
     { label: 'UEI', value: depositUei(deposit) },
     { label: 'Контакт', value: contactLabel(depositPerson(deposit)) },
     { label: 'Дата оформления', value: shortDateTime(deposit?.fundedAt, '—') },
-    { label: 'Внесено', value: money(deposit?.fundedAmount) },
+    ...(payment.fixed ? [{ label: 'Номинал', value: money(payment.nominal) }] : []),
+    { label: 'Внесено', value: money(payment.funded) },
+    ...(payment.fixed ? [{ label: payment.paid ? 'Платёж' : 'К оплате', value: payment.paid ? 'Оплачено' : money(payment.due) }] : []),
     { label: 'Срок', value: terms?.termRule || 'Бессрочно' },
     { label: 'Условие выгоды', value: terms?.benefit || 'Без дополнительной выгоды' },
   ];
@@ -379,7 +384,9 @@ function issuedList(items = []) {
     title: contactLabel(depositPerson(deposit)),
     subtitle: depositUei(deposit),
     rightTop: money(deposit?.balance),
-    rightBottom: depositStatusLabel(deposit?.status),
+    rightBottom: deposit?.status === 'active' && depositFundingProgress(deposit).fixed
+      ? (depositFundingProgress(deposit).paid ? 'Оплачено' : 'К оплате ' + money(depositFundingProgress(deposit).due))
+      : depositStatusLabel(deposit?.status),
     interactive: true,
     initial: '',
     data: `data-deposit-instance="${escapeHtml(deposit.depositId)}"`,
@@ -693,74 +700,114 @@ function paymentForm(entry, wallets, { amount = '', max = null } = {}) {
 }
 
 async function openPaymentsQ(root, deposit, { onSaved = () => {} } = {}) {
-  const wallets = getWallets();
-  const entries = fundingEntries(deposit).slice().reverse();
-  const terms = deposit?.terms && typeof deposit.terms === 'object' ? deposit.terms : {};
-  const target = Math.max(0, Number(terms?.amount || 0));
-  const funded = Math.max(0, Number(deposit?.fundedAmount || 0));
-  const isFixed = (String(terms.amountMode || (target > 0 ? 'fixed' : 'free')) === 'fixed') && target > 0;
-  const remaining = isFixed ? Math.max(0, target - funded) : 0;
-  const sections = entries.map((entry) => paymentForm(entry, wallets, {
-    max: isFixed ? remaining + Math.max(0, Number(entry.amount || 0)) : null,
-  }));
-  // A free-amount deposit accepts repeated payments; a fixed-amount deposit
-  // stops offering another payment when its nominal is fully funded.
-  if (!isFixed || remaining > 0.009) {
-    sections.push(paymentForm(null, wallets, {
-      amount: isFixed ? remaining : '',
-      max: isFixed ? remaining : null,
-    }));
-  }
-  const layer = mountModal(root, modal(page(sections), {
+  const layer = mountModal(root, modal('<div data-deposit-payment-host></div>', {
     variant: 'q',
     surface: 'app',
     title: 'Платёж',
   }));
   if (!layer) return null;
-  initDatePickers(layer);
-  layer.querySelectorAll('[data-deposit-payment-form]').forEach((form) => {
-    form.addEventListener('submit', async (event) => {
-      event.preventDefault();
-      const values = formObject(form);
-      const errorNode = form.querySelector('[data-deposit-payment-error]');
-      const wallet = wallets.find((item) => String(item?.id) === String(values.walletId));
-      const amount = Math.max(0, Number(String(values.amount || '0').replace(',', '.')) || 0);
-      if (!wallet || amount <= 0) {
-        if (errorNode) errorNode.textContent = 'Укажите сумму и кошелёк';
-        return;
-      }
-      const operationId = String(form.dataset.operationId || '');
-      const amountLimit = Number(form.querySelector('[name="amount"]')?.max);
-      if (isFixed && Number.isFinite(amountLimit) && amountLimit > 0 && amount > amountLimit + 0.009) {
-        if (errorNode) errorNode.textContent = 'Сумма превышает остаток по программе';
-        return;
-      }
-      try {
-        if (operationId) {
-          await correctDepositFunding({
-            depositId: deposit.depositId,
-            operationId,
-            amount,
-            walletId: wallet.id,
-            walletName: wallet.name,
-            occurredAt: new Date(`${values.occurredAt}T12:00:00`),
-          });
-        } else {
-          await fundExistingDeposit({
-            depositId: deposit.depositId,
-            amount,
-            walletId: wallet.id,
-            walletName: wallet.name,
-            occurredAt: new Date(`${values.occurredAt}T12:00:00`),
-          });
+
+  const render = (current) => {
+    if (layer.isConnected === false) return;
+    const host = layer.querySelector('[data-deposit-payment-host]');
+    if (!host) return;
+    const wallets = getWallets();
+    const entries = fundingEntries(current).slice().reverse();
+    const progress = depositFundingProgress(current);
+    const sections = entries.map((entry) => paymentForm(entry, wallets, {
+      max: progress.fixed ? progress.due + Math.max(0, Number(entry.amount || 0)) : null,
+    }));
+    if (!progress.fixed || !progress.paid) {
+      sections.push(paymentForm(null, wallets, {
+        amount: progress.fixed ? progress.due : '',
+        max: progress.fixed ? progress.due : null,
+      }));
+    }
+
+    // The nominal is an invoice: each funding operation reduces the amount due.
+    // Do not substitute the Deposit's spendable balance for that amount.
+    host.innerHTML = page([
+      ...(progress.fixed ? [readOnlyReceipt({
+        totals: [
+          { label: 'Номинал', value: money(progress.nominal) },
+          { label: 'Внесено', value: money(progress.funded) },
+          { label: progress.paid ? 'Платёж' : 'К оплате',
+            value: progress.paid ? 'Оплачено' : money(progress.due), strong: true },
+        ],
+      })] : []),
+      ...sections,
+    ]);
+    initDatePickers(host);
+    host.querySelectorAll('[data-deposit-payment-form]').forEach((form) => {
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const values = formObject(form);
+        const errorNode = form.querySelector('[data-deposit-payment-error]');
+        const submit = form.querySelector('button[type="submit"]');
+        const wallet = wallets.find((item) => String(item?.id) === String(values.walletId));
+        const amount = Math.max(0, Number(String(values.amount || '0').replace(',', '.')) || 0);
+        if (!wallet || amount <= 0) {
+          if (errorNode) errorNode.textContent = 'Укажите сумму и кошелёк';
+          return;
         }
-        layer.v2Close?.();
-        await onSaved?.();
-      } catch (error) {
-        if (errorNode) errorNode.textContent = error instanceof Error ? error.message : 'Не удалось сохранить платёж';
-      }
+        const operationId = String(form.dataset.operationId || '');
+        const maximum = progress.fixed ? progress.due + (operationId
+          ? Math.max(0, Number(entries.find((item) => String(item.operationId) === operationId)?.amount || 0))
+          : 0) : null;
+        if (maximum !== null && amount > maximum + 0.009) {
+          if (errorNode) errorNode.textContent = 'Сумма превышает остаток по программе';
+          return;
+        }
+        if (submit?.disabled) return;
+        if (submit) submit.disabled = true;
+        if (errorNode) errorNode.textContent = '';
+        try {
+          if (operationId) {
+            await correctDepositFunding({
+              depositId: current.depositId,
+              operationId,
+              amount,
+              walletId: wallet.id,
+              walletName: wallet.name,
+              occurredAt: new Date(`${values.occurredAt}T12:00:00`),
+            });
+          } else {
+            await fundExistingDeposit({
+              depositId: current.depositId,
+              amount,
+              walletId: wallet.id,
+              walletName: wallet.name,
+              occurredAt: new Date(`${values.occurredAt}T12:00:00`),
+            });
+          }
+        } catch (error) {
+          if (errorNode) errorNode.textContent = error instanceof Error ? error.message : 'Не удалось сохранить платёж';
+          if (submit) submit.disabled = false;
+          return;
+        }
+        // Payment is already recorded at this point: never offer to submit it
+        // again from an old form, even if the following read fails.
+        try {
+          const fresh = (await listAllDeposits()).find((item) =>
+            String(item?.depositId || '') === String(current.depositId || ''));
+          if (fresh) {
+            const updated = depositFundingProgress(fresh);
+            if (updated.fixed && !updated.paid) render(fresh);
+            else layer.v2Close?.();
+          } else {
+            layer.v2Close?.();
+          }
+          await onSaved?.();
+        } catch (error) {
+          if (errorNode?.isConnected) errorNode.textContent =
+            'Платёж проведён, но обновить данные не удалось. Откройте депозит заново.';
+          layer.v2Close?.();
+        }
+      });
     });
-  });
+  };
+
+  render(deposit);
   return layer;
 }
 
@@ -1007,7 +1054,9 @@ function personDepositCard(deposit) {
       uei: getUEI('loyalty-deposit-program', deposit?.programId) || '',
       title: `${String(deposit?.programName || 'Депозит')}: ${money(deposit?.balance)}`,
       subtitle: terms.termRule || 'Бессрочно',
-      status: depositCardStatusLabel(deposit?.status),
+      status: deposit?.status === 'active' && depositFundingProgress(deposit).fixed
+        ? (depositFundingProgress(deposit).paid ? 'Оплачено' : 'К оплате ' + money(depositFundingProgress(deposit).due))
+        : depositCardStatusLabel(deposit?.status),
       benefit: terms.benefit || 'Депозит',
       nominal: hasNominal ? nominal : null,
       funded: deposit?.fundedAmount ?? null,

@@ -26,6 +26,19 @@ export function depositSpentAmount(deposit = {}) {
   return Math.max(0, spent);
 }
 
+// Funding completion is separate from the Deposit lifecycle (active/expired).
+// Finance/Deposit owns fundedAmount; the presentation never writes a status.
+export function depositFundingProgress(deposit = {}) {
+  const terms = deposit?.terms && typeof deposit.terms === 'object' ? deposit.terms : {};
+  const amount = Number(terms.amount);
+  const nominal = Number.isFinite(amount) ? Math.max(0, amount) : 0;
+  const fixed = nominal > 0 && String(terms.amountMode || 'fixed') === 'fixed';
+  const fundedRaw = Number(deposit?.fundedAmount);
+  const funded = Number.isFinite(fundedRaw) ? Math.max(0, fundedRaw) : 0;
+  const due = fixed ? Math.max(0, Math.round((nominal - funded) * 100) / 100) : null;
+  return { fixed, nominal: fixed ? nominal : null, funded, due, paid: fixed && due <= 0.009 };
+}
+
 export function depositCardScope() {
   return SCOPE;
 }
