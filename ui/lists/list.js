@@ -37,11 +37,6 @@ export function list({ items = [], className = '' } = {}) {
     const indicator = indicatorColor
       ? `<span class="ui-list__indicator" style="--ui-list-indicator:${escapeHtml(indicatorColor)}"${indicatorLabel ? ` role="img" aria-label="${escapeHtml(indicatorLabel)}" title="${escapeHtml(indicatorLabel)}"` : ' aria-hidden="true"'}></span>`
       : '';
-    // Optional existing drag handle, shared with V2 entries. Dense Service
-    // catalogues use the same drag controller without drawing a new UI type.
-    const reorderAction = item.reorderHandle
-      ? '<span class="list-entry__reorder-handle" data-reorder-handle role="button" tabindex="0" aria-label="Переместить"><span aria-hidden="true">⋮⋮</span></span>'
-      : '';
     const overline = item.overline
       ? `<span class="ui-list__overline">${escapeHtml(item.overline)}</span>`
       : '';
@@ -57,7 +52,7 @@ export function list({ items = [], className = '' } = {}) {
       : escapeHtml(primarySecondary);
 
     return `<${tag} class="${classes}"${interactive ? ` type="button"` : ''}${attrs}>` +
-      reorderAction + indicator +
+      indicator +
       `<span class="ui-list__main">${overline}<span class="ui-list__title">${escapeHtml(item.title ?? '')}</span>` +
       (primarySecondary || secondaryIndicator ? `<span class="ui-list__secondary">${secondaryMarkup}</span>` : '') +
       `</span>` +
