@@ -1,5 +1,5 @@
 import {
-  actionBlock, button, emptyState, field, initV2ListReorder,
+  actionBlock, button, compactAddButton, compactRemoveButton, emptyState, field, initV2ListReorder,
   modal, mountModal, openNotice, select, v2ListEntries, v2ListEntry,
 } from '../../ui/ui.js';
 import { escapeHtml } from '../../ui/utils/escape-html.js';
@@ -11,46 +11,149 @@ const id = () => crypto.randomUUID();
 const clean = value => String(value || '').trim();
 const kindName = kind => kind === 'products' ? 'товаров' : 'услуг';
 
-export function serviceGroupFields(kind, selected = {}) {
-  return getServiceGroupLevels(kind).map(group => select({
-    name: 'serviceGroup_' + group.id,
-    label: group.name,
-    value: selected?.[group.id] || '',
-    options: [
-      { value: '', label: 'Без группы' },
-      ...(group.values || []).map(value => ({ value: value.id, label: value.name })),
-    ],
-    data: 'data-service-group-level="' + escapeHtml(group.id) + '"',
-  })).join('');
+// A group definition is not an assignment. The owner chooses each group with
+// the compact + in the individual Service card, and may leave it unassigned.
+// Explicit group-only selection must survive saved and rehydrated data.
+export const SERVICE_GROUP_ONLY = '__service_group_only__';
+
+function serviceGroupRow(group, value = SERVICE_GROUP_ONLY) {
+  const values = Array.isArray(group.values) ? group.values : [];
+  const choice = values.length
+    ? select({
+      name: 'serviceGroup_' + group.id,
+      value: values.some(item => item.id === value) ? value : '',
+      options: [{ value: '', label: 'Без значения' },
+        ...values.map(item => ({ value: item.id, label: item.name }))],
+      data: 'data-service-group-level="' + escapeHtml(group.id) + '"',
+    })
+    : '<input type="hidden" data-service-group-level="' + escapeHtml(group.id) +
+      '" name="serviceGroup_' + escapeHtml(group.id) + '" value="' + SERVICE_GROUP_ONLY + '">';
+  return '<div class="inventory-editor-group" data-service-group-row="' + escapeHtml(group.id) + '">' +
+    '<div class="field-inline-label"><span>' + escapeHtml(group.name) + '</span>' +
+      compactRemoveButton({ data: 'data-service-group-remove="' + escapeHtml(group.id) + '"',
+        aria: 'Снять группу ' + group.name }) +
+    '</div>' + choice + '</div>';
 }
 
+export function serviceGroupFields(kind, selected = {}) {
+  const levels = getServiceGroupLevels(kind);
+  const rows = levels.filter(group =>
+    Object.prototype.hasOwnProperty.call(selected || {}, group.id) && String(selected[group.id] || '').trim())
+    .map(group => serviceGroupRow(group, selected[group.id])).join('');
+  return '<section data-service-position-groups="' + escapeHtml(kind) + '">' +
+    '<div class="field-inline-label"><span>Группа</span>' +
+      compactAddButton({ data: 'data-service-group-add', aria: 'Добавить группу' }) +
+    '</div>' +
+    '<div class="inventory-editor-group" data-service-group-rows>' + rows + '</div>' +
+    '<div data-service-group-picker></div>' +
+  '</section>';
+}
+
+// Returns exactly the user-selected groups, never all configured groups.
+// A selected group without a value has a real marker; unselected groups have
+// NO entry. This distinction prevents phantom folders and accidental resets.
 export function readServiceGroupFields(root) {
   return Object.fromEntries(
-    [...(root?.querySelectorAll?.('input[data-service-group-level]') || [])]
-      .filter(input => clean(input.value))
-      .map(input => [String(input.dataset.serviceGroupLevel), clean(input.value)]),
+    [...(root?.querySelectorAll?.('[data-service-group-row]') || [])].map(row => {
+      const key = String(row.dataset.serviceGroupRow || '');
+      const value = String(row.querySelector('[data-service-group-level]')?.value || '');
+      return [key, value || SERVICE_GROUP_ONLY];
+    }).filter(([key]) => key),
   );
 }
 
-// Reuse Inventory's ordered-criteria tree and disclosure panels. V2 rows stay
-// V2 at ALL catalogue sizes; groups only fold them into named levels.
+export function bindServiceGroupFields(root) {
+  const sections = [...(root?.querySelectorAll?.('[data-service-position-groups]') || [])];
+  const unsubscribers = sections.map(section => {
+    const levels = getServiceGroupLevels(section.dataset.servicePositionGroups);
+    const rows = section.querySelector('[data-service-group-rows]');
+    const picker = section.querySelector('[data-service-group-picker]');
+    const plus = section.querySelector('[data-service-group-add]');
+    if (!rows || !picker || !plus) return () => {};
+    const refreshPlus = () => {
+      const assigned = new Set([...rows.querySelectorAll('[data-service-group-row]')]
+        .map(row => row.dataset.serviceGroupRow));
+      plus.disabled = levels.length > 0 && levels.every(group => assigned.has(group.id));
+    };
+    const changed = () => section.dispatchEvent(new Event('change', { bubbles: true }));
+    const onClick = event => {
+      const remove = event.target.closest?.('[data-service-group-remove]');
+      if (remove && section.contains(remove)) {
+        rows.querySelectorAll('[data-service-group-row]').forEach(row => {
+          if (row.dataset.serviceGroupRow === remove.dataset.serviceGroupRemove) row.remove();
+        });
+        picker.innerHTML = '';
+        refreshPlus();
+        changed();
+        return;
+      }
+      if (!event.target.closest?.('[data-service-group-add]')) return;
+      if (!levels.length) {
+        openNotice({ title: 'Группы', message: 'Сначала создайте группу в настройках Сервиса.' });
+        return;
+      }
+      const assigned = new Set([...rows.querySelectorAll('[data-service-group-row]')]
+        .map(row => row.dataset.serviceGroupRow));
+      const remaining = levels.filter(group => !assigned.has(group.id));
+      if (!remaining.length) return;
+      picker.innerHTML = select({
+        name: 'serviceGroupToAdd', value: '',
+        options: [{ value: '', label: 'Выберите группу' },
+          ...remaining.map(group => ({ value: group.id, label: group.name }))],
+        data: 'data-service-group-pick',
+      });
+      picker.querySelector('[data-ui-select-trigger]')?.click();
+    };
+    const onInput = event => {
+      const candidate = event.target.closest?.('[data-service-group-pick]');
+      if (!candidate) return;
+      const group = levels.find(item => item.id === candidate.value);
+      if (group && !rows.querySelector('[data-service-group-row="' + CSS.escape(group.id) + '"]')) {
+        rows.insertAdjacentHTML('beforeend', serviceGroupRow(group));
+        refreshPlus();
+        changed();
+      }
+      picker.innerHTML = '';
+    };
+    section.addEventListener('click', onClick);
+    section.addEventListener('change', onInput);
+    refreshPlus();
+    return () => {
+      section.removeEventListener('click', onClick);
+      section.removeEventListener('change', onInput);
+    };
+  });
+  return () => unsubscribers.forEach(dispose => dispose());
+}
+
+// Existing Stock disclosure and V2 items, but a named group must fold even if
+// it has NO values. With values: "Инструменты" → "Брашинг" → V2 positions.
+// Multiple chosen groups are nested in the configured order, never implicit.
 export function renderServiceGroupTree(items = [], kind = 'procedures', renderRow = () => '', onReorder = () => {}, onError = () => {}) {
   const levels = getServiceGroupLevels(kind);
   if (!levels.length) return null;
-  const decorated = items.map(item => ({ ...item, criteriaValues: item.groupValues || {} }));
-  const tree = stockGroupTree(decorated, levels);
+  const criteria = levels.flatMap(group => [
+    { id: '__service_group_' + group.id, values: [{ id: 'selected', name: group.name }] },
+    { id: group.id, values: group.values || [] },
+  ]);
+  const decorated = items.map(item => {
+    const criteriaValues = {};
+    for (const group of levels) {
+      const value = String(item.groupValues?.[group.id] || '').trim();
+      if (!value) continue;
+      criteriaValues['__service_group_' + group.id] = 'selected';
+      if (value !== SERVICE_GROUP_ONLY &&
+          group.values?.some(option => option.id === value)) criteriaValues[group.id] = value;
+    }
+    return { ...item, criteriaValues };
+  });
+  const tree = stockGroupTree(decorated, criteria);
   const directRows = rows => rows.length
     ? v2ListEntries(rows.map(renderRow)) : '';
-  const walk = node => {
-    const children = sortedStockChildren(node, levels);
-    return children.map(child => {
-      const content = walk(child);
-      const markup = catalogDisclosure(child.value, content, Boolean(node.key), child.items.length);
-      // With one sole branch there is no navigation choice; reveal its content.
-      return children.length === 1 && node.direct.length === 0
-        ? markup.replace('<details>', '<details open>') : markup;
-    }).join('') + directRows(node.direct);
-  };
+  const walk = node => sortedStockChildren(node, criteria).map(child => {
+    // No auto-expansion: one group is still deliberately collapsible.
+    return catalogDisclosure(child.value, walk(child), Boolean(node.key), child.items.length);
+  }).join('') + directRows(node.direct);
   const html = '<div data-service-group-catalog>' + walk(tree) + '</div>';
   const attach = host => {
     const disposers = [...host.querySelectorAll('.list-entries')].map(groupList =>
