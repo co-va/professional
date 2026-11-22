@@ -31,6 +31,7 @@ import { bindServiceWorkplaceAssignments, serviceWorkplaceAssignmentList, servic
 import { setSharedActionVisible } from '../../../ui/page/page.js';
 import { productEditorSignature, rebaseWorkplaceAssignmentSignature } from '../editor-signature.js';
 import { scheduleServiceStatistics, serviceItemStatistics } from '../statistics.js';
+import { renderServiceGroupTree } from '../catalog-grouping.js';
 import { productCardAppearance, productCardFields, productCardPhoto } from '../card-presentation.js';
 import { commitDeleteProduct, getProducts, commitReorderProducts, commitProduct, commitProductWorkplace, commitInventoryRetailPrice, commitInventoryProductWorkplace } from './data.js';
 
@@ -70,8 +71,16 @@ function productRow(product) {
 
 export function renderProductCatalog(host, { root = host, onChanged = () => {} } = {}) {
   const items = getProducts();
+  const grouped = items.length
+    ? renderServiceGroupTree(items, 'products', productRow,
+      ids => commitReorderProducts(ids),
+      error => openNotice({
+        title: 'Порядок',
+        message: error instanceof Error ? error.message : 'Не удалось сохранить порядок.',
+      }))
+    : null;
   host.innerHTML = items.length
-    ? v2ListEntries(items.map(productRow))
+    ? grouped?.html || v2ListEntries(items.map(productRow))
     : emptyState('Товаров пока нет', 'Добавьте первый товар кнопкой «+».');
 
   host.querySelectorAll('[data-product]').forEach((node) => {
@@ -86,6 +95,7 @@ export function renderProductCatalog(host, { root = host, onChanged = () => {} }
   // Manual order belongs to Service, including stock-backed products.
   // The reorder gesture and handles are the same as Service → Услуги.
   // Persisted order never writes into Inventory or changes stock positions.
+  if (grouped) return grouped.attach(host);
   return initV2ListReorder(host, {
     onReorder: (ids) => commitReorderProducts(ids),
     onError: (error) => openNotice({
