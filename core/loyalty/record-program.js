@@ -38,7 +38,7 @@ function depositOptions(personKey,at=new Date()) {
       programId: deposit?.programId,
       name: deposit?.programName || 'Депозит',
       pricePercent: deposit?.terms?.benefitType==='discount' ? Number(deposit?.terms?.benefitValue||0) : 0,
-      balance: deposit?.balance ?? 0,
+      balance: deposit?.availableAt ?? deposit?.balance ?? 0,
     }))
     .filter(Boolean);
 }

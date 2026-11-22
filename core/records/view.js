@@ -893,7 +893,7 @@ export function openRecordView(record, {
   const personKey = String(currentRecord?.person?.key || currentRecord?.person?.id || '').trim();
   if (!readOnlyHistory && personKey) {
     if (root) root.innerHTML = emptyState('Запись', 'Проверяем условия скидки…');
-    void listPersonDeposits(personKey).then(() => {
+    void listPersonDeposits(personKey,currentRecord?.date).then(() => {
       if (layer.isConnected) render();
     }).catch((error) => {
       if (layer.isConnected && root) root.innerHTML = emptyState(
