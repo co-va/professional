@@ -2026,7 +2026,7 @@ function openInventoryAuditCriteria(root, {
          <div class="form-grid" data-inventory-audit-excluded-list></div>
        </details>
        <div class="form-grid" data-inventory-audit-active>${items.map(inventoryAuditInput).join('')}</div>`;
-  const markup = `<form data-inventory-audit-criteria>
+  const markup = `<form class="form-grid" data-inventory-audit-criteria>
     ${isData && existingLayer ? select({
       label: 'Что изменить', name: 'auditEditField', value: definition.value,
       options: INVENTORY_AUDIT_EDIT_FIELDS.map(({ value, label }) => ({ value, label })),
