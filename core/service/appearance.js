@@ -1,7 +1,8 @@
 import { openEntityCardAppearanceQ } from '../../ui/ui.js';
+import { flushBusinessPersistence } from '../business-persistence.js';
 import { getCardAppearanceTemplate, saveCardAppearanceTemplate } from '../../core/card-appearance-templates.js';
-import { getProcedures, resetProcedureCardAppearances, saveProcedure } from './procedures/data.js';
-import { getProducts, pushProductHistory, resetProductCardAppearances, saveProduct } from './products/data.js';
+import { getProcedures, commitProcedureCardAppearance, resetProcedureCardAppearances } from './procedures/data.js';
+import { getProducts, commitProductCardAppearance, resetProductCardAppearances } from './products/data.js';
 import { serviceItemStatistics, serviceSpentText } from './statistics.js';
 import {
   procedureCardAppearance,
@@ -43,7 +44,7 @@ function serviceAppearanceEditor(type, target) {
       appearance: target === 'all' && template?.appearance ? template.appearance : productCardAppearance(product),
       fields: productCardFields(product, { saleCount: statistics.count, revenue: statistics.revenue }),
       photo: target === 'all' ? String(template?.photo || product.photo || '') : productCardPhoto(product),
-      photoPosition: String(template?.photoPosition || '50% 50%'),
+      photoPosition: String((target === 'all' ? template?.photoPosition : product.photoPosition || template?.photoPosition) || '50% 50%'),
     };
   }
 
@@ -57,7 +58,7 @@ function serviceAppearanceEditor(type, target) {
       revenue: statistics.revenue,
     }),
     photo: target === 'all' ? String(template?.photo || procedure.photo || '') : procedureCardPhoto(procedure),
-    photoPosition: String(template?.photoPosition || '50% 50%'),
+    photoPosition: String((target === 'all' ? template?.photoPosition : procedure.photoPosition || template?.photoPosition) || '50% 50%'),
   };
 }
 
@@ -68,19 +69,17 @@ async function saveServiceAppearance({ type, target, appearance, photo, editor }
       photo,
       photoPosition: editor?.photoPosition || '50% 50%',
     });
-    if (type === 'product') resetProductCardAppearances();
-    else resetProcedureCardAppearances();
+    if (type === 'product') await resetProductCardAppearances();
+    else await resetProcedureCardAppearances();
+    await flushBusinessPersistence();
     return;
   }
 
   const current = serviceEntities(type).find((item) => String(item.id || '') === String(target || ''));
-  if (!current) return;
-  if (type === 'product') {
-    pushProductHistory(current, 'updated');
-    saveProduct({ ...current, photo, cardAppearance: appearance, updatedAt: new Date().toISOString() });
-  } else {
-    saveProcedure({ ...current, photo, cardAppearance: appearance, updatedAt: new Date().toISOString() });
-  }
+  if (!current) throw new Error('Позиция больше не доступна.');
+  const update = { appearance, photo, photoPosition: editor?.photoPosition || '50% 50%' };
+  if (type === 'product') await commitProductCardAppearance(current.id, update);
+  else await commitProcedureCardAppearance(current.id, update);
 }
 
 export function openServiceAppearanceQ(root, { onSaved = () => {} } = {}) {

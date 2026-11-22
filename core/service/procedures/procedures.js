@@ -84,6 +84,7 @@ function procedureOverviewCard(procedure, statistics = null) {
       revenue: statistics.revenue,
     } : null),
     image: procedureCardPhoto(procedure),
+    imagePosition: procedure.photoPosition || '50% 50%',
     className: 'entity-visual-card--service',
     interactive: true,
     data: 'data-procedure-open-editor',

@@ -71,6 +71,12 @@ export function inventorySaleProduct(item, linked = null) {
     pricePerUnit: Number.isFinite(unitPrice) ? unitPrice / (Number(item.saleQuantity) > 0 ? Number(item.saleQuantity) : 1) : 0,
     cost: { mode: 'amount', amount: Number.isFinite(unitPrice) ? Math.round(unitPrice * 100) / 100 : 0, free: false },
     about: String(linked?.about || ''),
+    // Appearance belongs to the Service overlay; Stock remains the only
+    // authority for name, quantity, purchase and calculated sale price.
+    photo: String(linked?.photo || item.photo || ''),
+    photoPosition: String(linked?.photoPosition || '50% 50%'),
+    cardAppearance: linked?.cardAppearance && typeof linked.cardAppearance === 'object'
+      ? clone(linked.cardAppearance) : {},
     groupValues: linked?.groupValues && typeof linked.groupValues === 'object' && !Array.isArray(linked.groupValues) ? clone(linked.groupValues) : {},
     workplaces: Array.isArray(linked?.workplaces) ? clone(linked.workplaces) : [],
     inventoryOwned: true,
@@ -182,15 +188,61 @@ export async function commitReorderProducts(ids = []) {
   });
 }
 
-export function resetProductCardAppearances() {
-  const values = readRawProducts();
-  let changed = 0;
-  const updated = values.map((item) => {
-    if (item.deletedAt || !item.cardAppearance || !Object.keys(item.cardAppearance).length) return item;
-    changed += 1;
-    return { ...item, cardAppearance: {}, updatedAt: new Date().toISOString() };
+// Per-item appearance writes only Service-owned presentation metadata.
+// A linked Inventory item is never copied into auxiliary-state/products.
+export async function commitProductCardAppearance(entityId, { appearance = {}, photo = '', photoPosition = '50% 50%' } = {}) {
+  const id = String(entityId || '');
+  const product = getProducts().find(item => String(item.id) === id);
+  if (!product) throw new Error('Товар больше не доступен.');
+  const stockId = String(product.inventoryItemId || '');
+  const previous = stockId ? null : readRawProducts().find(item => String(item.id) === id && !item.deletedAt);
+  const presentation = {
+    cardAppearance: clone(appearance && typeof appearance === 'object' && !Array.isArray(appearance) ? appearance : {}),
+    photo: String(photo || ''),
+    photoPosition: String(photoPosition || '50% 50%'),
+    updatedAt: new Date().toISOString(),
+  };
+  await commitServiceCollection({
+    read: readRawProducts,
+    persist: values => queueAuxiliaryDataset('products', values),
+    hydrate: values => { productsState = clone(values); },
+    mutate: values => {
+      const index = values.findIndex(item => !item.deletedAt && (stockId
+        ? String(item.inventoryItemId || '') === stockId
+        : String(item.id) === id));
+      if (index < 0) {
+        if (!stockId) throw new Error('Товар больше не доступен.');
+        return [...values, { id: 'inventory:' + stockId, inventoryItemId: stockId, ...presentation }];
+      }
+      return values.map((item, i) => {
+        if (i !== index) return item;
+        if (!stockId) return { ...item, ...presentation };
+        // Discard only inert Stock replicas created by the old appearance
+        // writer, keeping Service price, grouping, workplaces and ordering.
+        const { name, manufacturer, unit, quantity, pricePerUnit, cost,
+          inventoryOwned, stockPurchasePrice, stockMarkupValue,
+          stockMarkupMode, calculatedSalePrice, ...overlay } = item;
+        return { ...overlay, ...presentation };
+      });
+    },
   });
-  if (changed) writeProducts(updated);
+  if (previous) await commitProductHistory(previous);
+}
+
+// The shared template replaces individual appearances with ONE ACK-first
+// dataset mutation; unrelated prices, stock links and history remain intact.
+export async function resetProductCardAppearances() {
+  let changed = 0;
+  await commitServiceCollection({
+    read: readRawProducts,
+    persist: values => queueAuxiliaryDataset('products', values),
+    hydrate: values => { productsState = clone(values); },
+    mutate: values => values.map(item => {
+      if (item.deletedAt || !item.cardAppearance || !Object.keys(item.cardAppearance).length) return item;
+      changed += 1;
+      return { ...item, cardAppearance: {}, updatedAt: new Date().toISOString() };
+    }),
+  });
   return changed;
 }
 

@@ -88,15 +88,37 @@ export async function commitReorderProcedures(ids = []) {
   });
 }
 
-export function resetProcedureCardAppearances() {
-  const values = readRawProcedures();
-  let changed = 0;
-  const updated = values.map((item) => {
-    if (item.deletedAt || !item.cardAppearance || !Object.keys(item.cardAppearance).length) return item;
-    changed += 1;
-    return { ...item, cardAppearance: {}, updatedAt: new Date().toISOString() };
+// Update only card fields, preserving concurrent Service price and group edits.
+export async function commitProcedureCardAppearance(entityId, { appearance = {}, photo = '', photoPosition = '50% 50%' } = {}) {
+  const id = String(entityId || '');
+  await commitServiceCollection({
+    read: readRawProcedures,
+    persist: values => queueOperationalDataset('procedures', values),
+    hydrate: hydrateCurrentProceduresFromServer,
+    mutate: values => {
+      if (!values.some(item => String(item.id) === id && !item.deletedAt))
+        throw new Error('Услуга больше не доступна.');
+      return values.map(item => String(item.id) === id
+        ? { ...item, cardAppearance: clone(appearance && typeof appearance === 'object' && !Array.isArray(appearance) ? appearance : {}),
+          photo: String(photo || ''), photoPosition: String(photoPosition || '50% 50%'),
+          updatedAt: new Date().toISOString() }
+        : item);
+    },
   });
-  if (changed) writeProcedures(updated);
+}
+
+export async function resetProcedureCardAppearances() {
+  let changed = 0;
+  await commitServiceCollection({
+    read: readRawProcedures,
+    persist: values => queueOperationalDataset('procedures', values),
+    hydrate: hydrateCurrentProceduresFromServer,
+    mutate: values => values.map(item => {
+      if (item.deletedAt || !item.cardAppearance || !Object.keys(item.cardAppearance).length) return item;
+      changed += 1;
+      return { ...item, cardAppearance: {}, updatedAt: new Date().toISOString() };
+    }),
+  });
   return changed;
 }
 

@@ -114,6 +114,7 @@ function productOverviewCard(product, statistics = null) {
       revenue: statistics.revenue,
     } : null),
     image: productCardPhoto(product),
+    imagePosition: product.photoPosition || '50% 50%',
     className: 'entity-visual-card--service',
     interactive: true,
     data: 'data-product-open-editor',
