@@ -2,6 +2,7 @@ import {
   emptyState,
   initViewNavigation,
   openSharedProfileSettingsMenu,
+  openNotice,
   page,
   setV2ZHeaderRows,
   clearV2ZHeaderRows,
@@ -55,9 +56,17 @@ function openServiceSettings(root, rerender) {
       {
         id: 'grouping',
         label: 'Группы',
-        onSelect: () => {
-          if (!root?.isConnected) return;
-          openServiceGroupingQ(activeView, { onSaved: rerender });
+        onSelect: async () => {
+          try {
+            // Never edit an unhydrated catalogue: otherwise the first group
+            // write could overwrite saved stock-linked retail presentations.
+            await loadAuxiliaryState('service');
+            if (!root?.isConnected) return;
+            openServiceGroupingQ(activeView, { onSaved: rerender });
+          } catch (cause) {
+            openNotice({ title: 'Группы', message: cause instanceof Error
+              ? cause.message : 'Не удалось загрузить группы.' });
+          }
         },
       },
     ],
@@ -116,7 +125,9 @@ export function renderService(root, navigateBack = () => {}) {
     if (catalog) {
       const modulePromise = view === 'products' ? loadProductsModule() : loadProceduresModule();
       void modulePromise.then(async (module) => {
-        if (view === 'products') await loadInventory();
+        if (view === 'products') await Promise.all([
+          loadInventory(), loadAuxiliaryState('service'),
+        ]);
         if (version !== renderVersion || !catalog.isConnected) return;
         disposeCatalog = view === 'products'
           ? module.renderProductCatalog(catalog, { root, onChanged: renderCurrent })
@@ -130,7 +141,16 @@ export function renderService(root, navigateBack = () => {}) {
       const module = view === 'products' ? await loadProductsModule() : await loadProceduresModule();
       if (!root?.isConnected || version !== renderVersion) return;
       if (view === 'products') void module.openStockSaleCreate(root, { onChanged: renderCurrent });
-      else module.openProcedureEditor(root, null, { onChanged: renderCurrent });
+      else {
+        try {
+          await loadAuxiliaryState('service');
+          if (root?.isConnected && version === renderVersion)
+            module.openProcedureEditor(root, null, { onChanged: renderCurrent });
+        } catch (cause) {
+          openNotice({ title: 'Сервис', message: cause instanceof Error
+            ? cause.message : 'Не удалось загрузить группы.' });
+        }
+      }
     });
 
     notifyServiceContext();
