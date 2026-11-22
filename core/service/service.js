@@ -107,7 +107,7 @@ export function renderService(root, navigateBack = () => {}) {
     root.querySelector('[data-service-add]')?.addEventListener('click', async () => {
       const module = view === 'products' ? await loadProductsModule() : await loadProceduresModule();
       if (!root?.isConnected || version !== renderVersion) return;
-      if (view === 'products') void module.openStockSalePicker(root, { onChanged: renderCurrent });
+      if (view === 'products') void module.openStockSaleCreate(root, { onChanged: renderCurrent });
       else module.openProcedureEditor(root, null, { onChanged: renderCurrent });
     });
 
