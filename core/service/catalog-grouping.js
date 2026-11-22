@@ -91,6 +91,37 @@ export function openServiceGroupingQ(kind, { onSaved = () => {} } = {}) {
     onSaved();
     repaint();
   };
+  // Removing a group or option detaches its classification only; source
+  // Services, Products, Stock and historical Records are never deleted.
+  const confirmRemove = (title, action) => {
+    const layerConfirm = mountModal(document.body, modal(
+      '<p>Позиции останутся в каталоге, изменится только группировка.</p>' +
+      '<div class="form-error" role="alert" data-service-group-remove-error></div>' +
+      actionBlock(button('Удалить', { type: 'button', variant: 'delete-outline',
+        data: 'data-service-group-remove-confirm' }) +
+        button('Отмена', { type: 'button', variant: 'secondary',
+          data: 'data-service-group-remove-cancel' })),
+      { title, variant: 'q', surface: 'app' },
+    ));
+    if (!layerConfirm) return;
+    layerConfirm.querySelector('[data-service-group-remove-cancel]')
+      ?.addEventListener('click', () => layerConfirm.v2Close?.());
+    layerConfirm.querySelector('[data-service-group-remove-confirm]')
+      ?.addEventListener('click', async event => {
+        const btn = event.currentTarget;
+        if (btn.disabled) return;
+        btn.disabled = true;
+        try {
+          await action();
+          layerConfirm.v2Close?.();
+        } catch (cause) {
+          const node = layerConfirm.querySelector('[data-service-group-remove-error]');
+          if (node) node.textContent = cause.message || 'Не удалось удалить.';
+          btn.disabled = false;
+        }
+      });
+  };
+
   const valueEditor = (group, previous = null) => {
     const valueLayer = mountModal(document.body, modal(
       '<form data-service-value-form>' +
@@ -125,7 +156,8 @@ export function openServiceGroupingQ(kind, { onSaved = () => {} } = {}) {
       } finally { busy = false; }
     };
     form.addEventListener('submit', event => { event.preventDefault(); void persist(false); });
-    valueLayer.querySelector('[data-service-value-delete]')?.addEventListener('click', () => void persist(true));
+    valueLayer.querySelector('[data-service-value-delete]')?.addEventListener('click', () =>
+      confirmRemove('Удалить значение?', () => persist(true)));
   };
   const levelEditor = (previous = null) => {
     const editor = mountModal(document.body, modal(
@@ -157,7 +189,8 @@ export function openServiceGroupingQ(kind, { onSaved = () => {} } = {}) {
       } finally { busy = false; }
     };
     form.addEventListener('submit', event => { event.preventDefault(); void persist(false); });
-    editor.querySelector('[data-service-level-delete]')?.addEventListener('click', () => void persist(true));
+    editor.querySelector('[data-service-level-delete]')?.addEventListener('click', () =>
+      confirmRemove('Удалить группу?', () => persist(true)));
   };
   const openValues = key => {
     const group = levels.find(row => row.id === key);
@@ -196,7 +229,6 @@ export function openServiceGroupingQ(kind, { onSaved = () => {} } = {}) {
         onError: fail,
       });
     };
-    const oldOnSaved = onSaved;
     // Values are re-read after each Q closes; the source remains the shared
     // tenant-scoped config and not a duplicated local option list.
     valuesLayer.querySelector('[data-service-add-value]')?.addEventListener('click', () => {
