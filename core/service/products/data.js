@@ -184,7 +184,7 @@ export async function commitInventoryRetailPrice(itemId, price) {
   const raw = price == null ? '' : String(price).trim().replace(',', '.');
   const value = Number(raw);
   if (!id || !raw || !Number.isFinite(value) || value < 0
-      || !/^\\d+(?:\\.\\d{1,2})?$/.test(raw)) {
+      || !/^\d+(?:\.\d{1,2})?$/.test(raw)) {
     throw new Error('Укажите корректную цену продажи в рублях.');
   }
   if (!getInventoryItems().some(item => String(item.itemId) === id && item.canSell === true)) {
