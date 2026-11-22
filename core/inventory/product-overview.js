@@ -257,7 +257,7 @@ function openSupplierEditor(itemId, offerId = '', onSaved = () => {}) {
   if (!item) return null;
   const offer = item.supplierOffers?.find((row) => row.offerId === offerId) || null;
   const isPrimary = Boolean(offer && item.primaryOfferId === offer.offerId);
-  const markup = `<form data-inventory-offer-form>
+  const markup = `<form class="form-grid" data-inventory-offer-form>
     ${field({ label: 'Место покупки', name: 'supplier', value: offer?.supplier || '', required: true })}
     ${twoColumnLayout(
       field({ label: 'Прайс, ₽', name: 'listPrice', value: offer?.listPrice ?? '', type: 'number', min: '0', step: '0.01', inputmode: 'decimal' }),
