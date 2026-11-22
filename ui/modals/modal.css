@@ -24,7 +24,9 @@
   z-index:5;
   left:calc(var(--ui-action-inset) - var(--ui-action-shift,0px));
   right:calc(var(--ui-action-inset) + var(--ui-action-shift,0px));
-  bottom:calc(24px + var(--ui-bottom-safe,env(safe-area-inset-bottom)));
+  /* The physical Z/Q sheet never moves. Its actions use the same keyboard
+     inset as the shared scroll body, so buttons stay ABOVE the keyboard. */
+  bottom:calc(24px + var(--ui-bottom-safe,env(safe-area-inset-bottom)) + var(--ui-keyboard-inset,0px));
   box-sizing:border-box;
   margin:0;
   padding:0;
