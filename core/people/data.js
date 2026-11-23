@@ -42,6 +42,9 @@ export function normalizePerson(person = {}) {
     id: String(person.id || ''),
     // Immutable provenance of the original contact creation, not login status.
     creationSource: ['import', 'registration', 'manual'].includes(person.creationSource) ? person.creationSource : '',
+    contactStatus: ['import', 'registered', 'added'].includes(person.contactStatus)
+      ? person.contactStatus : (Array.isArray(person.accounts) && person.accounts.length ? 'registered'
+        : person.creationSource === 'import' ? 'import' : ''),
     name: String(person.name || ''),
     surname: String(person.surname || ''),
     photo: String(person.photo || ''),
@@ -270,6 +273,7 @@ export function upsertPersonFromAccount(account = {}) {
     ...(previous || {}),
     key: previous?.key || `account-${accountId}`,
     creationSource: previous?.creationSource || 'registration',
+    contactStatus: 'registered',
     name: String(account.name || previous?.name || ''),
     surname: String(account.surname || previous?.surname || ''),
     photo: String(profileData.photo || ''),
