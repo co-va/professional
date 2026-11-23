@@ -48,6 +48,7 @@ const FINANCE_LABELS=[
   ['amount','Сумма'],['article','Статья'],['toWallet','Кошелёк назначения'],
   ['recordId','Запись'],['phone','Телефон человека'],['recordDate','Дата записи'],
   ['recordFrom','Время записи'],['loan','Займ'],['investment','Инвестиция'],['note','Примечание'],
+  ['status','Статус'],['tips','Чаевые'],
 ];
 function csvCell(value){
   let s=String(value??'').replaceAll('\0','');
@@ -59,11 +60,19 @@ export function buildScopedCsv(domain,rows){
   if(domain==='records'){
     const count=Math.max(1,...rows.map(r=>r.services?.length||0));
     for(let i=1;i<=count;i++)labels.push(['service'+i,'Услуга '+i]);
+  } else {
+    const count=Math.max(1,...rows.map(r=>r.allocations?.length||0));
+    for(let i=1;i<=count;i++)labels.push(
+      ['wallet'+i,'Кошелёк '+i],['walletAmount'+i,'Сумма кошелька '+i]);
   }
   const fields=rows.map(row=>{
     const data={...row};
     if(domain==='records')row.services?.forEach((item,i)=>{
       data['service'+(i+1)]=item.name;
+    });
+    if(domain==='finance')row.allocations?.forEach((item,i)=>{
+      data['wallet'+(i+1)]=item.wallet;
+      data['walletAmount'+(i+1)]=item.amount;
     });
     return labels.map(([key])=>data[key]??'');
   });
