@@ -17,7 +17,7 @@ function moneyValue(value) {
 export function depositSpentAmount(deposit = {}) {
   if (!Array.isArray(deposit?.history)) return null;
   const spent = deposit.history.reduce((sum, entry) => {
-    if (entry?.kind !== 'payment') return sum;
+    if (!['payment', 'deposit-import-spend'].includes(entry?.kind)) return sum;
     const amount = Number(entry?.amount);
     if (!Number.isFinite(amount) || amount <= 0) return sum;
     const direction = String(entry?.direction || '').toUpperCase();
