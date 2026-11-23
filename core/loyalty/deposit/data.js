@@ -92,9 +92,12 @@ export function isActiveDepositAssignment(deposit=null,at=new Date()){
   const day=localDateKey(at);
   const today=localDateKey();
   const historical=Boolean(day && today && day<today);
+  const end=text(deposit?.terms?.termEndDate).slice(0,10);
+  const naturallyExpired=/^\d{4}-\d{2}-\d{2}$/.test(end)&&end<today;
   const funded=text(deposit?.fundedAt).slice(0,10);
-  // Expired/closed now does not invalidate an already-funded historic visit.
-  return (status==='active' || (historical && ['expired','closed'].includes(status)))
+  // Only natural end-of-term expiry revives the historic assignment, not
+  // an early closure/cancellation. Current terms and spendability are separate.
+  return (status==='active' || (historical && status==='expired' && naturallyExpired))
     && (!funded || funded<=day)
     && termsActive(deposit?.terms,at);
 }
