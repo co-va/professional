@@ -1,5 +1,5 @@
 import {
-  button, datePicker, escapeHtml, initDatePickers, modal, mountModal,
+  actionBlock, button, datePicker, escapeHtml, initDatePickers, modal, mountModal,
   openNotice, selectFile, twoColumnLayout, v2ListEntries, v2ListEntry, v2Section,
 } from '../../../ui/ui.js';
 import { apiRequest } from '../../auth.js';
@@ -207,10 +207,10 @@ export function openDepositExcelQ(root, rerender = async () => {}) {
     { id: 'import', label: 'Загрузка', run: () => openImport(root, rerender) },
     { id: 'template', label: 'Шаблон', run: () => download('/template', 'deposits-template.xlsx') },
   ];
-  const markup = actions.map((item) => button(item.label, {
+  const markup = actionBlock(actions.map((item) => button(item.label, {
     type: 'button', variant: 'secondary',
     data: 'data-deposit-excel-action="' + item.id + '"',
-  })).join('');
+  })).join(''));
   const menu = mountModal(root, modal(markup, {
     title: 'Excel', variant: 'x', surface: 'app', xRole: 'action',
   }));
