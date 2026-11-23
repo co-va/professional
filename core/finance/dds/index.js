@@ -30,6 +30,7 @@ import { getLedgerEntries } from '../read.js';
 import { renderFinanceArticles } from './articles.js';
 import { renderIncomeExpenseOperation } from './income-expense.js';
 import { SPECIAL_FINANCE_ACTIONS, renderSpecialFinanceOperation } from './special-operations.js';
+import { openDDSExcel } from './excel.js';
 
 function formatMoney(value = 0, { signed = false } = {}) {
   const amount = Number(value) || 0;
@@ -695,7 +696,7 @@ function openArticles(root) {
 }
 
 function availableDDSSettings() {
-  const items = [{ id: 'excel', label: 'Эксель' }];
+  const items = [{ id: 'excel', label: 'Excel' }];
   if (canUseCapability('finance.articles.access')) items.push({ id: 'articles', label: 'Статьи' });
   return items;
 }
@@ -717,7 +718,7 @@ function openDDSSettings(root, movements) {
     element.addEventListener('click', () => {
       const id = String(element.dataset.financeDdsTool || '');
       settings.v2Close?.();
-      if (id === 'excel') openDDSExport(root, movements);
+      if (id === 'excel') openDDSExcel(root, movements, {onImported:()=>renderDDS(root)});
       else if (id === 'articles') openArticles(root);
     });
   });
