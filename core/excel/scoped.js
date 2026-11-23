@@ -48,7 +48,7 @@ const FINANCE_LABELS=[
   ['amount','Сумма'],['article','Статья'],['toWallet','Кошелёк назначения'],
   ['recordId','Запись'],['phone','Телефон человека'],['recordDate','Дата записи'],
   ['recordFrom','Время записи'],['loan','Займ'],['investment','Инвестиция'],['note','Примечание'],
-  ['status','Статус'],['tips','Чаевые'],
+  ['status','Статус'],['cancelledAt','Дата отмены'],['tips','Чаевые'],
 ];
 function csvCell(value){
   let s=String(value??'').replaceAll('\0','');
