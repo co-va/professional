@@ -60,6 +60,8 @@ export function ddsExportRows(movements){
       investment:operation.kind.startsWith('investment-')?String(data.financeEntityName||''):'',
       note:String(data.note||''),
       status:operation.status==='cancelled'?'Отменена':'Активна',
+      cancelledAt:operation.status==='cancelled'
+        ? String(getFinanceOperation('cancel-'+operation.operationId)?.occurredAt||''):'',
       tips:Number(data.tips||0),
       allocations:allocations.map(entry=>({
         wallet:String(entry.walletName||''),amount:Number(entry.amount||0),
