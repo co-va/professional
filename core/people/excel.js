@@ -40,24 +40,41 @@ async function getWorkbook(rows, template = false) {
   const response = await request('table', { domain: 'people', rows, template });
   downloadBlob(await response.blob(), template ? 'Контакты-шаблон.xlsx' : 'Контакты.xlsx');
 }
+function birthdayLabel(value) {
+  const raw=String(value||'').trim();
+  const full=/^(\d{4})-(\d{2})-(\d{2})$/.exec(raw);
+  if(full)return full[3]+'.'+full[2]+'.'+full[1];
+  const partial=/^(\d{2})-(\d{2})$/.exec(raw);
+  return partial?partial[2]+'.'+partial[1]:raw;
+}
 function contactRows(people) {
   return (Array.isArray(people) ? people : []).map(person => ({
+    uei: String(person.uei || ''),
     name: String(person.name || ''),
     surname: String(person.surname || ''),
+    gender: person.gender === 'female' ? 'Ж'
+      : person.gender === 'male' ? 'М' : '',
+    birthday: birthdayLabel(person.birthDate),
+    // Personal percentage only: a program's rate is not a second manual grant.
+    discountPercent: Number(person.discountPercent) > 0
+      ? String(person.discountPercent) : '',
     phone: String(person.phones?.[0] || ''),
     additionalPhone: String(person.phones?.[1] || ''),
     email: String(person.emails?.[0] || ''),
-    birthday: String(person.birthDate || '').slice(0, 10),
-    gender: person.gender === 'female' ? 'Женский' :
-      person.gender === 'male' ? 'Мужской' : '',
-    uei: String(person.uei || ''),
+    additionalEmail: String(person.emails?.[1] || ''),
+    telegram: String(person.telegrams?.[0] || ''),
+    additionalTelegram: String(person.telegrams?.[1] || ''),
     personKey: String(person.key || ''),
   }));
 }
 const CONTACT_EXPORT_COLUMNS = [
-  ['name', 'Имя'], ['surname', 'Фамилия'], ['phone', 'Телефон'],
-  ['additionalPhone', 'Дополнительный телефон'], ['email', 'Email'],
-  ['birthday', 'Дата рождения'], ['gender', 'Пол'], ['uei', 'UEI'],
+  ['uei', 'Код клиента'],
+  ['name', 'Имя'], ['surname', 'Фамилия'],
+  ['gender', 'Пол'], ['birthday', 'Дата рождения'],
+  ['discountPercent', 'Скидка, %'],
+  ['phone', 'Телефон'], ['additionalPhone', 'Дополнительный телефон'],
+  ['email', 'Email'], ['additionalEmail', 'Дополнительный Email'],
+  ['telegram', 'Telegram'], ['additionalTelegram', 'Дополнительный Telegram'],
 ];
 
 function getCsv(rows) {
@@ -125,7 +142,7 @@ function fileInput(file) {
     source: 'Контакты',
     strict: true,
     expectedDomain: 'people',
-    sheets: { 'Люди': { domain: 'people' } },
+    sheets: { 'Люди': { domain: 'people' }, 'Данные': { domain: 'people' } },
   };
 }
 function previewContent(result) {
@@ -211,11 +228,11 @@ function openPreview(root, file, onLoaded) {
 async function chooseAndLoad(root, onLoaded) {
   // Must start directly inside the iOS click gesture.
   const file = await selectFile({
-    accept: '.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    accept: '.xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv',
   });
   if (!file) return;
-  if (!String(file.name || '').toLowerCase().endsWith('.xlsx') || Number(file.size) > 25 * 1024 * 1024) {
-    throw new Error('Выберите файл Excel размером до 25 МБ');
+  if (!/\.(xlsx|csv)$/i.test(String(file.name || '')) || Number(file.size) > 25 * 1024 * 1024) {
+    throw new Error('Выберите Excel или CSV размером до 25 МБ');
   }
   openPreview(root, file, onLoaded);
 }
