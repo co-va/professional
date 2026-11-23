@@ -13,6 +13,7 @@ import { journalWorkplaceSelect, openJournalWorkplaceControl, updateJournalWorkp
 import { renderJournalDay } from './день.js';
 import { renderJournalMonth } from './месяц.js';
 import { getJournalListRecords, renderJournalList } from './список.js';
+import { openJournalExcel } from './excel.js';
 
 const JOURNAL_CONTEXT_SCOPE = 'journal';
 const WORKPLACE_CONTEXT_SCOPES = {
@@ -243,9 +244,13 @@ export function renderJournal(root, options = {}) {
         workplaceId: selectedWorkplaceId,
         list: true,
         metaPending: true,
-      })}</div>`,
+      })}</div><div class="modal-actions">${button('Excel', {variant:'secondary',data:'data-journal-list-excel'})}</div>`,
       { variant: 'x', surface: 'app', title: 'Настройки журнала', className: 'modal--form-sheet' },
     ));
+    main?.querySelector('[data-journal-list-excel]')?.addEventListener('click',()=>{
+      main.v2Close?.();
+      openJournalExcel(document.body,{onImported:()=>renderView()});
+    });
     const input = main?.querySelector('input[name="journalWorkplaceMode"]');
     input?.addEventListener('change', () => {
       const nextId = String(input.value || '');
