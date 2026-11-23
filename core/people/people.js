@@ -1110,7 +1110,13 @@ function savePersonData(root, key) {
   person.name = root.querySelector('[name="name"]')?.value.trim() || person.name;
   person.surname = root.querySelector('[name="surname"]')?.value.trim() || '';
   person.gender = root.querySelector('[name="gender"]')?.value || '';
-  person.birthDate = root.querySelector('[name="birthDate"]')?.value || '';
+  const selectedBirthDay = root.querySelector('[name="birthDate"]')?.value || '';
+  const originalBirthDate = String(person.birthDate || '');
+  // The day/month editor must not erase a known birth year imported from Excel.
+  person.birthDate = /^\d{4}-\d{2}-\d{2}$/.test(originalBirthDate)
+    && /^\d{2}-\d{2}$/.test(selectedBirthDay)
+    ? originalBirthDate.slice(0, 5) + selectedBirthDay
+    : selectedBirthDay;
   const discountField = root.querySelector('[name="discountPercent"]');
   const programDiscount = getPersonPriceCondition(person).sources.some((source) => source.type === 'program');
   // The shown program percentage is derived only. Never write it to
