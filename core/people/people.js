@@ -749,16 +749,41 @@ function openListSettings(root, options = {}) {
     ${button('Сортировка', { variant: 'secondary', data: 'data-people-sort' })}
     ${button('Фильтр', { variant: 'secondary', data: 'data-people-filter' })}
     ${button('Вид', { variant: 'secondary', data: 'data-people-appearance' })}
-    ${button('Выгрузить в Excel', { variant: 'secondary', data: 'data-people-export' })}
+    ${button('Excel', { variant: 'secondary', data: 'data-people-excel' })}
   </div>`, { title: 'Клиенты', variant: 'x', surface: 'app' }));
   if (!layer) return null;
   layer.querySelector('[data-people-sort]')?.addEventListener('click', () => { layer.v2Close?.(); openSortSettings(root); });
   layer.querySelector('[data-people-filter]')?.addEventListener('click', () => { layer.v2Close?.(); openFilterSettings(root); });
   layer.querySelector('[data-people-appearance]')?.addEventListener('click', () => { layer.v2Close?.(); openPeopleAppearanceQ(root, options); });
-  layer.querySelector('[data-people-export]')?.addEventListener('click', () => {
+  layer.querySelector('[data-people-excel]')?.addEventListener('click', () => {
+    layer.v2Close?.();
+    openPeopleExcelMenu(root);
+  });
+  return layer;
+}
+
+// The shared Excel migration tool is not ready. Keep the existing filtered
+// export intact; don't fabricate a contact import workflow or template schema.
+function openPeopleExcelMenu(root) {
+  const layer = mountModal(root, modal(`<div class="modal-actions">
+    ${button('Выгрузка', { variant: 'secondary', data: 'data-people-excel-export' })}
+    ${button('Загрузка', { variant: 'secondary', data: 'data-people-excel-import' })}
+    ${button('Шаблон', { variant: 'secondary', data: 'data-people-excel-template' })}
+  </div>`, { title: 'Excel', variant: 'x', surface: 'app', xRole: 'action' }));
+  if (!layer) return null;
+  layer.querySelector('[data-people-excel-export]')?.addEventListener('click', () => {
     layer.v2Close?.();
     downloadCsv(root);
   });
+  for (const name of ['import', 'template']) {
+    layer.querySelector(`[data-people-excel-${name}]`)?.addEventListener('click', () => {
+      layer.v2Close?.();
+      openNotice({
+        title: 'Excel',
+        message: 'Не готово. Правила массовой загрузки Контактов и состав шаблона ещё не согласованы.',
+      });
+    });
+  }
   return layer;
 }
 
