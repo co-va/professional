@@ -5,6 +5,7 @@ import {
 import { getFinanceOperation } from '../data.js';
 import { getRecord } from '../../record/index.js';
 import { getWallets } from '../cash/data.js';
+import { getWorkplaces } from '../../workplace-time.js';
 import { refreshFinanceState } from '../service.js';
 import { chooseScopedImport,exportScopedCsv,exportScopedWorkbook,reportExcelError } from '../../excel/scoped.js';
 
@@ -39,7 +40,7 @@ export function ddsExportRows(movements){
     const operation=getFinanceOperation(lines[0]?.operationId);
     if(!operation||!NAMES[operation.kind]||operation.status==='cancelled')return [];
     const data=operation.data&&typeof operation.data==='object'?operation.data:{};
-    const quote=data.sourceQuote&&typeof data.sourceQuote==='object'?data.sourceQuote:{};
+    const quote=data.sourceQuote&&typeof data.sourceQuote==='object'?data.sourceQuote:data;
     const record=operation.source?.type==='record'?getRecord(operation.source.id):null;
     const allocations=Array.isArray(data.allocations)?data.allocations:[];
     // Two wallets are two visible Finance rows. Do not multiply the invoice.
@@ -61,6 +62,8 @@ export function ddsExportRows(movements){
     const subject=String(quote.subject||data.subject||data.financeEntityName
       ||lines[0]?.articleName||data.articleName||'');
     const invoiceDate=String(quote.invoiceDate||record?.date||operation.occurredAt||'').slice(0,10);
+    const placeId=String(record?.workplaceId||data.workplace||'');
+    const place=getWorkplaces().find(w=>String(w.key)===placeId);
     const quotedTotal=quote.quotedTotal==null?'':Number(quote.quotedTotal);
     const discount=quote.discountPercent!=null?String(quote.discountPercent)+'%'
       :quote.discountMoney!=null?String(quote.discountMoney):'';
@@ -68,7 +71,7 @@ export function ddsExportRows(movements){
       operationId:String(operation.operationId||''),
       kind:NAMES[operation.kind],
       occurredAt:String(operation.occurredAt||''),
-      workplace:String(data.workplaceName||record?.workplaceName||''),
+      workplace:String(data.workplaceName||place?.name||data.workplace||''),
       invoiceDate,invoiceTime:String(quote.invoiceTime||record?.from||''),
       participantCode:String(person.uei||data.uei||''),
       participant,phone:String(person.phone||record?.person?.phone||data.phone||''),
