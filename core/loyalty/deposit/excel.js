@@ -219,7 +219,12 @@ export function openDepositExcelQ(root, rerender = async () => {}) {
     menu.querySelector('[data-deposit-excel-action="' + item.id + '"]')
       ?.addEventListener('click', () => {
         menu.v2Close?.();
-        Promise.resolve().then(item.run).catch(reportError);
+        // iOS requires the native file chooser to open during the tap handler.
+        try {
+          Promise.resolve(item.run()).catch(reportError);
+        } catch (error) {
+          reportError(error);
+        }
       });
   });
   return menu;
