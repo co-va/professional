@@ -40,6 +40,8 @@ export function normalizePerson(person = {}) {
   return {
     key: String(person.key || ''),
     id: String(person.id || ''),
+    // Immutable provenance of the original contact creation, not login status.
+    creationSource: ['import', 'registration', 'manual'].includes(person.creationSource) ? person.creationSource : '',
     name: String(person.name || ''),
     surname: String(person.surname || ''),
     photo: String(person.photo || ''),
@@ -247,6 +249,7 @@ export function createPerson(name, surname, phone = '') {
     name,
     surname,
     phones: normalizedPhone ? [normalizedPhone] : [],
+    creationSource: 'manual',
     createdAt: new Date().toISOString(),
   });
 }
@@ -266,6 +269,7 @@ export function upsertPersonFromAccount(account = {}) {
   const person = normalizePerson({
     ...(previous || {}),
     key: previous?.key || `account-${accountId}`,
+    creationSource: previous?.creationSource || 'registration',
     name: String(account.name || previous?.name || ''),
     surname: String(account.surname || previous?.surname || ''),
     photo: String(profileData.photo || ''),
