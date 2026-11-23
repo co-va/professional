@@ -1,6 +1,6 @@
 import {
   button, escapeHtml, modal, mountModal, openNotice, selectFile,
-  v2ListEntries, v2ListEntry, v2Section,
+  segmentControl, initSegmentControls, v2ListEntries, v2ListEntry, v2Section,
 } from '../../ui/ui.js';
 import { apiRequest } from '../auth.js';
 import { hydratePeopleFromServer } from './data.js';
@@ -54,6 +54,70 @@ function contactRows(people) {
     personKey: String(person.key || ''),
   }));
 }
+const CONTACT_EXPORT_COLUMNS = [
+  ['name', 'Имя'], ['surname', 'Фамилия'], ['phone', 'Телефон'],
+  ['additionalPhone', 'Дополнительный телефон'], ['email', 'Email'],
+  ['birthday', 'Дата рождения'], ['gender', 'Пол'], ['uei', 'UEI'],
+];
+
+function getCsv(rows) {
+  const encodeCell = (value) => {
+    let raw = String(value ?? '').replaceAll('\u0000', '');
+    // Spreadsheet applications can execute CSV values beginning with a formula sign.
+    // Keep names, phone numbers and comments as text, not executable formulas.
+    if (/^[\s\u0009\r\n]*[=+\-@]/.test(raw)) raw = "'" + raw;
+    return '"' + raw.replaceAll('"', '""') + '"';
+  };
+  const columns = CONTACT_EXPORT_COLUMNS;
+  const lines = [
+    columns.map(([, label]) => label),
+    ...rows.map(row => columns.map(([field]) => row[field])),
+  ];
+  return '\uFEFF' + lines.map(row => row.map(encodeCell).join(';')).join('\r\n');
+}
+
+function openPeopleExport(root, getRows) {
+  const content = '<form class="form-grid" data-people-excel-export-form>'
+    + segmentControl([
+      {value: 'xlsx', label: 'Excel'}, {value: 'csv', label: 'CSV'},
+    ], {value:'xlsx', name:'format', aria:'Формат выгрузки'})
+    + button('Выгрузить', {type:'submit'})
+    + '</form>';
+  const layer = mountModal(root, modal(content, {
+    title: 'Выгрузка', variant: 'x', surface: 'app', xRole: 'action',
+  }));
+  if (!layer) return null;
+  initSegmentControls(layer);
+  const form = layer.querySelector('[data-people-excel-export-form]');
+  let running = false;
+  form?.addEventListener('submit', async event => {
+    event.preventDefault();
+    if (running) return;
+    running = true;
+    const submit = form.querySelector('button[type="submit"]');
+    if (submit) submit.disabled = true;
+    try {
+      // Read the filtered list only at the moment the professional exports it.
+      const rows = contactRows(getRows());
+      const format = String(new FormData(form).get('format') || 'xlsx');
+      if (format === 'csv') {
+        downloadBlob(new Blob([getCsv(rows)], {
+          type: 'text/csv;charset=utf-8',
+        }), 'Контакты.csv');
+      } else {
+        await getWorkbook(rows);
+      }
+      layer.v2Close?.();
+    } catch (error) {
+      notice(error);
+    } finally {
+      running = false;
+      if (submit) submit.disabled = false;
+    }
+  });
+  return layer;
+}
+
 function fileInput(file) {
   return {
     dataUrl: String(file.dataUrl || ''),
@@ -158,7 +222,7 @@ async function chooseAndLoad(root, onLoaded) {
 
 export function openPeopleExcelMenu(root, { getRows = () => [], onLoaded = () => {} } = {}) {
   const actions = [
-    { id: 'export', label: 'Выгрузка', run: () => getWorkbook(contactRows(getRows())) },
+    { id: 'export', label: 'Выгрузка', run: () => openPeopleExport(root, getRows) },
     { id: 'import', label: 'Загрузка', run: () => chooseAndLoad(root, onLoaded) },
     { id: 'template', label: 'Шаблон', run: () => getWorkbook([], true) },
   ];
