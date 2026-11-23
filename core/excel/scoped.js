@@ -36,12 +36,22 @@ export async function exportScopedWorkbook(domain,rows,{template=false}={}){
   const title=domain==='records'?'Записи':'Финансы';
   download(await response.blob(),template?title+'-шаблон.xlsx':title+'.xlsx');
 }
+// CSV cannot merge group headers. It retains the exact XLSX column order.
 const RECORD_LABELS=[
-  ['name','Имя'],['surname','Фамилия'],['phone','Телефон'],['uei','UEI'],
-  ['date','Дата'],['from','Время начала'],['to','Время окончания'],
-  ['workplace','Рабочее пространство'],['bookedBy','Кто записал'],
-  ['actionStatus','Статус записи'],['visitStatus','Посещение'],['paymentStatus','Оплата'],
-  ['createdAt','Дата создания'],
+  ['workplace','Рабочее пространство'],
+  ['uei','Код клиента'],['name','Имя'],['surname','Фамилия'],
+  ['phone','Телефон'],['email','Email'],
+  ['date','Дата визита'],['from','Время начала'],['to','Время окончания'],
+  ['creatorName','Кто создал'],['createdDate','Дата создания'],
+  ['createdTime','Время создания'],
+  ['actionStatus','Статус записи'],['changedBy','Кто изменил'],
+  ['changedDate','Дата изменения'],['changedTime','Время изменения'],
+];
+const RECORD_END_LABELS=[
+  ['quotedTotal','Стоимость записи'],['visitStatus','Посещение'],
+  ['paymentStatus','Статус оплаты'],['paidFull','Оплачено полностью'],
+  ['comment','Комментарий'],['integrationSource','Источник интеграции'],
+  ['recordId','ID записи'],
 ];
 const FINANCE_LABELS=[
   ['occurredAt','Дата операции'],['kind','Вид операции'],['wallet','Кошелёк'],
@@ -60,6 +70,7 @@ export function buildScopedCsv(domain,rows){
   if(domain==='records'){
     const count=Math.max(1,...rows.map(r=>r.services?.length||0));
     for(let i=1;i<=count;i++)labels.push(['service'+i,'Услуга '+i]);
+    labels.push(...RECORD_END_LABELS);
   } else {
     const count=Math.max(1,...rows.map(r=>r.allocations?.length||0));
     for(let i=1;i<=count;i++)labels.push(
