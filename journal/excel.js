@@ -6,13 +6,19 @@ import { getRecordsInRange, getRecordEvents, recordActionState, recordVisitState
 import { getRecordPaymentState } from '../core/finance/index.js';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { getPeople } from '../core/people/data.js';
+import { getProfile } from '../core/profile/data.js';
+import { resolveRecordSettlement } from '../core/finance/settlement.js';
 import { chooseScopedImport, exportScopedCsv, exportScopedWorkbook, reportExcelError } from '../core/excel/scoped.js';
 
 const actionLabels={booked:'Записался',rescheduled:'Перенёс',cancelled:'Отменил'};
 const visitLabels={expected:'Ожидает',arrived:'Пришёл','no-show':'Не пришёл'};
-const sourceLabels=new Set(['online-booking','account-journal','public-booking','user']);
-function stateFor(record){
-  const events=getRecordEvents(record.id);
+const onlineSources=new Set(['online-booking','account-journal','public-booking','user']);
+const integrationLabels={
+  'online-booking':'Онлайн-запись','public-booking':'Онлайн-запись',
+  'account-journal':'Приложение','user':'Приложение',
+  'journal':'Журнал','manual':'Журнал',
+};
+function stateFor(record,events){
   const action=recordActionState(record,events);
   const visit=recordVisitState(record,events);
   const payment=getRecordPaymentState(record);
@@ -20,29 +26,85 @@ function stateFor(record){
     :(!payment.hasPayments && record.historicalPaymentStatus)||'Не оплачено';
   return {action,visit,payment:paymentStatus};
 }
+function splitMoment(value,timeZone=''){
+  const date=new Date(String(value||''));
+  if(!Number.isFinite(date.getTime()))return {date:'',time:''};
+  const parts=new Intl.DateTimeFormat('ru-RU',{
+    timeZone:timeZone||'UTC',year:'numeric',month:'2-digit',day:'2-digit',
+    hour:'2-digit',minute:'2-digit',hourCycle:'h23',
+  }).formatToParts(date);
+  const key=Object.fromEntries(parts.map(part=>[part.type,part.value]));
+  return {date:[key.year,key.month,key.day].join('-'),time:key.hour+':'+key.minute};
+}
+function actorName(actor,record,person,profile){
+  const name=String(actor?.name||actor?.displayName||'').trim();
+  if(name)return name;
+  const profileId=String(actor?.profileId||'');
+  const accountId=String(actor?.accountId||'');
+  if(profile && (profileId && [profile.id,profile.key].includes(profileId)
+    || accountId && accountId===profile.platformAccountId))
+    return [profile.name,profile.surname].filter(Boolean).join(' ');
+  if(accountId && Array.isArray(person.accounts) && person.accounts.includes(accountId))
+    return [person.name,person.surname].filter(Boolean).join(' ');
+  return String(record?.historicalCreatorName||'');
+}
+function quotedServicesTotal(record){
+  if(record?.historicalQuotedTotal!==undefined && record?.historicalQuotedTotal!==null
+    && record?.historicalQuotedTotal!=='')return Number(record.historicalQuotedTotal);
+  const settlement=resolveRecordSettlement(record);
+  return (Array.isArray(settlement?.items)?settlement.items:[])
+    .filter(item=>item.sourceType==='procedure')
+    .reduce((sum,item)=>sum+Math.max(0,Number(item.planAmount)||0),0);
+}
 function getRows(from,to,{action='',visit='',payment='',workplaceId=''}={}){
   const catalog=getWorkplaces();
   const persons=new Map(getPeople().map(person=>[String(person.key),person]));
+  const profile=getProfile();
   return getRecordsInRange({from,to,workplaceId}).flatMap(record=>{
-    const status=stateFor(record);
+    const events=getRecordEvents(record.id);
+    const status=stateFor(record,events);
     if(action&&status.action!==action)return [];
     if(visit&&status.visit!==visit)return [];
     if(payment&&status.payment!==payment)return [];
     const owner=persons.get(String(record.person?.key||''))||{};
     const place=catalog.find(w=>String(w.key)===String(record.workplaceId));
+    const timezone=String(place?.timeZone||'');
+    const createdEvent=events.find(event=>event.type==='created');
+    const created=splitMoment(record.createdAt||createdEvent?.at,timezone);
+    const changedEvent=[...events].reverse().find(event=>
+      event.type==='cancelled'||event.type==='rescheduled');
+    const changed=splitMoment(changedEvent?.at,timezone);
+    const actionStatus=record.historicalAction==='Удалена'?'Удалена'
+      :actionLabels[status.action]||'Записался';
+    const creator=String(record.historicalCreatorName||'')
+      ||actorName(record.createdBy||createdEvent?.actor,record,owner,profile);
+    const changer=String(record.historicalChangedBy||'')
+      ||(changedEvent?actorName(changedEvent.actor,{},owner,profile):'');
     return [{
-      recordId:String(record.id||''),name:String(record.person?.name||''),
-      surname:String(record.person?.surname||''),phone:String(record.person?.phone||owner.phones?.[0]||''),
-      uei:String(owner.uei||''),date:String(record.date||''),
-      from:String(record.from||''),to:String(record.to||''),
-      workplace:String(place?.name||''),bookedBy:sourceLabels.has(String(record.source||''))?'Самостоятельно':'Профессионал',
-      actionStatus:actionLabels[status.action]||'Записался',
-      visitStatus:visitLabels[status.visit]||'',
-      paymentStatus:status.payment,createdAt:String(record.createdAt||''),
-      services:(Array.isArray(record.procedures)?record.procedures:[]).map(service=>({
-        name:String(service.name||''),cost:service.cost??service.price??'',
-        duration:service.duration??'',
+      recordId:String(record.id||''),
+      workplace:String(place?.name||''),
+      uei:String(owner.uei||''),
+      name:String(record.person?.name||owner.name||''),
+      surname:String(record.person?.surname||owner.surname||''),
+      phone:String(record.person?.phone||owner.phones?.[0]||''),
+      email:String(owner.emails?.[0]||''),
+      date:String(record.date||''),from:String(record.from||''),to:String(record.to||''),
+      creatorName:creator,
+      createdDate:String(record.historicalCreatedDate||created.date||''),
+      createdTime:String(record.historicalCreatedTime||created.time||''),
+      actionStatus,changedBy:changer,
+      changedDate:String(record.historicalChangedDate||changed.date||''),
+      changedTime:String(record.historicalChangedTime||changed.time||''),
+      services:(Array.isArray(record.procedures)?record.procedures:[]).map(item=>({
+        name:String(item.name||''),
       })),
+      quotedTotal:quotedServicesTotal(record),
+      visitStatus:visitLabels[status.visit]||'',
+      paymentStatus:status.payment,
+      paidFull:status.payment==='Оплачено'?'Да':'Нет',
+      comment:String(record.historicalComment||record.comment||''),
+      integrationSource:String(record.historicalIntegrationSource
+        ||integrationLabels[String(record.source||'')]||record.source||''),
     }];
   });
 }
