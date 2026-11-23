@@ -255,6 +255,7 @@ function historyKindLabel(kind) {
   if (kind === 'deposit-withdrawal') return 'Возврат';
   if (kind === 'refund') return 'Возврат';
   if (kind === 'payment') return 'Списание';
+  if (kind === 'deposit-import-spend') return 'Списание';
   return 'Операция';
 }
 
@@ -267,7 +268,11 @@ function depositHistoryWithBalance(deposit = {}) {
   return chronological.map(({ item }) => {
     const amount = Math.max(0, Number(item?.amount || 0));
     const direction = String(item?.direction || '').toUpperCase();
-    if (item?.kind === 'deposit-withdrawal') balance = 0;
+    // Core is the sole owner of the historical running balance. Never
+    // recompute accrued benefits or imported spending a second time in UI.
+    if (item?.balanceAfter != null && Number.isFinite(Number(item.balanceAfter))) {
+      balance = Number(item.balanceAfter);
+    } else if (item?.kind === 'deposit-withdrawal') balance = 0;
     else balance = Math.max(0, balance + (direction === 'IN' ? amount : -amount));
     return { ...item, balanceAfter: balance };
   });
@@ -283,6 +288,7 @@ function historyListMarkup(deposit = {}) {
   return v2ListEntries(items.map((item, index) => v2ListEntry({
     title: historyKindLabel(item?.kind),
     subtitle: shortDateTime(item?.occurredAt, '—'),
+    rightBottom: item?.origin === 'excel_import' ? 'Excel' : '',
     rightTop: `${String(item?.direction || '').toUpperCase() === 'IN' ? '+' : '−'}${money(item?.amount)}`,
     initial: '',
     interactive: true,
@@ -342,8 +348,22 @@ function historyEventMarkup(item = {}, operation = null) {
     const walletName = String(item?.walletName || operation?.data?.walletName || '').trim();
     if (walletName) rows.push({ label: 'Кошелёк', value: walletName });
   }
+  if (item?.origin === 'excel_import') {
+    rows.push({ label: 'Источник', value: 'Импорт Excel' });
+  } else {
+    rows.push({ label: 'Источник', value: 'Приложение' });
+  }
+  if (item?.kind === 'deposit-funding' && item?.walletResolution === 'unknown') {
+    rows.push({ label: 'Кошелёк', value: 'Не определён' });
+  }
+  if (item?.reconciliationStatus === 'unmatched') {
+    rows.push({ label: 'Связь с Журналом', value: 'Не сопоставлена' });
+  } else if (item?.recordId) {
+    rows.push({ label: 'Связь с Журналом', value: 'Сопоставлена' });
+  }
   rows.push({ label: 'Остаток', value: money(item?.balanceAfter) });
-  rows.push({ label: 'Дата формирования', value: shortDateTime(operation?.recordedAt || item?.occurredAt, '—') });
+  if (item?.dueToFund != null) rows.push({ label: 'К оплате', value: money(item?.dueToFund) });
+  rows.push({ label: 'Дата формирования', value: shortDateTime(item?.recordedAt || operation?.recordedAt || item?.occurredAt, '—') });
   return details(rows);
 }
 
