@@ -3,7 +3,7 @@ import {
   segmentControl, initSegmentControls, v2ListEntries, v2ListEntry, v2Section,
 } from '../../ui/ui.js';
 import { apiRequest } from '../auth.js';
-import { hydratePeopleFromServer } from './data.js';
+import { hydratePeopleFromServer, getPersonPriceCondition } from './data.js';
 import { hydrateUEIFromServer } from '../uei.js';
 
 function message(error) {
@@ -55,9 +55,10 @@ function contactRows(people) {
     gender: person.gender === 'female' ? 'Ж'
       : person.gender === 'male' ? 'М' : '',
     birthday: birthdayLabel(person.birthDate),
-    // Personal percentage only: a program's rate is not a second manual grant.
-    discountPercent: Number(person.discountPercent) > 0
-      ? String(person.discountPercent) : '',
+    // Export only an active personal percentage, never duplicate a program's
+    // historical rate as a new independently assigned manual discount.
+    discountPercent: String(getPersonPriceCondition(person).sources
+      .find(source => source.type === 'personal')?.percent || ''),
     phone: String(person.phones?.[0] || ''),
     additionalPhone: String(person.phones?.[1] || ''),
     email: String(person.emails?.[0] || ''),
