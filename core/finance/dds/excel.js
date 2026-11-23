@@ -3,6 +3,7 @@ import {
   segmentControl,select,twoColumnLayout,
 } from '../../../ui/ui.js';
 import { getFinanceOperation } from '../data.js';
+import { getRecord } from '../../record/index.js';
 import { getWallets } from '../cash/data.js';
 import { refreshFinanceState } from '../service.js';
 import { chooseScopedImport,exportScopedCsv,exportScopedWorkbook,reportExcelError } from '../../excel/scoped.js';
@@ -44,6 +45,7 @@ export function ddsExportRows(movements){
     const inbound=lines.find(item=>item.direction==='IN');
     const allocations=Array.isArray(data.allocations)?data.allocations:[];
     const main=allocations[0]||{};
+    const record=operation.source?.type==='record'?getRecord(operation.source.id):null;
     return [{
       operationId:String(operation.operationId||''),
       occurredAt:String(operation.occurredAt||''),kind:NAMES[operation.kind],
@@ -52,8 +54,8 @@ export function ddsExportRows(movements){
       article:String(first.articleName||data.articleName||''),
       toWallet:operation.kind==='transfer'?String(inbound?.walletName||data.toWalletName||''):'',
       recordId:operation.source?.type==='record'?String(operation.source.id||''):'',
-      phone:String(data.person?.phone||''),
-      recordDate:'',recordFrom:'',
+      phone:String(data.person?.phone||record?.person?.phone||''),
+      recordDate:String(record?.date||''),recordFrom:String(record?.from||''),
       loan:operation.kind.startsWith('loan-')?String(data.financeEntityName||''):'',
       investment:operation.kind.startsWith('investment-')?String(data.financeEntityName||''):'',
       note:String(data.note||''),
