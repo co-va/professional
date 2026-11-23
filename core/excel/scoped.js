@@ -41,15 +41,15 @@ const RECORD_LABELS=[
   ['workplace','Рабочее пространство'],
   ['uei','Код клиента'],['name','Имя'],['surname','Фамилия'],
   ['phone','Телефон'],['email','Email'],
-  ['date','Дата визита'],['from','Время начала'],['to','Время окончания'],
-  ['creatorName','Кто создал'],['createdDate','Дата создания'],
-  ['createdTime','Время создания'],
-  ['actionStatus','Статус записи'],['changedBy','Кто изменил'],
-  ['changedDate','Дата изменения'],['changedTime','Время изменения'],
+  ['date','Дата визита'],['from','Время визита'],['to','Время окончания'],
+  ['creatorName','Имя'],['createdDate','Дата'],
+  ['createdTime','Время'],
+  ['actionStatus','Статус'],['changedBy','Имя'],
+  ['changedDate','Дата'],['changedTime','Время'],
 ];
 const RECORD_END_LABELS=[
-  ['quotedTotal','Стоимость записи'],['visitStatus','Посещение'],
-  ['paymentStatus','Статус оплаты'],['paidFull','Оплачено полностью'],
+  ['quotedTotal','Стоимость'],['visitStatus','Статус посещения'],
+  ['paymentStatus','Статус оплаты'],
   ['comment','Комментарий'],['integrationSource','Источник интеграции'],
   ['recordId','ID записи'],
 ];
