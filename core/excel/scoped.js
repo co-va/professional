@@ -6,7 +6,7 @@ import { apiRequest } from '../auth.js';
 
 export function excelError(error) {
   const raw=error instanceof Error ? String(error.message||''):'';
-  return raw && !/HTTP|fetch|network|404|50\d|JSON|API|Failed to|Prisma|SQL|P20\d|transaction|sourceKey|tenantId|stack|undefined|constraint|database|Internal Server/i.test(raw)
+  return raw && !/HTTP|fetch|network|404|50\d|JSON|API|Failed to|Prisma|SQL|P20\d|transaction|sourceKey|tenantId|stack|undefined|constraint|database|Internal Server|ID переноса|CO-VA|JSON|payload|endpoint|UUID/i.test(raw)
     ? raw : 'Не удалось обработать файл. Проверьте таблицу и повторите.';
 }
 export function reportExcelError(error) {
@@ -88,7 +88,7 @@ function previewHtml(preview){
   const line='К загрузке: '+saved+(unchanged?' · Уже есть: '+unchanged:'')+(errors?' · Ошибок: '+errors:'');
   const issues=(preview.rows||[]).filter(row=>row.reason).slice(0,25).map(row=>{
     let detail=String(row.reason||'');
-    if(/SQL|Prisma|P20\d|sourceKey|tenantId|stack|undefined|constraint|database|transaction/i.test(detail))
+    if(/SQL|Prisma|P20\d|sourceKey|tenantId|stack|undefined|constraint|database|transaction|ID переноса|CO-VA|JSON|payload|endpoint|UUID/i.test(detail))
       detail='Проверьте сведения в строке';
     return v2ListEntry({title:'Строка '+String(row.row||'—'),subtitle:detail,interactive:false});
   });
