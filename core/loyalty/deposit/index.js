@@ -40,6 +40,7 @@ import { personDisplay } from '../../people/presentation.js';
 import { getCardAppearanceTemplate, saveCardAppearanceTemplate } from '../../card-appearance-templates.js';
 import { createUEI, getUEI, listUEIs, normalizeUEI, releaseUEI, replaceUEI } from '../../uei.js';
 import { openLoyaltySettingsMenu } from '../shared.js';
+import { openDepositExcelQ } from './excel.js';
 import {
   correctDepositFunding,
   deleteDeposit,
@@ -861,6 +862,7 @@ function openRootSettings(root, rerender) {
     title: 'Депозит',
     actions: [
       { id: 'appearance', label: 'Вид', onSelect: () => openAppearanceQ(root, rerender) },
+      { id: 'excel', label: 'Excel', onSelect: () => openDepositExcelQ(root, rerender) },
     ],
   });
 }
