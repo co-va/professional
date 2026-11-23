@@ -35,10 +35,13 @@ function recordPresentation(record, workplaces) {
 
 function paymentFor(record) {
   const state = getRecordPaymentState(record);
+  const imported = !state.hasPayments && record.historicalTransfer
+    ? String(record.historicalPaymentStatus || '') : '';
   return {
-    paid: Boolean(state.fullyPaid),
+    paid: Boolean(state.fullyPaid || imported === 'Оплачено'),
     activity: state.fullyPaid ? state.latestPayment : null,
     total: state.planTotal,
+    imported,
   };
 }
 
@@ -46,7 +49,7 @@ function recordId(record) {
   return String(record?.id || record?.sourceId || '');
 }
 
-function recordEntry(record, workplaces, { focus = false, paid = false, amountDue = 0 } = {}) {
+function recordEntry(record, workplaces, { focus = false, paid = false, amountDue = 0, imported = '' } = {}) {
   const presentation = recordPresentation(record, workplaces);
   const name = personName(presentation.person, 'Человек');
   const classes = [recordListStatusClass(record, { paid }), focus ? 'journal-list-focus' : ''].filter(Boolean).join(' ');
@@ -56,7 +59,7 @@ function recordEntry(record, workplaces, { focus = false, paid = false, amountDu
     title: name,
     subtitle: record?.person?.phone || '',
     rightTop: [shortDate(record?.date), String(record?.from || '')].filter(Boolean).join(' · '),
-    rightBottom: formatMoney(amountDue),
+    rightBottom: imported || formatMoney(amountDue),
     interactive: Boolean(id),
     data: id ? `data-journal-list-record="${escapeHtml(id)}"` : '',
     aria: id ? `Открыть запись ${name}` : '',
@@ -101,7 +104,7 @@ function renderTimeMode(root, records, workplaces) {
   const entries = ordered.flatMap((record, index) => {
     const payment = paymentFor(record);
     const row = recordEntry(record, workplaces, {
-      focus: index === splitIndex, paid: payment.paid, amountDue: payment.total,
+      focus: index === splitIndex, paid: payment.paid, amountDue: payment.total, imported: payment.imported,
     });
     return index === splitIndex ? [anchorEntry(), row] : [row];
   });
@@ -126,9 +129,9 @@ function renderFlowMode(root, records, workplaces) {
     recordActivityTime(b.record, b.payment.activity, { timeZone: b.timeZone })
       - recordActivityTime(a.record, a.payment.activity, { timeZone: a.timeZone }));
   const entries = [
-    ...completed.map(({ record, payment }) => recordEntry(record, workplaces, { paid: payment.paid, amountDue: payment.total })),
+    ...completed.map(({ record, payment }) => recordEntry(record, workplaces, { paid: payment.paid, amountDue: payment.total, imported: payment.imported })),
     anchorEntry(),
-    ...pending.map(({ record, payment }) => recordEntry(record, workplaces, { paid: payment.paid, amountDue: payment.total })),
+    ...pending.map(({ record, payment }) => recordEntry(record, workplaces, { paid: payment.paid, amountDue: payment.total, imported: payment.imported })),
   ];
   root.innerHTML = v2ListEntries(entries);
   bindRecordClicks(root, records);
