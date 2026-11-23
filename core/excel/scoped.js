@@ -58,18 +58,12 @@ export function buildScopedCsv(domain,rows){
   let labels=domain==='records'?[...RECORD_LABELS]:[...FINANCE_LABELS];
   if(domain==='records'){
     const count=Math.max(1,...rows.map(r=>r.services?.length||0));
-    for(let i=1;i<=count;i++)labels.push(
-      ['service'+i,'Услуга '+i],
-      ['cost'+i,'Цена услуги '+i],
-      ['duration'+i,'Длительность услуги '+i],
-    );
+    for(let i=1;i<=count;i++)labels.push(['service'+i,'Услуга '+i]);
   }
   const fields=rows.map(row=>{
     const data={...row};
     if(domain==='records')row.services?.forEach((item,i)=>{
       data['service'+(i+1)]=item.name;
-      data['cost'+(i+1)]=item.cost??'';
-      data['duration'+(i+1)]=item.duration??'';
     });
     return labels.map(([key])=>data[key]??'');
   });
