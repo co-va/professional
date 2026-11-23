@@ -83,11 +83,11 @@ function getRows(from,to,{action='',visit='',payment='',workplaceId=''}={}){
     return [{
       recordId:String(record.id||''),
       workplace:String(place?.name||''),
-      uei:String(owner.uei||''),
+      uei:String(record.person?.uei||owner.uei||''),
       name:String(record.person?.name||owner.name||''),
       surname:String(record.person?.surname||owner.surname||''),
       phone:String(record.person?.phone||owner.phones?.[0]||''),
-      email:String(owner.emails?.[0]||''),
+      email:String(record.person?.email||owner.emails?.[0]||''),
       date:String(record.date||''),from:String(record.from||''),to:String(record.to||''),
       creatorName:creator,
       createdDate:String(record.historicalCreatedDate||created.date||''),
