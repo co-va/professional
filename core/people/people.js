@@ -50,6 +50,7 @@ import { getAllPeople, getIdentityMemberKeys, getPeople, getPersonPriceCondition
 import { flushBusinessPersistence, isBusinessServerReady } from '../business-persistence.js';
 import { bindPersonCreateForm, personCreateForm } from './create.js';
 import { personDisplay } from './presentation.js';
+import { openPeopleExcelMenu } from './excel.js';
 import { personCardAppearance, personCardFields } from './card-presentation.js';
 import { getCurrentPersonHistory, getPersonHistory } from './history.js';
 import { getPersonMetadata } from './metadata.js';
@@ -757,36 +758,21 @@ function openListSettings(root, options = {}) {
   layer.querySelector('[data-people-appearance]')?.addEventListener('click', () => { layer.v2Close?.(); openPeopleAppearanceQ(root, options); });
   layer.querySelector('[data-people-excel]')?.addEventListener('click', () => {
     layer.v2Close?.();
-    openPeopleExcelMenu(root);
+    openPeopleExcelMenu(root, {
+      getRows: () => {
+        if (currentPeopleFilters().loyaltyMode && (root.peopleLoyaltyLoading || root.peopleLoyaltyError)) {
+          throw new Error('Список ещё загружается. Повторите выгрузку после обновления.');
+        }
+        return visiblePeople(root);
+      },
+      onLoaded: () => renderPeople(root, options),
+    });
   });
   return layer;
 }
 
 // The shared Excel migration tool is not ready. Keep the existing filtered
 // export intact; don't fabricate a contact import workflow or template schema.
-function openPeopleExcelMenu(root) {
-  const layer = mountModal(root, modal(`<div class="modal-actions">
-    ${button('Выгрузка', { variant: 'secondary', data: 'data-people-excel-export' })}
-    ${button('Загрузка', { variant: 'secondary', data: 'data-people-excel-import' })}
-    ${button('Шаблон', { variant: 'secondary', data: 'data-people-excel-template' })}
-  </div>`, { title: 'Excel', variant: 'x', surface: 'app', xRole: 'action' }));
-  if (!layer) return null;
-  layer.querySelector('[data-people-excel-export]')?.addEventListener('click', () => {
-    layer.v2Close?.();
-    downloadCsv(root);
-  });
-  for (const name of ['import', 'template']) {
-    layer.querySelector(`[data-people-excel-${name}]`)?.addEventListener('click', () => {
-      layer.v2Close?.();
-      openNotice({
-        title: 'Excel',
-        message: 'Не готово. Правила массовой загрузки Контактов и состав шаблона ещё не согласованы.',
-      });
-    });
-  }
-  return layer;
-}
-
 function openPeopleAppearanceQ(root, options = {}) {
   const values = getPeople();
   const sample = values[0] || {
@@ -811,29 +797,6 @@ function openPeopleAppearanceQ(root, options = {}) {
     },
     onSaved: () => renderPeople(root, options),
   });
-}
-
-function downloadCsv(root) {
-  // Use exactly the displayed list. Never export stale or incomplete cached
-  // loyalty assignments while the filtered list shows loading or an error.
-  if (currentPeopleFilters().loyaltyMode && (root.peopleLoyaltyLoading || root.peopleLoyaltyError)) {
-    openNotice({
-      title:'Выгрузка',
-      message:root.peopleLoyaltyError || 'Данные программ ещё загружаются. Повторите выгрузку после загрузки списка.',
-    });
-    return;
-  }
-  const headers = ['Имя', 'Фамилия', 'Телефон', 'Email'];
-  const rows = visiblePeople(root).map((person) => [person.name, person.surname, person.phones?.[0], person.emails?.[0]]);
-  const text = '\uFEFF' + [headers, ...rows]
-    .map((row) => row.map((value) => `"${String(value ?? '').replaceAll('"', '""')}"`).join(';'))
-    .join('\r\n');
-  const url = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8' }));
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = 'клиенты.csv';
-  anchor.click();
-  URL.revokeObjectURL(url);
 }
 
 
