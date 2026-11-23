@@ -96,10 +96,11 @@ export function openRecordConsumptionEditor(record, services = [], { onSaved = (
   };
   async function loadRecipeReferences() {
     const ids = missingReferenceIds();
-    for (let i = 0; i < ids.length; i += 250) {
-      const response = await apiRequest('/inventory/items/resolve-references', {
-        method: 'POST', body: JSON.stringify({ itemIds: ids.slice(i, i + 250) }),
-      });
+    for (let i = 0; i < ids.length; i += 40) {
+      // A GET stays available in read-only previews. Keep URLs short.
+      const path = '/inventory/items/references?ids=' +
+        encodeURIComponent(ids.slice(i, i + 40).join(','));
+      const response = await apiRequest(path);
       const payload = await response.json().catch(() => ({}));
       if (!response.ok || !Array.isArray(payload?.items))
         throw new Error('Не удалось восстановить названия товаров по архиву склада.');
