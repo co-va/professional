@@ -468,6 +468,8 @@ function listMarkup(items, query = '') {
       overline: display.uei,
       title: display.name,
       subtitle: display.phone,
+      rightBottom: person.contactStatus === 'import' ? 'Импорт'
+        : person.contactStatus === 'registered' ? 'Аккаунт' : '',
       initial: '',
       className: 'list-entry--record-person',
       interactive: true,
