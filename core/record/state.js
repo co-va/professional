@@ -11,7 +11,7 @@ function orderedEvents(events = []) {
 export function projectRecordLifecycle(record = {}, events = []) {
   // Historical Excel status is an initial snapshot, not a synthetic event.
   // Later real lifecycle events remain authoritative.
-  let status = record?.historicalAction === 'Отменил' ? 'cancelled' : 'active';
+  let status = ['Отменил','Удалена'].includes(record?.historicalAction) ? 'cancelled' : 'active';
   let confirmed = false;
   let attendance = record?.historicalVisit === 'Пришёл' ? 'arrived'
     : record?.historicalVisit === 'Не пришёл' ? 'no-show' : '';
@@ -68,7 +68,7 @@ export function projectRecordLifecycle(record = {}, events = []) {
 }
 
 export function recordActionState(record = {}, events = []) {
-  let state = record?.historicalAction === 'Отменил' ? 'cancelled'
+  let state = ['Отменил','Удалена'].includes(record?.historicalAction) ? 'cancelled'
     : record?.historicalAction === 'Перенёс' ? 'rescheduled' : 'booked';
   for (const event of orderedEvents(events)) {
     if (event.type === RECORD_EVENT_TYPES.CANCELLED) return 'cancelled';
