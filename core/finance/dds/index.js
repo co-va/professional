@@ -156,34 +156,6 @@ function operationListEntry(entries = []) {
   });
 }
 
-function csvCell(value) {
-  return `"${String(value ?? '').replaceAll('"', '""')}"`;
-}
-
-function downloadDDS(movements) {
-  const headers = ['Фактическая дата и время', 'Внесено в систему', 'Операция', 'Статья', 'Позиция', 'Человек', 'Рабочее место', 'Кошелёк', 'Сумма', 'Статус', 'Чаевые'];
-  const rows = movements.map((item) => [
-    operationMoment(item),
-    recordedMoment(item),
-    operationName(item).replace(' · Отменена', ''),
-    item?.articleName || '',
-    item?.lineName || '',
-    personText(item),
-    item?.workplace || '',
-    walletText(item),
-    operationAmount(item),
-    item?.operationStatus === 'cancelled' ? 'Отменена' : 'Активна',
-    item?.economicType === 'TIPS' || item?.economicType === 'TIPS_REFUND' ? Math.abs(operationAmount(item)) : 0,
-  ]);
-  const text = '\uFEFF' + [headers, ...rows].map((row) => row.map(csvCell).join(';')).join('\r\n');
-  const url = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8' }));
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = 'ДДС.csv';
-  anchor.click();
-  URL.revokeObjectURL(url);
-}
-
 function paymentReceiptGroups(entries = []) {
   const rows = Array.isArray(entries) ? entries : [];
   const first = rows[0] || {};
@@ -598,94 +570,6 @@ function openFinanceOperation(root, movements, operationId) {
 
   layer.querySelector('[data-finance-operation-settings]')?.addEventListener('click', () => {
     openOperationSettings(root, layer, entries);
-  });
-}
-
-function movementDay(item) {
-  const raw = String(item?.occurredAt || item?.refundedAt || item?.paidAt || item?.date || '').trim();
-  if (!raw) return '';
-  return raw.slice(0, 10);
-}
-
-function exportKind(item) {
-  const type = String(item?.economicType || '');
-  if (type === 'TRANSFER') return 'transfer';
-  if (type === 'LOAN_RECEIVED' || type === 'LOAN_REPAYMENT') return 'loan';
-  if (type === 'INVESTMENT_RECEIVED' || type === 'INVESTMENT_RETURN') return 'investment';
-  return item?.direction === 'OUT' ? 'expense' : 'income';
-}
-
-function filterExportMovements(movements, form) {
-  const data = new FormData(form);
-  const from = String(data.get('from') || '');
-  const to = String(data.get('to') || '');
-  const kind = String(data.get('kind') || '');
-  const walletId = String(data.get('walletId') || '');
-  const status = String(data.get('status') || '');
-  return movements.filter((item) => {
-    const day = movementDay(item);
-    if (from && (!day || day < from)) return false;
-    if (to && (!day || day > to)) return false;
-    if (kind && exportKind(item) !== kind) return false;
-    if (walletId && String(item?.walletId || '') !== walletId) return false;
-    if (status === 'active' && item?.operationStatus === 'cancelled') return false;
-    if (status === 'cancelled' && item?.operationStatus !== 'cancelled') return false;
-    return true;
-  });
-}
-
-function openDDSExport(root, movements) {
-  const wallets = [...new Map(movements
-    .filter((item) => item?.walletId)
-    .map((item) => [String(item.walletId), { value: String(item.walletId), label: walletText(item) || String(item.walletId) }])).values()];
-  const layer = mountV2ZLayer(root, v2ZLayer('', { className: 'finance-dds-export-z' }), { stack: true });
-  if (!layer) return;
-  layer.innerHTML = `${workspaceHeaderContext({
-    title: 'Выгрузка ДДС',
-  })}
-    <form class="compact-form" data-finance-dds-export-form novalidate>
-      ${datePicker({ label: 'С', name: 'from' })}
-      ${datePicker({ label: 'До', name: 'to' })}
-      ${select({
-        label: 'Операции',
-        name: 'kind',
-        value: '',
-        options: [
-          { value: '', label: 'Все операции' },
-          { value: 'income', label: 'Доходы' },
-          { value: 'expense', label: 'Расходы' },
-          { value: 'loan', label: 'Займы' },
-          { value: 'investment', label: 'Инвестиции' },
-          { value: 'transfer', label: 'Переводы' },
-        ],
-      })}
-      ${select({
-        label: 'Кошелёк',
-        name: 'walletId',
-        value: '',
-        options: [{ value: '', label: 'Все кошельки' }, ...wallets],
-      })}
-      ${select({
-        label: 'Статус',
-        name: 'status',
-        value: '',
-        options: [
-          { value: '', label: 'Все' },
-          { value: 'active', label: 'Активные' },
-          { value: 'cancelled', label: 'Отменённые' },
-        ],
-      })}
-    </form>
-    ${actionBlock(button('Выгрузить', {
-      data: 'data-finance-dds-export-submit',
-      aria: 'Выгрузить ДДС',
-    }))}`;
-  initDatePickers(layer);
-  layer.querySelector('[data-finance-dds-export-submit]')?.addEventListener('click', () => {
-    const form = layer.querySelector('[data-finance-dds-export-form]');
-    if (!form) return;
-    downloadDDS(filterExportMovements(movements, form));
-    layer.v2Close?.();
   });
 }
 
