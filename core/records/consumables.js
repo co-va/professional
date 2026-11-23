@@ -73,41 +73,7 @@ export function openRecordConsumptionEditor(record, services = [], { onSaved = (
   const actions = action?.closest('.modal-actions');
   let busy = false;
   let loaded = false;
-  let inventoryError = '';
-  const archivedReferences = new Map();
-  // Active Inventory remains the authority for selection. Archived item names
-  // are a read-only fallback for historic recipes, not restored stock.
-  const stock = () => new Map([
-    ...archivedReferences,
-    ...getInventoryItems().map(item => [text(item.itemId), item]),
-  ]);
-  const itemTitle = (row, item) => item?.name || text(row?.name || row?.itemName)
-    || (!loaded ? 'Загрузка товара…'
-      : inventoryError ? 'Не удалось загрузить товар'
-      : 'Позиция не найдена');
-  const missingReferenceIds = () => {
-    const active = new Set(getInventoryItems().map(item => text(item.itemId)));
-    const requested = data.flatMap(service => [
-      ...(Array.isArray(service.rows) ? service.rows : []),
-      ...service.groups.flatMap(group => Array.isArray(group.items) ? group.items : []),
-    ]);
-    return [...new Set(requested.map(row => text(row?.itemId)).filter(Boolean))]
-      .filter(id => !active.has(id));
-  };
-  async function loadRecipeReferences() {
-    const ids = missingReferenceIds();
-    for (let i = 0; i < ids.length; i += 40) {
-      // A GET stays available in read-only previews. Keep URLs short.
-      const path = '/inventory/items/references?ids=' +
-        encodeURIComponent(ids.slice(i, i + 40).join(','));
-      const response = await apiRequest(path);
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok || !Array.isArray(payload?.items))
-        throw new Error('Не удалось восстановить названия товаров по архиву склада.');
-      for (const item of payload.items) if (text(item?.itemId) && text(item?.name))
-        archivedReferences.set(text(item.itemId), item);
-    }
-  }
+  const stock = () => new Map(getInventoryItems().map(item => [text(item.itemId), item]));
   const draft = () => data.map(({ id, groups }) => ({ procedureId: id, groups }));
   const sync = () => {
     const changed = signature() !== initial;
@@ -175,7 +141,7 @@ export function openRecordConsumptionEditor(record, services = [], { onSaved = (
       const hasGroups = service.groups.some(group => group.items?.length);
       const normMarkup = norm.length ? list({
         className: 'ui-list--dense', items: norm.map(row => ({
-          title: itemTitle(row, items.get(text(row.itemId))),
+          title: items.get(text(row.itemId))?.name || (loaded ? 'Товар недоступен' : '…'),
           right: [row.quantity == null ? '—' : row.quantity, row.unit || (items.has(text(row.itemId)) ? procedureConsumableUnit(items.get(text(row.itemId))) : '')].filter(Boolean).join(' '),
         })),
       }) : '';
@@ -183,8 +149,7 @@ export function openRecordConsumptionEditor(record, services = [], { onSaved = (
         if (!editing) {
           const rows = (group.items || []).map(row => {
             const item = items.get(text(row.itemId));
-            return { title: itemTitle(row, item),
-              secondary: item?.archived ? 'В архиве склада' : '',
+            return { title: item?.name || 'Товар недоступен',
               right: [row.quantity ?? '—', row.unit || (item ? procedureConsumableUnit(item) : '')].filter(Boolean).join('\u00a0') };
           });
           return readDisclosure('group:' + si + ':' + gi, text(group.name) || 'Без группы',
@@ -193,7 +158,7 @@ export function openRecordConsumptionEditor(record, services = [], { onSaved = (
         const products = (group.items || []).map((row, ri) => {
           const product = items.get(text(row.itemId));
           const k = si + ':' + gi + ':' + ri;
-          const title = itemTitle(row, product);
+          const title = product?.name || 'Товар недоступен';
           const unit = row.unit || (product ? procedureConsumableUnit(product) : '');
           return '<div class="list-entry data-edit-row record-consumption-product" data-record-consumption-row data-reorder-id="' + ri + '">' +
             '<span class="list-entry__reorder-handle" data-reorder-handle role="button" tabindex="0" aria-label="' + escapeHtml('Переместить ' + title) + '"><span aria-hidden="true">⋮⋮</span></span>' +
@@ -405,22 +370,11 @@ export function openRecordConsumptionEditor(record, services = [], { onSaved = (
       if (layer.isConnected) error.textContent = text(e.message) || 'Расход не сохранён.';
     } finally { busy = false; if (layer.isConnected) sync(); }
   });
-  // Never render missing active products as "unavailable" before a confirmed
-  // stock read. Resolve archived names from Core without changing recipe rows.
-  const inventoryLoad = loadInventory().then(async () => {
-    try { await loadRecipeReferences(); }
-    catch (e) { inventoryError = text(e?.message) || 'Не удалось получить названия товаров.'; }
+  const inventoryLoad = loadInventory({ preferRecent: true }).then(() => {
     loaded = true;
-    if (!layer.isConnected) return;
-    if (inventoryError) error.textContent = inventoryError;
-    if (!host.contains(document.activeElement)) render();
-  }).catch(e => {
-    loaded = true;
-    inventoryError = text(e?.message) || 'Не удалось загрузить склад.';
-    if (!layer.isConnected) return;
-    error.textContent = inventoryError;
-    if (!host.contains(document.activeElement)) render();
+    if (layer.isConnected && !host.contains(document.activeElement)) render();
   });
+  void inventoryLoad.catch(e => { if (layer.isConnected) error.textContent = text(e.message) || 'Склад недоступен.'; });
   render();
   return layer;
 }
