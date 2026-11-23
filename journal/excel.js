@@ -10,7 +10,7 @@ import { getProfile } from '../core/profile/data.js';
 import { resolveRecordSettlement } from '../core/finance/settlement.js';
 import { chooseScopedImport, exportScopedCsv, exportScopedWorkbook, reportExcelError } from '../core/excel/scoped.js';
 
-const actionLabels={booked:'Записался',rescheduled:'Перенёс',cancelled:'Отменил'};
+const actionLabels={booked:'Записался',rescheduled:'Перенёс',cancelled:'Отменил',deleted:'Удалена'};
 const visitLabels={expected:'Ожидает',arrived:'Пришёл','no-show':'Не пришёл'};
 const onlineSources=new Set(['online-booking','account-journal','public-booking','user']);
 const integrationLabels={
@@ -63,7 +63,8 @@ function getRows(from,to,{action='',visit='',payment='',workplaceId=''}={}){
   return getRecordsInRange({from,to,workplaceId}).flatMap(record=>{
     const events=getRecordEvents(record.id);
     const status=stateFor(record,events);
-    if(action&&status.action!==action)return [];
+    const actionForExport=record.historicalAction==='Удалена'?'deleted':status.action;
+    if(action&&actionForExport!==action)return [];
     if(visit&&status.visit!==visit)return [];
     if(payment&&status.payment!==payment)return [];
     const owner=persons.get(String(record.person?.key||''))||{};
@@ -74,8 +75,7 @@ function getRows(from,to,{action='',visit='',payment='',workplaceId=''}={}){
     const changedEvent=[...events].reverse().find(event=>
       event.type==='cancelled'||event.type==='rescheduled');
     const changed=splitMoment(changedEvent?.at,timezone);
-    const actionStatus=record.historicalAction==='Удалена'?'Удалена'
-      :actionLabels[status.action]||'Записался';
+    const actionStatus=actionLabels[actionForExport]||'Записался';
     const creator=String(record.historicalCreatorName||'')
       ||actorName(record.createdBy||createdEvent?.actor,record,owner,profile);
     const changer=String(record.historicalChangedBy||'')
