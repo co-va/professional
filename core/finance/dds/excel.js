@@ -28,46 +28,61 @@ function kindGroup(entry){
   return 'income';
 }
 export function ddsExportRows(movements){
-  const groups=new Map();
-  for(const row of movements){
-    const id=String(row?.operationId||'');
-    if(!id||row?.operationKind==='cancel')continue;
-    if(!groups.has(id))groups.set(id,[]);
-    groups.get(id).push(row);
+  const grouped=new Map();
+  for(const movement of movements){
+    const id=String(movement?.operationId||'');
+    if(!id||movement?.operationKind==='cancel')continue;
+    if(!grouped.has(id))grouped.set(id,[]);
+    grouped.get(id).push(movement);
   }
-  return [...groups.values()].flatMap(lines=>{
-    const first=lines[0];
-    const operation=getFinanceOperation(first?.operationId);
-    if(!operation||!NAMES[operation.kind])return [];
-    // Deposit cash movements are transferred in the separate Deposit tool.
+  return [...grouped.values()].flatMap(lines=>{
+    const operation=getFinanceOperation(lines[0]?.operationId);
+    if(!operation||!NAMES[operation.kind]||operation.status==='cancelled')return [];
     const data=operation.data&&typeof operation.data==='object'?operation.data:{};
-    const out=lines.find(item=>item.direction==='OUT')||first;
-    const inbound=lines.find(item=>item.direction==='IN');
-    const allocations=Array.isArray(data.allocations)?data.allocations:[];
-    const main=allocations[0]||{};
+    const quote=data.sourceQuote&&typeof data.sourceQuote==='object'?data.sourceQuote:{};
     const record=operation.source?.type==='record'?getRecord(operation.source.id):null;
-    return [{
+    const allocations=Array.isArray(data.allocations)?data.allocations:[];
+    // Two wallets are two visible Finance rows. Do not multiply the invoice.
+    const walletRows=allocations.length
+      ?allocations.map(item=>({wallet:String(item.walletName||''),amount:Number(item.amount||0),direction:'Приход'}))
+      :[...lines.reduce((map,movement)=>{
+        const wallet=String(movement.walletName||data.walletName||'');
+        const direction=movement.direction==='OUT'?'Расход':'Приход';
+        const key=direction+'|'+wallet;
+        const row=map.get(key)||{wallet,amount:0,direction};
+        row.amount+=Number(movement.amount||0);
+        map.set(key,row);
+        return map;
+      },new Map()).values()];
+    const person=data.person&&typeof data.person==='object'?data.person:record?.person||{};
+    const participant=[person.name,person.surname].filter(Boolean).join(' ')
+      ||String(data.participant||data.counterpartyName||'');
+    const type=String(quote.purpose||NAMES[operation.kind]||'');
+    const subject=String(quote.subject||data.subject||data.financeEntityName
+      ||lines[0]?.articleName||data.articleName||'');
+    const invoiceDate=String(quote.invoiceDate||record?.date||operation.occurredAt||'').slice(0,10);
+    const quotedTotal=quote.quotedTotal==null?'':Number(quote.quotedTotal);
+    const discount=quote.discountPercent!=null?String(quote.discountPercent)+'%'
+      :quote.discountMoney!=null?String(quote.discountMoney):'';
+    return walletRows.filter(row=>row.amount>0).map(item=>({
       operationId:String(operation.operationId||''),
-      occurredAt:String(operation.occurredAt||''),kind:NAMES[operation.kind],
-      wallet:String(main.walletName||out.walletName||first.walletName||data.walletName||''),
-      amount:Number(data.total)||Number(first.operationTotal)||lines.reduce((v,l)=>v+Number(l.amount||0),0),
-      article:String(first.articleName||data.articleName||''),
-      toWallet:operation.kind==='transfer'?String(inbound?.walletName||data.toWalletName||''):'',
-      recordId:operation.source?.type==='record'?String(operation.source.id||''):'',
-      phone:String(data.person?.phone||record?.person?.phone||''),
-      recordDate:String(record?.date||''),recordFrom:String(record?.from||''),
-      loan:operation.kind.startsWith('loan-')?String(data.financeEntityName||''):'',
-      investment:operation.kind.startsWith('investment-')?String(data.financeEntityName||''):'',
+      kind:NAMES[operation.kind],
+      occurredAt:String(operation.occurredAt||''),
+      workplace:String(data.workplaceName||record?.workplaceName||''),
+      invoiceDate,invoiceTime:String(quote.invoiceTime||record?.from||''),
+      participantCode:String(person.uei||data.uei||''),
+      participant,phone:String(person.phone||record?.person?.phone||data.phone||''),
+      documentNumber:String(quote.documentNumber||data.documentNumber||operation.operationId||''),
+      purpose:type,subject,
+      direction:item.direction,
+      price:quote.price==null?'':Number(quote.price),discount,
+      quotedTotal,amount:item.amount,
+      paymentDate:String(operation.occurredAt||'').slice(0,10),
+      wallet:item.wallet,
       note:String(data.note||''),
-      status:operation.status==='cancelled'?'Отменена':'Активна',
-      cancelledAt:operation.status==='cancelled'
-        ? String(getFinanceOperation('cancel-'+operation.operationId)?.occurredAt||''):'',
-      tips:Number(data.tips||0),
-      allocations:allocations.map(entry=>({
-        wallet:String(entry.walletName||''),amount:Number(entry.amount||0),
-      })),
-      originalPayment:operation.kind==='refund'?String(operation.originalOperationId||''):'',
-    }];
+      integrationSource:String(quote.integrationSource||data.integrationSource||'Приложение'),
+      status:'Активна',
+    }));
   });
 }
 function filteredRows(movements,form){
@@ -82,7 +97,7 @@ function filteredRows(movements,form){
     &&(!to||row.occurredAt.slice(0,10)<=to)
     &&(!status||row.status===status)
     &&(!kind||kindGroup(row)===kind)
-    &&(!wallet||row.wallet===wallet||row.toWallet===wallet));
+    &&(!wallet||row.wallet===wallet));
 }
 function exportQ(root,movements){
   const wallets=getWallets().map(wallet=>({value:String(wallet.name||''),label:String(wallet.name||'')}));
