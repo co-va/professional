@@ -71,7 +71,7 @@ export function depositCardPhotoPosition() {
 export function depositCardStatusLabel(status = '') {
   if (status === 'paused') return 'Приостановлена';
   if (status === 'closed' || status === 'ended') return 'Завершена';
-  if (status === 'expired') return 'Срок завершён';
+  if (status === 'expired') return 'Списан';
   return 'Активна';
 }
 

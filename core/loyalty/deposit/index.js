@@ -104,7 +104,7 @@ function formObject(form) {
 }
 
 function depositStatusLabel(status = '') {
-  if (status === 'expired') return 'Срок завершён';
+  if (status === 'expired') return 'Списан';
   if (status === 'closed') return 'Закрыт';
   return 'Активен';
 }
