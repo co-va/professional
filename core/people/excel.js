@@ -7,7 +7,7 @@ import { hydratePeopleFromServer } from './data.js';
 import { hydrateUEIFromServer } from '../uei.js';
 
 function message(error) {
-  if (error instanceof Error && error.message && !/HTTP|fetch|network|404|500|502|503|JSON|API|Failed to/i.test(error.message))
+  if (error instanceof Error && error.message && !/HTTP|fetch|network|404|500|502|503|JSON|API|Failed to|Prisma|SQL|P20\d+|transaction|sourceKey|tenantId|stack|undefined|constraint|database/i.test(error.message))
     return error.message;
   return 'Не удалось выполнить действие. Повторите попытку.';
 }
@@ -75,7 +75,7 @@ function previewContent(result) {
     .filter(row => row?.reason)
     .slice(0, 25).map(row => {
       const detail = String(row.reason || '');
-      const plain = /SQL|Prisma|P20\d+|foreign key|constraint|sourceKey|tenantId|stack|undefined/i.test(detail)
+      const plain = /SQL|Prisma|P20\d+|foreign key|constraint|sourceKey|tenantId|stack|undefined|database|transaction|Internal Server Error/i.test(detail)
         ? 'Проверьте сведения в этой строке'
         : detail;
       return v2ListEntry({
