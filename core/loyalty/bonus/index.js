@@ -42,8 +42,6 @@ import {
   loyaltyTermFields,
   loyaltyVisualCard,
   notifyLoyaltyContext,
-  relationshipDetailsSection,
-  relationshipHistoryList,
   relationshipStatusLabel,
   normalizeOptionalUei,
   openLoyaltyProgramSettings,

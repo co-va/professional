@@ -1,4 +1,4 @@
-import { actionBlock, button, emptyState, field, list, modal, mountModal, select } from '../../ui/ui.js';
+import { actionBlock, button, emptyState, field, list, modal, mountModal} from '../../ui/ui.js';
 import { getInventoryItem, getInventoryItems, getInventoryStorageLocations } from './data.js';
 import { createInventoryStorageLocation, updateInventoryStorageLocation, transferInventoryStock } from './service.js';
 

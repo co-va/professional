@@ -1,4 +1,4 @@
-import { actionBlock, button, escapeHtml, field, list, modal, mountModal,
+import { button, escapeHtml, field, list, modal, mountModal,
   openNotice, select, v2ListEntry, v2ListEntries } from '../../ui/ui.js';
 import { compactCheck } from '../../ui/selection/check-list.js';
 import { catalogDisclosure } from '../inventory/catalog-ui.js';
@@ -43,12 +43,6 @@ const displayCode=value=>{
   return /^\d{1,4}$/.test(valueText)?valueText.padStart(4,'0'):valueText;
 };
 const codeLabel=value=>displayCode(value)?'Код: '+displayCode(value):'';
-const identityFields={
-  uei:'код клиента',phone:'телефон',additionalPhone:'доп. телефон',
-  email:'Email',additionalEmail:'доп. Email',
-  telegram:'Telegram',additionalTelegram:'доп. Telegram',
-};
-
 const rowKey=item=>String(item.field)+'::'+String(item.rowNumber);
 const discountValue=value=>{
   const raw=text(value).replace('%','').replace(',','.').replace(/\s+/g,'');

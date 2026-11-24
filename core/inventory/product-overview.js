@@ -1,7 +1,7 @@
 import {
-  actionBlock, button, emptyState, entityCardDefaultRows, entityCardRail, entityVisualCard, miniCard, miniCardRail, field,
+  actionBlock, button, entityCardDefaultRows, entityCardRail, entityVisualCard, miniCard, miniCardRail,
   modal, mountModal, openEntityCardAppearanceQ, openNotice, openSharedProfileSettingsMenu,
-  page, select, twoColumnLayout,
+  page, select,
   workspaceHeaderContext,
 } from '../../ui/ui.js';
 import { escapeHtml } from '../../ui/utils/escape-html.js';
@@ -13,8 +13,7 @@ import { inventoryCriterionGroups } from './classification.js';
 import { inventoryLocations, storageName,
   inventoryDisplayBalance, INVENTORY_TOTAL_SCOPE } from './stock-targets.js';
 import {
-  archiveInventorySupplierOffer, createInventorySupplierOffer, setInventoryPrimarySupplierOffer,
-  updateInventoryItem, updateInventorySupplierOffer,
+  updateInventoryItem,
 } from './service.js';
 
 const PRODUCT_APPEARANCE_SCOPE = 'inventory-item';
@@ -250,137 +249,6 @@ function offerValue(data, name, { required = false, positive = false, max = Infi
     throw new Error('Проверьте поле ' + name + '.');
   }
   return number;
-}
-
-function openSupplierEditor(itemId, offerId = '', onSaved = () => {}) {
-  const item = getInventoryItem(itemId);
-  if (!item) return null;
-  const offer = item.supplierOffers?.find((row) => row.offerId === offerId) || null;
-  const isPrimary = Boolean(offer && item.primaryOfferId === offer.offerId);
-  const markup = `<form class="form-grid" data-inventory-offer-form>
-    ${field({ label: 'Место покупки', name: 'supplier', value: offer?.supplier || '', required: true })}
-    ${twoColumnLayout(
-      field({ label: 'Прайс, ₽', name: 'listPrice', value: offer?.listPrice ?? '', type: 'number', min: '0', step: '0.01', inputmode: 'decimal' }),
-      field({ label: 'Цена, ₽', name: 'actualPrice', value: offer?.actualPrice ?? '', type: 'number', min: '0', step: '0.01', inputmode: 'decimal' }),
-      { ariaLabel: 'Цены предложения' },
-    )}
-    ${twoColumnLayout(
-      field({ label: 'Скидка, %', name: 'discountPercent', value: offer?.discountPercent ?? '', type: 'number', min: '0', max: '100', step: '0.01', inputmode: 'decimal' }),
-      field({ label: 'Содержимое, ' + item.unit, name: 'unitsPerOffer', value: offer?.unitsPerOffer ?? '', type: 'number', min: '0.001', step: '0.001', inputmode: 'decimal' }),
-      { ariaLabel: 'Скидка и содержимое закупаемой упаковки' },
-    )}
-    <p data-inventory-offer-calculated-discount></p>
-    ${select({ label: 'Основной', name: 'primary', value: isPrimary ? 'yes' : 'no', options: [
-      { value: 'no', label: 'Нет' }, { value: 'yes', label: 'Да' },
-    ] })}
-    ${field({ label: 'Артикул поставщика', name: 'supplierSku', value: offer?.supplierSku || '' })}
-    ${field({ label: 'Примечание', name: 'note', value: offer?.note || '' })}
-    <div class="form-error" data-inventory-offer-error role="alert"></div>
-    ${actionBlock(button('Применить', { type: 'submit', data: 'data-inventory-offer-save' }))}
-    ${offer ? button('Удалить поставщика', { variant: 'critical', data: 'data-inventory-offer-delete' }) : ''}
-  </form>`;
-  const layer = mountModal(document.body, modal(markup, {
-    title: offer ? 'Поставщик' : 'Добавить поставщика',
-    variant: 'x', xRole: 'editor',
-  }));
-  if (!layer) return null;
-  const form = layer.querySelector('[data-inventory-offer-form]');
-  const discountSummary = layer.querySelector('[data-inventory-offer-calculated-discount]');
-  const showDiscount = () => {
-    const baseText = form.querySelector('[name="listPrice"]')?.value?.trim() || '';
-    const actualText = form.querySelector('[name="actualPrice"]')?.value?.trim() || '';
-    const base = Number(baseText.replace(',', '.'));
-    const actual = Number(actualText.replace(',', '.'));
-    if (!baseText || !actualText || !Number.isFinite(base) || base <= 0 || !Number.isFinite(actual) || actual < 0) {
-      discountSummary.textContent = 'Скидка: —';
-      return;
-    }
-    const delta = Math.round((1 - actual / base) * 10000) / 100;
-    discountSummary.textContent = delta >= 0
-      ? 'Ваша скидка от прайса: ' + delta.toLocaleString('ru-RU') + '%'
-      : 'Цена выше прайса на ' + Math.abs(delta).toLocaleString('ru-RU') + '%';
-  };
-  form.querySelector('[name="listPrice"]')?.addEventListener('input', showDiscount);
-  form.querySelector('[name="actualPrice"]')?.addEventListener('input', showDiscount);
-  showDiscount();
-  const primaryButton = layer.querySelector('[data-inventory-offer-save]');
-  const errorHost = layer.querySelector('[data-inventory-offer-error]');
-  form.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    if (primaryButton.disabled) return;
-    const data = new FormData(form);
-    const supplier = String(data.get('supplier') || '').trim();
-    if (!supplier) {
-      errorHost.textContent = 'Укажите место покупки.';
-      return;
-    }
-    let value;
-    try {
-      value = {
-        supplier,
-        listPrice: offerValue(data, 'listPrice'),
-        actualPrice: offerValue(data, 'actualPrice'),
-        discountPercent: offerValue(data, 'discountPercent', { max: 100 }),
-        unitsPerOffer: offerValue(data, 'unitsPerOffer', { positive: true }),
-        supplierSku: String(data.get('supplierSku') || '').trim(),
-        note: String(data.get('note') || '').trim(),
-      };
-    } catch (error) {
-      errorHost.textContent = error.message || 'Проверьте значения.';
-      return;
-    }
-    primaryButton.disabled = true;
-    errorHost.textContent = '';
-    try {
-      let savedOfferId = offerId;
-      if (offer) await updateInventorySupplierOffer(itemId, offerId, value);
-      else {
-        const known = new Set((item.supplierOffers || []).map((row) => row.offerId));
-        await createInventorySupplierOffer(itemId, value);
-        savedOfferId = getInventoryItem(itemId)?.supplierOffers?.find((row) => !known.has(row.offerId))?.offerId || '';
-      }
-      const selectedPrimary = data.get('primary') === 'yes';
-      if (selectedPrimary && savedOfferId && getInventoryItem(itemId)?.primaryOfferId !== savedOfferId) {
-        await setInventoryPrimarySupplierOffer(itemId, savedOfferId);
-      } else if (isPrimary && !selectedPrimary) {
-        await setInventoryPrimarySupplierOffer(itemId, '');
-      } else if (selectedPrimary && !savedOfferId) {
-        throw new Error('Не удалось определить сохранённое предложение.');
-      }
-      layer.v2Close?.();
-      onSaved();
-    } catch (error) {
-      errorHost.textContent = error instanceof Error ? error.message : 'Не удалось сохранить поставщика.';
-    } finally {
-      primaryButton.disabled = false;
-    }
-  });
-  layer.querySelector('[data-inventory-offer-delete]')?.addEventListener('click', () => {
-    const confirm = mountModal(document.body, modal(
-      `<div class="modal-title"><h2>Удалить поставщика?</h2><p>История закупок сохранится.</p></div>
-      <div class="form-error" data-inventory-offer-delete-error role="alert"></div>
-      <div class="modal-actions">
-        ${button('Удалить', { variant: 'critical', data: 'data-inventory-offer-confirm-delete' })}
-        ${button('Отмена', { variant: 'secondary', data: 'data-inventory-offer-cancel-delete' })}
-      </div>`, { title: 'Удаление поставщика', variant: 'x', xRole: 'action' },
-    ));
-    if (!confirm) return;
-    confirm.querySelector('[data-inventory-offer-cancel-delete]')?.addEventListener('click', () => confirm.v2Close?.());
-    confirm.querySelector('[data-inventory-offer-confirm-delete]')?.addEventListener('click', async (event) => {
-      event.currentTarget.disabled = true;
-      try {
-        await archiveInventorySupplierOffer(itemId, offerId);
-        confirm.v2Close?.();
-        layer.v2Close?.();
-        onSaved();
-      } catch (error) {
-        event.currentTarget.disabled = false;
-        const host = confirm.querySelector('[data-inventory-offer-delete-error]');
-        if (host) host.textContent = error instanceof Error ? error.message : 'Не удалось удалить поставщика.';
-      }
-    });
-  });
-  return layer;
 }
 
 function stockCardPreviewExamples(item) {

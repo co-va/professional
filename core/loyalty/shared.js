@@ -11,7 +11,6 @@ import {
   openEntityCardAppearanceQ,
   openSharedProfileSettingsMenu,
   shortDateTime,
-  v2Section,
   select,
   twoColumnLayout,
   v2ListEntries,

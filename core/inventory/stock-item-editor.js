@@ -24,11 +24,8 @@ const optionalAmount = (raw, label, { integer = false, positive = false } = {}) 
     throw new Error('Проверьте поле «' + label + '».');
   return n;
 };
-const checkedName = (root, name) => root.querySelector('[data-stock-receipt="' + name + '"]')?.checked;
 const hasOwn = (obj, key) => Object.prototype.hasOwnProperty.call(obj, key);
 const same = (left, right) => JSON.stringify(left ?? null) === JSON.stringify(right ?? null);
-const displayMoney = value => value == null || !Number.isFinite(Number(value)) ? ''
-  : Number(value).toLocaleString('ru-RU', { maximumFractionDigits: 2 }) + ' ₽';
 
 function exclusiveReceipt(form, unit) {
   for (const box of form.querySelectorAll('[data-stock-receipt]'))
@@ -273,12 +270,6 @@ function groupChoices(item, groups) {
       ? item?.[group.legacyField] : item?.criteriaValues?.[group.id]),
   })).filter(row => row.value);
   return rows.length ? rows : [{ id: '', value: '' }];
-}
-
-function saleCost(purchase, receipt, count) {
-  if (purchase == null) return null;
-  // Sale always sells one whole receipt unit, not a consumption fraction.
-  return purchase;
 }
 
 export function openStockItemQEditor(itemId = '', defaults = {}, onSaved = () => {}, stockScope = 'total') {
