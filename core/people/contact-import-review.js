@@ -218,6 +218,10 @@ export function openContactImportReview(root,batchId,{onLoaded=()=>{}}={}){
     const groupInput=target.closest?.('[data-review-group-check]');
     if(groupInput){
       const group=groupInput.closest('.inventory-editor-panel')?.querySelector('[data-review-group]');
+      if(groupInput.checked&&group){
+        group.open=true;
+        expanded.add(group.dataset.reviewGroup);
+      }
       group?.querySelectorAll('[data-review-select]').forEach(input=>{
         input.checked=groupInput.checked;
       });
