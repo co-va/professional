@@ -1,9 +1,9 @@
-import { actionBlock, button, escapeHtml, field, list, modal, mountModal,
+import { actionBlock, button, escapeHtml, list, modal, mountModal,
   openNotice, select, v2ListEntry, v2ListEntries } from '../../ui/ui.js';
 import { compactCheck } from '../../ui/selection/check-list.js';
 import { catalogDisclosure } from '../inventory/catalog-ui.js';
 import { apiRequest } from '../auth.js';
-import { hydratePeopleFromServer } from './data.js';
+import { getAllPeople, hydratePeopleFromServer } from './data.js';
 import { hydrateUEIFromServer } from '../uei.js';
 
 const text=v=>String(v??'').trim();
@@ -40,7 +40,7 @@ const hiddenIdentifier=value=>/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-
 const displayCode=value=>{
   const valueText=text(value);
   if(!valueText||hiddenIdentifier(valueText))return '';
-  return /^\\d{1,4}$/.test(valueText)?valueText.padStart(4,'0'):valueText;
+  return /^\d{1,4}$/.test(valueText)?valueText.padStart(4,'0'):valueText;
 };
 const codeLabel=value=>displayCode(value)?'Код: '+displayCode(value):'';
 const identityFields={
@@ -50,70 +50,98 @@ const identityFields={
 };
 
 const rowKey=item=>String(item.field)+'::'+String(item.rowNumber);
-const issueOptions=fieldName=>fieldName==='identity'
-  ?[
-    {value:'',label:'Выберите действие'},
+const personName=person=>[text(person?.name),text(person?.surname)]
+  .filter(Boolean).join(' ');
+const personHeading=(code,name)=>[displayCode(code),text(name)]
+  .filter(Boolean).join(' ')||'Контакт';
+const fromExcel=value=>{
+  const source=text(value);
+  const parts=/^([0-9A-Za-z]{1,4})\s+(.+)$/.exec(source);
+  return parts?[displayCode(parts[1]),parts[2]].join(' '):source;
+};
+const personForIssue=(item,people)=>people.find(person=>
+  text(person.key)===text(item.personKey))||null;
+function choiceOptions(item){
+  const saved=text(item.system)||'Не указано';
+  const incoming=text(item.excel)||'Не указано';
+  if(item.field==='identity')return [
+    {value:'',label:'Выберите решение'},
     {value:'same',label:'Тот же человек'},
     {value:'different',label:'Другой человек'},
-  ]:[
-    {value:'',label:'Выберите действие'},
-    {value:'keep',label:'Оставить в системе'},
-    {value:'replace',label:'Принять из Excel'},
-    ...(['email','additionalEmail','phone','additionalPhone',
-      'telegram','additionalTelegram'].includes(fieldName)
-      ?[{value:'add',label:'Добавить как дополнительный'}]:[]),
   ];
-function issueRow(item){
+  return [
+    {value:'',label:'Какое значение правильное?'},
+    {value:'keep',label:'Система: '+saved},
+    {value:'replace',label:'Excel: '+incoming},
+    ...(['email','additionalEmail','phone','additionalPhone',
+      'telegram','additionalTelegram'].includes(item.field)
+      ?[{value:'add',label:'Добавить как дополнительный: '+incoming}]:[]),
+  ];
+}
+function issueRow(item,people=[]){
   const id=Number(item.rowNumber);
   const fieldName=text(item.field);
   const key=escapeHtml(rowKey(item));
-  const title=text(item.contact)||'Строка '+id;
   const saved=text(item.system)||'—';
   const incoming=text(item.excel)||'—';
   const owners=Array.isArray(item.owners)?item.owners:[];
-  const matches=owners.map(p=>[codeLabel(p.code),text(p.name),
-    text(p.key).startsWith('excel:')?'Excel: строка '+text(p.key).slice(6):'',
-  ].filter(Boolean).join(' · '));
-  const incomingLabel=fieldName==='identity'?'Excel: '+incoming:'Excel: '+incoming;
-  const present=fieldName==='identity'
-    ?'Найдено: '+(matches.join('; ')||saved)
-    :'Система: '+saved;
+  const found=personForIssue(item,people);
+  const knownName=personName(found);
+  const knownCode=text(found?.uei);
+  // The identity candidate belongs to the existing system record.
+  // The imported name and code are separate, never displayed as the
+  // system person's name.
+  const onlyCandidate=owners.length===1?owners[0]:null;
+  const title=fieldName==='identity'
+    ?onlyCandidate?personHeading(onlyCandidate.code,onlyCandidate.name)
+      :text(item.system)||'Несколько совпадений'
+    :[personHeading(knownCode,knownName||text(item.contact)
+        .replace(/^[0-9A-Za-z]{1,4}\s+/,'').trim()),
+       saved==='—'?'':saved].filter(Boolean).join(' · ');
+  const imported=fieldName==='identity'?fromExcel(incoming):incoming;
+  const comparison='Excel: '+imported;
+  const matchedBy=fieldName==='identity'&&onlyCandidate
+    ?(onlyCandidate.matchedBy||[]).map(field=>identityFields[field]||field).join(', ')
+    :'';
   const candidateOptions=[
     {value:'',label:'Выберите контакт'},
     ...owners.map(person=>({
       value:text(person.key),
-      label:[codeLabel(person.code),text(person.name),
+      label:[personHeading(person.code,person.name),
         text(person.key).startsWith('excel:')?'Excel: строка '+text(person.key).slice(6):'',
-      ].filter(Boolean).join(' · ')||'Найденный контакт',
+      ].filter(Boolean).join(' · '),
     })),
   ];
   const display=list({className:'ui-list--dense',items:[{
-    title,secondary:present,right:[incomingLabel],interactive:true,
-    data:'data-review-open',
-    aria:title+'. '+present+'. '+incomingLabel,
+    title,
+    secondary:comparison+(matchedBy?' · Совпадает: '+matchedBy:''),
+    interactive:true,data:'data-review-open',
+    aria:'Система: '+title+'. '+comparison,
   }]});
   const editRow=(label,content)=>'<div class="data-edit-row">'+
     '<span class="data-edit-row__name"><strong>'+escapeHtml(label)+'</strong></span>'+
     content+'</div>';
+  // One candidate needs no extra selection; the existing identifier is
+  // retained in a hidden field and is never exposed to the user.
+  const candidateControl=onlyCandidate
+    ?'<input type="hidden" data-review-candidate value="'+escapeHtml(onlyCandidate.key)+'">'
+    :editRow('Контакт',select({
+      name:'reviewCandidate-'+id+'-'+fieldName,
+      aria:'Выберите совпадающий контакт',
+      data:'data-review-candidate',options:candidateOptions,value:'',
+    }));
   return '<div data-review-row="'+id+'" data-review-field="'+escapeHtml(fieldName)+'">'+
     '<div class="inventory-counterparty-product-row">'+
       compactCheck({aria:'Выбрать: '+title,data:'data-review-select="'+key+'"'})+
       display+'</div>'+
     '<div class="inventory-audit-data-list" data-review-editor hidden>'+
-      editRow('Система','<span>'+escapeHtml(saved)+'</span>')+
-      editRow('Excel','<span>'+escapeHtml(incoming)+'</span>')+
-      editRow('Решение',select({
-        name:'reviewMode-'+id+'-'+fieldName,aria:'Решение для '+title,
-        data:'data-review-mode',options:issueOptions(fieldName),value:'',
+      editRow('Выбор',select({
+        name:'reviewMode-'+id+'-'+fieldName,
+        aria:'Выберите правильное значение для '+title,
+        data:'data-review-mode',options:choiceOptions(item),value:'',
       }))+
-      '<div data-review-candidates hidden>'+editRow('Найденный контакт',select({
-        name:'reviewCandidate-'+id+'-'+fieldName,aria:'Выберите совпадающий контакт',
-        data:'data-review-candidate',options:candidateOptions,value:'',
-      }))+'</div>'+
-      '<div data-review-edit-value hidden>'+editRow('Новое значение',field({
-        name:'reviewValue-'+id+'-'+fieldName,value:incoming,
-        data:'data-review-value',autocomplete:'off',
-      }))+'</div>'+
+      '<div data-review-candidates hidden>'+candidateControl+'</div>'+
+      '<input type="hidden" data-review-value value="'+escapeHtml(incoming==='—'?'':incoming)+'">'+
       (item.error?'<p class="form-error" role="alert">'+escapeHtml(item.error)+'</p>':'')+
     '</div></div>';
 }
@@ -127,7 +155,7 @@ function processedRow(row){
       title,secondary:subtitle,interactive:false,
     }]})+'</div>';
 }
-function content(batch){
+function content(batch,people=[]){
   const groups=(Array.isArray(batch.groups)?[...batch.groups]:[])
     .sort((a,b)=>Number(b.field==='identity')-Number(a.field==='identity'));
   const rows=Array.isArray(batch.rows)?batch.rows:[];
@@ -141,7 +169,7 @@ function content(batch){
       data:'data-review-group-check="'+escapeHtml(group.field)+'"',
     });
     return catalogDisclosure(group.label,
-      '<div class="inventory-audit-data-list">'+issues.map(issueRow).join('')+'</div>',
+      '<div class="inventory-audit-data-list">'+issues.map(item=>issueRow(item,people)).join('')+'</div>',
       false,issues.length,check)
       .replace('<details>','<details data-review-group="'+escapeHtml(group.field)+'">');
   });
@@ -182,10 +210,9 @@ export function openContactImportReview(root,batchId,{onLoaded=()=>{}}={}){
         editor.style.display=checked?'':'none';
       }
       const mode=text(row.querySelector('[data-review-mode]')?.value);
-      const values=row.querySelector('[data-review-edit-value]');
       const candidates=row.querySelector('[data-review-candidates]');
-      if(values)values.hidden=!checked||!['replace','add'].includes(mode);
-      if(candidates)candidates.hidden=!checked||mode!=='same';
+      if(candidates)candidates.hidden=!checked||mode!=='same'
+        ||Boolean(row.querySelector('[data-review-candidate][type="hidden"]'));
     });
     host.querySelectorAll('[data-review-group]').forEach(group=>{
       const parent=group.closest('.inventory-editor-panel');
@@ -207,7 +234,7 @@ export function openContactImportReview(root,batchId,{onLoaded=()=>{}}={}){
   }
   function show(){
     if(!layer.isConnected||!current)return;
-    host.innerHTML=content(current);
+    host.innerHTML=content(current,getAllPeople());
     host.querySelectorAll('[data-review-group]').forEach(group=>{
       if(expanded.has(group.dataset.reviewGroup))group.open=true;
       group.addEventListener('toggle',()=>{
