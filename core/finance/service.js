@@ -1,4 +1,4 @@
-import { apiRequest } from '../auth.js';
+import { apiRequest, apiResponseJson as responseJson } from '../auth.js';
 import { flushBusinessPersistence } from '../business-persistence.js';
 import { applyFinancePatch, hydrateFinanceFromServer } from './data.js';
 import { financialNumber } from './rules.js';
@@ -9,11 +9,6 @@ function notifyFinanceChanged(detail = {}) {
   window.dispatchEvent(new CustomEvent('professional:dds-changed', { detail }));
 }
 
-async function responseJson(response, fallback) {
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(payload?.message || fallback);
-  return payload;
-}
 
 async function applyServerState(response, fallback) {
   const payload = await responseJson(response, fallback);

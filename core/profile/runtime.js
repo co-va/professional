@@ -1,11 +1,10 @@
-import { apiRequest } from '../../core/auth.js';
+import { apiRequest, apiResponseJson as payload } from '../../core/auth.js';
 import { hydrateProfileFromServer, setProfileServerReady } from './data.js';
 import { hydrateWorkplacesFromServer, setWorkplacesServerReady } from './workplaces/data.js';
 
 let fullProfileStateLoad = null;
 let profileLoadEpoch = 0;
 
-async function payload(response,fallback){const value=await response.json().catch(()=>({}));if(!response.ok)throw new Error(value?.message||fallback);return value;}
 
 function hydrate(remote={}){
   hydrateProfileFromServer(remote?.profile||{},remote?.customProfessions||[],remote?.professionCatalog||[]);

@@ -1,4 +1,4 @@
-import { apiRequest } from '../auth.js';
+import { apiRequest, apiResponseJson as responseJson } from '../auth.js';
 import { flushBusinessPersistence } from '../business-persistence.js';
 import { hydrateBookingSettingsFromServer } from '../booking-settings/index.js';
 import { hydrateDaysFromServer } from '../day/index.js';
@@ -25,11 +25,6 @@ let stopListeners = () => {};
 const pendingScopes = new Set();
 const snapshots = new Map();
 
-async function responseJson(response, fallback) {
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(payload?.message || fallback);
-  return payload;
-}
 
 function stableSnapshot(value) {
   return JSON.stringify(value ?? null);

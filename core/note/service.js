@@ -1,4 +1,4 @@
-import { apiRequest } from '../auth.js';
+import { apiRequest, apiResponseJson as responseJson } from '../auth.js';
 import { deleteNoteRow, getNotes, hydrateNotesFromServer, insertNote, NOTE_DEFAULT_COLOR, patchNote } from './data.js';
 import { getNote } from './data.js';
 
@@ -127,11 +127,6 @@ export function removeNote(id) {
   return removed;
 }
 
-async function responseJson(response, fallback) {
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(payload?.message || fallback);
-  return payload;
-}
 
 export async function refreshNotesFromServer() {
   const payload = await responseJson(await apiRequest('/notes'), 'Не удалось обновить заметки');

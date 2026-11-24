@@ -3,13 +3,8 @@ import { preserveNotesForTarget } from '../note/index.js';
 import { deleteRecordRow, hydrateRecordStateFromServer, insertRecordRow, patchRecordRow } from './data.js';
 import { appendRecordEvent, deleteRecordEvents, RECORD_EVENT_TYPES } from './events.js';
 import { getRecord } from './read.js';
-import { apiRequest } from '../auth.js';
+import { apiRequest, apiResponseJson as responseJson } from '../auth.js';
 
-async function responseJson(response, fallback) {
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(payload?.message || fallback);
-  return payload;
-}
 
 export async function refreshRecordsFromServer() {
   const response = await apiRequest('/business-state/records');

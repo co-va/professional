@@ -1,14 +1,9 @@
-import { apiRequest } from './auth.js';
+import { apiRequest, apiResponseJson as jsonResponse } from './auth.js';
 import { button, escapeHtml, modal, mountModal } from '../ui/ui.js';
 
 const PLATFORM_PUSH_OPT_OUT_KEY = 'va-tools.platform.push.opt-out';
 let platformPushConfigurationCache = null;
 
-async function jsonResponse(response, fallback) {
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(payload?.message || fallback);
-  return payload;
-}
 
 function decodeBase64Url(value) {
   const padding = '='.repeat((4 - (String(value || '').length % 4)) % 4);

@@ -1,4 +1,4 @@
-import { apiRequest } from '../../auth.js';
+import { apiRequest, apiResponseJson as payload } from '../../auth.js';
 
 let accounts = [];
 
@@ -19,11 +19,6 @@ function money(value) {
   return Number.isFinite(number) ? Math.round(Math.max(0, number) * 100) / 100 : 0;
 }
 
-async function payload(response, fallback) {
-  const value = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(value?.message || fallback);
-  return value;
-}
 
 function normalizeAccount(value = {}) {
   const account = clone(value) || {};

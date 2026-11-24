@@ -1,4 +1,4 @@
-import { apiRequest } from '../../auth.js';
+import { apiRequest, apiResponseJson as payload } from '../../auth.js';
 import { describePriceConditionConflict, resolvePersonPriceCondition } from '../price-condition.js';
 
 let programs = [];
@@ -28,7 +28,6 @@ function termsActive(terms={},at=new Date()){
   // The end date in the "По" field is included, just as in Core.
   return day<=end;
 }
-async function payload(response,fallback){const value=await response.json().catch(()=>({}));if(!response.ok)throw new Error(value?.message||fallback);return value;}
 
 async function refreshFinance(){
   const { refreshFinanceState } = await import('../../finance/index.js');
