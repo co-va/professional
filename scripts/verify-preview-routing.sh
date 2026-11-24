@@ -56,23 +56,7 @@ test "$(curl -sS -H "Host: $preview" -o /dev/null -w '%{http_code}' "$base/PROJE
 test "$(curl -sS -H "Host: $preview" -X POST -o /dev/null -w '%{http_code}' "$base/professional.js")" = 403
 echo 'PASS: production and staging separation, verified snapshot, MIME and static access boundaries'
 # Load the entire workspace graph in a real browser against the actual container.
-node --input-type=module <<'JS'
-import { chromium } from 'playwright';
-const browser=await chromium.launch({headless:true,args:['--host-resolver-rules=MAP professional-volokovykh.msk1.amvera.tech 127.0.0.1','--no-proxy-server']});
-try {
-  const page=await browser.newPage();
-  const errors=[];
-  page.on('requestfailed',r=>errors.push(r.url()+' '+r.failure()?.errorText));
-  page.on('response',r=>{if(r.status()>=400)errors.push(r.status()+' '+r.url());});
-  await page.route('**/api/**',r=>r.fulfill({status:200,contentType:'application/json',body:'{}'}));
-  await page.goto('http://professional-volokovykh.msk1.amvera.tech:3000/',{waitUntil:'domcontentloaded'});
-  await page.locator('#app').getByText('Вход в Кабинет',{exact:true}).waitFor({timeout:15000});
-  const assets=await page.evaluate(()=>performance.getEntriesByType('resource').map(r=>new URL(r.name).pathname));
-  if(assets.some(p=>p==='/professional.js'||p==='/professional/workspace.js'||p.startsWith('/core/')))throw Error('Unbundled source requested');
-  if(errors.length)throw Error('Bundled login failed: '+errors.join('\n'));
-  console.log('PASS: bundled login rendered in browser without raw module requests');
-} finally {await browser.close();}
-JS
+node scripts/verify-preview-browser.mjs "http://$preview:3000/" --local
 docker rm -f "$cid" >/dev/null
 cid="$(docker run -d --network host professional-release)"
 ready

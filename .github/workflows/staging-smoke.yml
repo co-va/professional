@@ -67,25 +67,8 @@ jobs:
           esac
           echo 'PASS: production compiled assets, staging snapshot assets, MIME and unauthorized API denial'
 
-      - name: Verify actual browser renders the bundled login
+      - name: Verify actual browser renders login and workspace
         run: |
           npm install --no-save --no-package-lock playwright@1.56.1
           npx playwright install chromium
-          node --input-type=module <<'JS'
-          import { chromium } from 'playwright';
-          const browser=await chromium.launch({headless:true});
-          try {
-            const page=await browser.newPage();
-            page.on('requestfailed',r=>console.log('REQUEST FAILED',r.url(),r.failure()?.errorText));
-            page.on('response',r=>{if(r.status()>=400) console.log('HTTP',r.status(),r.url());});
-            page.on('pageerror',e=>console.log('PAGE ERROR',e.message));
-            page.on('console',m=>{if(m.type()==='error')console.log('BROWSER',m.text());});
-            // Never authenticate or mutate live account data.
-            await page.route('**/api/**',route=>route.fulfill({status:401,contentType:'application/json',body:'{}'}));
-            await page.goto('https://professional-volokovykh.msk1.amvera.tech/',{waitUntil:'domcontentloaded',timeout:90000});
-            await page.locator('#app').getByText('Вход в Кабинет',{exact:true}).waitFor({timeout:30000});
-            const paths=await page.evaluate(()=>performance.getEntriesByType('resource').map(r=>new URL(r.name).pathname));
-            if(paths.some(p=>p==='/professional.js'||p==='/professional/workspace.js'||p.startsWith('/core/')))throw Error('Raw modules loaded instead of bundled entry');
-            console.log('PASS: actual preview renders bundled login');
-          } finally {await browser.close();}
-          JS
+          node scripts/verify-preview-browser.mjs https://professional-volokovykh.msk1.amvera.tech/
