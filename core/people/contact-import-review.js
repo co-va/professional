@@ -60,8 +60,12 @@ function content(batch){
   const done=(Array.isArray(batch.rows)?batch.rows:[]).filter(row=>row.status==='done');
   const sections=groups.map(group=>{
     const entries=(batch.issues||[]).filter(item=>item.field===group.field);
+    const extra=['email','additionalEmail','phone','additionalPhone'].includes(group.field)
+      ?button('Добавить как дополнительный',{variant:'secondary',
+        data:'data-review-add="'+escapeHtml(group.field)+'"'}) : '';
     const items='<div class="list-entries">'+entries.map(issueRow).join('')+'</div>'+
-      actionBlock(button('Применить выбранные',{data:'data-review-apply="'+escapeHtml(group.field)+'"'}));
+      actionBlock(button('Применить выбранные',
+        {data:'data-review-apply="'+escapeHtml(group.field)+'"'})+extra);
     return catalogDisclosure(group.label,items,false,entries.length)
       .replace('<details>','<details data-review-group="'+escapeHtml(group.field)+'">');
   });
@@ -104,9 +108,10 @@ export function openContactImportReview(root,batchId,{onLoaded=()=>{}}={}){
     if(busy)return;
     const keep=event.target.closest('[data-review-keep]');
     const applyGroup=event.target.closest('[data-review-apply]');
-    if(!keep&&!applyGroup)return;
-    const selected=applyGroup?[...host.querySelectorAll('[data-review-row]')]
-      .filter(row=>row.dataset.reviewField===applyGroup.dataset.reviewApply
+    const addGroup=event.target.closest('[data-review-add]');
+    if(!keep&&!applyGroup&&!addGroup)return;
+    const selected=(applyGroup||addGroup)?[...host.querySelectorAll('[data-review-row]')]
+      .filter(row=>row.dataset.reviewField===(applyGroup?.dataset.reviewApply||addGroup?.dataset.reviewAdd)
         &&row.querySelector('[data-review-select]')?.checked)
       .map(row=>({rowNumber:Number(row.dataset.reviewRow),
         field:row.dataset.reviewField,value:text(row.querySelector('[data-review-value]')?.value)})):[];
@@ -118,7 +123,8 @@ export function openContactImportReview(root,batchId,{onLoaded=()=>{}}={}){
           field:row?.dataset.reviewField},'keep','');
       }else{
         if(!selected.length)throw Error('Выберите изменения галочками слева.');
-        for(const item of selected)await apply(item,'replace',item.value);
+        for(const item of selected)
+          await apply(item,addGroup?'add':'replace',item.value);
       }
       await reloadContacts(onLoaded);
       await reload();
