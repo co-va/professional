@@ -1,3 +1,4 @@
+import { createServiceSaveController } from '../editor-actions.js';
 import {
   actionBlock,
   button,
@@ -418,21 +419,13 @@ export function openProductEditor(root, existing = null, {
     });
   };
   let initialSignature = signature();
-  const actions = primary.closest('.modal-actions');
-  let visible = null;
-  let wasBusy = null;
   let saving = false;
   let assignmentSaving = false;
-  const syncDirty = () => {
-    const changed = signature() !== initialSignature;
-    const busy = saving || assignmentSaving;
-    if (visible === changed && wasBusy === busy) return changed;
-    if (visible !== changed) setSharedActionVisible(actions, changed);
-    visible = changed;
-    wasBusy = busy;
-    setSharedProfilePrimary(primary, { visible: changed, label: 'Сохранить', disabled: busy });
-    return changed;
-  };
+  const { syncDirty, currentVisibility } = createServiceSaveController(primary, {
+    signature,
+    baseline: () => initialSignature,
+    busy: () => saving || assignmentSaving,
+  });
 
   bindServiceWorkplaceAssignments(layer, {
     kind: 'product',
@@ -502,7 +495,7 @@ export function openProductEditor(root, existing = null, {
       return null;
     } finally {
       saving = false;
-      setSharedProfilePrimary(primary, { visible, label: 'Сохранить' });
+      setSharedProfilePrimary(primary, { visible: currentVisibility(), label: 'Сохранить' });
     }
     if (error) error.textContent = '';
     layer.v2Close?.();

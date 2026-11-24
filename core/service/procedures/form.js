@@ -1,6 +1,6 @@
+import { createServiceSaveController } from '../editor-actions.js';
 import { collectCost, validateCostDefinition, costField, durationPicker, field, initCostFields, initDurationPickers, setSharedProfilePrimary, textareaField } from '../../../ui/ui.js';
 import { getProcedures, commitProcedure, commitProcedureWorkplace } from './data.js';
-import { setSharedActionVisible } from '../../../ui/page/page.js';
 import { procedureEditorSignature, rebaseWorkplaceAssignmentSignature } from '../editor-signature.js';
 import { bindServiceWorkplaceAssignments, serviceWorkplaceAssignmentList } from '../workplace-selection.js';
 import { compactCheck } from '../../../ui/selection/check-list.js';
@@ -83,21 +83,13 @@ export function bindProcedureEditor(root, {
   };
   const onlineCheck = root.querySelector('[data-procedure-online-check]');
   let initialSignature = signature();
-  const actions = primary.closest('.modal-actions');
-  let visible = null;
-  let wasBusy = null;
   let saving = false;
   let assignmentSaving = false;
-  const syncDirty = () => {
-    const changed = signature() !== initialSignature;
-    const busy = saving || assignmentSaving;
-    if (visible === changed && wasBusy === busy) return changed;
-    if (visible !== changed) setSharedActionVisible(actions, changed);
-    visible = changed;
-    wasBusy = busy;
-    setSharedProfilePrimary(primary, { visible: changed, label: 'Сохранить', disabled: busy });
-    return changed;
-  };
+  const { syncDirty, currentVisibility } = createServiceSaveController(primary, {
+    signature,
+    baseline: () => initialSignature,
+    busy: () => saving || assignmentSaving,
+  });
 
   bindServiceWorkplaceAssignments(root, {
     kind: 'procedure',
@@ -201,7 +193,7 @@ export function bindProcedureEditor(root, {
       return null;
     } finally {
       saving = false;
-      setSharedProfilePrimary(primary, { visible, label: 'Сохранить' });
+      setSharedProfilePrimary(primary, { visible: currentVisibility(), label: 'Сохранить' });
     }
     if (error) error.textContent = '';
     onSaved(item);

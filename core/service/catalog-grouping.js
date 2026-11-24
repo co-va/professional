@@ -1,3 +1,4 @@
+import { bindServiceNameSave } from './editor-actions.js';
 import {
   actionBlock, button, compactAddButton, compactRemoveButton, compactButton, emptyState, field, initV2ListReorder,
   list, modal, mountModal, openNotice, select, v2ListEntries, v2ListEntry,
@@ -258,16 +259,7 @@ export function openServiceGroupingQ({ onSaved = () => {} } = {}) {
     const form = editor.querySelector('[data-service-group-editor-form]');
     const saveButton = editor.querySelector('[data-service-group-editor-save]');
     let busy = false;
-    const hasChange = () => {
-      const name = String(new FormData(form).get('name') || '').trim();
-      return Boolean(name) && (!previous || name !== String(previous.name || '').trim());
-    };
-    const syncSave = () => {
-      if (saveButton) saveButton.style.display = hasChange() ? '' : 'none';
-    };
-    form?.addEventListener('input', syncSave);
-    form?.addEventListener('change', syncSave);
-    if (form) syncSave();
+    const hasChange = bindServiceNameSave(form, saveButton, previous);
     form?.addEventListener('submit', async event => {
       event.preventDefault();
       if (busy || !hasChange()) return;
@@ -329,16 +321,7 @@ export function openServiceGroupingQ({ onSaved = () => {} } = {}) {
     const form = editor.querySelector('[data-service-value-editor-form]');
     const saveButton = editor.querySelector('[data-service-value-editor-save]');
     let busy = false;
-    const hasChange = () => {
-      const name = String(new FormData(form).get('name') || '').trim();
-      return Boolean(name) && (!previous || name !== String(previous.name || '').trim());
-    };
-    const syncSave = () => {
-      if (saveButton) saveButton.style.display = hasChange() ? '' : 'none';
-    };
-    form?.addEventListener('input', syncSave);
-    form?.addEventListener('change', syncSave);
-    if (form) syncSave();
+    const hasChange = bindServiceNameSave(form, saveButton, previous);
     const apply = async remove => {
       if (busy) {
         if (remove) throw new Error('Дождитесь завершения сохранения.');

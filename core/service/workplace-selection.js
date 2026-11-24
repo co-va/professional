@@ -3,7 +3,7 @@ import { escapeHtml } from '../../ui/utils/escape-html.js';
 import { button } from '../../ui/buttons/index.js';
 import { collectCost, costField, initCostFields, validateCostDefinition, costListParts } from '../../ui/cost/index.js';
 import { durationPicker, durationText, initDurationPickers } from '../../ui/duration/index.js';
-import { field, textareaField } from '../../ui/inputs/index.js';
+import { textareaField } from '../../ui/inputs/index.js';
 import { compactCheck } from '../../ui/selection/check-list.js';
 import { list as sharedList } from '../../ui/lists/list.js';
 import { procedureGroupBookingFields, bindProcedureGroupBooking } from './procedures/group-booking-ui.js';
