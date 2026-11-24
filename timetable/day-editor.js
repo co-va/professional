@@ -1,3 +1,4 @@
+import { dayDate as dateKey } from '../core/day/rules.js';
 import { fullDateLabel as formatDateLabel } from '../ui/utils/date-time.js';
 import { button, escapeHtml, initTimePickers, modal, mountModal, openDayWorkplaceControl, openDayWorkplaceTime, timePicker, twoColumnLayout } from '../ui/ui.js';
 import { createDay, findSuggestedInterval, getDay, getDayDraftScheduleConflicts, getDayRemovalConflicts, getDayTime, getDays, getDaysForDate, getScheduleConflicts, removeDay, saveDays, updateDayTime } from '../core/day/index.js';
@@ -5,12 +6,6 @@ import { getWorkingTimeUsageConflicts } from '../core/time/index.js';
 import { isValidRange } from '../core/time/index.js';
 import { getWorkplaces, resolveWorkplaceTime } from '../core/workplace-time.js';
 
-function dateKey(value) {
-  if (value instanceof Date && !Number.isNaN(value.getTime())) {
-    return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
-  }
-  return String(value || '').slice(0, 10);
-}
 
 function formatModalDate(value) {
   const key = dateKey(value);

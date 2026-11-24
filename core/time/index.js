@@ -4,6 +4,7 @@ export {
   containsRange,
   createTimeRange,
   isValidRange,
+  localDateKey,
   minutesBetween,
   minutesToTime,
   normalizeTime,

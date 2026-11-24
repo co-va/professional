@@ -69,3 +69,7 @@ export function rangesOverlap(fromA, toA, fromB, toB) {
   if ([a, b, c, d].some((value) => value == null) || b <= a || d <= c) return false;
   return a < d && c < b;
 }
+
+export function localDateKey(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}

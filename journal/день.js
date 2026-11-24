@@ -1,3 +1,4 @@
+import { localDateKey as dateKey } from '../core/time/index.js';
 import {
   ALL_WORKPLACES_ID,
   clearV2Y,
@@ -21,9 +22,6 @@ import { noteTargetLabel, noteVisibleForWorkplace } from './note-target.js';
 // Record/Event/Note data and editors still load only after a choice.
 import { openJournalCreation } from './creation-flow.js';
 
-function dateKey(date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-}
 
 // Visible range only; availability and conflicts remain owned by Time.
 function usageDisplayRange(date, usages = []) {

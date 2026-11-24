@@ -1,3 +1,4 @@
+import { localDateKey as dateKey } from './time/index.js';
 const CONTEXT_PREFIX = 'professional:workplace-context';
 
 function contextKey(scope = '') {
@@ -18,9 +19,6 @@ function writeContext(scope, value) {
   localStorage.setItem(contextKey(scope), JSON.stringify(value || {}));
 }
 
-function dateKey(date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-}
 
 export function getWorkplaceContext(workplaces = [], { scope = '' } = {}) {
   const items = Array.isArray(workplaces) ? workplaces : [];

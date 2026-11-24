@@ -1,14 +1,9 @@
+import { dayDate as dateValue } from './rules.js';
 import { getDayTime, getDays, getDaysForDate } from './read.js';
 import { getWorkplaces } from '../workplace-time.js';
 
 const WORKPLACE_FALLBACK_COLOR = '#212529';
 
-function dateValue(value) {
-  if (value instanceof Date && !Number.isNaN(value.getTime())) {
-    return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
-  }
-  return String(value || '').slice(0, 10);
-}
 
 function workplaceMap(workplaces = []) {
   return new Map((Array.isArray(workplaces) ? workplaces : []).map((workplace) => [String(workplace?.key || ''), workplace]));

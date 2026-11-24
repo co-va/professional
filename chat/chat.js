@@ -1,3 +1,4 @@
+import { chatTime as messageTime } from '../ui/utils/date-time.js';
 import { getCommunicationChannels, getCommunicationThread, getCommunicationThreads, sendCommunicationMessage } from '../core/communications/chat.js';
 import {
   deleteBroadcastTemplate,
@@ -79,11 +80,6 @@ function phoneOf(person = {}) {
   return String((Array.isArray(person.phones) ? person.phones : []).find(Boolean) || '');
 }
 
-function messageTime(value) {
-  const date = new Date(value || 0);
-  if (!Number.isFinite(date.getTime())) return '';
-  return new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit' }).format(date);
-}
 
 function directChannelValue(value) {
   const channel = String(value || '').trim().toUpperCase();
