@@ -61,19 +61,26 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          failed=0
           for test in scripts/ci/*.mjs; do
             echo "::group::$test"
-            node "$test"
+            if ! node "$test"; then
+              echo "::error file=$test::Regression check failed"
+              failed=1
+            fi
             echo "::endgroup::"
           done
+          exit "$failed"
 
       - name: Build production assets
+        if: success() || failure()
         run: |
           node scripts/build-web.mjs
           test -s dist/index.html
           test -n "$(find dist/assets -name 'styles-*.css' -print -quit)"
 
       - name: Docker and nginx configuration
+        if: success() || failure()
         run: |
           docker build --progress=plain -t professional-release .
           docker run --rm professional-release nginx -t
