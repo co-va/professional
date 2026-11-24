@@ -55,3 +55,9 @@ html.keyboard-open .v2-v-host{
   .v2-app{--v2-v-bottom:calc(32px + var(--ui-active-action-height,0px))}
   .v2-v{left:32px}
 }
+
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace .v2-desktop-v{position:absolute;right:116px;top:22px;pointer-events:auto}
+ .v2-app--workspace.has-v2-q-modal .v2-desktop-v{right:18px;top:12px}
+ .v2-app--workspace.has-v2-modal:not(.has-v2-q-modal) .v2-desktop-v{visibility:hidden;pointer-events:none}
+}

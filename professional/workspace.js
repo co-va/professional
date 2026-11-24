@@ -621,8 +621,12 @@ function renderWorkspace() {
 
   const onV2ContextChanged = () => syncWorkspaceHeader(surface);
   const wideMedia = typeof window.matchMedia === 'function' ? window.matchMedia(V2_DESKTOP_MEDIA) : null;
-  wideMedia?.addEventListener?.('change', onV2ContextChanged);
-  disposers.push(() => wideMedia?.removeEventListener?.('change', onV2ContextChanged));
+  const onPresentationChange = () => {
+    onV2ContextChanged();
+    if (state.activeSection === 'people') surface?.peopleRefreshPresentation?.();
+  };
+  wideMedia?.addEventListener?.('change', onPresentationChange);
+  disposers.push(() => wideMedia?.removeEventListener?.('change', onPresentationChange));
   window.addEventListener('va-tools:v2-context-changed', onV2ContextChanged);
   disposers.push(() => window.removeEventListener('va-tools:v2-context-changed', onV2ContextChanged));
 

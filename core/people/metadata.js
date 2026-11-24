@@ -22,6 +22,7 @@ export function getPersonMetadata(key) {
     recordCount: records.length,
     paidTotal: Math.max(0, Number(fact.factTotal) || 0),
     lastVisit: dated[0]?.date || '',
+    firstVisit: dated.length > 1 ? dated.at(-1)?.date || '' : '',
   };
 }
 

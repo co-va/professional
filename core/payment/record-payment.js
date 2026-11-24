@@ -615,7 +615,7 @@ export function openRecordPaymentActions(record, { onSaved = () => {}, extraActi
   if (!state?.latestPayment) return null;
   const layer = mountModal(anchor || document.body, modal(
     paymentActionsBody(state, extraActions),
-    { variant: 'x', surface: 'app', xRole: 'action' },
+    { variant: 'x', surface: 'app' },
   ));
   if (!layer) return null;
   bindPaymentBodyActions(layer, current, state, onSaved);

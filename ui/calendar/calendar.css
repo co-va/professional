@@ -55,3 +55,10 @@
   [data-v2-desktop-calendar] [data-journal-graph-calendar] .calendar__graph-occupancy{top:3px;left:3px;right:3px;gap:2px}
   [data-v2-desktop-calendar] [data-journal-graph-calendar] .calendar__graph-occupancy-bar{height:4px}
 }
+
+@media (min-width:768px) and (min-height:600px){
+ [data-v2-desktop-calendar] .segment-control{background:transparent;border-color:var(--text-secondary);margin-bottom:4px}
+ [data-v2-desktop-calendar] .segment-control button{background:transparent;color:var(--white)}
+ [data-v2-desktop-calendar] .segment-control button.is-active{background:var(--text-secondary);color:var(--white)}
+ [data-v2-desktop-calendar] .calendar__month-button{color:var(--white);border-color:var(--text-secondary)}
+}

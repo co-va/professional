@@ -1,6 +1,9 @@
 import {
   actionBlock,
   button,
+  compactButton,
+  dataTable,
+  bindDataTable,
   collectLinks,
   details,
   collectRepeatedEntries,
@@ -53,7 +56,9 @@ import { openPeopleExcelMenu } from './excel.js';
 import { openContactImportBatches } from './contact-import-review.js';
 import { personCardAppearance, personCardFields } from './card-presentation.js';
 import { getCurrentPersonHistory, getPersonHistory } from './history.js';
-import { getPersonMetadata } from './metadata.js';
+import { getPersonMetadata, formatPersonVisitDate } from './metadata.js';
+import { checkControl } from '../../ui/selection/check-list.js';
+import { isV2DesktopWorkspace } from '../../ui/v2/geometry.js';
 import { getRecord, getRecords } from '../record/index.js';
 import { getProcedures, hasCurrentProceduresSnapshot } from '../service/procedures/data.js';
 import { getWorkplaces, isWorkplacesServerReady } from '../profile/workplaces/data.js';
@@ -479,6 +484,63 @@ function listMarkup(items, query = '') {
   }));
 }
 
+function desktopPeopleTable(root, items) {
+  if (!items.length) return listMarkup(items, root.peopleSearchInput?.value || '');
+  const selected = root.peopleSelectedKeys ||= new Set();
+  const allSelected = items.every(person => selected.has(person.key));
+  const check = (data, aria, checked) => `<label class="ui-compact-check">${checkControl({ data, aria, checked })}</label>`;
+  const columns = [
+    { key: 'select', label: '', narrow: true, sortable: false, header: () => check('data-people-select-all', 'Выбрать все видимые контакты', allSelected), render: row => check(`data-people-select="${escapeHtml(row.key)}"`, `Выбрать ${row.name}`, selected.has(row.key)) },
+    { key: 'code', label: 'Код' },
+    { key: 'name', label: 'Имя Фамилия', render: row => `<button type="button" data-person="${escapeHtml(row.key)}">${escapeHtml(row.name)}</button>` },
+    { key: 'phone', label: 'Телефон', sortable: false },
+    { key: 'firstVisit', label: 'Первое посещение', sortable: false, render: row => escapeHtml(formatPersonVisitDate(row.firstVisit)) },
+    { key: 'lastVisit', label: 'Последнее посещение', render: row => escapeHtml(formatPersonVisitDate(row.lastVisit)) },
+    { key: 'edit', label: '', narrow: true, sortable: false, render: row => compactButton({ kind: 'settings', data: `data-people-edit="${escapeHtml(row.key)}"`, aria: `Редактировать ${row.name}` }) },
+  ];
+  const mode = getPeopleSortMode();
+  const sortKey = mode.startsWith('name') ? 'name' : mode.startsWith('uei') ? 'code' : 'lastVisit';
+  const rows = items.map(person => {
+    const display = personDisplay(person);
+    const metadata = getPersonMetadata(person.key);
+    return { key: person.key, code: display.uei, name: display.name, phone: display.phone, firstVisit: metadata.firstVisit, lastVisit: metadata.lastVisit };
+  });
+  return dataTable({ columns, rows, caption: 'Клиенты', compact: true, sortKey, descending: mode.endsWith('Desc') });
+}
+
+function bindDesktopPeopleTable(root, host, items) {
+  const selected = root.peopleSelectedKeys;
+  if (!selected) return;
+  const all = host.querySelector('[data-people-select-all]');
+  const sync = () => {
+    const inputs = [...host.querySelectorAll('[data-people-select]')];
+    if (!all) return;
+    all.checked = inputs.length > 0 && inputs.every(input => input.checked);
+    all.indeterminate = !all.checked && inputs.some(input => input.checked);
+  };
+  host.querySelectorAll('[data-people-select]').forEach(input => input.addEventListener('change', () => {
+    if (input.checked) selected.add(input.dataset.peopleSelect);
+    else selected.delete(input.dataset.peopleSelect);
+    sync();
+  }));
+  all?.addEventListener('change', () => {
+    items.forEach(person => { if (all.checked) selected.add(person.key); else selected.delete(person.key); });
+    host.querySelectorAll('[data-people-select]').forEach(input => { input.checked = all.checked; });
+    sync();
+  });
+  sync();
+  bindDataTable(host, key => {
+    const prefix = { name: 'name', code: 'uei', lastVisit: 'last' }[key];
+    if (!prefix) return;
+    const previous = getPeopleSortMode();
+    setPeopleSortMode(prefix + (previous === prefix + 'Asc' ? 'Desc' : 'Asc'));
+    refreshPeopleList(root);
+  });
+  host.querySelectorAll('[data-people-edit]').forEach(node => node.addEventListener('click', () => {
+    openPersonEdit(root, node.dataset.peopleEdit, { onSaved: () => refreshPeopleList(root) });
+  }));
+}
+
 function visiblePeople(root) {
   const query = root.peopleSearchInput?.value || '';
   return filterPeople(applyPeopleFilters(sortItems(getPeople(), getPeopleSortMode())), query);
@@ -497,7 +559,9 @@ function refreshPeopleList(root) {
   }
   const query = root.peopleSearchInput?.value || '';
   const items = visiblePeople(root);
-  host.innerHTML = listMarkup(items, query);
+  const desktop = isV2DesktopWorkspace(root.closest('[data-v2-app]'));
+  host.innerHTML = desktop ? desktopPeopleTable(root, items) : listMarkup(items, query);
+  if (desktop) bindDesktopPeopleTable(root, host, items);
   host.querySelectorAll('[data-person]').forEach((node) => {
     node.addEventListener('click', () => openPersonOverview(root, node.dataset.person, root.peopleOptions || {}));
   });
@@ -523,8 +587,15 @@ export function renderPeople(root, options = {}) {
   ]);
   const [searchRow] = setV2ZHeaderRows(root, [`<div class="people-search ui-search-field">
     ${field({ name: 'peopleSearch', type: 'search', placeholder: 'Поиск по имени или UEI', autocomplete: 'off', data: 'data-people-search' })}
+    <div class="v2-desktop-list-actions">
+      ${button('Фильтр', { variant: 'secondary', data: 'data-people-desktop-filter' })}
+      ${button('Excel', { variant: 'secondary', data: 'data-people-desktop-excel' })}
+    </div>
   </div>`]);
   root.peopleSearchInput = searchRow?.querySelector('[data-people-search]') || null;
+  root.peopleRefreshPresentation = () => refreshPeopleList(root);
+  searchRow?.querySelector('[data-people-desktop-filter]')?.addEventListener('click', event => openFilterSettings(root, event.currentTarget));
+  searchRow?.querySelector('[data-people-desktop-excel]')?.addEventListener('click', () => openPeopleExcelMenu(root, { getRows: () => visiblePeople(root), onLoaded: () => renderPeople(root, options) }));
   root.peopleLoyaltyLoading=Boolean(currentPeopleFilters().loyaltyMode);
   root.peopleLoyaltyError='';
   refreshPeopleList(root);
@@ -613,12 +684,12 @@ function peopleFilterFields(filters = {}) {
   </div>`;
 }
 
-function openFilterSettings(root) {
+function openFilterSettings(root, anchor = null) {
   let applied = currentPeopleFilters();
   let draft = { ...applied };
   const hasFilters = (filters) => Object.values(filters).some(Boolean);
   const sameFilters = (left, right) => Object.keys(applied).every((key) => String(left[key] || '') === String(right[key] || ''));
-  const layer = mountModal(root, modal(`
+  const layer = mountModal(anchor || root, modal(`
     <div data-people-filter-fields>${peopleFilterFields(draft)}</div>
     <div class="modal-actions" data-people-filter-actions hidden>
       ${button('Применить', { data: 'data-people-filter-action' })}

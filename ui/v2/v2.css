@@ -353,3 +353,11 @@
   .v2-app--workspace>.v2-layer-portal.is-anchored>.v2-layer-backdrop>.v2-layer--bottom{top:var(--v2-anchor-top,auto);left:var(--v2-anchor-left);right:auto;bottom:var(--v2-anchor-bottom,auto);width:var(--v2-anchor-width);height:auto;max-height:var(--v2-anchor-max-height);min-height:0;translate:none;padding:12px;animation:none;box-shadow:0 12px 32px rgba(0,0,0,.20)}
   .v2-app--workspace>.v2-layer-portal.is-anchored .v2-layer__gesture-zone{display:none}
 }
+
+.v2-desktop-list-actions{display:none}
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace .people-search:has(.v2-desktop-list-actions){display:flex;align-items:center;gap:12px}
+ .v2-app--workspace .people-search>.field{flex:1;min-width:0}
+ .v2-app--workspace .v2-desktop-list-actions{display:flex;align-items:center;gap:8px}
+ .v2-app--workspace .v2-desktop-list-actions .ui-button{width:auto}
+}

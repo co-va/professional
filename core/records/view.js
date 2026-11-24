@@ -425,7 +425,7 @@ export function openRecordView(record, {
 
   const openActions = (event) => {
     const trigger = event?.currentTarget;
-    const anchor = trigger?.matches?.('button') && trigger.getBoundingClientRect().width > 0 ? trigger : null;
+    const anchor = trigger?.v2DesktopAnchor || (trigger?.matches?.('button') && trigger.getBoundingClientRect().width > 0 ? trigger : null);
     if (!capabilities.settings) return;
     const source = syncCurrent();
     const paymentState = getRecordPaymentState(source);
@@ -448,7 +448,7 @@ export function openRecordView(record, {
     }
     const actions = mountModal(anchor || document.body, modal(
       actionSheet({ cancelled: source.status === 'cancelled' }),
-      { variant: 'x', surface: 'app', xRole: 'action' },
+      { variant: 'x', surface: 'app' },
     ));
     if (!actions) return;
 

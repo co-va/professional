@@ -1,5 +1,6 @@
 import { v2V } from './v.js';
 import { rootApp } from './root-app.js';
+import { isV2DesktopWorkspace, V2_DESKTOP_MEDIA } from './geometry.js';
 
 function activeQSurface(app) {
   if (!app?.classList?.contains('has-v2-q-modal')) return null;
@@ -31,7 +32,7 @@ export function setV2V(root, options = null) {
     if (!host.hidden) host.hidden = true;
     return null;
   }
-  host.innerHTML = v2V(options);
+  host.innerHTML = v2V({ ...options, desktop: isV2DesktopWorkspace(app) });
   host.hidden = false;
   return host.querySelector?.('[data-v2-v]') || null;
 }
@@ -124,7 +125,7 @@ export function bindV2VContext(root) {
       return;
     }
 
-    if (nextSource === source && control?.isConnected) {
+    if (nextSource === source && control?.isConnected && control.classList.contains('v2-desktop-v') === isV2DesktopWorkspace(app)) {
       syncControlState(control, source);
       return;
     }
@@ -135,7 +136,12 @@ export function bindV2VContext(root) {
       syncControlState(control, source);
       control.addEventListener('click', () => {
         if (!source?.isConnected || source.disabled) return;
-        source.click();
+        const anchor = control;
+        if (anchor?.classList.contains('v2-desktop-v')) {
+          source.v2DesktopAnchor = anchor;
+          anchor.focus({ preventScroll: true });
+        }
+        try { source.click(); } finally { delete source.v2DesktopAnchor; }
       });
     }
   };
@@ -154,6 +160,8 @@ export function bindV2VContext(root) {
     attributeFilter: ['hidden', 'disabled', 'aria-label'],
   });
   window.addEventListener('va-tools:v2-context-changed', schedule);
+  const media = typeof window.matchMedia === 'function' ? window.matchMedia(V2_DESKTOP_MEDIA) : null;
+  media?.addEventListener?.('change', schedule);
   sync();
   return () => {
     observer.disconnect();
@@ -161,6 +169,7 @@ export function bindV2VContext(root) {
     externalObserver = null;
     externalSurface = null;
     window.removeEventListener('va-tools:v2-context-changed', schedule);
+    media?.removeEventListener?.('change', schedule);
     if (!restoreManualV() && control?.isConnected && hostControl() === control) clearV2V(app);
     source = null;
     control = null;

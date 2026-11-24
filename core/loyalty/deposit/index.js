@@ -1,3 +1,5 @@
+import { dataTable } from '../../../ui/page/page.js';
+import { isV2DesktopWorkspace } from '../../../ui/v2/geometry.js';
 import {
   actionBlock,
   button,
@@ -365,8 +367,23 @@ function fundingEntries(deposit = {}) {
     .sort((a, b) => String(b?.occurredAt || '').localeCompare(String(a?.occurredAt || '')));
 }
 
-function issuedList(items = []) {
+function issuedList(items = [], desktop = false) {
   if (!items.length) return emptyState('Депозитов пока нет', 'Оформленные депозиты этой программы появятся здесь.');
+  if (desktop) return dataTable({
+    compact: true, caption: 'Оформленные депозиты',
+    columns: [
+      { key: 'code', label: 'Код', sortable: false },
+      { key: 'name', label: 'Клиент', sortable: false, render: row => `<button type="button" data-deposit-instance="${escapeHtml(row.id)}">${escapeHtml(row.name)}</button>` },
+      { key: 'nominal', label: 'Номинал', sortable: false }, { key: 'funded', label: 'Внесено', sortable: false },
+      { key: 'balance', label: 'Остаток', sortable: false }, { key: 'status', label: 'Состояние', sortable: false },
+    ],
+    rows: items.map(deposit => {
+      const payment = depositFundingProgress(deposit);
+      return { id: deposit.depositId, code: depositUei(deposit), name: contactLabel(depositPerson(deposit)),
+        nominal: payment.fixed ? money(payment.nominal) : 'Свободная сумма', funded: money(payment.funded), balance: money(deposit.balance),
+        status: deposit.status === 'active' && payment.fixed ? (payment.paid ? 'Оплачено' : 'К оплате ' + money(payment.due)) : depositStatusLabel(deposit.status) };
+    }),
+  });
   return v2ListEntries(items.map((deposit) => v2ListEntry({
     title: contactLabel(depositPerson(deposit)),
     subtitle: depositUei(deposit),
@@ -997,7 +1014,7 @@ async function openProgramLayer(root, programId, { person = null, onChanged = ()
         settingsData: 'data-deposit-program-settings',
         settingsAria: 'Настройки депозитной программы',
       }),
-      v2Section('Оформленные депозиты', issuedList(issued)),
+      v2Section('Оформленные депозиты', issuedList(issued, isV2DesktopWorkspace(layer.closest('[data-v2-app]')))),
     ]);
     layer.querySelector('[data-deposit-program-settings]')?.addEventListener('click', () => openProgramSettings(root, program, {
       person,
@@ -1159,10 +1176,14 @@ export async function renderDeposit(root) {
       settingsAria: 'Настройки депозита',
       c: { label: '+', data: 'data-deposit-program-add', aria: 'Создать депозитную программу' },
     }),
-    programs.length ? entityCardStack(programs.map((program) => card(programFields(program), {
+    programs.length ? (isV2DesktopWorkspace(root.closest('[data-v2-app]')) ? dataTable({
+      compact: true, caption: 'Депозитные программы',
+      columns: [{ key: 'code', label: 'Код', sortable: false }, { key: 'name', label: 'Программа', sortable: false, render: row => `<button type="button" data-deposit-program="${escapeHtml(row.id)}">${escapeHtml(row.name)}</button>` }, { key: 'nominal', label: 'Номинал', sortable: false }, { key: 'term', label: 'Срок', sortable: false }, { key: 'benefit', label: 'Условие', sortable: false }],
+      rows: programs.map(program => ({ id: program.id, code: programUei(program), name: program.name || 'Депозит', nominal: Number(program.amount) > 0 ? money(program.amount) : 'Свободная сумма', term: program.termRule || 'Бессрочно', benefit: program.benefit || 'Без дополнительной выгоды' })),
+    }) : entityCardStack(programs.map((program) => card(programFields(program), {
       data: `data-deposit-program="${escapeHtml(program.id)}"`,
       aria: `Открыть депозитную программу ${program.name || ''}`,
-    }))) : emptyState('Депозитных программ пока нет', 'Создайте первую программу кнопкой «+».')
+    })))) : emptyState('Депозитных программ пока нет', 'Создайте первую программу кнопкой «+».')
   ]);
   const rerender = () => renderDeposit(root);
   root.querySelector('[data-deposit-settings]')?.addEventListener('click', () => openRootSettings(root, rerender));

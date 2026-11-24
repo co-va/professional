@@ -217,9 +217,10 @@ export function mountV2Layer(html, { root = null } = {}) {
   if (!host) return null;
   if (!technical) applyXTransitionPolicy(node);
   const app = technical ? null : host.closest?.('[data-v2-app]');
+  const active = document.activeElement;
+  const anchor = root?.matches?.('button') ? root : (kind === 'bottom' && active?.matches?.('.v2-desktop-v') && app?.contains(active) ? active : null);
   const lockedStage = technical ? null : lockV2StageInteraction(app);
   const releaseHeaderLock = technical ? () => {} : lockModalHeader(app);
-  const anchor = root?.matches?.('button') ? root : null;
   const portalOwner = technical ? null : mountV2ModalPortal(host, app, kind, anchor);
   portalOwner?.setQLayer?.(qLayer);
   const mountHost = portalOwner?.portal || host;
