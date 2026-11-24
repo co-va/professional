@@ -165,14 +165,13 @@ function issueRow(item,people=[]){
     '</div></div>';
 }
 function decisionOptions(item){
-  const saved=text(item.system)||'Не указано',excel=text(item.excel)||'Не указано';
   if(item.field==='identity')return [
     {value:'',label:'Выберите контакт'},
     {value:'same',label:'Существующий контакт'},
     {value:'different',label:'Создать контакт'},
   ];
   return [
-    {value:'',label:'Выберите изменение'},
+    {value:'',label:'Выберите значение'},
     {value:'keep',label:'Сохранить'},
     {value:'replace',label:'Заменить'},
     ...(['email','additionalEmail','phone','additionalPhone','telegram','additionalTelegram','note'].includes(item.field)
