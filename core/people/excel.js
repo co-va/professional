@@ -5,6 +5,7 @@ import {
 import { apiRequest } from '../auth.js';
 import { hydratePeopleFromServer, getPersonPriceCondition } from './data.js';
 import { hydrateUEIFromServer } from '../uei.js';
+import { openContactImportBatches, openContactImportUpload } from './contact-import-review.js';
 
 function message(error) {
   if (error instanceof Error && error.message && !/HTTP|fetch|network|404|500|502|503|JSON|API|Failed to|Prisma|SQL|P20\d+|transaction|sourceKey|tenantId|stack|undefined|constraint|database/i.test(error.message))
@@ -65,6 +66,7 @@ function contactRows(people) {
     additionalEmail: String(person.emails?.[1] || ''),
     telegram: String(person.telegrams?.[0] || ''),
     additionalTelegram: String(person.telegrams?.[1] || ''),
+    note: String(person.note || ''),
     personKey: String(person.key || ''),
   }));
 }
@@ -76,6 +78,7 @@ const CONTACT_EXPORT_COLUMNS = [
   ['phone', 'Телефон'], ['additionalPhone', 'Дополнительный телефон'],
   ['email', 'Email'], ['additionalEmail', 'Дополнительный Email'],
   ['telegram', 'Telegram'], ['additionalTelegram', 'Дополнительный Telegram'],
+  ['note', 'Примечание'],
 ];
 
 function getCsv(rows) {
@@ -235,7 +238,7 @@ async function chooseAndLoad(root, onLoaded) {
   if (!/\.(xlsx|csv)$/i.test(String(file.name || '')) || Number(file.size) > 25 * 1024 * 1024) {
     throw new Error('Выберите Excel или CSV размером до 25 МБ');
   }
-  openPreview(root, file, onLoaded);
+  openContactImportUpload(root, file, { onLoaded });
 }
 
 export function openPeopleExcelMenu(root, { getRows = () => [], onLoaded = () => {} } = {}) {
@@ -243,6 +246,8 @@ export function openPeopleExcelMenu(root, { getRows = () => [], onLoaded = () =>
     { id: 'export', label: 'Выгрузка', run: () => openPeopleExport(root, getRows) },
     { id: 'import', label: 'Загрузка', run: () => chooseAndLoad(root, onLoaded) },
     { id: 'template', label: 'Шаблон', run: () => getWorkbook([], true) },
+    { id: 'uploads', label: 'Загрузки', run: () =>
+      openContactImportBatches(root, { onLoaded }) },
   ];
   const markup = '<div class="modal-actions">'
     + actions.map(action => button(action.label, {
