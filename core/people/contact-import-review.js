@@ -1,4 +1,4 @@
-import { actionBlock, button, escapeHtml, modal, mountModal,
+import { button, escapeHtml, modal, mountModal,
   openNotice, v2ListEntry, v2ListEntries } from '../../ui/ui.js';
 import { catalogDisclosure } from '../inventory/catalog-ui.js';
 import { apiRequest } from '../auth.js';
@@ -35,52 +35,70 @@ const batchRow=batch=>v2ListEntry({
   rightBottom:String(batch.groupCount||0)+' групп',
   data:'data-contact-review-open="'+escapeHtml(batch.id)+'"',
 });
+const hiddenIdentifier=value=>/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text(value));
+const displayCode=value=>{
+  const valueText=text(value);
+  if(!valueText||hiddenIdentifier(valueText))return '';
+  return /^\\d{1,4}$/.test(valueText)?valueText.padStart(4,'0'):valueText;
+};
+const codeLabel=value=>displayCode(value)?'Код: '+displayCode(value):'';
+const identityFields={
+  uei:'код клиента',phone:'телефон',additionalPhone:'доп. телефон',
+  email:'Email',additionalEmail:'доп. Email',
+  telegram:'Telegram',additionalTelegram:'доп. Telegram',
+};
 function identityRow(item){
-  const id=String(item.rowNumber),name=escapeHtml(item.contact||'Строка '+id);
+  const id=String(Number(item.rowNumber)||0);
+  const title=escapeHtml(item.contact||'Строка '+id);
   const owners=Array.isArray(item.owners)?item.owners:[];
   const options=owners.map(person=>{
-    const label=[person.code,person.name,
-      (person.matchedBy||[]).map(field=>({
-        uei:'Код',phone:'Телефон',additionalPhone:'Телефон',
-        email:'Email',additionalEmail:'Email',telegram:'Telegram',
-        additionalTelegram:'Telegram',
-      })[field]||field).join(', ')].filter(Boolean).join(' · ');
-    return '<option value="'+escapeHtml(person.key)+'">'+escapeHtml(label)+'</option>';
+    const matched=(person.matchedBy||[]).map(field=>identityFields[field]||field).join(', ');
+    const fromFile=text(person.key).startsWith('excel:')?'Excel: строка '+text(person.key).slice(6):'';
+    const label=[codeLabel(person.code),person.name,fromFile,
+      matched?'Совпало: '+matched:''].filter(Boolean).join(' · ');
+    return '<option value="'+escapeHtml(person.key)+'">'+escapeHtml(label||'Найденный контакт')+'</option>';
   }).join('');
-  const select=owners.length
-    ?'<select class="contact-review-value" data-review-candidate aria-label="Найденный контакт">'+options+'</select>'
-    :'<span class="ui-list__secondary">Совпадение не найдено</span>';
-  return '<div class="list-entry list-entry--columns contact-review-item contact-review-identity" data-review-row="'+id+'" data-review-field="identity">'+
+  const selected=owners.length
+    ?'<label class="contact-review-item__label" for="review-identity-'+id+'">Найденный контакт</label>'+
+      '<select class="contact-review-value" data-review-candidate id="review-identity-'+id+'">'+options+'</select>'
+    :'<span class="contact-review-item__muted">Подходящих контактов не найдено</span>';
+  return '<div class="list-entry contact-review-item contact-review-identity" data-review-row="'+id+'" data-review-field="identity">'+
     '<div class="list-entry__background"></div><div class="list-entry__content">'+
-    '<input type="checkbox" class="list-entry__selector" data-review-select aria-label="Выбрать '+name+'">'+
-    '<div class="list-entry__columns">'+
-    '<span class="list-entry__column"><span class="list-entry__column-line is-strong">'+name+'</span>'+
-    '<span class="list-entry__column-line is-muted">Excel: '+escapeHtml(item.excel||'—')+'</span>'+
-    '</span><span class="list-entry__column">'+select+'</span>'+
-    '<span class="list-entry__column contact-review-identity__actions">'+
-    '<button type="button" class="ui-button ui-button--outline" data-review-same'+(!owners.length?' disabled':'')+'>Тот же</button>'+
-    '<button type="button" class="ui-button ui-button--outline" data-review-different>Другой</button>'+
-    '</span></div></div></div>';
+    '<div class="contact-review-item__main">'+
+      '<strong class="contact-review-item__title">'+title+'</strong>'+
+      '<div class="contact-review-item__editor">'+selected+'</div>'+
+      '<div class="contact-review-identity__actions">'+
+        '<button type="button" class="ui-button ui-button--outline" data-review-same'+(!owners.length?' disabled':'')+'>Тот же человек</button>'+
+        '<button type="button" class="ui-button ui-button--outline" data-review-different>Другой человек</button>'+
+      '</div></div></div></div>';
 }
 function issueRow(item){
   if(item.field==='identity')return identityRow(item);
-  const id=String(item.rowNumber),field=escapeHtml(item.field);
-  const label=escapeHtml(item.contact||'Строка '+id);
-  const old=escapeHtml(item.system||'—'),incoming=escapeHtml(item.excel||'—');
-  const problem=item.error?'<span class="list-entry__column-line is-muted">'+escapeHtml(item.error)+'</span>':'';
+  const id=String(Number(item.rowNumber)||0),field=escapeHtml(item.field);
+  const title=escapeHtml(item.contact||'Строка '+id);
+  const saved=escapeHtml(item.system||'—'),excel=escapeHtml(item.excel||'—');
   const owners=Array.isArray(item.owners)&&item.owners.length
-    ?'<span class="list-entry__column-line is-muted">'+item.owners.map(owner=>
-      escapeHtml([owner.code,owner.name].filter(Boolean).join(' · '))).join('; ')+'</span>':'';
-  return '<div class="list-entry list-entry--columns contact-review-item" data-review-row="'+id+'" data-review-field="'+field+'">'+
+    ?'<div class="contact-review-item__muted">Совпадает с: '+item.owners.map(owner=>
+      escapeHtml([codeLabel(owner.code),owner.name].filter(Boolean).join(' · '))).join('; ')+'</div>':'';
+  const problem=item.error
+    ?'<div class="contact-review-item__error">'+escapeHtml(item.error)+'</div>':'';
+  return '<div class="list-entry contact-review-item" data-review-row="'+id+'" data-review-field="'+field+'">'+
     '<div class="list-entry__background"></div><div class="list-entry__content">'+
-    '<input type="checkbox" class="list-entry__selector" data-review-select aria-label="Выбрать '+label+'">'+
-    '<div class="list-entry__columns">'+
-    '<span class="list-entry__column"><span class="list-entry__column-line is-strong">'+label+'</span>'+
-      '<span class="list-entry__column-line is-muted" title="'+old+'">Система: '+old+'</span>'+
-      '<span class="list-entry__column-line is-muted" title="'+incoming+'">Excel: '+incoming+'</span>'+owners+problem+'</span>'+
-    '<span class="list-entry__column"><label for="review-'+id+'-'+field+'" class="ui-list__secondary">Изменить на</label>'+
-      '<input class="contact-review-value" data-review-value id="review-'+id+'-'+field+'" value="'+escapeHtml(item.excel||'')+'" aria-label="Новое значение"></span>'+
-    '<span class="list-entry__column"><button type="button" class="ui-button ui-button--outline" data-review-keep>Оставить</button></span>'+
+    '<input type="checkbox" class="list-entry__selector" data-review-select aria-label="Выбрать '+title+'">'+
+    '<div class="contact-review-item__main">'+
+      '<strong class="contact-review-item__title">'+title+'</strong>'+
+      '<div class="contact-review-item__facts">'+
+        '<div class="contact-review-item__values">'+
+          '<div><span class="contact-review-item__label">Система</span><span>'+saved+'</span></div>'+
+          '<div><span class="contact-review-item__label">Excel</span><span>'+excel+'</span></div>'+
+          owners+problem+
+        '</div>'+
+        '<div class="contact-review-item__editor">'+
+          '<label class="contact-review-item__label" for="review-'+id+'-'+field+'">Новое значение</label>'+
+          '<input class="contact-review-value" data-review-value id="review-'+id+'-'+field+'" value="'+escapeHtml(item.excel||'')+'">'+
+          '<button type="button" class="ui-button ui-button--outline" data-review-keep>Оставить старое</button>'+
+        '</div>'+
+      '</div>'+
     '</div></div></div>';
 }
 function content(batch){
@@ -91,26 +109,34 @@ function content(batch){
   const unchanged=rows.filter(row=>row.status==='unchanged');
   const sections=groups.map(group=>{
     const entries=(batch.issues||[]).filter(item=>item.field===group.field);
+    if(!entries.length)return '';
     const extra=['email','additionalEmail','phone','additionalPhone'].includes(group.field)
       ?button('Добавить как дополнительный',{variant:'secondary',
         data:'data-review-add="'+escapeHtml(group.field)+'"'}) : '';
-    const items='<div class="list-entries">'+entries.map(issueRow).join('')+'</div>'+
-      actionBlock(button('Применить выбранные',
-        {data:'data-review-apply="'+escapeHtml(group.field)+'"'})+extra);
+    // These actions belong to the open group. They MUST NOT use
+    // actionBlock/.modal-actions: the shared Q runtime positions that
+    // class as an absolute, floating footer.
+    const tools=group.field==='identity'?'':'<div class="contact-review-group-actions" data-review-toolbar hidden>'+
+      button('Применить выбранные',{data:'data-review-apply="'+escapeHtml(group.field)+'"'})+
+      extra+'</div>';
+    const items='<div class="list-entries">'+entries.map(issueRow).join('')+'</div>'+tools;
     return catalogDisclosure(group.label,items,false,entries.length)
       .replace('<details>','<details data-review-group="'+escapeHtml(group.field)+'">');
   });
-  const completed=catalogDisclosure('Загружено',v2ListEntries(done.map(row=>
-    v2ListEntry({title:row.name||'Контакт',
-      subtitle:[row.code,'Строка '+row.rowNumber].filter(Boolean).join(' · '),
-      interactive:false,omitEmptySubtitle:true}))),false,done.length);
-  const skipped=catalogDisclosure('Без изменений',v2ListEntries(unchanged.map(row=>
-    v2ListEntry({title:row.name||'Контакт',
-      subtitle:[row.code,'Строка '+row.rowNumber].filter(Boolean).join(' · '),
-      interactive:false,omitEmptySubtitle:true}))),false,unchanged.length);
+  const compactRow=row=>v2ListEntry({
+    title:row.name||'Контакт',
+    subtitle:[codeLabel(row.code),'Excel: строка '+row.rowNumber].filter(Boolean).join(' · '),
+    interactive:false,omitEmptySubtitle:true,
+  });
+  const completed=done.length?catalogDisclosure('Загружено',
+    v2ListEntries(done.map(compactRow)),false,done.length):'';
+  const skipped=unchanged.length?catalogDisclosure('Без изменений',
+    v2ListEntries(unchanged.map(compactRow)),false,unchanged.length):'';
   return '<div class="form-grid contact-review-batch">'+
-    '<div>'+escapeHtml(progress(batch))+' · Групп различий: '+groups.length+'</div>'+
-    sections.join('')+completed+skipped+
+    '<div class="contact-review-progress">'+
+      '<strong>'+escapeHtml(progress(batch))+'</strong>'+
+      '<span>'+Number(batch.pending||0)+' требуют решения · '+groups.length+' групп различий</span>'+
+    '</div>'+sections.join('')+completed+skipped+
     '<p class="form-error" role="alert" data-review-error></p></div>';
 }
 export function openContactImportReview(root,batchId,{onLoaded=()=>{}}={}){
@@ -139,6 +165,12 @@ export function openContactImportReview(root,batchId,{onLoaded=()=>{}}={}){
     });
     show();
   };
+  host.addEventListener('change',event=>{
+    if(!event.target.closest?.('[data-review-select]'))return;
+    const group=event.target.closest('[data-review-group]');
+    const toolbar=group?.querySelector('[data-review-toolbar]');
+    if(toolbar)toolbar.hidden=!group.querySelector('[data-review-select]:checked');
+  });
   host.addEventListener('click',async event=>{
     if(busy)return;
     const keep=event.target.closest('[data-review-keep]');
