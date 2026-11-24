@@ -35,7 +35,35 @@ const batchRow=batch=>v2ListEntry({
   rightBottom:String(batch.groupCount||0)+' групп',
   data:'data-contact-review-open="'+escapeHtml(batch.id)+'"',
 });
+function identityRow(item){
+  const id=String(item.rowNumber),name=escapeHtml(item.contact||'Строка '+id);
+  const owners=Array.isArray(item.owners)?item.owners:[];
+  const options=owners.map(person=>{
+    const label=[person.code,person.name,
+      (person.matchedBy||[]).map(field=>({
+        uei:'Код',phone:'Телефон',additionalPhone:'Телефон',
+        email:'Email',additionalEmail:'Email',telegram:'Telegram',
+        additionalTelegram:'Telegram',
+      })[field]||field).join(', ')].filter(Boolean).join(' · ');
+    return '<option value="'+escapeHtml(person.key)+'">'+escapeHtml(label)+'</option>';
+  }).join('');
+  const select=owners.length
+    ?'<select class="contact-review-value" data-review-candidate aria-label="Найденный контакт">'+options+'</select>'
+    :'<span class="ui-list__secondary">Совпадение не найдено</span>';
+  return '<div class="list-entry list-entry--columns contact-review-item contact-review-identity" data-review-row="'+id+'" data-review-field="identity">'+
+    '<div class="list-entry__background"></div><div class="list-entry__content">'+
+    '<input type="checkbox" class="list-entry__selector" data-review-select aria-label="Выбрать '+name+'">'+
+    '<div class="list-entry__columns">'+
+    '<span class="list-entry__column"><span class="list-entry__column-line is-strong">'+name+'</span>'+
+    '<span class="list-entry__column-line is-muted">Excel: '+escapeHtml(item.excel||'—')+'</span>'+
+    '</span><span class="list-entry__column">'+select+'</span>'+
+    '<span class="list-entry__column contact-review-identity__actions">'+
+    '<button type="button" class="ui-button ui-button--outline" data-review-same'+(!owners.length?' disabled':'')+'>Тот же</button>'+
+    '<button type="button" class="ui-button ui-button--outline" data-review-different>Другой</button>'+
+    '</span></div></div></div>';
+}
 function issueRow(item){
+  if(item.field==='identity')return identityRow(item);
   const id=String(item.rowNumber),field=escapeHtml(item.field);
   const label=escapeHtml(item.contact||'Строка '+id);
   const old=escapeHtml(item.system||'—'),incoming=escapeHtml(item.excel||'—');
@@ -56,7 +84,8 @@ function issueRow(item){
     '</div></div></div>';
 }
 function content(batch){
-  const groups=Array.isArray(batch.groups)?batch.groups:[];
+  const groups=(Array.isArray(batch.groups)?[...batch.groups]:[])
+    .sort((a,b)=>Number(b.field==='identity')-Number(a.field==='identity'));
   const done=(Array.isArray(batch.rows)?batch.rows:[]).filter(row=>row.status==='done');
   const sections=groups.map(group=>{
     const entries=(batch.issues||[]).filter(item=>item.field===group.field);
@@ -107,9 +136,11 @@ export function openContactImportReview(root,batchId,{onLoaded=()=>{}}={}){
   host.addEventListener('click',async event=>{
     if(busy)return;
     const keep=event.target.closest('[data-review-keep]');
+    const same=event.target.closest('[data-review-same]');
+    const different=event.target.closest('[data-review-different]');
     const applyGroup=event.target.closest('[data-review-apply]');
     const addGroup=event.target.closest('[data-review-add]');
-    if(!keep&&!applyGroup&&!addGroup)return;
+    if(!keep&&!applyGroup&&!addGroup&&!same&&!different)return;
     const selected=(applyGroup||addGroup)?[...host.querySelectorAll('[data-review-row]')]
       .filter(row=>row.dataset.reviewField===(applyGroup?.dataset.reviewApply||addGroup?.dataset.reviewAdd)
         &&row.querySelector('[data-review-select]')?.checked)
@@ -117,7 +148,13 @@ export function openContactImportReview(root,batchId,{onLoaded=()=>{}}={}){
         field:row.dataset.reviewField,value:text(row.querySelector('[data-review-value]')?.value)})):[];
     busy=true;
     try{
-      if(keep){
+      if(same||different){
+        const row=(same||different).closest('[data-review-row]');
+        const value=same?text(row.querySelector('[data-review-candidate]')?.value):'';
+        if(same&&!value)throw Error('Выберите найденный контакт');
+        await apply({rowNumber:Number(row.dataset.reviewRow),field:'identity'},
+          same?'same':'different',value);
+      }else if(keep){
         const row=keep.closest('[data-review-row]');
         await apply({rowNumber:Number(row?.dataset.reviewRow),
           field:row?.dataset.reviewField},'keep','');
