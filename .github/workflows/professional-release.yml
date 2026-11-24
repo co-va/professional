@@ -53,10 +53,14 @@ jobs:
 
       - name: Install pinned build and browser tools
         run: |
-          npm install --no-save --no-package-lock esbuild@0.25.12 playwright@1.56.1
+          npm install --no-save --no-package-lock esbuild@0.25.12 playwright@1.56.1 eslint@9.39.1 globals@16.5.0 postcss@8.5.6
           npx playwright install chromium
 
+      - name: Full JavaScript and CSS semantic audit
+        run: node scripts/audit-professional-clean.mjs --symbols
+
       - name: Existing domain and UI regression checks
+        if: success() || failure()
         shell: bash
         run: |
           set -euo pipefail

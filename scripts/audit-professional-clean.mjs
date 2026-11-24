@@ -286,3 +286,87 @@ if (uniqueProblems.length) {
 }
 
 console.log('Professional clean audit PASS: standalone boundaries, guest Booking isolation, retired markers, reachability and duplicate checks are clean.');
+
+// Release-only semantic diagnostics. The file-graph audit above also runs
+// without any npm dependencies. Never auto-delete a finding or count a
+// candidate as a proven duplicate until its callers and contract are checked.
+if (process.argv.includes('--symbols')) {
+  const { ESLint } = await import('eslint');
+  const { default: globals } = await import('globals');
+  const { default: postcss } = await import('postcss');
+  const functions = new Map();
+  const duplicates = new Map();
+  const semantic = {
+    create(context) {
+      const code = context.sourceCode;
+      const capture = (node, name) => {
+        if (!name || !node.body) return;
+        const tokens = code.getTokens(node.body);
+        if (tokens.length < 36) return;
+        const signature = crypto.createHash('sha256')
+          .update(JSON.stringify(tokens.map(token => [token.type, token.value]))).digest('hex');
+        if (!functions.has(signature)) functions.set(signature, []);
+        functions.get(signature).push(context.filename.replace(root + path.sep, '') + ':' + node.loc.start.line + ' ' + name);
+      };
+      return {
+        FunctionDeclaration(node) { capture(node, node.id?.name); },
+        VariableDeclarator(node) {
+          if (node.id.type === 'Identifier' && ['ArrowFunctionExpression','FunctionExpression'].includes(node.init?.type))
+            capture(node.init, node.id.name);
+        },
+      };
+    },
+  };
+  const eslint = new ESLint({
+    overrideConfigFile: true,
+    ignore: false,
+    overrideConfig: [{
+      files: ['**/*.js','**/*.mjs'],
+      languageOptions: { ecmaVersion: 'latest', sourceType: 'module', globals: { ...globals.browser, ...globals.serviceworker } },
+      plugins: { release: { rules: { 'duplicate-function-candidates': semantic } } },
+      rules: {
+        'no-unused-vars': ['warn', { args: 'none', caughtErrors: 'none', ignoreRestSiblings: true }],
+        'no-undef': 'error',
+        'no-unreachable': 'error',
+        'no-dupe-keys': 'error',
+        'release/duplicate-function-candidates': 'warn',
+      },
+      linterOptions: { reportUnusedDisableDirectives: 'off' },
+    }],
+  });
+  let errors = 0, unused = 0, jsCount = 0, cssCount = 0;
+  for (const file of runtimeCode) {
+    const source = await fs.readFile(abs(file), 'utf8');
+    if (/\.(js|mjs)$/.test(file)) {
+      jsCount++;
+      const [result] = await eslint.lintText(source, {filePath: abs(file)});
+      for (const issue of result.messages) {
+        const kind = issue.severity === 2 ? 'SYMBOL_ERROR' : 'UNUSED_CANDIDATE';
+        if (issue.severity === 2) errors++; else unused++;
+        console.log(kind + ' ' + file + ':' + issue.line + ':' + issue.column + ' ' + issue.message + ' [' + issue.ruleId + ']');
+      }
+    } else if (file.endsWith('.css')) {
+      cssCount++;
+      try {
+        const css = postcss.parse(source, {from: file});
+        css.walkRules(rule => {
+          const declarations = rule.nodes.filter(node=>node.type==='decl').map(node=>[node.prop,node.value,node.important||false]);
+          if (declarations.length < 4) return;
+          const scope = [];
+          for (let parent=rule.parent; parent?.type==='atrule'; parent=parent.parent) scope.unshift('@'+parent.name+' '+parent.params);
+          const signature = JSON.stringify([scope,rule.selector,declarations]);
+          if (!duplicates.has(signature)) duplicates.set(signature, []);
+          duplicates.get(signature).push(file+':'+rule.source.start.line+' '+rule.selector);
+        });
+      } catch (error) {
+        errors++;
+        console.log('CSS_ERROR '+file+' '+error.message);
+      }
+    }
+  }
+  let functionGroups=0, cssGroups=0;
+  for (const group of functions.values()) if (group.length>1) {functionGroups++;console.log('FUNCTION_DUPLICATE_CANDIDATE '+group.join(' | '));}
+  for (const group of duplicates.values()) if (group.length>1) {cssGroups++;console.log('CSS_DUPLICATE_CANDIDATE '+group.join(' | '));}
+  console.log('Semantic audit: '+jsCount+' JS, '+cssCount+' CSS; '+errors+' errors, '+unused+' unused candidates, '+functionGroups+' function groups, '+cssGroups+' CSS groups.');
+  if (errors) process.exitCode = 1;
+}
