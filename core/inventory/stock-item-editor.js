@@ -222,7 +222,7 @@ function stockMetricRow(key, label, metric, unit, moneyLabel = 'Стоимост
     '</div>';
 }
 
-function supplierPurchase(item) {
+export function supplierPurchase(item) {
   const linked = Boolean(item?.primaryOfferId);
   const priced = item?.basePriceSource === 'primary-offer' && item?.basePrice != null;
   return { locked: linked, value: linked ? priced ? item.basePrice : ''

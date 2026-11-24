@@ -36,7 +36,7 @@ import {
   inventoryStockThresholdInput, inventoryStockThresholdStored, inventoryStockThresholdUnit,
 } from './completeness.js';
 import { openInventoryProductAppearanceQ, openInventoryProductOverview } from './product-overview.js';
-import { openQuickStockItemX, openStockItemQEditor } from './stock-item-editor.js';
+import { openQuickStockItemX, openStockItemQEditor, supplierPurchase } from './stock-item-editor.js';
 import {
   openInventoryBulkSupplierLink, prepareInventorySupplierLinks, applyInventorySupplierLinks,
 } from './supplier-bulk-link.js';
@@ -1613,7 +1613,7 @@ function inventoryAuditFieldDefinition(key) {
 
 function inventoryAuditCurrentValue(item, definition) {
   if (definition.value === 'usage') return itemUsageMode(item);
-  if (definition.value === 'referencePrice') return itemPrimaryPrice(item) ?? item.referencePrice;
+  if (definition.value === 'referencePrice') return supplierPurchase(item).value;
   if (definition.value === 'minStock' || definition.value === 'targetStock')
     return inventoryStockThresholdInput(item, item[definition.value]);
   return item[definition.value];
@@ -1625,7 +1625,7 @@ function inventoryAuditDataControl(definition, name, { shared = false, locked = 
   const label = shared
     ? definition.value === 'position' ? 'Начальный номер (дальше по порядку)' : 'Новое значение'
     : '';
-  if (locked) return field({ label, name, placeholder: 'Цена от поставщика', disabled: true });
+  if (locked) return field({ label, name, value: String(value ?? ''), placeholder: 'Цена от поставщика', disabled: true });
   if (definition.kind === 'criterion') {
     // Same existing dropdown as the product card: choose a catalogued value,
     // never create a new category/manufacturer by typing in bulk editor.
@@ -1659,7 +1659,7 @@ function inventoryAuditDataControl(definition, name, { shared = false, locked = 
 function inventoryAuditDataRow(item, index, definition, includeManufacturer = false, selected = false) {
   const name = String(item.name || 'Позиция');
   const current = inventoryAuditCurrentValue(item, definition);
-  const locked = definition.value === 'referencePrice' && itemPrimaryPrice(item) !== null;
+  const locked = definition.value === 'referencePrice' && supplierPurchase(item).locked;
   return `<div class="data-edit-row inventory-audit-data-row" role="group" aria-label="${escapeHtml(definition.label + ': ' + name)}">
     ${compactCheck({ checked: selected, disabled: locked,
       data: `data-inventory-audit-selected="${index}"`,
@@ -1730,7 +1730,7 @@ async function applyInventoryAuditDataChanges(layer, { items, definition, perIte
     return false;
   }
     if (!perItem && definition.value === 'referencePrice') {
-      const locked = items.filter(item => itemPrimaryPrice(item) !== null);
+      const locked = items.filter(item => supplierPurchase(item).locked);
       if (locked.length) {
         status.textContent = `У ${locked.length} позиций цена определяется основным поставщиком. Исключите их из выбора или измените цену у поставщика.`;
         return;
@@ -1755,7 +1755,7 @@ async function applyInventoryAuditDataChanges(layer, { items, definition, perIte
       }
       for (const [index, item] of items.entries()) {
         if (perItem && selectedIndices && !selectedIndices.has(index)) continue;
-        if (perItem && definition.value === 'referencePrice' && itemPrimaryPrice(item) !== null) continue;
+        if (perItem && definition.value === 'referencePrice' && supplierPurchase(item).locked) continue;
         const raw = perItem ? String(data.get(`auditItem-${index}`) ?? '').trim() : '';
         const shouldClear = perItem && clearItems.has(index);
         if (perItem && !shouldClear &&

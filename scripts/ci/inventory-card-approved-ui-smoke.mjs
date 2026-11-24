@@ -67,3 +67,16 @@ assert.match(classification, /updateInventoryCriterion\(group\.id,patch\)/);
 assert.match(storage, /transferInventoryStock/);
 assert.match(storage, /updateInventoryStorageLocation/);
 console.log('PASS: compact inventory receipt/nominal/consumption UI and Core group/storage/supplier Q controls');
+
+// Regression: the bulk editor and the Q use the exact same price/lock
+// contract, including a linked supplier with an absent or zero price.
+const purchaseCode=form.slice(form.indexOf('function supplierPurchase('),form.indexOf('function packPieces('));
+const purchase=new Function(purchaseCode+'\nreturn supplierPurchase;')();
+assert.deepEqual(purchase({referencePrice: 120}),{locked:false,value:120});
+assert.deepEqual(purchase({referencePrice:120,primaryOfferId:'o',basePriceSource:'primary-offer',basePrice:0}),{locked:true,value:0});
+assert.deepEqual(purchase({referencePrice:120,primaryOfferId:'o'}),{locked:true,value:''});
+assert.deepEqual(purchase({referencePrice:120,primaryOfferId:'o',basePriceSource:'primary-offer',basePrice:90}),{locked:true,value:90});
+assert.match(inventory,/supplierPurchase\(item\)\.value/);
+assert.equal((inventory.match(/supplierPurchase\(item\)\.locked/g)||[]).length,3);
+assert.doesNotMatch(inventory,/itemPrimaryPrice\(/);
+console.log('PASS: stock and bulk editor share one supplier price/lock mechanism');
