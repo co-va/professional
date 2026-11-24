@@ -1,7 +1,7 @@
 import {
-  actionBlock, button, entityCardDefaultRows, entityCardRail, entityVisualCard, miniCard, miniCardRail,
+  button, entityCardDefaultRows, entityCardRail, entityVisualCard, miniCard, miniCardRail,
   modal, mountModal, openEntityCardAppearanceQ, openNotice, openSharedProfileSettingsMenu,
-  page, select,
+  page,
   workspaceHeaderContext,
 } from '../../ui/ui.js';
 import { escapeHtml } from '../../ui/utils/escape-html.js';
@@ -236,19 +236,6 @@ function openStockSupplierInfo(itemId, offerId) {
   return mountModal(document.body, modal(html, {
     title: 'Контрагент', variant: 's', surface: 'app',
   }));
-}
-
-function offerValue(data, name, { required = false, positive = false, max = Infinity } = {}) {
-  const raw = String(data.get(name) ?? '').trim();
-  if (!raw) {
-    if (required) throw new Error('Заполните обязательные поля.');
-    return null;
-  }
-  const number = Number(raw.replace(',', '.'));
-  if (!Number.isFinite(number) || number < 0 || (positive && number === 0) || number > max) {
-    throw new Error('Проверьте поле ' + name + '.');
-  }
-  return number;
 }
 
 function stockCardPreviewExamples(item) {

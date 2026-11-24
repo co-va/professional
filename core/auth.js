@@ -151,3 +151,10 @@ export function logout() {
   clearAuthToken();
   window.dispatchEvent(new CustomEvent('professional:auth-logout'));
 }
+
+// Common transport decoding only; each domain retains its own validation and persistence.
+export async function apiResponseJson(response, fallback) {
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload?.message || fallback);
+  return payload;
+}

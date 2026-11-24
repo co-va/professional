@@ -1,4 +1,4 @@
-import { apiRequest } from '../../../core/auth.js';
+import { apiRequest, apiResponseJson as responseJson } from '../../../core/auth.js';
 import { normalizePhoneForStorage } from '../../../core/phone/index.js';
 
 const WORKPLACE_FALLBACK_COLOR = '#212529';
@@ -82,12 +82,6 @@ function notifyWorkplacesChanged(detail = {}) {
   if (typeof window === 'undefined') return;
   window.dispatchEvent(new CustomEvent('professional:workplaces-changed', { detail }));
   window.dispatchEvent(new CustomEvent('professional:time-usage-changed', { detail }));
-}
-
-async function responseJson(response, fallbackMessage) {
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(payload?.message || fallbackMessage);
-  return payload;
 }
 
 export function hydrateWorkplacesFromServer(values = [], referenceData = null) {

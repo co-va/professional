@@ -1,4 +1,4 @@
-import { apiRequest } from '../../core/auth.js';
+import { apiRequest, apiResponseJson as responseJson } from '../../core/auth.js';
 import { normalizePhoneForStorage } from '../../core/phone/index.js';
 
 let profileState = null;
@@ -65,12 +65,6 @@ function normalizeProfessionCatalog(values) {
     if (!byKey.has(key)) byKey.set(key, value);
   }
   return [...byKey.values()];
-}
-
-async function responseJson(response, fallbackMessage) {
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(payload?.message || fallbackMessage);
-  return payload;
 }
 
 function requireServerReady() {

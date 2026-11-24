@@ -1,10 +1,4 @@
-import { apiRequest } from '../auth.js';
-
-async function jsonResponse(response, fallbackMessage) {
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(payload?.message || fallbackMessage);
-  return payload;
-}
+import { apiRequest, apiResponseJson as jsonResponse } from '../auth.js';
 
 export async function getTelegramBotConnection() {
   return jsonResponse(await apiRequest('/communications/integrations/telegram'), 'Не удалось загрузить Telegram-интеграцию');
