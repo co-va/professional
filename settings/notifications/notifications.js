@@ -1,3 +1,4 @@
+import { compactCheck } from '../../ui/selection/check-list.js';
 import {
   getNotificationCatalog,
   getNotificationDeliveryRouting,
@@ -245,7 +246,7 @@ function groupedEvents(catalog = []) {
 
 function eventRow(event, policy) {
   return `<div class="app-notification-row" data-notification-row="${escapeHtml(event.type)}">
-    <input type="checkbox" data-notification-enabled="${escapeHtml(event.type)}" aria-label="Отправлять: ${escapeHtml(event.title)}" ${policy.enabled ? 'checked' : ''}>
+    ${compactCheck({checked: policy.enabled, data: `data-notification-enabled="${escapeHtml(event.type)}"`, aria: 'Отправлять: ' + event.title})}
     <span data-notification-open="${escapeHtml(event.type)}" role="button" tabindex="0" aria-label="Редактировать: ${escapeHtml(event.title)}">
       <strong>${escapeHtml(event.title)}</strong>
       ${event.description ? `<small>${escapeHtml(event.description)}</small>` : ''}
@@ -260,7 +261,7 @@ function allEventsEnabled(catalog, routing) {
 function serviceControlMarkup(catalog, routing) {
   return v2Section('Сервисные уведомления', `<div class="app-notification-list">
     <div class="app-notification-row">
-      <input type="checkbox" data-notification-service-enabled aria-label="Все сервисные уведомления" ${allEventsEnabled(catalog, routing) ? 'checked' : ''}>
+      ${compactCheck({checked: allEventsEnabled(catalog, routing), data: 'data-notification-service-enabled', aria: 'Все сервисные уведомления'})}
       <span>
         <strong>Все сервисные уведомления</strong>
         <small>Включить или выключить весь список</small>

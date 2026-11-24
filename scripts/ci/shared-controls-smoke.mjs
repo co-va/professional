@@ -27,12 +27,14 @@ const checks = '<div data-test="compact">'+compactCheck({label:'Выбрать',
 // Report remaining cases instead of silently claiming that all feature paths
 // use the component; they must be reviewed before accepting the release.
 const files = execFileSync('git',['ls-files','-z'],{encoding:'utf8'}).split('\0').filter(path=>/\.(js|html)$/.test(path)&&!path.startsWith('scripts/')&&path!=='ui/selection/check-list.js');
+const directChecks=[];
 for(const path of files){
   const source=read(path);
   const raw = [...source.matchAll(/<input\b[^>]{0,500}\btype\s*=\s*["']checkbox["']/gi)];
-  for(const hit of raw) console.log('DIRECT_CHECKBOX '+path+':'+source.slice(0,hit.index).split('\n').length);
+  for(const hit of raw) directChecks.push(path+':'+source.slice(0,hit.index).split('\n').length);
 }
 
+assert.deepEqual(directChecks, [], 'All checkboxes must use Shared UI');
 const browser = await chromium.launch({headless:true});
 try {
   const page = await browser.newPage({viewport:{width:390,height:844}});

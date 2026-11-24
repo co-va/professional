@@ -3,8 +3,9 @@ import { readFileSync } from 'node:fs';
 
 const source = readFileSync('core/inventory/service.js', 'utf8');
 const ui = readFileSync('core/inventory/inventory.js', 'utf8');
+const editor = readFileSync('core/inventory/stock-item-editor.js', 'utf8');
 const body = source.replace(/^import [^\n]+\n/gm, '').replace(/^export /gm, '');
-const makeService = new Function('apiRequest', 'applyInventorySnapshot', 'getInventoryItem',
+const makeService = new Function('apiRequest', 'applyInventorySnapshot', 'getInventoryItem', 'getAuthToken',
   body + '\nreturn {updateInventoryItem, reorderInventoryItems};');
 
 let response = null;
@@ -17,6 +18,7 @@ const service = makeService(
   },
   payload => {refreshed++; return payload;},
   itemId => ({itemId, position:editedPosition}),
+  () => 'test-session',
 );
 
 response = {ok:false,status:404,payload:{message:'Cannot POST /inventory/items/reorder'}};
@@ -45,10 +47,10 @@ await assert.rejects(()=>service.reorderInventoryItems('CHI',['a','b']),
   /Порядок не сохранён/);
 assert.equal(refreshed,2,'Incomplete reorder response is not accepted');
 
-assert.match(ui, /data-inventory-item-save-error role="alert" hidden/,
+assert.match(editor, /data-stock-position-error hidden role="alert"/,
   'Save errors are visible in the existing Q instead of being dismissed');
-assert.match(ui, /saveError\.hidden = false/, 'Save error is persisted until user edits');
-assert.match(ui, /message\.dataset\.inventoryReorderError = ''/,
+assert.match(editor, /notice\.hidden = false/, 'Save error is persisted until user edits');
+assert.match(ui, /listHost\.prepend\(message\)/,
   'Reorder errors remain visible within the current Z without new modal');
 assert.doesNotMatch(ui, /onError: \(error\) => openNotice/,
   'Reorder failures no longer rely on a transient modal');

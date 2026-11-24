@@ -10,7 +10,7 @@ const stripImports = (source) => source
 const price = runInNewContext(stripImports(read('core/loyalty/price-condition.js'))
   + '\n({ resolvePersonPriceCondition, describePriceConditionConflict })');
 const deposits = runInNewContext(stripImports(read('core/loyalty/deposit/data.js'))
-  + '\n({ hydrateDepositInstances, getPersonDepositPriceConditions })', {
+  + '\n({ hydrateDepositInstances, getPersonDepositPriceConditions, getDepositInstances })', {
   resolvePersonPriceCondition: price.resolvePersonPriceCondition,
   describePriceConditionConflict: price.describePriceConditionConflict,
 });
@@ -18,11 +18,12 @@ const condition = runInNewContext(stripImports(read('core/people/data.js'))
   + '\ngetPersonPriceCondition', {
   resolvePersonPriceCondition: price.resolvePersonPriceCondition,
   getPersonDepositPriceConditions: deposits.getPersonDepositPriceConditions,
+  getDepositInstances: deposits.getDepositInstances,
 });
 const person = { key: 'client', name: 'Алекс', surname: 'Тест', discountPercent: 0 };
 const activeDeposit = {
   depositId: 'deposit-1', programId: 'program-1', programName: 'Зима',
-  person: { key: person.key }, status: 'active', discountPercent: 20,
+  person: { key: person.key }, status: 'active', discountPercent: 20, fundedAt:'2020-01-01T00:00:00Z',
   terms: { termMode: 'dated', termStartDate: '2020-01-01', termEndDate: '2099-12-31' },
 };
 deposits.hydrateDepositInstances([activeDeposit]);
@@ -31,8 +32,10 @@ assert.equal(effective.percent, 20, 'Active deposit grants 20%');
 assert.equal(effective.source?.type, 'program', 'Discount belongs to the deposit');
 assert.equal(effective.conflict, false, 'Single program does not conflict');
 assert.equal(person.discountPercent, 0, 'Program discount never becomes personal percent');
-assert.equal(condition({ ...person, discountPercent: 20 }).conflict, true,
-  'An extra manual discount would conflict and must not be written');
+assert.equal(condition({ ...person, discountPercent: 20 }).percent, 20,
+  'A legacy personal percentage is superseded by the deposit');
+assert.equal(condition({ ...person, discountPercent: 20, discountAssignedAt:'2021-01-01T00:00:00Z' }).conflict, true,
+  'An independently assigned competing discount is rejected');
 
 const card = runInNewContext(stripImports(read('core/people/card-presentation.js'))
   + '\npersonCardFields', {
