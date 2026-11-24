@@ -1,5 +1,11 @@
 import { escapeHtml } from '../utils/escape-html.js';
 
+// The native checkbox and its mark have one renderer in every layout.
+export function checkControl({ checked = false, disabled = false, data = '', aria = '', value, markClass = '' } = {}) {
+  return `<input class="ui-check-input" type="checkbox"${value == null ? '' : ` value="${escapeHtml(String(value))}"`}${checked ? ' checked' : ''}${disabled ? ' disabled' : ''}${data ? ` ${data}` : ''}${aria ? ` aria-label="${escapeHtml(aria)}"` : ''}>
+    <span class="ui-compact-check__mark${markClass ? ` ${escapeHtml(markClass)}` : ''}" aria-hidden="true"></span>`;
+}
+
 export function checkList(items = [], { className = '' } = {}) {
   const values = Array.isArray(items) ? items : [];
   return `<div class="ui-check-list${className ? ` ${escapeHtml(className)}` : ''}" data-check-list>${values.map((item = {}) => {
@@ -8,8 +14,7 @@ export function checkList(items = [], { className = '' } = {}) {
     const secondary = String(item.secondary ?? '');
     const checked = Boolean(item.checked);
     return `<label class="ui-check-list__item${checked ? ' is-checked' : ''}">
-      <input type="checkbox" value="${escapeHtml(value)}"${checked ? ' checked' : ''}${item.data ? ` ${item.data}` : ''}>
-      <span class="ui-check-list__mark" aria-hidden="true">${checked ? '✓' : ''}</span>
+      ${checkControl({ value, checked, disabled: Boolean(item.disabled), data: item.data || '', markClass: 'ui-check-list__mark' })}
       <span class="ui-check-list__text"><strong>${escapeHtml(label)}</strong>${secondary ? `<small>${escapeHtml(secondary)}</small>` : ''}</span>
     </label>`;
   }).join('')}</div>`;
@@ -17,8 +22,7 @@ export function checkList(items = [], { className = '' } = {}) {
 
 export function compactCheck({ label = '', checked = false, data = '', aria = '', disabled = false } = {}) {
   return `<label class="ui-compact-check${disabled ? ' is-disabled' : ''}">
-    <input type="checkbox"${checked ? ' checked' : ''}${disabled ? ' disabled' : ''}${data ? ` ${data}` : ''}${aria || label ? ` aria-label="${escapeHtml(aria || label)}"` : ''}>
-    <span class="ui-compact-check__mark" aria-hidden="true"></span>
+    ${checkControl({ checked, disabled, data, aria: aria || label })}
     <span class="ui-compact-check__label">${escapeHtml(label)}</span>
   </label>`;
 }
@@ -31,8 +35,6 @@ export function initCheckList(root) {
   const sync = (input) => {
     const row = input.closest('.ui-check-list__item');
     row?.classList.toggle('is-checked', input.checked);
-    const mark = row?.querySelector('.ui-check-list__mark');
-    if (mark) mark.textContent = input.checked ? '✓' : '';
   };
   root.querySelectorAll('.ui-check-list input[type="checkbox"]').forEach((input) => {
     sync(input);

@@ -69,9 +69,6 @@
    No parallel checkbox component or Order-only control geometry. */
 :is([data-inventory-audit-criteria],[data-inventory-order-review]) .field-inline-label{min-width:0}
 :is([data-inventory-audit-criteria],[data-inventory-order-review]) .field-inline-label>.ui-compact-check{position:relative;box-sizing:border-box;flex:0 0 var(--ui-compact-size);width:var(--ui-compact-size);height:var(--ui-compact-size);min-width:var(--ui-compact-size);min-height:var(--ui-compact-size);padding:0;border:0;background:transparent;gap:0;align-items:center;justify-content:center}
-:is([data-inventory-audit-criteria],[data-inventory-order-review]) .field-inline-label>.ui-compact-check .ui-compact-check__mark{box-sizing:border-box;width:22px;height:22px;flex:0 0 22px;border:0;background:#dedede}
-:is([data-inventory-audit-criteria],[data-inventory-order-review]) .field-inline-label>.ui-compact-check input:checked+.ui-compact-check__mark{border:0;background:#dedede}
-:is([data-inventory-audit-criteria],[data-inventory-order-review]) .field-inline-label>.ui-compact-check input:checked+.ui-compact-check__mark::after{color:#1a1a1a;font-size:14px;font-weight:800}
 :is([data-inventory-audit-criteria],[data-inventory-order-review]) .field-inline-label>.ui-compact-check .ui-compact-check__label:empty{display:none}
 :is([data-inventory-audit-criteria],[data-inventory-order-review]) .field-inline-label>strong{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 :is([data-inventory-audit-criteria],[data-inventory-order-review]) .field-inline-label>:is([data-inventory-audit-result],[data-inventory-order-balance]){flex:0 1 auto;min-width:0;max-width:42%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right}

@@ -1,4 +1,5 @@
 import { button } from '../buttons/index.js';
+import { checkControl } from '../selection/check-list.js';
 import { escapeHtml } from '../utils/escape-html.js';
 
 function text(value = '') {
@@ -20,7 +21,7 @@ export function settingsPanel(items = []) {
 export function notificationSettings(items = [], { showStatus = true } = {}) {
   return `<div class="app-notification-list">${(Array.isArray(items) ? items : []).filter(Boolean).map((item) => `
     <label class="app-notification-row${item.disabled ? ' is-disabled' : ''}">
-      <input type="checkbox" ${item.data || ''} ${item.checked ? 'checked' : ''} ${item.disabled ? 'disabled' : ''}>
+      ${checkControl({ data: item.data || '', checked: Boolean(item.checked), disabled: Boolean(item.disabled) })}
       <span><strong>${Array.isArray(item.labelLines) && item.labelLines.length
         ? item.labelLines.map((line) => `<span class="app-notification-row__label-line">${text(line)}</span>`).join(' ')
         : text(item.label || '')}</strong>${item.description ? `<small>${text(item.description)}</small>` : ''}</span>

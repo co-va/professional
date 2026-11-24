@@ -86,6 +86,14 @@ assert(inputs.includes('height:var(--ui-field-height);min-height:var(--ui-field-
 assert(['.ui-select__control{','.ui-selector__search{','.ui-selector__option{'].every(c=>{const q=selectorsStyle.split(c)[1]?.split('}')[0]||'';return q.includes('height:var(--ui-selector-control-height);min-height:var(--ui-selector-control-height);max-height:var(--ui-selector-control-height)')}), 'Selector rows, search and trigger must be exactly 46px');
 assert(!bookingStyle.includes('min-height:52px'), 'Booking account editor cannot use 52px controls');
 assert(bookingStyle.includes('--booking-control-radius:0px'), 'Booking text controls must match Shared square fields');
+const checkCss = read('ui/selection/check-list.css');
+const checkJs = read('ui/selection/check-list.js');
+const notificationCss = read('ui/settings/settings.css');
+const notificationJs = read('ui/settings/index.js');
+assert(checkCss.includes('width:var(--ui-compact-size,28px);height:var(--ui-compact-size,28px)') && checkCss.includes("content:'✓'"), 'One Compact checkbox geometry and mark');
+assert(count(checkJs, '<input class="ui-check-input" type="checkbox"') === 1 && !notificationJs.includes('<input type="checkbox"'), 'Checkbox renderer has one owner');
+assert(notificationJs.includes('checkControl({') && !notificationCss.includes('.app-notification-row input'), 'Notifications use the Shared checkbox');
+assert(!read('ui/layout/layout.css').includes('.ui-compact-check__mark'), 'Stocktake and Orders must not override checkbox size or color');
 assert(count(inputs, '.password-field__control{') === 1 && count(inputs, '.password-field__toggle{') === 1, 'Repeated password field CSS must have a single owner');
 assert(count(inputs, '.phone-input{') === 1, 'Shared phone field geometry must not have redundant breakpoint clones');
 assert(zLayout.includes('const SURFACE_HEADER_STYLE = [') && !zLayout.includes('Q_HEADER_STYLE'), 'Z/Q must have one Header geometry owner');
