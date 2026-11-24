@@ -34,6 +34,24 @@ jobs:
         with:
           node-version: '22'
 
+      - name: Require recorded operational evidence for release
+        if: github.event_name == 'pull_request'
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          CORE_GATE_SHA: cc60a79f516d771e5d8d02420fb1dbd9cd5b9f60
+        run: |
+          set -euo pipefail
+          gate_dir="$(mktemp -d "$RUNNER_TEMP/core-release-gate.XXXXXX")"
+          trap 'rm -rf "$gate_dir"' EXIT
+          git -C "$gate_dir" init -q
+          git -C "$gate_dir" fetch --no-tags --depth=1 https://github.com/co-va/core.git "$CORE_GATE_SHA"
+          git -C "$gate_dir" checkout --detach -q FETCH_HEAD
+          test "$(git -C "$gate_dir" rev-parse HEAD)" = "$CORE_GATE_SHA"
+          node "$gate_dir/tests/release-evidence.test.mjs"
+          node "$gate_dir/scripts/check-release-evidence.mjs" "$BASE_SHA" "$HEAD_SHA" professional
+
       - name: Repository boundaries and exact duplicates
         run: node scripts/audit-professional-clean.mjs
 
