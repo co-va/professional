@@ -306,3 +306,37 @@
 .v2-app .v2-primary-source-only{display:none!important}
 
 .v2-header.is-modal-locked{pointer-events:none}
+
+/* The same workspace and shared components, arranged for a wide viewport.
+   No separate desktop data model or palette. Phone layout is unchanged. */
+.v2-header__desktop-account,.v2-desktop-footer{display:none}
+@media (min-width:768px) and (min-height:600px){
+  .app-shell:has(>.v2-app--workspace){width:100%;max-width:none}
+  .v2-app--workspace{--v2-desktop-sidebar-width:312px;--v2-z-viewport-overscan:0px;--v2-edge:0px;width:100%;max-width:none}
+  .v2-app--workspace>.v2-header{grid-template-columns:52px calc(var(--v2-desktop-sidebar-width) - 76px) minmax(0,1fr) auto 46px}
+  .v2-app--workspace .v2-header__desktop-account{display:block;grid-column:2;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:16px;font-weight:650}
+  .v2-app--workspace .v2-header__title{grid-column:3}
+  .v2-app--workspace [data-v2-desktop-context-redundant]>.v2-header__title{visibility:hidden}
+  .v2-app--workspace .v2-header__slot--c{grid-column:4}
+  .v2-app--workspace .v2-header__slot--d{grid-column:5}
+  .v2-app--workspace>.v2-app__stage{display:grid;grid-template-columns:var(--v2-desktop-sidebar-width) minmax(0,1fr)}
+  .v2-app--workspace>.v2-app__stage>.v2-front{grid-column:2;grid-row:1;min-width:0;transform:none;animation:none;transition:none;will-change:auto}
+  .v2-app--workspace>.v2-app__stage>.v2-front>[data-v2-z]{width:100%;margin-left:0}
+  .v2-app--workspace>.v2-app__stage>.v2-front>[data-v2-z]>[data-v2-z-header]>[data-v2-z-dismiss],.v2-app--workspace .v2-edge-swipe-zone{display:none}
+  .v2-app--workspace .v2-fe-deck{position:relative;grid-column:1;grid-row:1;inset:auto;min-height:0;display:flex;flex-direction:column;gap:4px;padding:0 16px 20px;opacity:1;pointer-events:auto;overflow:auto;overscroll-behavior:contain;perspective:none;transform-style:flat}
+  .v2-app--workspace .v2-card-deck--x{display:contents;pointer-events:auto;transform:none;opacity:1;filter:none}
+  .v2-app--workspace .v2-card-deck--y{position:static;order:var(--v2-desktop-nav-order);flex:none;display:flex;gap:2px;padding-left:36px;align-items:stretch;opacity:1;pointer-events:auto;overflow:visible;scroll-snap-type:none;transform:none;perspective:none}
+  .v2-app--workspace .v2-card-deck::before,.v2-app--workspace .v2-card-deck::after{display:none}
+  .v2-app--workspace .v2-card-deck .v2-card-deck__card{order:var(--v2-desktop-nav-order);width:100%;height:auto;min-height:48px;margin:0;padding:12px 14px;flex-direction:row;align-items:center;justify-content:flex-start;gap:12px;border:0;border-radius:10px;background:transparent;color:var(--v2-white);box-shadow:none;transform:none;opacity:1;filter:none;z-index:auto;touch-action:manipulation;scroll-snap-align:none;will-change:auto}
+  .v2-app--workspace .v2-card-deck .v2-card-deck__card.is-active{background:#484e54}
+  .v2-app--workspace .v2-card-deck .v2-card-deck__card strong{font-size:14px;font-weight:500;line-height:1.15}
+  .v2-app--workspace .v2-card-deck .v2-card-deck__card.is-active strong{font-weight:650}
+  .v2-app--workspace .v2-card-deck--y .v2-card-deck__card{min-height:36px;padding:8px 12px}
+  .v2-app--workspace .v2-card-deck--y .v2-card-deck__card strong{font-size:13px}
+  .v2-app--workspace .v2-nav-icon{width:24px;height:24px}
+  .v2-app--workspace .v2-f-nested{display:none}
+  .v2-app--workspace .v2-desktop-footer{display:block;order:999;margin-top:auto;padding:12px 14px;color:var(--text-muted);font-size:12px}
+  .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard{top:0;left:auto;right:0;bottom:0;width:min(var(--v2-desktop-q-width,380px),50%);border-radius:var(--v2-z-radius) 0 0 0}
+  .v2-app--workspace>.v2-layer-portal>.v2-layer-backdrop[data-v2-layer-kind="top"]{background:transparent}
+  .v2-app--workspace>.v2-layer-portal>.v2-layer-backdrop>.v2-layer--top{top:0;left:50%;right:auto;width:min(440px,100%);max-height:80%;translate:-50% 0;border-radius:0}
+}

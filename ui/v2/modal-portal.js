@@ -1,5 +1,5 @@
 import { text } from './html.js';
-import { v2ModalPortalGeometry, v2QModalPortalGeometry } from './geometry.js';
+import { v2ModalPortalGeometry, v2QModalPortalGeometry, isV2DesktopWorkspace } from './geometry.js';
 import {
   activeV2ModalSurface,
   lockV2ModalSurface,
@@ -27,7 +27,7 @@ export function v2Layer(content = '', { kind = 'standard', title = '', className
   return `<div class="v2-layer-backdrop" data-v2-layer data-v2-layer-kind="${resolved}"><section class="v2-layer v2-layer--${resolved} ${text(className)}" role="dialog" aria-modal="true" aria-label="${text(title)}" tabindex="-1">${closeControl}${gestureZone}${body}</section></div>`;
 }
 
-function mountV2ModalPortal(host, app = null) {
+function mountV2ModalPortal(host, app = null, kind = 'standard') {
   if (!host) return null;
 
   const portal = document.createElement('div');
@@ -55,7 +55,7 @@ function mountV2ModalPortal(host, app = null) {
       width: appRect.width,
       height: appRect.height,
     };
-    let geometry = v2ModalPortalGeometry(hostRect, layoutViewport);
+    let geometry = v2ModalPortalGeometry(kind === 'top' && isV2DesktopWorkspace(app) ? appRect : hostRect, layoutViewport);
     if (qLayer && app) {
       geometry = v2ModalPortalGeometry(appRect, layoutViewport);
       const headerBottom = app.querySelector?.('[data-v2-header]')?.getBoundingClientRect?.().bottom;
@@ -202,7 +202,7 @@ export function mountV2Layer(html, { root = null } = {}) {
   const app = technical ? null : host.closest?.('[data-v2-app]');
   const lockedStage = technical ? null : lockV2StageInteraction(app);
   const releaseHeaderLock = technical ? () => {} : lockModalHeader(app);
-  const portalOwner = technical ? null : mountV2ModalPortal(host, app);
+  const portalOwner = technical ? null : mountV2ModalPortal(host, app, kind);
   portalOwner?.setQLayer?.(qLayer);
   const mountHost = portalOwner?.portal || host;
   node.classList.add(technical ? 'v2-layer-backdrop--technical' : 'v2-layer-backdrop--contained');

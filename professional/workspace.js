@@ -22,6 +22,7 @@ import { activateDemo, canUseCapability, getAccess, loadAccess } from '../core/a
 import { mountV2ZLayer, openNotice, initV2WorkspaceInteraction, setV2DeckOpen, v2CardDeck, v2Header, v2Shell, v2Sticker, v2ZLayer } from '../ui/ui.js';
 import { startPlatformNotices } from '../core/platform-notices.js';
 import { setThemeColor } from '../ui/viewport/index.js';
+import { isV2DesktopWorkspace, V2_DESKTOP_MEDIA } from '../ui/v2/geometry.js';
 
 configureWorkplaceSource(getWorkplaceEntities);
 configureTimeUsageSource(getJournalTimeUsages);
@@ -189,7 +190,7 @@ function ensureSecondary(section) {
 }
 
 function setNavigationOpen(open) {
-  state.navigationOpen = Boolean(open);
+  state.navigationOpen = Boolean(open) && !isV2DesktopWorkspace(app.querySelector('[data-v2-app]'));
   if (!state.navigationOpen) state.navigationLevel = 'f';
   setV2DeckOpen(app, state.navigationOpen);
 }
@@ -326,8 +327,11 @@ function syncWorkspaceHeader(surface) {
       }
     : workspaceProfileASlot();
 
+  const accountSlot = workspaceProfileASlot();
   header.outerHTML = v2Header({
-    a: aSlot,
+    a: isV2DesktopWorkspace(header.closest('[data-v2-app]')) ? accountSlot : aSlot,
+    desktopAccount: accountSlot.label,
+    desktopContextRedundant: contextRoot === surface && !subtitle && title === rootDisplayLabel(root),
     b: subtitle ? { label: title, subtitle } : title,
     c: cVisible ? {
       kind: 'text',
@@ -445,8 +449,11 @@ function renderWorkspace() {
     level: 'e',
   }) : '';
 
+  const accountSlot = workspaceProfileASlot();
   const headerMarkup = v2Header({
-    a: workspaceProfileASlot(),
+    a: accountSlot,
+    desktopAccount: accountSlot.label,
+    desktopContextRedundant: state.activeSection !== 'chat',
     b: state.activeSection === 'chat' ? 'Чат' : rootDisplayLabel(root),
     d: sectionAllowed('chat') ? { kind: 'chat', data: 'data-v2-workspace-chat', aria: 'Чат' } : null,
   });
@@ -456,6 +463,7 @@ function renderWorkspace() {
       header: headerMarkup,
       deck: rootDeck,
       eDeck,
+      desktopFooter: 'Аквера',
       deckOpen: state.navigationOpen,
       eOpen: state.navigationOpen && state.navigationLevel === 'e',
       zEnter: Boolean(state.navigationEnterZ),
@@ -517,7 +525,7 @@ function renderWorkspace() {
       state.navigationLevel = open ? 'e' : 'f';
     },
     onRootSelect: (id) => {
-      const hasE = secondaryItems(id).length > 1;
+      const hasE = secondaryItems(id).length > 1 && !isV2DesktopWorkspace(shell);
       state.navigationLevel = hasE ? 'e' : 'f';
       state.navigationEnterZ = !hasE;
       navigate(id, { navigationOpen: hasE });
@@ -526,6 +534,9 @@ function renderWorkspace() {
   }));
 
   const onV2ContextChanged = () => syncWorkspaceHeader(surface);
+  const wideMedia = typeof window.matchMedia === 'function' ? window.matchMedia(V2_DESKTOP_MEDIA) : null;
+  wideMedia?.addEventListener?.('change', onV2ContextChanged);
+  disposers.push(() => wideMedia?.removeEventListener?.('change', onV2ContextChanged));
   window.addEventListener('va-tools:v2-context-changed', onV2ContextChanged);
   disposers.push(() => window.removeEventListener('va-tools:v2-context-changed', onV2ContextChanged));
 

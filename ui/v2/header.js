@@ -57,11 +57,12 @@ function actionControl(slot = {}, role = '') {
   return `<div class="v2-header__slot v2-header__slot--${role}"><button type="button" class="v2-header__control v2-header__control--${kind}${variantClass}"${dataAttributes(slot.data)} aria-label="${aria}"${slot.disabled ? ' disabled' : ''}>${body}${badge}</button></div>`;
 }
 
-export function v2Header({ a = null, b = '', c = null, d = null } = {}) {
+export function v2Header({ a = null, b = '', c = null, d = null, desktopAccount = '', desktopContextRedundant = false } = {}) {
   const title = titleControl(b);
   const headerClasses = ['v2-header', c && !c.hidden ? 'has-c' : '', d && !d.hidden ? 'has-d' : ''].filter(Boolean).join(' ');
-  return `<header class="${headerClasses}" data-v2-header>
+  return `<header class="${headerClasses}" data-v2-header${desktopContextRedundant ? ' data-v2-desktop-context-redundant' : ''}>
     ${avatarControl(a)}
+    ${desktopAccount ? `<span class="v2-header__desktop-account">${text(desktopAccount)}</span>` : ''}
     ${title}
     ${actionControl(c, 'c')}
     ${actionControl(d, 'd')}
