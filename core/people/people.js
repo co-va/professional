@@ -748,10 +748,11 @@ function openFilterSettings(root) {
   return layer;
 }
 
-function openListWorkMenu(root) {
+function openListWorkMenu(root, options = {}) {
   const layer = mountModal(root, modal(`<div class="modal-actions">
     ${button('Сортировка', { variant: 'secondary', data: 'data-people-sort' })}
     ${button('Фильтр', { variant: 'secondary', data: 'data-people-filter' })}
+    ${button('Загрузки', { variant: 'secondary', data: 'data-people-uploads' })}
   </div>`, { title: 'Работа со списками', variant: 'x', surface: 'app', xRole: 'action' }));
   if (!layer) return null;
   layer.querySelector('[data-people-sort]')?.addEventListener('click', () => {
@@ -762,6 +763,12 @@ function openListWorkMenu(root) {
     layer.v2Close?.();
     openFilterSettings(root);
   });
+  layer.querySelector('[data-people-uploads]')?.addEventListener('click', () => {
+    layer.v2Close?.();
+    openContactImportBatches(root, {
+      onLoaded: () => renderPeople(root, options),
+    });
+  });
   return layer;
 }
 
@@ -769,23 +776,16 @@ function openListSettings(root, options = {}) {
   const layer = mountModal(root, modal(`<div class="modal-actions">
     ${button('Работа со списками', { variant: 'secondary', data: 'data-people-list-work' })}
     ${button('Вид', { variant: 'secondary', data: 'data-people-appearance' })}
-    ${button('Загрузки', { variant: 'secondary', data: 'data-people-uploads' })}
     ${button('Excel', { variant: 'secondary', data: 'data-people-excel' })}
   </div>`, { title: 'Клиенты', variant: 'x', surface: 'app', xRole: 'action' }));
   if (!layer) return null;
   layer.querySelector('[data-people-list-work]')?.addEventListener('click', () => {
     layer.v2Close?.();
-    openListWorkMenu(root);
+    openListWorkMenu(root, options);
   });
   layer.querySelector('[data-people-appearance]')?.addEventListener('click', () => {
     layer.v2Close?.();
     openPeopleAppearanceQ(root, options);
-  });
-  layer.querySelector('[data-people-uploads]')?.addEventListener('click', () => {
-    layer.v2Close?.();
-    openContactImportBatches(root, {
-      onLoaded: () => renderPeople(root, options),
-    });
   });
   layer.querySelector('[data-people-excel]')?.addEventListener('click', () => {
     layer.v2Close?.();
