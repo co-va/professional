@@ -175,7 +175,12 @@ export function openContactImportReview(root,batchId,{onLoaded=()=>{}}={}){
     host.querySelectorAll('[data-review-row]').forEach(row=>{
       const checked=Boolean(row.querySelector('[data-review-select]')?.checked);
       const editor=row.querySelector('[data-review-editor]');
-      if(editor)editor.hidden=!checked;
+      if(editor){
+        editor.hidden=!checked;
+        // The canonical .inventory-audit-data-list uses display:grid;
+        // enforce hidden until selected without altering the shared CSS.
+        editor.style.display=checked?'':'none';
+      }
       const mode=text(row.querySelector('[data-review-mode]')?.value);
       const values=row.querySelector('[data-review-edit-value]');
       const candidates=row.querySelector('[data-review-candidates]');
