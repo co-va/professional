@@ -36,6 +36,7 @@ function issueRow(item){
   const id=String(item.rowNumber),field=escapeHtml(item.field);
   const label=escapeHtml(item.contact||'Строка '+id);
   const old=escapeHtml(item.system||'—'),incoming=escapeHtml(item.excel||'—');
+  const problem=item.error?'<span class="list-entry__column-line is-muted">'+escapeHtml(item.error)+'</span>':'';
   const owners=Array.isArray(item.owners)&&item.owners.length
     ?'<span class="list-entry__column-line is-muted">'+item.owners.map(owner=>
       escapeHtml([owner.code,owner.name].filter(Boolean).join(' · '))).join('; ')+'</span>':'';
@@ -45,7 +46,7 @@ function issueRow(item){
     '<div class="list-entry__columns">'+
     '<span class="list-entry__column"><span class="list-entry__column-line is-strong">'+label+'</span>'+
       '<span class="list-entry__column-line is-muted" title="'+old+'">Система: '+old+'</span>'+
-      '<span class="list-entry__column-line is-muted" title="'+incoming+'">Excel: '+incoming+'</span>'+owners+'</span>'+
+      '<span class="list-entry__column-line is-muted" title="'+incoming+'">Excel: '+incoming+'</span>'+owners+problem+'</span>'+
     '<span class="list-entry__column"><label for="review-'+id+'-'+field+'" class="ui-list__secondary">Изменить на</label>'+
       '<input class="contact-review-value" data-review-value id="review-'+id+'-'+field+'" value="'+escapeHtml(item.excel||'')+'" aria-label="Новое значение"></span>'+
     '<span class="list-entry__column"><button type="button" class="ui-button ui-button--outline" data-review-keep>Оставить</button></span>'+
@@ -123,7 +124,16 @@ export function openContactImportReview(root,batchId,{onLoaded=()=>{}}={}){
       if(node)node.textContent=text(e?.message);else errorNotice(e);
     }finally{busy=false;}
   });
-  void reload().catch(errorNotice);
+  void (async()=>{
+    await reload();
+    // Resume unprocessed source rows after reopening a saved upload.
+    while(layer.isConnected&&current?.rows?.some(row=>row.status==='new')){
+      current=await request('advance',{batchId,limit:40});
+      show();
+      if(!current.more)break;
+    }
+    await reloadContacts(onLoaded);
+  })().catch(errorNotice);
   return layer;
 }
 export function openContactImportBatches(root,{onLoaded=()=>{}}={}){
