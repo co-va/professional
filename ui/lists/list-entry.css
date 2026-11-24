@@ -47,3 +47,23 @@
  .contact-review-item .list-entry__columns{grid-template-columns:minmax(0,1fr) 68px 56px;gap:4px}
  .contact-review-item [data-review-keep]{width:54px;max-width:54px;font-size:10px}
 }
+
+/* Identity reconciliation: same compact V2 row as all other differences. */
+.contact-review-identity .list-entry__columns{
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr) 61px;
+}
+.contact-review-identity__actions{display:flex;flex-direction:column;gap:3px}
+.contact-review-identity__actions button{
+  height:25px;min-height:25px;width:60px;max-width:60px;padding:1px 3px;font-size:10px;
+}
+.contact-review-identity [data-review-candidate]{
+  height:30px;min-height:30px;font-size:11px;
+}
+@media(max-width:360px){
+  .contact-review-identity .list-entry__columns{
+    grid-template-columns:minmax(0,1fr) minmax(0,1fr) 51px;gap:4px;
+  }
+  .contact-review-identity__actions button{
+    width:50px;max-width:50px;font-size:9px;
+  }
+}
