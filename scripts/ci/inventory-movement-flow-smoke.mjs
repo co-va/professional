@@ -29,7 +29,7 @@ assert.match(editorSource, /class="field-inline-label"/, 'Movement rows use stoc
 assert.doesNotMatch(editorSource, /<div class="two-column-layout" data-inventory-movement-row/, 'No oversized mosaic layout');
 
 for (const kind of ['RECEIPT', 'CONSUMPTION', 'WRITE_OFF', 'RETURN']) {
-  const item = { itemId: 'A', name: 'Краска', manufacturer: 'CHI', balance: 100, unit: 'г', canConsume: true };
+  const item = { itemId: 'A', name: 'Краска', manufacturer: 'CHI', balance: 100, unit: 'г', receiptUnit:'шт.', consumeUnit:'г', packageQuantity:100, canConsume: true };
   const nodes = {
     choices: { innerHTML: '' },
     search: { value: '', addEventListener() {} },
@@ -49,9 +49,9 @@ for (const kind of ['RECEIPT', 'CONSUMPTION', 'WRITE_OFF', 'RETURN']) {
     addEventListener(name, fn) { this[name] = fn; },
     querySelectorAll() {
       return [{
-        dataset: { itemId: 'A', rowDirection: '' },
+        dataset: { itemId: 'A', rowDirection: '', quantityUnit:kind==='RECEIPT'?'шт.':'г' },
         querySelector: selector => selector.includes('quantity') ? { value: '7' }
-          : kind === 'CONSUMPTION' ? null : { value: '2' },
+          : ['CONSUMPTION','RECEIPT'].includes(kind) ? null : { value: '2' },
       }];
     },
   };
@@ -59,10 +59,16 @@ for (const kind of ['RECEIPT', 'CONSUMPTION', 'WRITE_OFF', 'RETURN']) {
   const save = { disabled: false };
   const deps = {
     getInventoryMovement: () => null,
-    select: () => '<operation-selector>',
+    select: ({name}) => name==='movementKind'?'<operation-selector>':'<stock-selector>',
     workspaceHeaderContext: ({ v }) => '<shared-context ' + (v?.data || '') + '>',
     canUseCapability: () => true,
     inventoryAuditFilters: () => [],
+    inventoryPackPieceCount: () => 1,
+    inventoryLocations: () => [{locationId:'primary',name:'Склад',isPrimary:true}],
+    storageName: place => place.name,
+    STOCK_VIEW: {storageScope:'primary'},
+    inventoryToday: () => '2026-11-24',
+    inventoryOccurredAt: date => date==='2026-11-24'?'2026-11-24T12:00:00.000Z':null,
     openSharedProfileSettingsMenu: data => data.actions[0].onSelect(),
     openInventoryItemFilters: () => { openedFilter = true; },
     openInventoryAuditSelection: () => {},
@@ -111,7 +117,7 @@ for (const kind of ['RECEIPT', 'CONSUMPTION', 'WRITE_OFF', 'RETURN']) {
     renderMovements: () => {},
     openNotice: () => {},
     notifyContext: () => {},
-    FormData: class { get(name) { return name === 'supplier' ? 'Поставщик' : ''; } },
+    FormData: class { get(name) { return ({supplier:'Поставщик',storageLocationId:'primary',occurredDate:'2026-11-24'})[name]||''; } },
   };
   const open = new Function('deps',
     `const { ${Object.keys(deps).join(',')} } = deps; ${editorSource}; return openMovementEditor;`)(deps);
@@ -126,7 +132,7 @@ for (const kind of ['RECEIPT', 'CONSUMPTION', 'WRITE_OFF', 'RETURN']) {
   assert.equal(openedFilter, true, `${kind}: filter available in Q1`);
   assert.equal(nodes.choices.innerHTML, '', `${kind}: no items before selecting operation`);
   assert.equal(nodes.next.disabled, true, `${kind}: disabled without operation`);
-  first.change({ target: { matches: selector => selector === 'input[name="movementKind"]', value: kind } });
+  first.change({ target: { matches: selector => selector === '[name="movementKind"]', value: kind } });
   assert.match(nodes.choices.innerHTML, /<check>/, `${kind}: item options after selecting operation`);
   assert.equal(nodes.next.disabled, true, `${kind}: cannot advance without a material`);
   first.change({ target: { closest: () => ({ checked: true, dataset: { inventoryMovementItem: 'A' } }) } });
@@ -134,10 +140,11 @@ for (const kind of ['RECEIPT', 'CONSUMPTION', 'WRITE_OFF', 'RETURN']) {
   nodes.next.click();
   assert.match(quantityMarkup, /class="field-inline-label"/, `${kind}: stocktake layout for material`);
   assert.match(quantityMarkup, /100 г/, `${kind}: balance displayed alongside material name`);
-  assert.match(quantityMarkup, /<field>(Поступило|Израсходовано|Списано|Возвращено), г<\/field>/, `${kind}: quantity input with operation and unit`);
+  assert.match(quantityMarkup, /<field>(Поступило|Израсходовано|Списано|Возвращено), (?:г|шт\.)<\/field>/, `${kind}: quantity input with operation and unit`);
   if (kind === 'CONSUMPTION') assert.doesNotMatch(quantityMarkup, /<two-columns>/, 'Expense input is single and compact');
   assert.match(quantityMarkup, new RegExp(`\\[title=${kind}\\]`), `${kind}: Q2 title inherits operation`);
-  assert.ok(quantityMarkup.indexOf('Основание прихода') >= 0 || kind !== 'RECEIPT');
+  assert.ok(quantityMarkup.includes('Дата прихода') || kind !== 'RECEIPT');
+  assert.ok(quantityMarkup.includes('<stock-selector>'), 'Explicit storage selector');
   assert.ok(quantityMarkup.indexOf('Примечание') >= 0 || kind !== 'CONSUMPTION');
   assert.ok(quantityMarkup.indexOf('<field>') < quantityMarkup.indexOf('Краска'), `${kind}: note is before material list`);
   if (kind === 'CONSUMPTION') assert.doesNotMatch(quantityMarkup, /Тюбиков выбыло/, 'Quick consumption needs grams only');
@@ -149,7 +156,11 @@ for (const kind of ['RECEIPT', 'CONSUMPTION', 'WRITE_OFF', 'RETURN']) {
   assert.equal(created.lines[0].quantity, 7);
   if (kind === 'CONSUMPTION') assert.equal(created.lines[0].containerDelta, undefined,
     'Consumption should not request tube counting');
-  else assert.equal(created.lines[0].containerDelta, kind === 'WRITE_OFF' ? -2 : 2);
+  else assert.equal(created.lines[0].containerDelta, kind === 'RECEIPT' ? 7 : kind === 'WRITE_OFF' ? -2 : 2);
+  assert.equal(created.lines[0].storageLocationId,'primary');
+  assert.equal(created.occurredAt,'2026-11-24T12:00:00.000Z');
+  assert.ok(created.movementId,'Idempotent request ID');
+  if(kind==='RECEIPT') assert.equal(created.lines[0].quantityUnit,'шт.');
   if (kind === 'RECEIPT') assert.equal(created.supplier, 'Поставщик');
   assert.equal(first.closed, true, `${kind}: close selection after save`);
   assert.equal(second.closed, true, `${kind}: close quantities after save`);
