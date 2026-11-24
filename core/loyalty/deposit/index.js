@@ -15,7 +15,6 @@ import {
   modal,
   mountModal,
   mountV2ZLayer,
-  openDocumentViewer,
   openEntityCardAppearanceQ,
   openNotice,
   openSharedProfileSettingsMenu,
@@ -207,20 +206,6 @@ function card(fields, { data = '', aria = '', interactive = true } = {}) {
     data,
     aria,
   });
-}
-
-function programConditions(program = {}, issuedCount = null) {
-  const lines = [
-    `UEI: ${programUei(program) || '—'}`,
-    `Состояние: ${depositCardStatusLabel(program?.status)}`,
-    `Сумма: ${Number(program?.amount || 0) > 0 ? money(program.amount) : 'Свободная'}`,
-    `Срок: ${program?.termRule || 'Бессрочно'}`,
-    `Выгода: ${program?.benefit || 'Без дополнительной выгоды'}`,
-    `Показывать всем: ${program?.showToAll === false ? 'Нет' : 'Да'}`,
-  ];
-  if (issuedCount != null) lines.push(`Оформлено: ${Math.max(0, Number(issuedCount) || 0)}`);
-  lines.push(`Создано: ${shortDateTime(program?.createdAt, '—')}`, '', program?.description || 'Дополнительные условия не указаны.');
-  return lines.join('\n');
 }
 
 function depositInfo(deposit = {}) {
@@ -415,14 +400,6 @@ function issuedList(items = []) {
   })));
 }
 
-async function setProgramStatus(programId, status) {
-  const now = new Date().toISOString();
-  const next = getDepositPrograms().map((item) => String(item?.id) === String(programId)
-    ? { ...item, status, updatedAt: now }
-    : item);
-  await saveDepositPrograms(next);
-}
-
 async function setProgramVisibility(programId, showToAll) {
   const now = new Date().toISOString();
   const next = getDepositPrograms().map((item) => String(item?.id) === String(programId)
@@ -489,13 +466,6 @@ function openAppearanceQ(root, onSaved = () => {}) {
       });
     },
     onSaved,
-  });
-}
-
-function openProgramConditions(program, issuedCount) {
-  return openDocumentViewer({
-    title: program?.name || 'Условия депозита',
-    content: programConditions(program, issuedCount),
   });
 }
 

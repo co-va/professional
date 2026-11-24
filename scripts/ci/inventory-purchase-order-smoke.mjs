@@ -258,7 +258,7 @@ assert.match(service, /verifyOrderState/);
 // Regression: first + on an empty counterparty directory passes null into
 // the shared Q editor. The form must render and wire its submit action.
 const newCompanyStart = counterpartySource.indexOf('function companyForm(');
-const newCompanyEnd = counterpartySource.indexOf('async function openCatalog(', newCompanyStart);
+const newCompanyEnd = counterpartySource.indexOf('// Stock can start with a supplier catalog', newCompanyStart);
 assert.ok(newCompanyStart >= 0 && newCompanyEnd > newCompanyStart);
 const newCompanyCode = counterpartySource.slice(newCompanyStart, newCompanyEnd);
 let createdCompanyForm = '';

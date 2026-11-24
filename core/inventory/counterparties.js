@@ -208,67 +208,6 @@ function openCompanyEditor(company, onSaved) {
   return layer;
 }
 
-async function openCatalog(company, { itemId = '', onLinked = () => {} } = {}) {
-  const layer = mountModal(document.body, modal(
-    `<div class="ui-search-field">${field({ name: 'catalogSearch', type: 'search',
-      placeholder: 'Название, артикул, производитель…' })}</div>
-    ${actionBlock(button('Поиск', { data: 'data-counterparty-catalog-search' }))}
-    <div data-counterparty-catalog-results></div>
-    <div data-counterparty-catalog-pages></div>`, {
-      title: 'Прайс · ' + company.name, variant: 'q', surface: 'app',
-    }));
-  if (!layer) return;
-  const search = layer.querySelector('[name="catalogSearch"]');
-  const results = layer.querySelector('[data-counterparty-catalog-results]');
-  const pages = layer.querySelector('[data-counterparty-catalog-pages]');
-  let offset = 0;
-  let run = 0;
-  const show = async () => {
-    const revision = ++run;
-    results.innerHTML = emptyState('Каталог', 'Загружаем…');
-    try {
-      const data = await json('/' + urlId(company.id) + '/catalog?search=' +
-        encodeURIComponent(search.value.trim()) + '&skip=' + offset);
-      if (!layer.isConnected || revision !== run) return;
-      const entries = data.items || [];
-      results.innerHTML = entries.length
-        ? v2ListEntries(entries.map(row => v2ListEntry({
-            title: row.name,
-            subtitle: [row.supplierSku && 'Арт. ' + row.supplierSku,
-              row.brand || row.manufacturer, row.supplierNote].filter(Boolean).join(' · '),
-            rightTop: money(row.listPrice),
-            rightBottom: supplierAvailability(row.supplierAvailable),
-            interactive: true, initial: '',
-            data: 'data-counterparty-catalog-row="' + escapeHtml(row.id) + '"',
-            aria: 'Выбрать позицию ' + row.name,
-          })))
-        : emptyState('Товары не найдены', data.priceList
-          ? 'Попробуйте другой запрос.' : 'Загрузите прайс-лист этого контрагента.');
-      results.querySelectorAll('[data-counterparty-catalog-row]').forEach(node => {
-        node.addEventListener('click', () => {
-          const row = entries.find(value => value.id === node.dataset.counterpartyCatalogRow);
-          if (row) openCatalogRow(company, row, { itemId, onLinked });
-        });
-      });
-      pages.innerHTML = `<p>${offset + (entries.length ? 1 : 0)}–${offset + entries.length} из ${data.count}</p>` +
-        actionBlock((offset ? button('Предыдущие', { data: 'data-catalog-prev', variant: 'secondary' }) : '') +
-          (offset + entries.length < data.count
-            ? button('Далее', { data: 'data-catalog-next', variant: 'secondary' }) : ''));
-      pages.querySelector('[data-catalog-prev]')?.addEventListener('click', () => { offset = Math.max(0, offset - 100); void show(); });
-      pages.querySelector('[data-catalog-next]')?.addEventListener('click', () => { offset += 100; void show(); });
-    } catch (error) {
-      results.innerHTML = emptyState('Каталог недоступен', errText(error));
-    }
-  };
-  layer.querySelector('[data-counterparty-catalog-search]')?.addEventListener('click', () => {
-    offset = 0; void show();
-  });
-  search.addEventListener('keydown', event => {
-    if (event.key === 'Enter') { event.preventDefault(); offset = 0; void show(); }
-  });
-  void show();
-}
-
 // Stock can start with a supplier catalog without first creating a local item.
 // Reuses the same supplier catalog/row Q as the existing association flow.
 export async function openSupplierCatalogCreation(onSaved = () => {}, onManual = null) {

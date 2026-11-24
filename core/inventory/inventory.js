@@ -7,15 +7,12 @@ import {
   datePicker,
   initDatePickers,
   emptyState,
-  entityVisualCard,
-  entityCardStack,
   field,
   textareaField,
   modal,
   mountModal,
   mountV2ZLayer,
   openNotice,
-  openEntityCardAppearanceQ,
   openSharedProfileSettingsMenu,
   page,
   list,
@@ -34,9 +31,8 @@ import { escapeHtml } from '../../ui/utils/escape-html.js';
 import { compactCheck } from '../../ui/selection/check-list.js';
 import { canUseCapability } from '../access.js';
 import { setSharedActionVisible } from '../../ui/page/page.js';
-import { getCardAppearanceTemplate, saveCardAppearanceTemplate } from '../card-appearance-templates.js';
 import {
-  inventoryItemCompletion, inventoryManufacturerCompletion, isWeighedInventoryItem, netStocktakeGrams,
+  inventoryItemCompletion, isWeighedInventoryItem, netStocktakeGrams,
   inventoryStockThresholdInput, inventoryStockThresholdStored, inventoryStockThresholdUnit,
 } from './completeness.js';
 import { openInventoryProductAppearanceQ, openInventoryProductOverview } from './product-overview.js';
@@ -52,8 +48,7 @@ import { openInventoryStorageLocations, reconcileLegacyInventoryStorage } from '
 import { openInventoryTransfer } from './movement-transfer.js';
 import { renderStockBrandList, buildStockCatalogGroups, stockRootCriterion, stockNestedCriteria } from './stock-catalog.js';
 import { stockGroupTree, sortedStockChildren, stockGroupValue } from './grouping.js';
-import { planInventoryPositionReorder, planInventoryMoveToEnd,
-  inventoryEndPosition } from './position-reorder-plan.js';
+import { planInventoryPositionReorder, planInventoryMoveToEnd } from './position-reorder-plan.js';
 import { catalogDisclosure } from './catalog-ui.js';
 import { INVENTORY_TOTAL_SCOPE, inventoryDisplayBalance, inventoryDisplayTarget,
   inventoryItemBelongsToStorage, itemLocationBalance, inventoryLocations,
@@ -74,14 +69,12 @@ import {
   archiveSelectedInventoryItems,
   updateInventoryItemsBatch,
   correctInventoryMovement,
-  createInventoryItem,
   createInventoryMovement,
   loadInventory,
   loadInventoryCriteria,
   reorderInventoryCriterionValues,
   reorderInventoryItemsBatch,
   repairInventoryPositions,
-  updateInventoryItem,
 } from './service.js';
 
 const UNIT_OPTIONS = [
@@ -138,33 +131,9 @@ function saveInventorySortMode(key, value) {
     // Storage disabled: keep the selected order active for this session.
   }
 }
-const MANUFACTURER_CARD_APPEARANCE = {
-  lines: [
-    {}, {}, {}, {}, {},
-    { field: 'manufacturer', zone: 'full', align: 'left', size: 'xl', color: 'white', bold: true },
-    {},
-    { field: 'count', zone: 'full', align: 'left', size: 'm', color: 'white' },
-    { field: 'completion', zone: 'right', align: 'right', size: 'm', color: 'white' },
-  ],
-};
-
 function numberText(value, maximum = 3) {
   const number = Number(value) || 0;
   return number.toLocaleString('ru-RU', { maximumFractionDigits: maximum }).replaceAll('\u00a0', ' ');
-}
-
-// The exact physical count is an independent stock fact. Before the first
-// measurement, only the theoretical minimum can be displayed (not as fact).
-function tubeCountText(item = {}) {
-  if (!isWeighedInventoryItem(item)) return '';
-  if (Number.isSafeInteger(item.containerCount) && item.containerCount >= 0) {
-    return `${numberText(item.containerCount)} тюб.`;
-  }
-  const amount = Number(item.balance);
-  const capacity = Number(item.packageQuantity);
-  return Number.isFinite(amount) && amount >= 0 && Number.isFinite(capacity) && capacity > 0
-    ? `тюб. неизвестно · минимум ${Math.ceil(amount / capacity)}`
-    : 'тюб. неизвестно';
 }
 
 function moneyText(value) {
@@ -230,26 +199,6 @@ function stockTypeOptions(manufacturer = '') {
     .filter(Boolean))]
     .sort((left, right) => left.localeCompare(right, 'ru', { numeric: true, sensitivity: 'base' }));
   return [{ value: '', label: 'Все подкатегории' }, ...values.map((value) => ({ value, label: value }))];
-}
-
-function manufacturerGroups(query = '', type = STOCK_VIEW.manufacturersType) {
-  const needle = normalizedSearch(query);
-  const groups = new Map();
-  getInventoryItems().forEach((item) => {
-    if (!matchesType(item, type)) return;
-    const manufacturer = manufacturerName(item);
-    if (needle && !`${manufacturer} ${itemSearchText(item)}`.toLocaleLowerCase('ru-RU').includes(needle)) return;
-    const rows = groups.get(manufacturer) || [];
-    rows.push(item);
-    groups.set(manufacturer, rows);
-  });
-  const result = [...groups.entries()].map(([name, items]) => ({ name, items }));
-  const byName = (left, right) => left.name.localeCompare(right.name, 'ru', { numeric: true, sensitivity: 'base' });
-  if (STOCK_VIEW.manufacturersSort === 'name-desc') result.sort((left, right) => byName(right, left));
-  else if (STOCK_VIEW.manufacturersSort === 'count-desc') result.sort((left, right) => right.items.length - left.items.length || byName(left, right));
-  else if (STOCK_VIEW.manufacturersSort === 'count-asc') result.sort((left, right) => left.items.length - right.items.length || byName(left, right));
-  else result.sort(byName);
-  return result;
 }
 
 function movementTitle(movement = {}) {
@@ -740,57 +689,6 @@ function stockSearchField(value = '', data = 'data-inventory-stock-search') {
   })}</div>`;
 }
 
-function manufacturerCardFields({ name, items } = {}) {
-  const allItems = Array.isArray(items) ? items : [];
-  const audit = inventoryManufacturerCompletion(allItems);
-  const count = allItems.length;
-  const ready = count - audit.incomplete;
-  return [
-    { value: 'manufacturer', label: 'Компания', text: name || '' },
-    { value: 'count', label: 'Позиции', text: `${count} ${count === 1 ? 'позиция' : count > 1 && count < 5 ? 'позиции' : 'позиций'}` },
-    { value: 'completion', label: 'Заполненность', text: `${audit.percentage}%` },
-    { value: 'incomplete', label: 'Не заполнено', text: String(audit.incomplete) },
-    { value: 'ready', label: 'Заполнено', text: String(ready) },
-  ];
-}
-
-function manufacturerCardAppearance() {
-  return getCardAppearanceTemplate('inventory-manufacturer')?.appearance || MANUFACTURER_CARD_APPEARANCE;
-}
-
-function stockManufacturerCardsMarkup(query = '') {
-  const groups = manufacturerGroups(query);
-  if (!getInventoryItems().length) return emptyState('Склад пуст', 'Добавьте первую позицию.');
-  if (!groups.length) return emptyState('Ничего не найдено', 'Измените поиск или фильтр.');
-  const cards = groups.map((group) => entityVisualCard({
-    appearance: manufacturerCardAppearance(),
-    fields: manufacturerCardFields(group),
-    interactive: true,
-    data: `data-inventory-manufacturer="${escapeHtml(group.name)}"`,
-    aria: `Открыть товары ${group.name}`,
-  }));
-  return entityCardStack(cards);
-}
-
-function openManufacturerAppearance(root, onSaved = () => {}) {
-  const samples = manufacturerGroups();
-  const sample = samples[0] || { name: EMPTY_MANUFACTURER, items: [] };
-  return openEntityCardAppearanceQ(root, {
-    title: 'Вид',
-    typeOptions: [{ value: 'inventory-manufacturer', label: 'Компания' }],
-    initialType: 'inventory-manufacturer',
-    resolve: () => ({
-      appearance: manufacturerCardAppearance(),
-      fields: manufacturerCardFields(sample),
-    }),
-    save: async ({ appearance }) => {
-      saveCardAppearanceTemplate('inventory-manufacturer', { appearance });
-    },
-    allowPhoto: false,
-    onSaved,
-  });
-}
-
 // Stock item rows stay fixed. Only category headers can be reordered.
 // The existing shared list engine saves category order. Only a temporary
 // compact header preview follows the pointer; expanded contents stay in flow.
@@ -1085,12 +983,6 @@ function openStockControls(trigger, level, manufacturer, onChange, mode = 'sort'
   });
   syncAction();
 }
-function bindManufacturerCards(root, host) {
-  host.querySelectorAll('[data-inventory-manufacturer]').forEach((control) => {
-    control.addEventListener('click', () => openManufacturerStock(root, control.dataset.inventoryManufacturer));
-  });
-}
-
 function openManufacturerStock(root, manufacturer, groupContext = null) {
   // Each visit to a physical shelf opens in the explicit numerical order.
   // A remembered name/price filter must not silently replace shelf sequence.

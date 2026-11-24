@@ -22,7 +22,7 @@ assert.match(editorSource, /title: movementTitle\(\{ kind: actualKind \}\)/, 'Q2
 assert.match(editorSource, /openInventoryItemFilters\(selectionLayer/, 'Movement filter reuses the common stock filter');
 assert.doesNotMatch(editorSource, /title: 'Количество'/, 'No generic count heading');
 assert.doesNotMatch(editorSource, /Убрано пустых тюбиков/, 'Ordinary consumption does not demand empty tube counts');
-assert.match(inventory, /id: 'inventory', label: 'Инвентаризация'/, 'Stocktake remains under Stock');
+assert.match(editorSource, /canUseCapability\('inventory.stocktake.access'\)/, 'Stocktake belongs to the capability-gated movement selector');
 assert.doesNotMatch(editorSource, /function movementEditorRow\(|searchableSelect\(/, 'No obsolete per-item dropdown forms');
 assert.ok(editorSource.indexOf('data-inventory-movement-selection') < editorSource.indexOf('data-inventory-movement-row'), 'Select items before quantities');
 assert.match(editorSource, /class="field-inline-label"/, 'Movement rows use stocktake item heading and balance');
