@@ -23,6 +23,16 @@ const checks = '<div data-test="compact">'+compactCheck({label:'Выбрать',
   + '<div data-inventory-order-review><div class="field-inline-label">'+compactCheck({checked:true,aria:'Выбрать заказ'})+'<strong>Товар</strong></div></div>'
   + checkList([{value:'a',label:'Позиция',checked:true}])
   + notificationSettings([{label:'Email',checked:true,data:'data-email-test'},{label:'Push',disabled:true,data:'data-push-test'}]);
+// Inventory of direct checkbox markup outside the shared renderer.
+// Report remaining cases instead of silently claiming that all feature paths
+// use the component; they must be reviewed before accepting the release.
+const files = execFileSync('git',['ls-files','-z'],{encoding:'utf8'}).split('\0').filter(path=>/\.(js|html)$/.test(path)&&!path.startsWith('scripts/')&&path!=='ui/selection/check-list.js');
+for(const path of files){
+  const source=read(path);
+  const raw = [...source.matchAll(/<input\b[^>]{0,500}\btype\s*=\s*["']checkbox["']/gi)];
+  for(const hit of raw) console.log('DIRECT_CHECKBOX '+path+':'+source.slice(0,hit.index).split('\n').length);
+}
+
 const browser = await chromium.launch({headless:true});
 try {
   const page = await browser.newPage({viewport:{width:390,height:844}});
@@ -45,17 +55,9 @@ try {
   }
   await page.locator('.app-notification-row').first().click();
   assert.equal(await page.locator('[data-email-test]').isChecked(),false);
-  await page.locator('.app-notification-row').last().click();
+  assert.equal(await page.locator('[data-push-test]').isDisabled(),true);
+  await page.locator('.app-notification-row').last().evaluate(label=>label.click());
   assert.equal(await page.locator('[data-push-test]').isChecked(),false);
   console.log('PASS: actual shared inputs and selectors 46px/16px, all six checkbox marks 28px and common behavior');
 } finally { await browser.close(); }
 
-// Inventory of direct checkbox markup outside the shared renderer.
-// Report remaining cases instead of silently claiming that all feature paths
-// use the component; they must be reviewed before accepting the release.
-const files = execFileSync('git',['ls-files','-z'],{encoding:'utf8'}).split('\0').filter(path=>/\.(js|html)$/.test(path)&&!path.startsWith('scripts/')&&path!=='ui/selection/check-list.js');
-for(const path of files){
-  const source=read(path);
-  const raw = [...source.matchAll(/<input\b[^>]{0,500}\btype\s*=\s*["']checkbox["']/gi)];
-  for(const hit of raw) console.log('DIRECT_CHECKBOX '+path+':'+source.slice(0,hit.index).split('\n').length);
-}
