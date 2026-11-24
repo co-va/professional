@@ -87,7 +87,7 @@ for (const [name, code] of [['entry', entry], ['correction', correction], ['refu
   assert.match(code, /loadWalletCatalog\(\)/, name + ' must load actual wallets');
   assert.doesNotMatch(code, /getWallets\(\)/, name + ' must never read a cold wallet cache');
 }
-assert.match(entry, /\[wallets\]\s*=\s*await Promise\.all\(/);
+assert.match(entry, /\[wallets, verifiedPersonDeposits\]\s*=\s*await Promise\.all\(/);
 assert.match(entry, /paymentMethods\(\{ wallets, deposits, personalAccount, total,/);
 assert.match(correction, /\[wallets, deposits\]\s*=\s*await Promise\.all\(/);
 assert.match(correction, /paymentMethods\(\{ wallets, deposits, total:/);

@@ -41,7 +41,11 @@ const qSurface = css.match(/\.v2-layer-portal\.is-q>\.v2-layer-backdrop\[data-v2
 assert.match(qSurface, /(?:^|;)padding-top:0(?:;|$)/, 'Q has no duplicate top padding');
 assert.match(qSurface, /(?:^|;)background:var\(--v2-inner-surface\)(?:;|$)/, 'Q uses the approved warm surface');
 assert.match(css, /\.v2-q-title,\.v2-z-title\{[^}]*height:46px;min-height:46px;max-height:46px/);
-assert.match(arrow, /'margin:0 0 0 18px'/);
+assert.match(arrow, /'margin:0'/);
+assert.match(arrow, /'left:18px'/);
+assert.match(arrow, /'position:absolute'/);
+assert.match(arrow, /'top:50%'/);
+assert.match(arrow, /'transform:translateY\(-50%\)'/);
 assert.match(surface, /\.ui-search-field\{padding:0\}/);
 assert.match(surface, /\.segment-control\{margin:0\}/);
 assert.doesNotMatch(surface, /margin-bottom:8px|padding-bottom:0!important/);

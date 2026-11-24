@@ -14,7 +14,7 @@ const strip = value => value.replace(/^export /gm, '');
 const data = new Function('window', 'CustomEvent',
   strip(thresholdHelpers) + strip(dataSource.replace(/^import[^\n]+\n/gm, ''))
     + 'return {applyInventorySnapshot,inventoryOrderSuggestions,getInventoryOrders};')(
-    { dispatchEvent: () => {} }, class CustomEvent {},
+    { dispatchEvent: () => {}, addEventListener: () => {} }, class CustomEvent {},
   );
 
 data.applyInventorySnapshot({ items: [

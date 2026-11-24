@@ -195,7 +195,7 @@ export async function openProcedureAdjustment(record, procedureId, { onSaved = (
   const personKey = String(source?.person?.key || source?.person?.id || '').trim();
   if (personKey) {
     try {
-      await listPersonDeposits(personKey);
+      await listPersonDeposits(personKey,source.date);
     } catch (error) {
       openNotice({ title: 'Условия скидки', message: String(error?.message || 'Не удалось проверить программу.') });
       return null;

@@ -113,6 +113,7 @@ for (const status of ['formed', 'paid', 'received']) {
   }};
   const mocks = {
     getInventoryOrder: () => order,
+    getInventorySupplierClaims: () => [],
     workspaceHeaderContext: context => {
       assert.equal(context.v.data,'data-inventory-order-z-menu');
       return '<button data-inventory-order-z-menu></button>';

@@ -99,7 +99,7 @@ const creation = read('core/people/record-creation.js');
 const editor = read('core/records/records.js');
 const payment = read('core/payment/record-payment.js');
 const entryStart = payment.indexOf('async function openPaymentEntry(');
-const fetchIndex = payment.indexOf('loadVerifiedPaymentSource(() => listPersonDeposits(key)', entryStart);
+const fetchIndex = payment.indexOf('loadVerifiedPaymentSource(() => listPersonDeposits(key,current?.date)', entryStart);
 const priceIndex = payment.indexOf('settlement = settlementForRecord(verifiedRecord)', entryStart);
 assert.ok(fetchIndex > entryStart && priceIndex > fetchIndex,
   'Payment must fetch current deposit conditions before calculating due');
@@ -109,17 +109,17 @@ assert.match(payment, /const checkedSettlement = settlementForRecord\(checkedRec
   'Payment must recheck current settlement before committing');
 assert.match(payment, /if \(changed\) throw new Error\('Скидка или сумма оплаты изменилась/,
   'A changed program or due must reject stale payment');
-assert.match(recordView, /void listPersonDeposits\(personKey\)\.then/,
+assert.match(recordView, /void listPersonDeposits\(personKey,currentRecord\?\.date\)\.then/,
   'Record view refreshes current program conditions');
 assert.match(creation, /loadRecordCreationOperationalState\(\), listPersonDeposits\(person\.key\)/,
   'Contact-created Record preloads active program');
 assert.match(editor, /export async function openProcedureAdjustment/,
   'Price editor must verify the program before opening');
-assert.match(editor, /await listPersonDeposits\(personKey\)/,
+assert.match(editor, /await listPersonDeposits\(personKey,source\.date\)/,
   'Price editor cannot use unverified cache');
 assert.match(editor, /disabled: adjustment\.programDiscount/,
   'Program discount percent stays disabled in price editor');
-assert.match(editor, /getPersonPriceCondition\(contact\)/,
+assert.match(editor, /getPersonPriceCondition\(contact,state\.date \|\| new Date\(\)\)/,
   'Record confirmation shows effective discount rather than the manual field only');
 // Journal may select only active server-backed Deposit instances. The other
 // loyalty families have not been implemented and their demo lists must not
@@ -127,12 +127,12 @@ assert.match(editor, /getPersonPriceCondition\(contact\)/,
 const selectionSource = read('core/loyalty/record-program.js');
 assert.doesNotMatch(selectionSource, /get(?:Certificate|Subscription|Referral|Bonus)AssignmentsForPerson/,
   'Incomplete program modules may not be loaded by Journal');
-assert.match(selectionSource, /isActiveDepositAssignment\(deposit\)/,
+assert.match(selectionSource, /isActiveDepositAssignment\(deposit,at\)/,
   'Journal and the Person price condition share one Deposit active check');
 const depositFixtures = [
-  { depositId: 'live', programId: 'p1', person: { key: 'p1' }, status: 'active', discountPercent: 20 },
-  { depositId: 'expired', programId: 'p2', person: { key: 'p1' }, status: 'expired', discountPercent: 50 },
-  { depositId: 'other-person', programId: 'p3', person: { key: 'p2' }, status: 'active', discountPercent: 30 },
+  { depositId: 'live', programId: 'p1', person: { key: 'p1' }, status: 'active', discountPercent: 20, terms: { benefitType: 'discount', benefitValue: 20 } },
+  { depositId: 'expired', programId: 'p2', person: { key: 'p1' }, status: 'expired', discountPercent: 50, terms: { benefitType: 'discount', benefitValue: 50 } },
+  { depositId: 'other-person', programId: 'p3', person: { key: 'p2' }, status: 'active', discountPercent: 30, terms: { benefitType: 'discount', benefitValue: 30 } },
 ];
 const programOptions = runInNewContext(strip(selectionSource) + '\ngetRecordProgramOptions', {
   getDepositInstances: () => depositFixtures,
