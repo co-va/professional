@@ -235,12 +235,12 @@ assert.match(massSource, /right: \[supplierCatalogBulkDisplay\(row\[definition\.
   'Every row displays the current selected-field value on the right');
 assert.match(massSource, /selected\.has\(id\) && next !== null \? next : row\[def\.value\]/,
   'Typing a valid new value previews it on the right for checked rows only');
-assert.match(massSource, /method: 'PUT', body: \{ \[def\.value\]: value \}/,
-  'Existing Core single-position PUT is used');
-assert.match(massSource, /const saved = await loadSelected\(\)/,
-  'Saved data is reread and verified');
-assert.match(massSource, /rows\.forEach\(row => Object\.assign\(row, saved\.get\(String\(row\.id\)\)\)\)/,
-  'The table is updated to the persisted data instead of being closed');
+assert.match(massSource, /method: 'POST', body: \{ rowIds: ids, field: def\.value, value \}/,
+  'One atomic Core bulk request per batch');
+assert.match(massSource, /supplierCatalogValueMatches\(saved\.get\(String\(row\.id\)\)\?\.\[def\.value\], value, def\)/,
+  'Returned authoritative rows are verified');
+assert.match(massSource, /if \(current\) Object\.assign\(row, current\)/,
+  'Same list retains persisted rows');
 assert.match(massSource, /valueInput\(\)\.value = '';\s*renderList\(\)/,
   'Value input clears while selection and table remain for another field');
 assert.doesNotMatch(massSource, /mountModal\(layer|layer\.v2Close\?\.\(\);\s*onSaved\(\)/,
@@ -314,11 +314,11 @@ const bulkMocks = {
   openNotice: () => {},
   json: async (path, options = {}) => {
     mockRequests.push({ path, options });
-    if (options.method === 'PUT') {
-      const id = path.split('/').pop();
-      const row = serverRows.find(row => row.id === id);
-      Object.assign(row, options.body);
-      return { ...row };
+    if (options.method === 'POST' && path.endsWith('/catalog/bulk')) {
+      const {rowIds, field, value} = options.body;
+      const updated = serverRows.filter(row => rowIds.includes(row.id));
+      updated.forEach(row => { row[field] = value; });
+      return {items: updated.map(row => ({...row}))};
     }
     if (path.includes('/catalog?skip='))
       return { count: serverRows.length, items: serverRows.map(row => ({ ...row })) };
@@ -393,10 +393,10 @@ assert.equal(serverRows[0].listPrice, 2850);
 assert.equal(serverRows[1].listPrice, 2700, 'Unchecked row is not written');
 assert.equal(countNode.textContent, 'Выбрано 1 из 2', 'Subset remains selected after save');
 assert.equal(closeCount, 0);
-const puts = mockRequests.filter(request => request.options.method === 'PUT');
-assert.equal(puts.length, 5, 'Consecutive edits save 2 articles, 2 prices, then 1 selected price');
-assert.ok(puts.every(request => request.path.startsWith('/supplier-1/catalog/')),
-  'No duplicate bulk Core route was added');
+const posts = mockRequests.filter(request => request.options.method === 'POST');
+assert.equal(posts.length, 3, 'Three edits use exactly three requests');
+assert.deepEqual(posts.map(request=>request.options.body.rowIds),[['a','b'],['a','b'],['a']]);
+assert.ok(posts.every(request => request.path === '/supplier-1/catalog/bulk'));
 mockLayer.v2Close();
 assert.equal(callbackCount, 1, 'Parent refresh happens once after explicit close');
 assert.equal(closeCount, 1);

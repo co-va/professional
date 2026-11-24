@@ -284,7 +284,12 @@ const newCompanyHelpers = {
   modal: value => value,
   mountModal: (_, value) => { createdCompanyForm = value; return companyLayer; },
   document: { body: {} },
-  json: async (url, options) => { savedCompany = { url, options }; return { id: 'supplier-1' }; },
+  json: async (url, options) => {
+    if (!options) return [{id:'supplier-1',...savedCompany.options.body}];
+    savedCompany = {url,options};
+    return {id:'supplier-1',...options.body};
+  },
+  openNotice: ({message}) => {throw Error(message);},
   urlId: value => value,
   errText: value => String(value?.message || ''),
   FormData: class {

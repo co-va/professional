@@ -5,6 +5,7 @@ import { inventoryEndPosition, planInventoryMoveToEnd, planInventoryPositionReor
 
 const source = readFileSync('core/inventory/inventory.js', 'utf8');
 const service = readFileSync('core/inventory/service.js', 'utf8');
+const itemEditor=readFileSync('core/inventory/stock-item-editor.js','utf8');
 const start = source.indexOf('function inventoryPositionComparator(');
 const end = source.indexOf('function matchesType(', start);
 assert.ok(start > 0 && end > start, 'Shared catalog position comparator exists');
@@ -26,13 +27,11 @@ assert.deepEqual(rows.sort(compare).map(item=>item.itemId),
 assert.equal(rows.find(row=>row.itemId==='chi3').position,0,
   'Legacy unnumbered records must remain detectable for repair');
 assert.match(source, /itemsSort: \['position-asc'/, 'Manual order is a distinct sort mode');
-assert.match(source, /value: Number\(item\.position\) > 0 \? item\.position : ''/,
-  'Legacy missing positions remain visible as incomplete data until written');
-assert.match(source, /field\(\{ label: '№', name: 'position'/,
-  'Small number field is in the Marking row');
-assert.match(source, /columns: 3, ariaLabel: 'Порядок, артикул и штрихкод'/,
-  'No separate position editor or UI structure');
-assert.match(source, /position: requestedPosition/, 'Number is saved with the item');
+assert.match(itemEditor, /position: numberValue\(item\.position > 0 \? item\.position : ''\)/,
+  'Legacy missing positions remain visible');
+assert.match(itemEditor, /field\(\{ label: '№ позиции', name: 'position'/);
+assert.match(itemEditor, /patch\.position = pos \? Number\(pos\) : null/);
+assert.match(source, /return openStockItemQEditor\(/, 'One item editor');
 assert.doesNotMatch(source, /function openInventoryPositionEditor\(/, 'No additional position dialog');
 assert.match(source, /function stockListMarkup\(/, 'Existing stock list remains the owner');
 assert.match(source, /stockGroupTree\(items, nestedCriteria\)/,
@@ -99,9 +98,8 @@ assert.equal(inventoryEndPosition(company,'CHI','b'),4, 'Clearing a numbered ite
 assert.equal(inventoryEndPosition([...company,
   {itemId:'old',manufacturer:'CHI',name:'Legacy',position:0}],'CHI','old'),5,
   'A legacy zero gets a positive number at the tail');
-assert.match(source, /const requestedPosition = requestedPositionText === ''[\s\S]*?inventoryEndPosition\(/,
-  'Blank card number resolves to the end');
-assert.match(source, /position: requestedPosition,/, 'New cards explicitly send a positive position');
+assert.match(service, /inventoryEndPosition\(getInventoryItems\(\)/, 'Blank position resolves to the end in the service');
+assert.match(service, /Core assigns the next position atomically/, 'Creation delegates position allocation to Core');
 assert.match(source, /planInventoryMoveToEnd\(getInventoryItems\(\)/,
   'Multi-row tail move uses the canonical reorder');
 assert.doesNotMatch(source, /await clearInventoryItemPositions\(/,
