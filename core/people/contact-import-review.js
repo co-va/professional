@@ -1,4 +1,4 @@
-import { actionBlock, button, escapeHtml, list, modal, mountModal,
+import { actionBlock, button, escapeHtml, field, list, modal, mountModal,
   openNotice, select, v2ListEntry, v2ListEntries } from '../../ui/ui.js';
 import { compactCheck } from '../../ui/selection/check-list.js';
 import { catalogDisclosure } from '../inventory/catalog-ui.js';
@@ -50,6 +50,28 @@ const identityFields={
 };
 
 const rowKey=item=>String(item.field)+'::'+String(item.rowNumber);
+const discountValue=value=>{
+  const raw=text(value).replace('%','').replace(',','.').replace(/\s+/g,'');
+  const numeric=Number(raw);
+  if(!raw||!Number.isFinite(numeric))return '';
+  // Excel stores percentage-formatted 20% as the fractional number 0.2.
+  // In the import review the professional explicitly confirms the human
+  // percentage (20), never the raw Excel fraction.
+  const percent=numeric>0&&numeric<1?numeric*100:numeric;
+  return String(Number(percent.toFixed(6)));
+};
+const discountLabel=value=>{
+  const percent=discountValue(value);
+  return percent===''?text(value):Number(percent).toLocaleString('ru-RU',{
+    maximumFractionDigits:6,
+  })+' %';
+};
+const validDiscount=value=>{
+  const raw=text(value).replace(',','.');
+  if(!raw)return false;
+  const percent=Number(raw);
+  return Number.isFinite(percent)&&percent>=0&&percent<=100;
+};
 const personName=person=>[text(person?.name),text(person?.surname)]
   .filter(Boolean).join(' ');
 const personHeading=(code,name)=>[displayCode(code),text(name)]
@@ -69,6 +91,15 @@ function choiceOptions(item){
     {value:'same',label:'Тот же человек'},
     {value:'different',label:'Другой человек'},
   ];
+  if(item.field==='discountPercent'){
+    const existing=/Уточните: процент или доля/i.test(saved)
+      ?'Не менять скидку в системе':'Система: '+discountLabel(saved);
+    return [
+      {value:'',label:'Какой процент правильный?'},
+      {value:'keep',label:existing},
+      {value:'replace',label:'Excel: '+discountLabel(incoming)},
+    ];
+  }
   return [
     {value:'',label:'Какое значение правильное?'},
     {value:'keep',label:'Система: '+saved},
@@ -84,6 +115,10 @@ function issueRow(item,people=[]){
   const key=escapeHtml(rowKey(item));
   const saved=text(item.system)||'—';
   const incoming=text(item.excel)||'—';
+  const discount=fieldName==='discountPercent';
+  const savedIsHint=discount&&/Уточните: процент или доля/i.test(saved);
+  const shownSaved=discount&&!savedIsHint?discountLabel(saved):saved;
+  const shownIncoming=discount?discountLabel(incoming):incoming;
   const owners=Array.isArray(item.owners)?item.owners:[];
   const found=personForIssue(item,people);
   const knownName=personName(found);
@@ -97,8 +132,8 @@ function issueRow(item,people=[]){
       :text(item.system)||'Несколько совпадений'
     :[personHeading(knownCode,knownName||text(item.contact)
         .replace(/^[0-9A-Za-z]{1,4}\s+/,'').trim()),
-       saved==='—'?'':saved].filter(Boolean).join(' · ');
-  const imported=fieldName==='identity'?fromExcel(incoming):incoming;
+       saved==='—'||savedIsHint?'':shownSaved].filter(Boolean).join(' · ');
+  const imported=fieldName==='identity'?fromExcel(incoming):shownIncoming;
   const comparison='Excel: '+imported;
   const matchedBy=fieldName==='identity'&&onlyCandidate
     ?(onlyCandidate.matchedBy||[]).map(field=>identityFields[field]||field).join(', ')
@@ -141,7 +176,14 @@ function issueRow(item,people=[]){
         data:'data-review-mode',options:choiceOptions(item),value:'',
       }))+
       '<div data-review-candidates hidden>'+candidateControl+'</div>'+
-      '<input type="hidden" data-review-value value="'+escapeHtml(incoming==='—'?'':incoming)+'">'+
+      (discount
+        ?'<div data-review-edit-value hidden>'+editRow('Процент',field({
+          name:'reviewPercent-'+id,
+          label:'',type:'number',min:'0',max:'100',step:'any',
+          inputmode:'decimal',autocomplete:'off',
+          value:discountValue(incoming),data:'data-review-value',
+        }))+'</div>'
+        :'<input type="hidden" data-review-value value="'+escapeHtml(incoming==='—'?'':incoming)+'">')+
       (item.error?'<p class="form-error" role="alert">'+escapeHtml(item.error)+'</p>':'')+
     '</div></div>';
 }
@@ -213,6 +255,12 @@ export function openContactImportReview(root,batchId,{onLoaded=()=>{}}={}){
       const candidates=row.querySelector('[data-review-candidates]');
       if(candidates)candidates.hidden=!checked||mode!=='same'
         ||Boolean(row.querySelector('[data-review-candidate][type="hidden"]'));
+      const percentEditor=row.querySelector('[data-review-edit-value]');
+      if(percentEditor) {
+        const visible=checked&&mode==='replace';
+        percentEditor.hidden=!visible;
+        percentEditor.style.display=visible?'':'none';
+      }
     });
     host.querySelectorAll('[data-review-group]').forEach(group=>{
       const parent=group.closest('.inventory-editor-panel');
@@ -229,7 +277,9 @@ export function openContactImportReview(root,batchId,{onLoaded=()=>{}}={}){
     if(footer)footer.hidden=!rows.length;
     if(apply)apply.disabled=busy||!rows.length||rows.some(row=>{
       const mode=text(row.querySelector('[data-review-mode]')?.value);
-      return !mode||(mode==='same'&&!text(row.querySelector('[data-review-candidate]')?.value));
+      return !mode||(mode==='same'&&!text(row.querySelector('[data-review-candidate]')?.value))
+        ||(row.dataset.reviewField==='discountPercent'&&mode==='replace'
+          &&!validDiscount(row.querySelector('[data-review-value]')?.value));
     });
   }
   function show(){
@@ -262,6 +312,9 @@ export function openContactImportReview(root,batchId,{onLoaded=()=>{}}={}){
       ||target.closest?.('[data-review-mode]')
       ||target.closest?.('[data-review-candidate]'))sync();
   });
+  host.addEventListener('input',event=>{
+    if(event.target.closest?.('[data-review-value]'))sync();
+  });
   host.addEventListener('click',async event=>{
     const open=event.target.closest?.('[data-review-open]');
     if(open){
@@ -284,7 +337,9 @@ export function openContactImportReview(root,batchId,{onLoaded=()=>{}}={}){
     try{
       for(const item of entries){
         const value=item.mode==='same'?item.personKey
-          :['replace','add'].includes(item.mode)?item.currentValue:'';
+          :['replace','add'].includes(item.mode)?(
+            item.field==='discountPercent'
+              ?text(item.currentValue).replace(',','.') :item.currentValue):'';
         current=await request('decide',{batchId,rowNumber:item.rowNumber,
           field:item.field,mode:item.mode,value});
       }
