@@ -1,3 +1,4 @@
+import { normalizeStringList as normalizedChatKeys } from '../utils/values.js';
 import { workspaceHeaderContext } from '../header/index.js';
 import { mountV2ZLayer, v2ZLayer } from '../v2/index.js';
 import { setV2ZHeaderRows, v2ZBodySections } from '../v2/z-layout.js';
@@ -27,11 +28,6 @@ function escapeRecordText(value = '') {
   }[char]));
 }
 
-function normalizedChatKeys(values = []) {
-  return [...new Set((Array.isArray(values) ? values : [])
-    .map((value) => String(value || '').trim())
-    .filter(Boolean))];
-}
 
 function isRecordEditClass(className = '') {
   return String(className || '').split(/\s+/).includes('record-edit-z');

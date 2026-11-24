@@ -1,3 +1,4 @@
+import { normalizeStringList as normalizeStrings } from '../../ui/utils/values.js';
 import { normalizePhoneForStorage, phonesMatch } from '../phone/index.js';
 import { apiRequest, getAuthToken } from '../auth.js';
 import { getMembers, getUEI } from '../uei.js';
@@ -33,9 +34,6 @@ function normalizePhones(values = []) {
     .filter(Boolean))];
 }
 
-function normalizeStrings(values = []) {
-  return [...new Set((Array.isArray(values) ? values : []).map((value) => String(value || '').trim()).filter(Boolean))];
-}
 
 export function normalizePerson(person = {}) {
   return {

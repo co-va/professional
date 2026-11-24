@@ -1,3 +1,4 @@
+import { cropPercent as cropPosition } from '../../../ui/utils/values.js';
 import { apiRequest, apiResponseJson as responseJson } from '../../../core/auth.js';
 import { normalizePhoneForStorage } from '../../../core/phone/index.js';
 
@@ -19,10 +20,6 @@ function normalizeLinks(values) {
     .map((value) => ({ type: String(value.type || ''), url: String(value.url || '') }));
 }
 
-function cropPosition(value) {
-  const numeric = Number(value);
-  return Number.isFinite(numeric) ? Math.max(0, Math.min(100, Math.round(numeric))) : 50;
-}
 
 function normalizeReferenceData(value = {}) {
   const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};

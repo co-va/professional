@@ -1,3 +1,4 @@
+import { cropPercent as cropPosition } from '../../ui/utils/values.js';
 import { apiRequest, apiResponseJson as responseJson } from '../../core/auth.js';
 import { normalizePhoneForStorage } from '../../core/phone/index.js';
 
@@ -24,10 +25,6 @@ function normalizePhones(values) {
   return [...new Set(normalizeList(values).map((value) => normalizePhoneForStorage(value)).filter(Boolean))];
 }
 
-function cropPosition(value) {
-  const numeric = Number(value);
-  return Number.isFinite(numeric) ? Math.max(0, Math.min(100, Math.round(numeric))) : 50;
-}
 
 export function normalizeProfile(profile = {}) {
   const phones = normalizePhones(profile.phones?.length ? profile.phones : [profile.phone]);

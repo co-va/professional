@@ -1,3 +1,4 @@
+import { normalizeStringList as normalizedPersonKeys } from '../ui/utils/values.js';
 import { chatTime as messageTime } from '../ui/utils/date-time.js';
 import { getCommunicationChannels, getCommunicationThread, getCommunicationThreads, sendCommunicationMessage } from '../core/communications/chat.js';
 import {
@@ -125,11 +126,6 @@ function personByKey(key) {
   return peopleList().find((person) => String(person.key) === String(key)) || null;
 }
 
-function normalizedPersonKeys(values = []) {
-  return [...new Set((Array.isArray(values) ? values : [])
-    .map((value) => String(value || '').trim())
-    .filter(Boolean))];
-}
 
 function openProfessionalContacts(root, state) {
   const people = peopleList();
