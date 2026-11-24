@@ -1,4 +1,4 @@
-import { apiRequest } from '../auth.js';
+import { apiRequest, apiResponseJson as payload } from '../auth.js';
 import { queueDocumentDataset } from '../business-persistence.js';
 import { hydrateConsentsFromServer } from '../../settings/documents/consents.js';
 import { getProfile } from '../../core/profile/data.js';
@@ -7,7 +7,6 @@ import { configureDocumentHistoryPersistence, hydrateDocumentHistoryFromServer }
 configureDocumentPersistence((value)=>queueDocumentDataset('documents',value));configureDocumentHistoryPersistence((value)=>queueDocumentDataset('history',value));
 function clone(value){return value==null?value:JSON.parse(JSON.stringify(value));}
 function normalizeBundle(value={}){return {documents:Array.isArray(value.documents)?clone(value.documents):[],consents:Array.isArray(value.consents)?clone(value.consents):[],history:Array.isArray(value.history)?clone(value.history):[]};}
-async function payload(response,fallback){const value=await response.json().catch(()=>({}));if(!response.ok)throw new Error(value?.message||fallback);return value;}
 function hydrate(bundle){const value=normalizeBundle(bundle?.data||bundle);hydrateDocumentsFromServer(value.documents);hydrateConsentsFromServer(value.consents);hydrateDocumentHistoryFromServer(value.history);}
 async function persistReconciled(value){await payload(await apiRequest('/tenant-document-archive/documents',{method:'PUT',body:JSON.stringify({value:value.documents})}),'Не удалось обновить документы');await payload(await apiRequest('/tenant-document-archive/history',{method:'PUT',body:JSON.stringify({value:value.history})}),'Не удалось обновить историю документов');}
 export async function ensureRknGuide(){return payload(await apiRequest('/tenant-document-archive/rkn-guide/ensure',{method:'POST',body:JSON.stringify({})}),'Не удалось подготовить инструкцию РКН');}

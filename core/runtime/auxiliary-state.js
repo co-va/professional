@@ -1,4 +1,4 @@
-import { apiRequest } from '../auth.js';
+import { apiRequest, apiResponseJson as payload } from '../auth.js';
 import { getWallets, hydrateCashEntitiesFromServer, hydrateFinanceFromServer, hydrateWalletsFromServer } from '../finance/index.js';
 import { hydrateProductsFromServer } from '../../core/service/products/data.js';
 import { hydrateTagsFromServer } from '../../settings/tags/data.js';
@@ -9,7 +9,6 @@ let auxiliaryEpoch = 0;
 const auxiliaryStateLoads = new Map();
 
 function clone(value){return value==null?value:JSON.parse(JSON.stringify(value));}
-async function payload(response,fallback){const value=await response.json().catch(()=>({}));if(!response.ok)throw new Error(value?.message||fallback);return value;}
 function owns(value,key){return Boolean(value&&Object.prototype.hasOwnProperty.call(value,key));}
 function hydrateAuxiliary(remote){
   // Do not erase a known wallet catalog on a malformed/partial response.

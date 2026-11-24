@@ -1,4 +1,4 @@
-import { apiRequest } from '../auth.js';
+import { apiRequest, apiResponseJson as payload } from '../auth.js';
 import { setBusinessServerReady } from '../business-persistence.js';
 import { hydrateUEIFromServer } from '../uei.js';
 import { hydrateRecordStateFromServer } from '../record/index.js';
@@ -18,11 +18,6 @@ function normalizeUEI(value = {}) {
   };
 }
 
-async function payload(response, fallback) {
-  const value = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(value?.message || fallback);
-  return value;
-}
 
 function hydrate(remote = {}) {
   hydratePeopleFromServer(Array.isArray(remote.people) ? clone(remote.people) : []);
