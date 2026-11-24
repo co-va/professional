@@ -1,0 +1,46 @@
+// Public Time Core contract.
+// Manifestations import this facade; internal atoms remain grouped under Time.
+export {
+  containsRange,
+  createTimeRange,
+  isValidRange,
+  localDateKey,
+  minutesBetween,
+  minutesToTime,
+  normalizeTime,
+  rangesOverlap,
+  shiftTimeDateKey,
+  timeToMinutes,
+} from './math.js';
+export {
+  createTimeGrid,
+  getTimeGridMinuteState,
+  getTimeGridRangeState,
+  listTimeGridAvailableEnds,
+  listTimeGridAvailableStarts,
+} from './grid.js';
+export { buildNaturalBookingTimeRows } from './booking-candidates.js';
+export {
+  configureTimeUsageSource,
+  getTimeUsagesForScope,
+  getWorkingTimeUsageConflicts,
+  normalizeTimeUsage,
+  notifyTimeUsageChanged,
+} from './usage.js';
+export {
+  checkTimeAvailability,
+  getAvailabilityGrid,
+  getTimeAvailabilityAt,
+  listAvailableEndTimes,
+  listAvailableStartTimes,
+} from './availability.js';
+
+export {
+  normalizeWorkplaceTimeZone,
+  zonedIntervalMoment,
+  hasZonedIntervalEnded,
+  zonedDateTimeParts,
+  zonedDateTimeToDate,
+} from './zone.js';
+
+export { timeMinutes, recordDurationHours } from './math.js';

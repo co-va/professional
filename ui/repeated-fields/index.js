@@ -1,0 +1,100 @@
+import { compactAddButton, compactRemoveButton } from '../buttons/index.js';
+import { phoneInput } from '../inputs/index.js';
+import { escapeHtml } from '../utils/escape-html.js';
+
+function normalizeItems(values) {
+  if (!Array.isArray(values)) return [];
+  return values
+    .filter(value => value !== null && value !== undefined)
+    .map(value => typeof value === 'object' && value !== null
+      ? { value: String(value.value ?? ''), source: String(value.source ?? ''), display: typeof value.display === 'string' ? value.display : null }
+      : { value: String(value), source: '', display: null });
+}
+
+export function repeatedField({
+  label = '',
+  name = '',
+  values = [],
+  type = 'text',
+  placeholder = 'Добавить значение',
+  className = '',
+  showEmptyRow = true,
+  addInHeader = false,
+} = {}) {
+  const items = normalizeItems(values);
+  const rows = items.length ? items : (showEmptyRow ? [{ value: '', source: '' }] : []);
+  const addLabel = label ? `Добавить ${label}` : 'Добавить значение';
+  const addControl = compactAddButton({
+    className:'array-row__add',
+    data:`data-repeated-add="${escapeHtml(name)}"`,
+    aria:addLabel,
+  });
+  const header = addInHeader
+    ? `<div class="array-group__header"><span class="array-label">${escapeHtml(label)}</span>${addControl}</div>`
+    : `<span class="array-label">${escapeHtml(label)}</span>`;
+  const rowMarkup = rows.map((item,index) => repeatedRow({
+    name,
+    type,
+    value:item.value,
+    source:item.source,
+    display:item.display,
+    placeholder,
+    label,
+    action:addInHeader ? (index === 0 ? 'none' : 'remove') : (index === 0 ? 'add' : 'remove'),
+  })).join('');
+  return `<div class="array-group ${escapeHtml(className)}" data-repeated-field data-repeated-name="${escapeHtml(name)}" data-repeated-label="${escapeHtml(label)}" data-repeated-type="${escapeHtml(type)}" data-repeated-placeholder="${escapeHtml(placeholder)}" data-repeated-add-placement="${addInHeader ? 'header' : 'row'}">${header}<div data-repeated-list>${rowMarkup}</div></div>`;
+}
+
+function repeatedRow({ name, type, value = '', source = '', display = null, placeholder, label = '', action = 'remove' }) {
+  const sourceMarkup = source ? ` data-repeated-source="${escapeHtml(source)}"` : '';
+  const removeLabel = label ? `Удалить ${label}` : 'Удалить значение';
+  const addLabel = label ? `Добавить ${label}` : 'Добавить значение';
+  const inputMarkup = typeof display === 'string'
+    ? `<input type="hidden" name="${escapeHtml(name)}" value="${escapeHtml(value)}"><input type="text" value="${escapeHtml(display)}" data-repeated-identity-alias="${escapeHtml(value)}" aria-label="${escapeHtml(label)}" readonly>`
+    : type === 'tel'
+      ? phoneInput({ name, value, aria: label || 'Телефон' })
+      : `<input type="${escapeHtml(type)}" name="${escapeHtml(name)}" value="${escapeHtml(value)}" placeholder="${escapeHtml(placeholder)}">`;
+  const control = action === 'add'
+    ? compactAddButton({ className:'array-row__add', data:`data-repeated-add="${escapeHtml(name)}"`, aria:addLabel })
+    : action === 'remove'
+      ? `${compactRemoveButton({ data: "data-repeated-remove", aria: removeLabel })}`
+      : '';
+  return `<div class="array-row${action === 'none' ? ' array-row--solo' : ''}" data-repeated-row${sourceMarkup}>${inputMarkup}${control}</div>`;
+}
+
+export function initRepeatedFields(root) {
+  root.querySelectorAll('[data-repeated-field]').forEach(group => {
+    if (group.dataset.repeatedInitialized === 'true') return;
+    group.dataset.repeatedInitialized = 'true';
+    group.addEventListener('click', event => {
+      const remove = event.target.closest('[data-repeated-remove]');
+      if (remove) {
+        remove.closest('[data-repeated-row]')?.remove();
+        group.dispatchEvent(new Event('change', { bubbles: true }));
+        return;
+      }
+      const add = event.target.closest('[data-repeated-add]');
+      if (!add) return;
+      const list = group.querySelector('[data-repeated-list]');
+      if (!list) return;
+      const name = group.dataset.repeatedName || '';
+      const label = group.dataset.repeatedLabel || '';
+      const type = group.dataset.repeatedType || 'text';
+      const placeholder = group.dataset.repeatedPlaceholder || 'Добавить значение';
+      list.insertAdjacentHTML('beforeend', repeatedRow({ name, type, placeholder, label, action:'remove' }));
+      group.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+  });
+}
+
+export function collectRepeatedField(root, name) {
+  return [...root.querySelectorAll(`[data-repeated-field][data-repeated-name="${CSS.escape(name)}"] input[name="${CSS.escape(name)}"]`)]
+    .map(input => input.value.trim())
+    .filter(Boolean);
+}
+
+export function collectRepeatedEntries(root, name) {
+  return [...root.querySelectorAll(`[data-repeated-field][data-repeated-name="${CSS.escape(name)}"] [data-repeated-row]`)]
+    .map(row => ({ value: row.querySelector(`input[name="${CSS.escape(name)}"]`)?.value.trim() || '', source: row.dataset.repeatedSource || '' }))
+    .filter(item => item.value);
+}

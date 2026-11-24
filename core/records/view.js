@@ -1,0 +1,878 @@
+import { formatReportRubles, formatReportNumber } from '../../ui/utils/values.js';
+import { timeMinutes, recordDurationHours } from '../time/index.js';
+import { isoDateLabel as formatDate } from '../../ui/utils/date-time.js';
+import {
+  actionBlock,
+  emptyState,
+  escapeHtml,
+  field,
+  bindRecordSettings,
+  button,
+  durationText,
+  modal,
+  mountModal,
+  mountRecordZ,
+  mountRecordQ,
+  setRecordHeaderRows,
+  openNotice,
+  recordConfirmationMiniCard,
+  recordZHost,
+  select,
+  v2ListEntry,
+  v2ListEntries,
+} from '../../ui/ui.js';
+import { readOnlyReceipt } from '../../ui/receipt/index.js';
+import { workplaceForId } from '../workplace-time.js';
+import { getAllPeople } from '../people/data.js';
+import { listPersonDeposits } from '../loyalty/deposit/data.js';
+import { openPersonHistoryQ } from '../people/people.js';
+import { personDisplay } from '../people/presentation.js';
+import { getRecordPaymentState, resolveRecordSettlement } from '../finance/index.js';
+import { getRecordProgramOptions, recordProgramSelection } from '../loyalty/record-program.js';
+import { normalizeWorkplaceTimeZone, zonedIntervalMoment, hasZonedIntervalEnded } from '../time/index.js';
+import { canAcceptRecordTips, openRecordPayment } from '../payment/record-payment.js';
+import { openRecordPaymentActions } from '../payment/record-payment.js';
+import { openRecordSale } from '../sale/sale.js';
+import {
+  cancelRecord,
+  deleteRecord,
+  getRecord,
+  refreshRecordsFromServer,
+  setRecordAttendance,
+  setRecordConfirmed,
+} from '../record/index.js';
+import { flushBusinessPersistence } from '../business-persistence.js';
+import { getNotesForTarget, hasNotesForTarget } from '../note/index.js';
+import { openProcedureAdjustment, openRecords } from './records.js';
+import { openPersonRecordCreation } from '../people/record-creation.js';
+import { getProcedures } from '../service/procedures/data.js';
+import { proceduresForWorkplace, procedureCostForWorkplace, procedureDurationForWorkplace } from '../service/procedures/selection.js';
+import { setRecordLoyaltyProgram } from './program-selection.js';
+
+
+function formatMoney(value) {
+  return `${new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(Number(value) || 0)} ₽`;
+}
+
+
+function workplaceName(id) {
+  const workplace = workplaceForId(id);
+  return workplace?.name || workplace?.title || 'Рабочее пространство';
+}
+
+
+
+
+
+function recordWorkplaceTimeZone(record = null) {
+  const workplace = workplaceForId(record?.workplaceId);
+  return normalizeWorkplaceTimeZone(workplace?.timeZone || '');
+}
+
+function recordHasEnded(record = null, now = new Date()) {
+  return hasZonedIntervalEnded(record, recordWorkplaceTimeZone(record), now);
+}
+
+// Read the discount type and the already calculated amount from Settlement items.
+// No percentage or payable amount is recalculated in the Record view.
+function settlementItemDiscount(item = {}) {
+  if (Number(item?.pricePercent) > 0.009) {
+    return { kind: 'percent', label: `${formatReportNumber(item.pricePercent)}%`, amount: Number(item.pricePercentMoney) || 0 };
+  }
+  if (item?.correctionMode === 'percent' && Number(item.correctionPercent) > 0.009) {
+    return { kind: 'percent', label: `${formatReportNumber(item.correctionPercent)}%`, amount: Number(item.correctionMoney) || 0 };
+  }
+  if (item?.correctionMode === 'money' && Number(item.correctionMoney) > 0.009) {
+    return { kind: 'money', label: '', amount: Number(item.correctionMoney) || 0 };
+  }
+  return null;
+}
+
+function settlementDiscountLabel(settlement = null) {
+  const items = Array.isArray(settlement?.items) ? settlement.items : [];
+  const discounts = items.map((item) => settlementItemDiscount(item));
+  if (!discounts.some(Boolean)) return '';
+  const singlePercent = discounts[0]?.kind === 'percent'
+    && discounts.every((discount) => discount?.kind === 'percent' && discount.label === discounts[0].label);
+  if (singlePercent) return discounts[0].label;
+  if (discounts.every((discount) => !discount || discount.kind === 'money')) {
+    return formatMoney(settlement?.correctionTotal);
+  }
+  return 'Разные';
+}
+
+function recordReportStatusRows(record, state) {
+  const paidTotal = Math.max(0, Number(state?.paidTotal) || 0);
+  const remaining = Math.max(0, Number(state?.remaining) || 0);
+  if (remaining <= 0.009) {
+    return paidTotal > 0.009 || state?.fullyPaid
+      ? [{ label: 'Оплачено', value: formatReportRubles(paidTotal) }]
+      : [{ label: 'К оплате', value: formatReportRubles(0) }];
+  }
+  const outstandingLabel = recordHasEnded(record) ? 'Задолженность' : 'К оплате';
+  if (paidTotal > 0.009) {
+    return [
+      { label: 'Оплачено', value: formatReportRubles(paidTotal) },
+      { label: outstandingLabel, value: formatReportRubles(remaining) },
+    ];
+  }
+  return [{ label: outstandingLabel, value: formatReportRubles(remaining) }];
+}
+
+function openRecordZReport(record) {
+  const current = getRecord(record?.id) || record;
+  if (!current?.id) return null;
+  const settlement = resolveRecordSettlement(current);
+  const state = getRecordPaymentState(current);
+  const procedures = Array.isArray(current?.procedures) ? current.procedures : [];
+  const procedureCount = procedures.length;
+  const hours = recordDurationHours(current);
+  const total = Math.max(0, Number(settlement?.planTotal) || 0);
+  const averageProcedure = procedureCount ? total / procedureCount : 0;
+  const averageHour = hours ? total / hours : 0;
+  const date = String(current?.date || '').slice(0, 10);
+  const dateLabel = date ? new Date(`${date}T12:00:00`).toLocaleDateString('ru-RU') : '';
+  const items = Array.isArray(settlement?.items) ? settlement.items : [];
+  const breakdown = items.flatMap((item) => {
+    const discount = settlementItemDiscount(item);
+    const title = String(item?.name || (item?.sourceType === 'product' ? 'Товар' : 'Услуга'));
+    return [
+      { label: item?.sourceType === 'product' ? `Товар: ${title}` : title, value: formatReportRubles(item.price) },
+      ...(discount ? [{
+        label: discount.kind === 'percent' ? `Скидка ${discount.label}` : 'Скидка',
+        value: formatReportRubles(discount.amount),
+      }] : []),
+    ];
+  });
+  const groups = [
+    [
+      { label: workplaceName(current?.workplaceId), value: dateLabel },
+      { label: 'Кол-во услуг', value: String(procedureCount) },
+      { label: 'Кол-во часов', value: formatReportNumber(hours) },
+      { label: 'Средний чек услуги', value: formatReportRubles(averageProcedure) },
+      { label: 'Средний чек часа', value: formatReportRubles(averageHour) },
+    ],
+    [
+      ...breakdown,
+      ...(items.length > 1 ? [{
+        label: items.some((item) => item?.sourceType === 'product') ? 'Стоимость услуг и товаров' : 'Стоимость услуг',
+        value: formatReportRubles(settlement?.serviceTotal),
+        strong: true,
+      }] : []),
+    ],
+    [{ label: 'Итого', value: formatReportRubles(total), strong: true }],
+    recordReportStatusRows(current, state),
+    [{ label: 'Tips', value: formatReportRubles(state?.tipsTotal) }],
+  ];
+  return mountModal(document.body, modal(readOnlyReceipt({
+    title: 'Z - Отчет',
+    groups,
+  }), { variant: 's', surface: 'app', title: 'Z - Отчет' }));
+}
+
+function normalizedAttendance(value) {
+  return value === 'arrived' || value === 'no-show' ? value : '';
+}
+
+function appointmentStart(record = {}) {
+  return zonedIntervalMoment(record, 'from', recordWorkplaceTimeZone(record));
+}
+
+function hasAppointmentStarted(record = {}) {
+  const start = appointmentStart(record);
+  return Boolean(start && Date.now() >= start.getTime());
+}
+
+const RECORD_VIEW_CAPABILITIES = Object.freeze({
+  professional: Object.freeze({
+    settings: true,
+    personHistory: true,
+    contactIdentity: true,
+    loyaltyProgram: true,
+    procedureSettings: true,
+    zReport: true,
+    sale: true,
+    consumables: true,
+    payment: true,
+    confirmation: true,
+    attendance: true,
+    notes: true,
+  }),
+  account: Object.freeze({
+    settings: false,
+    personHistory: false,
+    contactIdentity: false,
+    loyaltyProgram: false,
+    procedureSettings: false,
+    zReport: false,
+    sale: false,
+    consumables: false,
+    payment: false,
+    confirmation: false,
+    attendance: false,
+    notes: false,
+  }),
+});
+
+function recordViewCapabilities(context = 'professional') {
+  return String(context || '').trim().toLowerCase() === 'account'
+    ? RECORD_VIEW_CAPABILITIES.account
+    : RECORD_VIEW_CAPABILITIES.professional;
+}
+
+function accountProfessionalDisplay(professional = null) {
+  if (!professional || typeof professional !== 'object' || Array.isArray(professional)) {
+    return { name: '', phone: '', uei: '', photo: '', initials: '' };
+  }
+  const display = personDisplay(professional);
+  const name = [professional?.name, professional?.surname].filter(Boolean).join(' ').trim();
+  const initials = [professional?.name, professional?.surname]
+    .filter(Boolean)
+    .map((value) => String(value).trim().slice(0, 1))
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+  return {
+    name,
+    phone: display.phone || '',
+    uei: String(professional?.uei || ''),
+    photo: String(professional?.photo || ''),
+    initials,
+  };
+}
+
+function actionSheet({ cancelled = false } = {}) {
+  return actionBlock([
+    !cancelled ? button('Корректировка', { variant: 'secondary', data: 'data-record-view-correct' }) : '',
+    !cancelled ? button('Отмена', { variant: 'danger', data: 'data-record-view-cancel' }) : '',
+    button('Удалить', { variant: 'critical', data: 'data-record-view-delete' }),
+    button('История', { variant: 'secondary', data: 'data-record-view-history' }),
+  ].filter(Boolean).join(''));
+}
+
+// The calculated service norm is not a stock movement or an individual template.
+// Older paid records must not be presented as if the current service norm
+// were the actual quantity used at that visit.
+function recordCalculatedConsumables(record = {}) {
+  const services = new Map(getProcedures().map(item => [String(item.id), item]));
+  return (Array.isArray(record.procedures) ? record.procedures : []).map(procedure => {
+    const service = services.get(String(procedure.id || ''));
+    const rows = service?.consumablesEnabled === false ? [] :
+      Array.isArray(procedure.consumables) && procedure.consumables.length
+      ? procedure.consumables
+      : Array.isArray(service?.consumables) ? service.consumables : [];
+    return { id: String(procedure.id || ''), name: procedure.name || service?.name || 'Услуга', rows };
+  });
+}
+
+function recordConsumablesSticker(record, payment) {
+  const groups = recordCalculatedConsumables(record);
+  const hasActual = Array.isArray(record.consumableTemplates) &&
+    record.consumableTemplates.some(template => template.groups?.some(group => group.items?.length));
+  const status = hasActual ? (record.consumablesPosted === true && payment?.fullyPaid ? 'paid' : 'individual') : 'calculated';
+  const subtitle = hasActual ? 'Индивидуальный шаблон' :
+    groups.some(group => group.rows.length) ? 'Расчётный расход' : 'Расход не задан';
+  return `<button type="button" class="v2-sticker record-consumables-sticker" data-record-view-consumables data-record-consumption-state="${status}">
+    <span class="record-consumables-sticker__head"><strong class="ui-list__title">Расходники</strong><span aria-hidden="true">›</span></span>
+    <span class="ui-list__secondary">${escapeHtml(subtitle)}</span>
+  </button>`;
+}
+
+async function openRecordConsumables(record, { onSaved = () => {} } = {}) {
+  const { openRecordConsumptionEditor } = await import('./consumables.js');
+  return openRecordConsumptionEditor(record, recordCalculatedConsumables(record), { onSaved });
+}
+
+export function openRecordView(record, {
+  onClose = () => {},
+  context = 'professional',
+  professional = null,
+  readOnlyHistory = false,
+  presentation = 'z',
+} = {}) {
+  if (!record?.id) return null;
+
+  const useQ = presentation === 'q';
+  // Reuse the same preview while respecting the opening container:
+  // Q from contact History cannot open that same History Q again.
+  const baseCapabilities = readOnlyHistory
+    ? { ...RECORD_VIEW_CAPABILITIES.account, contactIdentity: true }
+    : recordViewCapabilities(context);
+  const capabilities = useQ ? { ...baseCapabilities, personHistory: false } : baseCapabilities;
+  const professionalDisplay = accountProfessionalDisplay(professional);
+  let currentRecord = readOnlyHistory ? record : (getRecord(record.id) || record);
+  let startTimer = null;
+  const layer = (useQ ? mountRecordQ : mountRecordZ)({
+    settings: capabilities.settings,
+    title: useQ ? '' : capabilities.contactIdentity
+      ? (personDisplay(currentRecord.person || {}).name || 'Запись')
+      : (professionalDisplay.name || 'Запись'),
+    className: useQ ? 'record-view-q journal-view-z' : 'record-view-z journal-view-z',
+    ...(capabilities.contactIdentity ? {} : {
+      aImage: professionalDisplay.photo,
+      aInitials: professionalDisplay.initials,
+    }),
+    onClose: () => {
+      if (startTimer) clearTimeout(startTimer);
+      startTimer = null;
+      onClose();
+    },
+  });
+  if (!layer) return null;
+
+  const root = recordZHost(layer);
+
+  const syncCurrent = () => {
+    if (!readOnlyHistory) currentRecord = getRecord(currentRecord.id) || currentRecord;
+    return currentRecord;
+  };
+
+  const historyPerson = (source) => {
+    const personKey = String(source?.person?.key || source?.person?.id || '').trim();
+    const person = getAllPeople().find((item) => String(item?.key || item?.id || '').trim() === personKey)
+      || source?.person
+      || {};
+    return person?.key ? person : { ...person, key: personKey };
+  };
+
+  const openHistory = (source = syncCurrent()) => {
+    if (!capabilities.personHistory) return null;
+    const person = historyPerson(source);
+    if (!String(person?.key || '').trim()) return null;
+    return openPersonHistoryQ(document.body, person);
+  };
+
+  const persistAndRefresh = async () => {
+    await flushBusinessPersistence();
+    await refreshRecordsFromServer();
+    syncCurrent();
+  };
+
+  const persistStatus = async (mutate, message) => {
+    const updated = mutate();
+    if (!updated) return;
+    currentRecord = updated;
+    render();
+    try {
+      await persistAndRefresh();
+      render();
+    } catch (error) {
+      await refreshRecordsFromServer().catch(() => null);
+      syncCurrent();
+      render();
+      openNotice({ title: 'Не удалось сохранить', message: String(error?.message || message) });
+    }
+  };
+
+  const confirmCancel = (source) => {
+    const confirm = mountModal(document.body, modal(
+      `<div class="modal-title"><h2>Отменить?</h2><p>Запись останется в истории, время освободится.</p></div>${actionBlock([
+        button('Назад', { variant: 'secondary', data: 'data-record-view-cancel-no' }),
+        button('Отменить без удержания', { variant: 'danger', data: 'data-record-view-cancel-yes' }),
+      ].join(''))}`,
+      { variant: 'x', surface: 'app', title: 'Отмена' },
+    ));
+    if (!confirm) return;
+    confirm.querySelector('[data-record-view-cancel-no]')?.addEventListener('click', () => confirm.v2Close?.());
+    confirm.querySelector('[data-record-view-cancel-yes]')?.addEventListener('click', async (event) => {
+      const submit = event.currentTarget;
+      submit.disabled = true;
+      if (!cancelRecord(source.id)) {
+        submit.disabled = false;
+        return;
+      }
+      try {
+        await persistAndRefresh();
+        confirm.v2Close?.();
+        layer.v2Close?.();
+      } catch (error) {
+        await refreshRecordsFromServer().catch(() => null);
+        openNotice({ title: 'Не удалось отменить', message: String(error?.message || 'Сервер не подтвердил отмену.') });
+        if (submit.isConnected) submit.disabled = false;
+      }
+    });
+  };
+
+  const confirmDelete = (source) => {
+    const confirm = mountModal(document.body, modal(
+      `<div class="modal-title"><h2>Удалить?</h2><p>Запись и её история будут удалены без восстановления.</p></div>${actionBlock(
+        button('Удалить', { variant: 'critical', data: 'data-record-view-delete-confirm' }),
+      )}`,
+      { variant: 'x', surface: 'app', title: 'Удалить' },
+    ));
+    if (!confirm) return;
+    confirm.querySelector('[data-record-view-delete-confirm]')?.addEventListener('click', async (event) => {
+      const submit = event.currentTarget;
+      submit.disabled = true;
+      if (!deleteRecord(source.id)) {
+        submit.disabled = false;
+        return;
+      }
+      try {
+        await flushBusinessPersistence();
+        await refreshRecordsFromServer();
+        confirm.v2Close?.();
+        layer.v2Close?.();
+      } catch (error) {
+        await refreshRecordsFromServer().catch(() => null);
+        openNotice({ title: 'Не удалось удалить', message: String(error?.message || 'Сервер не подтвердил удаление.') });
+        if (submit.isConnected) submit.disabled = false;
+      }
+    });
+  };
+
+  const openActions = () => {
+    if (!capabilities.settings) return;
+    const source = syncCurrent();
+    const paymentState = getRecordPaymentState(source);
+    if (paymentState.hasPayments) {
+      const actions = openRecordPaymentActions(source, {
+        onSaved: () => {
+          syncCurrent();
+          render();
+        },
+        extraActions: capabilities.personHistory
+          ? button('История', { variant: 'secondary', data: 'data-record-view-history' })
+          : '',
+      });
+      actions?.querySelector('[data-record-view-history]')?.addEventListener('click', () => {
+        actions.v2Close?.();
+        void openHistory(source);
+      });
+      return;
+    }
+    const actions = mountModal(document.body, modal(
+      actionSheet({ cancelled: source.status === 'cancelled' }),
+      { variant: 'x', surface: 'app' },
+    ));
+    if (!actions) return;
+
+    actions.querySelector('[data-record-view-correct]')?.addEventListener('click', () => {
+      actions.v2Close?.();
+      const latest = syncCurrent();
+      openRecords({
+        context: 'professional',
+        record: latest,
+        professionalActions: true,
+        onSaved: async (saved) => {
+          currentRecord = saved;
+          render();
+          try {
+            await persistAndRefresh();
+            render();
+          } catch (error) {
+            await refreshRecordsFromServer().catch(() => null);
+            syncCurrent();
+            render();
+            openNotice({ title: 'Не удалось сохранить', message: String(error?.message || 'Сервер не подтвердил изменения.') });
+          }
+        },
+      });
+    });
+
+    actions.querySelector('[data-record-view-cancel]')?.addEventListener('click', () => {
+      actions.v2Close?.();
+      confirmCancel(source);
+    });
+
+    actions.querySelector('[data-record-view-delete]')?.addEventListener('click', () => {
+      actions.v2Close?.();
+      confirmDelete(source);
+    });
+
+    actions.querySelector('[data-record-view-history]')?.addEventListener('click', () => {
+      actions.v2Close?.();
+      void openHistory(source);
+    });
+  };
+
+  const onProcedureSaved = async (saved) => {
+    currentRecord = saved;
+    render();
+    try {
+      await persistAndRefresh();
+      render();
+    } catch (error) {
+      await refreshRecordsFromServer().catch(() => null);
+      syncCurrent();
+      render();
+      openNotice({ title: 'Не удалось сохранить', message: String(error?.message || 'Сервер не подтвердил изменения.') });
+      return false;
+    }
+    return true;
+  };
+
+  const openServiceMenu = () => {
+    if (!capabilities.procedureSettings) return;
+    const source = syncCurrent();
+    if (getRecordPaymentState(source).hasPayments) {
+      openNotice({ message: 'После оплаты используйте корректировку оплаты.' });
+      return;
+    }
+    const procedures = Array.isArray(source.procedures) ? source.procedures : [];
+    const settlement = resolveRecordSettlement(source);
+    const byId = new Map((Array.isArray(settlement?.items) ? settlement.items : [])
+      .filter((item) => String(item?.sourceType || 'procedure') === 'procedure')
+      .map((item) => [String(item?.sourceId || ''), item]));
+    const rows = procedures.map((procedure, index) => v2ListEntry({
+      title: String(procedure?.name || 'Услуга'),
+      subtitle: durationText(Number(procedure?.duration) || 0),
+      rightTop: formatMoney(byId.get(String(procedure?.id || ''))?.price ?? procedure?.cost ?? 0),
+      initial: String(procedure?.name || 'У').slice(0, 1).toUpperCase(),
+      data: `data-record-view-service-index="${index}"`,
+      aria: `Корректировать услугу ${String(procedure?.name || 'Услуга')}`,
+    }));
+    const menu = mountModal(document.body, modal(
+      (rows.length ? v2ListEntries(rows) : emptyState('Услуги пока не выбраны'))
+        + actionBlock(button('Добавить услугу', { data: 'data-record-view-add-service' })),
+      { variant: 'x', surface: 'app', title: 'Услуги' },
+    ));
+    if (!menu) return;
+    menu.querySelectorAll('[data-record-view-service-index]').forEach((node) => node.addEventListener('click', () => {
+      const procedure = procedures[Number(node.dataset.recordViewServiceIndex)];
+      if (!procedure?.id) return;
+      menu.v2Close?.();
+      void openProcedureAdjustment(syncCurrent(), procedure.id, { onSaved: onProcedureSaved })
+        .catch((error) => openNotice({ title: 'Услуга', message: String(error?.message || 'Не удалось открыть услугу.') }));
+    }));
+    menu.querySelector('[data-record-view-add-service]')?.addEventListener('click', () => {
+      menu.v2Close?.();
+      openRecords({
+        context: 'professional',
+        record: syncCurrent(),
+        initialStep: 'procedures',
+        professionalActions: true,
+        onSaved: onProcedureSaved,
+      });
+    });
+  };
+
+  const repeatRecord = () => {
+    const source = syncCurrent();
+    const selectedIds = new Set((Array.isArray(source?.procedures) ? source.procedures : [])
+      .map((item) => String(item?.id || '')).filter(Boolean));
+    // Repeat the service selection, not an obsolete historic price snapshot.
+    // The existing Record owner resolves the current price and availability.
+    const selected = proceduresForWorkplace(getProcedures(), source.workplaceId)
+      .filter((item) => selectedIds.has(String(item?.id || '')))
+      .map((item) => ({
+        id: String(item.id),
+        name: String(item.name || ''),
+        duration: procedureDurationForWorkplace(item, source.workplaceId),
+        cost: procedureCostForWorkplace(item, source.workplaceId),
+        raw: item,
+      }));
+    void openPersonRecordCreation({
+      person: source.person,
+      workplaceId: source.workplaceId,
+      procedures: selected,
+    }).then((owner) => {
+      if (owner) layer.v2Close?.();
+    }).catch((error) => openNotice({
+      title: 'Повторить запись',
+      message: String(error?.message || 'Не удалось открыть повторную запись.'),
+    }));
+  };
+
+  if (capabilities.settings) bindRecordSettings(layer, openActions);
+
+  const scheduleStartRender = (source) => {
+    if (startTimer) clearTimeout(startTimer);
+    startTimer = null;
+    const start = appointmentStart(source);
+    if (!start) return;
+    const delay = start.getTime() - Date.now();
+    if (delay <= 0) return;
+    startTimer = setTimeout(() => {
+      startTimer = null;
+      if (layer.isConnected) render();
+    }, Math.min(delay + 50, 2147483647));
+  };
+
+  const render = () => {
+    const source = syncCurrent();
+    scheduleStartRender(source);
+    const person = personDisplay(source.person || {});
+    const procedures = Array.isArray(source.procedures) ? source.procedures : [];
+    const payment = readOnlyHistory
+      ? { hasPayments: false, fullyPaid: false, partiallyPaid: false, remaining: 0 }
+      : getRecordPaymentState(source);
+    const settlement = readOnlyHistory
+      ? { items: [], serviceTotal: 0, planTotal: 0 }
+      : resolveRecordSettlement(source);
+    const settlementByProcedure = new Map((Array.isArray(settlement?.items) ? settlement.items : [])
+      .filter((item) => String(item?.sourceType || 'procedure') === 'procedure')
+      .map((item) => [String(item?.sourceId || ''), item]));
+    const personKey = String(source?.person?.key || source?.person?.id || '').trim();
+    const programs = capabilities.loyaltyProgram && !readOnlyHistory
+      ? getRecordProgramOptions(personKey,source.date).sort((left, right) => Number(right.type === 'deposit') - Number(left.type === 'deposit'))
+      : [];
+    const programLabel = (program) => {
+      const name = String(program?.name || 'Депозит');
+      return program?.type === 'deposit' && program.balance != null
+        ? `${name}: ${formatMoney(program.balance)}`
+        : name;
+    };
+    const storedProgramKey = String(source?.loyaltyProgram?.key || '');
+    const selectedProgramKey = programs.find((item) => item.key === storedProgramKey)?.key || programs[0]?.key || '';
+    const programSelector = !programs.length ? ''
+      : payment.hasPayments || source.status === 'cancelled'
+        ? field({ label: 'Программа', value: programLabel(programs.find((item) => item.key === selectedProgramKey)), readonly: true })
+        : select({
+          label: 'Программа',
+          name: 'recordLoyaltyProgram',
+          value: selectedProgramKey,
+          options: programs.map((item) => {
+            const label = programLabel(item);
+            const amount = item.type === 'deposit' && item.balance != null ? formatMoney(item.balance) : '';
+            const name = String(item.name || 'Депозит');
+            const split = Boolean(amount) && label.length > 25;
+            return { value: item.key, label: split ? `${name}:` : label, meta: split ? amount : item.typeLabel };
+          }),
+          data: 'data-record-view-program',
+          aria: 'Выбрать программу записи',
+        });
+    const contact = capabilities.contactIdentity
+      ? (getAllPeople().find((item) => String(item?.key || item?.id || '').trim() === personKey) || source.person || {})
+      : (source.person || {});
+    const discountLabel = readOnlyHistory ? '' : settlementDiscountLabel(settlement);
+    const fromMinutes = timeMinutes(source.from);
+    const toMinutes = timeMinutes(source.to);
+    const appointmentMinutes = fromMinutes != null && toMinutes != null && toMinutes > fromMinutes
+      ? toMinutes - fromMinutes
+      : procedures.reduce((sum, item) => sum + (Number(item?.duration) || 0), 0);
+    const contactDisplay = capabilities.contactIdentity ? personDisplay(contact) : professionalDisplay;
+    const recordName = [source?.person?.name, source?.person?.surname]
+      .map((value) => String(value || '').trim()).filter(Boolean).join(' ');
+    const identity = capabilities.contactIdentity
+      ? [String(contactDisplay.uei || person.uei || '').trim(), recordName || contactDisplay.name]
+        .filter(Boolean).join(' ')
+      : [String(professionalDisplay.uei || '').trim(), professionalDisplay.name].filter(Boolean).join(' ');
+    const card = recordConfirmationMiniCard({
+      viewer: true,
+      serviceSettings: capabilities.procedureSettings && !payment.hasPayments && !readOnlyHistory,
+      repeat: capabilities.contactIdentity && !readOnlyHistory,
+      workplace: workplaceName(source.workplaceId),
+      contactDiscount: '',
+      date: formatDate(source.date),
+      period: `${source.from || ''}–${source.to || ''}`,
+      startTime: String(source.from || '').trim(),
+      endTime: String(source.to || '').trim(),
+      identity,
+      phone: capabilities.contactIdentity ? (person.phone || contactDisplay.phone || '') : professionalDisplay.phone,
+      duration: durationText(appointmentMinutes),
+      discountMoney: discountLabel,
+      total: readOnlyHistory ? '—' : formatMoney(settlement?.planTotal),
+      procedures: [
+        ...procedures.map((item) => {
+          const financeItem = settlementByProcedure.get(String(item?.id || ''));
+          return {
+            name: item?.name || 'Услуга',
+            durationText: durationText(Number(item?.duration) || 0),
+            right: readOnlyHistory
+              ? (item?.cost !== '' && item?.cost != null ? formatMoney(item.cost) : '—')
+              : formatMoney(financeItem?.price ?? item?.cost ?? 0),
+          };
+        }),
+      ],
+    });
+
+    const started = hasAppointmentStarted(source);
+    const effectiveAttendance = normalizedAttendance(source.attendance) || (started ? 'arrived' : '');
+    const confirmedControl = `<div class="segment-control segment-control--one" role="group" aria-label="Подтверждение записи">
+      <button type="button" class="${payment.fullyPaid || source.confirmed ? 'is-active' : ''}" aria-pressed="${payment.fullyPaid || Boolean(source.confirmed)}" data-record-view-confirmed${payment.fullyPaid ? ' disabled' : ''}>Подтвердил</button>
+    </div>`;
+    const attendanceControl = `<div class="segment-control segment-control--two-equal" role="group" aria-label="Посещение записи">
+      <button type="button" class="${effectiveAttendance === 'arrived' ? 'is-active' : ''}" aria-pressed="${effectiveAttendance === 'arrived'}" data-record-view-attendance="arrived"${!started ? ' disabled' : ''}>Пришел</button>
+      <button type="button" class="${effectiveAttendance === 'no-show' ? 'is-active' : ''}" aria-pressed="${effectiveAttendance === 'no-show'}" data-record-view-attendance="no-show"${!started ? ' disabled' : ''}>Не пришел</button>
+    </div>`;
+    setRecordHeaderRows(layer, [
+      capabilities.confirmation ? confirmedControl : '',
+      capabilities.attendance ? attendanceControl : '',
+    ].filter(Boolean));
+
+    const cancelled = source.status === 'cancelled';
+    const tipsOnlyAvailable = !cancelled && !readOnlyHistory && canAcceptRecordTips(source, payment);
+    const paymentStateLabel = payment.fullyPaid
+      ? `Оплачено: ${formatMoney(payment.paidTotal)}`
+      : `${recordHasEnded(source) ? 'Задолженность' : 'К оплате'}: ${formatMoney(payment.remaining)}`;
+    root.innerHTML = `<div class="record-screen record-screen--state-view record-screen--record-view">
+      ${card}
+      ${capabilities.consumables && !readOnlyHistory && !cancelled && procedures.length ? recordConsumablesSticker(source, payment) : ''}
+      ${programSelector}
+      ${readOnlyHistory ? '' : actionBlock([
+        capabilities.sale && !payment.hasPayments ? button('Продажа', { variant: 'secondary', data: 'data-record-view-sale' }) : '',
+        capabilities.notes && hasNotesForTarget('record', source.id)
+          ? button('Заметки', { variant: 'secondary', data: 'data-record-view-notes' })
+          : '',
+        cancelled
+          ? button('Отменена', { disabled: true })
+          : payment.fullyPaid && !tipsOnlyAvailable
+          ? button(paymentStateLabel, {
+            disabled: true,
+            className: payment.tipsTotal > 0.009 ? 'record-payment-button--has-tips' : '',
+            aria: payment.tipsTotal > 0.009 ? `${paymentStateLabel}, есть Tips` : paymentStateLabel,
+          })
+          : capabilities.payment
+            ? button(tipsOnlyAvailable ? 'Tips' : `К оплате: ${formatMoney(payment.remaining)}`, {
+              data: 'data-record-view-payment',
+              className: payment.tipsTotal > 0.009 ? 'record-payment-button--has-tips' : '',
+              aria: payment.tipsTotal > 0.009 ? 'Оплата записи, есть Tips' : 'Оплата записи',
+            })
+            : button(paymentStateLabel, {
+              disabled: true,
+              className: payment.tipsTotal > 0.009 ? 'record-payment-button--has-tips' : '',
+            }),
+      ].filter(Boolean).join(''))}
+    </div>`;
+
+    root.querySelector('[data-record-view-program]')?.addEventListener('change', async (event) => {
+      const selector = event.currentTarget;
+      if (selector.disabled) return;
+      const latest = syncCurrent();
+      if (getRecordPaymentState(latest).hasPayments || latest.status === 'cancelled') {
+        openNotice({ message: 'Программу оплаченной или отменённой записи изменять нельзя.' });
+        render();
+        return;
+      }
+      const nextProgram = programs.find((item) => item.key === String(selector.value || '')) || null;
+      if (!nextProgram) return;
+      selector.disabled = true;
+      try {
+        const updated = setRecordLoyaltyProgram(latest, recordProgramSelection(nextProgram));
+        if (!updated) throw new Error('Не удалось изменить программу записи.');
+        await persistAndRefresh();
+        currentRecord = getRecord(updated.id) || updated;
+        render();
+      } catch (error) {
+        await refreshRecordsFromServer().catch(() => null);
+        syncCurrent();
+        render();
+        openNotice({ title: 'Не удалось сохранить', message: String(error?.message || 'Сервер не подтвердил выбор программы.') });
+      } finally {
+        if (selector.isConnected) selector.disabled = false;
+      }
+    });
+
+    root.querySelector('[data-record-view-service-settings]')?.addEventListener('click', (event) => {
+      event.stopPropagation();
+      openServiceMenu();
+    });
+    root.querySelector('[data-record-view-service-settings]')?.addEventListener('keydown', (event) => event.stopPropagation());
+    root.querySelector('[data-record-view-repeat]')?.addEventListener('click', (event) => {
+      event.stopPropagation();
+      repeatRecord();
+    });
+    root.querySelector('[data-record-view-repeat]')?.addEventListener('keydown', (event) => event.stopPropagation());
+
+    const reportCard = root.querySelector('.record-confirmation-view__card');
+    if (capabilities.zReport) {
+      reportCard?.setAttribute('role', 'button');
+      reportCard?.setAttribute('tabindex', '0');
+      reportCard?.setAttribute('aria-label', 'Z-отчёт записи');
+      reportCard?.addEventListener('click', (event) => {
+        const action = event.target.closest?.('button,select,input,[role="button"]');
+        if (action && action !== reportCard && reportCard.contains(action)) return;
+        openRecordZReport(syncCurrent());
+      });
+      reportCard?.addEventListener('keydown', (event) => {
+        if (event.target !== reportCard || (event.key !== 'Enter' && event.key !== ' ')) return;
+        event.preventDefault();
+        openRecordZReport(syncCurrent());
+      });
+    }
+    root.querySelector('[data-record-view-notes]')?.addEventListener('click', () => {
+      if (!capabilities.notes) return;
+      const notes = getNotesForTarget('record', source.id);
+      if (!notes.length) return;
+      const noteDate = String(notes[0]?.date || source.date || '').slice(0, 10);
+      layer.v2Close?.();
+      queueMicrotask(() => {
+        window.dispatchEvent(new CustomEvent('professional:journal-note-focus-request', {
+          detail: {
+            targetType: 'record',
+            targetId: String(source.id || ''),
+            date: noteDate,
+            workplaceId: String(source.workplaceId || ''),
+          },
+        }));
+      });
+    });
+    root.querySelector('[data-record-view-consumables]')?.addEventListener('click', () => {
+      if (!capabilities.consumables) return;
+      void openRecordConsumables(syncCurrent(), { onSaved: async () => {
+        await refreshRecordsFromServer();
+        syncCurrent();
+        render();
+      } }).catch(error => openNotice({ title: 'Расходники', message: String(error?.message || 'Не удалось открыть расходники.') }));
+    });
+    root.querySelector('[data-record-view-sale]')?.addEventListener('click', () => {
+      if (!capabilities.sale) return;
+      openRecordSale(syncCurrent(), {
+        onSaved: (saved) => {
+          currentRecord = saved;
+          render();
+        },
+      });
+    });
+    root.querySelector('[data-record-view-payment]')?.addEventListener('click', () => {
+      if (!capabilities.payment) return;
+      openRecordPayment(syncCurrent(), {
+        onCompleted: () => {
+          syncCurrent();
+          if (layer.isConnected) render();
+          // Finance acknowledges payment and Core posts the existing stock
+          // movement together. Refresh the Record/Inventory owners, rather
+          // than guessing that payment created a movement on the client.
+          if (currentRecord.consumableTemplates?.length) {
+            void refreshRecordsFromServer().then(async () => {
+              syncCurrent();
+              if (layer.isConnected) render();
+              if (currentRecord.consumablesPosted === true) {
+                const { loadInventory } = await import('../inventory/service.js');
+                await loadInventory();
+              }
+            }).catch(() => null);
+          }
+        },
+      });
+    });
+
+    layer.querySelector('[data-record-view-confirmed]')?.addEventListener('click', () => {
+      if (!capabilities.confirmation || payment.fullyPaid) return;
+      persistStatus(
+        () => setRecordConfirmed(source.id, !Boolean(source.confirmed)),
+        'Сервер не подтвердил изменение статуса.',
+      );
+    });
+    layer.querySelectorAll('[data-record-view-attendance]').forEach((node) => node.addEventListener('click', () => {
+      if (!capabilities.attendance || !hasAppointmentStarted(source)) return;
+      const next = normalizedAttendance(node.dataset.recordViewAttendance);
+      const current = normalizedAttendance(source.attendance) || 'arrived';
+      if (!next || next === current) return;
+      persistStatus(
+        () => setRecordAttendance(source.id, next),
+        'Сервер не подтвердил изменение посещения.',
+      );
+    }));
+
+    layer.dataset.recordViewContext = capabilities === RECORD_VIEW_CAPABILITIES.account ? 'account' : 'professional';
+    layer.dataset.recordViewPaymentState = payment.fullyPaid ? 'paid' : payment.partiallyPaid ? 'partial' : 'unpaid';
+  };
+
+  // Read current deposit conditions before displaying a payable amount.
+  // The record Z/Q opens immediately; it shows a short loading state rather
+  // than briefly showing an incorrect undiscounted total.
+  const personKey = String(currentRecord?.person?.key || currentRecord?.person?.id || '').trim();
+  if (!readOnlyHistory && personKey) {
+    if (root) root.innerHTML = emptyState('Запись', 'Проверяем условия скидки…');
+    void listPersonDeposits(personKey,currentRecord?.date).then(() => {
+      if (layer.isConnected) render();
+    }).catch((error) => {
+      if (layer.isConnected && root) root.innerHTML = emptyState(
+        'Не удалось проверить скидку', String(error?.message || 'Нет ответа от сервера.'),
+      );
+    });
+  } else render();
+  return layer;
+}

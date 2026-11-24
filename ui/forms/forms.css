@@ -1,0 +1,259 @@
+.form-error{color:var(--danger);font-size:13px;line-height:1.35}
+.booking-account .form-error{font-size:13px;text-align:center}
+
+
+/* Separate the bulk-selection controls from the value editor above. */
+.inventory-counterparty-bulk-selection{margin-top:16px}
+
+/* Inventory Q uses the same native details/summary disclosure as orders. */
+.inventory-item-accordion{min-width:0;border:0;background:transparent}
+.inventory-editor-panel{position:relative;min-width:0;border-bottom:1px solid var(--border)}
+.inventory-editor-panel details{min-width:0}
+.inventory-editor-panel summary.inventory-editor-summary{
+  cursor:pointer;min-height:46px;line-height:46px;
+  font-size:14px;font-weight:700;color:var(--text);
+}
+.inventory-editor-panel:has(> .inventory-editor-heading__controls)>details>summary.inventory-editor-summary{padding-right:110px}
+.inventory-editor-panel--nested:has(> .inventory-editor-heading__controls)>details>summary.inventory-editor-summary{padding-right:42px}
+.inventory-editor-panel:has([data-inventory-unit-help]) summary.inventory-editor-summary{padding-right:40px}
+.inventory-editor-row--three .field>span{font-size:12px}
+.inventory-editor-heading__controls{
+  position:absolute;right:0;top:9px;display:flex;align-items:center;gap:6px;
+}
+/* Counterparty Q: use the existing 46px native disclosure row.
+   Only prevent wrapping and position the canonical 28px check. */
+.inventory-editor-panel--catalog-choice>details>summary.inventory-editor-summary{
+  box-sizing:border-box;
+  width:100%;
+  padding:0 8px 0 36px;
+  font-size:13px;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.inventory-editor-panel--catalog-choice:has(> .inventory-editor-heading__controls)>details>summary.inventory-editor-summary{
+  padding-right:70px;
+}
+.inventory-editor-panel--catalog-choice>.inventory-editor-heading__selection{
+  position:absolute;left:0;top:9px;z-index:1;
+}
+.inventory-editor-panel--catalog-choice>.inventory-editor-heading__controls{
+  top:15px;
+}
+/* Catalog products: the existing Compact check sits inside the white dense
+   List row, not in a separate column. Preserve the shared row geometry. */
+/* Stock Z2: category and type are static headings, never nested folders.
+   All products remain directly clickable without extra disclosure gestures. */
+.inventory-stock-category{min-width:0;margin-top:12px}
+.inventory-stock-category:first-child{margin-top:0}
+/* Stock Z2 only: every row is compact and fixed-height, independent
+   of the selection checkbox or the category reorder handle. */
+.inventory-stock-category-sequence{gap:0;min-width:0;width:100%}
+.inventory-stock-category-sequence>.inventory-stock-category{margin-top:0;width:100%;min-width:0}
+.inventory-stock-category-sequence .inventory-editor-panel__body{padding:0}
+.inventory-stock-category-sequence .inventory-editor-summary{
+  box-sizing:border-box;width:100%;height:46px;min-height:46px;max-height:46px;
+  padding-top:0;padding-bottom:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis
+}
+.inventory-stock-category-sequence>.inventory-stock-category:has(> .inventory-editor-heading__controls)>details>summary.inventory-editor-summary{padding-right:48px}
+.inventory-stock-category-sequence>.inventory-stock-category>.inventory-editor-heading__controls{top:0;right:0;height:46px}
+.inventory-stock-category-sequence>.inventory-stock-category .list-entry__reorder-handle{
+  box-sizing:border-box;width:36px;height:46px;min-height:46px;max-height:46px;margin:0
+}
+.inventory-stock-category-sequence .inventory-counterparty-product-row,
+.inventory-stock-category-sequence .inventory-counterparty-product-row>.ui-list{box-sizing:border-box;width:100%;min-width:0}
+.inventory-stock-category-sequence .inventory-counterparty-product-row .ui-list__item{
+  box-sizing:border-box;height:46px;min-height:46px;max-height:46px;overflow:hidden;
+  padding-top:4px;padding-bottom:4px
+}
+.inventory-stock-category-sequence .inventory-counterparty-product-row .ui-list__main,
+.inventory-stock-category-sequence .inventory-counterparty-product-row .ui-list__right-secondary{min-width:0;overflow:hidden}
+/* Expanded groups do not jump; just their 46px heading preview follows
+   the finger. The shared engine still owns the reorder and save. */
+.inventory-stock-category-sequence>.inventory-stock-category.is-reordering{
+  z-index:2;transform:none;transition:none;box-shadow:none;pointer-events:none;will-change:auto
+}
+.inventory-stock-category-sequence>.inventory-stock-category.is-reordering>details>summary{
+  background:var(--v2-inner-surface,#F5F5F3);
+  outline:2px solid var(--text);outline-offset:-2px
+}
+.inventory-stock-category-drag-preview{
+  position:fixed;z-index:2147483647;box-sizing:border-box;height:46px;
+  display:flex;flex-direction:column;justify-content:center;gap:2px;
+  min-width:0;padding:0 45px 0 14px;background:var(--white);color:var(--text);
+  font-family:inherit;font-size:14px;line-height:1.15;
+  border:2px solid var(--text);box-shadow:0 12px 24px rgba(0,0,0,.22);
+  overflow:hidden;pointer-events:none;touch-action:none
+}
+.inventory-stock-category-drag-preview strong,
+.inventory-stock-category-drag-preview small{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.inventory-stock-category-drag-preview strong{font-weight:750}
+.inventory-stock-category-drag-preview small{font-size:11px;color:var(--text-secondary)}
+.inventory-stock-category-drag-preview::after{
+  content:"⋮⋮";position:absolute;right:16px;top:50%;transform:translateY(-50%);
+  font-size:19px;letter-spacing:-3px;color:var(--text)
+}
+/* Mark the precise destination on the fixed heading, not at the far
+   bottom edge of an expanded category's contents. */
+.inventory-stock-category-sequence>.inventory-stock-category.is-reorder-target-before>details>summary{
+  box-shadow:inset 0 3px 0 var(--text);background:var(--v2-inner-surface,#F5F5F3)
+}
+.inventory-stock-category-sequence>.inventory-stock-category.is-reorder-target-after>details>summary{
+  box-shadow:inset 0 -3px 0 var(--text);background:var(--v2-inner-surface,#F5F5F3)
+}
+
+.inventory-stock-category-heading,.inventory-stock-type-heading{
+  display:flex;justify-content:space-between;align-items:baseline;gap:8px;
+  min-width:0;overflow-wrap:anywhere;
+}
+.inventory-stock-category-heading{
+  border-bottom:1px solid var(--border);padding:12px 10px 9px;
+  font-size:17px;line-height:1.2;font-weight:740;
+}
+.inventory-stock-type-heading{
+  padding:10px 10px 6px;font-size:14px;line-height:1.2;
+  font-weight:650;color:var(--text);
+}
+.inventory-stock-category-heading small,.inventory-stock-type-heading small{
+  flex:0 0 auto;white-space:nowrap;font-weight:400;
+  font-size:12px;color:var(--text-secondary);
+}
+.inventory-counterparty-product-row{position:relative;min-width:0}
+.inventory-counterparty-product-row>.ui-compact-check{
+  position:absolute;
+  top:50%;
+  left:12px;
+  transform:translateY(-50%);
+  z-index:1;
+}
+.inventory-counterparty-product-row>.ui-list{min-width:0}
+.inventory-counterparty-product-row .ui-list__item{
+  padding-left:calc(12px + var(--ui-compact-size,28px) + 8px);
+}
+.inventory-counterparty-product-row+.inventory-counterparty-product-row>.ui-list{border-top:0}
+.inventory-counterparty-product-row .ui-list__main{overflow:hidden}
+.inventory-counterparty-product-row .ui-list__title,
+.inventory-counterparty-product-row .ui-list__secondary{
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.inventory-counterparty-product-row .ui-list__right-secondary span{
+  white-space:nowrap;
+  overflow-wrap:normal;
+}
+/* The existing List indicator follows the SKU in the second line. */
+.inventory-counterparty-product-row .ui-list__secondary:has(>.ui-list__indicator){
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.inventory-counterparty-product-row .ui-list__secondary-text{
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+/* Availability is expressed only by the price tone, not a separate dot. */
+.inventory-counterparty-product-row .is-supplier-available .ui-list__right-secondary{
+  color:var(--text);
+}
+.inventory-counterparty-product-row .is-supplier-unavailable .ui-list__right-secondary{
+  color:var(--text-muted);
+}
+.inventory-editor-panel__body{padding:0 0 14px}
+.inventory-editor-panel [hidden]{display:none!important}
+.inventory-editor-group{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;align-content:start;min-width:0}
+.inventory-editor-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;align-items:start;min-width:0}
+.inventory-editor-row--identity{grid-template-columns:minmax(0,1.25fr) minmax(0,1fr)}
+.inventory-editor-row--three{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.inventory-editor-row > *, .inventory-editor-row--three > *, .inventory-editor-measure{min-width:0}
+.inventory-editor-row .field,.inventory-editor-measure .field{min-width:0;max-width:100%;margin:0}
+.inventory-editor-measure{display:grid;gap:6px;align-content:start}
+.inventory-editor-label{font-size:13px;color:var(--text-secondary);line-height:normal}
+.inventory-editor-measure__control{min-width:0;display:grid;grid-template-columns:minmax(0,1fr) minmax(60px,68px);gap:4px}
+.inventory-editor-measure__control > .field > span:empty{display:none}
+.inventory-editor-number{position:relative;min-width:0}
+.inventory-editor-number .field input{box-sizing:border-box;min-width:0;padding-right:41px;text-overflow:clip;font-variant-numeric:tabular-nums}
+.inventory-editor-number__suffix{position:absolute;right:12px;bottom:16px;font-size:12px;line-height:1;color:var(--text-secondary);pointer-events:none;white-space:nowrap}
+.inventory-editor-row--three .inventory-editor-number .field>span,.inventory-editor-row--three .ui-select.field>span{font-size:12px}
+.inventory-editor-row--three .inventory-editor-number .field input{padding-left:7px;padding-right:24px}
+.inventory-editor-row--three .inventory-editor-number__suffix{right:6px}
+.inventory-editor-extra-toggles{display:flex;flex-wrap:nowrap;gap:8px;align-items:center;white-space:nowrap}
+/* Stock editor only: receipt choices share the label's horizontal axis.
+   Shared 28 px compact checks and 46 px fields/selectors remain unchanged. */
+.inventory-editor-row--receipt{grid-template-columns:minmax(0,1fr)}
+.inventory-editor-measure--receipt{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:var(--ui-compact-size,28px)}
+.inventory-editor-measure--receipt>.inventory-editor-label{flex:0 0 auto}
+.inventory-editor-measure--receipt>.inventory-editor-extra-toggles{margin-left:auto;gap:8px;justify-content:flex-end}
+.inventory-editor-row--receipt>[data-inventory-pack-count]{grid-template-columns:minmax(0,1fr) minmax(0,2fr);gap:8px;align-items:center}
+.inventory-editor-row--receipt>[data-inventory-pack-count]>.inventory-editor-label{min-width:0}
+.inventory-editor-row--receipt>[data-inventory-pack-count]>.inventory-editor-measure__control{min-width:0}
+/* Same label track and baseline for quantity+unit and purchase-price fields. */
+.inventory-editor-row--nominal [data-inventory-one-piece-nominal],
+.inventory-editor-row--nominal>.inventory-editor-number>.field{grid-template-rows:18px var(--ui-field-height);gap:6px}
+.inventory-editor-row--nominal [data-inventory-nominal-label],
+.inventory-editor-row--nominal>.inventory-editor-number>.field>span{display:flex;align-items:center;min-height:18px;line-height:18px;white-space:nowrap}
+.inventory-editor-row--nominal .inventory-editor-measure__control{height:var(--ui-field-height)}
+
+.inventory-editor-number:has([name="netWeight"]) input[readonly],
+.inventory-editor-number:has([name="packageQuantity"]) input[readonly]{background:transparent;border-color:transparent;color:var(--text);font-weight:700;cursor:default;opacity:1}
+@media(max-width:380px){
+ .inventory-editor-row{gap:6px}
+ .inventory-editor-row--three{gap:5px}
+}
+
+.inventory-editor-disposal{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;min-width:0}
+
+.inventory-editor-group .column-layout--3{gap:6px}
+.inventory-editor-group .column-layout--3 > .column-layout__column{min-width:0}
+.inventory-editor-group .column-layout--3 .field > span{font-size:12px}
+
+.inventory-editor-number .field input{padding-right:52px}
+.inventory-editor-number:has([name="purchasePrice"]) input:disabled{background:transparent;border-color:transparent;color:var(--text);font-weight:650;opacity:1}
+
+
+/* Procedure consumables: canonical dense List with an unobtrusive quantity field. */
+[data-procedure-consumable-items] .ui-list__item{gap:8px}
+[data-procedure-consumable-items] .service-consumable-quantity{width:86px;flex:0 0 86px}
+[data-procedure-consumable-items] .service-consumable-quantity .field{width:100%;min-width:0;gap:2px}
+[data-procedure-consumable-items] .service-consumable-quantity .field input{
+  box-sizing:border-box;width:100%;min-width:0;padding:8px 6px;font-variant-numeric:tabular-nums
+}
+
+
+/* Stock position X/Q: one shared control height, compact receipt choice,
+   exactly two aligned entry columns for packaging and purchase price. */
+.stock-position-form{display:grid;gap:12px;min-width:0}
+.stock-position-form .inventory-editor-group{gap:12px}
+.stock-position-receipt{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:var(--ui-field-height)}
+.stock-position-receipt>.inventory-editor-extra-toggles{margin-left:auto;flex-wrap:nowrap}
+.stock-position-two-fields,.stock-position-group-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;align-items:start}
+.stock-position-two-fields>*,
+.stock-position-group-row>*{min-width:0}
+.stock-position-two-fields .field>span{white-space:nowrap;font-size:12px}
+.stock-position-group-heading{display:flex;align-items:center;justify-content:space-between;min-height:28px;font-size:13px;font-weight:650}
+.stock-position-group-row{margin-bottom:8px}
+.stock-position-group-row--removable{grid-template-columns:minmax(0,1fr) minmax(0,1fr) var(--ui-compact-size);align-items:center}
+.stock-position-group-row--removable>.ui-compact-button{justify-self:center}
+.stock-position-group-row .ui-select{min-width:0}
+.stock-position-static-content{min-height:var(--ui-field-height);display:flex;align-items:center;justify-content:space-between;gap:8px}
+.stock-position-number{position:relative;min-width:0}
+.stock-position-number .field{min-width:0}
+.stock-position-number .field input{padding-right:33px}
+.stock-position-unit{position:absolute;bottom:16px;right:10px;pointer-events:none;color:var(--text-secondary);font-size:12px}
+.stock-position-note{font-size:12px;color:var(--text-secondary);margin:0}
+.stock-position-form .field input:disabled{background:var(--surface-soft);border-color:var(--border)}
+.stock-position-form .inventory-editor-heading__controls{right:0}
+
+
+.stock-supplier-info{display:grid;gap:12px}
+.stock-supplier-info-line{display:flex;justify-content:space-between;gap:12px;align-items:start;font-size:13px}
+.stock-supplier-info-line>span{color:var(--text-secondary);flex:0 0 38%}
+.stock-supplier-info-line>strong{text-align:right;overflow-wrap:anywhere}
+
+.stock-position-form .inventory-editor-panel__body.is-inactive{opacity:.48;pointer-events:none}
+
+
+/* The first X has two short actions, never full-width primary buttons. */
+.stock-create-actions{display:grid;grid-template-columns:repeat(2,max-content);justify-content:center;gap:8px;align-items:center}

@@ -1,0 +1,123 @@
+// Read-only inventory-card audit. Optional commercial fields (supplier,
+// discount, stock thresholds, prices) are not mistaken for mandatory fields.
+// Zero tare is a valid value; an unset tare is not.
+const value = (input) => String(input ?? '').trim();
+const hasText = (input) => value(input).length > 0;
+const hasPositive = (input) => input !== '' && input != null && Number.isFinite(Number(input)) && Number(input) > 0;
+const hasNonNegative = (input) => input !== '' && input != null && Number.isFinite(Number(input)) && Number(input) >= 0;
+
+export function isWeighedInventoryItem(item = {}) {
+  return ['г', 'гр', 'гр.', 'грамм', 'граммы'].includes(value(item?.unit).toLocaleLowerCase('ru-RU'));
+}
+
+export function inventoryItemCompletion(item = {}) {
+  const checks = [
+    { label: 'Наименование', ok: hasText(item.name) },
+    { label: 'Производитель', ok: hasText(item.manufacturer) },
+    { label: 'Единица', ok: hasText(item.unit) },
+    { label: 'Категория', ok: hasText(item.category) || hasText(item.productType) },
+    { label: 'Артикул или штрихкод', ok: hasText(item.sku) || hasText(item.barcode) },
+  ];
+  if (isWeighedInventoryItem(item)) {
+    checks.push({ label: 'В упаковке', ok: hasPositive(item.packageQuantity) });
+    // No physical container means no tare weight is required. Legacy g-items
+    // with unspecified container mode retain their previous completeness checks.
+    if (item.containerMode !== 'NONE') checks.push(
+      { label: 'Масса брутто', ok: hasPositive(item.grossWeight) },
+      { label: 'Масса тары', ok: hasNonNegative(item.tareWeight) },
+    );
+  }
+  if (hasNonNegative(item.tareWeight) && hasPositive(item.grossWeight)
+    && Number(item.tareWeight) > Number(item.grossWeight)) {
+    checks.push({ label: 'Проверить массу тары', ok: false });
+  }
+  const missing = checks.filter((check) => !check.ok).map(({ label }) => label);
+  return {
+    filled: checks.length - missing.length,
+    total: checks.length,
+    percentage: Math.round(100 * (checks.length - missing.length) / checks.length),
+    missing,
+    complete: missing.length === 0,
+  };
+}
+
+export function inventoryManufacturerCompletion(items = []) {
+  const audits = (Array.isArray(items) ? items : []).map(inventoryItemCompletion);
+  const total = audits.reduce((sum, audit) => sum + audit.total, 0);
+  const filled = audits.reduce((sum, audit) => sum + audit.filled, 0);
+  return {
+    percentage: total ? Math.round(100 * filled / total) : 100,
+    incomplete: audits.filter((audit) => !audit.complete).length,
+    count: audits.length,
+  };
+}
+
+// Product content is recorded in grams; tareWeight is grams per actual tube.
+// We never guess the count from a gross measurement, or treat an absent tare
+// as 0. A negative result is an error, not an inventory adjustment to zero.
+export function netStocktakeGrams({ gross, containers, tareWeight } = {}) {
+  const numericGross = Number(gross);
+  const numericCount = Number(containers);
+  const numericTare = Number(tareWeight);
+  if (gross === '' || gross == null || !Number.isFinite(numericGross) || numericGross < 0)
+    throw new Error('Укажите общий вес с тарой.');
+  if (containers === '' || containers == null || !Number.isInteger(numericCount) || numericCount < 0)
+    throw new Error('Укажите количество тюбиков.');
+  // An empty location may contain zero tubes and zero grams of gross weight.
+  if (numericCount === 0) {
+    if (numericGross !== 0) throw new Error('При нуле тюбиков общий вес должен быть равен нулю.');
+    return 0;
+  }
+  if (tareWeight === '' || tareWeight == null || !Number.isFinite(numericTare) || numericTare < 0)
+    throw new Error('В карточке товара не указана масса тары.');
+  const content = numericGross - numericCount * numericTare;
+  if (content < -0.000001) throw new Error('Масса тары превышает общий вес.');
+  return Math.max(0, Math.round(content * 1000) / 1000);
+}
+
+// InventoryItem.minStock/targetStock already store whole-tube equivalents
+// (0.5 = half a tube). Never migrate, divide, or multiply these saved values.
+export function inventoryStockThresholdUnit(item = {}) {
+  return String(item.thresholdUnit || item.receiptUnit || (isWeighedInventoryItem(item) ? 'тюб.' : item.unit || 'шт.'));
+}
+
+export function inventoryStockThresholdInput(_item = {}, value = null) {
+  if (value == null || value === '') return '';
+  const number = Number(value);
+  return Number.isFinite(number) ? number : '';
+}
+
+export function inventoryStockThresholdStored(_item = {}, value = null) {
+  if (value == null || value === '') return null;
+  const number = Number(value);
+  if (!Number.isFinite(number) || number < 0)
+    throw new Error('Укажите неотрицательный минимум и цель.');
+  return number;
+}
+
+// Actual balance is stored in grams, while thresholds are set in tubes.
+// Convert balance only for recommendation comparisons. Physical containerCount
+// is a separate measurement and must not be used as remaining content.
+export function inventoryStockBalanceInThresholdUnits(item = {}) {
+  // The canonical server decides conversion. An explicit null means unknown,
+  // not grams disguised as pieces; never use a speculative fallback in that case.
+  if (Object.prototype.hasOwnProperty.call(item, 'balanceInThresholdUnit')) {
+    if (item.balanceInThresholdUnit == null) return null;
+    const precise = Number(item.balanceInThresholdUnit);
+    return Number.isFinite(precise) && precise >= 0 ? precise : null;
+  }
+  const balance = Number(item.balance);
+  if (!Number.isFinite(balance) || balance < 0) return null;
+  if (!isWeighedInventoryItem(item)) return balance;
+  const configured = Number(item.packageQuantity);
+  // Zero grams is zero tubes even when package capacity is not configured.
+  if (balance === 0) return 0;
+  // Core exposes netPackageWeight from grossWeight minus tareWeight. This is
+  // an actual known net weight of one tube, not a guessed physical count.
+  const knownNetWeight = Number(item.netPackageWeight);
+  const size = Number.isFinite(configured) && configured > 0 ? configured
+    : Number.isFinite(knownNetWeight) && knownNetWeight > 0 ? knownNetWeight
+    : null;
+  if (size == null) return null;
+  return balance / size;
+}

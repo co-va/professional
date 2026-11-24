@@ -1,0 +1,62 @@
+/* One Shared viewport and keyboard controller for every Z, Q and X. */
+:root{
+  --visual-vh:var(--app-stable-vh,100dvh)!important;
+  --ui-visual-top:0px;
+  --ui-visual-left:0px;
+  --ui-keyboard-inset:0px;
+  --ui-bottom-safe:env(safe-area-inset-bottom);
+}
+html.keyboard-open{--ui-bottom-safe:0px}
+/* The native iOS keyboard can expose the document canvas below the
+   app. Extend the actual H gutter and Z/Q paper together behind it:
+   the left H gutter remains graphite all the way to the phone bottom.
+   Use the Shared Z/Q edge, never an individual form's width or position. */
+html.keyboard-open{
+  --ui-keyboard-sheet-left:var(--v2-edge,16px);
+  --ui-keyboard-paper-start:max(var(--ui-keyboard-sheet-left),calc((100% - var(--app-max-width,390px)) / 2 + var(--ui-keyboard-sheet-left)));
+  --ui-keyboard-paper-end:min(100%,calc((100% + var(--app-max-width,390px)) / 2));
+}
+/* Bottom X occupies the whole app width; it has no left H gutter. */
+html.keyboard-open:has([data-v2-layer-kind="bottom"]){
+  --ui-keyboard-sheet-left:0px;
+}
+html.keyboard-open:has([data-v2-app]),
+html.keyboard-open body:has([data-v2-app]){
+  /* Warm fallback if native WebKit paints only background-color under keyboard. */
+  background-color:var(--v2-inner-surface,#F5F5F3);
+  background-image:linear-gradient(to right,
+    var(--surface-dark,#2F3338) 0 var(--ui-keyboard-paper-start),
+    var(--v2-inner-surface,#F5F5F3) var(--ui-keyboard-paper-start) var(--ui-keyboard-paper-end),
+    var(--surface-dark,#2F3338) var(--ui-keyboard-paper-end) 100%);
+}
+html.keyboard-open .app-shell:has([data-v2-app]){
+  /* Warm fallback if native WebKit paints only background-color under keyboard. */
+  background-color:var(--v2-inner-surface,#F5F5F3);
+  background-image:linear-gradient(to right,
+    var(--surface-dark,#2F3338) 0 var(--ui-keyboard-sheet-left),
+    var(--v2-inner-surface,#F5F5F3) var(--ui-keyboard-sheet-left) 100%);
+}
+
+/* Keyboard reduces only Z/Q scrollable content. The white Z/Q surfaces
+   remain attached to the application's physical right and bottom edges. */
+:is([data-v2-z-body],[data-v2-q-body]){margin-bottom:var(--ui-keyboard-inset)}
+
+/* X is one white surface down to the application bottom, INCLUDING the
+   area covered by the keyboard. Raise its contents, not the whole surface.
+   Scrolling ends at the final action; it cannot expose the dark H background. */
+.v2-layer--bottom{
+  bottom:0;
+  max-height:min(calc(52% + var(--ui-keyboard-inset)),calc(100% - 12px));
+  overflow-y:auto;
+  overscroll-behavior:none;
+}
+html.keyboard-open .v2-layer--bottom{
+  padding-bottom:calc(20px + var(--ui-keyboard-inset));
+}
+/* X variants may define their own height and padding; one shared keyboard
+   override maintains the same lower anchor and top stop for every variant. */
+html.keyboard-open .modal-sheet.v2-layer--bottom{
+  min-height:0;
+  max-height:min(calc(52% + var(--ui-keyboard-inset)),calc(100% - 12px));
+  padding-bottom:calc(20px + var(--ui-keyboard-inset));
+}

@@ -1,0 +1,99 @@
+.two-column-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;align-items:start}.two-column-layout__column{min-width:0}.column-layout{display:grid;gap:12px;align-items:start}.column-layout--1{grid-template-columns:minmax(0,1fr)}.column-layout--2{grid-template-columns:repeat(2,minmax(0,1fr))}.column-layout--3{grid-template-columns:repeat(3,minmax(0,1fr))}.column-layout__column{min-width:0}@media(max-width:360px){.two-column-layout,.column-layout{gap:8px}}
+
+/* Shared single-line data edit layout: item label and editable field stay on the same row. */
+.data-edit-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(110px,36%);align-items:center;gap:10px;min-width:0}
+.data-edit-row__name{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;line-height:1.25}
+.data-edit-row__name strong{font-weight:650}
+.data-edit-row__name small{font-size:12px;font-weight:400;color:var(--text-secondary)}
+.data-edit-row>.field{min-width:0;margin:0}
+.data-edit-row>.field>span:empty{display:none}
+@media(max-width:360px){.data-edit-row{grid-template-columns:minmax(0,1fr) minmax(100px,38%);gap:8px}}
+
+/* Data editor: same compact product rows as Stocktake and Orders.
+   One existing compactCheck at left, title in the middle, value at right. */
+.inventory-audit-data-list{display:grid;gap:0;min-width:0}
+.data-edit-row.inventory-audit-data-row{
+  grid-template-columns:var(--ui-compact-size,28px) minmax(0,1fr) minmax(108px,38%);
+  align-items:center;gap:8px;min-height:var(--ui-field-height);
+  padding:5px 0;border-bottom:1px solid var(--border);
+}
+.inventory-audit-data-row>.ui-compact-check{align-self:center;justify-self:start;min-width:var(--ui-compact-size,28px)}
+.inventory-audit-data-row>.data-edit-row__name{
+  white-space:normal;overflow:visible;text-overflow:clip;
+  overflow-wrap:anywhere;line-height:1.3;font-size:14px;
+}
+.inventory-audit-data-row>.field{min-width:0;gap:0}
+.inventory-audit-data-row>.field>span:empty{display:none}
+.inventory-audit-data-row .field textarea{
+  box-sizing:border-box;width:100%;height:var(--ui-field-height);
+  min-height:var(--ui-field-height);max-height:78px;
+  resize:none;overflow-y:auto;line-height:1.3;padding:10px 9px;
+}
+/* The supplier's name is supplementary data in the same frozen data row,
+   never a new product card or modal. Both result and name remain in place. */
+.inventory-audit-data-row--supplier .inventory-audit-supplier-caption{
+  grid-column:2/-1;display:flex;align-items:flex-start;gap:8px;min-width:0;
+  font-size:13px;line-height:1.2;color:var(--text-secondary);
+}
+.inventory-audit-supplier-caption>[data-inventory-supplier-name]{
+  flex:1 1 auto;min-width:0;overflow:hidden;overflow-wrap:anywhere;
+  display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;
+}
+.inventory-audit-supplier-caption>[data-inventory-supplier-result]{
+  flex:0 0 auto;max-width:42%;text-align:right;white-space:nowrap;
+}
+
+[data-inventory-audit-actions] [hidden]{display:none!important}
+@media(max-width:360px){
+  .data-edit-row.inventory-audit-data-row{
+    grid-template-columns:var(--ui-compact-size,28px) minmax(0,1fr) minmax(104px,39%);
+    gap:6px;
+  }
+}
+
+/* Inventory data choice: one shared two-column row, no custom selector geometry. */
+.inventory-audit-value-cell{min-width:0;display:grid;gap:6px;align-content:start}
+.inventory-audit-value-heading{display:grid;grid-template-columns:minmax(0,1fr) var(--ui-field-height);align-items:end;gap:6px;font-size:13px;line-height:1.2;color:var(--text-secondary)}
+.inventory-audit-value-heading>span:last-child{text-align:center;font-size:12px}
+.inventory-audit-value-line{display:grid;grid-template-columns:minmax(0,1fr) var(--ui-field-height);align-items:center;gap:6px;min-width:0}
+.inventory-audit-value-line>[data-inventory-audit-common-value]{min-width:0}
+.inventory-audit-value-line .field{min-width:0;gap:0}
+.inventory-audit-value-line .field>span:empty{display:none}
+.inventory-audit-common-check .ui-compact-check{min-height:var(--ui-field-height);height:var(--ui-field-height);padding:0;justify-content:center;gap:0}
+.inventory-audit-common-check .ui-compact-check__label:empty{display:none}
+
+/* Empty selection status must not consume vertical space above the item list. */
+[data-inventory-audit-selection] [data-inventory-audit-status]:empty{display:none}
+
+/* Stocktake and Purchase Orders share one compactCheck and stock row layout.
+   No parallel checkbox component or Order-only control geometry. */
+:is([data-inventory-audit-criteria],[data-inventory-order-review]) .field-inline-label{min-width:0}
+:is([data-inventory-audit-criteria],[data-inventory-order-review]) .field-inline-label>.ui-compact-check{position:relative;box-sizing:border-box;flex:0 0 var(--ui-compact-size);width:var(--ui-compact-size);height:var(--ui-compact-size);min-width:var(--ui-compact-size);min-height:var(--ui-compact-size);padding:0;border:0;background:transparent;gap:0;align-items:center;justify-content:center}
+:is([data-inventory-audit-criteria],[data-inventory-order-review]) .field-inline-label>.ui-compact-check .ui-compact-check__label:empty{display:none}
+:is([data-inventory-audit-criteria],[data-inventory-order-review]) .field-inline-label>strong{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+:is([data-inventory-audit-criteria],[data-inventory-order-review]) .field-inline-label>:is([data-inventory-audit-result],[data-inventory-order-balance]){flex:0 1 auto;min-width:0;max-width:42%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right}
+
+/* Stocktake: keep the excluded summary and its expanded rows visibly
+   separated from the numbered working list without changing shared controls. */
+[data-inventory-audit-criteria] [data-inventory-audit-excluded]:not([hidden]){margin-bottom:16px}
+[data-inventory-audit-criteria] [data-inventory-audit-excluded][open] [data-inventory-audit-excluded-list]{margin-top:10px;padding-bottom:4px}
+
+/* Shared data-edit-row geometry; Order lines keep the Stocktake checkbox
+   and compact numeric control on the same horizontal row. */
+[data-inventory-order-review] .data-edit-row>.field-inline-label{justify-content:flex-start}
+[data-inventory-order-review] .data-edit-row__name{white-space:normal;min-width:0;display:grid;gap:2px}
+[data-inventory-order-review] .data-edit-row__name strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+[data-inventory-order-review] .data-edit-row__name small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+[data-inventory-order-review] [data-inventory-order-excluded] {margin-bottom:16px}
+[data-inventory-order-review] [data-inventory-order-excluded][open] [data-inventory-order-excluded-list]{margin-top:10px;padding-bottom:4px}
+
+/* Stock and inventory audit share compact editable rows: labels remain on the
+   left, quantities on the right. The transfer editor never uses V2 cards. */
+[data-inventory-transfer-rows]{display:grid;gap:0;margin:8px 0 12px;min-width:0}
+[data-inventory-transfer-rows] .inventory-transfer-row{padding:8px 0;border-bottom:1px solid var(--border)}
+[data-inventory-transfer-rows] .inventory-transfer-row__name{display:grid;gap:3px}
+[data-inventory-transfer-rows] .inventory-transfer-row__name strong,
+[data-inventory-transfer-rows] .inventory-transfer-row__name small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+[data-inventory-transfer-rows] .inventory-editor-number .field>span:empty{display:none}
+[data-inventory-transfer-rows] .inventory-editor-number__suffix{bottom:17px}
+[data-inventory-transfer-actions][hidden]{display:none!important}

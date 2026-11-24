@@ -1,0 +1,152 @@
+import { RECORD_EVENT_TYPES } from './events.js';
+import { zonedIntervalMoment } from '../time/zone.js';
+
+function orderedEvents(events = []) {
+  return (Array.isArray(events) ? events : [])
+    .filter((event) => event?.type)
+    .slice()
+    .sort((left, right) => Date.parse(left?.at || '') - Date.parse(right?.at || ''));
+}
+
+export function projectRecordLifecycle(record = {}, events = []) {
+  // Historical Excel status is an initial snapshot, not a synthetic event.
+  // Later real lifecycle events remain authoritative.
+  let status = ['Отменил','Удалена'].includes(record?.historicalAction) ? 'cancelled' : 'active';
+  let confirmed = false;
+  let attendance = record?.historicalVisit === 'Пришёл' ? 'arrived'
+    : record?.historicalVisit === 'Не пришёл' ? 'no-show' : '';
+  let completed = false;
+  let confirmedAt = '';
+  let attendanceAt = '';
+  let completedAt = '';
+  let cancelledAt = '';
+  let lifecycleUpdatedAt = record?.createdAt || record?.updatedAt || '';
+
+  for (const event of orderedEvents(events)) {
+    const at = String(event?.at || '');
+    if (event.type === RECORD_EVENT_TYPES.CONFIRMED) {
+      confirmed = true;
+      confirmedAt = at;
+    } else if (event.type === RECORD_EVENT_TYPES.UNCONFIRMED) {
+      confirmed = false;
+      confirmedAt = at;
+    } else if (event.type === RECORD_EVENT_TYPES.ARRIVED) {
+      attendance = 'arrived';
+      attendanceAt = at;
+    } else if (event.type === RECORD_EVENT_TYPES.NO_SHOW) {
+      attendance = 'no-show';
+      attendanceAt = at;
+    } else if (event.type === RECORD_EVENT_TYPES.ATTENDANCE_CLEARED) {
+      attendance = '';
+      attendanceAt = at;
+    } else if (event.type === RECORD_EVENT_TYPES.COMPLETED) {
+      completed = true;
+      completedAt = at;
+      if (!attendance) {
+        attendance = 'arrived';
+        attendanceAt = at;
+      }
+    } else if (event.type === RECORD_EVENT_TYPES.CANCELLED) {
+      status = 'cancelled';
+      cancelledAt = at;
+    }
+    if (at) lifecycleUpdatedAt = at;
+  }
+
+  return {
+    ...record,
+    status,
+    confirmed,
+    attendance,
+    completed,
+    confirmedAt,
+    attendanceAt,
+    completedAt,
+    cancelledAt,
+    lifecycleUpdatedAt,
+  };
+}
+
+export function recordActionState(record = {}, events = []) {
+  let state = ['Отменил','Удалена'].includes(record?.historicalAction) ? 'cancelled'
+    : record?.historicalAction === 'Перенёс' ? 'rescheduled' : 'booked';
+  for (const event of orderedEvents(events)) {
+    if (event.type === RECORD_EVENT_TYPES.CANCELLED) return 'cancelled';
+    if (event.type === RECORD_EVENT_TYPES.CREATED) state = 'booked';
+    else if (event.type === RECORD_EVENT_TYPES.RESCHEDULED) state = 'rescheduled';
+  }
+  return state;
+}
+
+export function recordVisitState(record = {}, events = []) {
+  if (recordActionState(record, events) === 'cancelled') return '';
+  const lifecycle = projectRecordLifecycle(record, events);
+  if (lifecycle.attendance === 'arrived') return 'arrived';
+  if (lifecycle.attendance === 'no-show') return 'no-show';
+  return 'expected';
+}
+
+export function recordPaymentStatus(record = {}, events = [], payment = {}) {
+  const visit = recordVisitState(record, events);
+  if (!visit || visit === 'no-show') return '';
+  const dueValue = payment?.due ?? payment?.remaining ?? 0;
+  const due = Math.max(0, Number(dueValue) || 0);
+  if (due <= 0.009) return 'paid';
+  return visit === 'arrived' ? 'debt' : 'due';
+}
+
+export function projectRecordStatuses(record = {}, events = [], payment = {}) {
+  return {
+    action: recordActionState(record, events),
+    visit: recordVisitState(record, events),
+    payment: recordPaymentStatus(record, events, payment),
+  };
+}
+
+export function recordAppointmentTime(record, field = 'from', timeZone = '') {
+  const moment = zonedIntervalMoment(record, field, timeZone);
+  return moment && Number.isFinite(moment.getTime()) ? moment.getTime() : 0;
+}
+
+export function recordVisualState(record, { paid = false } = {}) {
+  if (record?.status === 'cancelled') return 'cancelled';
+  if (record?.attendance === 'no-show') return 'no-show';
+  if (paid) return 'paid';
+  return 'active';
+}
+
+// One visual-status contract for Journal and Contact History.
+export function recordListStatusClass(record, { paid = false } = {}) {
+  return `journal-list-record--${recordVisualState(record, { paid })}`;
+}
+
+export function isRecordCompletedSide(record, { paid = false, now = Date.now(), timeZone = '' } = {}) {
+  return record?.status === 'cancelled'
+    || record?.attendance === 'no-show'
+    || record?.completed === true
+    || paid
+    || recordAppointmentTime(record, 'to', timeZone) <= now;
+}
+
+export function recordActivityTime(record, payment = null, { completed = false, timeZone = '' } = {}) {
+  if (record?.status === 'cancelled') {
+    const cancelledAt = Date.parse(String(record?.cancelledAt || record?.lifecycleUpdatedAt || record?.updatedAt || ''));
+    if (Number.isFinite(cancelledAt)) return cancelledAt;
+  }
+  if (payment) {
+    const paidAt = Date.parse(String(payment?.paidAt || payment?.createdAt || ''));
+    if (Number.isFinite(paidAt)) return paidAt;
+  }
+  if (record?.attendance === 'no-show') {
+    const attendanceAt = Date.parse(String(record?.attendanceAt || record?.lifecycleUpdatedAt || record?.updatedAt || record?.createdAt || ''));
+    if (Number.isFinite(attendanceAt)) return attendanceAt;
+  }
+  if (record?.completed) {
+    const completedAt = Date.parse(String(record?.completedAt || record?.lifecycleUpdatedAt || ''));
+    if (Number.isFinite(completedAt)) return completedAt;
+  }
+  if (completed) return recordAppointmentTime(record, 'to', timeZone) || recordAppointmentTime(record, 'from', timeZone);
+  const updatedAt = Date.parse(String(record?.lifecycleUpdatedAt || record?.updatedAt || record?.createdAt || ''));
+  if (Number.isFinite(updatedAt)) return updatedAt;
+  return recordAppointmentTime(record, 'from', timeZone) || recordAppointmentTime(record, 'to', timeZone);
+}

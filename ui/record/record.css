@@ -1,0 +1,142 @@
+.record-screen{width:100%;min-height:100%;padding:0 18px 28px}.record-screen--state-view{padding-top:8px;display:grid;gap:8px}.record-screen--record-view{display:flex;flex-direction:column;gap:8px}.record-screen--time{display:flex;flex-direction:column;justify-content:flex-start}.record-screen--procedures,.record-screen--people{display:flex;flex-direction:column}.record-time-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}.record-time-toolbar strong{font-size:23px}.record-person-list{display:grid;gap:10px}@media (max-width:360px){.record-screen{padding-left:14px;padding-right:14px}}
+
+.record-confirmation-view{display:grid;gap:20px;width:100%;min-width:0}
+.record-confirmation-view__card{display:flex;justify-content:center;width:100%;min-width:0}
+.record-confirmation-notice{display:grid;gap:15px;min-width:0}
+.record-confirmation-notice__headline{margin:0;font-size:23px;line-height:1.15;font-weight:760}
+.record-confirmation-notice__moment{font-size:18px;line-height:1.2;font-weight:700}
+.record-confirmation-notice__procedures{display:grid;gap:9px;min-width:0}
+.record-confirmation-notice__row,.record-confirmation-notice__total{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px;align-items:baseline;min-width:0}
+.record-confirmation-notice__row span,.record-confirmation-notice__total span{min-width:0;overflow-wrap:anywhere}
+.record-confirmation-notice__row strong,.record-confirmation-notice__total strong{white-space:nowrap;text-align:right}
+.record-confirmation-notice__total{font-size:16px;font-weight:760}
+.record-confirmation-notice__status{font-size:16px;line-height:1.2;font-weight:800}
+
+.list-entry--record-person{background:#fff}
+.list-entry--record-person .list-entry__background{background:#fff;background-image:none}
+.list-entry--record-person .list-entry__background>span{display:none}
+.list-entry--record-person .list-entry__content{background:#fff}
+.list-entry--record-person .list-entry__text{grid-template-rows:repeat(3,minmax(0,auto));gap:4px}
+
+.record-status-controls .segment-control--one button.is-active,.record-status-controls .segment-control--one button.is-active:disabled{background:var(--active);color:var(--text);font-weight:650}
+
+.record-status-controls{display:grid;gap:8px}.record-status-controls .segment-control{margin-bottom:0}
+
+.record-creation-flow{height:100%;min-height:0;display:grid;grid-template-rows:minmax(0,1fr) auto;gap:12px}
+.record-creation-flow__body{min-height:0;overflow:auto;overscroll-behavior:contain}.record-creation-flow__action:empty{display:none}
+.record-creation-time-rows{display:grid;gap:14px}.record-creation-time-row{display:grid;gap:8px}
+[data-record-creation-step="date"] .record-creation-flow__body{overflow:hidden}
+[data-record-creation-step="person"] .record-screen--people{height:100%;min-height:0;padding:0}[data-record-creation-step="person"] .record-person-list{min-height:0;overflow:auto}
+.record-creation-flow .record-screen{padding-left:0;padding-right:0;padding-bottom:0}
+
+/* The existing payment button indicates available Tips without showing the amount. */
+.record-payment-button--has-tips{position:relative}
+.record-payment-button--has-tips::after{content:'';position:absolute;right:14px;top:50%;width:6px;height:6px;border-radius:50%;background:currentColor;transform:translateY(-50%);pointer-events:none}
+
+
+/* Inline composition of the existing rectangular V2 sticker in Record.
+   Width follows the approved mini-card; its own shadow keeps it floating.
+   The additional two states are reserved for persisted individual templates. */
+.record-screen--record-view>.record-consumables-sticker{
+  box-sizing:border-box;align-self:center;width:min(290px,100%);max-width:290px;
+  min-height:58px;padding:10px 12px;gap:4px;border:0;border-radius:0;
+  background:var(--button-secondary);color:var(--text);font:inherit;
+  text-align:left;cursor:pointer;box-shadow:0 16px 26px -20px rgba(17,17,17,.48),0 8px 14px -12px rgba(17,17,17,.4)
+}
+.record-screen--record-view>.record-consumables-sticker[data-record-consumption-state="individual"]{background:#EFFFBB}
+.record-screen--record-view>.record-consumables-sticker[data-record-consumption-state="paid"]{background:#DDE8D7}
+.record-consumables-sticker__head{display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:0}
+.record-consumables-sticker__head>span{font-size:22px;line-height:1}
+.record-consumables-sticker>.ui-list__secondary{margin:0}
+
+
+/* Record expense composition: use the shared data-edit row, field,
+   number+unit and Compact controls directly on the modal surface.
+   Do not change the global 46px field or 28px Compact geometry. */
+[data-record-consumption-services] .record-consumption-service{display:grid;gap:8px;min-width:0}
+[data-record-consumption-services] .record-consumption-group{display:grid;gap:0;min-width:0}
+[data-record-consumption-services] .record-consumption-group-header{
+  grid-template-columns:minmax(0,1fr) var(--ui-compact-size) var(--ui-compact-size);gap:6px
+}
+[data-record-consumption-services] .record-consumption-group-header>.field{min-width:0;gap:0}
+[data-record-consumption-services] .record-consumption-product{
+  grid-template-columns:minmax(0,1fr) 86px var(--ui-compact-size);gap:6px;
+  padding:2px 0;border-bottom:1px solid var(--border);background:transparent
+}
+[data-record-consumption-services] .record-consumption-product>.data-edit-row__name{
+  white-space:normal;overflow-wrap:anywhere;overflow:visible;text-overflow:clip
+}
+[data-record-consumption-services] .record-consumption-product .field{gap:0;min-width:0;margin:0}
+[data-record-consumption-services] .field>span:empty{display:none}
+[data-record-consumption-services] .record-consumption-product .inventory-editor-number .field input{
+  box-sizing:border-box;padding-left:6px;padding-right:34px;text-align:left
+}
+[data-record-consumption-services] .record-consumption-product .inventory-editor-number__suffix{right:5px}
+[data-record-consumption-services] .record-consumption-add-group{min-height:var(--ui-compact-size);background:transparent;border:0;padding:0;margin:0}
+[data-record-consumption-services] [data-record-consumption-cost]:empty{display:none}
+
+/* Saved expense: no controls or empty control columns in reading mode. */
+[data-record-consumption-services] .record-consumption-read-title{
+  font-size:18px;font-weight:600;line-height:1.3;padding:8px 0 4px
+}
+[data-record-consumption-services] .record-consumption-read-list{border:0;background:transparent}
+[data-record-consumption-services] .record-consumption-read-list .ui-list__item{
+  display:flex;flex-direction:row;flex-wrap:nowrap;align-items:center;justify-content:space-between;
+  padding:6px 0;min-height:38px;gap:8px;background:transparent;border-bottom:1px solid var(--border)
+}
+[data-record-consumption-services] .record-consumption-read-list .ui-list__main{flex:1 1 0;min-width:0}
+[data-record-consumption-services] .record-consumption-read-list .ui-list__right-secondary{
+  flex:0 0 auto;white-space:nowrap;text-align:right;color:var(--text);font-variant-numeric:tabular-nums;font-size:18px;font-weight:600;line-height:1.2
+}
+[data-record-consumption-services] .record-consumption-read-list .ui-list__right-secondary span{white-space:nowrap;overflow-wrap:normal}
+[data-record-consumption-edit].ui-button--outline{background:var(--white);color:var(--text);border-color:var(--text)}
+/* Record consumption uses one mode-dependent action button. */
+
+/* Recorded actual consumption: stronger service/group hierarchy, no selector. */
+[data-record-consumption-services] .record-consumption-service-title{font-size:20px;font-weight:650;line-height:1.25}
+
+
+/* Expense Q: shared List reorder primitive, scoped to editing rows only. */
+[data-record-consumption-services] .record-consumption-reorder-list{
+  display:grid;gap:0;min-width:0;background:transparent
+}
+[data-record-consumption-services] .record-consumption-product.list-entry{
+  grid-template-columns:36px minmax(0,1fr) 86px var(--ui-compact-size);
+  width:100%;min-height:var(--ui-field-height);transform:none;transition:none;
+  border:0;border-bottom:1px solid var(--border);border-radius:0;
+  box-shadow:none;overflow:visible;isolation:auto;background:transparent;cursor:default
+}
+[data-record-consumption-services] .record-consumption-product.list-entry.is-reordering{
+  z-index:4;transform:translate3d(0,var(--list-entry-drag-y,0px),0);
+  background:var(--white);box-shadow:0 10px 24px rgba(0,0,0,.16)
+}
+[data-record-consumption-services] .record-consumption-product .list-entry__reorder-handle{margin:0;width:36px}
+[data-record-consumption-services] .record-consumption-product-name{
+  box-sizing:border-box;display:block;min-width:0;width:100%;
+  background:transparent;border:0;border-radius:0;padding:0;color:var(--text);
+  text-align:left;font:inherit;font-size:14px;line-height:1.25;cursor:pointer;
+  overflow-wrap:anywhere
+}
+[data-record-consumption-services] .record-consumption-product-name:focus-visible{
+  outline:2px solid var(--text);outline-offset:2px
+}
+[data-record-consumption-services] .record-consumption-reorder-list.is-reordering{user-select:none;-webkit-user-select:none}
+[data-record-consumption-services] .record-consumption-product.is-reorder-target-before::before,
+[data-record-consumption-services] .record-consumption-product.is-reorder-target-after::after{
+  content:"";position:absolute;left:0;right:0;height:2px;background:var(--text);z-index:5;pointer-events:none
+}
+[data-record-consumption-services] .record-consumption-product.is-reorder-target-before::before{top:0}
+[data-record-consumption-services] .record-consumption-product.is-reorder-target-after::after{bottom:0}
+[data-record-consumption-services] [data-record-consumption-services] 
+
+
+/* Stock's exact catalogDisclosure hierarchy inside Record's read-only Q.
+   Preserve Stock's native details triangles, surface, and nested behavior. */
+[data-record-consumption-services] > .inventory-editor-panel > details > .inventory-editor-summary{
+  font-size:20px;font-weight:650
+}
+[data-record-consumption-services] .inventory-editor-panel--nested > details > .inventory-editor-summary{
+  font-size:18px;font-weight:600
+}
+[data-record-consumption-services] .inventory-editor-panel__body{min-width:0}
+[data-record-consumption-services] .record-consumption-read-list{width:100%}
