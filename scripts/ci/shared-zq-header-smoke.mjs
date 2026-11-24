@@ -37,7 +37,9 @@ for (const count of [0, 1, 2, 3, 4]) {
   assert.doesNotMatch(getStyle(q, 'q', 'body'), /padding-top/, 'Q must not have second gap');
 }
 
-assert.match(css, /\.v2-layer-portal\.is-q>\.v2-layer-backdrop\[data-v2-q="true"\]>\.v2-layer--standard\{[^}]*padding-top:0\}/);
+const qSurface = css.match(/\.v2-layer-portal\.is-q>\.v2-layer-backdrop\[data-v2-q="true"\]>\.v2-layer--standard\{([^}]*)\}/)?.[1] || '';
+assert.match(qSurface, /(?:^|;)padding-top:0(?:;|$)/, 'Q has no duplicate top padding');
+assert.match(qSurface, /(?:^|;)background:var\(--v2-inner-surface\)(?:;|$)/, 'Q uses the approved warm surface');
 assert.match(css, /\.v2-q-title,\.v2-z-title\{[^}]*height:46px;min-height:46px;max-height:46px/);
 assert.match(arrow, /'margin:0 0 0 18px'/);
 assert.match(surface, /\.ui-search-field\{padding:0\}/);

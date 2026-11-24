@@ -34,14 +34,17 @@ const markerOrder = [
   "name: 'procedureDuration'",
   "name: 'procedureCost'",
   "name: 'procedureDescription'",
-  "title: 'Групповая запись'",
-  "serviceWorkplaceSelector(procedure.workplaces)",
+  "procedureGroupBookingFields({",
+  "data-procedure-online-check",
+  "serviceGroupFields('procedures',",
+  "serviceWorkplaceAssignmentList()",
 ];
 const positions = markerOrder.map((marker) => source.indexOf(marker));
-assert.ok(positions.every((position) => position >= 0), 'All six form sections must exist');
+assert.ok(positions.every((position) => position >= 0), 'All current form sections must exist');
 assert.deepEqual(positions, [...positions].sort((a, b) => a - b), 'Field sections must use the approved order');
+assert.match(readFileSync('core/service/procedures/group-booking-ui.js', 'utf8'), /title: 'Групповая запись'/, 'Group booking label belongs to its shared UI owner');
 assert.match(source, /setSharedActionVisible\(actions, changed\)/, 'Shared Save visibility must follow dirty state');
-assert.match(source, /if \(saving \|\| !syncDirty\(\)\) return null/, 'Unchanged form must not submit');
+assert.match(source, /if \(saving \|\| assignmentSaving \|\| !syncDirty\(\)\) return null/, 'Unchanged or busy form must not submit');
 assert.match(source, /onChange: \(workplaces\) => \{[\s\S]*?syncDirty\(\)/, 'Workplace changes must sync');
 assert.match(source, /if \(event\.target\.closest\('\[data-cost-mode\]'\)\) syncDirty\(\)/, 'Cost-mode changes must sync');
 assert.match(source, /form\.addEventListener\('input', syncDirty\)/, 'Text changes must sync');
