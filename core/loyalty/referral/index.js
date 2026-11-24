@@ -26,10 +26,12 @@ import {
   v2Section,
   v2ZLayer,
 } from '../../../ui/ui.js';
-import { getProcedures } from '../../service/procedures/data.js';
 import {
   bindViewSettings,
   formObject,
+  periodLabel,
+  serviceItems,
+  serviceName,
   initLoyaltyTermFields,
   initOptionalUeiField,
   loyaltyCardFields,
@@ -85,7 +87,6 @@ function eventLabel(value = '') {
 function rewardTypeLabel(value = '') { return value === 'fixed' ? 'Фиксированные бонусы' : 'Процент от базы'; }
 function assignmentLabel(value = '') { return value === 'selected' ? 'Выбранным контактам' : 'Всем контактам'; }
 function relationStatus(value = '') { if (value === 'completed') return 'Выполнено'; if (value === 'cancelled') return 'Отменено'; return 'Ожидает результата'; }
-function periodLabel(count = 0, unit = 'days') { const amount = Math.max(1, Number(count || 1)); return `${amount} ${unit === 'months' ? 'мес.' : unit === 'years' ? 'лет' : 'дн.'}`; }
 
 function capLabel(program = {}) {
   const value = Math.max(0, Number(program.capValue || 0));
@@ -198,9 +199,6 @@ function levelFields(level, reward = {}) {
 }
 
 function baseLabel(value = '') { if (value === 'items') return 'Сумма выбранных позиций'; if (value === 'supported') return 'Поддерживаемая база программы'; return 'Сумма оплаченной операции'; }
-function serviceItems() { return getProcedures().map((item) => ({ value: String(item.id || ''), label: item.name || 'Позиция Сервиса' })).filter((item) => item.value); }
-function serviceName(id = '') { return serviceItems().find((item) => item.value === String(id || ''))?.label || ''; }
-
 function initReferralConstructor(layer, editingProgram = null) {
   const form = layer?.querySelector?.('[data-referral-form]');
   if (!form) return;

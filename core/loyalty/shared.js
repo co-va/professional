@@ -24,6 +24,7 @@ import { getCardAppearanceTemplate, saveCardAppearanceTemplate } from '../card-a
 import { getAllPeople } from '../people/data.js';
 import { personDisplay } from '../people/presentation.js';
 import { getProfile } from '../profile/data.js';
+import { getProcedures } from '../service/procedures/data.js';
 import {
   loyaltyCardAppearance,
   loyaltyCardFields,
@@ -59,7 +60,7 @@ export function notifyLoyaltyContext() {
   window.dispatchEvent(new CustomEvent('va-tools:v2-context-changed'));
 }
 
-function crop(value) {
+export function crop(value) {
   const number = Number(value);
   return Number.isFinite(number) ? Math.max(0, Math.min(100, Math.round(number))) : 50;
 }
@@ -381,3 +382,11 @@ export function availablePeople(fallback = []) {
 }
 
 export { loyaltyCardFields };
+
+export function periodLabel(count = 0, unit = 'days') { const amount = Math.max(1, Number(count || 1)); return `${amount} ${unit === 'months' ? 'мес.' : unit === 'years' ? 'лет' : 'дн.'}`; }
+
+export function serviceItems() {
+  return getProcedures().map((item) => ({ value: String(item.id || ''), label: item.name || 'Позиция Сервиса' })).filter((item) => item.value);
+}
+
+export function serviceName(id = '') { return serviceItems().find((item) => item.value === String(id || ''))?.label || ''; }

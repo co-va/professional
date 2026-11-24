@@ -30,10 +30,12 @@ import {
   v2Section,
   v2ZLayer,
 } from '../../../ui/ui.js';
-import { getProcedures } from '../../service/procedures/data.js';
 import {
   bindViewSettings,
   formObject,
+  periodLabel,
+  serviceItems as services,
+  serviceName,
   initLoyaltyTermFields,
   initOptionalUeiField,
   loyaltyCardFields,
@@ -77,7 +79,6 @@ function statusLabel(status = '') {
 }
 
 function assignmentLabel(value = '') { return value === 'selected' ? 'Выбранным контактам' : 'Всем контактам'; }
-function periodLabel(count = 0, unit = 'days') { const amount = Math.max(1, Number(count || 1)); return `${amount} ${unit === 'months' ? 'мес.' : unit === 'years' ? 'лет' : 'дн.'}`; }
 
 function conditionLabel(value = '') {
   if (value === 'first-paid') return 'Первая оплаченная операция';
@@ -220,12 +221,6 @@ function participantList(items = []) {
 function openConditions(program = {}) {
   return openDocumentViewer({ title: program.name || 'Условия бонусной программы', content: programConditions(program) });
 }
-
-function services() {
-  return getProcedures().map((item) => ({ value: String(item.id || ''), label: item.name || 'Позиция Сервиса' })).filter((item) => item.value);
-}
-
-function serviceName(id = '') { return services().find((item) => item.value === String(id || ''))?.label || ''; }
 
 function tierFields(index, tier = {}) {
   return `<div data-bonus-tier="${index}">${twoColumnLayout(

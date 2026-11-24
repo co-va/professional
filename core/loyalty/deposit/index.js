@@ -36,7 +36,7 @@ import { getAllPeople } from '../../people/data.js';
 import { personDisplay } from '../../people/presentation.js';
 import { getCardAppearanceTemplate, saveCardAppearanceTemplate } from '../../card-appearance-templates.js';
 import { createUEI, getUEI, listUEIs, normalizeUEI, releaseUEI, replaceUEI } from '../../uei.js';
-import { openLoyaltySettingsMenu } from '../shared.js';
+import { crop, formObject, personOption as contactOption, openLoyaltySettingsMenu } from '../shared.js';
 import { openDepositExcelQ } from './excel.js';
 import {
   correctDepositFunding,
@@ -73,11 +73,6 @@ function notifyContext() {
   window.dispatchEvent(new CustomEvent('va-tools:v2-context-changed'));
 }
 
-function crop(value) {
-  const number = Number(value);
-  return Number.isFinite(number) ? Math.max(0, Math.min(100, Math.round(number))) : 50;
-}
-
 function depositHeaderContext({ title = 'Депозит', settingsData = '', settingsAria = 'Настройки депозита', c = null } = {}) {
   const profile = getProfile();
   const profileName = [profile?.name, profile?.surname].filter(Boolean).join(' ').trim() || 'Профиль';
@@ -97,10 +92,6 @@ function depositHeaderContext({ title = 'Депозит', settingsData = '', set
   });
 }
 
-function formObject(form) {
-  return Object.fromEntries([...new FormData(form).entries()].map(([key, value]) => [key, typeof value === 'string' ? value.trim() : value]));
-}
-
 function depositStatusLabel(status = '') {
   if (status === 'expired') return 'Списан';
   if (status === 'closed') return 'Закрыт';
@@ -110,14 +101,6 @@ function depositStatusLabel(status = '') {
 function contactLabel(person = {}) {
   const display = personDisplay(person);
   return display.name || 'Без имени';
-}
-
-function contactOption(person = {}) {
-  const display = personDisplay(person);
-  return {
-    value: String(person?.key || person?.id || ''),
-    label: [display.uei, display.name].filter(Boolean).join(' · ') || 'Без имени',
-  };
 }
 
 function programUei(program = {}) {
