@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { apiResponseJson } from '../../core/auth.js';
 
 const read = (path) => readFileSync(path, 'utf8');
 const stripImports = (source) => source
@@ -35,7 +36,7 @@ let remote = { wallets: actual, investments: [], loans: [] };
 let rejectRequest = false;
 const auxiliary = new Function('apiRequest', 'getWallets', 'hydrateCashEntitiesFromServer',
   'hydrateFinanceFromServer', 'hydrateWalletsFromServer', 'hydrateProductsFromServer',
-  'hydrateTagsFromServer', 'hydrateCardAppearanceTemplates', 'window',
+  'hydrateTagsFromServer', 'hydrateCardAppearanceTemplates', 'window', 'payload',
   stripImports(auxiliarySource) + '\nreturn { loadWalletCatalog, loadAuxiliaryState };')(
     async (path) => {
       requests.push(path);
@@ -43,7 +44,7 @@ const auxiliary = new Function('apiRequest', 'getWallets', 'hydrateCashEntitiesF
       return { ok: true, json: async () => remote };
     },
     wallets.getWallets, () => {}, () => {}, wallets.hydrateWalletsFromServer,
-    () => {}, () => {}, () => {}, fakeWindow,
+    () => {}, () => {}, () => {}, fakeWindow, apiResponseJson,
   );
 
 assert.deepEqual(wallets.getWallets(), [], 'Cold Journal must begin without hydrated wallet data');
