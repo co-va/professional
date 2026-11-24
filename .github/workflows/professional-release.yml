@@ -1,8 +1,6 @@
 name: Professional / Release
 
 on:
-  push:
-    branches: [staging]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -87,3 +85,4 @@ jobs:
         run: |
           docker build --progress=plain -t professional-release .
           docker run --rm professional-release nginx -t
+          bash scripts/verify-preview-routing.sh

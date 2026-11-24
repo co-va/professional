@@ -6,5 +6,6 @@ RUN node scripts/build-web.mjs
 
 FROM nginx:1.27-alpine
 COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY nginx-api.conf /etc/nginx/professional-api.conf
 COPY --from=build /src/dist/ /usr/share/nginx/html/
 EXPOSE 3000
