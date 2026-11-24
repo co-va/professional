@@ -1,5 +1,5 @@
 import { button, emptyState, modal, mountModal, openNotice, select } from '../../ui/ui.js';
-import { loyaltyNavigationItems } from './index.js';
+import { loyaltyNavigationItems, loadLoyaltyModule } from './index.js';
 
 // Use the canonical Loyalty E list, but only programs that require manual
 // assignment. Personal Account is automatic and stays accessible from the
@@ -12,7 +12,7 @@ export function personProgramActionTypes() {
 // is operational. A future E-card is automatically listed, and its own catalog
 // becomes selectable as soon as that module implements the shared contract.
 async function loadPersonProgramWorkflow(kind, person) {
-  const module = await import(`./${kind}/index.js`);
+  const module = await loadLoyaltyModule(kind);
   if (typeof module.getPersonProgramChoices !== 'function'
     || typeof module.openPersonProgramChoice !== 'function') return null;
   const settings = await module.getPersonProgramChoices(person);

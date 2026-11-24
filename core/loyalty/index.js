@@ -3,14 +3,20 @@ import { loyaltyHeader } from './shared.js';
 import { canUseCapability } from '../access.js';
 
 const LOYALTY_NAVIGATION = [
-  { id: 'deposit', label: 'Депозит', capability: 'loyalty.deposit.access' },
+  { id: 'deposit', load: () => import('./deposit/index.js'), label: 'Депозит', capability: 'loyalty.deposit.access' },
   // Created automatically on first access for each Person; not a manually issued program.
-  { id: 'personal-account', label: 'Личный счёт', capability: 'loyalty.personal_account.access', assignableToPerson: false },
-  { id: 'certificate', label: 'Сертификат', capability: 'loyalty.certificate.access' },
-  { id: 'subscription', label: 'Абонемент', capability: 'loyalty.subscription.access' },
-  { id: 'referral', label: 'Реферальная программа', capability: 'loyalty.referral.access' },
-  { id: 'bonus', label: 'Бонусная программа', capability: 'loyalty.bonus.access' },
+  { id: 'personal-account', load: () => import('./personal-account/index.js'), label: 'Личный счёт', capability: 'loyalty.personal_account.access', assignableToPerson: false },
+  { id: 'certificate', load: () => import('./certificate/index.js'), label: 'Сертификат', capability: 'loyalty.certificate.access' },
+  { id: 'subscription', load: () => import('./subscription/index.js'), label: 'Абонемент', capability: 'loyalty.subscription.access' },
+  { id: 'referral', load: () => import('./referral/index.js'), label: 'Реферальная программа', capability: 'loyalty.referral.access' },
+  { id: 'bonus', load: () => import('./bonus/index.js'), label: 'Бонусная программа', capability: 'loyalty.bonus.access' },
 ];
+
+export function loadLoyaltyModule(id) {
+  const item = LOYALTY_NAVIGATION.find(entry => entry.id === id);
+  if (!item) throw new Error(`Unknown Loyalty E "${id}"`);
+  return item.load();
+}
 
 export function loyaltyNavigationItems() {
   return LOYALTY_NAVIGATION
@@ -24,7 +30,7 @@ export function loyaltyNavigationItems() {
  */
 export async function collectPersonLoyaltyCards(person = {}, { refresh = true } = {}) {
   const groups = await Promise.all(loyaltyNavigationItems().map(async ({ id }) => {
-    const owner = await import(`./${id}/index.js`);
+    const owner = await loadLoyaltyModule(id);
     if (typeof owner.getPersonLoyaltyCards !== 'function') {
       throw new Error(`Loyalty E "${id}" has no Person card contract`);
     }
@@ -45,7 +51,7 @@ export async function renderLoyaltySection(root, section = 'deposit') {
     root.innerHTML = page([loyaltyHeader('Лояльность'), emptyState('Инструмент недоступен', 'У вас нет доступа к этому инструменту.')]);
     return;
   }
-  const owner = await import(`./${section}/index.js`);
+  const owner = await loadLoyaltyModule(section);
   if (typeof owner.render !== 'function') {
     throw new Error(`Loyalty E "${section}" has no render entrypoint`);
   }
