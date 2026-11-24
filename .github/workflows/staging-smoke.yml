@@ -37,6 +37,13 @@ jobs:
             echo 'Production must not be served as staging'; exit 1
           fi
           echo 'Checking staging preview host'
+          expected="$(git ls-remote origin refs/heads/staging | cut -f1)"
+          for attempt in $(seq 1 12); do
+            current="$(curl -fsS --max-time 10 "$preview/__preview_revision" || true)"
+            if [ "$current" = "$expected" ]; then break; fi
+            sleep 5
+          done
+          test "$current" = "$expected"
           fetch --fail -D "$tmp/preview.headers" "$preview/" -o "$tmp/preview.html"
           grep -qi '^x-co-va-preview: staging' "$tmp/preview.headers"
           grep -qi '^content-type: text/html' "$tmp/preview.headers"
@@ -44,7 +51,9 @@ jobs:
           for file in professional.js ui/v2/v2.css; do
             fetch --fail -D "$tmp/asset.headers" "$preview/$file" -o "$tmp/asset"
             grep -qi '^x-co-va-preview: staging' "$tmp/asset.headers"
-            cmp "$file" "$tmp/asset"
+            git fetch --quiet --depth=1 origin "$expected"
+            git show "$expected:$file" > "$tmp/expected-asset"
+            cmp "$tmp/expected-asset" "$tmp/asset"
             case "$file" in
               *.js) grep -qi '^content-type:.*javascript' "$tmp/asset.headers";;
               *.css) grep -qi '^content-type:.*text/css' "$tmp/asset.headers";;
@@ -55,4 +64,29 @@ jobs:
             401|403) ;;
             *) echo "Unexpected preview API status: $status"; exit 1;;
           esac
-          echo 'PASS: production compiled assets, staging raw assets, MIME and unauthorized API denial'
+          echo 'PASS: production compiled assets, staging snapshot assets, MIME and unauthorized API denial'
+
+      - name: Verify actual browser loads the authenticated workspace module
+        run: |
+          npm install --no-save --no-package-lock playwright@1.56.1
+          npx playwright install chromium
+          node --input-type=module <<'JS'
+          import { chromium } from 'playwright';
+          const browser=await chromium.launch({headless:true});
+          try {
+            const page=await browser.newPage();
+            page.on('requestfailed',r=>console.log('REQUEST FAILED',r.url(),r.failure()?.errorText));
+            page.on('response',r=>{if(r.status()>=400) console.log('HTTP',r.status(),r.url());});
+            page.on('pageerror',e=>console.log('PAGE ERROR',e.message));
+            page.on('console',m=>{if(m.type()==='error')console.log('BROWSER',m.text());});
+            // Never authenticate or mutate live account data.
+            await page.route('**/api/**',route=>route.fulfill({status:401,contentType:'application/json',body:'{}'}));
+            await page.goto('https://professional-volokovykh.msk1.amvera.tech/',{waitUntil:'domcontentloaded',timeout:90000});
+            const result=await page.evaluate(async()=>{
+              try {const m=await import('/professional/workspace.js');return {ok:typeof m.renderAuthenticated==='function'};}
+              catch(e){return {ok:false,message:e.message,stack:e.stack};}
+            });
+            console.log('WORKSPACE',JSON.stringify(result));
+            if(!result.ok)throw Error('Live workspace import failed');
+          } finally {await browser.close();}
+          JS
