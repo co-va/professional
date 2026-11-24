@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
+import { nonnegativeNumber } from '../../ui/utils/values.js';
 
 const read = (file) => readFileSync(file, 'utf8');
 const strip = (source) => source
@@ -55,6 +56,7 @@ assert.equal(person.discountPercent, 0, 'Program does not copy a second percenta
 
 const procedure = runInNewContext(strip(read('core/payment/procedure-adjustment.js'))
   + '\ngetRecordProcedurePaymentAdjustment', {
+  numberValue: nonnegativeNumber,
   getRecord: () => record, getRecordPaymentState: settlement.getRecordPaymentState,
   resolveRecordSettlement: settlement.resolveRecordSettlement,
 });
