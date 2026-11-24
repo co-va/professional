@@ -1,3 +1,5 @@
+import { formatReportRubles as formatRubles, formatReportNumber as formatNumber } from '../ui/utils/values.js';
+import { recordDurationHours } from '../core/time/index.js';
 import { viewNavigation, initViewNavigation, ALL_WORKPLACES_ID, modal, mountModal, openDayWorkplaceControl, openSharedProfileSettingsMenu, workspaceHeaderContext, button } from '../ui/ui.js';
 import { setV2ZHeaderRows, clearV2ZHeaderRows } from '../ui/v2/z-layout.js';
 import { getWorkplaceContext, setWorkplaceContext } from '../core/workplace-context.js';
@@ -44,31 +46,9 @@ function monthPrefix(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-`;
 }
 
-function formatRubles(value = 0) {
-  const amount = Math.max(0, Number(value) || 0);
-  return `${new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(amount).replaceAll('\u00a0', ' ')} р.`;
-}
 
-function formatNumber(value = 0) {
-  const number = Math.max(0, Number(value) || 0);
-  return new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(number).replaceAll('\u00a0', ' ');
-}
 
-function timeMinutes(value = '') {
-  const match = String(value || '').match(/^(\d{1,2}):(\d{2})/);
-  if (!match) return null;
-  const hours = Number(match[1]);
-  const minutes = Number(match[2]);
-  if (!Number.isFinite(hours) || !Number.isFinite(minutes) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
-  return hours * 60 + minutes;
-}
 
-function recordDurationHours(record = null) {
-  const from = timeMinutes(record?.from);
-  const to = timeMinutes(record?.to);
-  if (from == null || to == null || to <= from) return 0;
-  return (to - from) / 60;
-}
 
 function recordHasEnded(record = null, now = new Date()) {
   const workplace = getWorkplaces().find((entry) =>

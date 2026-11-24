@@ -1,3 +1,9 @@
+import { formatSignedMoney } from '../../../ui/utils/values.js';
+
+function formatMoney(value = 0, { signed = false } = {}) {
+  return formatSignedMoney(value, signed);
+}
+
 import {
   actionBlock,
   button,
@@ -32,12 +38,6 @@ import { renderIncomeExpenseOperation } from './income-expense.js';
 import { SPECIAL_FINANCE_ACTIONS, renderSpecialFinanceOperation } from './special-operations.js';
 import { openDDSExcel } from './excel.js';
 
-function formatMoney(value = 0, { signed = false } = {}) {
-  const amount = Number(value) || 0;
-  const absolute = Math.abs(amount).toLocaleString('ru-RU').replaceAll('\u00a0', ' ');
-  if (!signed || Math.abs(amount) < 0.009) return `${absolute} ₽`;
-  return `${amount < 0 ? '−' : '+'}${absolute} ₽`;
-}
 
 function operationMoment(item) {
   const raw = item?.occurredAt || item?.refundedAt || item?.paidAt || '';

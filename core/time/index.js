@@ -42,3 +42,5 @@ export {
   zonedDateTimeParts,
   zonedDateTimeToDate,
 } from './zone.js';
+
+export { timeMinutes, recordDurationHours } from './math.js';

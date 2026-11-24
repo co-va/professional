@@ -1,3 +1,4 @@
+import { formatSignedMoney as money } from '../../../ui/utils/values.js';
 import {
   button,
   datePicker,
@@ -10,12 +11,6 @@ import {
 import { financeDateRange, financeLocalDateValue } from '../date.js';
 import { getZReport } from '../read.js';
 
-function money(value = 0, signed = false) {
-  const amount = Number(value) || 0;
-  const absolute = Math.abs(amount).toLocaleString('ru-RU').replaceAll('\u00a0', ' ');
-  if (!signed || Math.abs(amount) < 0.009) return `${absolute} ₽`;
-  return `${amount < 0 ? '−' : '+'}${absolute} ₽`;
-}
 
 function summaryList(report) {
   return list({

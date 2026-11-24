@@ -73,3 +73,19 @@ export function rangesOverlap(fromA, toA, fromB, toB) {
 export function localDateKey(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
+
+export function timeMinutes(value = '') {
+  const match = String(value || '').match(/^(\d{1,2}):(\d{2})/);
+  if (!match) return null;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
+  return hours * 60 + minutes;
+}
+
+export function recordDurationHours(record = null) {
+  const from = timeMinutes(record?.from);
+  const to = timeMinutes(record?.to);
+  if (from == null || to == null || to <= from) return 0;
+  return (to - from) / 60;
+}
