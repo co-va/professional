@@ -59,10 +59,6 @@
   grid-template-columns:minmax(0,1fr) var(--ui-compact-size) var(--ui-compact-size);gap:6px
 }
 [data-record-consumption-services] .record-consumption-group-header>.field{min-width:0;gap:0}
-[data-record-consumption-services] .record-consumption-group-header>.field input{
-  box-sizing:border-box;min-width:0;padding:0 12px;font-weight:600;font-size:18px
-}
-[data-record-consumption-services] .record-consumption-group-header>.field input:focus{border-bottom-color:var(--text-secondary)}
 [data-record-consumption-services] .record-consumption-product{
   grid-template-columns:minmax(0,1fr) 86px var(--ui-compact-size);gap:6px;
   padding:2px 0;border-bottom:1px solid var(--border);background:transparent

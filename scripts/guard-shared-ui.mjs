@@ -85,7 +85,9 @@ assert(shellStyle.includes('--ui-field-height:46px;') && shellStyle.includes('--
 assert(inputs.includes('height:var(--ui-field-height);min-height:var(--ui-field-height);max-height:var(--ui-field-height)'), 'Shared one-line inputs must be exactly 46px');
 assert(['.ui-select__control{','.ui-selector__search{','.ui-selector__option{'].every(c=>{const q=selectorsStyle.split(c)[1]?.split('}')[0]||'';return q.includes('height:var(--ui-selector-control-height);min-height:var(--ui-selector-control-height);max-height:var(--ui-selector-control-height)')}), 'Selector rows, search and trigger must be exactly 46px');
 assert(!bookingStyle.includes('min-height:52px'), 'Booking account editor cannot use 52px controls');
-assert(bookingStyle.includes('--booking-control-radius:0px'), 'Booking text controls must match Shared square fields');
+assert(!bookingStyle.includes('--booking-control-radius') && !bookingStyle.includes('.booking-account .field input'), 'Booking must inherit Shared fields, not override them');
+assert(!read('ui/forms/forms.css').includes('.ui-select__control'), 'Stock must not override Shared selector geometry');
+assert(!inputs.includes('.link-row .ui-select__control'), 'Links must not override Shared selector geometry');
 const checkCss = read('ui/selection/check-list.css');
 const checkJs = read('ui/selection/check-list.js');
 const notificationCss = read('ui/settings/settings.css');

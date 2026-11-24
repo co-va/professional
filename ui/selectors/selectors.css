@@ -1,9 +1,9 @@
 :root{--ui-selector-control-height:var(--ui-field-height)}
 .ui-select{min-width:0;max-width:100%}
-.ui-select__control{position:relative;width:100%;max-width:100%;min-width:0;height:var(--ui-selector-control-height);min-height:var(--ui-selector-control-height);max-height:var(--ui-selector-control-height);border:1px solid var(--border);border-radius:0;padding:0 40px 0 13px;display:flex;align-items:center;justify-content:center;gap:10px;overflow:hidden;background:var(--white);color:var(--text);font:inherit;text-align:center;cursor:pointer}
+.ui-select__control{position:relative;width:100%;max-width:100%;min-width:0;height:var(--ui-selector-control-height);min-height:var(--ui-selector-control-height);max-height:var(--ui-selector-control-height);border:1px solid var(--border);border-radius:0;padding:0 clamp(17px,12%,40px) 0 clamp(3px,4%,13px);display:flex;align-items:center;justify-content:center;gap:10px;overflow:hidden;background:var(--white);color:var(--text);font:inherit;text-align:center;cursor:pointer}
 .ui-select__control:focus-visible{outline:2px solid var(--text-secondary);outline-offset:2px}
 .ui-select__value{flex:1 1 auto;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center}
-.ui-select__chevron{position:absolute;right:13px;flex:0 0 auto;color:var(--text-secondary);font-size:17px;line-height:1}
+.ui-select__chevron{position:absolute;right:clamp(3px,4%,13px);flex:0 0 auto;color:var(--text-secondary);font-size:17px;line-height:1}
 .ui-selector{display:grid;min-width:0}
 .ui-selector__wheel{width:100%;min-width:0;border:1px solid var(--border);border-radius:0;background:var(--white);overflow:hidden}
 .ui-selector__search-wrap{padding:10px 12px;border-bottom:1px solid var(--border);background:var(--white)}
@@ -38,6 +38,5 @@
 .ui-select--center .ui-select__selection{justify-content:center;width:100%}
 .ui-select--center .ui-select__text{flex:0 1 auto;text-align:center}
 .ui-select--center .ui-select__value{text-align:center}
-.ui-select--center .ui-select__chevron{position:absolute;right:13px}
 .ui-selector--center .ui-selector__option{justify-content:center;text-align:center}
 .ui-selector--center .ui-selector__option-main{flex:0 1 auto;text-align:center}

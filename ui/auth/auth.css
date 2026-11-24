@@ -3,7 +3,7 @@ body:has(.shared-login-screen){background:var(--surface-dark)}
 .app-shell:has(.shared-login-screen){width:100%;max-width:none;min-height:100dvh;margin:0;padding-top:0;background:var(--surface-dark);box-shadow:none}
 .shared-login-screen{width:min(100%,var(--app-max-width));min-height:100dvh;margin:0 auto;background:var(--surface-dark)}
 .shared-login-screen .v2-sticker{border-radius:0}
-.shared-login-form .field input,.shared-login-form .password-field__control input{border-radius:0!important}
+
 .shared-login-form .v2-sticker-link{border-radius:0}
 .shared-login-screen .ui-button:active,[data-shared-profile-action="logout"]:active{transform:translateY(1px);filter:brightness(.9)}
 

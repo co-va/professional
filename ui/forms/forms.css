@@ -173,8 +173,6 @@
 .inventory-editor-label{font-size:13px;color:var(--text-secondary);line-height:normal}
 .inventory-editor-measure__control{min-width:0;display:grid;grid-template-columns:minmax(0,1fr) minmax(60px,68px);gap:4px}
 .inventory-editor-measure__control > .field > span:empty{display:none}
-.inventory-editor-measure__control .ui-select__control,.inventory-editor-row--three .ui-select__control{box-sizing:border-box;width:100%;min-width:0;padding:0 17px 0 3px}
-.inventory-editor-measure__control .ui-select__chevron,.inventory-editor-row--three .ui-select__chevron{right:3px;font-size:13px}
 .inventory-editor-number{position:relative;min-width:0}
 .inventory-editor-number .field input{box-sizing:border-box;min-width:0;padding-right:41px;text-overflow:clip;font-variant-numeric:tabular-nums}
 .inventory-editor-number__suffix{position:absolute;right:12px;bottom:16px;font-size:12px;line-height:1;color:var(--text-secondary);pointer-events:none;white-space:nowrap}
@@ -239,7 +237,6 @@
 .stock-position-group-row--removable{grid-template-columns:minmax(0,1fr) minmax(0,1fr) var(--ui-compact-size);align-items:center}
 .stock-position-group-row--removable>.ui-compact-button{justify-self:center}
 .stock-position-group-row .ui-select{min-width:0}
-.stock-position-group-row .ui-select__control{box-sizing:border-box;width:100%;min-width:0}
 .stock-position-static-content{min-height:var(--ui-field-height);display:flex;align-items:center;justify-content:space-between;gap:8px}
 .stock-position-number{position:relative;min-width:0}
 .stock-position-number .field{min-width:0}
