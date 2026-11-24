@@ -47,10 +47,10 @@ assert.match(details, /\['Артикул',/);
 assert.match(details, /\['Короткое название',/);
 assert.doesNotMatch(details, /data-company-selection-card|data-company-product-check/);
 assert.match(counterparties, /catalog\/link-status/);
-assert.match(counterparties, /function openSupplierAgreement\(/,
-  'Agreement discount belongs to Counterparty, not Stock card');
-assert.match(counterparties, /listPriceSample/);
-assert.match(counterparties, /purchasePriceSample/);
+assert.match(counterparties, /label: 'Скидка по договору', name: 'discountPercent'/,
+  'Agreement discount belongs to the canonical Counterparty editor, not Stock card');
+assert.match(counterparties, /input\.discountPercent = discount/);
+assert.match(counterparties, /counterpartyFieldMismatch\(input, stored\)/);
 assert.doesNotMatch(counterparties, /function openSupplierBatchPrices\(/);
 assert.match(counterparties, /catalog\/bulk/);
 assert.match(counterparties, /function openSupplierProductEditor\(/);
@@ -59,7 +59,8 @@ assert.match(counterparties, /\['Цена со скидкой', money\(supplierE
 const supplierQ = counterparties.slice(counterparties.indexOf('function openCatalogProductDetails('),
   counterparties.indexOf('function catalogItemList('));
 assert.doesNotMatch(supplierQ, /row\.actualPrice|inventoryItem\.update/);
-assert.match(counterparties, /id: 'discount', label: 'Скидка по договору'/);
+assert.match(counterparties, /value: 'discountPercent', label: 'Скидка по договору'/);
+assert.match(counterparties, /openCompanyEditor\(company, saved =>/);
 assert.match(counterparties, /unitsPerOffer/);
 assert.match(classification, /createInventoryClassificationGroup/);
 assert.match(classification, /updateInventoryClassificationGroup/);

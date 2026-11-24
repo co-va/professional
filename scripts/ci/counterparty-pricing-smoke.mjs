@@ -293,7 +293,7 @@ const formNode = Object.assign(events(), {
 const mockLayer = {
   isConnected: true,
   querySelector(name) { return name === '[data-company-bulk-editor]' ? formNode : null; },
-  v2Close() { closeCount++; this.isConnected = false; },
+  v2Close() { closeCount++; mockLayer.isConnected = false; },
 };
 const bulkMocks = {
   document: { body: {} },

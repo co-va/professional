@@ -44,7 +44,7 @@ assert.equal(refreshed,2,'Verified reorder response refreshes the state once');
 
 response = {ok:true,status:200,payload:{items:[{itemId:'a',manufacturer:'CHI',position:1}]}};
 await assert.rejects(()=>service.reorderInventoryItems('CHI',['a','b']),
-  /Порядок не сохранён/);
+  /Сервер не подтвердил непрерывный порядок производителя/);
 assert.equal(refreshed,2,'Incomplete reorder response is not accepted');
 
 assert.match(editor, /data-stock-position-error hidden role="alert"/,
