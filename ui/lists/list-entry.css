@@ -30,6 +30,19 @@
 .contact-review-batch .inventory-editor-panel{margin:0;min-width:0}
 .contact-review-batch .inventory-editor-panel__body{padding:8px 0}
 .contact-review-batch .list-entries{gap:6px}
+.contact-review-batch .list-entry:not(.contact-review-item){
+  min-height:46px
+}
+.contact-review-batch .list-entry:not(.contact-review-item) .list-entry__content{
+  min-height:46px;padding:8px 10px
+}
+.contact-review-batch .list-entry:not(.contact-review-item) .list-entry__text{gap:2px}
+.contact-review-batch .list-entry:not(.contact-review-item) .list-entry__main strong{
+  font-size:13px;line-height:1.2
+}
+.contact-review-batch .list-entry:not(.contact-review-item) .list-entry__main small{
+  font-size:11px;line-height:1.2
+}
 .contact-review-item{min-width:0;min-height:0}
 .contact-review-item .list-entry__content{
   display:grid;grid-template-columns:20px minmax(0,1fr);
