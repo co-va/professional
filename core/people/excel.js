@@ -4,7 +4,7 @@ import {
 } from '../../ui/ui.js';
 import { apiRequest } from '../auth.js';
 import { getPersonPriceCondition } from './data.js';
-import { openContactImportBatches, openContactImportUpload } from './contact-import-review.js';
+import { openContactImportUpload } from './contact-import-review.js';
 
 function message(error) {
   if (error instanceof Error && error.message && !/HTTP|fetch|network|404|500|502|503|JSON|API|Failed to|Prisma|SQL|P20\d+|transaction|sourceKey|tenantId|stack|undefined|constraint|database/i.test(error.message))
@@ -155,8 +155,6 @@ export function openPeopleExcelMenu(root, { getRows = () => [], onLoaded = () =>
     { id: 'export', label: 'Выгрузка', run: () => openPeopleExport(root, getRows) },
     { id: 'import', label: 'Загрузка', run: () => chooseAndLoad(root, onLoaded) },
     { id: 'template', label: 'Шаблон', run: () => getWorkbook([], true) },
-    { id: 'uploads', label: 'Загрузки', run: () =>
-      openContactImportBatches(root, { onLoaded }) },
   ];
   const markup = '<div class="modal-actions">'
     + actions.map(action => button(action.label, {

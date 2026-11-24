@@ -51,6 +51,7 @@ import { flushBusinessPersistence, isBusinessServerReady } from '../business-per
 import { bindPersonCreateForm, personCreateForm } from './create.js';
 import { personDisplay } from './presentation.js';
 import { openPeopleExcelMenu } from './excel.js';
+import { openContactImportBatches } from './contact-import-review.js';
 import { personCardAppearance, personCardFields } from './card-presentation.js';
 import { getCurrentPersonHistory, getPersonHistory } from './history.js';
 import { getPersonMetadata } from './metadata.js';
@@ -747,17 +748,45 @@ function openFilterSettings(root) {
   return layer;
 }
 
-function openListSettings(root, options = {}) {
+function openListWorkMenu(root) {
   const layer = mountModal(root, modal(`<div class="modal-actions">
     ${button('Сортировка', { variant: 'secondary', data: 'data-people-sort' })}
     ${button('Фильтр', { variant: 'secondary', data: 'data-people-filter' })}
-    ${button('Вид', { variant: 'secondary', data: 'data-people-appearance' })}
-    ${button('Excel', { variant: 'secondary', data: 'data-people-excel' })}
-  </div>`, { title: 'Клиенты', variant: 'x', surface: 'app' }));
+  </div>`, { title: 'Работа со списками', variant: 'x', surface: 'app', xRole: 'action' }));
   if (!layer) return null;
-  layer.querySelector('[data-people-sort]')?.addEventListener('click', () => { layer.v2Close?.(); openSortSettings(root); });
-  layer.querySelector('[data-people-filter]')?.addEventListener('click', () => { layer.v2Close?.(); openFilterSettings(root); });
-  layer.querySelector('[data-people-appearance]')?.addEventListener('click', () => { layer.v2Close?.(); openPeopleAppearanceQ(root, options); });
+  layer.querySelector('[data-people-sort]')?.addEventListener('click', () => {
+    layer.v2Close?.();
+    openSortSettings(root);
+  });
+  layer.querySelector('[data-people-filter]')?.addEventListener('click', () => {
+    layer.v2Close?.();
+    openFilterSettings(root);
+  });
+  return layer;
+}
+
+function openListSettings(root, options = {}) {
+  const layer = mountModal(root, modal(`<div class="modal-actions">
+    ${button('Работа со списками', { variant: 'secondary', data: 'data-people-list-work' })}
+    ${button('Вид', { variant: 'secondary', data: 'data-people-appearance' })}
+    ${button('Загрузки', { variant: 'secondary', data: 'data-people-uploads' })}
+    ${button('Excel', { variant: 'secondary', data: 'data-people-excel' })}
+  </div>`, { title: 'Клиенты', variant: 'x', surface: 'app', xRole: 'action' }));
+  if (!layer) return null;
+  layer.querySelector('[data-people-list-work]')?.addEventListener('click', () => {
+    layer.v2Close?.();
+    openListWorkMenu(root);
+  });
+  layer.querySelector('[data-people-appearance]')?.addEventListener('click', () => {
+    layer.v2Close?.();
+    openPeopleAppearanceQ(root, options);
+  });
+  layer.querySelector('[data-people-uploads]')?.addEventListener('click', () => {
+    layer.v2Close?.();
+    openContactImportBatches(root, {
+      onLoaded: () => renderPeople(root, options),
+    });
+  });
   layer.querySelector('[data-people-excel]')?.addEventListener('click', () => {
     layer.v2Close?.();
     openPeopleExcelMenu(root, {
