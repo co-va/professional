@@ -37,7 +37,8 @@ check() {
   grep -qi '^Cache-Control:.*no-store' "$tmp/headers"
 }
 check / text/html
-grep -q 'src="professional.js"' "$tmp/body"
+grep -q '/assets/' "$tmp/body"
+if grep -q 'src="professional.js"' "$tmp/body"; then exit 1; fi
 check /__preview_revision text/plain
 test "$(cat "$tmp/body")" = "$expected"
 check /professional.js application/javascript
@@ -47,9 +48,9 @@ cmp professional/workspace.js "$tmp/body"
 check /ui/v2/v2.css text/css
 cmp ui/v2/v2.css "$tmp/body"
 check /booking text/html
-grep -q 'online-booking/booking-entry.js' "$tmp/body"
+grep -q '/assets/' "$tmp/body"
 check /invite/ text/html
-grep -q 'invite.js' "$tmp/body"
+grep -q '/assets/' "$tmp/body"
 check /service-worker.js application/javascript
 test "$(curl -sS -H "Host: $preview" -o /dev/null -w '%{http_code}' "$base/PROJECT_STATE.md")" = 404
 test "$(curl -sS -H "Host: $preview" -X POST -o /dev/null -w '%{http_code}' "$base/professional.js")" = 403
@@ -65,9 +66,11 @@ try {
   page.on('response',r=>{if(r.status()>=400)errors.push(r.status()+' '+r.url());});
   await page.route('**/api/**',r=>r.fulfill({status:200,contentType:'application/json',body:'{}'}));
   await page.goto('http://professional-volokovykh.msk1.amvera.tech:3000/',{waitUntil:'domcontentloaded'});
-  const loaded=await page.evaluate(async()=>typeof (await import('/professional/workspace.js')).renderAuthenticated==='function');
-  if(!loaded||errors.length)throw Error('Workspace import failed: '+errors.join('\n'));
-  console.log('PASS: complete workspace dependency graph loaded from local staging snapshot');
+  await page.locator('#app').getByText('Вход в Кабинет',{exact:true}).waitFor({timeout:15000});
+  const assets=await page.evaluate(()=>performance.getEntriesByType('resource').map(r=>new URL(r.name).pathname));
+  if(assets.some(p=>p==='/professional.js'||p==='/professional/workspace.js'||p.startsWith('/core/')))throw Error('Unbundled source requested');
+  if(errors.length)throw Error('Bundled login failed: '+errors.join('\n'));
+  console.log('PASS: bundled login rendered in browser without raw module requests');
 } finally {await browser.close();}
 JS
 docker rm -f "$cid" >/dev/null

@@ -1,4 +1,4 @@
-// Production-only, content-versioned delivery. Source modules stay unchanged.
+// Shared, content-versioned delivery. Source modules stay unchanged.
 // CSS is concatenated in the exact HTML order; esbuild keeps ESM lazy chunks.
 import { build } from 'esbuild';
 import { createHash } from 'node:crypto';
@@ -7,6 +7,7 @@ import path from 'node:path';
 
 const root = process.cwd();
 const output = path.join(root, 'dist');
+const preview = process.env.PROFESSIONAL_PREVIEW_BUILD === '1';
 const publicRoots = [
   'app-icon.svg', 'icon-192.png', 'booking.html', 'chat', 'core', 'css',
   'index.html', 'invite', 'journal', 'manifest.webmanifest', 'online-booking',
@@ -36,6 +37,7 @@ async function descendants(location, prefix = '') {
 const publicFiles = (await descendants(output))
   .filter((file) => !file.startsWith('assets/')).sort();
 const digest = createHash('sha256');
+if (preview) digest.update('preview-single-entry-v1\0');
 for (const file of publicFiles) {
   digest.update(file).update('\0').update(await readFile(path.join(output, file)));
 }
@@ -80,7 +82,7 @@ const result = await build({
   chunkNames: 'chunks/[name]-[hash]',
   assetNames: 'files/[name]-[hash]',
   bundle: true,
-  splitting: true,
+  splitting: !preview,
   platform: 'browser',
   format: 'esm',
   target: ['safari15.4', 'chrome100'],
