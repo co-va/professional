@@ -47,3 +47,23 @@ test "$status" = 404
 status="$(curl -sS -H "Host: $preview" -X POST -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/professional.js)"
 test "$status" = 403
 echo 'PASS: one Amvera container, main production bundle, staging preview routes, MIME, cache and static access boundaries'
+
+# The local HTTP fixture verifies routing but cannot prove the real upstream TLS.
+# Exercise the unmodified production image against both real HTTPS upstreams.
+docker rm -f "$cid" >/dev/null
+cid="$(docker run -d --network host professional-release)"
+for i in $(seq 1 20); do
+  if curl -fsS -H 'Host: prof.va-tools.ru' http://127.0.0.1:3000/ -o "$tmp/main.html"; then break; fi
+  sleep 1
+done
+if ! curl -fsS --retry 3 --retry-all-errors --retry-delay 2 --max-time 25 -H "Host: $preview" -D "$tmp/headers" http://127.0.0.1:3000/ -o "$tmp/body"; then
+  docker logs --tail 60 "$cid"
+  exit 1
+fi
+grep -qi '^X-CO-VA-Preview: staging' "$tmp/headers"
+grep -q 'src="professional.js"' "$tmp/body"
+for host in "$preview" prof.va-tools.ru; do
+  status="$(curl -sS --max-time 25 -H "Host: $host" -H 'Authorization: Bearer ci-invalid-professional-token' -o "$tmp/api.body" -w '%{http_code}' http://127.0.0.1:3000/api/auth/me)"
+  case "$status" in 401|403) ;; *) docker logs --tail 60 "$cid"; echo "Unexpected API status: $status"; exit 1;; esac
+done
+echo 'PASS: real GitHub and Core HTTPS upstreams with certificate verification enabled'

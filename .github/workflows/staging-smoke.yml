@@ -1,0 +1,58 @@
+name: Professional / Staging smoke
+
+on:
+  push:
+    branches: [staging, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: professional-staging-smoke
+  cancel-in-progress: true
+
+jobs:
+  live-preview:
+    name: Live preview
+    runs-on: ubuntu-24.04
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify deployed host split and safe API access
+        shell: bash
+        run: |
+          set -euo pipefail
+          tmp="$(mktemp -d)"
+          trap 'rm -rf "$tmp"' EXIT
+          prod='https://prof.va-tools.ru'
+          preview='https://professional-volokovykh.msk1.amvera.tech'
+          fetch() {
+            curl --silent --show-error --location --retry 4 --retry-all-errors --retry-delay 3 --retry-max-time 75 --connect-timeout 10 --max-time 20 "$@"
+          }
+          echo 'Checking production host'
+          fetch --fail -D "$tmp/main.headers" "$prod/" -o "$tmp/main.html"
+          grep -q '/assets/' "$tmp/main.html"
+          if grep -qi '^x-co-va-preview:' "$tmp/main.headers"; then
+            echo 'Production must not be served as staging'; exit 1
+          fi
+          echo 'Checking staging preview host'
+          fetch --fail -D "$tmp/preview.headers" "$preview/" -o "$tmp/preview.html"
+          grep -qi '^x-co-va-preview: staging' "$tmp/preview.headers"
+          grep -qi '^content-type: text/html' "$tmp/preview.headers"
+          grep -q 'src="professional.js"' "$tmp/preview.html"
+          for file in professional.js ui/v2/v2.css; do
+            fetch --fail -D "$tmp/asset.headers" "$preview/$file" -o "$tmp/asset"
+            grep -qi '^x-co-va-preview: staging' "$tmp/asset.headers"
+            cmp "$file" "$tmp/asset"
+            case "$file" in
+              *.js) grep -qi '^content-type:.*javascript' "$tmp/asset.headers";;
+              *.css) grep -qi '^content-type:.*text/css' "$tmp/asset.headers";;
+            esac
+          done
+          status="$(fetch -H 'Authorization: Bearer ci-invalid-professional-token' -o "$tmp/api.body" -w '%{http_code}' "$preview/api/auth/me")"
+          case "$status" in
+            401|403) ;;
+            *) echo "Unexpected preview API status: $status"; exit 1;;
+          esac
+          echo 'PASS: production compiled assets, staging raw assets, MIME and unauthorized API denial'
