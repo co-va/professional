@@ -86,7 +86,9 @@ function issueRow(item){
 function content(batch){
   const groups=(Array.isArray(batch.groups)?[...batch.groups]:[])
     .sort((a,b)=>Number(b.field==='identity')-Number(a.field==='identity'));
-  const done=(Array.isArray(batch.rows)?batch.rows:[]).filter(row=>row.status==='done');
+  const rows=Array.isArray(batch.rows)?batch.rows:[];
+  const done=rows.filter(row=>row.status==='done');
+  const unchanged=rows.filter(row=>row.status==='unchanged');
   const sections=groups.map(group=>{
     const entries=(batch.issues||[]).filter(item=>item.field===group.field);
     const extra=['email','additionalEmail','phone','additionalPhone'].includes(group.field)
@@ -102,9 +104,13 @@ function content(batch){
     v2ListEntry({title:row.name||'Контакт',
       subtitle:[row.code,'Строка '+row.rowNumber].filter(Boolean).join(' · '),
       interactive:false,omitEmptySubtitle:true}))),false,done.length);
+  const skipped=catalogDisclosure('Без изменений',v2ListEntries(unchanged.map(row=>
+    v2ListEntry({title:row.name||'Контакт',
+      subtitle:[row.code,'Строка '+row.rowNumber].filter(Boolean).join(' · '),
+      interactive:false,omitEmptySubtitle:true}))),false,unchanged.length);
   return '<div class="form-grid contact-review-batch">'+
     '<div>'+escapeHtml(progress(batch))+' · Групп различий: '+groups.length+'</div>'+
-    sections.join('')+completed+
+    sections.join('')+completed+skipped+
     '<p class="form-error" role="alert" data-review-error></p></div>';
 }
 export function openContactImportReview(root,batchId,{onLoaded=()=>{}}={}){
