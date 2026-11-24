@@ -45,11 +45,6 @@ function operationMoment(item) {
   return shortDateTime(raw, fallback);
 }
 
-function recordedMoment(item) {
-  const raw = item?.recordedAt || '';
-  return raw ? shortDateTime(raw, '') : '';
-}
-
 function operationName(item) {
   const kind = String(item?.operationKind || '');
   const type = String(item?.economicType || '');
@@ -77,11 +72,6 @@ function operationName(item) {
   else if (item?.direction === 'IN') label = 'Доход';
   else if (item?.direction === 'OUT') label = 'Расход';
   return item?.operationStatus === 'cancelled' ? `${label} · Отменена` : label;
-}
-
-function operationAmount(item) {
-  const amount = Math.max(0, Number(item?.amount) || Math.abs(Number(item?.total) || 0));
-  return item?.direction === 'OUT' ? -amount : amount;
 }
 
 function walletText(item) {

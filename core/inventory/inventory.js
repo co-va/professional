@@ -1,11 +1,7 @@
 import {
   actionBlock,
   button,
-  compactButton,
   details,
-  columnLayout,
-  datePicker,
-  initDatePickers,
   emptyState,
   field,
   textareaField,
@@ -23,17 +19,16 @@ import {
   v2ListEntries,
   v2ListEntry,
   initV2ListReorder,
-  v2Section,
   v2ZLayer,
   workspaceHeaderContext,
 } from '../../ui/ui.js';
 import { escapeHtml } from '../../ui/utils/escape-html.js';
 import { compactCheck } from '../../ui/selection/check-list.js';
 import { canUseCapability } from '../access.js';
-import { setSharedActionVisible } from '../../ui/page/page.js';
+import '../../ui/page/page.js';
 import {
   inventoryItemCompletion, isWeighedInventoryItem, netStocktakeGrams,
-  inventoryStockThresholdInput, inventoryStockThresholdStored, inventoryStockThresholdUnit,
+  inventoryStockThresholdInput, inventoryStockThresholdStored,
 } from './completeness.js';
 import { openInventoryProductAppearanceQ, openInventoryProductOverview } from './product-overview.js';
 import { openQuickStockItemX, openStockItemQEditor, supplierPurchase } from './stock-item-editor.js';
@@ -50,9 +45,8 @@ import { renderStockBrandList, buildStockCatalogGroups, stockRootCriterion, stoc
 import { stockGroupTree, sortedStockChildren, stockGroupValue } from './grouping.js';
 import { planInventoryPositionReorder, planInventoryMoveToEnd } from './position-reorder-plan.js';
 import { catalogDisclosure } from './catalog-ui.js';
-import { INVENTORY_TOTAL_SCOPE, inventoryDisplayBalance, inventoryDisplayTarget,
-  inventoryItemBelongsToStorage, itemLocationBalance, inventoryLocations,
-  openInventoryStockTargets, storageName } from './stock-targets.js';
+import { INVENTORY_TOTAL_SCOPE, inventoryDisplayBalance,
+  inventoryItemBelongsToStorage, itemLocationBalance, inventoryLocations, storageName } from './stock-targets.js';
 import {
   emptyStockFilters, hasStockFilters, matchesStockFilters,
   stockFilterOptions, stockSupplierNames, STOCK_FILLED, STOCK_EMPTY,
@@ -243,14 +237,6 @@ function itemUsageMode(item = {}) {
   return 'track';
 }
 
-
-const INVENTORY_CARD_UNITS = [
-  ...UNIT_OPTIONS,
-  { value: 'кг', label: 'кг' }, { value: 'л', label: 'л' },
-  { value: 'м', label: 'м' }, { value: 'см', label: 'см' },
-  { value: 'м²', label: 'м²' }, { value: 'пара', label: 'пара' },
-  { value: 'компл.', label: 'компл.' },
-];
 
 // The stock view still needs a lossless count of pieces per purchased pack.
 function inventoryPackPieceCount(item = {}) {
@@ -2359,7 +2345,6 @@ function openInventoryAuditCriteria(root, {
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     if (saving) return;
-    const data = new FormData(form);
     if (isData && definition.value === 'supplier') {
       if (saving || supplierApplied || !supplierCompanyId || !supplierPreview?.some(entry => entry.row)) return;
       saving = true;

@@ -2,7 +2,7 @@ import { apiRequest } from '../auth.js';
 import { flushBusinessPersistence } from '../business-persistence.js';
 import { applyFinancePatch, hydrateFinanceFromServer } from './data.js';
 import { financialNumber } from './rules.js';
-import { getDDSExpenses, getDDSIncome } from './read.js';
+import './read.js';
 
 function notifyFinanceChanged(detail = {}) {
   if (typeof window === 'undefined') return;

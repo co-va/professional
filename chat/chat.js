@@ -15,7 +15,6 @@ import {
   clearV2ZHeaderRows,
   collectCheckList,
   emptyState,
-  escapeHtml,
   field,
   initCheckList,
   v2ListEntries,

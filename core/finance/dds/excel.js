@@ -1,5 +1,5 @@
 import {
-  button,datePicker,initDatePickers,initSegmentControls,modal,mountModal,openNotice,
+  button,datePicker,initDatePickers,initSegmentControls,modal,mountModal,
   segmentControl,select,twoColumnLayout,
 } from '../../../ui/ui.js';
 import { getFinanceOperation } from '../data.js';

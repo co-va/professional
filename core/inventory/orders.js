@@ -30,7 +30,6 @@ const packSize = row => {
   return Number.isFinite(size) && size > 0 ? size : 1;
 };
 const isTube = row => ['г', 'гр', 'гр.', 'грамм', 'граммы'].includes(String(row.unit || '').toLocaleLowerCase('ru-RU'));
-const packageLabel = row => isTube(row) ? 'тюб.' : 'шт.';
 const ORDER_MODES = [
   { value: 'target', label: 'К заказу' },
   { value: 'minimum', label: 'Минимум' },

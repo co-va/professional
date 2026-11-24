@@ -1,12 +1,12 @@
 import {
   actionBlock, button, compactButton, emptyState, escapeHtml, field,
-  list, modal, mountModal, openNotice, page, select, workspaceHeaderContext,
+  list, modal, mountModal, page, select, workspaceHeaderContext,
 } from '../../ui/ui.js';
 import { apiRequest } from '../auth.js';
 import { getInventoryItems } from './data.js';
 import { loadInventory } from './service.js';
 import { inventoryCriterionGroups } from './classification.js';
-import { buildStockCatalogGroups, renderStockBrandList, stockGroupedSections } from './stock-catalog.js';
+import { renderStockBrandList, stockGroupedSections } from './stock-catalog.js';
 import { compactCheck } from '../../ui/selection/check-list.js';
 
 const PATH = '/inventory/consumption-groups';

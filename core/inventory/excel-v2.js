@@ -30,13 +30,6 @@ function errorMessage(error, fallback = 'Ошибка Excel') {
   return error instanceof Error ? error.message : fallback;
 }
 
-async function jsonRequest(path, options = {}) {
-  const response = await apiRequest(`/inventory/excel${path}`, options);
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(payload?.message || 'Не удалось обработать Excel');
-  return payload;
-}
-
 async function downloadWorkbook(path, { method = 'GET', body = null, fallback = 'warehouse.xlsx' } = {}) {
   const response = await apiRequest(`/inventory/excel${path}`, {
     method,
