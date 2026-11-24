@@ -7,7 +7,10 @@ import { hydrateUEIFromServer } from '../uei.js';
 
 const text=v=>String(v??'').trim();
 const request=async(path,data={})=>{
-  const response=await apiRequest('/data-transfer/contacts/'+path,{
+  const reading=path==='batches'||path==='detail';
+  const url='/data-transfer/contacts/'+path+(reading&&data.batchId
+    ?'?batchId='+encodeURIComponent(text(data.batchId)):'');
+  const response=await apiRequest(url,reading?{}:{
     method:'POST',body:JSON.stringify(data),
   });
   const payload=await response.json().catch(()=>({}));
