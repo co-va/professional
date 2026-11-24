@@ -242,7 +242,6 @@ export function miniCard({
   const centerMarkup = `${lineItems.length ? `<div class="mini-card__lines">${lineItems.map(lineMarkup).join('')}</div>` : ''}
     ${rowItems.length ? `<div class="mini-card__rows">${rowItems.map(rowMarkup).join('')}</div>` : ''}`;
   const footerMarkup = actionLabel ? `<span class="mini-card__context-action">${escapeHtml(actionLabel)}</span>` : '';
-  const centerAttrs = interactive ? '' : ' tabindex="0" role="region" aria-label="Содержимое мини-карты"';
   return cardShell({
     tag, classes: resolvedClasses, style: surfaceStyle, attributes: actionAttrs,
     head: headerMarkup, center: centerMarkup, footer: footerMarkup,

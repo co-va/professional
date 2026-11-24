@@ -211,7 +211,6 @@ export function openProfileAppearanceQ(root,{onSaved=null,navigateBack=()=>{},op
 }
 
 function openProfileSettings(root,navigateBack,options={}){
-  const p=getProfile();
   const access=getAccess();
   const commercialActions=access?.commercialMode==='DEMO'?[
     {id:'demo-status',label:demoRemainingText(access),disabled:true},

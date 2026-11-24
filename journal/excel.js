@@ -12,7 +12,6 @@ import { chooseScopedImport, exportScopedCsv, exportScopedWorkbook, reportExcelE
 
 const actionLabels={booked:'Записался',rescheduled:'Перенёс',cancelled:'Отменил',deleted:'Удалена'};
 const visitLabels={expected:'Ожидает',arrived:'Пришёл','no-show':'Не пришёл'};
-const onlineSources=new Set(['online-booking','account-journal','public-booking','user']);
 const integrationLabels={
   'online-booking':'Онлайн-запись','public-booking':'Онлайн-запись',
   'account-journal':'Приложение','user':'Приложение',

@@ -13,12 +13,6 @@ function activeZSurface(app) {
   return layers.at(-1) || app?.querySelector?.('[data-v2-front] > [data-v2-z]') || null;
 }
 
-function activeWorkspaceSurface(app) {
-  const qSurface = activeQSurface(app);
-  if (qSurface) return qSurface;
-  return activeZSurface(app);
-}
-
 function syncControlState(control, source) {
   if (!control || !source) return;
   const disabled = Boolean(source.disabled);

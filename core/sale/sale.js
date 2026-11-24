@@ -7,7 +7,6 @@ import {
   initMultiSelect,
   modal,
   mountModal,
-  openNotice,
   page,
   v2ListEntries,
   v2ListEntry,

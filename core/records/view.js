@@ -3,7 +3,6 @@ import {
   emptyState,
   escapeHtml,
   field,
-  list,
   bindRecordSettings,
   button,
   durationText,

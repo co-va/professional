@@ -19,7 +19,6 @@ import {
   initTags,
   initUEI,
   links,
-  list,
   modal,
   monthDayPicker,
   mountModal,
@@ -59,7 +58,7 @@ import { getRecord, getRecords } from '../record/index.js';
 import { getProcedures, hasCurrentProceduresSnapshot } from '../service/procedures/data.js';
 import { getWorkplaces, isWorkplacesServerReady } from '../profile/workplaces/data.js';
 import { loadRecordCreationOperationalState } from '../runtime/operational-state.js';
-import { getCardAppearanceTemplate, saveCardAppearanceTemplate } from '../card-appearance-templates.js';
+import { saveCardAppearanceTemplate } from '../card-appearance-templates.js';
 import { getPeopleFilters, getPeopleSortMode, setPeopleFilters, setPeopleSortMode } from './view-state.js';
 import { buildPersonRelationshipSections } from './programs.js';
 import { openPersonProgramActions } from '../loyalty/person-program-actions.js';
