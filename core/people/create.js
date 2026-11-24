@@ -1,5 +1,5 @@
 import { button, field, mountModal, modal, phoneField } from '../../ui/ui.js';
-import { createPerson, findPeopleByPhone, getAllPeople, savePeople } from './data.js';
+import { createPerson, findPeopleByPhone, commitNewPerson } from './data.js';
 
 export function personCreateForm(preset = {}) {
   return `<form class="form-grid" data-person-create-form>
@@ -15,13 +15,18 @@ export function bindPersonCreateForm(root, { onCreated = () => {} } = {}) {
   const form = root?.querySelector?.('[data-person-create-form]');
   if (!form || form.dataset.personCreateReady === 'true') return;
   form.dataset.personCreateReady = 'true';
-  form.addEventListener('submit', (event) => {
+  let submitting = false;
+  let draft = null;
+  form.addEventListener('submit', async (event) => {
     event.preventDefault();
+    if (submitting) return;
+    const button = form.querySelector('[type="submit"]');
+    const errorNode = form.querySelector('[data-error]');
+    if (errorNode) errorNode.textContent = '';
     const data = new FormData(form);
     const name = String(data.get('name') || '').trim();
     const surname = String(data.get('surname') || '').trim();
     const phone = String(data.get('phone') || '').trim();
-    const all = getAllPeople();
     try {
       if (!name) throw Error('Имя обязательно.');
       const phoneMatches = phone ? findPeopleByPhone(phone) : [];
@@ -32,13 +37,19 @@ export function bindPersonCreateForm(root, { onCreated = () => {} } = {}) {
         onCreated(phoneMatches[0]);
         return;
       }
-      const person = createPerson(name, surname, phone);
-      all.push(person);
-      savePeople(all);
-      onCreated(person);
+      // Reuse the same key if the server committed but the response was lost.
+      const next = createPerson(name, surname, phone);
+      draft = draft ? { ...next, key: draft.key, createdAt: draft.createdAt } : next;
+      submitting = true;
+      if (button) button.disabled = true;
+      const saved = await commitNewPerson(draft);
+      draft = null;
+      if (form.isConnected) onCreated(saved);
     } catch (error) {
-      const node = form.querySelector('[data-error]');
-      if (node) node.textContent = error instanceof Error ? error.message : 'Не удалось создать';
+      if (errorNode) errorNode.textContent = error instanceof Error ? error.message : 'Не удалось создать';
+    } finally {
+      submitting = false;
+      if (button) button.disabled = false;
     }
   });
 }

@@ -1,4 +1,5 @@
 import { normalizePhoneForStorage, phonesMatch } from '../phone/index.js';
+import { apiRequest, getAuthToken } from '../auth.js';
 import { getMembers, getUEI } from '../uei.js';
 import { flushBusinessPersistence, isBusinessServerReady, queuePersonDelete, queuePersonUpsert } from '../business-persistence.js';
 import { getTags } from '../../settings/tags/data.js';
@@ -218,6 +219,30 @@ export function savePeople(people = []) {
       void queuePersonUpsert(next.person, next.position);
     }
   }
+}
+
+// Manual creation uses the existing Person endpoint and applies only the server ACK.
+// Never submit the whole people snapshot for a single new contact.
+export async function commitNewPerson(person) {
+  const token = getAuthToken();
+  if (!token || !isBusinessServerReady()) throw new Error('Нет соединения с сервером. Контакт не сохранён.');
+  const item = normalizePerson(person);
+  if (!item.key || !item.name.trim()) throw new Error('Имя обязательно.');
+  const position = peopleState.findIndex(value => value.key === item.key);
+  const response = await apiRequest(`/business-state/people/${encodeURIComponent(item.key)}`, {
+    method: 'PUT',
+    timeoutMs: 12000,
+    body: JSON.stringify({ person: item, position: position < 0 ? peopleState.length : position }),
+  });
+  const saved = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(saved?.message || 'Не удалось сохранить контакт.');
+  if (!saved || saved.key !== item.key) throw new Error('Сервер не подтвердил сохранение контакта.');
+  if (getAuthToken() !== token || !isBusinessServerReady()) throw new Error('Сеанс изменился. Откройте контакты заново.');
+  const confirmed = normalizePerson(saved);
+  const index = peopleState.findIndex(value => value.key === confirmed.key);
+  if (index < 0) peopleState = [...peopleState, confirmed];
+  else peopleState = peopleState.map(value => value.key === confirmed.key ? confirmed : value);
+  return clone(confirmed);
 }
 
 // Targeted tag mutation, persisted before changing the Person projection.
