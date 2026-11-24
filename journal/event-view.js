@@ -1,3 +1,4 @@
+import { isoDateLabel as dateLabel } from '../ui/utils/date-time.js';
 import { actionBlock } from '../ui/page/page.js';
 import {
   button,
@@ -28,10 +29,6 @@ function esc(value = '') {
   }[char]));
 }
 
-function dateLabel(value = '') {
-  const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  return match ? `${match[3]}.${match[2]}.${match[1].slice(-2)}` : String(value || '');
-}
 
 function unavailable(reason = '') {
   if (reason === 'occupied') return 'Это время уже занято.';

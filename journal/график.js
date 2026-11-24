@@ -1,3 +1,4 @@
+import { fullDateLabel as formatDateLabel } from '../ui/utils/date-time.js';
 import { actionBlock, button, initCalendar, initMultiSelect, modal, mountModal, openDayWorkplaceControl, timePicker, initTimePickers, escapeHtml, ALL_WORKPLACES_ID } from '../ui/ui.js';
 import { getWorkplaces, resolveWorkplaceTime, getWorkingDayIndicators, getWorkingDayTotalMinutes } from '../core/workplace-time.js';
 import { getDays, getDay, getDayTime } from '../core/day/index.js';
@@ -10,7 +11,6 @@ import { applyTimetableWorkingDays, applyTimetableDaysOff, applyTimetableTimeCor
 function datesForWorkplace(days, workplaceId) { return days.filter((item) => item?.workplaceId === workplaceId).map((item) => item.date).filter(Boolean); }
 function datesForAllWorkplaces(days) { return [...new Set(days.map((item) => item?.date).filter(Boolean))]; }
 function workingDayForDate(days, workplaceId, date) { return getDay(days, workplaceId, date); }
-function formatDateLabel(value) { const [year, month, day] = String(value || '').split('-'); return year && month && day ? `${day}.${month}.${year}` : String(value || ''); }
 function formatDuration(totalMinutes) {
   const total = Math.max(0, Number(totalMinutes) || 0);
   const hours = Math.floor(total / 60);

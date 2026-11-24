@@ -1,3 +1,4 @@
+import { isoDateLabel as formatDate } from '../../ui/utils/date-time.js';
 import {
   actionBlock,
   emptyState,
@@ -46,10 +47,6 @@ import { getProcedures } from '../service/procedures/data.js';
 import { proceduresForWorkplace, procedureCostForWorkplace, procedureDurationForWorkplace } from '../service/procedures/selection.js';
 import { setRecordLoyaltyProgram } from './program-selection.js';
 
-function formatDate(value) {
-  const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  return match ? `${match[3]}.${match[2]}.${match[1].slice(-2)}` : String(value || '');
-}
 
 function formatMoney(value) {
   return `${new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(Number(value) || 0)} ₽`;

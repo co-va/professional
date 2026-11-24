@@ -1,3 +1,4 @@
+import { fullDateLabel as formatDateLabel } from '../ui/utils/date-time.js';
 import { button, escapeHtml, initTimePickers, modal, mountModal, openDayWorkplaceControl, openDayWorkplaceTime, timePicker, twoColumnLayout } from '../ui/ui.js';
 import { createDay, findSuggestedInterval, getDay, getDayDraftScheduleConflicts, getDayRemovalConflicts, getDayTime, getDays, getDaysForDate, getScheduleConflicts, removeDay, saveDays, updateDayTime } from '../core/day/index.js';
 import { getWorkingTimeUsageConflicts } from '../core/time/index.js';
@@ -278,10 +279,6 @@ export function applyTimetableWorkingDays({
 } = {}) {
   const selectedWorkplaceId = String(workplaceId || '');
   if (!selectedWorkplaceId || !Array.isArray(dates) || !dates.length) return false;
-  const formatDateLabel = (value) => {
-    const [year, month, day] = String(value || '').split('-');
-    return year && month && day ? `${day}.${month}.${year}` : String(value || '');
-  };
 
   function conflictWorkplaceLabel(day) {
     return workplaces.find((item) => String(item?.key || '') === String(day?.workplaceId || ''))?.name || 'Другое место работы';

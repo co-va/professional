@@ -33,3 +33,16 @@ export function shortDateTime(value, fallback = '') {
 export function shortDateTimeParts(value) {
   return { date: shortDate(value, ''), time: shortTime(value, '') };
 }
+
+export function isoDateLabel(value) {
+  const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return match ? `${match[3]}.${match[2]}.${match[1].slice(-2)}` : String(value || '');
+}
+
+export function fullDateLabel(value) { const [year, month, day] = String(value || '').split('-'); return year && month && day ? `${day}.${month}.${year}` : String(value || ''); }
+
+export function chatTime(value) {
+  const date = new Date(value || 0);
+  if (!Number.isFinite(date.getTime())) return '';
+  return new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit' }).format(date);
+}

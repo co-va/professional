@@ -1,3 +1,4 @@
+import { chatTime } from '../../ui/utils/date-time.js';
 import {
   emptyState,
   field,
@@ -10,11 +11,6 @@ import {
 } from '../../ui/ui.js';
 import { bindMessageActivation, bindMessageAttachments, initMessageComposer, messageComposer, messageThread } from '../../ui/chat/index.js';
 
-function chatTime(value) {
-  const date = new Date(value || 0);
-  if (!Number.isFinite(date.getTime())) return '';
-  return new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit' }).format(date);
-}
 
 function threadUnread(thread = {}) {
   const count = Math.max(0, Math.trunc(Number(thread?.unreadCount) || 0));

@@ -1,3 +1,4 @@
+import { isoDateLabel as dateLabel } from '../utils/date-time.js';
 import { v2HorizontalRail } from '../v2/index.js';
 import { escapeHtml } from '../utils/escape-html.js';
 
@@ -8,10 +9,6 @@ function validColor(value = '') {
   return /^#[0-9A-F]{6}$/.test(color) ? color : NOTE_DEFAULT_COLOR;
 }
 
-function dateLabel(value = '') {
-  const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  return match ? `${match[3]}.${match[2]}.${match[1].slice(-2)}` : String(value || '');
-}
 
 function timeLabel(note = {}) {
   const from = String(note?.from || '').slice(0, 5);
