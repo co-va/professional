@@ -1,3 +1,4 @@
+import { escapeHtml as esc } from '../ui/utils/escape-html.js';
 import { isoDateLabel as dateLabel } from '../ui/utils/date-time.js';
 import { actionBlock } from '../ui/page/page.js';
 import {
@@ -19,15 +20,6 @@ import { flushBusinessPersistence } from '../core/business-persistence.js';
 import { noteAttachmentStickers } from '../ui/note/index.js';
 import { openNoteView } from './note-view.js';
 
-function esc(value = '') {
-  return String(value).replace(/[&<>"']/g, (char) => ({
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#039;',
-  }[char]));
-}
 
 
 function unavailable(reason = '') {

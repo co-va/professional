@@ -1,10 +1,7 @@
+import { nonnegativeNumber as numberValue } from '../utils/values.js';
 import { modal, mountModal } from '../modals/index.js';
 import { escapeHtml } from '../utils/escape-html.js';
 
-function numberValue(value) {
-  const number = Number(String(value ?? '').replace(',', '.'));
-  return Number.isFinite(number) ? Math.max(0, number) : 0;
-}
 
 function money(value) {
   return `${numberValue(value).toLocaleString('ru-RU', { maximumFractionDigits: 2 }).replaceAll('\u00a0', ' ')} ₽`;

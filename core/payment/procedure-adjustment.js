@@ -1,3 +1,4 @@
+import { nonnegativeNumber as numberValue } from '../../ui/utils/values.js';
 import {
   calculateSettlement,
   getRecordPaymentState,
@@ -6,10 +7,6 @@ import {
 } from '../finance/index.js';
 import { getRecord } from '../record/index.js';
 
-const numberValue = (value) => {
-  const number = Number(String(value ?? '').replace(',', '.'));
-  return Number.isFinite(number) ? Math.max(0, number) : 0;
-};
 
 const percentValue = (value) => Math.max(0, Math.min(100, numberValue(value)));
 

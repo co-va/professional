@@ -1,3 +1,4 @@
+import { escapeHtml as escapeRecordText } from '../utils/escape-html.js';
 import { normalizeStringList as normalizedChatKeys } from '../utils/values.js';
 import { workspaceHeaderContext } from '../header/index.js';
 import { mountV2ZLayer, v2ZLayer } from '../v2/index.js';
@@ -18,15 +19,6 @@ function recordSurface() {
     || document.body;
 }
 
-function escapeRecordText(value = '') {
-  return String(value).replace(/[&<>"']/g, (char) => ({
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#039;',
-  }[char]));
-}
 
 
 function isRecordEditClass(className = '') {
