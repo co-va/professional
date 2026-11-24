@@ -1,0 +1,79 @@
+name: Professional / Release
+
+on:
+  push:
+    branches: [staging]
+    paths: ['.github/workflows/professional-release.yml']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: professional-release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  release-gate:
+    name: Release gate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Only repository staging may release to main
+        if: github.event_name == 'pull_request'
+        env:
+          HEAD_BRANCH: ${{ github.head_ref }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+        run: |
+          test "$HEAD_BRANCH" = staging
+          test "$HEAD_REPO" = "$GITHUB_REPOSITORY"
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Repository boundaries and exact duplicates
+        run: node scripts/audit-professional-clean.mjs
+
+      - name: Shared UI, entry and closure registry
+        run: |
+          node scripts/check-light-entry.mjs
+          node scripts/check-ui-contract.mjs
+          node scripts/guard-shared-ui.mjs
+          node scripts/release/verify-closures.mjs
+
+      - name: JavaScript syntax
+        shell: bash
+        run: |
+          git ls-files -z '*.js' '*.mjs' | xargs -0 -r -n1 node --check
+
+      - name: Install pinned build and browser tools
+        run: |
+          npm install --no-save --no-package-lock esbuild@0.25.12 playwright@1.56.1
+          npx playwright install chromium
+
+      - name: Existing domain and UI regression checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          for test in scripts/ci/*.mjs; do
+            echo "::group::$test"
+            node "$test"
+            echo "::endgroup::"
+          done
+
+      - name: Build production assets
+        run: |
+          node scripts/build-web.mjs
+          test -s dist/index.html
+          test -n "$(find dist/assets -name 'styles-*.css' -print -quit)"
+
+      - name: Docker and nginx configuration
+        run: |
+          docker build --progress=plain -t professional-release .
+          docker run --rm professional-release nginx -t
