@@ -83,109 +83,102 @@ const fromExcel=value=>{
 };
 const personForIssue=(item,people)=>people.find(person=>
   text(person.key)===text(item.personKey))||null;
-function choiceOptions(item){
-  const saved=text(item.system)||'Не указано';
-  const incoming=text(item.excel)||'Не указано';
-  if(item.field==='identity')return [
-    {value:'',label:'Выберите решение'},
-    {value:'same',label:'Тот же человек'},
-    {value:'different',label:'Другой человек'},
-  ];
-  if(item.field==='discountPercent'){
-    const existing=/Уточните: процент или доля/i.test(saved)
-      ?'Не менять скидку в системе':'Система: '+discountLabel(saved);
-    return [
-      {value:'',label:'Какой процент правильный?'},
-      {value:'keep',label:existing},
-      {value:'replace',label:'Excel: '+discountLabel(incoming)},
-    ];
+const matchingGroup=issue=>{
+  if(issue.field!=='identity')return issue.field;
+  const owners=Array.isArray(issue.owners)?issue.owners:[];
+  const fields=owners.flatMap(o=>o.matchedBy||[]);
+  for(const candidate of ['email','additionalEmail','uei','phone','additionalPhone','telegram','additionalTelegram'])
+    if(fields.includes(candidate))return candidate;
+  return 'identity';
+};
+const fieldTitle={
+  email:'Email',additionalEmail:'Дополнительный Email',
+  uei:'Код клиента',phone:'Телефон',additionalPhone:'Дополнительный телефон',
+  telegram:'Telegram',additionalTelegram:'Дополнительный Telegram',
+  identity:'Проверить человека',
+};
+function reviewGroups(batch){
+  const issues=Array.isArray(batch.issues)?batch.issues:[];
+  const identityForRow=new Map(issues.filter(i=>i.field==='identity').map(i=>[i.rowNumber,i]));
+  const skipped=new Set();
+  const groups=new Map();
+  // Identity is attached to the matching field (Email/phone/client code),
+  // never rendered again in an unrelated "Совпадение" group.
+  for(const item of issues.filter(i=>i.field==='identity')){
+    const group=matchingGroup(item),key=String(item.rowNumber)+'::'+group;
+    skipped.add(key);
+    if(!groups.has(group))groups.set(group,[]);
+    groups.get(group).push(item);
   }
-  return [
-    {value:'',label:'Какое значение правильное?'},
-    {value:'keep',label:'Система: '+saved},
-    {value:'replace',label:'Excel: '+incoming},
-    ...(['email','additionalEmail','phone','additionalPhone',
-      'telegram','additionalTelegram'].includes(item.field)
-      ?[{value:'add',label:'Добавить как дополнительный: '+incoming}]:[]),
-  ];
+  for(const item of issues.filter(i=>i.field!=='identity')){
+    const key=String(item.rowNumber)+'::'+item.field;
+    if(skipped.has(key)&&identityForRow.has(item.rowNumber))continue;
+    if(!groups.has(item.field))groups.set(item.field,[]);
+    groups.get(item.field).push(item);
+  }
+  const configured=new Map((batch.groups||[]).map(g=>[g.field,g.label]));
+  return [...groups].map(([field,items])=>({
+    field,items,label:fieldTitle[field]||configured.get(field)||field,
+  }));
+}
+const matchingOwner=item=>(Array.isArray(item.owners)?item.owners:[])
+  .find(o=>o.matchedBy?.includes(matchingGroup(item)))
+  ||(Array.isArray(item.owners)?item.owners[0]:null);
+function issueDisplay(item,people=[]){
+  const fieldName=text(item.field);
+  const owner=matchingOwner(item);
+  const ownPerson=owner?people.find(p=>text(p.key)===text(owner.key)):null;
+  const saved=text(item.system)||'—',incoming=text(item.excel)||'—';
+  if(fieldName==='identity'){
+    const title=owner?personHeading(owner.code,owner.name):saved;
+    const group=matchingGroup(item);
+    const matches=group==='email'||group==='additionalEmail'
+      ?(ownPerson?.emails||[]).join(', ')
+      :group==='phone'||group==='additionalPhone'
+        ?(ownPerson?.phones||[]).join(', ')
+        :group==='uei'?displayCode(owner?.code)
+          :group==='telegram'||group==='additionalTelegram'
+            ?(ownPerson?.telegrams||[]).join(', '):'';
+    const meta=matches?(fieldTitle[group]||group)+': '+matches:'';
+    return {title,secondary:'Excel: '+fromExcel(incoming)+(meta?' · '+meta:'')};
+  }
+  const person=personForIssue(item,people);
+  const name=personName(person)||text(item.contact).replace(/^[0-9A-Za-z]{1,4}\s+/,'').trim();
+  const dataValue=fieldName==='discountPercent'?discountLabel(incoming):incoming;
+  const oldValue=fieldName==='discountPercent'&&/Уточните: процент или доля/i.test(saved)
+    ?'':fieldName==='discountPercent'?discountLabel(saved):saved;
+  const title=[personHeading(person?.uei,name),oldValue==='—'?'':oldValue]
+    .filter(Boolean).join(' · ');
+  return {title,secondary:'Excel: '+dataValue};
 }
 function issueRow(item,people=[]){
-  const id=Number(item.rowNumber);
-  const fieldName=text(item.field);
-  const key=escapeHtml(rowKey(item));
-  const saved=text(item.system)||'—';
-  const incoming=text(item.excel)||'—';
-  const discount=fieldName==='discountPercent';
-  const savedIsHint=discount&&/Уточните: процент или доля/i.test(saved);
-  const shownSaved=discount&&!savedIsHint?discountLabel(saved):saved;
-  const shownIncoming=discount?discountLabel(incoming):incoming;
-  const owners=Array.isArray(item.owners)?item.owners:[];
-  const found=personForIssue(item,people);
-  const knownName=personName(found);
-  const knownCode=text(found?.uei);
-  // The identity candidate belongs to the existing system record.
-  // The imported name and code are separate, never displayed as the
-  // system person's name.
-  const onlyCandidate=owners.length===1?owners[0]:null;
-  const title=fieldName==='identity'
-    ?onlyCandidate?personHeading(onlyCandidate.code,onlyCandidate.name)
-      :text(item.system)||'Несколько совпадений'
-    :[personHeading(knownCode,knownName||text(item.contact)
-        .replace(/^[0-9A-Za-z]{1,4}\s+/,'').trim()),
-       saved==='—'||savedIsHint?'':shownSaved].filter(Boolean).join(' · ');
-  const imported=fieldName==='identity'?fromExcel(incoming):shownIncoming;
-  const comparison='Excel: '+imported;
-  const matchedBy=fieldName==='identity'&&onlyCandidate
-    ?(onlyCandidate.matchedBy||[]).map(field=>identityFields[field]||field).join(', ')
-    :'';
-  const candidateOptions=[
-    {value:'',label:'Выберите контакт'},
-    ...owners.map(person=>({
-      value:text(person.key),
-      label:[personHeading(person.code,person.name),
-        text(person.key).startsWith('excel:')?'Excel: строка '+text(person.key).slice(6):'',
-      ].filter(Boolean).join(' · '),
-    })),
-  ];
-  const display=list({className:'ui-list--dense',items:[{
-    title,
-    secondary:comparison+(matchedBy?' · Совпадает: '+matchedBy:''),
-    interactive:true,data:'data-review-open',
-    aria:'Система: '+title+'. '+comparison,
-  }]});
-  const editRow=(label,content)=>'<div class="data-edit-row">'+
-    '<span class="data-edit-row__name"><strong>'+escapeHtml(label)+'</strong></span>'+
-    content+'</div>';
-  // One candidate needs no extra selection; the existing identifier is
-  // retained in a hidden field and is never exposed to the user.
-  const candidateControl=onlyCandidate
-    ?'<input type="hidden" data-review-candidate value="'+escapeHtml(onlyCandidate.key)+'">'
-    :editRow('Контакт',select({
-      name:'reviewCandidate-'+id+'-'+fieldName,
-      aria:'Выберите совпадающий контакт',
-      data:'data-review-candidate',options:candidateOptions,value:'',
-    }));
+  const id=Number(item.rowNumber),fieldName=text(item.field);
+  const display=issueDisplay(item,people);
   return '<div data-review-row="'+id+'" data-review-field="'+escapeHtml(fieldName)+'">'+
     '<div class="inventory-counterparty-product-row">'+
-      compactCheck({aria:'Выбрать: '+title,data:'data-review-select="'+key+'"'})+
-      display+'</div>'+
-    '<div class="inventory-audit-data-list" data-review-editor hidden>'+
-      editRow('Выбор',select({
-        name:'reviewMode-'+id+'-'+fieldName,
-        aria:'Выберите правильное значение для '+title,
-        data:'data-review-mode',options:choiceOptions(item),value:'',
-      }))+
-      '<div data-review-candidates hidden>'+candidateControl+'</div>'+
-      (discount
-        ?'<div data-review-edit-value hidden>'+editRow('Процент',field({
-          name:'reviewPercent-'+id,
-          label:'',type:'number',min:'0',max:'100',step:'any',
-          inputmode:'decimal',autocomplete:'off',
-          value:discountValue(incoming),data:'data-review-value',
-        }))+'</div>'
-        :'<input type="hidden" data-review-value value="'+escapeHtml(incoming==='—'?'':incoming)+'">')+
-      (item.error?'<p class="form-error" role="alert">'+escapeHtml(item.error)+'</p>':'')+
+      compactCheck({aria:'Выбрать: '+display.title,
+        data:'data-review-select="'+escapeHtml(rowKey(item))+'"'})+
+      list({className:'ui-list--dense',items:[{
+        ...display,interactive:true,data:'data-review-open',
+        aria:display.title+'. '+display.secondary,
+      }]})+
     '</div></div>';
+}
+function decisionOptions(item){
+  const saved=text(item.system)||'Не указано',excel=text(item.excel)||'Не указано';
+  if(item.field==='identity')return [
+    {value:'',label:'Это один человек?'},
+    {value:'same',label:'Да, тот же человек'},
+    {value:'different',label:'Нет, другой человек'},
+  ];
+  return [
+    {value:'',label:'Какое значение правильное?'},
+    {value:'keep',label:'Оставить в системе: '+(item.field==='discountPercent'?discountLabel(saved):saved)},
+    {value:'replace',label:'Принять из Excel: '+(item.field==='discountPercent'?discountLabel(excel):excel)},
+    ...(['email','additionalEmail','phone','additionalPhone','telegram','additionalTelegram'].includes(item.field)
+      ?[{value:'add',label:'Добавить как дополнительный'}]:[]),
+    {value:'manual',label:item.field==='discountPercent'?'Указать процент':'Указать другое значение'},
+  ];
 }
 function processedRow(row){
   const title=text(row.name)||'Контакт';
@@ -198,21 +191,18 @@ function processedRow(row){
     }]})+'</div>';
 }
 function content(batch,people=[]){
-  const groups=(Array.isArray(batch.groups)?[...batch.groups]:[])
-    .sort((a,b)=>Number(b.field==='identity')-Number(a.field==='identity'));
+  const groups=reviewGroups(batch);
   const rows=Array.isArray(batch.rows)?batch.rows:[];
   const done=rows.filter(row=>row.status==='done');
   const unchanged=rows.filter(row=>row.status==='unchanged');
   const sections=groups.map(group=>{
-    const issues=(batch.issues||[]).filter(item=>item.field===group.field);
-    if(!issues.length)return '';
     const check=compactCheck({
       aria:'Выбрать всю группу '+group.label,
       data:'data-review-group-check="'+escapeHtml(group.field)+'"',
     });
     return catalogDisclosure(group.label,
-      '<div class="inventory-audit-data-list">'+issues.map(item=>issueRow(item,people)).join('')+'</div>',
-      false,issues.length,check)
+      '<div class="inventory-audit-data-list">'+group.items.map(item=>issueRow(item,people)).join('')+'</div>',
+      false,group.items.length,check)
       .replace('<details>','<details data-review-group="'+escapeHtml(group.field)+'">');
   });
   const ready=done.length?catalogDisclosure('Загружено',
@@ -228,7 +218,7 @@ function content(batch,people=[]){
     '<div class="inventory-stock-category-sequence" data-review-groups>'+
       sections.join('')+ready+identical+'</div>'+
     '<p class="form-error" role="alert" data-review-error></p>'+
-    actionBlock(button('Применить',{data:'data-review-apply'}))+
+    button('Применить',{data:'data-review-apply'})+
   '</div>';
 }
 export function openContactImportReview(root,batchId,{onLoaded=()=>{}}={}){
@@ -241,27 +231,11 @@ export function openContactImportReview(root,batchId,{onLoaded=()=>{}}={}){
   const expanded=new Set();
   const selectedRows=()=>[...host.querySelectorAll('[data-review-row]')]
     .filter(row=>row.querySelector('[data-review-select]')?.checked);
+  const selectedIssues=()=>selectedRows()
+    .map(row=>(current?.issues||[]).find(item=>
+      item.rowNumber===Number(row.dataset.reviewRow)&&item.field===row.dataset.reviewField))
+    .filter(Boolean);
   function sync(){
-    host.querySelectorAll('[data-review-row]').forEach(row=>{
-      const checked=Boolean(row.querySelector('[data-review-select]')?.checked);
-      const editor=row.querySelector('[data-review-editor]');
-      if(editor){
-        editor.hidden=!checked;
-        // The canonical .inventory-audit-data-list uses display:grid;
-        // enforce hidden until selected without altering the shared CSS.
-        editor.style.display=checked?'':'none';
-      }
-      const mode=text(row.querySelector('[data-review-mode]')?.value);
-      const candidates=row.querySelector('[data-review-candidates]');
-      if(candidates)candidates.hidden=!checked||mode!=='same'
-        ||Boolean(row.querySelector('[data-review-candidate][type="hidden"]'));
-      const percentEditor=row.querySelector('[data-review-edit-value]');
-      if(percentEditor) {
-        const visible=checked&&mode==='replace';
-        percentEditor.hidden=!visible;
-        percentEditor.style.display=visible?'':'none';
-      }
-    });
     host.querySelectorAll('[data-review-group]').forEach(group=>{
       const parent=group.closest('.inventory-editor-panel');
       const selectAll=parent?.querySelector(':scope > .inventory-editor-heading__selection [data-review-group-check]');
@@ -271,16 +245,8 @@ export function openContactImportReview(root,batchId,{onLoaded=()=>{}}={}){
       selectAll.checked=items.length>0&&chosen===items.length;
       selectAll.indeterminate=chosen>0&&chosen<items.length;
     });
-    const rows=selectedRows();
     const apply=host.querySelector('[data-review-apply]');
-    const footer=apply?.closest('.modal-actions');
-    if(footer)footer.hidden=!rows.length;
-    if(apply)apply.disabled=busy||!rows.length||rows.some(row=>{
-      const mode=text(row.querySelector('[data-review-mode]')?.value);
-      return !mode||(mode==='same'&&!text(row.querySelector('[data-review-candidate]')?.value))
-        ||(row.dataset.reviewField==='discountPercent'&&mode==='replace'
-          &&!validDiscount(row.querySelector('[data-review-value]')?.value));
-    });
+    if(apply){apply.hidden=!selectedRows().length;apply.disabled=busy;}
   }
   function show(){
     if(!layer.isConnected||!current)return;
@@ -295,6 +261,130 @@ export function openContactImportReview(root,batchId,{onLoaded=()=>{}}={}){
     sync();
   }
   const reload=async()=>{current=await request('detail',{batchId});show();};
+  function openEditor(items){
+    if(busy||!items.length)return;
+    const oneKind=items.every(i=>i.field===items[0].field);
+    const group=matchingGroup(items[0]);
+    const common=items.length>1&&oneKind;
+    const people=getAllPeople();
+    const first=items[0];
+    const heading=fieldTitle[group]||text(first.label)||'Данные';
+    const preview=list({className:'ui-list--dense',items:items.map(item=>({
+      ...issueDisplay(item,people),interactive:false,
+    }))});
+    const manualControl=(item,key)=>'<div data-review-manual="'+key+'" hidden>'+
+      field({
+        label:item.field==='discountPercent'?'Процент':'Новое значение',
+        name:'reviewManual-'+key,value:item.field==='discountPercent'
+          ?discountValue(item.excel):text(item.excel),
+        type:item.field==='discountPercent'?'number':'text',
+        ...(item.field==='discountPercent'?{min:'0',max:'100',step:'any',inputmode:'decimal'}:{}),
+      })+'</div>';
+    const selectedField=(item,key,shared=false)=>{
+      const options=shared?decisionOptions(item).map(option=>({
+        ...option,
+        label:option.value==='keep'?'Оставить прежние значения'
+          :option.value==='replace'?'Принять значения из Excel':option.label,
+      })):decisionOptions(item);
+      const candidate=item.field==='identity'&&item.owners?.length>1
+        ?select({
+          label:'Какой контакт?',name:'reviewCandidate-'+key,
+          options:[
+            {value:'',label:'Выберите контакт'},
+            ...item.owners.map(owner=>({
+              value:owner.key,label:personHeading(owner.code,owner.name),
+            })),
+          ],
+        }):'';
+      return '<div data-review-choice="'+key+'">'+
+        select({
+          label:shared?'Одно решение для всех':issueDisplay(item,people).title,
+          name:'reviewMode-'+key,
+          options,
+        })+
+        (candidate?'<div data-review-candidate-control="'+key+'" hidden>'+candidate+'</div>':'')+
+        manualControl(item,key)+'</div>';
+    };
+    const options=common
+      ?compactCheck({label:'Одно значение для всех',checked:true,data:'data-review-common'})+
+        '<div data-review-common-control>'+selectedField(first,'common',true)+'</div>'+
+        '<div data-review-individual-control hidden>'+
+          items.map((item,index)=>selectedField(item,String(index))).join('')+
+        '</div>'
+      :items.map((item,index)=>selectedField(item,String(index))).join('');
+    const message=items.some(item=>item.field==='identity'&&matchingGroup(item).includes('email'))
+      ?'<p class="ui-list__secondary">«Другой человек» создаст отдельный контакт. Email, уже принадлежащий другому человеку, не переносится.</p>':'';
+    const html='<form class="form-grid" data-review-choice-form>'+
+      '<p class="ui-list__secondary">Выбрано: '+items.length+'</p>'+
+      preview+message+options+
+      '<p class="form-error" role="alert" data-review-choice-error></p>'+
+      button('Применить',{type:'submit',data:'data-review-confirm'})+
+    '</form>';
+    const dialog=mountModal(root,modal(html,{
+      title:heading,variant:'x',surface:'app',xRole:'editor',
+    }));
+    if(!dialog)return;
+    const form=dialog.querySelector('[data-review-choice-form]');
+    const commonToggle=dialog.querySelector('[data-review-common]');
+    function shared(){return common&&Boolean(commonToggle?.checked);}
+    function syncChoice(){
+      const sharedBlock=dialog.querySelector('[data-review-common-control]');
+      const separateBlock=dialog.querySelector('[data-review-individual-control]');
+      if(sharedBlock){sharedBlock.hidden=!shared();sharedBlock.style.display=shared()?'':'none';}
+      if(separateBlock){separateBlock.hidden=shared();separateBlock.style.display=shared()?'none':'';}
+      dialog.querySelectorAll('[data-review-choice]').forEach(node=>{
+        const mode=text(form.elements.namedItem('reviewMode-'+node.dataset.reviewChoice)?.value);
+        const manual=node.querySelector('[data-review-manual]');
+        const candidate=node.querySelector('[data-review-candidate-control]');
+        if(manual){manual.hidden=mode!=='manual';manual.style.display=mode==='manual'?'':'none';}
+        if(candidate){candidate.hidden=mode!=='same';candidate.style.display=mode==='same'?'':'none';}
+      });
+    }
+    form.addEventListener('change',syncChoice);
+    syncChoice();
+    form.addEventListener('submit',async event=>{
+      event.preventDefault();
+      if(busy)return;
+      const error=form.querySelector('[data-review-choice-error]');
+      if(error)error.textContent='';
+      let operations;
+      try{
+        operations=items.map((item,index)=>{
+          const key=shared()?'common':String(index);
+          const requested=text(form.elements.namedItem('reviewMode-'+key)?.value);
+          if(!requested)throw Error('Выберите правильное значение');
+          const mode=requested==='manual'?'replace':requested;
+          const candidate=item.field==='identity'
+            ?item.owners?.length===1?text(item.owners[0].key)
+              :text(form.elements.namedItem('reviewCandidate-'+key)?.value):'';
+          if(mode==='same'&&!candidate)
+            throw Error('Выберите человека из найденных контактов');
+          let value=mode==='same'?candidate:'';
+          if(mode==='replace'||mode==='add'){
+            value=requested==='manual'
+              ?text(form.elements.namedItem('reviewManual-'+key)?.value)
+              :item.field==='discountPercent'?discountValue(item.excel):text(item.excel);
+            if(!value)throw Error('Укажите новое значение');
+            if(item.field==='discountPercent'&&!validDiscount(value))
+              throw Error('Процент должен быть от 0 до 100');
+          }
+          return {rowNumber:item.rowNumber,field:item.field,mode,value};
+        });
+      }catch(err){if(error)error.textContent=text(err.message);return;}
+      busy=true;
+      const submit=form.querySelector('[data-review-confirm]');
+      if(submit)submit.disabled=true;
+      try{
+        for(const operation of operations)
+          current=await request('decide',{batchId,...operation});
+        await reloadContacts(onLoaded);
+        dialog.v2Close?.();
+        await reload();
+      }catch(err){
+        if(error)error.textContent=text(err.message)||'Не удалось сохранить';
+      }finally{busy=false;if(submit?.isConnected)submit.disabled=false;sync();}
+    });
+  }
   host.addEventListener('change',event=>{
     const target=event.target;
     const groupInput=target.closest?.('[data-review-group-check]');
@@ -308,48 +398,18 @@ export function openContactImportReview(root,batchId,{onLoaded=()=>{}}={}){
         input.checked=groupInput.checked;
       });
     }
-    if(target.closest?.('[data-review-select]')||groupInput
-      ||target.closest?.('[data-review-mode]')
-      ||target.closest?.('[data-review-candidate]'))sync();
+    sync();
+    if((groupInput||target.closest?.('[data-review-select]'))&&target.checked)
+      openEditor(selectedIssues());
   });
-  host.addEventListener('input',event=>{
-    if(event.target.closest?.('[data-review-value]'))sync();
-  });
-  host.addEventListener('click',async event=>{
+  host.addEventListener('click',event=>{
     const open=event.target.closest?.('[data-review-open]');
     if(open){
       const check=open.closest('[data-review-row]')?.querySelector('[data-review-select]');
-      if(check){check.checked=!check.checked;sync();}
+      if(check){check.checked=!check.checked;sync();if(check.checked)openEditor(selectedIssues());}
       return;
     }
-    const apply=event.target.closest?.('[data-review-apply]');
-    if(!apply||busy||apply.disabled)return;
-    const entries=selectedRows().map(row=>({
-      rowNumber:Number(row.dataset.reviewRow),
-      field:row.dataset.reviewField,
-      mode:text(row.querySelector('[data-review-mode]')?.value),
-      value:'',
-      currentValue:text(row.querySelector('[data-review-value]')?.value),
-      personKey:text(row.querySelector('[data-review-candidate]')?.value),
-    }));
-    if(!entries.length)return;
-    busy=true;sync();
-    try{
-      for(const item of entries){
-        const value=item.mode==='same'?item.personKey
-          :['replace','add'].includes(item.mode)?(
-            item.field==='discountPercent'
-              ?text(item.currentValue).replace(',','.') :item.currentValue):'';
-        current=await request('decide',{batchId,rowNumber:item.rowNumber,
-          field:item.field,mode:item.mode,value});
-      }
-      await reloadContacts(onLoaded);
-      await reload();
-    }catch(error){
-      const node=host.querySelector('[data-review-error]');
-      if(node)node.textContent=text(error?.message);
-      else errorNotice(error);
-    }finally{busy=false;sync();}
+    if(event.target.closest?.('[data-review-apply]'))openEditor(selectedIssues());
   });
   void (async()=>{
     await reload();
