@@ -167,17 +167,17 @@ function issueRow(item,people=[]){
 function decisionOptions(item){
   const saved=text(item.system)||'Не указано',excel=text(item.excel)||'Не указано';
   if(item.field==='identity')return [
-    {value:'',label:'Это один человек?'},
-    {value:'same',label:'Да, тот же человек'},
-    {value:'different',label:'Нет, другой человек'},
+    {value:'',label:'Выберите контакт'},
+    {value:'same',label:'Существующий контакт'},
+    {value:'different',label:'Создать контакт'},
   ];
   return [
-    {value:'',label:'Какое значение правильное?'},
-    {value:'keep',label:'Оставить в системе: '+(item.field==='discountPercent'?discountLabel(saved):saved)},
-    {value:'replace',label:'Принять из Excel: '+(item.field==='discountPercent'?discountLabel(excel):excel)},
-    ...(['email','additionalEmail','phone','additionalPhone','telegram','additionalTelegram'].includes(item.field)
-      ?[{value:'add',label:'Добавить как дополнительный'}]:[]),
-    {value:'manual',label:item.field==='discountPercent'?'Указать процент':'Указать другое значение'},
+    {value:'',label:'Выберите изменение'},
+    {value:'keep',label:'Сохранить'},
+    {value:'replace',label:'Заменить'},
+    ...(['email','additionalEmail','phone','additionalPhone','telegram','additionalTelegram','note'].includes(item.field)
+      ?[{value:'add',label:'Добавить'}]:[]),
+    {value:'manual',label:'Изменить значение'},
   ];
 }
 function processedRow(row){
@@ -281,11 +281,7 @@ export function openContactImportReview(root,batchId,{onLoaded=()=>{}}={}){
         ...(item.field==='discountPercent'?{min:'0',max:'100',step:'any',inputmode:'decimal'}:{}),
       })+'</div>';
     const selectedField=(item,key,shared=false)=>{
-      const options=shared?decisionOptions(item).map(option=>({
-        ...option,
-        label:option.value==='keep'?'Оставить прежние значения'
-          :option.value==='replace'?'Принять значения из Excel':option.label,
-      })):decisionOptions(item);
+      const options=decisionOptions(item);
       const candidate=item.field==='identity'&&item.owners?.length>1
         ?select({
           label:'Какой контакт?',name:'reviewCandidate-'+key,
@@ -303,7 +299,9 @@ export function openContactImportReview(root,batchId,{onLoaded=()=>{}}={}){
           options,
         })+
         (candidate?'<div data-review-candidate-control="'+key+'" hidden>'+candidate+'</div>':'')+
-        manualControl(item,key)+'</div>';
+        manualControl(item,key)+
+        '<p class="ui-list__secondary" data-review-append hidden>Добавить к существующим данным: '+
+        escapeHtml(text(item.excel))+'</p></div>';
     };
     const options=common
       ?compactCheck({label:'Одно значение для всех',checked:true,data:'data-review-common'})+
@@ -313,7 +311,7 @@ export function openContactImportReview(root,batchId,{onLoaded=()=>{}}={}){
         '</div>'
       :items.map((item,index)=>selectedField(item,String(index))).join('');
     const message=items.some(item=>item.field==='identity'&&matchingGroup(item).includes('email'))
-      ?'<p class="ui-list__secondary">«Другой человек» создаст отдельный контакт. Email, уже принадлежащий другому человеку, не переносится.</p>':'';
+      ?'<p class="ui-list__secondary">«Создать контакт»: Email, уже принадлежащий другому контакту, не переносится.</p>':'';
     const html='<form class="form-grid" data-review-choice-form>'+
       '<p class="ui-list__secondary">Выбрано: '+items.length+'</p>'+
       preview+message+options+
@@ -336,8 +334,10 @@ export function openContactImportReview(root,batchId,{onLoaded=()=>{}}={}){
         const mode=text(form.elements.namedItem('reviewMode-'+node.dataset.reviewChoice)?.value);
         const manual=node.querySelector('[data-review-manual]');
         const candidate=node.querySelector('[data-review-candidate-control]');
+        const addition=node.querySelector('[data-review-append]');
         if(manual){manual.hidden=mode!=='manual';manual.style.display=mode==='manual'?'':'none';}
         if(candidate){candidate.hidden=mode!=='same';candidate.style.display=mode==='same'?'':'none';}
+        if(addition){addition.hidden=mode!=='add';addition.style.display=mode==='add'?'':'none';}
       });
     }
     form.addEventListener('change',syncChoice);
@@ -353,7 +353,11 @@ export function openContactImportReview(root,batchId,{onLoaded=()=>{}}={}){
           const key=shared()?'common':String(index);
           const requested=text(form.elements.namedItem('reviewMode-'+key)?.value);
           if(!requested)throw Error('Выберите правильное значение');
-          const mode=requested==='manual'?'replace':requested;
+          // Notes are one text field, while contact channels are arrays.
+          // Append a note using the existing guarded replace operation; other
+          // multi-value fields use the server's add operation.
+          const mode=requested==='manual'||(requested==='add'&&item.field==='note')
+            ?'replace':requested;
           const candidate=item.field==='identity'
             ?item.owners?.length===1?text(item.owners[0].key)
               :text(form.elements.namedItem('reviewCandidate-'+key)?.value):'';
@@ -364,6 +368,11 @@ export function openContactImportReview(root,batchId,{onLoaded=()=>{}}={}){
             value=requested==='manual'
               ?text(form.elements.namedItem('reviewManual-'+key)?.value)
               :item.field==='discountPercent'?discountValue(item.excel):text(item.excel);
+            if(requested==='add'&&item.field==='note'){
+              const previous=text(item.system),incoming=text(item.excel);
+              value=[previous,incoming].filter(Boolean).join('\n');
+              if(value.length>500)throw Error('Примечание слишком длинное. Не более 500 символов.');
+            }
             if(!value)throw Error('Укажите новое значение');
             if(item.field==='discountPercent'&&!validDiscount(value))
               throw Error('Процент должен быть от 0 до 100');
