@@ -2,7 +2,7 @@
 set -euo pipefail
 tmp="$(mktemp -d)"
 cid=""
-cleanup() { if [ -n "$cid" ]; then docker rm -f "$cid" >/dev/null 2>&1 || true; fi; rm -rf "$tmp"; }
+cleanup() { if [ -n "$cid" ]; then docker rm -f "$cid" >/dev/null 2>&1 || true; fi; sudo rm -rf "$tmp"; }
 trap cleanup EXIT
 preview='professional-volokovykh.msk1.amvera.tech'
 base='http://127.0.0.1:3000'
@@ -10,7 +10,7 @@ git clone --quiet --bare . "$tmp/fixture.git"
 git --git-dir="$tmp/fixture.git" update-ref refs/heads/staging HEAD
 mkdir "$tmp/cache"
 sync_fixture() {
-  docker run --rm -v "$tmp/cache:/var/cache/professional-preview" -v "$tmp/fixture.git:/fixture.git:ro" \
+  docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$tmp/cache:/var/cache/professional-preview" -v "$tmp/fixture.git:/fixture.git:ro" \
     -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0=/fixture.git \
     --entrypoint /usr/local/bin/professional-preview-refresh professional-release --once "$1"
 }
