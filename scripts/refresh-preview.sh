@@ -32,9 +32,13 @@ refresh() (
   for required in index.html professional.js professional/workspace.js ui/v2/v2.css; do
     test -s "$tmp/public/$required"
   done
-  printf '%s\n' "$rev" > "$tmp/public/__preview_revision"
-  chmod 755 "$tmp/public"
-  if [ ! -d "$dest" ]; then mv "$tmp/public" "$dest"; fi
+  # Use the trusted main builder, not executable build scripts from staging.
+  (cd "$tmp/public" && PROFESSIONAL_PREVIEW_BUILD=1 timeout 90 node /opt/professional-preview-builder/build-web.mjs)
+  test -s "$tmp/public/dist/index.html"
+  grep -q '/assets/' "$tmp/public/dist/index.html"
+  printf '%s\n' "$rev" > "$tmp/public/dist/__preview_revision"
+  chmod 755 "$tmp/public/dist"
+  if [ ! -d "$dest" ]; then mv "$tmp/public/dist" "$dest"; fi
   ln -s "snapshots/$rev" "$tmp/current"
   mv -Tf "$tmp/current" "$cache/current"
   echo "Professional staging snapshot ready: $rev"
