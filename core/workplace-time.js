@@ -124,3 +124,7 @@ export function canScheduleWork(days, { workplaceId, date, from, to, excludeWork
 export function getOtherWorkDays(days, date, workplaceId) {
   return getDaysForDate(days, date).filter((day) => String(day?.workplaceId || '') !== String(workplaceId || ''));
 }
+
+export function workplaceForId(id) {
+  return getWorkplaces().find((item) => String(item?.key ?? item?.id ?? '') === String(id || '')) || null;
+}

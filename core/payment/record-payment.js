@@ -26,7 +26,7 @@ import {
 import { isActiveDepositAssignment, listPersonDeposits } from '../loyalty/deposit/data.js';
 import { selectedRecordDepositId } from '../loyalty/record-program.js';
 import { loadPersonalAccount } from '../loyalty/personal-account/data.js';
-import { getWorkplaces } from '../workplace-time.js';
+import { workplaceForId } from '../workplace-time.js';
 import { normalizeWorkplaceTimeZone, zonedDateTimeParts, zonedDateTimeToDate, zonedIntervalMoment } from '../time/index.js';
 import { getAllPeople } from '../people/data.js';
 import { personDisplay } from '../people/presentation.js';
@@ -74,9 +74,6 @@ async function persistRecordCompletion(record) {
   return getRecord(current.id) || completed;
 }
 
-function workplaceForId(id) {
-  return getWorkplaces().find((item) => String(item?.key ?? item?.id ?? '') === String(id || '')) || null;
-}
 
 function workplaceName(id) {
   const workplace = workplaceForId(id);

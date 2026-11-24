@@ -22,7 +22,7 @@ import {
   v2ListEntries,
 } from '../../ui/ui.js';
 import { readOnlyReceipt } from '../../ui/receipt/index.js';
-import { getWorkplaces } from '../workplace-time.js';
+import { workplaceForId } from '../workplace-time.js';
 import { getAllPeople } from '../people/data.js';
 import { listPersonDeposits } from '../loyalty/deposit/data.js';
 import { openPersonHistoryQ } from '../people/people.js';
@@ -54,9 +54,6 @@ function formatMoney(value) {
   return `${new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(Number(value) || 0)} ₽`;
 }
 
-function workplaceForId(id) {
-  return getWorkplaces().find((item) => String(item?.key ?? item?.id ?? '') === String(id || '')) || null;
-}
 
 function workplaceName(id) {
   const workplace = workplaceForId(id);

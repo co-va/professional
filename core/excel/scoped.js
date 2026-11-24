@@ -21,20 +21,10 @@ async function post(path,body) {
   }
   return res;
 }
-function download(blob,filename){
-  const url=URL.createObjectURL(blob);
-  const link=document.createElement('a');
-  link.href=url;
-  link.download=filename;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  setTimeout(()=>URL.revokeObjectURL(url),1000);
-}
 export async function exportScopedWorkbook(domain,rows,{template=false}={}){
   const response=await post('table',{domain,rows,template});
   const title=domain==='records'?'Записи':'Финансы';
-  download(await response.blob(),template?title+'-шаблон.xlsx':title+'.xlsx');
+  downloadBlob(await response.blob(),template?title+'-шаблон.xlsx':title+'.xlsx');
 }
 // CSV cannot merge group headers. It retains the exact XLSX column order.
 const RECORD_LABELS=[
@@ -85,7 +75,7 @@ export function buildScopedCsv(domain,rows){
     .map(line=>line.map(csvCell).join(';')).join('\r\n');
 }
 export function exportScopedCsv(domain,rows){
-  download(new Blob([buildScopedCsv(domain,rows)],{type:'text/csv;charset=utf-8'}),
+  downloadBlob(new Blob([buildScopedCsv(domain,rows)],{type:'text/csv;charset=utf-8'}),
     (domain==='records'?'Записи':'Финансы')+'.csv');
 }
 function previewHtml(preview){
@@ -148,4 +138,15 @@ export async function chooseScopedImport(root,domain,{onImported=()=>{}}={}){
     }
   });
   await previewFile();
+}
+
+export function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
