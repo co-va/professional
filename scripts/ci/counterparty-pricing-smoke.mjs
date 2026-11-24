@@ -410,8 +410,14 @@ assert.doesNotMatch(detail, /row\.actualPrice|updateInventoryItem/);
 
 // Counterparty detail performance contract: repeat opening does not repeat the
 // same catalog/warehouse requests, and the list paints before link hydration.
-assert.match(source, /const catalogCache = new Map\(\)/,
-  'Catalog view cache belongs to Counterparties page, not a global account leak');
+assert.match(source, /let sharedCatalogCache = new Map\(\)/);
+assert.match(source, /companyCache\.token !== token[\s\S]*?sharedCatalogCache = new Map\(\)/,
+  'Changing account replaces, rather than reuses, the session cache');
+assert.match(source, /professional:auth-logout[\s\S]*?sharedCatalogCache = new Map\(\)/);
+assert.match(source, /currentCompanyCache\(\) !== state \|\| state\.generation !== generation/,
+  'Obsolete catalog requests cannot populate the current cache');
+assert.match(source, /if \(cached && Array\.isArray\(cached\.statuses\)\)/,
+  'Entries alone must not be treated as verified catalog links');
 assert.match(source, /initialCompanies: currentCompanies, catalogCache/,
   'The loaded company list is reused when opening the supplier detail');
 assert.match(source, /catalogCache\.clear\(\)/,
@@ -420,11 +426,28 @@ assert.match(source, /catalogCache\?\.delete\(key\)/,
   'Editing or hiding supplier products must bypass the previous catalog snapshot');
 const companyPart = source.slice(source.indexOf('async function openCompany('),
   source.indexOf('export async function openSupplierAssociation('));
-assert.match(companyPart, /for \(let skip = 100; skip < count; skip \+= 400\)/,
+assert.match(companyPart, /for \(let skip = pageSize; skip < count; skip \+= pageSize \* parallel\)/,
   'Catalog pages load in bounded batches, not one-by-one');
-assert.match(companyPart, /renderCatalog\(entries, list\);\s*\/\/ The stock snapshot/,
+assert.match(companyPart, /renderCatalog\(entries, list\);[\s\S]*?await statusesPromise/,
   'Ready brands must paint before waiting on optional link-status information');
 
+// Exercise the actual account-cache reset, including an old in-flight map.
+const cacheSource = source.slice(source.indexOf('const COMPANY_CACHE_MS'),source.indexOf('const COUNTERPARTY_CARD_SCOPE'));
+let token = 'account-a';
+let onLogout;
+const sessionCache = new Function('getAuthToken','window',cacheSource+'\nreturn {currentCompanyCache, map:()=>sharedCatalogCache};')(()=>token,{addEventListener:(_,fn)=>{onLogout=fn;}});
+const oldState = sessionCache.currentCompanyCache();
+const oldMap = sessionCache.map();
+oldMap.set('same-company',{entries:['private-a']});
+token='account-b';
+const newState=sessionCache.currentCompanyCache();
+assert.notEqual(newState,oldState);
+assert.notEqual(sessionCache.map(),oldMap);
+oldMap.set('late-response',{entries:['private-a']});
+assert.equal(sessionCache.map().size,0);
+onLogout();
+assert.equal(sessionCache.map().size,0);
+const mockState={token:'test-session',generation:0};
 const catalogCalls = [];
 const catalogLayers = [];
 const catalogCache = new Map();
@@ -442,7 +465,7 @@ const mockCatalogJson = async path => {
     return { statuses: [] };
   }
   if (path.includes('/catalog?skip=')) {
-    const skip = Number(path.split('skip=')[1]);
+    const skip = Number(new URLSearchParams(path.split('?')[1]).get('skip'));
     return { count: 250, items: catalogRows(skip) };
   }
   throw new Error('Redundant counterparty list or unexpected request: ' + path);
@@ -461,14 +484,14 @@ function mockSupplierLayer() {
 const mockOpenCompany = new Function('json', 'workspaceHeaderContext',
   'mountV2ZLayer', 'v2ZLayer', 'v2Section', 'counterpartyInformation', 'emptyState',
   'catalogBrands', 'catalogGroupsMarkup', 'urlId', 'escapeHtml', 'openNotice',
-  'getInventoryItems', 'loadInventory', companyPart + '\nreturn openCompany;')(
+  'getInventoryItems', 'loadInventory', 'currentCompanyCache', 'getAuthToken', companyPart + '\nreturn openCompany;')(
   mockCatalogJson, ({ title }) => title, mockSupplierLayer, content => content,
   (title, content) => '<section>' + title + ': ' + content + '</section>',
   company => company.contactName, () => '<LOADING>',
   entries => new Map([['BRAND', new Map([['', entries]])]]),
   brands => '<READY>' + brands.size,
   value => value, value => value, () => null, () => [],
-  async () => { stockReads++; });
+  async () => { stockReads++; }, () => mockState, () => mockState.token);
 const supplierForCache = { id: 'test-company', name: 'Supplier', contactName: 'Svetlana' };
 const tickCatalog = async () => { for (let n = 0; n < 50; n++) await Promise.resolve(); };
 deferStatuses = {};
@@ -500,11 +523,11 @@ assert.match(catalogLayers[2].list.innerHTML, /<READY>/,
   'Old cached assortment remains visible while silently refreshing it');
 await tickCatalog();
 assert.equal(catalogCalls.length, requestCount + 4, 'Older cache must refresh from server');
-catalogCache.delete(supplierForCache.id);
+catalogCache.set(supplierForCache.id,{at:Date.now(),entries:[{id:'unverified'}]});
 await mockOpenCompany(supplierForCache.id, {}, () => {},
   { initialCompanies: [supplierForCache], catalogCache });
 await tickCatalog();
 assert.equal(catalogCalls.length, requestCount + 8,
-  'Invalidating after a mutation must refetch the updated catalog');
+  'An entries-only cache must not skip verification of links');
 
 console.log('PASS: supplier list price, agreement discount, item exception, bulk update and stock isolation');

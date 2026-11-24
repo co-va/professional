@@ -18,18 +18,18 @@ const PATH = '/inventory/counterparties';
 // or their prices to disk, and never keep stale rows after an explicit write.
 const COMPANY_CACHE_MS = 15000;
 let companyCache = { token: '', rows: null, at: 0, inFlight: null, generation: 0 };
-const sharedCatalogCache = new Map();
+let sharedCatalogCache = new Map();
 function currentCompanyCache() {
   const token = getAuthToken();
   if (companyCache.token !== token) {
     companyCache = { token, rows: null, at: 0, inFlight: null, generation: 0 };
-    sharedCatalogCache.clear();
+    sharedCatalogCache = new Map();
   }
   return companyCache;
 }
 if (typeof window !== 'undefined') window.addEventListener('professional:auth-logout', () => {
   companyCache = { token: '', rows: null, at: 0, inFlight: null, generation: 0 };
-  sharedCatalogCache.clear();
+  sharedCatalogCache = new Map();
 });
 const COUNTERPARTY_CARD_SCOPE = 'inventory-counterparty';
 // Same entity card/constructor used for company cards in Stock. This is
@@ -64,13 +64,22 @@ function message(payload, status) {
 }
 
 async function json(path = '', { method = 'GET', body } = {}) {
+  const token = getAuthToken();
   const response = await apiRequest(PATH + path, {
     method,
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
   const value = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(message(value, response.status));
-  if (String(method).toUpperCase() !== 'GET') invalidateInventoryNavigationCache();
+  if (getAuthToken() !== token) throw new Error('Сеанс изменился. Откройте раздел повторно.');
+  if (String(method).toUpperCase() !== 'GET') {
+    const state = currentCompanyCache();
+    state.rows = null;
+    state.at = 0;
+    state.generation++;
+    sharedCatalogCache.clear();
+    invalidateInventoryNavigationCache();
+  }
   return value;
 }
 async function loadCompanies({ force = false } = {}) {
@@ -91,12 +100,14 @@ async function loadCompanies({ force = false } = {}) {
         state.at = Date.now();
       }
     }
+    if (getAuthToken() !== token || companyCache !== state) throw new Error('Сеанс изменился.');
     return rows;
   } finally {
     if (state.inFlight === promise) state.inFlight = null;
   }
 }
 async function importExcel(action, file, fields = {}) {
+  const token = getAuthToken();
   const data = new FormData();
   data.append('file', file);
   Object.entries(fields).forEach(([key, value]) => {
@@ -107,6 +118,12 @@ async function importExcel(action, file, fields = {}) {
   });
   const value = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(message(value, response.status));
+  if (getAuthToken() !== token) throw new Error('Сеанс изменился.');
+  const state = currentCompanyCache();
+  state.rows = null;
+  state.at = 0;
+  state.generation++;
+  sharedCatalogCache.clear();
   invalidateInventoryNavigationCache();
   return value;
 }
@@ -343,6 +360,7 @@ async function openStockSupplierCatalog(company, { onLinked = () => {} } = {}) {
   host.innerHTML = emptyState('Ассортимент', 'Загружаем…');
   try {
     const key = String(company.id);
+    currentCompanyCache();
     const cached = sharedCatalogCache.get(key);
     if (cached && Array.isArray(cached.entries) && Date.now() - cached.at < 60000) {
       entries = cached.entries;
@@ -1513,11 +1531,13 @@ async function openCompany(companyId, root, onChanged = () => {}, { initialCompa
 
   const showCatalog = async ({ preferCache = false } = {}) => {
     const currentRun = ++revision;
+    const state = currentCompanyCache();
+    const generation = state.generation;
     const list = host.querySelector('[data-company-catalog-list]');
     if (!list) return;
     const key = String(companyId);
     const cached = preferCache ? catalogCache?.get(key) : null;
-    if (cached) {
+    if (cached && Array.isArray(cached.statuses)) {
       linkedCatalogIds = cached.linked === null ? null : new Set(cached.linked);
       matchedCatalogItems = cached.matched === null ? null : new Map(cached.matched);
       catalogLinkStatuses = new Map(cached.statuses);
@@ -1581,6 +1601,7 @@ async function openCompany(companyId, root, onChanged = () => {}, { initialCompa
         }
       }
       if (!layer.isConnected || !list.isConnected || currentRun !== revision) return;
+      if (currentCompanyCache() !== state || state.generation !== generation || getAuthToken() !== state.token) return;
       catalogCache?.set(key, {
         at: Date.now(), entries,
         linked: linkedCatalogIds === null ? null : [...linkedCatalogIds],
@@ -1633,8 +1654,11 @@ async function openCompany(companyId, root, onChanged = () => {}, { initialCompa
 const supplierMatchKey = value => String(value || '').trim().toLocaleUpperCase('ru-RU');
 
 async function supplierCatalogRows(company) {
+  const state = currentCompanyCache();
+  const generation = state.generation;
+  const cache = sharedCatalogCache;
   const key = String(company.id);
-  const cached = sharedCatalogCache.get(key);
+  const cached = cache.get(key);
   if (cached && Array.isArray(cached.entries) && Date.now() - cached.at < 60000)
     return cached.entries;
   const base = '/' + urlId(key) + '/catalog?take=500&skip=';
@@ -1649,7 +1673,8 @@ async function supplierCatalogRows(company) {
     const pages = await Promise.all(offsets.map(at => json(base + at)));
     pages.forEach(page => entries.push(...(Array.isArray(page.items) ? page.items : [])));
   }
-  sharedCatalogCache.set(key, { at: Date.now(), entries });
+  if (currentCompanyCache() !== state || getAuthToken() !== state.token) throw new Error('Сеанс изменился.');
+  if (state.generation === generation) cache.set(key, { at: Date.now(), entries });
   return entries;
 }
 
@@ -1888,6 +1913,7 @@ export async function renderCounterparties(root) {
   ]);
   const host = root.querySelector('[data-counterparties-list]');
   // In-memory supplier cache is bound to the current authenticated session.
+  const state = currentCompanyCache();
   const catalogCache = sharedCatalogCache;
   let currentCompanies = [];
   const renderCards = () => {
@@ -1920,7 +1946,7 @@ export async function renderCounterparties(root) {
     if (!currentCompanies.length) host.innerHTML = emptyState('Контрагенты', 'Загружаем…');
     try {
       const companies = await (prepared || loadCompanies({ force: invalidate === true }));
-      if (!root.isConnected) return;
+      if (!root.isConnected || currentCompanyCache() !== state || getAuthToken() !== state.token) return;
       currentCompanies = Array.isArray(companies) ? companies : [];
       renderCards();
     } catch (cause) { host.innerHTML = emptyState('Контрагенты недоступны', errText(cause)); }
