@@ -5,12 +5,7 @@ import { field } from '../inputs/index.js';
 import { columnLayout } from '../layout/index.js';
 import { escapeHtml } from '../utils/escape-html.js';
 import { v2ZBodySections } from '../v2/z-layout.js';
-import { paymentMethodsMarkup, initPaymentMethodsAllocation } from './methods.js';
-
-const numberValue = (value) => {
-  const number = Number(String(value ?? '').replace(/\s+/g, '').replace(',', '.'));
-  return Number.isFinite(number) ? number : 0;
-};
+import { numberValue, paymentMethodsMarkup, initPaymentMethodsAllocation } from './methods.js';
 
 const moneyText = (value) => {
   const number = numberValue(value);

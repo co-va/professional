@@ -3,7 +3,7 @@ import { select } from '../selectors/index.js';
 import { field } from '../inputs/index.js';
 import { readOnlyReceipt } from '../receipt/index.js';
 
-const numberValue = (value) => {
+export const numberValue = (value) => {
   const number = Number(String(value ?? '').replace(/\s+/g, '').replace(',', '.'));
   return Number.isFinite(number) ? number : 0;
 };

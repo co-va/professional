@@ -17,39 +17,8 @@ export function wheel({values,selected,type,formatter=(v)=>String(v).padStart(2,
   return Array.from({length:CYCLES},(_,cycle)=>base.map((value,index)=>`<button type="button" class="time-wheel__item${cycle===MIDDLE_CYCLE&&String(value)===String(selected)?' is-selected':''}" data-time-wheel-item data-time-wheel-type="${esc(type)}" data-value="${esc(value)}" data-cycle="${cycle}" data-index="${index}">${esc(formatter(value))}</button>`).join('')).join('');
 }
 
-export function timePicker({name,label,value='',minuteStep=15,min='00:00',max='23:59',allowEmpty=false,placeholder='—'}={}){
-  const raw=String(value||'').trim();
-  const stored=allowEmpty&&!raw?'':text(raw);
-  const visible=stored||placeholder;
-  return `<div class="time-picker" data-time-picker="${esc(name)}" data-time-minute-step="${Number(minuteStep)||15}" data-time-min="${esc(min)}" data-time-max="${esc(max)}" data-time-allow-empty="${allowEmpty?'true':'false'}" data-time-placeholder="${esc(placeholder)}"><span class="time-picker__label">${esc(label)}</span><button type="button" class="time-picker__button" data-time-open>${esc(visible)}</button><input type="hidden" name="${esc(name)}" value="${esc(stored)}" data-time-value></div>`;
-}
-
-export function initTimePickers(root){root.querySelectorAll('[data-time-picker]').forEach(host=>host.querySelector('[data-time-open]')?.addEventListener('click',()=>open(host)))}
-
-function openPicker({
-  currentValue='00:00',
-  minuteStep=15,
-  minValue='00:00',
-  maxValue='23:59',
-  title='Время',
-  allowEmpty=false,
-  onSave=()=>{},
-  onClear=()=>{},
-}={}){
-  const current=normalize(currentValue);
-  const step=Math.max(1,Math.min(59,Number(minuteStep)||15));
-  const min=normalize(minValue);
-  const max=normalize(maxValue);
-  const hours=Array.from({length:24},(_,i)=>i).filter(h=>h>=min.h&&h<=max.h);
-  const minutes=Array.from({length:Math.floor(59/step)+1},(_,i)=>i*step).filter(m=>m<=59);
-  if(!hours.length||!minutes.length)return null;
-  const initialHour=hours.includes(current.h)?current.h:hours[0];
-  const initialMinute=minutes.includes(current.min)?current.min:minutes[0];
-  const selectedValues={hours:String(initialHour),minutes:String(initialMinute)};
-  const content=`<div class="modal-title"><h2>${esc(title)}</h2></div><div class="time-wheel" data-time-wheel><div class="time-wheel__column" data-time-wheel-column="hours"><span class="time-wheel__label">Часы</span><div class="time-wheel__viewport">${wheel({values:hours,selected:initialHour,type:'hours'})}</div></div><div class="time-wheel__column" data-time-wheel-column="minutes"><span class="time-wheel__label">Минуты</span><div class="time-wheel__viewport">${wheel({values:minutes,selected:initialMinute,type:'minutes'})}</div></div></div>${allowEmpty?button('Очистить',{variant:'secondary',data:'data-time-clear'}):''}${button('Сохранить',{data:'data-time-save'})}`;
-  const modalRoot=mountModal(document.body,modal(content,{variant:'x',title,className:'modal--time-picker-sheet',xRole:'picker'}));
-  if(!modalRoot)return null;
-
+// One wheel interaction owner for both clock time and duration.
+export function bindTimeWheel(modalRoot, initialValues, onSelect=()=>{}) {
   const nearestItem=(viewport)=>{
     const items=[...viewport.querySelectorAll('[data-time-wheel-item]')];
     if(!items.length)return null;
@@ -61,8 +30,7 @@ function openPicker({
 
   const selectOnly=(viewport,item)=>{
     viewport.querySelectorAll('[data-time-wheel-item]').forEach(other=>other.classList.toggle('is-selected',other===item));
-    const type=item?.dataset.timeWheelType;
-    if((type==='hours'||type==='minutes')&&item?.dataset.value!=null)selectedValues[type]=String(item.dataset.value);
+    if (item?.dataset.timeWheelType && item.dataset.value != null) onSelect(item.dataset.timeWheelType, String(item.dataset.value));
   };
 
   const center=(type,value)=>{
@@ -100,8 +68,7 @@ function openPicker({
   });
 
   requestAnimationFrame(()=>requestAnimationFrame(()=>{
-    center('hours',initialHour);
-    center('minutes',initialMinute);
+    Object.entries(initialValues).forEach(([type,value])=>center(type,value));
   }));
 
   modalRoot.querySelectorAll('[data-time-wheel-item]').forEach(item=>item.addEventListener('click',()=>{
@@ -110,6 +77,44 @@ function openPicker({
     selectOnly(viewport,item);
     viewport.scrollTo({top:item.offsetTop-(viewport.clientHeight-item.offsetHeight)/2,behavior:'smooth'});
   }));
+
+  return { syncColumn };
+}
+
+export function timePicker({name,label,value='',minuteStep=15,min='00:00',max='23:59',allowEmpty=false,placeholder='—'}={}){
+  const raw=String(value||'').trim();
+  const stored=allowEmpty&&!raw?'':text(raw);
+  const visible=stored||placeholder;
+  return `<div class="time-picker" data-time-picker="${esc(name)}" data-time-minute-step="${Number(minuteStep)||15}" data-time-min="${esc(min)}" data-time-max="${esc(max)}" data-time-allow-empty="${allowEmpty?'true':'false'}" data-time-placeholder="${esc(placeholder)}"><span class="time-picker__label">${esc(label)}</span><button type="button" class="time-picker__button" data-time-open>${esc(visible)}</button><input type="hidden" name="${esc(name)}" value="${esc(stored)}" data-time-value></div>`;
+}
+
+export function initTimePickers(root){root.querySelectorAll('[data-time-picker]').forEach(host=>host.querySelector('[data-time-open]')?.addEventListener('click',()=>open(host)))}
+
+function openPicker({
+  currentValue='00:00',
+  minuteStep=15,
+  minValue='00:00',
+  maxValue='23:59',
+  title='Время',
+  allowEmpty=false,
+  onSave=()=>{},
+  onClear=()=>{},
+}={}){
+  const current=normalize(currentValue);
+  const step=Math.max(1,Math.min(59,Number(minuteStep)||15));
+  const min=normalize(minValue);
+  const max=normalize(maxValue);
+  const hours=Array.from({length:24},(_,i)=>i).filter(h=>h>=min.h&&h<=max.h);
+  const minutes=Array.from({length:Math.floor(59/step)+1},(_,i)=>i*step).filter(m=>m<=59);
+  if(!hours.length||!minutes.length)return null;
+  const initialHour=hours.includes(current.h)?current.h:hours[0];
+  const initialMinute=minutes.includes(current.min)?current.min:minutes[0];
+  const selectedValues={hours:String(initialHour),minutes:String(initialMinute)};
+  const content=`<div class="modal-title"><h2>${esc(title)}</h2></div><div class="time-wheel" data-time-wheel><div class="time-wheel__column" data-time-wheel-column="hours"><span class="time-wheel__label">Часы</span><div class="time-wheel__viewport">${wheel({values:hours,selected:initialHour,type:'hours'})}</div></div><div class="time-wheel__column" data-time-wheel-column="minutes"><span class="time-wheel__label">Минуты</span><div class="time-wheel__viewport">${wheel({values:minutes,selected:initialMinute,type:'minutes'})}</div></div></div>${allowEmpty?button('Очистить',{variant:'secondary',data:'data-time-clear'}):''}${button('Сохранить',{data:'data-time-save'})}`;
+  const modalRoot=mountModal(document.body,modal(content,{variant:'x',title,className:'modal--time-picker-sheet',xRole:'picker'}));
+  if(!modalRoot)return null;
+
+  bindTimeWheel(modalRoot, {hours:initialHour,minutes:initialMinute}, (type,value)=>{selectedValues[type]=value;});
 
   modalRoot.querySelector('[data-time-clear]')?.addEventListener('click',()=>{
     onClear();
