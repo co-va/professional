@@ -1,17 +1,17 @@
 :root{--ui-selector-control-height:var(--ui-field-height)}
 .ui-select{min-width:0;max-width:100%}
-.ui-select__control{position:relative;width:100%;max-width:100%;min-width:0;height:var(--ui-selector-control-height);min-height:var(--ui-selector-control-height);max-height:var(--ui-selector-control-height);border:1px solid var(--border);border-radius:0;padding:0 clamp(17px,12%,40px) 0 clamp(3px,4%,13px);display:flex;align-items:center;justify-content:center;gap:10px;overflow:hidden;background:var(--white);color:var(--text);font:inherit;text-align:center;cursor:pointer}
+.ui-select__control{position:relative;width:100%;max-width:100%;min-width:0;height:var(--ui-selector-control-height);min-height:var(--ui-selector-control-height);max-height:var(--ui-selector-control-height);border:1px solid var(--border);border-radius:0;padding:0 clamp(17px,12%,40px) 0 clamp(3px,4%,13px);display:flex;align-items:center;justify-content:center;gap:10px;overflow:hidden;background:var(--white);color:var(--text);font:inherit;font-size:16px;text-align:center;cursor:pointer}
 .ui-select__control:focus-visible{outline:2px solid var(--text-secondary);outline-offset:2px}
 .ui-select__value{flex:1 1 auto;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center}
 .ui-select__chevron{position:absolute;right:clamp(3px,4%,13px);flex:0 0 auto;color:var(--text-secondary);font-size:17px;line-height:1}
 .ui-selector{display:grid;min-width:0}
 .ui-selector__wheel{width:100%;min-width:0;border:1px solid var(--border);border-radius:0;background:var(--white);overflow:hidden}
 .ui-selector__search-wrap{padding:10px 12px;border-bottom:1px solid var(--border);background:var(--white)}
-.ui-selector__search{box-sizing:border-box;width:100%;height:var(--ui-selector-control-height);min-height:var(--ui-selector-control-height);max-height:var(--ui-selector-control-height);border:1px solid var(--border);border-radius:0;padding:0 12px;background:var(--white);color:var(--text);font:inherit;outline:none}
+.ui-selector__search{box-sizing:border-box;width:100%;height:var(--ui-selector-control-height);min-height:var(--ui-selector-control-height);max-height:var(--ui-selector-control-height);border:1px solid var(--border);border-radius:0;padding:0 12px;background:var(--white);color:var(--text);font:inherit;font-size:16px;outline:none}
 .ui-selector__search:focus{border-color:var(--text-secondary)}
 .ui-selector__viewport{max-width:100%;max-height:min(260px,42vh);overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;scrollbar-width:none;padding:0 14px}
 .ui-selector__viewport::-webkit-scrollbar{display:none}
-.ui-selector__option{width:100%;min-width:0;height:var(--ui-selector-control-height);min-height:var(--ui-selector-control-height);max-height:var(--ui-selector-control-height);border:0;border-bottom:1px solid var(--border);padding:4px 4px;line-height:1.15;display:flex;align-items:center;justify-content:center;background:var(--white);color:var(--text);font:inherit;text-align:center;cursor:pointer;white-space:normal;overflow-wrap:anywhere}
+.ui-selector__option{width:100%;min-width:0;height:var(--ui-selector-control-height);min-height:var(--ui-selector-control-height);max-height:var(--ui-selector-control-height);border:0;border-bottom:1px solid var(--border);padding:4px 4px;line-height:1.15;display:flex;align-items:center;justify-content:center;background:var(--white);color:var(--text);font:inherit;font-size:16px;text-align:center;cursor:pointer;white-space:normal;overflow-wrap:anywhere}
 .ui-selector__option:last-child{border-bottom:0}
 .ui-selector__option.is-current{font-weight:700}
 /* Card View picker only: red unused, black placed, bold black current cell. */
