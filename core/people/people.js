@@ -1030,6 +1030,7 @@ function personDataFields(person, all) {
     v2Section('Персональные данные', `<div class="form-grid">
       ${field({ label: 'Имя', name: 'name', value: person.name, required: true })}
       ${field({ label: 'Фамилия', name: 'surname', value: person.surname })}
+      ${field({ label: 'Примечание', name: 'note', value: person.note || '' })}
       ${select({ label: 'Пол', name: 'gender', value: person.gender || '', options: [
         { value: '', label: 'Не указан' },
         { value: 'female', label: 'Женский' },
@@ -1109,6 +1110,7 @@ function savePersonData(root, key) {
   if (!memberKeys.length) memberKeys.push(key);
   person.name = root.querySelector('[name="name"]')?.value.trim() || person.name;
   person.surname = root.querySelector('[name="surname"]')?.value.trim() || '';
+  person.note = root.querySelector('[name="note"]')?.value.trim() || '';
   person.gender = root.querySelector('[name="gender"]')?.value || '';
   const selectedBirthDay = root.querySelector('[name="birthDate"]')?.value || '';
   const originalBirthDate = String(person.birthDate || '');

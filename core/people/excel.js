@@ -1,10 +1,10 @@
 import {
-  button, escapeHtml, modal, mountModal, openNotice, selectFile,
-  segmentControl, initSegmentControls, v2ListEntries, v2ListEntry, v2Section,
+  button, modal, mountModal, openNotice, selectFile,
+  segmentControl, initSegmentControls,
 } from '../../ui/ui.js';
 import { apiRequest } from '../auth.js';
-import { hydratePeopleFromServer, getPersonPriceCondition } from './data.js';
-import { hydrateUEIFromServer } from '../uei.js';
+import { getPersonPriceCondition } from './data.js';
+import { openContactImportBatches, openContactImportUpload } from './contact-import-review.js';
 
 function message(error) {
   if (error instanceof Error && error.message && !/HTTP|fetch|network|404|500|502|503|JSON|API|Failed to|Prisma|SQL|P20\d+|transaction|sourceKey|tenantId|stack|undefined|constraint|database/i.test(error.message))
@@ -65,6 +65,7 @@ function contactRows(people) {
     additionalEmail: String(person.emails?.[1] || ''),
     telegram: String(person.telegrams?.[0] || ''),
     additionalTelegram: String(person.telegrams?.[1] || ''),
+    note: String(person.note || ''),
     personKey: String(person.key || ''),
   }));
 }
@@ -76,6 +77,7 @@ const CONTACT_EXPORT_COLUMNS = [
   ['phone', 'Телефон'], ['additionalPhone', 'Дополнительный телефон'],
   ['email', 'Email'], ['additionalEmail', 'Дополнительный Email'],
   ['telegram', 'Telegram'], ['additionalTelegram', 'Дополнительный Telegram'],
+  ['note', 'Примечание'],
 ];
 
 function getCsv(rows) {
@@ -136,96 +138,6 @@ function openPeopleExport(root, getRows) {
   return layer;
 }
 
-function fileInput(file) {
-  return {
-    dataUrl: String(file.dataUrl || ''),
-    filename: String(file.name || ''),
-    source: 'Контакты',
-    strict: true,
-    expectedDomain: 'people',
-    sheets: { 'Люди': { domain: 'people' }, 'Данные': { domain: 'people' } },
-  };
-}
-function previewContent(result) {
-  const total = Number(result.transferred || 0);
-  const same = Number(result.unchanged || 0);
-  const failed = Number(result.failed || 0);
-  const summary = 'К загрузке: ' + total
-    + (same ? ' · Уже есть: ' + same : '')
-    + (failed ? ' · Ошибок: ' + failed : '');
-  const errors = (Array.isArray(result.rows) ? result.rows : [])
-    .filter(row => row?.reason)
-    .slice(0, 25).map(row => {
-      const detail = String(row.reason || '');
-      const plain = /SQL|Prisma|P20\d+|foreign key|constraint|sourceKey|tenantId|stack|undefined|database|transaction|Internal Server Error/i.test(detail)
-        ? 'Проверьте сведения в этой строке'
-        : detail;
-      return v2ListEntry({
-        title: 'Строка ' + String(row.row || '—'),
-        subtitle: plain, interactive: false,
-      });
-    });
-  return v2Section('Загрузка', '<div>' + escapeHtml(summary) + '</div>')
-    + (errors.length ? v2Section('Что исправить', v2ListEntries(errors)) : '');
-}
-function openPreview(root, file, onLoaded) {
-  const layer = mountModal(root, modal(
-    '<div class="form-grid">'
-      + '<div>' + escapeHtml(file.name || 'Контакты.xlsx') + '</div>'
-      + '<div data-people-excel-preview aria-live="polite">Читаем файл…</div>'
-      + '</div>',
-    { title: 'Загрузка', variant: 'q', surface: 'app' },
-  ));
-  if (!layer) return null;
-  const host = layer.querySelector('[data-people-excel-preview]');
-  const payload = fileInput(file);
-  let ready = false;
-  let saving = false;
-  async function showPreview() {
-    ready = false;
-    if (host) host.textContent = 'Читаем файл…';
-    try {
-      const response = await request('check', payload);
-      const result = await response.json();
-      if (!layer.isConnected) return;
-      ready = !result.failed && Number(result.transferred) > 0;
-      host.innerHTML = previewContent(result)
-        + (ready ? button('Загрузить', { type: 'button', data: 'data-people-excel-save' }) : '');
-      if (!ready && !result.failed && !result.transferred) {
-        host.insertAdjacentHTML('beforeend', '<div>Новых сведений нет.</div>');
-      }
-    } catch (error) {
-      if (host && layer.isConnected) host.textContent = message(error);
-    }
-  }
-  host?.addEventListener('click', async event => {
-    const control = event.target?.closest?.('[data-people-excel-save]');
-    if (!control || !ready || saving) return;
-    ready = false;
-    saving = true;
-    control.disabled = true;
-    try {
-      const response = await request('commit', payload);
-      const result = await response.json();
-      const loaded = Number(result.transferred || 0);
-      if (result.failed) throw new Error('В файле есть ошибки. Изменения не сохранены.');
-      const contacts = await apiRequest('/business-state/journal');
-      if (!contacts.ok) throw new Error('Контакты загружены, но список не обновился. Откройте его ещё раз.');
-      const saved = await contacts.json();
-      hydratePeopleFromServer(saved.people || []);
-      hydrateUEIFromServer(saved.uei || {});
-      layer.v2Close?.();
-      onLoaded?.();
-      openNotice({ title: 'Контакты', message: 'Загружено: ' + loaded });
-    } catch (error) {
-      notice(error);
-      saving = false;
-      await showPreview();
-    }
-  });
-  void showPreview();
-  return layer;
-}
 async function chooseAndLoad(root, onLoaded) {
   // Must start directly inside the iOS click gesture.
   const file = await selectFile({
@@ -235,7 +147,7 @@ async function chooseAndLoad(root, onLoaded) {
   if (!/\.(xlsx|csv)$/i.test(String(file.name || '')) || Number(file.size) > 25 * 1024 * 1024) {
     throw new Error('Выберите Excel или CSV размером до 25 МБ');
   }
-  openPreview(root, file, onLoaded);
+  openContactImportUpload(root, file, { onLoaded });
 }
 
 export function openPeopleExcelMenu(root, { getRows = () => [], onLoaded = () => {} } = {}) {
@@ -243,6 +155,8 @@ export function openPeopleExcelMenu(root, { getRows = () => [], onLoaded = () =>
     { id: 'export', label: 'Выгрузка', run: () => openPeopleExport(root, getRows) },
     { id: 'import', label: 'Загрузка', run: () => chooseAndLoad(root, onLoaded) },
     { id: 'template', label: 'Шаблон', run: () => getWorkbook([], true) },
+    { id: 'uploads', label: 'Загрузки', run: () =>
+      openContactImportBatches(root, { onLoaded }) },
   ];
   const markup = '<div class="modal-actions">'
     + actions.map(action => button(action.label, {

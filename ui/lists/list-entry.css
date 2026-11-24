@@ -19,3 +19,31 @@
 .list-entry__content:has(.list-entry__reorder-handle){grid-template-columns:36px minmax(0,1fr) auto auto auto}
 .list-entry--columns .list-entry__content:has(.list-entry__reorder-handle){grid-template-columns:36px minmax(0,1fr) auto auto}
 .list-entry--columns .list-entry__columns{grid-column:auto}
+
+/* Contacts import review uses the established compact V2 list row.
+   One real selection checkbox, two facts, one editable value. */
+.contact-review-item{min-height:56px}
+.contact-review-item .list-entry__content{min-height:56px;padding:7px 8px;
+  grid-template-columns:24px minmax(0,1fr);gap:7px}
+.contact-review-item .list-entry__selector{position:relative;appearance:auto;
+  -webkit-appearance:checkbox;width:20px;height:20px;margin:0;justify-self:center}
+.contact-review-item .list-entry__columns{grid-column:2;
+  grid-template-columns:minmax(0,1fr) minmax(72px,.75fr) 66px;
+  gap:6px;align-items:center}
+.contact-review-item .list-entry__column{font-size:12px;gap:2px;line-height:1.15}
+.contact-review-item .list-entry__column--2{text-align:left}
+.contact-review-item .list-entry__column-line{max-width:100%;overflow:hidden;
+  white-space:nowrap;text-overflow:ellipsis}
+.contact-review-item .contact-review-value{display:block;width:100%;max-width:100%;
+  min-width:0;height:30px;padding:3px 5px;border:1px solid var(--border);
+  border-radius:0;background:var(--white);font-size:12px}
+.contact-review-item [data-review-keep]{width:64px;min-width:0;max-width:64px;
+  padding:4px;height:30px;min-height:30px;font-size:11px}
+.contact-review-batch .inventory-editor-panel{margin:0}
+.contact-review-batch .inventory-editor-panel__body{padding:6px 0}
+.contact-review-batch .list-entries{gap:4px}
+@media(max-width:360px){
+ .contact-review-item .list-entry__content{padding-left:5px;padding-right:5px;gap:4px}
+ .contact-review-item .list-entry__columns{grid-template-columns:minmax(0,1fr) 68px 56px;gap:4px}
+ .contact-review-item [data-review-keep]{width:54px;max-width:54px;font-size:10px}
+}

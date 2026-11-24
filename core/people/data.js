@@ -47,6 +47,7 @@ export function normalizePerson(person = {}) {
         : person.creationSource === 'import' ? 'import' : ''),
     name: String(person.name || ''),
     surname: String(person.surname || ''),
+    note: String(person.note || ''),
     photo: String(person.photo || ''),
     gender: String(person.gender || ''),
     birthDate: String(person.birthDate || ''),
