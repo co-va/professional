@@ -96,6 +96,7 @@ function openPicker({
   minValue='00:00',
   maxValue='23:59',
   title='Время',
+  anchor=null,
   allowEmpty=false,
   onSave=()=>{},
   onClear=()=>{},
@@ -111,7 +112,7 @@ function openPicker({
   const initialMinute=minutes.includes(current.min)?current.min:minutes[0];
   const selectedValues={hours:String(initialHour),minutes:String(initialMinute)};
   const content=`<div class="modal-title"><h2>${esc(title)}</h2></div><div class="time-wheel" data-time-wheel><div class="time-wheel__column" data-time-wheel-column="hours"><span class="time-wheel__label">Часы</span><div class="time-wheel__viewport">${wheel({values:hours,selected:initialHour,type:'hours'})}</div></div><div class="time-wheel__column" data-time-wheel-column="minutes"><span class="time-wheel__label">Минуты</span><div class="time-wheel__viewport">${wheel({values:minutes,selected:initialMinute,type:'minutes'})}</div></div></div>${allowEmpty?button('Очистить',{variant:'secondary',data:'data-time-clear'}):''}${button('Сохранить',{data:'data-time-save'})}`;
-  const modalRoot=mountModal(document.body,modal(content,{variant:'x',title,className:'modal--time-picker-sheet',xRole:'picker'}));
+  const modalRoot=mountModal(anchor || document.body,modal(content,{variant:'x',title,className:'modal--time-picker-sheet',xRole:'picker'}));
   if(!modalRoot)return null;
 
   bindTimeWheel(modalRoot, {hours:initialHour,minutes:initialMinute}, (type,value)=>{selectedValues[type]=value;});
@@ -136,6 +137,7 @@ function open(host){
   if(!hidden)return null;
   return openPicker({
     currentValue:hidden.value,
+    anchor:host.querySelector('[data-time-open]'),
     minuteStep:host.dataset.timeMinuteStep,
     minValue:host.dataset.timeMin||'00:00',
     maxValue:host.dataset.timeMax||'23:59',

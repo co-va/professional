@@ -1,4 +1,5 @@
 import { formatReportRubles, formatReportNumber } from '../../ui/utils/values.js';
+import { isV2DesktopWorkspace } from '../../ui/v2/geometry.js';
 import { timeMinutes, recordDurationHours } from '../time/index.js';
 import { isoDateLabel as formatDate } from '../../ui/utils/date-time.js';
 import {
@@ -292,13 +293,14 @@ export function openRecordView(record, {
 } = {}) {
   if (!record?.id) return null;
 
-  const useQ = presentation === 'q';
+  const desktopQ = presentation !== 'q' && context === 'professional' && isV2DesktopWorkspace(document.querySelector('.v2-app--workspace'));
+  const useQ = presentation === 'q' || desktopQ;
   // Reuse the same preview while respecting the opening container:
   // Q from contact History cannot open that same History Q again.
   const baseCapabilities = readOnlyHistory
     ? { ...RECORD_VIEW_CAPABILITIES.account, contactIdentity: true }
     : recordViewCapabilities(context);
-  const capabilities = useQ ? { ...baseCapabilities, personHistory: false } : baseCapabilities;
+  const capabilities = presentation === 'q' ? { ...baseCapabilities, personHistory: false } : baseCapabilities;
   const professionalDisplay = accountProfessionalDisplay(professional);
   let currentRecord = readOnlyHistory ? record : (getRecord(record.id) || record);
   let startTimer = null;
@@ -421,12 +423,15 @@ export function openRecordView(record, {
     });
   };
 
-  const openActions = () => {
+  const openActions = (event) => {
+    const trigger = event?.currentTarget;
+    const anchor = trigger?.matches?.('button') && trigger.getBoundingClientRect().width > 0 ? trigger : null;
     if (!capabilities.settings) return;
     const source = syncCurrent();
     const paymentState = getRecordPaymentState(source);
     if (paymentState.hasPayments) {
       const actions = openRecordPaymentActions(source, {
+        anchor,
         onSaved: () => {
           syncCurrent();
           render();
@@ -441,9 +446,9 @@ export function openRecordView(record, {
       });
       return;
     }
-    const actions = mountModal(document.body, modal(
+    const actions = mountModal(anchor || document.body, modal(
       actionSheet({ cancelled: source.status === 'cancelled' }),
-      { variant: 'x', surface: 'app' },
+      { variant: 'x', surface: 'app', xRole: 'action' },
     ));
     if (!actions) return;
 

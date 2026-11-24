@@ -3,6 +3,10 @@ import { financeNavigationItems, renderFinanceSection } from '../core/finance/in
 import { inventoryNavigationItems, renderInventorySection } from '../core/inventory/index.js';
 import { loyaltyNavigationItems, renderLoyaltySection } from '../core/loyalty/index.js';
 import { renderJournal } from '../journal/journal.js';
+import { mountJournalMonthCalendar } from '../journal/месяц.js';
+import { getWorkplaceContext, setWorkplaceContext } from '../core/workplace-context.js';
+import { getWorkplaces } from '../core/workplace-time.js';
+import { localDateKey } from '../core/time/index.js';
 import { settingsNavigationItems, renderSettingsSection } from '../settings/settings.js';
 import { render as renderProfile } from '../core/profile/profile.js';
 import { getProfile } from '../core/profile/data.js';
@@ -19,7 +23,7 @@ import { getJournalTimeUsages } from '../journal/time-usage-source.js';
 import { configureWorkplaceSource } from '../core/workplace-time.js';
 import { configureTimeUsageSource } from '../core/time/index.js';
 import { activateDemo, canUseCapability, getAccess, loadAccess } from '../core/access.js';
-import { mountV2ZLayer, openNotice, initV2WorkspaceInteraction, setV2DeckOpen, v2CardDeck, v2Header, v2Shell, v2Sticker, v2ZLayer } from '../ui/ui.js';
+import { ALL_WORKPLACES_ID, viewNavigation, initViewNavigation, mountV2ZLayer, openNotice, initV2WorkspaceInteraction, setV2DeckOpen, v2CardDeck, v2Header, v2Shell, v2Sticker, v2ZLayer } from '../ui/ui.js';
 import { startPlatformNotices } from '../core/platform-notices.js';
 import { setThemeColor } from '../ui/viewport/index.js';
 import { isV2DesktopWorkspace, V2_DESKTOP_MEDIA } from '../ui/v2/geometry.js';
@@ -46,6 +50,9 @@ const state = {
   navigationEnterZ: false,
   chatPersonKey: '',
   journalView: 'day',
+  desktopCalendarMode: 'records',
+  desktopCalendarMonth: null,
+  desktopCalendarContext: null,
   secondary: {
     finance: 'cash',
     inventory: 'stock',
@@ -377,7 +384,79 @@ async function ensureWorkspaceState(section) {
   await Promise.all(tasks);
 }
 
-async function renderActiveWorkspaceSurface(surface) {
+function bindDesktopCalendar(shell) {
+  const host = shell?.querySelector('[data-v2-desktop-calendar]');
+  if (!host) return { dispose: () => {}, sync: () => {} };
+  let disposed = false;
+  let ready = false;
+  let loading = null;
+  const media = typeof window.matchMedia === 'function' ? window.matchMedia(V2_DESKTOP_MEDIA) : null;
+  const allowed = () => isV2DesktopWorkspace(shell) && canUseCapability('journal.month.access');
+  const modes = [{ id: 'records', label: 'Записи' }, ...(canUseCapability('timetable.access') ? [{ id: 'schedule', label: 'График' }] : [])];
+  const context = () => state.desktopCalendarContext || getWorkplaceContext([...getWorkplaces(), { key: ALL_WORKPLACES_ID }], { scope: 'journal' });
+  const render = () => {
+    if (disposed || !host.isConnected) return;
+    host.hidden = !allowed();
+    if (!allowed() || !ready) return;
+    if (!modes.some(item => item.id === state.desktopCalendarMode)) state.desktopCalendarMode = 'records';
+    const active = state.desktopCalendarMode;
+    const selected = context();
+    const month = state.desktopCalendarMonth || selected.date;
+    const schedule = active === 'schedule';
+    const workplace = schedule ? getWorkplaceContext([...getWorkplaces(), { key: ALL_WORKPLACES_ID }], { scope: 'journal:graph' }).workplaceId : selected.workplaceId;
+    host.innerHTML = viewNavigation({ views: modes, activeView: active }) + '<div data-v2-sidebar-month></div>';
+    initViewNavigation(host, { views: modes, activeView: active, onChange: (mode) => {
+      state.desktopCalendarMode = mode;
+      render();
+    } });
+    const calendar = host.querySelector('[data-v2-sidebar-month]');
+    if (schedule) calendar.dataset.journalGraphCalendar = '';
+    mountJournalMonthCalendar(calendar, {
+      month, workplaceId: workplace || ALL_WORKPLACES_ID, selectedValue: localDateKey(selected.date), schedule,
+      onMonthChange: (nextMonth) => { state.desktopCalendarMonth = nextMonth; },
+      onDateSelect: (date) => {
+        if (!canUseCapability('journal.day.access')) return;
+        state.desktopCalendarMonth = date;
+        if (state.activeSection === 'journal') {
+          window.dispatchEvent(new CustomEvent('professional:desktop-journal-date', { detail: { date } }));
+        } else {
+          setWorkplaceContext({ date, scope: 'journal' });
+          state.desktopCalendarContext = null;
+          state.journalView = 'day';
+          navigate('journal', { navigationOpen: false });
+        }
+      },
+    });
+  };
+  const sync = () => {
+    if (disposed || !host.isConnected) return;
+    host.hidden = !allowed();
+    if (!allowed()) return;
+    if (ready) { render(); return; }
+    if (loading) return;
+    loading = Promise.all([loadProfileState(), loadBusinessState(), loadOperationalState(), loadFinanceState()])
+      .then(() => { ready = true; render(); })
+      .catch(error => { if (!disposed) { host.textContent = 'Не удалось загрузить календарь'; console.error(error); } })
+      .finally(() => { loading = null; });
+  };
+  let queued = false;
+  const schedule = () => {
+    if (queued || disposed) return;
+    queued = true;
+    queueMicrotask(() => { queued = false; sync(); });
+  };
+  const events = ['professional:records-changed', 'professional:dds-changed', 'professional:time-usage-changed', 'professional:workplaces-changed'];
+  events.forEach(name => window.addEventListener(name, schedule));
+  media?.addEventListener?.('change', sync);
+  sync();
+  return { sync, dispose: () => {
+    disposed = true;
+    events.forEach(name => window.removeEventListener(name, schedule));
+    media?.removeEventListener?.('change', sync);
+  } };
+}
+
+async function renderActiveWorkspaceSurface(surface, calendarSync = () => {}) {
   const section = state.activeSection;
   await ensureWorkspaceState(section);
   ensureServerSync();
@@ -393,6 +472,12 @@ async function renderActiveWorkspaceSurface(surface) {
   if (section === 'journal') {
     return renderJournal(surface, {
       initialView: state.journalView || 'day',
+      onCalendarContextChange: (context) => {
+        const previous = state.desktopCalendarContext;
+        state.desktopCalendarContext = context;
+        if (!previous || localDateKey(previous.date) !== localDateKey(context.date)) state.desktopCalendarMonth = context.date;
+        calendarSync();
+      },
       onViewChange: (view) => {
         state.journalView = view;
       },
@@ -464,6 +549,7 @@ function renderWorkspace() {
       deck: rootDeck,
       eDeck,
       desktopFooter: 'Аквера',
+      desktopCalendar: true,
       deckOpen: state.navigationOpen,
       eOpen: state.navigationOpen && state.navigationLevel === 'e',
       zEnter: Boolean(state.navigationEnterZ),
@@ -557,7 +643,9 @@ function renderWorkspace() {
     attributeFilter: ['class', 'disabled', 'aria-label', 'data-v2-primary-visible', 'data-v2-primary-label', 'data-v2-primary-variant'],
   });
 
-  const result = surface ? renderActiveWorkspaceSurface(surface) : null;
+  const desktopCalendar = bindDesktopCalendar(shell);
+  disposers.push(desktopCalendar.dispose);
+  const result = surface ? renderActiveWorkspaceSurface(surface, desktopCalendar.sync) : null;
   Promise.resolve(result).then((nextDispose) => {
     if (disposed || renderVersion !== workspaceRenderVersion) {
       if (typeof nextDispose === 'function') nextDispose();
@@ -635,6 +723,9 @@ export async function renderAuthenticated(account = authenticatedAccount) {
 window.addEventListener('professional:auth-logout', () => {
   stopProfessionalPresence();
   authenticatedAccount = null;
+  state.desktopCalendarContext = null;
+  state.desktopCalendarMonth = null;
+  state.desktopCalendarMode = 'records';
   workspaceReady = false;
   disposeView();
   disposeView = () => {};

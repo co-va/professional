@@ -7,6 +7,7 @@ export function v2Shell({
   deck = '',
   eDeck = '',
   desktopFooter = '',
+  desktopCalendar = false,
   v = '',
   className = '',
   deckOpen = false,
@@ -20,6 +21,7 @@ export function v2Shell({
     ${header}
     <div class="v2-y-host" data-v2-y-host hidden></div>
     <div class="v2-app__stage">
+      ${desktopCalendar ? '<aside class="v2-desktop-calendar" data-v2-desktop-calendar></aside>' : ''}
       ${feDeck}
       <div class="v2-front" data-v2-front style="width:calc(100% + var(--v2-z-viewport-overscan,24px));height:calc(100% + var(--v2-z-viewport-overscan,24px))">
         <main class="v2-z" ${zData} data-v2-dismissible="false">

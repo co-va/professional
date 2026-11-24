@@ -89,6 +89,7 @@ export function renderJournal(root, options = {}) {
     setWorkplaceContext({ workplaceId: selectedWorkplaceId, date: selectedDate, scope: WORKPLACE_CONTEXT_SCOPES[mode] });
     // The Journal date is shared; its Day workplace selection is not.
     if (mode !== 'day') setWorkplaceContext({ date: selectedDate, scope: JOURNAL_CONTEXT_SCOPE });
+    options.onCalendarContextChange?.({ date: selectedDate, workplaceId: selectedWorkplaceId });
   };
 
   const restoreWorkplaceContext = () => {
@@ -581,6 +582,7 @@ export function renderJournal(root, options = {}) {
     } else {
       syncJournalHeader();
     }
+    options.onCalendarContextChange?.({ date: selectedDate, workplaceId: selectedWorkplaceId });
     const viewRoot = root.querySelector('[data-journal-view]');
     if (activeView === 'day') {
       disposeActiveView = renderJournalDay(viewRoot, {
@@ -687,6 +689,19 @@ export function renderJournal(root, options = {}) {
   };
 
   window.addEventListener('professional:journal-note-focus-request', focusJournalNotes);
+  const selectDesktopDate = (event) => {
+    const nextDate = event.detail?.date;
+    if (!(nextDate instanceof Date) || Number.isNaN(nextDate.getTime()) || !availableViews.some(view => view.id === 'day')) return;
+    if (root.querySelector('[data-record-creation-flow]')) return;
+    selectedDate = nextDate;
+    activeView = 'day';
+    monthMode = 'view';
+    restoreWorkplaceContext();
+    persistProfessionalContext();
+    options.onViewChange?.(activeView);
+    renderView();
+  };
+  window.addEventListener('professional:desktop-journal-date', selectDesktopDate);
 
   let refreshQueued = false;
   const scheduleRefresh = () => {
@@ -715,6 +730,7 @@ export function renderJournal(root, options = {}) {
     root.removeEventListener('click', handleSettingsClick);
     refreshEvents.forEach((eventName) => window.removeEventListener(eventName, scheduleRefresh));
     window.removeEventListener('professional:journal-note-focus-request', focusJournalNotes);
+    window.removeEventListener('professional:desktop-journal-date', selectDesktopDate);
     clearV2ZHeaderRows(root);
   };
 }

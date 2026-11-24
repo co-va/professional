@@ -76,3 +76,7 @@ html.keyboard-open .modal-actions button[data-ui-keyboard-action="auxiliary"]{
 
 /* Only this long Q title scales on narrow phones; other Q headings are unchanged. */
 .modal--account-controls .v2-q-title{font-size:clamp(13px,4.3vw,18px);letter-spacing:-.035em;white-space:nowrap;max-width:100%}
+
+@media (min-width:768px) and (min-height:600px){
+  .v2-app--workspace .v2-layer-portal.is-anchored .modal-sheet.modal--bottom{height:auto;min-height:0;max-height:var(--v2-anchor-max-height);padding:12px;overflow:auto}
+}

@@ -608,14 +608,14 @@ export function openRecordPayment(record, { onCompleted = () => {} } = {}) {
   return openPaymentEntry(record, onCompleted);
 }
 
-export function openRecordPaymentActions(record, { onSaved = () => {}, extraActions = '' } = {}) {
+export function openRecordPaymentActions(record, { onSaved = () => {}, extraActions = '', anchor = null } = {}) {
   if (!record?.id) return null;
   const current = getRecord(record.id) || record;
   const state = paymentStateForRecord(current);
   if (!state?.latestPayment) return null;
-  const layer = mountModal(document.body, modal(
+  const layer = mountModal(anchor || document.body, modal(
     paymentActionsBody(state, extraActions),
-    { variant: 'x', surface: 'app' },
+    { variant: 'x', surface: 'app', xRole: 'action' },
   ));
   if (!layer) return null;
   bindPaymentBodyActions(layer, current, state, onSaved);

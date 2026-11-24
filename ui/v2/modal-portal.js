@@ -27,7 +27,7 @@ export function v2Layer(content = '', { kind = 'standard', title = '', className
   return `<div class="v2-layer-backdrop" data-v2-layer data-v2-layer-kind="${resolved}"><section class="v2-layer v2-layer--${resolved} ${text(className)}" role="dialog" aria-modal="true" aria-label="${text(title)}" tabindex="-1">${closeControl}${gestureZone}${body}</section></div>`;
 }
 
-function mountV2ModalPortal(host, app = null, kind = 'standard') {
+function mountV2ModalPortal(host, app = null, kind = 'standard', anchor = null) {
   if (!host) return null;
 
   const portal = document.createElement('div');
@@ -55,7 +55,24 @@ function mountV2ModalPortal(host, app = null, kind = 'standard') {
       width: appRect.width,
       height: appRect.height,
     };
-    let geometry = v2ModalPortalGeometry(kind === 'top' && isV2DesktopWorkspace(app) ? appRect : hostRect, layoutViewport);
+    const wide = isV2DesktopWorkspace(app);
+    let geometry = v2ModalPortalGeometry(wide && (kind === 'top' || kind === 'bottom') ? appRect : hostRect, layoutViewport);
+    const anchorRect = wide && kind === 'bottom' && anchor?.isConnected ? anchor.getBoundingClientRect() : null;
+    const anchored = Boolean(anchorRect && anchorRect.width > 0 && anchorRect.height > 0);
+    portal.classList.toggle('is-anchored', anchored);
+    if (anchored) {
+      const gap = 6;
+      const width = Math.min(Math.max(anchorRect.width, 240), 380, Math.max(0, appRect.width - 16));
+      const left = Math.max(8, Math.min(anchorRect.left - appRect.left, appRect.width - width - 8));
+      const below = Math.max(0, appRect.bottom - anchorRect.bottom - gap - 8);
+      const above = Math.max(0, anchorRect.top - appRect.top - gap - 8);
+      const openAbove = below < 280 && above > below;
+      portal.style.setProperty('--v2-anchor-left', `${left}px`);
+      portal.style.setProperty('--v2-anchor-width', `${width}px`);
+      portal.style.setProperty('--v2-anchor-top', openAbove ? 'auto' : `${anchorRect.bottom - appRect.top + gap}px`);
+      portal.style.setProperty('--v2-anchor-bottom', openAbove ? `${appRect.bottom - anchorRect.top + gap}px` : 'auto');
+      portal.style.setProperty('--v2-anchor-max-height', `${Math.max(0, openAbove ? above : below)}px`);
+    }
     if (qLayer && app) {
       geometry = v2ModalPortalGeometry(appRect, layoutViewport);
       const headerBottom = app.querySelector?.('[data-v2-header]')?.getBoundingClientRect?.().bottom;
@@ -202,7 +219,8 @@ export function mountV2Layer(html, { root = null } = {}) {
   const app = technical ? null : host.closest?.('[data-v2-app]');
   const lockedStage = technical ? null : lockV2StageInteraction(app);
   const releaseHeaderLock = technical ? () => {} : lockModalHeader(app);
-  const portalOwner = technical ? null : mountV2ModalPortal(host, app, kind);
+  const anchor = root?.matches?.('button') ? root : null;
+  const portalOwner = technical ? null : mountV2ModalPortal(host, app, kind, anchor);
   portalOwner?.setQLayer?.(qLayer);
   const mountHost = portalOwner?.portal || host;
   node.classList.add(technical ? 'v2-layer-backdrop--technical' : 'v2-layer-backdrop--contained');
