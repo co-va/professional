@@ -56,7 +56,8 @@
 .settings-booking-fields{gap:8px;min-width:0}
 .settings-booking-fields .input-action-row{min-width:0;grid-template-columns:minmax(0,1fr) auto}
 .settings-booking-fields .input-action-row input{width:100%;min-width:0}
-.settings-inline-welcome{margin-top:12px;gap:8px}
+.settings-inline-welcome{margin:0;gap:8px;min-width:0}
+.settings-overview-panel[data-settings-welcome-panel]{width:100%;box-sizing:border-box}
 .settings-inline-welcome .settings-h-action{justify-self:end}
 .settings-overview [hidden]{display:none!important}
 .settings-overview-panel[data-settings-panel="integrations"]{padding:0;border:0;background:transparent}

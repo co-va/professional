@@ -81,8 +81,11 @@ export function settingsOverviewMarkup(visible) {
     return '<section class="settings-overview-card">'+trigger+'</section>';
   };
   const panel = id => ['online-booking','integrations','tags','documents'].includes(id) ? '' : '<section id="settings-panel-'+id+'" class="settings-overview-panel" data-settings-panel="'+id+'" hidden><div data-settings-embedded></div></section>';
+  const welcomePanel = available.has('online-booking')
+    ? '<section id="settings-online-welcome" class="settings-overview-panel" data-settings-welcome-panel hidden></section>'
+    : '';
   return workspaceHeaderContext({title:'Настройки'})+'<div class="settings-overview">'+
-    (top.length ? '<div class="settings-overview-section">'+columnLayout(top.map(card),{columns:top.length,ariaLabel:'Онлайн-запись, интеграции и перенос данных'})+top.map(panel).join('')+'</div>' : '')+
+    (top.length ? '<div class="settings-overview-section">'+columnLayout(top.map(card),{columns:top.length,ariaLabel:'Онлайн-запись, интеграции и перенос данных'})+welcomePanel+top.map(panel).join('')+'</div>' : '')+
     (middle.length ? '<div class="settings-overview-section">'+columnLayout(middle.map(card),{columns:middle.length,ariaLabel:'Уведомления и ярлыки'})+middle.map(panel).join('')+'</div>' : '')+
     (available.has('documents') ? '<div class="settings-overview-section">'+card('documents')+panel('documents')+'</div>' : '')+
     '</div>';

@@ -200,16 +200,21 @@ function bindBookingRules(root) {
 }
 
 function renderInlineBooking(root) {
+  // The editor belongs to the overview row, not to either summary card.
+  const panel = root.closest('.settings-overview-section')?.querySelector('[data-settings-welcome-panel]');
+  if (!panel) return;
   const workplaces = publicRouteState.workplaces.filter(item=>item.key && item.slug);
   const options = [{value:'',label:'Выбрать рабочее пространство'},...workplaces.map(item=>({value:item.key,label:item.name||'Без названия'}))];
   const saved = getBookingSettings();
-  root.innerHTML = `<div class="settings-inline-heading"><strong>Онлайн-запись</strong>${button('Приветствие',{className:'settings-h-action',data:'data-inline-welcome aria-expanded="false"'})}</div>
+  root.innerHTML = `<div class="settings-inline-heading"><strong>Онлайн-запись</strong>${button('Приветствие',{className:'settings-h-action',data:'data-inline-welcome aria-expanded="false" aria-controls="settings-online-welcome"'})}</div>
     <div class="form-grid settings-booking-fields">
       ${copyLinkField('Общая ссылка',bookingLink(publicRouteState.profileSlug),'general')}
       ${select({label:'Рабочее пространство',name:'bookingWorkplace',value:'',options,aria:'Выбрать рабочее пространство для онлайн-записи'})}
       ${copyLinkField('Ссылка рабочего пространства','','workplace')}
-    </div>
-    <form class="form-grid settings-inline-welcome" data-inline-welcome-form hidden>
+    </div>`;
+  panel.hidden = true;
+  panel.innerHTML = `<div class="settings-inline-heading"><strong>Приветствие</strong></div>
+    <form class="form-grid settings-inline-welcome" data-inline-welcome-form>
       ${field({label:'Заголовок',name:'welcomeTitle',value:saved.welcomeTitle,maxlength:90})}
       ${textareaField({label:'Текст',name:'welcomeText',value:saved.welcomeText,rows:4,maxlength:500})}
       ${button('Сохранить',{type:'submit',className:'settings-h-action',data:'data-inline-welcome-save hidden'})}
@@ -224,18 +229,21 @@ function renderInlineBooking(root) {
     if(copy) copy.disabled=!link?.value;
   });
   const toggle=root.querySelector('[data-inline-welcome]');
-  const form=root.querySelector('[data-inline-welcome-form]');
+  const form=panel.querySelector('[data-inline-welcome-form]');
   const save=form?.querySelector('[data-inline-welcome-save]');
   let baseline=saved;
   const sync=()=>{if(save)save.hidden=settingsSignature(welcomeDraft(form,baseline))===settingsSignature(baseline);};
-  toggle?.addEventListener('click',()=>{form.hidden=!form.hidden;toggle.setAttribute('aria-expanded',String(!form.hidden));});
+  toggle?.addEventListener('click',()=>{
+    panel.hidden=!panel.hidden;
+    toggle.setAttribute('aria-expanded',String(!panel.hidden));
+  });
   form?.addEventListener('input',sync);
   form?.addEventListener('change',sync);
   form?.addEventListener('submit',event=>{
     event.preventDefault();
     baseline=saveBookingSettings(welcomeDraft(form,getBookingSettings()));
     sync();
-    form.hidden=true;
+    panel.hidden=true;
     toggle?.setAttribute('aria-expanded','false');
   });
   sync();
