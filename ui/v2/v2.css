@@ -587,7 +587,7 @@
  .people-filter-popup [data-people-filter-fields] .field>span{font-size:13px;color:#41484F;line-height:1.2}
  .people-filter-popup .ui-select__control{height:34px;min-height:34px;max-height:34px;border-radius:8px;font-size:13px;padding:0 23px 0 9px}
  .people-filter-popup .ui-select__selection,.people-filter-popup .ui-select__text,.people-filter-popup .ui-select__value{justify-content:flex-start;text-align:left;font-size:13px}
- .people-filter-popup [data-people-filter-actions]:not([hidden]){margin-top:12px}
+ .v2-layer--bottom.people-filter-popup [data-people-filter-actions]:not([hidden]){margin-top:12px;background:transparent}
  .people-filter-popup [data-people-filter-action]{height:36px;min-height:36px;border-radius:10px;font-size:13px}
  .people-filter-popup [hidden]{display:none!important}
  .people-filter-selector .ui-selector__wheel{border:0;border-radius:10px}
