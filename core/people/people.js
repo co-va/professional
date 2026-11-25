@@ -493,8 +493,8 @@ function desktopPeopleTable(root, items, visitIndex) {
     { key: 'code', label: 'Код', sortable:false },
     { key: 'name', label: 'Имя Фамилия', sortable:false, render: row => `<button type="button" data-person="${escapeHtml(row.key)}">${escapeHtml(row.name)}</button>` },
     { key: 'phone', label: 'Телефон', sortable: false },
-    { key: 'firstVisit', label: 'Первое посещение', sortable: false, render: row => escapeHtml(row.firstVisit ? formatPersonVisitDate(row.firstVisit) : '') },
-    { key: 'lastVisit', label: 'Последнее посещение', sortable:false, render: row => escapeHtml(row.lastVisit ? formatPersonVisitDate(row.lastVisit) : '') },
+    { key: 'firstVisit', label: 'Первое посещение', sortable: false, header: () => '<span>Первое</span><span>посещение</span>', render: row => escapeHtml(row.firstVisit ? formatPersonVisitDate(row.firstVisit) : '') },
+    { key: 'lastVisit', label: 'Последнее посещение', sortable:false, header: () => '<span>Последнее</span><span>посещение</span>', render: row => escapeHtml(row.lastVisit ? formatPersonVisitDate(row.lastVisit) : '') },
   ];
   const rows = items.map(person => {
     const display = personDisplay(person);
@@ -584,6 +584,8 @@ export function renderPeople(root, options = {}) {
       <div class="people-desktop-actions">
         ${button('Фильтр',{variant:'secondary',data:'data-people-desktop-filter'})}
         ${button('Сортировка',{variant:'secondary',data:'data-people-desktop-sort'})}
+      </div>
+      <div class="people-desktop-actions people-desktop-actions--right">
         ${button('Excel',{variant:'secondary',data:'data-people-desktop-excel'})}
         ${button('Загрузки',{variant:'secondary',data:'data-people-desktop-uploads'})}
         ${button('Вид',{variant:'secondary',data:'data-people-desktop-view'})}
