@@ -1,10 +1,8 @@
 import { text, dataAttributes } from './html.js';
-import { compactButton } from '../buttons/index.js';
 
 export function v2V({ data = '', aria = 'Действия раздела', hidden = false, desktop = false } = {}) {
   if (hidden) return '';
-  if (desktop) return compactButton({ kind: 'settings', data: `data-v2-v ${data}`, className: 'v2-desktop-v', aria });
-  return `<button type="button" class="v2-v" data-v2-v${dataAttributes(data)} aria-label="${text(aria)}">
+  return `<button type="button" class="v2-v${desktop ? ' v2-desktop-v' : ''}" data-v2-v${dataAttributes(data)} aria-label="${text(aria)}">
     <svg class="v2-v__medallion" viewBox="0 0 40 40" aria-hidden="true">
       <defs>
         <linearGradient id="v2-v-glass" x1="8" y1="4" x2="30" y2="35" gradientUnits="userSpaceOnUse">

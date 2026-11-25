@@ -1,5 +1,19 @@
 # PROJECT_STATE
 
+# Desktop Professional — обязательный контракт владельца (25.11.2026)
+
+Использовать согласованные V12 (календарь), V18 (расположение, Q и S), не демонстрационные данные. Сохранить действующие компоненты, API, фотографии, бизнес-логику и Mobile. Не считать перенос готовым из-за успешного smoke. Работать только Professional/staging; main/Core/User не менять.
+
+* F постоянное слева, 312 px; E под соответствующим F; H графит #2F3338; один календарь под аккаунтом над навигацией. Тёмные контуры, красные выходные, соседние даты только числа, исходные цвета и реальные показатели записей/графика.
+* Журнал — единственное полноценное Z до правого и нижнего краёв. На Desktop убрать центральный Месяц: календарь и график принадлежат F. Переключатели и действия на H над рабочей областью, не в белом Z. Список записей — таблица/строки как в Admin, не мобильные карточки. Сохранить операции графика и Excel.
+* Все прочие разделы — рабочие списки на H по образцу Admin, без полноэкранного белого Z. Открытая сущность/редактор — существующий Q справа (не более половины окна, верхний левый угол скруглён). Никакого дублирования заголовков и данных. Не согласованные детали сохранять в исходном Q, не изобретать UI. Карты, фото, пропорции, конструктор одинаковы на всех устройствах. Запись — исходная MiniCard и функции, включая рецепты, расходники и оплату. Услуги: длительность, конец вычисляет система.
+* S только сверху, прямая полоска, высота по содержимому; уведомление исчезает, отчёт остаётся. X компактный центр или меню/селектор у поля, барабаны времени. Владелец отверг замену V на шестерёнку: использовать исходный V.
+* Перед следующим изменением сверить эту спецификацию, исходный UI и действительный staging. Не добавлять новую палитру или самостоятельно переделывать согласованные компоненты. Не объявлять полную приёмку без проверки всех разделов на Desktop/iPad и Mobile.
+
+Кандидат: центральный Month исключён в wide; Graph использует действующий контроллер в F; H-панель, таблица Journal и исходный V. Проверки на реальных данных, отчёт месяца, вложенные Q и остальные разделы не завершены.
+
+---
+
 ## Desktop — correction of section layout 25.11.2026
 
 Owner rejected the expanded Mobile Z used for all wide sections. On Desktop/iPad only Journal is a continuous edge-attached Z; all other root sections and their nested Z list pages are on H, with content-height compact lists as in Admin. The canonical Z DOM hooks remain for existing controllers; the presentation is selected by the active section, not separate business logic. Existing Q remains the right-side modal, real entity/mini cards, palette and Mobile remain untouched. Existing row components are denser on H; individual instruments that still contain mobile-specific cards/forms require addressed review, not automatic destructive conversion. Added wide/phone geometry assertions to the synthetic browser preview test. Actual customer acceptance and complete per-tool audit are pending. Main/Core/User untouched.

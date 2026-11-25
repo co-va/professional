@@ -36,7 +36,9 @@ try {
   const geometry=()=>surface.evaluate(node=>({background:getComputedStyle(node).backgroundColor,radius:getComputedStyle(node).borderTopLeftRadius}));
   await shell.locator('[data-v2-root-item="journal"]').waitFor({state:'attached'});
   assert.equal(await shell.getAttribute('data-v2-desktop-surface'),'journal');
-  assert.equal((await geometry()).radius,'34px','Journal retains full Z');
+  const journalBody=surface.locator(':scope > [data-v2-z-body]');
+  assert.equal(await journalBody.evaluate(node=>getComputedStyle(node).borderTopLeftRadius),'34px','Journal retains full Z body');
+  assert.equal((await geometry()).background,'rgb(47, 51, 56)','Journal controls on H');
   await page.evaluate(()=>{location.hash='profile';});
   await page.waitForFunction(()=>document.querySelector('.v2-app--workspace')?.dataset.v2DesktopSurface==='list');
   assert.deepEqual(await geometry(),{background:'rgb(47, 51, 56)',radius:'0px'},'Desktop profile is on H, not white Z');
@@ -45,7 +47,7 @@ try {
   await page.setViewportSize({width:1280,height:900});
   await page.evaluate(()=>{location.hash='journal';});
   await page.waitForFunction(()=>document.querySelector('.v2-app--workspace')?.dataset.v2DesktopSurface==='journal');
-  assert.equal((await geometry()).radius,'34px','Return to Journal restores Z');
+  assert.equal(await journalBody.evaluate(node=>getComputedStyle(node).borderTopLeftRadius),'34px','Return to Journal restores Z body');
   console.log('PASS: Journal-only Desktop Z; non-Journal H; Mobile Z preserved');
   const assets=await page.evaluate(()=>performance.getEntriesByType('resource').map(r=>new URL(r.name).pathname));
   assert.ok(assets.some(p=>p.startsWith('/assets/')&&p.endsWith('.js')));

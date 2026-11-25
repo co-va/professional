@@ -398,3 +398,25 @@
 @media (min-width:768px) and (max-width:1024px) and (min-height:600px){
   .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z{padding:0 18px 24px}
 }
+
+/* Journal header controls belong to H; only the working body manifests Z. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace[data-v2-desktop-surface="journal"] .v2-front>[data-v2-z]{background:var(--v2-base);border-radius:0;box-shadow:none;padding:0}
+ .v2-app--workspace[data-v2-desktop-surface="journal"] .v2-front>[data-v2-z]>[data-v2-z-header]{background:var(--v2-base)!important;margin:0!important;padding:0 20px 12px!important;grid-template-columns:minmax(0,1fr)!important;color:var(--white)}
+ .v2-app--workspace[data-v2-desktop-surface="journal"] .v2-front>[data-v2-z]>[data-v2-z-header]>[data-v2-z-header-content]{grid-column:1!important;padding:0!important}
+ .v2-app--workspace[data-v2-desktop-surface="journal"] .v2-front>[data-v2-z]>[data-v2-z-body]{background:var(--v2-inner-surface);border-radius:var(--v2-z-radius) 0 0 0;padding:16px 18px 24px}
+ .v2-app--workspace .v2-journal-desktop-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+ .v2-app--workspace .v2-journal-desktop-toolbar [data-journal-primary-navigation]:empty{display:none}
+ .v2-app--workspace .v2-journal-desktop-toolbar .segment-control{width:auto;min-width:130px;margin:0;background:transparent;border-color:var(--text-secondary)}
+ .v2-app--workspace .v2-journal-desktop-toolbar .segment-control button{min-height:28px;background:transparent;color:var(--white)}
+ .v2-app--workspace .v2-journal-desktop-toolbar .segment-control button.is-active{background:var(--text-secondary)}
+ .v2-app--workspace .v2-journal-desktop-actions{display:flex;align-items:center;gap:8px;margin-left:auto}
+ .v2-app--workspace .v2-journal-desktop-actions .ui-button{width:auto;height:32px;min-height:32px;border-radius:var(--radius-control);font-size:13px;padding:0 12px}
+ .v2-app--workspace .v2-journal-desktop-toolbar [data-journal-period-navigation]{color:var(--white)}
+ .v2-app--workspace .v2-journal-desktop-toolbar [data-journal-period-navigation] .ui-compact-button{color:var(--white);border-color:var(--text-secondary)}
+ .v2-app--workspace .journal-list-viewport{height:auto;min-height:0;overflow:visible}
+ .v2-app--workspace .ui-data-table--compact tr.journal-list-record--active td{background:#EFFFBB}
+ .v2-app--workspace .ui-data-table--compact tr.journal-list-record--paid td{background:#DDE8D7}
+ .v2-app--workspace .ui-data-table--compact tr.journal-list-record--no-show td,.v2-app--workspace .ui-data-table--compact tr.journal-list-record--cancelled td{background:#F1DADA}
+ .v2-app--workspace .ui-data-table--compact tr.journal-list-record--deleted td{background:#FDD2D2;color:#EB4C42}
+}

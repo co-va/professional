@@ -4,6 +4,7 @@ import { inventoryNavigationItems, renderInventorySection } from '../core/invent
 import { loyaltyNavigationItems, renderLoyaltySection } from '../core/loyalty/index.js';
 import { renderJournal } from '../journal/journal.js';
 import { mountJournalMonthCalendar } from '../journal/месяц.js';
+import { renderJournalGraphMode } from '../journal/график.js';
 import { getWorkplaceContext, setWorkplaceContext } from '../core/workplace-context.js';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { localDateKey } from '../core/time/index.js';
@@ -23,7 +24,7 @@ import { getJournalTimeUsages } from '../journal/time-usage-source.js';
 import { configureWorkplaceSource } from '../core/workplace-time.js';
 import { configureTimeUsageSource } from '../core/time/index.js';
 import { activateDemo, canUseCapability, getAccess, loadAccess } from '../core/access.js';
-import { ALL_WORKPLACES_ID, viewNavigation, initViewNavigation, mountV2ZLayer, openNotice, initV2WorkspaceInteraction, setV2DeckOpen, v2CardDeck, v2Header, v2Shell, v2Sticker, v2ZLayer } from '../ui/ui.js';
+import { ALL_WORKPLACES_ID, viewNavigation, initViewNavigation, select, button, mountV2ZLayer, openNotice, initV2WorkspaceInteraction, setV2DeckOpen, v2CardDeck, v2Header, v2Shell, v2Sticker, v2ZLayer } from '../ui/ui.js';
 import { startPlatformNotices } from '../core/platform-notices.js';
 import { setThemeColor } from '../ui/viewport/index.js';
 import { isV2DesktopWorkspace, V2_DESKTOP_MEDIA } from '../ui/v2/geometry.js';
@@ -390,6 +391,8 @@ function bindDesktopCalendar(shell) {
   let disposed = false;
   let ready = false;
   let loading = null;
+  let disposeGraph = () => {};
+  let graphActive = false;
   const media = typeof window.matchMedia === 'function' ? window.matchMedia(V2_DESKTOP_MEDIA) : null;
   const allowed = () => isV2DesktopWorkspace(shell) && canUseCapability('journal.month.access');
   const modes = [{ id: 'records', label: 'Записи' }, ...(canUseCapability('timetable.access') ? [{ id: 'schedule', label: 'График' }] : [])];
@@ -397,7 +400,8 @@ function bindDesktopCalendar(shell) {
   const render = () => {
     if (disposed || !host.isConnected) return;
     host.hidden = !allowed();
-    if (!allowed() || !ready) return;
+    if (!allowed() || !ready) { disposeGraph(); disposeGraph = () => {}; graphActive = false; return; }
+    disposeGraph(); disposeGraph = () => {}; graphActive = false;
     if (!modes.some(item => item.id === state.desktopCalendarMode)) state.desktopCalendarMode = 'records';
     const active = state.desktopCalendarMode;
     const selected = context();
@@ -410,7 +414,23 @@ function bindDesktopCalendar(shell) {
       render();
     } });
     const calendar = host.querySelector('[data-v2-sidebar-month]');
-    if (schedule) calendar.dataset.journalGraphCalendar = '';
+    if (schedule) {
+      host.insertAdjacentHTML('beforeend', '<div data-sidebar-graph-controls></div><div data-sidebar-graph-actions></div>');
+      const controlsHost = host.querySelector('[data-sidebar-graph-controls]');
+      controlsHost.innerHTML = select({name:'sidebarGraphWorkplace',value:workplace || ALL_WORKPLACES_ID,options:[{value:ALL_WORKPLACES_ID,label:'Все пространства'},...getWorkplaces().map(item=>({value:item.key,label:item.name}))]}) + button('Рабочее время',{variant:'secondary',data:'data-sidebar-graph-time'});
+      let controls = null;
+      graphActive = true;
+      disposeGraph = renderJournalGraphMode({
+        root:host,calendarRoot:calendar,actionsRoot:host.querySelector('[data-sidebar-graph-actions]'),month,workplaceId:workplace || ALL_WORKPLACES_ID,
+        onMonthChange:nextMonth=>{state.desktopCalendarMonth=nextMonth;},
+        onWorkplaceChange:id=>{setWorkplaceContext({workplaceId:id,scope:'journal:graph'}); const time=controlsHost.querySelector('[data-sidebar-graph-time]'); if(time)time.disabled=id===ALL_WORKPLACES_ID;},
+        onControls:value=>{controls=value;},
+      }) || (()=>{});
+      controlsHost.querySelector('[name="sidebarGraphWorkplace"]')?.addEventListener('change',event=>controls?.selectWorkplace(event.target.value));
+      const time=controlsHost.querySelector('[data-sidebar-graph-time]');
+      if(time){time.disabled=!controls?.canEditTime?.();time.addEventListener('click',()=>controls?.openTime?.());}
+      return;
+    }
     mountJournalMonthCalendar(calendar, {
       month, workplaceId: workplace || ALL_WORKPLACES_ID, selectedValue: localDateKey(selected.date), schedule,
       onMonthChange: (nextMonth) => { state.desktopCalendarMonth = nextMonth; },
@@ -431,8 +451,8 @@ function bindDesktopCalendar(shell) {
   const sync = () => {
     if (disposed || !host.isConnected) return;
     host.hidden = !allowed();
-    if (!allowed()) return;
-    if (ready) { render(); return; }
+    if (!allowed()) { disposeGraph(); disposeGraph=()=>{}; graphActive=false; return; }
+    if (ready) { if(!graphActive) render(); return; }
     if (loading) return;
     loading = Promise.all([loadProfileState(), loadBusinessState(), loadOperationalState(), loadFinanceState()])
       .then(() => { ready = true; render(); })
@@ -451,6 +471,7 @@ function bindDesktopCalendar(shell) {
   sync();
   return { sync, dispose: () => {
     disposed = true;
+    disposeGraph();
     events.forEach(name => window.removeEventListener(name, schedule));
     media?.removeEventListener?.('change', sync);
   } };

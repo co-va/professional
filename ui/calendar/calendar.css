@@ -62,3 +62,10 @@
  [data-v2-desktop-calendar] .segment-control button.is-active{background:var(--text-secondary);color:var(--white)}
  [data-v2-desktop-calendar] .calendar__month-button{color:var(--white);border-color:var(--text-secondary)}
 }
+
+@media (min-width:768px) and (min-height:600px){
+ [data-v2-desktop-calendar] [data-sidebar-graph-controls]{display:grid;gap:6px;margin-top:8px}
+ [data-v2-desktop-calendar] [data-sidebar-graph-controls] .ui-button,[data-v2-desktop-calendar] [data-sidebar-graph-actions] .ui-button{min-height:32px;height:32px;font-size:13px}
+ [data-v2-desktop-calendar] .calendar__header .ui-compact-button{color:var(--white);border-color:var(--text-secondary)}
+ [data-v2-desktop-calendar] .calendar__date.is-today.is-selected{background:transparent}
+}
