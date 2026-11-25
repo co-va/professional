@@ -108,3 +108,30 @@
 .settings-document-row .list-entry__status-mark{display:grid;place-items:center;justify-self:center;width:24px;height:24px;border:1px solid var(--border);border-radius:5px;color:var(--text);font-weight:700}
 .settings-document-row .list-entry__action{justify-self:center}
 .settings-document-row .list-entry__leading-icon{color:var(--text-secondary)}
+
+/* Desktop notifications: summary action on H, canonical list entries, inline editor. */
+.settings-notification-card-heading{width:100%;margin-bottom:0}
+.notification-desktop-master{display:flex;align-items:center;margin-bottom:12px}
+.notification-desktop-master .ui-compact-check__label{font-size:20px;font-weight:730}
+.notification-desktop-master .ui-check-input:indeterminate+.ui-compact-check__mark::after{content:'−';font-size:19px;font-weight:800;color:var(--text)}
+.notification-desktop-group{margin-top:16px;min-width:0}
+.notification-desktop-group h3{margin:0;padding:9px 12px;background:#E0D6D6;color:#41484F;font-size:14px;font-weight:650;border-radius:10px 10px 0 0}
+.notification-desktop-group>.list-entries{border:1px solid var(--border);border-top:0;border-radius:0 0 10px 10px}
+.notification-desktop-item+.notification-desktop-item{border-top:1px solid var(--border)}
+.notification-desktop-row{display:grid;grid-template-columns:var(--ui-compact-size,28px) minmax(0,1fr);align-items:center;gap:10px;padding:0 12px}
+.notification-desktop-row .notification-desktop-entry.list-entry{width:100%;min-width:0;background:transparent;border:0;box-shadow:none;padding:0;text-align:left}
+.notification-desktop-entry .list-entry__background{display:none}
+.notification-desktop-entry .list-entry__content{position:relative;inset:auto;display:flex;padding:8px 0;min-height:46px;align-items:center}
+.notification-desktop-entry .list-entry__main{min-width:0}
+.notification-desktop-entry[aria-expanded="true"]{font-weight:700}
+.notification-desktop-editor{padding:14px 12px 16px;border-top:1px solid var(--border);background:var(--v2-inner-surface,#F5F5F3)}
+.notification-editor-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:36px}
+.notification-editor-heading>strong{font-size:17px}
+.notification-editor-actions{display:flex;align-items:center;gap:8px;flex:none}
+.notification-editor-columns{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px;align-items:start}
+.notification-editor-columns>*{min-width:0}
+.notification-editor-preview{display:grid;gap:8px;padding:12px;background:var(--white);border:1px solid var(--border);border-radius:10px}
+.notification-editor-preview small,.notification-variables small{color:var(--text-secondary);font-size:12px}
+.notification-variables{display:grid;gap:8px}
+.notification-variable-chips{display:flex;gap:6px;flex-wrap:wrap}
+.notification-variable-chips .ui-button{font-weight:500}

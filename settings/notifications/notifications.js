@@ -11,6 +11,7 @@ import {
 } from '../../core/notifications/routing.js';
 import {
   button,
+  compactButton,
   emptyState,
   escapeHtml,
   field,
@@ -22,6 +23,8 @@ import {
   smallActionButton,
   textareaField,
   v2Section,
+  v2ListEntry,
+  v2ListEntries,
   v2ZLayer,
   workspaceHeaderContext,
 } from '../../ui/ui.js';
@@ -44,6 +47,9 @@ const PREVIEW_VALUES = Object.freeze({
   workplace: 'Рабочее пространство',
   amount: '5 000 ₽',
   document: 'Согласие на обработку данных',
+  program: 'Программа лояльности',
+  investment: 'Инвестиционная программа',
+  status: 'Подтверждено',
   person: { name: 'Александр', surname: 'Иванов' },
 });
 
@@ -88,7 +94,7 @@ function openPushInfo() {
   }));
 }
 
-async function openDeliverySettings() {
+export async function openDeliverySettings() {
   const policy = await getNotificationDeliveryRouting();
   const channels = externalChannelValues(policy);
   const pushInfo = `<div class="field-inline-label"><span>Push — всегда</span>${smallActionButton({
@@ -235,6 +241,126 @@ function openEditor(root, routing, event) {
   return layer;
 }
 
+
+const VARIABLE_LABELS = Object.freeze({
+  date:'Дата', time:'Время', workplace:'Рабочее пространство', amount:'Сумма',
+  document:'Название документа', program:'Название программы лояльности',
+  investment:'Название инвестиции', status:'Статус участия',
+  'person.name':'Имя клиента', 'person.surname':'Фамилия клиента',
+});
+
+function desktopGroups(catalog) {
+  const groups = new Map(['Запись','Финансы','Лояльность','Документы и согласия'].map(name=>[name,[]]));
+  for (const event of catalog) {
+    const type = String(event.type || '');
+    const name = /^(loyalty|personal-account|investment|deposit)\./.test(type)
+      ? 'Лояльность' : text(event.group) || 'Другие';
+    if (!groups.has(name)) groups.set(name,[]);
+    groups.get(name).push(event);
+  }
+  return [...groups].filter(([,events])=>events.length);
+}
+
+function desktopRow(event, routing) {
+  const type = escapeHtml(event.type);
+  const policy = policyFor(routing,event);
+  return `<div class="notification-desktop-item" data-notification-item="${type}">
+    <div class="notification-desktop-row">
+      ${compactCheck({checked:policy.enabled,data:'data-notification-enabled="'+type+'"',aria:'Отправлять: '+event.title})}
+      ${v2ListEntry({title:event.title,subtitle:event.description||'',omitEmptySubtitle:true,initial:'',className:'notification-desktop-entry',data:'data-notification-open="'+type+'" aria-expanded="false"',aria:'Редактировать: '+event.title})}
+    </div>
+    <div class="notification-desktop-editor" data-notification-editor="${type}" hidden></div>
+  </div>`;
+}
+
+function desktopCatalogMarkup(catalog,routing) {
+  return `<div class="notification-desktop-master">${compactCheck({label:'Сервисные уведомления',checked:allEventsEnabled(catalog,routing),data:'data-notification-service-enabled',aria:'Все сервисные уведомления'})}</div>
+    <div class="muted" data-notification-catalog-status aria-live="polite"></div>
+    ${desktopGroups(catalog).map(([group,events])=>`<section class="notification-desktop-group"><h3>${escapeHtml(group)}</h3>${v2ListEntries(events.map(event=>desktopRow(event,routing)))}</section>`).join('')}`;
+}
+
+function desktopEditor(panel,event,routing,close) {
+  const current=policyFor(routing,event);
+  const variables=Array.isArray(event.variables)?event.variables:[];
+  panel.innerHTML=`<form class="form-grid" data-notification-policy-form>
+    <div class="notification-editor-heading"><strong>${escapeHtml(event.title)}</strong><div class="notification-editor-actions">
+      ${button('Сохранить',{type:'submit',className:'settings-h-action',data:'data-notification-editor-save hidden'})}
+      ${compactButton({kind:'remove',className:'settings-detail-close',data:'data-notification-editor-close',aria:'Закрыть редактор'})}
+    </div></div>
+    <div class="notification-editor-columns"><div class="form-grid">
+      ${field({label:'Заголовок',name:'titleTemplate',value:current.titleTemplate,required:true})}
+      ${textareaField({label:'Текст',name:'bodyTemplate',value:current.bodyTemplate,rows:5,required:true})}
+      ${variables.length?`<div class="notification-variables"><small>Подставить данные в заголовок или текст</small><div class="notification-variable-chips">${variables.map(key=>`<button type="button" class="settings-outline-action ui-button" data-notification-variable="${escapeHtml(key)}" title="${escapeHtml('{{'+key+'}}')}">${escapeHtml(VARIABLE_LABELS[key]||key)}</button>`).join('')}</div><small>Выберите поле и нажмите нужную переменную. При отправке она заменится фактическими данными.</small></div>`:''}
+      <div class="muted" data-notification-editor-status aria-live="polite"></div>
+    </div><div class="notification-editor-preview"><strong>Предпросмотр</strong><small>Пример сообщения</small>${previewMarkup(current.titleTemplate,current.bodyTemplate)}</div></div>
+  </form>`;
+  const form=panel.querySelector('form');
+  const title=form.elements.titleTemplate;
+  const body=form.elements.bodyTemplate;
+  const save=form.querySelector('[data-notification-editor-save]');
+  const preview=form.querySelector('[data-notification-preview]');
+  const status=form.querySelector('[data-notification-editor-status]');
+  let baseline=editorSignature(form),active=body,busy=false;
+  const redraw=()=>{
+    preview.innerHTML=messageBubble({direction:'outbound',body:[renderTemplate(title.value),renderTemplate(body.value)].filter(Boolean).join('\n\n')},{viewer:'profile'});
+    save.hidden=editorSignature(form)===baseline;
+    save.disabled=busy;
+  };
+  [title,body].forEach(input=>input.addEventListener('focus',()=>{active=input;}));
+  form.addEventListener('input',redraw);
+  form.querySelectorAll('[data-notification-variable]').forEach(control=>{
+    control.addEventListener('pointerdown',event=>event.preventDefault());
+    control.addEventListener('click',()=>{
+      const key=control.dataset.notificationVariable;
+      if(!variables.includes(key))return;
+      const token='{{'+key+'}}';
+      const start=active.selectionStart??active.value.length,end=active.selectionEnd??start;
+      active.setRangeText(token,start,end,'end');
+      active.focus({preventScroll:true});
+      redraw();
+    });
+  });
+  form.querySelector('[data-notification-editor-close]').addEventListener('click',close);
+  form.addEventListener('submit',async e=>{
+    e.preventDefault();
+    if(busy||editorSignature(form)===baseline)return;
+    busy=true;redraw();status.textContent='Сохраняем…';
+    try {
+      const saved=await saveNotificationRouting(event.type,{titleTemplate:title.value,bodyTemplate:body.value});
+      const index=routing.findIndex(item=>item?.eventType===event.type);
+      if(index>=0)routing[index]=saved;else routing.push(saved);
+      title.value=saved?.titleTemplate??title.value;
+      body.value=saved?.bodyTemplate??body.value;
+      baseline=editorSignature(form);status.textContent='';
+    } catch(error) {status.textContent=error?.message||'Не удалось сохранить сообщение';}
+    finally {busy=false;redraw();}
+  });
+  redraw();
+}
+
+function bindDesktopEditors(root,host,catalog,routing) {
+  const buttons=[...host.querySelectorAll('[data-notification-open]')];
+  const closeAll=except=>{
+    for(const control of buttons){
+      if(control===except)continue;
+      const panel=control.closest('[data-notification-item]')?.querySelector('[data-notification-editor]');
+      if(panel)panel.hidden=true;
+      control.setAttribute('aria-expanded','false');
+    }
+  };
+  root.closest('[data-settings-panel="notifications"]')?.addEventListener('settings-detail-closed',()=>closeAll());
+  for(const control of buttons) control.addEventListener('click',()=>{
+    const panel=control.closest('[data-notification-item]')?.querySelector('[data-notification-editor]');
+    const event=catalog.find(item=>item.type===control.dataset.notificationOpen);
+    if(!panel||!event)return;
+    const show=panel.hidden;
+    closeAll();
+    if(!show)return;
+    if(!panel.firstElementChild) desktopEditor(panel,event,routing,()=>{panel.hidden=true;control.setAttribute('aria-expanded','false');control.focus({preventScroll:true});});
+    panel.hidden=false;control.setAttribute('aria-expanded','true');
+  });
+}
+
 function groupedEvents(catalog = []) {
   const groups = new Map();
   for (const event of Array.isArray(catalog) ? catalog : []) {
@@ -282,20 +408,26 @@ function replaceRouting(routing, saved) {
   routing.splice(0, routing.length, ...(Array.isArray(saved) ? saved : []));
 }
 
-function bindCatalog(root, host, catalog, routing) {
+function bindCatalog(root, host, catalog, routing, {desktop=false}={}) {
   const byType = new Map(catalog.map((event) => [event.type, event]));
   const serviceToggle = host.querySelector('[data-notification-service-enabled]');
   const eventToggles = [...host.querySelectorAll('[data-notification-enabled]')];
 
+  const catalogStatus=host.querySelector('[data-notification-catalog-status]');
+  let saving=false;
+  const lock=value=>{saving=value;if(serviceToggle)serviceToggle.disabled=value;eventToggles.forEach(checkbox=>{checkbox.disabled=value;});};
   const syncServiceState = () => {
-    if (serviceToggle) serviceToggle.checked = allEventsEnabled(catalog, routing);
+    if (serviceToggle) {
+      serviceToggle.checked = allEventsEnabled(catalog, routing);
+      serviceToggle.indeterminate = !serviceToggle.checked && catalog.some(event=>policyFor(routing,event).enabled);
+    }
   };
+  syncServiceState();
 
   serviceToggle?.addEventListener('change', async () => {
+    if(saving)return;
     const requested = serviceToggle.checked;
-    const previous = !requested;
-    serviceToggle.disabled = true;
-    eventToggles.forEach((checkbox) => { checkbox.disabled = true; });
+    lock(true);if(catalogStatus)catalogStatus.textContent='';
     try {
       const saved = await setAllNotificationsEnabled(requested);
       replaceRouting(routing, saved);
@@ -304,20 +436,19 @@ function bindCatalog(root, host, catalog, routing) {
         checkbox.checked = routing.find((item) => item?.eventType === type)?.enabled === true;
       });
       syncServiceState();
-    } catch {
-      serviceToggle.checked = previous;
-    } finally {
-      serviceToggle.disabled = false;
-      eventToggles.forEach((checkbox) => { checkbox.disabled = false; });
-    }
+    } catch (error) {
+      syncServiceState();
+      if(catalogStatus)catalogStatus.textContent=error?.message||'Не удалось изменить уведомления';
+    } finally {lock(false);}
   });
 
   eventToggles.forEach((checkbox) => {
     checkbox.addEventListener('click', (event) => event.stopPropagation());
     checkbox.addEventListener('change', async () => {
+      if(saving)return;
       const type = checkbox.dataset.notificationEnabled || '';
       const previous = !checkbox.checked;
-      checkbox.disabled = true;
+      lock(true);if(catalogStatus)catalogStatus.textContent='';
       try {
         const saved = await setNotificationEnabled(type, checkbox.checked);
         const index = routing.findIndex((item) => item?.eventType === type);
@@ -325,14 +456,14 @@ function bindCatalog(root, host, catalog, routing) {
         else routing.push(saved);
         checkbox.checked = saved?.enabled === true;
         syncServiceState();
-      } catch {
+      } catch (error) {
         checkbox.checked = previous;
-      } finally {
-        checkbox.disabled = false;
-      }
+        if(catalogStatus)catalogStatus.textContent=error?.message||'Не удалось изменить уведомление';
+      } finally {lock(false);}
     });
   });
 
+  if(desktop){bindDesktopEditors(root,host,catalog,routing);return;}
   const open = (node) => {
     const event = byType.get(node.dataset.notificationOpen || '');
     if (event) openEditor(root, routing, event);
@@ -348,8 +479,9 @@ function bindCatalog(root, host, catalog, routing) {
 }
 
 export async function render(root) {
+  const desktop=root.hasAttribute('data-settings-embedded');
   root.innerHTML = page([
-    settingsSectionHeader(root,{
+    desktop?'':settingsSectionHeader(root,{
       title: 'Уведомления',
       v: {
         data: 'data-notification-delivery-settings-open',
@@ -369,8 +501,8 @@ export async function render(root) {
       getNotificationRouting(),
     ]);
     if (!host) return;
-    host.innerHTML = `${serviceControlMarkup(catalog, routing)}${catalogMarkup(catalog, routing)}`;
-    bindCatalog(root, host, catalog, routing);
+    host.innerHTML = desktop?desktopCatalogMarkup(catalog,routing):`${serviceControlMarkup(catalog, routing)}${catalogMarkup(catalog, routing)}`;
+    bindCatalog(root, host, catalog, routing,{desktop});
   } catch (error) {
     if (host) host.innerHTML = emptyState('Настройки недоступны', error instanceof Error ? error.message : 'Не удалось загрузить уведомления.');
   }
