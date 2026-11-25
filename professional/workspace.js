@@ -31,7 +31,6 @@ import { startPlatformNotices } from '../core/platform-notices.js';
 import { setThemeColor } from '../ui/viewport/index.js';
 import { isV2DesktopWorkspace, V2_DESKTOP_MEDIA } from '../ui/v2/geometry.js';
 import { syncV2YPlacement } from '../ui/v2/y.js';
-import { syncV2DesktopZTitle } from '../ui/v2/z-layout.js';
 
 configureWorkplaceSource(getWorkplaceEntities);
 configureTimeUsageSource(getJournalTimeUsages);
@@ -327,7 +326,6 @@ function syncWorkspaceHeader(surface) {
     titleRoot.querySelector('.page-header h1'),
     fallbackTitle,
   );
-  if (isV2DesktopWorkspace(surface.closest('[data-v2-app]'))) syncV2DesktopZTitle(titleRoot, root === 'journal' && titleRoot === surface ? 'Журнал' : title);
   const subtitle = context?.dataset.workspaceSubtitle || '';
   const aContext = contextRoot.querySelector('[data-workspace-a-context]');
   const dSource = contextRoot.querySelector('[data-workspace-d-action]');
