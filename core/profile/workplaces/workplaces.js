@@ -66,10 +66,10 @@ export function workplaceForm(existing=null){
       <input type="hidden" name="workplaceAllowRescheduling" value="${bookingRules.allowClientRescheduling?'true':'false'}">` : ''}
     <div class="workplace-booking-top">
       <div class="workplace-booking-tools">
-        ${bookingRules ? `<div class="workplace-booking-step">
+        ${bookingRules ? `${compactButton({kind:'info',data:'data-workplace-booking-info',aria:'О шаге записи'})}
+        <div class="workplace-booking-step">
           <span>Шаг</span>${select({name:'workplaceBookingSlotStep',value:String(bookingRules.preferredSlotStep),options:BOOKING_SLOT_STEPS.map(step=>({value:String(step),label:step+' мин'}))})}
-        </div>
-        ${compactButton({kind:'info',data:'data-workplace-booking-info',aria:'О шаге записи'})}` : ''}
+        </div>` : ''}
       </div>
       <div class="workplace-booking-checks${bookingRules?'':' workplace-booking-checks--single'}">
         ${compactCheck({label:'Онлайн-запись',checked:w.visibleInPublicBooking!==false,data:'data-workplace-public-booking-visibility'})}
