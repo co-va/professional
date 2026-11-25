@@ -948,6 +948,7 @@ function openPeopleAppearanceQ(root, options = {}) {
   };
   return openEntityCardAppearanceQ(root, {
     title: 'Вид',
+    className: isV2DesktopWorkspace(root.closest('[data-v2-app]')) ? 'people-card-appearance-q' : '',
     typeLabel: 'Карта',
     typeOptions: [{ value: 'person', label: 'Клиент' }],
     initialType: 'person',

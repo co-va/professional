@@ -641,3 +641,16 @@
  .v2-app--workspace [data-people-list-host] .ui-data-table--compact td>.people-table-open{display:grid;place-items:center;width:32px;height:40px;margin:auto;color:#41484F;touch-action:manipulation;cursor:pointer}
  .v2-app--workspace [data-people-list-host] .people-table-open:hover{background:var(--surface-soft);border-radius:8px}
 }
+
+/* Desktop Contacts / View: same card constructor, more upper whitespace,
+   slightly wider Q, and the accepted anchored selector presentation. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.people-card-appearance-q{
+   width:min(440px,50%);
+ }
+ .people-card-appearance-q [data-v2-q-body]{padding-top:48px}
+ .people-card-appearance-q [data-entity-card-appearance-constructor]{width:100%;max-width:360px;margin-inline:auto}
+ .people-card-appearance-q .ui-select__control{height:34px;min-height:34px;max-height:34px;border-radius:8px;font-size:13px;padding:0 23px 0 9px}
+ .people-card-appearance-q .ui-select__selection,.people-card-appearance-q .ui-select__text,.people-card-appearance-q .ui-select__value{justify-content:flex-start;text-align:left;font-size:13px}
+ .people-card-appearance-q .ui-select__meta{font-size:11px}
+}

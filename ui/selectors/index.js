@@ -134,8 +134,8 @@ function openSelector(trigger) {
     </div>
   </div>`;
 
-  const contactFilter = Boolean(trigger.closest('.people-filter-popup'));
-  const modalRoot = mountModal(trigger, modal(content, { variant: 'x', title: 'Выбор', xRole: 'picker', className:contactFilter ? 'people-action-popup people-filter-selector' : '' }));
+  const desktopContactSelector = Boolean(trigger.closest('.people-filter-popup, .people-card-appearance-q'));
+  const modalRoot = mountModal(trigger, modal(content, { variant: 'x', title: 'Выбор', xRole: 'picker', className:desktopContactSelector ? 'people-action-popup people-filter-selector' : '' }));
   const surface = modalRoot?.querySelector('[data-ui-selector]');
   if (!surface) return;
   surface.uiSourceInput = input;

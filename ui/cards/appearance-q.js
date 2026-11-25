@@ -12,6 +12,7 @@ function optionValue(options = [], preferred = '') {
 
 export function openEntityCardAppearanceQ(root, {
   title = 'Вид',
+  className = '',
   typeLabel = 'Тип карты',
   typeOptions = [],
   initialType = '',
@@ -33,7 +34,7 @@ export function openEntityCardAppearanceQ(root, {
     // The title is for accessibility only: the header is reserved for actual selectors.
     title: '',
     variant: 'q',
-    className: 'entity-card-appearance-q',
+    className: ['entity-card-appearance-q', className].filter(Boolean).join(' '),
   }));
   layer?.querySelector('.modal-sheet')?.setAttribute('aria-label', title);
   const host = layer?.querySelector('[data-entity-card-appearance-q]');
