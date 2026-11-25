@@ -887,3 +887,16 @@
  .v2-app--workspace>.v2-layer-portal.is-anchored>.v2-layer-backdrop[data-v2-x-role="picker"]>.v2-layer--bottom.service-workplace-picker .ui-list__title{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
  .v2-app--workspace>.v2-layer-portal.is-anchored>.v2-layer-backdrop[data-v2-x-role="picker"]>.v2-layer--bottom.service-workplace-picker .ui-list__item:is(:hover,:focus-visible){background:var(--surface-soft);border-radius:8px}
 }
+
+/* A single fixed-height setting row. The existing toggle remains in its
+   original slot; the optional capacity uses the reserved right-hand slot. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard .desktop-inline-group-booking .list-entry__content{box-sizing:border-box;grid-template-columns:minmax(0,1fr) 48px 48px;gap:6px;padding:4px 8px}
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard .desktop-inline-group-booking .list-entry__toggle{width:48px}
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard .desktop-inline-group-booking .list-entry__main small{font-size:11px;line-height:13px;white-space:normal;overflow-wrap:normal}
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard .desktop-inline-capacity{min-width:0;width:48px;align-self:center}
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard .desktop-inline-capacity[hidden]{display:block!important;visibility:hidden;pointer-events:none}
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard .desktop-inline-capacity>.field{display:block;margin:0}
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard .desktop-inline-capacity>.field>span{display:none}
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard .desktop-inline-capacity input[type="number"]{box-sizing:border-box;width:48px;height:32px;min-height:32px;max-height:32px;padding:0 4px;text-align:center;font-size:16px}
+}

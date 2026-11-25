@@ -70,7 +70,20 @@ export function bindProcedureEditor(root, {
     const capacity = form.querySelector(':scope > [data-procedure-group-capacity]');
     const online = form.querySelector('[data-procedure-online-check]')?.closest('.ui-compact-check');
     if (group?.parentElement === form && capacity?.parentElement === form && online?.parentElement === form) {
-      form.prepend(group, online, capacity);
+      const content = group.querySelector('.list-entry__content');
+      const input = capacity.querySelector('[name="procedureGroupCapacity"]');
+      if (content && input) {
+        // Keep the original numeric input and conditional visibility owner.
+        // The number sits to the right of the existing toggle in one row.
+        capacity.classList.add('desktop-inline-capacity');
+        input.setAttribute('aria-label', 'Максимум людей');
+        input.title = 'Максимум людей';
+        content.append(capacity);
+        group.classList.add('desktop-inline-group-booking');
+        form.prepend(group, online);
+      } else {
+        form.prepend(group, online, capacity);
+      }
     }
   }
 
