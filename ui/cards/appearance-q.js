@@ -3,6 +3,7 @@ import { button } from '../buttons/index.js';
 import { modal, mountModal } from '../modals/index.js';
 import { select } from '../selectors/index.js';
 import { mountEntityCardConstructor } from './entity-card-constructor.js';
+import { isV2DesktopWorkspace } from '../v2/geometry.js';
 
 function optionValue(options = [], preferred = '') {
   const values = (Array.isArray(options) ? options : []).map((item) => String(item?.value ?? ''));
@@ -40,6 +41,9 @@ export function openEntityCardAppearanceQ(root, {
   const host = layer?.querySelector('[data-entity-card-appearance-q]');
   const headerHost = layer?.querySelector('[data-v2-q-header-content]');
   if (!host || !headerHost) return layer;
+  const sheet = headerHost.closest('.v2-layer--standard');
+  const desktop = Boolean(sheet && sheet.closest('[data-v2-q="true"]') && isV2DesktopWorkspace(sheet.closest('[data-v2-app]')));
+  if (desktop) sheet.classList.add('desktop-q-fixed-tools', 'desktop-appearance-q');
 
   const render = () => {
     const targets = Array.isArray(targetOptions(type)) ? targetOptions(type).filter(Boolean) : [];
@@ -67,14 +71,19 @@ export function openEntityCardAppearanceQ(root, {
 
     // The Q Header owns the card-type controls; the Q Body owns the sole preview.
     // No duplicate preview is mounted into the Header.
-    headerHost.innerHTML = typeSelector || targetSelector
-      ? `<div class="entity-card-appearance-q__selectors">${typeSelector}${targetSelector}</div>`
-      : '';
-    host.innerHTML = `<div data-entity-card-appearance-constructor></div>
-      ${actionBlock(button('Сохранить', {
-        data: 'data-card-q-save',
-        aria: 'Сохранить вид карты',
-      }))}`;
+    const saveMarkup = button('Сохранить', {
+      data: 'data-card-q-save',
+      aria: 'Сохранить вид карты',
+    });
+    const selectors = `<div class="entity-card-appearance-q__selectors">${typeSelector}${targetSelector}</div>`;
+    if (desktop) {
+      // Both header rows remain mounted even when their controls are absent.
+      headerHost.innerHTML = `<div class="desktop-q-toolbar desktop-appearance-q__actions" data-v2-layer-gesture-ignore>${actionBlock(saveMarkup, { className: 'desktop-q-action-slot' })}</div>${selectors}`;
+      host.innerHTML = '<div data-entity-card-appearance-constructor></div>';
+    } else {
+      headerHost.innerHTML = typeSelector || targetSelector ? selectors : '';
+      host.innerHTML = `<div data-entity-card-appearance-constructor></div>${actionBlock(saveMarkup)}`;
+    }
 
     headerHost.querySelector('[name="entityCardAppearanceType"]')?.addEventListener('change', (event) => {
       type = String(event.target.value || '');
@@ -87,7 +96,7 @@ export function openEntityCardAppearanceQ(root, {
     });
 
     const constructor = host.querySelector('[data-entity-card-appearance-constructor]');
-    const saveButton = host.querySelector('[data-card-q-save]');
+    const saveButton = (desktop ? headerHost : host).querySelector('[data-card-q-save]');
     const saveActions = saveButton?.closest('.modal-actions');
     let controller = null;
     const syncSaveButton = ({ dirty = false, saving = false } = {}) => {

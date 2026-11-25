@@ -924,3 +924,13 @@
  .v2-app--workspace .desktop-workplace-editor>.desktop-workplace-danger-footer{display:flex;justify-content:flex-end;align-items:center;margin-top:8px}
  .v2-app--workspace .desktop-workplace-editor>.desktop-workplace-danger-footer>.ui-button{box-sizing:border-box;width:160px;min-width:160px;max-width:160px;height:36px;min-height:36px;max-height:36px;margin:0;padding:0 12px;border-radius:10px;font-size:13px}
 }
+
+/* Shared Desktop View Q: fixed action line above a fixed selector line.
+   The existing Q toolbar styles own Save; empty lines retain their geometry. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-appearance-q{--desktop-appearance-selector-height:var(--ui-field-height,46px)}
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-appearance-q.desktop-q-fixed-tools .desktop-appearance-q__actions{height:68px;min-height:68px;max-height:68px;flex:0 0 68px;padding-right:36px}
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-appearance-q .entity-card-appearance-q__selectors{box-sizing:border-box;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:center;gap:8px;min-height:var(--desktop-appearance-selector-height);height:var(--desktop-appearance-selector-height);max-height:var(--desktop-appearance-selector-height);flex:0 0 var(--desktop-appearance-selector-height);padding-right:0}
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-appearance-q .entity-card-appearance-q__selectors>.ui-select{min-width:0;width:100%;margin:0}
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-appearance-q.desktop-q-fixed-tools>[data-v2-q-body]{padding-top:max(12px,calc(var(--v2-desktop-q-content-start) - var(--v2-desktop-q-header-height) - var(--desktop-appearance-selector-height)))}
+}
