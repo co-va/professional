@@ -175,6 +175,8 @@ export function syncV2DesktopZTitle(root, title = '') {
  * Mobile and non-Q surfaces are no-ops; field-local controls stay in place.
  */
 export function moveDesktopQTool(control, { desktopLabel = '' } = {}) {
+  // Destructive page actions must remain separate at the bottom right.
+  if (control?.matches?.('.ui-button--danger,.ui-button--critical,.ui-button--delete-outline')) return false;
   const sheet = control?.closest?.('.v2-layer--standard');
   const body = control?.closest?.('[data-v2-q-body]');
   if (!sheet || !body || !sheet.closest('[data-v2-q="true"]')
@@ -210,5 +212,21 @@ export function moveDesktopQTool(control, { desktopLabel = '' } = {}) {
   slot.classList.add('desktop-q-action-slot');
   row.append(slot);
   if (previous?.matches('.app-settings-panel') && !previous.children.length) previous.remove();
+  return true;
+}
+
+/** Desktop Q destructive footer, using the existing measured modal-actions
+ * owner. The original control and its confirmation handler are retained. */
+export function pinDesktopQDanger(control) {
+  if (!control?.matches?.('.ui-button--danger,.ui-button--critical,.ui-button--delete-outline')) return false;
+  const sheet = control.closest('.v2-layer--standard');
+  const body = control.closest('[data-v2-q-body]');
+  if (!sheet || !body || !sheet.closest('[data-v2-q="true"]')
+      || !isV2DesktopWorkspace(sheet.closest('[data-v2-app]'))) return false;
+  const footer = control.parentElement;
+  if (footer?.parentElement !== body || footer.children.length !== 1) return false;
+  footer.classList.remove('app-settings-panel');
+  footer.classList.add('modal-actions', 'v2-desktop-danger-footer');
+  control.setAttribute('data-ui-keyboard-action', 'auxiliary');
   return true;
 }

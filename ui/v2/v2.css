@@ -900,3 +900,10 @@
  .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard .desktop-inline-capacity>.field>span{display:none}
  .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard .desktop-inline-capacity input[type="number"]{box-sizing:border-box;width:48px;height:32px;min-height:32px;max-height:32px;padding:0 4px;text-align:center;font-size:16px}
 }
+
+/* Desktop Q destructive action follows the accepted Clients Z footer:
+   isolated, fixed bottom right, never in the action toolbar. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard>[data-v2-q-body]>.v2-desktop-danger-footer{left:auto;right:var(--v2-desktop-q-inset);width:max-content;margin:0;background:var(--v2-inner-surface)}
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard>[data-v2-q-body]>.v2-desktop-danger-footer>.ui-button{box-sizing:border-box;width:160px;min-width:160px;max-width:160px;height:var(--v2-desktop-q-button-height);min-height:var(--v2-desktop-q-button-height);max-height:var(--v2-desktop-q-button-height);margin:0;padding:0 12px;border-width:1px;border-radius:10px;font-size:13px;line-height:1}
+}

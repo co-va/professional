@@ -1,5 +1,5 @@
 import { modal, mountModal } from '../../ui/modals/index.js';
-import { moveDesktopQTool } from '../../ui/v2/z-layout.js';
+import { moveDesktopQTool, pinDesktopQDanger } from '../../ui/v2/z-layout.js';
 import { escapeHtml } from '../../ui/utils/escape-html.js';
 import { button } from '../../ui/buttons/index.js';
 import { collectCost, costField, initCostFields, validateCostDefinition, costListParts } from '../../ui/cost/index.js';
@@ -61,7 +61,7 @@ export function bindServiceWorkplaceAssignments(root, {
     // Only page-level actions, not local price/assignment editor controls.
     const remove = root.querySelector('[data-procedure-editor-delete], [data-product-editor-delete], [data-service-retail-product-delete]');
     const primary = root.querySelector('[data-procedure-editor-primary], [data-product-editor-primary], [data-service-retail-price-apply]');
-    if (remove) moveDesktopQTool(remove, { desktopLabel: remove.matches('[data-service-retail-product-delete]') ? 'Снять с продажи' : 'Удалить' });
+    if (remove) pinDesktopQDanger(remove);
     if (primary) moveDesktopQTool(primary);
   }
   const isProcedure = kind === 'procedure';
