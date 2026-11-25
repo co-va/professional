@@ -833,3 +833,9 @@
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-group-branch][hidden]{display:none!important}
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-group-branch]>.list-entries:last-child>.list-entry:last-child{border-bottom:0}
 }
+
+/* A field picker is a local selector, not a dimmed Desktop X editor.
+   Keep the existing portal/outside-dismiss behavior and Q underneath. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace>.v2-layer-portal.is-anchored>.v2-layer-backdrop[data-v2-x-role="picker"]:has(>.v2-layer--bottom:is(.modal--time-picker-sheet,.modal--duration-picker-popover)){background:transparent}
+}
