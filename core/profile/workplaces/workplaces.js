@@ -1,6 +1,6 @@
 import { actionBlock, button, compactButton, openNotice, collectLinks, colorPicker, escapeHtml, field, initColorPickers, initLinks, initTimePickers, links, mountModal, modal, phoneField, select, textareaField, timePicker } from '../../../ui/ui.js';
 import { compactCheck } from '../../../ui/selection/check-list.js';
-import { moveDesktopQTool, pinDesktopQDanger } from '../../../ui/v2/z-layout.js';
+import { moveDesktopQTool } from '../../../ui/v2/z-layout.js';
 import { isV2DesktopWorkspace } from '../../../ui/v2/geometry.js';
 import { getProfile } from '../data.js';
 import { canUseCapability } from '../../access.js';
@@ -37,7 +37,7 @@ export function workplaceForm(existing=null){
     data:'data-workplace-primary',
     aria:'Сохранить',
   }));
-  // Destructive action must stay at the end of the scrollable Q form, never in the floating .modal-actions footer.
+  // Mobile keeps Delete at the end of the form. Desktop moves the same action into its own bottom row.
   const deletion=existing
     ? button('Удалить',{
         variant:'critical',
@@ -64,6 +64,13 @@ export function workplaceForm(existing=null){
     ${photoFields}
     ${bookingRules ? `<input type="hidden" name="workplaceAllowCancellation" value="${bookingRules.allowClientCancellation?'true':'false'}">
       <input type="hidden" name="workplaceAllowRescheduling" value="${bookingRules.allowClientRescheduling?'true':'false'}">` : ''}
+    ${field({label:'Название',name:'workplaceName',value:w.name,placeholder:'Название рабочего пространства',required:true})}
+    ${select({label:'Город *',name:'workplaceCity',value:w.city||'',options:cities,placeholder:'Город',searchable:true,allowCustom:false})}
+    ${field({label:'Адрес',name:'workplaceAddress',value:w.address,placeholder:'Адрес'})}
+    ${phoneField({label:'Телефон',name:'workplacePhone',value:w.phone||''})}
+    ${scheduleField}
+    ${select({label:'Валюта',name:'workplaceCurrency',value:w.currency||defaults.currency||'',options:currencies})}
+    ${colorField}
     <div class="workplace-booking-top">
       <div class="workplace-booking-tools">
         ${bookingRules ? `${compactButton({kind:'info',data:'data-workplace-booking-info',aria:'О шаге записи'})}
@@ -77,13 +84,6 @@ export function workplaceForm(existing=null){
         ${compactCheck({label:'Перенос записи',checked:bookingRules.allowClientRescheduling,data:'data-workplace-booking-reschedule'})}` : ''}
       </div>
     </div>
-    ${field({label:'Название',name:'workplaceName',value:w.name,placeholder:'Название рабочего пространства',required:true})}
-    ${select({label:'Город *',name:'workplaceCity',value:w.city||'',options:cities,placeholder:'Город',searchable:true,allowCustom:false})}
-    ${field({label:'Адрес',name:'workplaceAddress',value:w.address,placeholder:'Адрес'})}
-    ${phoneField({label:'Телефон',name:'workplacePhone',value:w.phone||''})}
-    ${scheduleField}
-    ${select({label:'Валюта',name:'workplaceCurrency',value:w.currency||defaults.currency||'',options:currencies})}
-    ${colorField}
     ${links({links:w.links||[],name:'workplace-links',label:'Ссылки',compact:true,addInHeader:true})}
     ${textareaField({label:'О рабочем пространстве',name:'workplaceAbout',value:w.about||'',placeholder:'Коротко о рабочем пространстве'})}
     <div class="form-error" data-workplace-error></div>
@@ -213,13 +213,12 @@ export function bindWorkplaceForm(root,existing=null,{onSaved=()=>{},onDeleted=(
       remove.classList.remove('ui-button--critical','ui-button--delete-outline');
       remove.classList.add('ui-button--danger');
       const footer=body.ownerDocument.createElement('div');
-      footer.className='app-settings-panel';
+      // Desktop Delete is an independent, normal-flow footer, not a keyboard-managed modal-actions stack.
+      footer.className='desktop-workplace-danger-footer';
+      footer.setAttribute('data-workplace-desktop-footer','');
+      remove.setAttribute('data-ui-keyboard-action','auxiliary');
       footer.append(remove);
-      body.append(footer);
-      if(pinDesktopQDanger(remove)){
-        // Keep the destructive action outside the scrolling form, in the Q footer.
-        body.after(footer);
-      }
+      body.after(footer);
     }
   }
   const initial=formSnapshot(form);
