@@ -15,13 +15,9 @@ import {
   emptyState,
   escapeHtml,
   field,
-  modal,
-  mountModal,
-  openSharedProfileSettingsMenu,
   select,
   setCopyButtonCopied,
   textareaField,
-  workspaceHeaderContext,
 } from '../../ui/ui.js';
 
 let publicRouteState = { profileSlug: '', workplaces: [] };
@@ -66,12 +62,6 @@ function bindCopyButtons(root) {
   });
 }
 
-function selectedWorkplaceLink(workplaces, key) {
-  const selected = workplaces.find((item) => item.key === key) || null;
-  if (!selected?.slug) return '';
-  return copyLinkField(selected.name || 'Ссылка рабочего пространства', bookingLink(publicRouteState.profileSlug, selected.slug), 'workplace');
-}
-
 function settingsSignature(value) {
   return JSON.stringify(normalizeBookingSettings(value));
 }
@@ -91,65 +81,8 @@ function setWelcomeSaveVisible(host, visible) {
   if (actions) actions.hidden = !visible;
 }
 
-function openWelcomeQ(root) {
-  const saved = getBookingSettings();
-  const content = `${workspaceHeaderContext({ title: 'Приветствие' })}
-    <form class="form-grid" data-online-booking-welcome>
-      ${field({ label: 'Заголовок', name: 'welcomeTitle', value: saved.welcomeTitle, maxlength: 90 })}
-      ${textareaField({ label: 'Текст', name: 'welcomeText', value: saved.welcomeText, rows: 6, maxlength: 500 })}
-      ${actionBlock(button('Сохранить', {
-        type: 'submit',
-        data: 'data-online-booking-welcome-save',
-        aria: 'Сохранить приветствие',
-      }))}
-    </form>`;
-
-  const layer = mountModal(root, modal(content, {
-    title: 'Приветствие',
-    variant: 'q',
-    className: 'online-booking-welcome-q',
-  }));
-  if (!layer) return null;
-
-  const form = layer.querySelector('[data-online-booking-welcome]');
-  const updateDirty = () => {
-    setWelcomeSaveVisible(layer, Boolean(form) && settingsSignature(welcomeDraft(form, saved)) !== settingsSignature(saved));
-  };
-  form?.addEventListener('input', updateDirty);
-  form?.addEventListener('change', updateDirty);
-  form?.addEventListener('submit', (event) => {
-    event.preventDefault();
-    if (!form) return;
-    saveBookingSettings(welcomeDraft(form, saved));
-    layer.v2Close?.();
-  });
-  updateDirty();
-  return layer;
-}
-
-function openOnlineBookingSettings(root) {
-  return openSharedProfileSettingsMenu({
-    title: 'Настройки онлайн-записи',
-    actions: [
-      {
-        id: 'welcome',
-        label: 'Приветствие',
-        onSelect: () => openWelcomeQ(root),
-      },
-    ],
-  });
-}
-
 function mountScreen(root, body) {
-  const embedded = root.hasAttribute('data-settings-embedded');
-  root.innerHTML = `${settingsSectionHeader(root,{
-    title: 'Онлайн-запись',
-    v: {
-      data: 'data-online-booking-settings',
-      aria: 'Настройки онлайн-записи',
-    },
-  },[{label:'Приветствие',data:'data-online-booking-settings'}])}<div class="form-grid form-grid--relaxed">${body}</div>`;
-  root.querySelector('[data-online-booking-settings]')?.addEventListener('click', () => embedded ? openWelcomeQ(root) : openOnlineBookingSettings(root));
+  root.innerHTML = `${settingsSectionHeader(root,{title:'Онлайн-запись'})}<div class="form-grid form-grid--relaxed">${body}</div>`;
 }
 
 function renderInlineBooking(root) {
@@ -202,31 +135,43 @@ function renderInlineBooking(root) {
 
 function renderReady(root) {
   if(root.hasAttribute('data-settings-embedded')) return renderInlineBooking(root);
-  const workplaces = publicRouteState.workplaces.filter((item) => item.key && item.slug);
-  const options = [
-    { value: '', label: 'Выбрать рабочее пространство' },
-    ...workplaces.map((item) => ({ value: item.key, label: item.name || 'Без названия' })),
-  ];
-
-  mountScreen(root, `<div class="form-grid form-grid--relaxed">
-    ${copyLinkField('Общая ссылка', bookingLink(publicRouteState.profileSlug), 'general')}
-    ${select({
-      label: 'Рабочее пространство',
-      name: 'bookingWorkplace',
-      value: '',
-      options,
-      aria: 'Выбрать рабочее пространство для онлайн-записи',
-    })}
-    <div data-workplace-booking-link></div>
-  </div>`);
-
+  const workplaces = publicRouteState.workplaces.filter(item=>item.key && item.slug);
+  const options = [{value:'',label:'Выбрать рабочее пространство'},...workplaces.map(item=>({value:item.key,label:item.name||'Без названия'}))];
+  const saved = getBookingSettings();
+  mountScreen(root,`<div class="form-grid settings-mobile-booking-links">
+    ${copyLinkField('Общая ссылка',bookingLink(publicRouteState.profileSlug),'general')}
+    ${select({label:'Рабочее пространство',name:'bookingWorkplace',value:'',options,aria:'Выбрать рабочее пространство для онлайн-записи'})}
+    ${copyLinkField('Ссылка рабочего пространства','','workplace')}
+  </div>
+  <section class="settings-mobile-booking-welcome">
+    <strong>Приветствие</strong>
+    <form class="form-grid" data-online-booking-welcome>
+      ${field({label:'Заголовок',name:'welcomeTitle',value:saved.welcomeTitle,maxlength:90})}
+      ${textareaField({label:'Текст',name:'welcomeText',value:saved.welcomeText,rows:6,maxlength:500})}
+      ${actionBlock(button('Сохранить',{type:'submit',data:'data-online-booking-welcome-save',aria:'Сохранить приветствие'}))}
+    </form>
+  </section>`);
   bindCopyButtons(root);
-  root.querySelector('input[name="bookingWorkplace"]')?.addEventListener('change', (event) => {
-    const host = root.querySelector('[data-workplace-booking-link]');
-    if (!host) return;
-    host.innerHTML = selectedWorkplaceLink(workplaces, event.target.value);
-    bindCopyButtons(host);
+  const copy=root.querySelector('[data-copy-booking-link="workplace"]');
+  const link=copy?.closest('.input-action-row')?.querySelector('input');
+  if(copy)copy.disabled=true;
+  root.querySelector('input[name="bookingWorkplace"]')?.addEventListener('change',event=>{
+    const workplace=workplaces.find(item=>item.key===event.target.value);
+    if(link)link.value=workplace?bookingLink(publicRouteState.profileSlug,workplace.slug):'';
+    if(copy)copy.disabled=!link?.value;
   });
+  const form=root.querySelector('[data-online-booking-welcome]');
+  let baseline=saved;
+  const sync=()=>setWelcomeSaveVisible(root,settingsSignature(welcomeDraft(form,baseline))!==settingsSignature(baseline));
+  form?.addEventListener('input',sync);
+  form?.addEventListener('change',sync);
+  form?.addEventListener('submit',event=>{
+    event.preventDefault();
+    if(settingsSignature(welcomeDraft(form,baseline))===settingsSignature(baseline))return;
+    baseline=saveBookingSettings(welcomeDraft(form,getBookingSettings()));
+    sync();
+  });
+  sync();
 }
 
 function renderUnavailable(root, title, message) {

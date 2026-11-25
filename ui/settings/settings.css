@@ -152,3 +152,10 @@
 .notification-editor-z .notification-variable-chips .ui-button{color:var(--text);background:var(--white);border-color:var(--border)}
 
 .notification-editor-z .notification-mobile-save-actions[hidden],.notification-editor-z [data-notification-mobile-save][hidden]{display:none!important}
+
+/* Mobile online-booking Z1: permanent link fields and inline welcome editor. */
+.settings-mobile-booking-links{min-width:0;gap:12px}
+.settings-mobile-booking-links .input-action-row{min-width:0;grid-template-columns:minmax(0,1fr) auto}
+.settings-mobile-booking-links .input-action-row input{width:100%;min-width:0}
+.settings-mobile-booking-welcome{display:grid;gap:12px;min-width:0;margin-top:8px}
+.settings-mobile-booking-welcome>strong{font-size:18px;line-height:1.2}
