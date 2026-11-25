@@ -111,11 +111,13 @@
 
 /* Desktop notifications: summary action on H, canonical list entries, inline editor. */
 .settings-notification-card-heading{width:100%;margin-bottom:0;min-height:36px;flex-wrap:nowrap}
-.settings-notification-card{cursor:pointer}
+.settings-notification-card-actions{display:flex;align-items:center;gap:8px;flex:none;margin-left:auto}
+.settings-notification-card{cursor:pointer;gap:6px}
 .settings-notification-title{font:inherit;font-size:20px;font-weight:730;line-height:1.2;color:var(--text);background:transparent;border:0;padding:0;text-align:left;cursor:pointer}
 .settings-notification-card [data-notification-delivery-card]{width:100%;min-width:0;cursor:default}
-.settings-notification-delivery-form{gap:8px;min-width:0}
-.settings-notification-delivery-form .field-inline-label{justify-content:flex-start;gap:8px}
+.settings-notification-delivery-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 10px;min-width:0}
+.settings-notification-delivery-form>.settings-delivery-mode,.settings-notification-delivery-form>[data-notification-delivery-status]{grid-column:1/-1}
+.settings-notification-delivery-form>.ui-select{margin:0;min-width:0}
 .settings-notification-delivery-form [data-notification-delivery-status]:empty{display:none}
 .notification-desktop-master{display:flex;align-items:center;margin-bottom:12px}
 .notification-desktop-master .ui-compact-check__label{font-size:20px;font-weight:730}

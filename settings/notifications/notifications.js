@@ -86,7 +86,7 @@ function selectedExternalChannels(form) {
 }
 
 function openPushInfo() {
-  const content = '<div class="modal-title"><h2>Push</h2><p>Push отправляется всегда отдельно. Последовательность применяется только к Telegram и Email.</p></div>';
+  const content = '<div class="modal-title"><h2>Push</h2><p>Push отправляется всегда отдельно. Порядок доставки применяется только к Telegram и Email. «Во все выбранные каналы» — отправка в оба выбранных канала. «По очереди» — следующий канал используется, если предыдущий не доставил сообщение.</p></div>';
   return mountModal(document.body, modal(content, {
     title: 'О Push',
     variant: 's',
@@ -94,12 +94,14 @@ function openPushInfo() {
   }));
 }
 
-function deliveryFields(policy = {}) {
+function deliveryFields(policy = {}, { desktop = false } = {}) {
   const channels = externalChannelValues(policy);
-  return `<div class="field-inline-label"><span>Push — всегда</span>${smallActionButton({
+  const modeOptions = desktop ? ROUTING_MODE_OPTIONS.map(option => option.value === 'fallback' ? {...option,label:'По очереди'} : option) : ROUTING_MODE_OPTIONS;
+  const pushInfo = desktop ? '' : `<div class="field-inline-label"><span>Push — всегда</span>${smallActionButton({
     icon: 'info', data: 'data-notification-push-info', aria: 'О Push',
-  })}</div>
-    ${select({label:'Порядок отправки',name:'mode',value:policy?.mode === 'fallback'?'fallback':'always',options:ROUTING_MODE_OPTIONS})}
+  })}</div>`;
+  return `${pushInfo}
+    ${select({label:'Порядок отправки',name:'mode',value:policy?.mode === 'fallback'?'fallback':'always',options:modeOptions,className:desktop?'settings-delivery-mode':''})}
     ${select({label:'Канал 1',name:'channel1',value:channels[0],options:EXTERNAL_CHANNEL_OPTIONS})}
     ${select({label:'Канал 2',name:'channel2',value:channels[1],options:EXTERNAL_CHANNEL_OPTIONS})}`;
 }
@@ -110,14 +112,17 @@ function deliveryDraft(form) {
 }
 
 export async function renderDeliveryCard(host) {
-  const save = host.closest('.settings-notification-card')?.querySelector('[data-notification-card-save]');
+  const card = host.closest('.settings-notification-card');
+  const save = card?.querySelector('[data-notification-card-save]');
   if (!save) return;
+  const info = card.querySelector('[data-notification-card-info]');
+  if (info) info.onclick = openPushInfo;
   save.hidden = true;
   const policy = await getNotificationDeliveryRouting();
   if (!host.isConnected) return;
   const draw = current => {
     host.innerHTML = `<form id="settings-notification-delivery-form" class="form-grid settings-notification-delivery-form" data-notification-delivery-form>
-      ${deliveryFields(current)}
+      ${deliveryFields(current,{desktop:true})}
       <div class="muted" data-notification-delivery-status aria-live="polite"></div>
     </form>`;
     const form = host.querySelector('form');
@@ -129,7 +134,6 @@ export async function renderDeliveryCard(host) {
       save.disabled = busy;
       form.querySelectorAll('button').forEach(control=>{control.disabled=busy;});
     };
-    form.querySelector('[data-notification-push-info]')?.addEventListener('click',openPushInfo);
     form.addEventListener('input',sync);
     form.addEventListener('change',sync);
     form.addEventListener('submit',async event=>{
