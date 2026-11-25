@@ -9,7 +9,7 @@ import { catalogDisclosure } from '../inventory/catalog-ui.js';
 import { stockGroupTree, sortedStockChildren } from '../inventory/grouping.js';
 import {
   getServiceGroupLevels, commitServiceGroupLevels,
-  getServiceGroupEntries, commitServiceGroupOrder,
+  getServiceGroupEntries, commitServiceGroupOrder, commitServiceGroupSection,
 } from './products/data.js';
 
 const id = () => crypto.randomUUID();
@@ -314,10 +314,11 @@ export function openServiceGroupingQ({ onSaved = () => {}, desktop = false } = {
       ? current()?.values?.find(value => value.id === valueEdit.id) : null;
     const nameChanged = () => Boolean(nameDraft.trim()) &&
       (creating || nameDraft.trim() !== String(current()?.name || '').trim());
+    const kindChanged = () => Boolean(current() && kindDraft !== current().kind);
     const valueChanged = () => Boolean(valueEdit?.name.trim()) &&
       (valueEdit.isNew || valueEdit.name.trim() !== String(edited()?.name || '').trim());
     const canSave = () => Boolean((creating || current()) && nameDraft.trim() &&
-      (!valueEdit || valueEdit.name.trim()) && (nameChanged() || valueChanged()));
+      (!valueEdit || valueEdit.name.trim()) && (nameChanged() || kindChanged() || valueChanged()));
     const sync = () => {
       const active = current();
       add.textContent = active ? '+ Добавить значение' : '+ Добавить группу';
@@ -339,13 +340,14 @@ export function openServiceGroupingQ({ onSaved = () => {}, desktop = false } = {
     const save = async () => {
       if (busy || !canSave()) return;
       const active = current();
-      const kind = creating ? kindDraft : active.kind;
+      const kind = kindDraft;
+      const originalKind = creating ? kind : active.kind;
       const newId = creating ? id() : active.id;
       const name = nameDraft.trim();
       const nextValue = valueEdit ? { ...valueEdit, name: valueEdit.name.trim() } : null;
       busy = true; sync(); error.textContent = '';
       try {
-        const existing = getServiceGroupLevels(kind);
+        const existing = getServiceGroupLevels(originalKind);
         if (!creating && !existing.some(group => group.id === newId))
           throw new Error('Группа больше не существует.');
         if (nextValue && !nextValue.isNew && !active.values?.some(value => value.id === nextValue.id))
@@ -359,7 +361,11 @@ export function openServiceGroupingQ({ onSaved = () => {}, desktop = false } = {
               ? [...values, { id: id(), name: nextValue.name }]
               : values.map(value => value.id === nextValue.id ? { ...value, name: nextValue.name } : value) };
           });
-        await commitServiceGroupLevels(kind, next);
+        if (!creating && originalKind !== kind) {
+          await commitServiceGroupSection(originalKind, kind, next.find(group => group.id === newId));
+        } else {
+          await commitServiceGroupLevels(kind, next);
+        }
         onSaved();
         const fresh = getServiceGroupEntries().find(group => group.kind === kind && group.id === newId);
         if (fresh) enter(fresh);
@@ -376,14 +382,13 @@ export function openServiceGroupingQ({ onSaved = () => {}, desktop = false } = {
       error.textContent = '';
       if (!creating && !active) {
         const entries = getServiceGroupEntries();
-        content.innerHTML = entries.length ? list({
-          className: 'ui-list--dense list-entries',
-          items: entries.map(group => ({
-            title: group.name, secondary: kindLabel(group.kind), right: valueCountText(group), interactive: true, reorderHandle: true,
-            data: 'data-desktop-group-key="' + escapeHtml(group.key) + '" data-reorder-id="' + escapeHtml(group.key) + '"',
-            aria: 'Открыть группу ' + group.name,
-          })),
-        }) : emptyState('Групп пока нет');
+        content.innerHTML = entries.length ? v2ListEntries(entries.map(group => v2ListEntry({
+          title: group.name, subtitle: kindLabel(group.kind), rightBottom: valueCountText(group),
+          initial: '', interactive: true, reorderHandle: true,
+          reorderAria: 'Переместить ' + group.name,
+          data: 'data-desktop-group-key="' + escapeHtml(group.key) + '" data-reorder-id="' + escapeHtml(group.key) + '"',
+          aria: 'Открыть группу ' + group.name,
+        }))) : emptyState('Групп пока нет');
         content.querySelectorAll('[data-desktop-group-key]').forEach(node => node.addEventListener('click', event => {
           if (busy || event.target.closest?.('[data-reorder-handle]')) return;
           const group = groupByKey(node.dataset.desktopGroupKey);
@@ -396,13 +401,12 @@ export function openServiceGroupingQ({ onSaved = () => {}, desktop = false } = {
         sync(); return;
       }
       content.innerHTML = '<form class="compact-form" data-desktop-group-form>' +
-        (creating ? select({ label: 'Раздел', name: 'groupKind', value: kindDraft,
-          options: [{ value: 'procedures', label: 'Услуги' }, { value: 'products', label: 'Товары' }] })
-          : '') +
+        select({ label: 'Раздел', name: 'groupKind', value: kindDraft,
+          options: [{ value: 'procedures', label: 'Услуги' }, { value: 'products', label: 'Товары' }] }) +
         field({ label: 'Наименование группы', name: 'name', value: nameDraft, required: true, maxlength: 80 }) +
         (valueEdit ? field({ label: 'Наименование значения', name: 'valueName', value: valueEdit.name,
           required: true, maxlength: 80 }) : '') +
-        (!creating ? '<div class="inventory-editor-group"><div class="inventory-editor-label">Значения</div><div data-service-group-value-list></div></div>' : '') +
+        (!creating ? '<div class="desktop-group-values"><div class="inventory-editor-label">Значения</div><div data-service-group-value-list></div></div>' : '') +
         '</form>';
       const form = content.querySelector('[data-desktop-group-form]');
       form.addEventListener('input', event => {

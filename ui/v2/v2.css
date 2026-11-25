@@ -956,3 +956,11 @@
  .v2-app--workspace .desktop-service-groups-q [data-desktop-group-content] .ui-list__right-secondary{font-size:13px;line-height:16px;font-variant-numeric:tabular-nums;white-space:nowrap}
  .v2-app--workspace .desktop-service-groups-q [data-service-group-value-list] .desktop-group-empty-row .ui-list__title{color:var(--text-secondary);font-weight:400}
 }
+
+/* Service group directory keeps original LS2. Only value rows use the dense
+   workplace-style list, including a single empty row in the same frame. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace .desktop-service-groups-q .desktop-group-values{display:grid;gap:6px;min-width:0}
+ .v2-app--workspace .desktop-service-groups-q [data-service-group-value-list]>.ui-list--dense.list-entries{box-sizing:border-box;border-radius:var(--radius-control,14px);min-height:0;height:auto;gap:0;padding:0;margin:0}
+ .v2-app--workspace .desktop-service-groups-q [data-service-group-value-list] .ui-list__item.desktop-group-empty-row{height:44px;min-height:44px;max-height:44px;padding:4px 12px;flex:0 0 44px}
+}
