@@ -463,3 +463,17 @@
  .v2-desktop-toolbar-user>button[data-desktop-profile]{max-width:120px}
  .v2-app--workspace>.v2-header>.v2-desktop-toolbar-user{gap:4px}
 }
+
+/* Desktop Y belongs only to the right work area, never to F/E or the calendar.
+   Keep the current note rail until its new presentation is approved. */
+@media (min-width:768px) and (min-height:600px){
+  .v2-app--workspace>.v2-app__stage>.v2-front{
+    display:flex;flex-direction:column;
+  }
+  .v2-app--workspace>.v2-app__stage>.v2-front>[data-v2-y-host]{
+    flex:0 0 auto;width:100%;min-width:0;
+  }
+  .v2-app--workspace>.v2-app__stage>.v2-front>[data-v2-z]:not([data-v2-z-layer]){
+    flex:1 1 auto;height:auto;min-height:0;
+  }
+}

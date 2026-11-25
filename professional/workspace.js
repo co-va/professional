@@ -30,6 +30,7 @@ import { ALL_WORKPLACES_ID, viewNavigation, initViewNavigation, select, button, 
 import { startPlatformNotices } from '../core/platform-notices.js';
 import { setThemeColor } from '../ui/viewport/index.js';
 import { isV2DesktopWorkspace, V2_DESKTOP_MEDIA } from '../ui/v2/geometry.js';
+import { syncV2YPlacement } from '../ui/v2/y.js';
 
 configureWorkplaceSource(getWorkplaceEntities);
 configureTimeUsageSource(getJournalTimeUsages);
@@ -648,7 +649,10 @@ function renderWorkspace() {
   // Preserve the shared Z DOM contract for Mobile and existing controllers.
   // On wide screens only Journal manifests as a full Z surface; all other
   // section roots are the ordinary H workspace, not a white page/modal.
-  if (shell) shell.dataset.v2DesktopSurface = state.activeSection === 'journal' ? 'journal' : 'list';
+  if (shell) {
+    shell.dataset.v2DesktopSurface = state.activeSection === 'journal' ? 'journal' : 'list';
+    syncV2YPlacement(shell);
+  }
   const surface = shell?.querySelector('[data-v2-workspace-surface]');
   const disposers = [];
   let moduleDispose = () => {};
