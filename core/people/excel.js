@@ -5,7 +5,7 @@ import {
 } from '../../ui/ui.js';
 import { apiRequest } from '../auth.js';
 import { getPersonPriceCondition } from './data.js';
-import { openContactImportUpload } from './contact-import-review.js';
+import { openContactImportUpload, openContactImportBatches } from './contact-import-review.js';
 
 function message(error) {
   if (error instanceof Error && error.message && !/HTTP|fetch|network|404|500|502|503|JSON|API|Failed to|Prisma|SQL|P20\d+|transaction|sourceKey|tenantId|stack|undefined|constraint|database/i.test(error.message))
@@ -148,7 +148,9 @@ export function openPeopleExcelMenu(root, { getRows = () => [], onLoaded = () =>
     { id: 'template', label: 'Шаблон', run: () => getWorkbook([], true) },
   ];
   const desktopMenu = Boolean(anchor?.matches?.('[data-people-desktop-excel]'));
+  if (desktopMenu) actions.push({id:'history',label:'История загрузок',run:()=>openContactImportBatches(root,{onLoaded})});
   const desktopLabels = {
+    history: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9h8M8 13h8M8 17h5"/></svg><span>История загрузок</span>',
     export: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V3m-5 5 5-5 5 5M4 16v4h16v-4"/></svg><span>Выгрузить</span>',
     import: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v13m-5-5 5 5 5-5M4 16v4h16v-4"/></svg><span>Загрузить</span>',
     template: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H5v18h14V8l-5-5Zm0 0v5h5M8 12h8m-8 4h8m-4-4v4"/></svg><span>Скачать шаблон</span>',

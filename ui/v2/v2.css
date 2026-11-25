@@ -621,3 +621,8 @@
    width:126px;min-width:126px;max-width:126px;padding-left:22px;padding-right:6px;
  }
 }
+
+/* Desktop Contacts: keep the complete debt heading on one line, without changing the common heading font. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact :is(th,td)[data-table-column="debt"]{width:146px;min-width:146px;white-space:nowrap;overflow-wrap:normal;word-break:normal}
+}

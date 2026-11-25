@@ -593,7 +593,6 @@ export function renderPeople(root, options = {}) {
       </div>
       <div class="people-desktop-actions people-desktop-actions--right">
         ${button('<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3v18m-4-4 4 4 4-4M17 21V3m-4 4 4-4 4 4"/></svg>',{variant:'secondary',className:'people-desktop-icon',data:'data-people-desktop-excel title="Обмен данными" aria-haspopup="dialog"',aria:'Обмен данными'})}
-        ${button('Загрузки',{variant:'secondary',data:'data-people-desktop-uploads'})}
         ${button('Вид',{variant:'secondary',data:'data-people-desktop-view'})}
         ${button('<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>',{variant:'secondary',className:'people-desktop-icon people-desktop-add',data:'data-people-desktop-add title="Добавить клиента" aria-haspopup="dialog"',aria:'Добавить клиента'})}
       </div>
@@ -610,7 +609,6 @@ export function renderPeople(root, options = {}) {
     onLoaded: () => renderPeople(root, options)
   }));
   searchRow?.querySelector('[data-people-desktop-sort]')?.addEventListener('click', event => openSortSettings(root,event.currentTarget));
-  searchRow?.querySelector('[data-people-desktop-uploads]')?.addEventListener('click', () => openContactImportBatches(root,{onLoaded:()=>renderPeople(root,options)}));
   searchRow?.querySelector('[data-people-desktop-view]')?.addEventListener('click', () => openPeopleAppearanceQ(root,options));
   searchRow?.querySelector('[data-people-desktop-add]')?.addEventListener('click', event => openAddMenu(root,options,event.currentTarget));
   root.peopleLoyaltyLoading=Boolean(currentPeopleFilters().loyaltyMode);
