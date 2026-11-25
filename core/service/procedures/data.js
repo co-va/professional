@@ -103,7 +103,7 @@ export async function commitProcedure(item) {
 
 // Consumables are attributes of the existing Procedure, not a second catalogue.
 // Preserve concurrent edits to price, workplaces, description and other fields.
-export async function commitProcedureConsumables(procedureId, consumables = []) {
+export async function commitProcedureConsumables(procedureId, consumables = [], groupNorms = undefined) {
   const id = String(procedureId || '');
   return commitServiceCollection({
     read: readRawProcedures,
@@ -118,7 +118,9 @@ export async function commitProcedureConsumables(procedureId, consumables = []) 
         unit: String(row.unit || ''),
       }));
       return values.map(item => String(item.id) === id
-        ? { ...item, consumables: saved, updatedAt: new Date().toISOString() }
+        ? { ...item, consumables: saved,
+          ...(groupNorms === undefined ? {} : { consumableGroupNorms: clone(groupNorms) }),
+          updatedAt: new Date().toISOString() }
         : item);
     },
   });

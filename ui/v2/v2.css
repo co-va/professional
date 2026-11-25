@@ -1002,3 +1002,24 @@
  .v2-app--workspace .desktop-table-popup .desktop-table-picker-item>small{font-size:11px;color:var(--text-secondary);overflow-wrap:anywhere;text-align:left}
  .v2-app--workspace .desktop-table-popup .desktop-table-picker-item:is(:hover,:focus-visible){background:var(--surface-soft)}
 }
+
+/* Shared product/group picker: natural-size popup, persistent search and
+   apply; only the result list scrolls, never the whole selection form. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace .desktop-table-popup.service-consumable-picker{display:flex;flex-direction:column;min-height:0;overflow:hidden}
+ .v2-app--workspace .desktop-table-popup.service-consumable-picker>[data-consumable-choices]{flex:0 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain}
+ .v2-app--workspace .desktop-table-popup.service-consumable-picker>.consumable-picker-apply{flex:0 0 auto;position:static;margin:8px 0 0;display:flex;justify-content:flex-end}
+ .v2-app--workspace .desktop-table-popup.service-consumable-picker>.consumable-picker-apply[hidden]{display:none!important}
+ .v2-app--workspace .desktop-table-popup.service-consumable-picker>.consumable-picker-apply>.ui-button{width:112px;height:36px;min-height:36px;border-radius:10px;font-size:13px}
+ .v2-app--workspace .desktop-table-popup .desktop-table-picker-check{display:grid;grid-template-columns:var(--ui-compact-size,28px) minmax(0,1fr);align-items:center;gap:10px}
+ .v2-app--workspace .desktop-table-popup td:has(.desktop-table-picker-check){padding:0}
+ .v2-app--workspace .desktop-table-popup .desktop-table-picker-check .ui-check-input{pointer-events:none}
+}
+.desktop-table-picker-copy{min-width:0;display:grid;gap:2px;text-align:left}
+.desktop-table-picker-copy>strong{font-size:13px;font-weight:500;overflow-wrap:anywhere}
+.desktop-table-picker-copy>small{font-size:11px;color:var(--text-secondary);overflow-wrap:anywhere}
+.service-consumable-inline-quantity{display:flex;align-items:center;gap:6px;flex:0 0 auto}
+.service-consumable-inline-quantity>.field{width:70px;margin:0}
+.service-consumable-inline-quantity>.field>span:empty{display:none}
+.service-consumable-inline-quantity>.field>input{box-sizing:border-box;min-width:0;width:100%;height:34px;min-height:34px;padding:4px 6px;border-radius:8px}
+.service-consumable-inline-quantity>span{font-size:12px;min-width:23px}

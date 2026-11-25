@@ -6,6 +6,8 @@ import { setSharedActionVisible } from '../../../ui/page/page.js';
 import { moveDesktopQTool } from '../../../ui/v2/z-layout.js';
 import { isV2DesktopWorkspace } from '../../../ui/v2/geometry.js';
 import { getInventoryItems } from '../../inventory/data.js';
+import { loadConsumptionGroups } from '../../inventory/consumption-groups.js';
+import { checkControl } from '../../../ui/selection/check-list.js';
 import { loadInventory } from '../../inventory/service.js';
 import { commitProcedureConsumables, getProcedures } from './data.js';
 
@@ -92,71 +94,114 @@ function costSummaryText(rows, inventory) {
     : 'Рассчитано: ' + money(result.total) + ' · не все расходы указаны';
 }
 
-export function openConsumablePicker(selected, onPick, { anchor = null } = {}) {
+// Group norms and concrete stock items have separate identities. A norm is
+// never converted into an arbitrary physical item or a stock movement.
+export function normalizeProcedureGroupNorms(value = []) {
+  const seen = new Set();
+  return (Array.isArray(value) ? value : []).map(row => {
+    const groupId = String(row?.groupId || '').trim();
+    const quantity = number(row?.quantity);
+    const unit = String(row?.unit || '').trim();
+    if (!groupId || seen.has(groupId) || !unit || !(quantity > 0))
+      throw new Error('Укажите количество расхода для каждой группы.');
+    seen.add(groupId);
+    return { groupId, name: String(row.name || '').trim(), quantity, unit };
+  });
+}
+
+export function openConsumablePicker(selected, onPick, { anchor = null, multiple = false, groupRows = null } = {}) {
+  const groupMode = Array.isArray(groupRows);
   const desktop = isV2DesktopWorkspace(anchor?.closest('[data-v2-app]') || document.querySelector('.v2-app--workspace'));
   if (desktop && anchor) anchor.dataset.v2AnchorWidth = '520';
+  const title = groupMode ? 'Группы расхода' : 'Товары';
+  const searchField = field({ label: 'Поиск', name: 'consumableSearch', type: 'search',
+    placeholder: groupMode ? 'Название группы' : 'Товар, производитель или артикул' });
   const panel = (desktop
-    ? '<div class="desktop-table-picker-tools">' +
-      field({ label: 'Поиск', name: 'consumableSearch', type: 'search', placeholder: 'Товар, производитель или артикул' }) +
-      compactButton({ kind: 'remove', data: 'data-consumable-picker-close', aria: 'Закрыть' }) +
-      '</div>'
-    : field({ label: 'Поиск', name: 'consumableSearch', type: 'search', placeholder: 'Товар, производитель или артикул' })) +
-    '<div data-consumable-choices></div>';
+    ? '<div class="desktop-table-picker-tools">' + searchField +
+      compactButton({ kind: 'remove', data: 'data-consumable-picker-close', aria: 'Закрыть' }) + '</div>'
+    : searchField) +
+    '<div data-consumable-choices></div>' +
+    (multiple ? actionBlock(button('Применить', { data: 'data-consumable-picker-apply' }), { className: 'consumable-picker-apply' }) : '');
   const layer = mountModal(desktop && anchor ? anchor : document.body, modal(panel, {
-    title: 'Выбрать товар', variant: 'x',
+    title, variant: 'x',
     ...(desktop ? { className: 'desktop-table-popup service-consumable-picker', surface: 'app', xRole: 'picker' } : {}),
   }));
   if (!layer) return null;
   const search = layer.querySelector('[name="consumableSearch"]');
   const host = layer.querySelector('[data-consumable-choices]');
+  const apply = layer.querySelector('[data-consumable-picker-apply]');
+  const chosen = new Map();
+  const sync = () => {
+    if (apply) {
+      const action = apply.closest('.modal-actions');
+      if (action) action.hidden = !chosen.size;
+      apply.disabled = !chosen.size;
+    }
+  };
+  const choices = () => groupMode ? groupRows.map(group => ({
+    id: String(group.groupId), title: group.name, secondary: group.unit,
+    payload: { groupId: String(group.groupId), name: group.name, unit: group.unit, quantity: null },
+    search: [group.name],
+  })) : getInventoryItems().map(item => ({
+    id: String(item.itemId), title: item.name || 'Товар',
+    secondary: [item.manufacturer, item.sku].filter(Boolean).join(' · '),
+    payload: { itemId: String(item.itemId), quantity: null, unit: procedureConsumableUnit(item) },
+    search: [item.name, item.manufacturer, item.sku],
+  }));
+  const choose = (id, checked = true) => {
+    const row = choices().find(item => item.id === id);
+    if (!row || selected.has(id)) return;
+    if (multiple) {
+      if (checked) chosen.set(id, row.payload);
+      else chosen.delete(id);
+      sync();
+    } else {
+      layer.v2Close?.();
+      onPick(row.payload);
+    }
+  };
   layer.querySelector('[data-consumable-picker-close]')?.addEventListener('click', () => layer.v2Close?.());
+  apply?.addEventListener('click', () => {
+    if (!chosen.size) return;
+    const result = [...chosen.values()];
+    layer.v2Close?.();
+    onPick(result);
+  });
   const render = () => {
     const needle = String(search?.value || '').trim().toLocaleLowerCase('ru-RU');
-    const items = getInventoryItems().filter(item => !selected.has(String(item.itemId))
-      && [item.name, item.manufacturer, item.sku].some(value =>
-        String(value || '').toLocaleLowerCase('ru-RU').includes(needle)));
-    // Stock products use the canonical dense List, not full-size V2 cards.
-    // Keep huge catalogues responsive: searching reveals further matches.
+    const items = choices().filter(item => !selected.has(item.id) &&
+      item.search.some(value => String(value || '').toLocaleLowerCase('ru-RU').includes(needle)));
     const visible = items.slice(0, 80);
-    host.innerHTML = items.length ? (desktop ? dataTable({
-      compact: true, caption: 'Товары',
-      columns: [
-        { key: 'title', label: 'Товар', sortable: false, render: row =>
-          '<button type="button" class="desktop-table-picker-item" data-consumable-pick="' +
-            escapeHtml(row.itemId) + '" aria-label="Добавить ' + escapeHtml(row.title) + '">' +
-            '<strong>' + escapeHtml(row.title) + '</strong>' +
-            (row.secondary ? '<small>' + escapeHtml(row.secondary) + '</small>' : '') +
-          '</button>' },
-      ],
-      rows: visible.map(item => ({
-        itemId: item.itemId, title: item.name || 'Товар',
-        secondary: [item.manufacturer, item.sku].filter(Boolean).join(' · '),
-      })),
-    }) : list({
+    const rowMarkup = row => {
+      const text = '<span class="desktop-table-picker-copy"><strong>' + escapeHtml(row.title) + '</strong>' +
+        (row.secondary ? '<small>' + escapeHtml(row.secondary) + '</small>' : '') + '</span>';
+      if (multiple) return '<label class="desktop-table-picker-item desktop-table-picker-check">' +
+        checkControl({ checked: chosen.has(row.id), data: 'data-consumable-check="' + escapeHtml(row.id) + '"',
+          aria: row.title }) + text + '</label>';
+      return '<button type="button" class="desktop-table-picker-item" data-consumable-pick="' +
+        escapeHtml(row.id) + '" aria-label="Добавить ' + escapeHtml(row.title) + '">' + text + '</button>';
+    };
+    if (desktop) host.innerHTML = dataTable({
+      compact: true, caption: title,
+      columns: [{ key: 'title', label: groupMode ? 'Группа' : 'Товар', sortable: false,
+        render: row => row.id ? rowMarkup(row) : escapeHtml(row.title) }],
+      rows: visible.length ? visible : [{ title: groupMode ? 'Группы не найдены' : 'Товары не найдены' }],
+    });
+    else if (multiple) host.innerHTML = visible.length
+      ? '<div class="ui-check-list">' + visible.map(row => rowMarkup(row).replace('desktop-table-picker-item desktop-table-picker-check','ui-check-list__item')).join('') + '</div>'
+      : emptyState(groupMode ? 'Группы не найдены' : 'Товары не найдены');
+    else host.innerHTML = visible.length ? list({
       className: 'ui-list--dense',
-      items: visible.map(item => ({
-        title: item.name || 'Товар',
-        secondary: [item.manufacturer, item.sku].filter(Boolean).join(' · '),
-        interactive: true,
-        data: 'data-consumable-pick="' + escapeHtml(item.itemId) + '"',
-        aria: 'Добавить ' + (item.name || 'товар'),
-      })),
-    })) + (items.length > visible.length
-      ? '<p class="ui-list__secondary">Показано ' + visible.length +
-        ' из ' + items.length + '. Уточните поиск.</p>' : '')
-      : desktop ? dataTable({
-        compact: true, caption: 'Товары',
-        columns: [{ key: 'title', label: 'Товар', sortable: false }],
-        rows: [{ title: 'Товары не найдены' }],
-      }) : emptyState('Товары не найдены', 'Измените поиск или добавьте товар на склад.');
+      items: visible.map(row => ({ title: row.title, secondary: row.secondary, interactive: true,
+        data: 'data-consumable-pick="' + escapeHtml(row.id) + '"', aria: 'Добавить ' + row.title })),
+    }) : emptyState(groupMode ? 'Группы не найдены' : 'Товары не найдены');
+    if (items.length > visible.length) host.insertAdjacentHTML('beforeend',
+      '<p class="ui-list__secondary">Показано ' + visible.length + ' из ' + items.length + '</p>');
     host.querySelectorAll('[data-consumable-pick]').forEach(node =>
-      node.addEventListener('click', () => {
-        const itemId = node.dataset.consumablePick;
-        const item = getInventoryItems().find(value => String(value.itemId) === itemId);
-        if (!item) return;
-        layer.v2Close?.();
-        onPick({ itemId, quantity: null, unit: procedureConsumableUnit(item) });
-      }));
+      node.addEventListener('click', () => choose(node.dataset.consumablePick)));
+    host.querySelectorAll('[data-consumable-check]').forEach(input =>
+      input.addEventListener('change', () => choose(input.dataset.consumableCheck, input.checked)));
+    sync();
   };
   search?.addEventListener('input', render);
   render();
@@ -168,13 +213,20 @@ export async function openProcedureConsumables(procedureId, onSaved = () => {}) 
   const current = getProcedures().find(item => String(item.id) === String(procedureId));
   if (!current) return openNotice({ title: 'Расходник', message: 'Услуга не найдена.' });
   let rows = normalizeProcedureConsumables(current.consumables);
-  const signature = value => {
-    try { return JSON.stringify(normalizeProcedureConsumables(value)); }
-    catch { return JSON.stringify(value); }
+  let norms = (Array.isArray(current.consumableGroupNorms) ? current.consumableGroupNorms : [])
+    .map(row => ({ ...row }));
+  let stockGroups = [];
+  let groupsLoaded = false;
+  const signature = () => {
+    try { return JSON.stringify([normalizeProcedureConsumables(rows), normalizeProcedureGroupNorms(norms)]); }
+    catch { return JSON.stringify([rows, norms]); }
   };
-  const initial = signature(rows);
+  const initial = signature();
   const panel = '<div data-procedure-consumable-items></div>' +
     '<p class="ui-list__secondary" data-procedure-consumable-cost></p>' +
+    '<div class="app-settings-panel">' +
+      button('+ Группа', { variant: 'secondary', data: 'data-procedure-consumable-group-add' }) +
+    '</div>' +
     '<div class="app-settings-panel">' +
       button('+ Товар', { variant: 'secondary', data: 'data-procedure-consumable-add' }) +
     '</div>' +
@@ -190,21 +242,53 @@ export async function openProcedureConsumables(procedureId, onSaved = () => {}) 
   const save = layer.querySelector('[data-procedure-consumable-save]');
   const actions = save?.closest('.modal-actions');
   const add = layer.querySelector('[data-procedure-consumable-add]');
-  const desktop = moveDesktopQTool(add);
-  if (desktop) moveDesktopQTool(save, { desktopLabel: 'Сохранить' });
+  const addGroup = layer.querySelector('[data-procedure-consumable-group-add]');
+  const desktop = moveDesktopQTool(addGroup);
+  if (desktop) {
+    moveDesktopQTool(add);
+    moveDesktopQTool(save, { desktopLabel: 'Сохранить' });
+  }
   let saving = false;
   const sync = () => {
     if (costNode) {
-      costNode.hidden = !rows.length;
-      costNode.textContent = costSummaryText(rows, getInventoryItems());
+      costNode.hidden = !rows.length && !norms.length;
+      const exact = procedureConsumableSummary(rows, getInventoryItems());
+      const byGroup = new Map(stockGroups.map(group => [String(group.groupId), group]));
+      let total = exact.total, calculated = exact.calculated, missing = exact.missing;
+      for (const norm of norms) {
+        const group = byGroup.get(String(norm.groupId));
+        const price = group?.unit === norm.unit ? number(group.averageUnitCost) : null;
+        const quantity = number(norm.quantity);
+        if (price == null || !(price >= 0) || !(quantity > 0)) { missing++; continue; }
+        total += price * quantity;
+        calculated++;
+      }
+      costNode.textContent = !calculated ? 'Себестоимость: не рассчитана'
+        : (missing ? 'Рассчитано: ' : 'Себестоимость: ') + money(total) +
+          (missing ? ' · не все расходы указаны' : '');
     }
-    setSharedActionVisible(actions, signature(rows) !== initial);
+    setSharedActionVisible(actions, signature() !== initial);
     if (save) save.disabled = saving;
     if (add) add.disabled = saving;
+    if (addGroup) addGroup.disabled = saving;
   };
   const render = () => {
     const inventory = new Map(getInventoryItems().map(item => [String(item.itemId), item]));
-    host.innerHTML = rows.length ? '<div class="ui-list ui-list--dense">' +
+    const groupMap = new Map(stockGroups.map(group => [String(group.groupId), group]));
+    const normMarkup = norms.map((row, index) => {
+      const group = groupMap.get(String(row.groupId));
+      const title = group?.name || row.name || 'Группа недоступна';
+      return '<div class="ui-list__item service-consumable-norm" data-consumable-norm-row="' + index + '">' +
+        '<span class="ui-list__main"><span class="ui-list__title">' + escapeHtml(title) + '</span>' +
+        '<span class="ui-list__secondary">' + escapeHtml(groupsLoaded && !group ? 'Группа недоступна' : 'Группа расхода') + '</span></span>' +
+        '<span class="service-consumable-inline-quantity">' +
+        field({ name: 'normQuantity' + index, type: 'number', min: '0.000001', step: 'any', inputmode: 'decimal',
+          placeholder: '—', value: row.quantity ?? '', data: 'data-consumable-norm-quantity aria-label="Количество расхода"' }) +
+        '<span>' + escapeHtml(row.unit) + '</span></span>' +
+        compactButton({ kind: 'remove', data: 'data-consumable-norm-remove="' + index + '"', aria: 'Убрать ' + title }) +
+        '</div>';
+    }).join('');
+    host.innerHTML = rows.length || norms.length ? '<div class="ui-list ui-list--dense">' + normMarkup +
       rows.map((row, index) => {
         const item = inventory.get(String(row.itemId));
         const title = item?.name || 'Товар недоступен';
@@ -231,6 +315,14 @@ export async function openProcedureConsumables(procedureId, onSaved = () => {}) 
     sync();
   };
   host.addEventListener('input', event => {
+    if (event.target.matches?.('[data-consumable-norm-quantity]')) {
+      const index = Number(event.target.closest('[data-consumable-norm-row]')?.dataset.consumableNormRow);
+      if (!norms[index]) return;
+      norms[index] = { ...norms[index], quantity: event.target.value };
+      if (errorNode) errorNode.textContent = '';
+      sync();
+      return;
+    }
     if (!event.target.matches?.('[data-consumable-quantity]')) return;
     const index = Number(event.target.closest('[data-consumable-row]')?.dataset.consumableRow);
     if (!rows[index]) return;
@@ -239,12 +331,32 @@ export async function openProcedureConsumables(procedureId, onSaved = () => {}) 
     sync();
   });
   host.addEventListener('click', event => {
+    const normControl = event.target.closest?.('[data-consumable-norm-remove]');
+    if (normControl) {
+      const index = Number(normControl.dataset.consumableNormRemove);
+      if (norms[index]) norms.splice(index, 1);
+      render();
+      return;
+    }
     const control = event.target.closest?.('[data-consumable-remove]');
     if (!control) return;
     const index = Number(control.dataset.consumableRemove);
     if (!rows[index]) return;
     rows.splice(index, 1);
     render();
+  });
+  addGroup?.addEventListener('click', async () => {
+    if (saving) return;
+    try { await groupLoad; }
+    catch (error) {
+      openNotice({ title: 'Группы расхода', message: error?.message || 'Не удалось загрузить группы.' });
+      return;
+    }
+    if (!layer.isConnected) return;
+    openConsumablePicker(new Set(norms.map(row => String(row.groupId))), picked => {
+      norms.push(...picked);
+      render();
+    }, { anchor: addGroup, multiple: true, groupRows: stockGroups });
   });
   add?.addEventListener('click', async () => {
     if (saving) return;
@@ -256,14 +368,17 @@ export async function openProcedureConsumables(procedureId, onSaved = () => {}) 
     }
     if (!layer.isConnected) return;
     openConsumablePicker(new Set(rows.map(row => String(row.itemId))), item => {
-      rows.push(item);
+      rows.push(...item);
       render();
-    }, { anchor: add });
+    }, { anchor: add, multiple: true });
   });
   save?.addEventListener('click', async () => {
     if (saving) return;
-    let value;
-    try { value = normalizeProcedureConsumables(rows); }
+    let value, groupValue;
+    try {
+      value = normalizeProcedureConsumables(rows);
+      groupValue = normalizeProcedureGroupNorms(norms);
+    }
     catch (error) {
       if (errorNode) errorNode.textContent = error.message;
       return;
@@ -271,7 +386,7 @@ export async function openProcedureConsumables(procedureId, onSaved = () => {}) 
     saving = true;
     sync();
     try {
-      await commitProcedureConsumables(procedureId, value);
+      await commitProcedureConsumables(procedureId, value, groupValue);
       layer.v2Close?.();
       onSaved();
     } catch (error) {
@@ -282,6 +397,15 @@ export async function openProcedureConsumables(procedureId, onSaved = () => {}) 
     }
   });
   render();
+  const groupLoad = loadConsumptionGroups().then(groups => {
+    stockGroups = groups;
+    groupsLoaded = true;
+    if (layer.isConnected) {
+      if (host.contains(document.activeElement)) sync();
+      else render();
+    }
+  });
+  void groupLoad.catch(() => {});
   const inventoryLoad = loadInventory({ preferRecent: true }).then(() => {
     if (!layer.isConnected) return;
     // Preserve focus when a stock snapshot arrives while quantity is edited.
