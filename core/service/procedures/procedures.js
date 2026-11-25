@@ -193,7 +193,7 @@ function renderProcedureOverview(layer, baseRoot, id, { onChanged = () => {}, st
     title: procedure.name || 'Услуга',
     card: procedureOverviewCard(procedure, statistics),
     workplaceCards: procedureWorkplaceCards(procedure, statistics),
-    actions: button('Расходник', { variant: 'secondary', data: 'data-procedure-open-consumables' }),
+    actions: button('Расходник', { variant: 'secondary', className: 'v2-desktop-tool-accent', data: 'data-procedure-open-consumables' }),
   });
   layer.querySelector('[data-procedure-open-consumables]')?.addEventListener('click', async () => {
     const { openProcedureConsumables } = await import('./consumables.js');
