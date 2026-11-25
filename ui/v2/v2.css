@@ -538,7 +538,10 @@
 @media (min-width:768px) and (min-height:600px){
  .people-desktop-tools>.field{flex:1 1 180px;max-width:300px;width:auto;min-width:140px}
  .people-desktop-actions--right{margin-left:auto}
- .people-desktop-actions .ui-button{background:#E0D6D6;color:#41484F;border-color:#E0D6D6}
+ .people-desktop-actions .ui-button{background:var(--white);color:#41484F;border-color:var(--white)}
+ .people-desktop-query-tools .ui-compact-button{color:var(--white);background:transparent;border:0;border-radius:6px}
+ .people-desktop-query-tools .ui-compact-button[aria-pressed="true"]{background:#E0D6D6;color:#41484F}
+ .people-desktop-query-tools .ui-compact-button:focus-visible{outline-color:var(--white)}
  .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact :is(th,td):is([data-table-column="firstVisit"],[data-table-column="lastVisit"]){
    box-sizing:border-box;width:110px;min-width:110px;max-width:110px;text-align:center;padding:4px 6px;
  }
@@ -550,7 +553,7 @@
    Mobile and all other X presentations retain their original geometry. */
 @media (min-width:768px) and (min-height:600px){
  .people-desktop-actions .people-desktop-icon{display:grid;place-items:center;width:36px;min-width:36px;padding:0}
- .people-desktop-actions .people-desktop-add{background:var(--white);border-color:var(--white)}
+ .people-desktop-actions .people-desktop-add{background:#E0D6D6;border-color:#E0D6D6}
  .v2-app--workspace>.v2-layer-portal.is-anchored>.v2-layer-backdrop>.v2-layer--bottom:is(.people-action-popup,.desktop-q-action-popup){
    border-radius:14px;background:var(--white);padding:8px;overflow:auto;
  }

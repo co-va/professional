@@ -557,6 +557,13 @@ function visiblePeople(root, visitIndex = null) {
 function refreshPeopleList(root) {
   const host = root.querySelector('[data-people-list-host]');
   if (!host) return;
+  const toolbar = root.closest('[data-v2-z]')?.querySelector('[data-people-desktop-toolbar]');
+  const filterActive = Object.values(currentPeopleFilters()).some(Boolean);
+  const sortActive = getPeopleSortMode() !== 'nameAsc';
+  for (const [selector, active] of [['[data-people-desktop-filter]', filterActive], ['[data-people-desktop-sort]', sortActive]]) {
+    const control = toolbar?.querySelector(selector);
+    if (control && control.getAttribute('aria-pressed') !== String(active)) control.setAttribute('aria-pressed', String(active));
+  }
   if (currentPeopleFilters().loyaltyMode && root.peopleLoyaltyLoading) {
     host.textContent='Загружаем контакты…';
     updateDesktopPeopleCount(root,null);
@@ -603,9 +610,9 @@ export function renderPeople(root, options = {}) {
   const search = field({ name:'peopleSearch', type:'search', placeholder:wide?'Поиск по имени или коду':'Поиск по имени или UEI', autocomplete:'off', data:'data-people-search' });
   const [searchRow] = setV2ZHeaderRows(root, [wide ? `<section data-people-desktop-toolbar>
     <div class="people-desktop-tools">${search}
-      <div class="people-desktop-actions">
-        ${button('Фильтр',{variant:'secondary',data:'data-people-desktop-filter'})}
-        ${button('Сортировка',{variant:'secondary',data:'data-people-desktop-sort'})}
+      <div class="people-desktop-actions people-desktop-query-tools">
+        ${compactButton({kind:'filter',data:'data-people-desktop-filter title="Фильтр" aria-haspopup="dialog" aria-pressed="false"'})}
+        ${compactButton({kind:'sort',data:'data-people-desktop-sort title="Сортировка" aria-haspopup="dialog" aria-pressed="false"'})}
       </div>
       <div class="people-desktop-actions people-desktop-actions--right">
         ${button('<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3v18m-4-4 4 4 4-4M17 21V3m-4 4 4-4 4 4"/></svg>',{variant:'secondary',className:'people-desktop-icon',data:'data-people-desktop-excel title="Обмен данными" aria-haspopup="dialog"',aria:'Обмен данными'})}
