@@ -69,7 +69,7 @@
 /* C exists only when the current context has an add action. */
 .v2-header__slot--c .v2-header__control{box-sizing:border-box;width:max-content;min-width:42px;height:42px;padding:0 12px;border:1px solid #fff;border-radius:12px;background:#111;color:#fff;white-space:nowrap}
 .v2-header__slot--c .v2-header__control--white{border-color:#111;background:#fff;color:#111}
-.v2-header__slot--c .v2-header__control--danger{border-color:var(--v2-danger);background:var(--v2-danger);color:#fff}
+.v2-header__slot--c .v2-header__control--danger{border-color:var(--ui-delete-foreground);background:var(--ui-delete-background);color:var(--ui-delete-foreground)}
 .v2-header__slot--c .v2-header__control:disabled{border-color:#B7B7B7;background:var(--v2-disabled);color:#777}
 .v2-header__slot--c .v2-header__control:active{transform:translateY(1px);filter:brightness(.92)}
 
@@ -78,8 +78,9 @@
 .v2-header__slot--d .v2-header__control--chat{width:42px;min-width:42px;height:42px;border:0;border-radius:0;padding:0;background:transparent;color:#fff}
 .v2-header__back{font-size:32px;line-height:1;font-weight:400;transform:translateY(-1px)}
 .v2-header__control--text{border-radius:12px;white-space:nowrap}
-.v2-header__control--danger{border-color:var(--v2-danger);background:var(--v2-danger);color:#fff}
+.v2-header__control--danger{border-color:var(--ui-delete-foreground);background:var(--ui-delete-background);color:var(--ui-delete-foreground)}
 .v2-header__control:disabled{background:var(--v2-disabled);color:#777;opacity:1}
+.v2-header__control--danger:disabled,.v2-header__slot--c .v2-header__control--danger:disabled{border-color:var(--ui-delete-foreground);background:var(--ui-delete-background);color:var(--ui-delete-foreground);opacity:.55}
 .v2-header__icon{width:22px;height:22px;display:grid;place-items:center}.v2-header__icon svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.v2-header__icon--chat svg{width:24px;height:24px;fill:currentColor;stroke:none}
 .v2-header__badge{position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;padding:0 5px;border-radius:999px;display:grid;place-items:center;background:var(--v2-danger);color:#fff;font-size:10px;font-weight:850}
 
@@ -772,8 +773,8 @@
    Keep the Mobile sheet geometry; Desktop confirmations are centered on a
    dimmed H backdrop, not anchored popups. Technical viewers and Q unchanged. */
 [data-v2-delete-confirmation] .modal-actions>.v2-confirmation-safe{background:var(--text);border-color:var(--text);color:var(--white)}
-[data-v2-delete-confirmation] .modal-actions>.v2-confirmation-destructive{background:#FDD2D2;border-color:#EB4C42;color:#EB4C42}
-[data-v2-delete-confirmation] .modal-actions>.v2-confirmation-destructive:disabled{background:var(--button-secondary);border-color:#B7B7B7;color:#777}
+[data-v2-delete-confirmation] .modal-actions>.v2-confirmation-destructive{background:var(--ui-delete-background);border-color:var(--ui-delete-foreground);color:var(--ui-delete-foreground)}
+[data-v2-delete-confirmation] .modal-actions>.v2-confirmation-destructive:disabled{background:var(--ui-delete-background);border-color:var(--ui-delete-foreground);color:var(--ui-delete-foreground);opacity:.55}
 @media (min-width:768px) and (min-height:600px){
  .v2-app--workspace>.v2-layer-portal>.v2-layer-backdrop[data-v2-delete-confirmation]>.v2-layer--bottom{border-radius:14px;padding:28px 32px;width:min(440px,calc(100% - 32px));box-shadow:0 12px 32px rgba(0,0,0,.24);animation:v2-desktop-confirm-in .16s ease-out both;color:#41484F}
  .v2-app--workspace [data-v2-delete-confirmation] .modal-title{margin-bottom:24px}
