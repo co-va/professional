@@ -745,7 +745,14 @@
 [data-v2-delete-confirmation] .modal-actions>.v2-confirmation-destructive:disabled{background:var(--button-secondary);border-color:#B7B7B7;color:#777}
 @media (min-width:768px) and (min-height:600px){
  .v2-app--workspace>.v2-layer-portal>.v2-layer-backdrop[data-v2-delete-confirmation]{background:rgba(0,0,0,.46)}
- .v2-app--workspace>.v2-layer-portal>.v2-layer-backdrop[data-v2-delete-confirmation]>.v2-layer--bottom{border-radius:14px;padding:20px;width:min(400px,calc(100% - 32px));box-shadow:0 12px 32px rgba(0,0,0,.24);animation:v2-desktop-confirm-in .16s ease-out both}
+ .v2-app--workspace>.v2-layer-portal>.v2-layer-backdrop[data-v2-delete-confirmation]>.v2-layer--bottom{border-radius:14px;padding:28px 32px;width:min(440px,calc(100% - 32px));box-shadow:0 12px 32px rgba(0,0,0,.24);animation:v2-desktop-confirm-in .16s ease-out both;color:#41484F}
+ .v2-app--workspace [data-v2-delete-confirmation] .modal-title{margin-bottom:24px}
+ .v2-app--workspace [data-v2-delete-confirmation] .modal-title h2{color:#41484F}
+ .v2-app--workspace [data-v2-delete-confirmation] .modal-title p{margin-top:8px;font-size:15px;line-height:1.5;color:#41484F}
+ .v2-app--workspace [data-v2-delete-confirmation] .modal-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;justify-items:stretch;align-items:center;margin-top:24px}
+ .v2-app--workspace [data-v2-delete-confirmation] .modal-actions>:is(.v2-confirmation-safe,.v2-confirmation-destructive){box-sizing:border-box;width:100%;min-width:0;max-width:160px;height:var(--h-tools,36px);min-height:var(--h-tools,36px);max-height:var(--h-tools,36px);margin:0;padding:0 10px;border-width:1px;border-radius:10px;font-size:13px;line-height:1}
+ .v2-app--workspace [data-v2-delete-confirmation] .modal-actions>.v2-confirmation-destructive{grid-column:1;grid-row:1;justify-self:start}
+ .v2-app--workspace [data-v2-delete-confirmation] .modal-actions>.v2-confirmation-safe{grid-column:2;grid-row:1;justify-self:end}
  .v2-app--workspace [data-v2-delete-confirmation] .v2-layer__gesture-zone{display:none}
  .v2-app--workspace>.v2-layer-portal>.v2-layer-backdrop[data-v2-delete-confirmation]>.v2-layer--bottom.is-dismissing{animation:none;opacity:0;transform:translateY(0);transition:opacity .15s ease}
 }
