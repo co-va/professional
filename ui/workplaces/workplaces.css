@@ -31,10 +31,13 @@
   .v2-app--workspace [data-v2-q-header-content] .desktop-q-toolbar.workplace-booking-toolbar .workplace-booking-tools>.ui-compact-button{width:var(--ui-compact-size);height:var(--ui-compact-size);min-height:var(--ui-compact-size);max-height:var(--ui-compact-size);flex:0 0 var(--ui-compact-size)}
 }
 
-/* Mobile retains the original field order and readable, left-aligned settings. */
-.workplace-form>.workplace-booking-top>.workplace-booking-checks{grid-template-columns:minmax(0,1fr);gap:10px}
-.workplace-form>.workplace-booking-top>.workplace-booking-checks>.ui-compact-check{justify-self:start}
-.workplace-form>.workplace-booking-top>.workplace-booking-tools{order:1}
+/* Mobile keeps the booking tools below color, using the same equal-column checks
+   as Desktop. Only the in-form step row stretches; relocated Desktop tools are unaffected. */
+.workplace-form>.workplace-booking-top>.workplace-booking-tools{order:1;width:100%;gap:12px}
+.workplace-form>.workplace-booking-top>.workplace-booking-tools>.workplace-booking-step{order:0;flex:1 1 0;min-width:0}
+.workplace-form>.workplace-booking-top>.workplace-booking-tools>.workplace-booking-step .ui-select{flex:1 1 auto;width:auto;min-width:0;max-width:none}
+.workplace-form>.workplace-booking-top>.workplace-booking-tools>[data-workplace-booking-info]{order:1;flex:0 0 var(--ui-compact-size,28px)}
+.workplace-form>.workplace-booking-top>.workplace-booking-checks .ui-compact-check__label{overflow-wrap:anywhere}
 
 /* Desktop workplace Q: footer is outside the scroll body and outside modal-actions.
    The existing Desktop workplace danger-footer appearance is reused. */
