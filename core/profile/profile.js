@@ -1,4 +1,4 @@
-import { collectRepeatedField, entityVisualCard, escapeHtml, field, modal, mountModal, openEntityCardAppearanceQ, openSharedProfileDataEditor, openSharedProfileSettingsMenu, openSharedPasswordAction, page, repeatedField, searchableSelect, select, textareaField, v2HorizontalRail, v2Section, workspaceHeaderContext, workplaceAddButton } from '../../ui/ui.js';
+import { button, setV2ZHeaderRows, collectRepeatedField, entityVisualCard, escapeHtml, field, modal, mountModal, openEntityCardAppearanceQ, openSharedProfileDataEditor, openSharedProfileSettingsMenu, openSharedPasswordAction, page, repeatedField, searchableSelect, select, textareaField, v2HorizontalRail, v2Section, workspaceHeaderContext, workplaceAddButton } from '../../ui/ui.js';
 import { canUseCapability, getAccess, getLimit, loadAccess, requestLiveMode } from '../../core/access.js';
 import { changePassword, logout } from '../../core/auth.js';
 import { getProfessionCatalog, getProfile, saveProfile as saveProfileData } from './data.js';
@@ -211,7 +211,7 @@ export function openProfileAppearanceQ(root,{onSaved=null,navigateBack=()=>{},op
   });
 }
 
-function openProfileSettings(root,navigateBack,options={}){
+function profileSettingsActions(root,navigateBack,options={}){
   const access=getAccess();
   const commercialActions=access?.commercialMode==='DEMO'?[
     {id:'demo-status',label:demoRemainingText(access),disabled:true},
@@ -242,15 +242,33 @@ function openProfileSettings(root,navigateBack,options={}){
       },
     },
   ]:[];
-  return openSharedProfileSettingsMenu({
-    actions:[
+  return [
       ...commercialActions,
       {id:'appearance',label:'Вид',onSelect:()=>openProfileAppearanceQ(root,{navigateBack,options})},
       {id:'password',label:'Изменить пароль',onSelect:()=>openSharedPasswordAction({onSubmit:({currentPassword,newPassword})=>changePassword(currentPassword,newPassword)})},
       {id:'controls',label:'Документы / Уведомления',onSelect:()=>import('./account-controls.js').then(({openAccountControlsModal})=>openAccountControlsModal())},
       {id:'logout',label:'Выход',variant:'danger',onSelect:()=>logout()},
-    ],
+  ];
+}
+
+function openProfileSettings(root,navigateBack,options={}){
+  return openSharedProfileSettingsMenu({actions:profileSettingsActions(root,navigateBack,options)});
+}
+
+function renderDesktopProfileTools(root,navigateBack,options,workplacesAllowed,title){
+  const actions=profileSettingsActions(root,navigateBack,options)
+    .filter(action=>!['controls','logout'].includes(action.id));
+  const add=workplacesAllowed?button('<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>',{
+    variant:'secondary',className:'v2-desktop-tool-primary',data:'data-profile-desktop-add',aria:'Добавить рабочее пространство',
+  }):'';
+  const markup='<div class="v2-desktop-tool-row" data-profile-desktop-toolbar><div class="v2-desktop-tool-actions">'+
+    actions.map(action=>button(action.label,{variant:'secondary',data:'data-profile-desktop-action="'+action.id+'"',disabled:Boolean(action.disabled)})).join('')+add+'</div></div>';
+  const [row]=setV2ZHeaderRows(root,[markup],{desktopTitle:title});
+  row?.querySelectorAll('[data-profile-desktop-action]').forEach(control=>{
+    const action=actions.find(item=>item.id===control.dataset.profileDesktopAction);
+    if(action&&!action.disabled)control.addEventListener('click',action.onSelect);
   });
+  row?.querySelector('[data-profile-desktop-add]')?.addEventListener('click',()=>openWorkplace(root,null,navigateBack,options));
 }
 
 function openWorkplaceQ(root,existing,navigateBack,options={}){
@@ -296,13 +314,15 @@ function renderProfile(root,navigateBack,options={}){
   const workplacesAllowed=canUseCapability('workplaces.access');
   const workplaceOnly=options.desktopPart==='workplaces';
   const profileOnly=options.desktopPart==='profile';
-  const desktopOverview=isV2DesktopWorkspace(root.closest('[data-v2-app]'))&&!profileOnly&&!workplaceOnly;
+  const desktopRoot=isV2DesktopWorkspace(root.closest('[data-v2-app]'))&&!profileOnly;
+  const desktopOverview=desktopRoot&&!workplaceOnly;
   root.innerHTML=page([
-    workplaceOnly?workspaceHeaderContext({title:'Рабочие пространства',v:{data:'data-profile-settings',aria:'Настройки'}}):profileContext(p,desktopOverview||profileOnly?'Профиль':fullName(p)),
+    workplaceOnly?workspaceHeaderContext({title:'Рабочие пространства',v:desktopRoot?null:{data:'data-profile-settings',aria:'Настройки'}}):profileContext(p,desktopOverview||profileOnly?'Профиль':fullName(p),{includeSettings:!desktopRoot}),
     workplaceOnly?'':desktopOverview?v2Section('Профиль',profileCard(p)):profileCard(p),
     workplacesAllowed&&!profileOnly?(workplaceOnly?workplaceRail():v2Section('Рабочие пространства',workplaceRail())):'',
-    workplacesAllowed&&!profileOnly?rootAddSource():''
+    workplacesAllowed&&!profileOnly&&!desktopRoot?rootAddSource():''
   ]);
+  if(desktopRoot)renderDesktopProfileTools(root,navigateBack,options,workplacesAllowed,workplaceOnly?'Рабочие пространства':'Профиль');
   root.querySelector('[data-profile-settings]')?.addEventListener('click',()=>openProfileSettings(root,navigateBack,options));
   root.querySelector('[data-profile-card]')?.addEventListener('click',()=>openProfileData(root,navigateBack,options));
   root.querySelector('[data-add-workplace]')?.addEventListener('click',()=>openWorkplace(root,null,navigateBack,options));
