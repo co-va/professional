@@ -784,6 +784,9 @@
  .v2-app--workspace [data-v2-delete-confirmation] .modal-actions>:is(.v2-confirmation-safe,.v2-confirmation-destructive){box-sizing:border-box;width:100%;min-width:0;max-width:160px;height:var(--h-tools,36px);min-height:var(--h-tools,36px);max-height:var(--h-tools,36px);margin:0;padding:0 10px;border-width:1px;border-radius:10px;font-size:13px;line-height:1}
  .v2-app--workspace [data-v2-delete-confirmation] .modal-actions>.v2-confirmation-destructive{grid-column:1;grid-row:1;justify-self:start}
  .v2-app--workspace [data-v2-delete-confirmation] .modal-actions>.v2-confirmation-safe{grid-column:2;grid-row:1;justify-self:end}
+ /* Document confirmation: owner explicitly requests the destructive action on the right. */
+ .v2-app--workspace [data-v2-delete-confirmation] .document-delete-confirmation .modal-actions>.v2-confirmation-destructive{grid-column:2;justify-self:end}
+ .v2-app--workspace [data-v2-delete-confirmation] .document-delete-confirmation .modal-actions>.v2-confirmation-safe{grid-column:1;justify-self:start}
  .v2-app--workspace [data-v2-delete-confirmation] .v2-layer__gesture-zone{display:none}
  .v2-app--workspace>.v2-layer-portal>.v2-layer-backdrop[data-v2-delete-confirmation]>.v2-layer--bottom.is-dismissing{animation:none;opacity:0;transform:translateY(0);transition:opacity .15s ease}
 }

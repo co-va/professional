@@ -414,7 +414,7 @@ function desktopDocumentList() {
     subtitle:documentMoment(item)?shortDateTime(documentMoment(item),''):'',omitEmptySubtitle:true,
     rightTop:String(visibleDocumentVersion(item)),
     data:'data-profile-document="'+escapeHtml(item.id)+'"',
-    actionData:(isCoreDocument(item)||canDeleteDocument(item))?'data-desktop-document-actions="'+escapeHtml(item.id)+'" aria-expanded="false"':'',
+    actionData:(isCoreDocument(item)||canDeleteDocument(item))?'data-desktop-document-actions="'+escapeHtml(item.id)+'"'+(isCoreDocument(item)?' aria-expanded="false"':' data-desktop-document-delete'):'',
     actionIcon:isCoreDocument(item)?'✎':'×',
     actionAria:isCoreDocument(item)?'Редактировать документ':isRknGuide(item)?'Убрать документ':'Удалить документ'
   })))+'</div>':emptyState('Документов пока нет',''))+'</section>';
@@ -445,20 +445,25 @@ function detailReceipt(item) {
 
 function confirmDocumentDeletion(root, layer, item) {
   const rkn = isRknGuide(item);
+  const desktop = root.hasAttribute('data-settings-embedded');
+  const title = rkn ? 'Убрать документ' : 'Удалить документ';
+  const message = rkn
+    ? 'Документ будет убран из отображения. Системный файл останется в архиве.'
+    : 'Документ будет удалён из текущих документов. Уже существующие факты подписания не удаляются.';
+  const destructive = button(rkn ? 'Убрать' : 'Удалить', { variant: 'critical', data: 'data-confirm-document-delete' });
   const confirm = mountModal(document.body, modal(
-    `<div class="compact-form">
-      <p>${rkn
-        ? 'Документ будет убран из отображения. Системный файл останется в архиве.'
-        : 'Документ будет удалён из текущих документов. Уже существующие факты подписания не удаляются.'}</p>
-      ${button(rkn ? 'Убрать' : 'Удалить', { variant: 'critical', data: 'data-confirm-document-delete' })}
-    </div>`,
+    desktop
+      ? `<div class="modal-title"><h2>${escapeHtml(title)}?</h2><p>${escapeHtml(message)}</p></div>
+         <div class="modal-actions">${destructive}${button('Отмена', {variant:'secondary',data:'data-cancel-document-delete'})}</div>`
+      : `<div class="compact-form"><p>${escapeHtml(message)}</p>${destructive}</div>`,
     {
       title: rkn ? 'Убрать документ' : 'Удалить документ',
       variant: 'x',
       surface: 'app',
-      className: 'modal--form-sheet',
+      className: desktop ? 'document-delete-confirmation' : 'modal--form-sheet',
     },
   ));
+  confirm?.querySelector('[data-cancel-document-delete]')?.addEventListener('click', () => confirm.v2Close?.());
   confirm?.querySelector('[data-confirm-document-delete]')?.addEventListener('click', () => {
     try {
       deleteDocument(item.id);

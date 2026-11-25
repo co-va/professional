@@ -170,6 +170,7 @@
 .settings-inline-document-editor .form-grid{min-width:0}
 .settings-inline-document-editor textarea{resize:vertical}
 .settings-document-row [data-desktop-document-actions]{color:var(--text);font-size:20px;font-weight:400}
+.settings-document-row [data-desktop-document-delete]{color:var(--ui-delete-foreground)}
 
 /* Desktop table headings follow the established italic H-list convention. */
 .settings-document-list-heading,.notification-desktop-group h3,.settings-list-heading{font-style:italic}
