@@ -406,8 +406,6 @@
   }
   .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z:not(.v2-z--layer)>[data-v2-z-header]{grid-template-columns:minmax(0,1fr)!important}
   .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z:not(.v2-z--layer)>[data-v2-z-header]>[data-v2-z-header-content]{grid-column:1!important;padding:0!important}
-  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z:not(.v2-z--layer)>[data-v2-z-header]:has(>[data-v2-z-header-content]:empty){display:none!important}
-  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z--layer>[data-v2-z-header] [data-v2-z-dismiss]{color:var(--white)!important;left:0!important}
   .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z>[data-v2-z-body]{scrollbar-width:auto;scrollbar-gutter:stable}
   .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z>[data-v2-z-body]::-webkit-scrollbar{display:revert}
   .v2-app--workspace[data-v2-desktop-surface="list"] .v2-workspace-surface{min-height:0}
@@ -506,16 +504,6 @@
 /* Contacts: match the approved Admin working area, not the mobile list.
    Exact Admin pearl #E0D6D6 and header ink #41484F, scoped to this screen. */
 @media (min-width:768px) and (min-height:600px){
- .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]){
-   padding:36px 36px 48px;
- }
- .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar])>[data-v2-z-header]{
-   max-width:1240px;width:100%;align-self:center;padding-bottom:24px!important;
- }
- .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar])>[data-v2-z-body]{
-   max-width:1240px;width:100%;align-self:center;
- }
- [data-people-desktop-toolbar] h2{margin:0 0 24px;color:var(--white);font-size:30px;line-height:1.2;font-weight:720;letter-spacing:-.035em}
  .people-desktop-tools{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
  .people-desktop-tools>.field{width:min(300px,100%);min-width:180px}
  .people-desktop-tools>.field input[type="search"]{height:36px;min-height:36px;max-height:36px;border-radius:10px;font-size:13px}
@@ -542,7 +530,6 @@
  .v2-app--workspace>.v2-header:has(.v2-desktop-toolbar-context){border-bottom:1px solid rgba(255,255,255,.14)}
 }
 @media (min-width:768px) and (max-width:1024px) and (min-height:600px){
- .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]){padding:26px 26px 36px}
  .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact td{padding:4px 8px}
 }
 
@@ -654,9 +641,6 @@
 /* Desktop Contacts: counter matches the H title; selection and opening are
    separate native controls. No row-wide click target. */
 @media (min-width:768px) and (min-height:600px){
- .people-desktop-title{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:0 0 24px}
- [data-people-desktop-toolbar] .people-desktop-title h2{margin:0}
- .people-desktop-title>[data-people-count]{color:var(--white);font-size:30px;line-height:1.2;font-weight:720;letter-spacing:-.035em;font-variant-numeric:tabular-nums;white-space:nowrap}
  .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact :is(th,td)[data-table-column="select"]{padding:0 4px;text-align:center}
  .v2-app--workspace [data-people-list-host] .ui-compact-check{position:relative;display:inline-grid;place-items:center;width:36px;height:40px;min-height:40px;touch-action:manipulation}
  .v2-app--workspace [data-people-list-host] .ui-compact-check .ui-check-input{inset:0;width:100%;height:100%;margin:0;pointer-events:auto;cursor:pointer}
@@ -696,23 +680,32 @@
  .v2-app--workspace .people-overview-record{width:auto;height:34px;min-height:34px;padding:0 12px;border-radius:8px;font-size:13px;white-space:nowrap;touch-action:manipulation}
 }
 
-/* Desktop Clients Z2: the same H surface as the list, not a Q. */
+/* Shared desktop H grid: the title starts at the left work-area inset,
+   the text back control ends at the right inset; never center the work area.
+   Keep mobile Z and all Q geometry intact. */
+[data-h-title-row]{display:none}
 @media (min-width:768px) and (min-height:600px){
- .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.people-desktop-overview-z{padding:36px 36px 48px}
- .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.people-desktop-overview-z>[data-v2-z-header]{max-width:1240px;width:100%;align-self:center;grid-template-columns:minmax(0,1fr)!important;padding-bottom:24px!important}
- .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.people-desktop-overview-z>[data-v2-z-header]>[data-v2-z-header-content]{grid-column:1!important;padding:0!important}
- .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.people-desktop-overview-z>[data-v2-z-header]>[data-v2-z-dismiss]{display:none!important}
- .v2-app--workspace .people-desktop-overview-z>[data-v2-z-body]{max-width:1240px;width:100%;align-self:center}
- .v2-app--workspace .people-desktop-overview-z .people-overview-heading{height:auto;justify-content:space-between;gap:12px;padding:0;margin:0 0 20px}
- .v2-app--workspace .people-desktop-overview-z .people-overview-heading h2{margin:0;color:var(--white);font-size:30px;line-height:1.2;font-weight:720;letter-spacing:-.035em}
- .v2-app--workspace .people-desktop-overview-z .people-overview-heading .ui-compact-button,.v2-app--workspace .people-desktop-overview-z .people-overview-tools .ui-compact-button{color:var(--white)}
- .v2-app--workspace .people-desktop-overview-z .people-overview-toolbar{justify-content:flex-end;flex-wrap:wrap;gap:12px}
- .v2-app--workspace .people-desktop-overview-z .people-overview-tools{margin-left:0;flex-wrap:wrap}
- .v2-app--workspace .people-desktop-overview-z .people-overview-record{background:#E0D6D6;color:#41484F;border-color:#E0D6D6}
- .v2-app--workspace .people-desktop-overview-z .people-overview-delete{width:auto;height:34px;min-height:34px;padding:0 12px;border-radius:8px;font-size:13px;white-space:nowrap}
- .v2-app--workspace .people-desktop-overview-z [data-person-card]{width:min(338px,100%);max-width:338px;align-self:flex-start}
+.v2-app--workspace{--h-inset:36px;--h-top:36px;--h-bottom:48px;--h-title:36px;--h-gap:24px;--h-tools:36px;--h-content-gap:24px}
+.v2-app--workspace [data-v2-z-header]>[data-v2-z-dismiss]{display:none!important;visibility:hidden!important;pointer-events:none!important}
+.v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z{padding:var(--h-top) var(--h-inset) var(--h-bottom)}
+.v2-app--workspace[data-v2-desktop-surface] .v2-front>.v2-z>[data-v2-z-header]{display:grid!important;grid-template-columns:minmax(0,1fr)!important;grid-template-rows:var(--h-title) minmax(var(--h-tools),auto);align-items:center;gap:var(--h-gap);width:100%;max-width:none;align-self:stretch;min-height:0!important;margin:0!important;padding:0 0 var(--h-content-gap)!important;background:var(--v2-base)!important}
+.v2-app--workspace .v2-front>.v2-z>[data-v2-z-header]>[data-h-title-row]{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;justify-items:end;column-gap:16px;width:100%;min-width:0;text-align:left!important}
+.v2-app--workspace [data-h-title-row]>[data-h-title]{grid-column:1;justify-self:start;display:block;width:100%;min-width:0;margin:0!important;padding:0!important;text-align:left!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--white);font-size:30px;line-height:1.2;font-weight:720;letter-spacing:-.035em}
+.v2-app--workspace [data-h-title-row]>[data-h-accessory]{grid-column:2;justify-self:end}
+.v2-app--workspace [data-h-accessory]:empty{display:none}
+.v2-app--workspace [data-h-accessory]>[data-people-count]{color:var(--white);font-size:30px;line-height:1.2;font-weight:720;letter-spacing:-.035em;font-variant-numeric:tabular-nums;white-space:nowrap}
+.v2-app--workspace [data-h-back]{grid-column:3;justify-self:end;display:none;background:transparent;border:0;padding:0;color:var(--white);font:inherit;font-size:14px;line-height:1.2;min-height:36px;cursor:pointer}
+.v2-app--workspace .v2-front>.v2-z--layer[data-v2-dismissible="true"]>[data-v2-z-header] [data-h-back]{display:block}
+.v2-app--workspace[data-v2-desktop-surface] .v2-front>.v2-z>[data-v2-z-header]>[data-v2-z-header-content]{grid-column:1!important;grid-row:2;min-height:var(--h-tools);justify-content:center;align-self:stretch;margin:0!important;padding:0!important}
+.v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z>[data-v2-z-body]{max-width:none;width:100%;align-self:stretch;scrollbar-gutter:auto}
+.v2-app--workspace[data-v2-desktop-surface="journal"] .v2-front>.v2-z:not(.v2-z--layer)>[data-v2-z-header]{width:calc(100% - 2 * var(--h-inset));margin-inline:var(--h-inset)!important;padding:var(--h-top) 0 var(--h-content-gap)!important}
+.v2-app--workspace .people-desktop-overview-z .people-overview-toolbar{justify-content:flex-end;flex-wrap:wrap;gap:12px;min-height:var(--h-tools)}
+.v2-app--workspace .people-desktop-overview-z .people-overview-tools{margin-left:0;flex-wrap:wrap}
+.v2-app--workspace .people-desktop-overview-z .people-overview-tools .ui-compact-button{color:var(--white)}
+.v2-app--workspace .people-desktop-overview-z .people-overview-record{background:#E0D6D6;color:#41484F;border-color:#E0D6D6;height:36px;min-height:36px}
+.v2-app--workspace .people-desktop-overview-z .people-overview-toolbar .ui-select__control{height:36px;min-height:36px;max-height:36px}
+.v2-app--workspace .people-desktop-overview-z [data-person-card]{width:min(338px,100%);max-width:338px;align-self:flex-start}
+.v2-app--workspace .v2-front>.v2-z .v2-desktop-danger-footer{left:auto;right:var(--h-inset);width:max-content}
+.v2-app--workspace .v2-front>.v2-z .v2-desktop-danger-footer>.ui-button{width:auto;min-width:128px}
 }
-@media (min-width:768px) and (max-width:1023px) and (min-height:600px){
- .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.people-desktop-overview-z{padding:26px 26px 36px}
- .v2-app--workspace .people-desktop-overview-z .people-overview-tools{margin-left:0}
-}
+@media (min-width:768px) and (max-width:1024px) and (min-height:600px){.v2-app--workspace{--h-inset:26px;--h-top:26px;--h-bottom:36px}}
