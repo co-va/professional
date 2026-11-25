@@ -946,9 +946,10 @@ function openPeopleAppearanceQ(root, options = {}) {
     key: '', name: 'Имя', surname: 'Фамилия', phones: ['+7 900 000-00-00'],
     emails: [], telegrams: [], uei: '0000', photo: '',
   };
-  return openEntityCardAppearanceQ(root, {
+  const desktop = isV2DesktopWorkspace(root.closest('[data-v2-app]'));
+  const layer = openEntityCardAppearanceQ(root, {
     title: 'Вид',
-    className: isV2DesktopWorkspace(root.closest('[data-v2-app]')) ? 'people-card-appearance-q' : '',
+    className: desktop ? 'people-card-appearance-q' : '',
     typeLabel: 'Карта',
     typeOptions: [{ value: 'person', label: 'Клиент' }],
     initialType: 'person',
@@ -965,6 +966,11 @@ function openPeopleAppearanceQ(root, options = {}) {
     },
     onSaved: () => renderPeople(root, options),
   });
+  if (desktop) {
+    const header = layer?.querySelector('[data-v2-q-header]');
+    header?.insertAdjacentHTML('beforeend', '<button type="button" class="v2-layer__close people-card-appearance-close" data-modal-close aria-label="Закрыть">×</button>');
+  }
+  return layer;
 }
 
 
