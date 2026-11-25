@@ -56,9 +56,14 @@ export function bindServiceWorkplaceAssignments(root, {
   const list = root.querySelector('[data-service-workplace-prices]');
   const addButton = root.querySelector('[data-service-workplace-add]');
   if (!list || !addButton) return { read: () => [] };
-  const addPanel = addButton.closest('.service-workplace-add-panel');
-  const desktopTool = moveDesktopQTool(addButton);
-  if (desktopTool && addPanel && !addPanel.children.length) addPanel.remove();
+  const desktopTool = moveDesktopQTool(addButton, { desktopLabel: '+ Пространство' });
+  if (desktopTool) {
+    // Only page-level actions, not local price/assignment editor controls.
+    const remove = root.querySelector('[data-procedure-editor-delete], [data-product-editor-delete], [data-service-retail-product-delete]');
+    const primary = root.querySelector('[data-procedure-editor-primary], [data-product-editor-primary], [data-service-retail-price-apply]');
+    if (remove) moveDesktopQTool(remove, { desktopLabel: remove.matches('[data-service-retail-product-delete]') ? 'Снять с продажи' : 'Удалить' });
+    if (primary) moveDesktopQTool(primary);
+  }
   const isProcedure = kind === 'procedure';
   // Preserve legacy assignments even if a workplace was archived or is
   // temporarily missing from the current list. Never erase them on Q Save.

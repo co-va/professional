@@ -40,3 +40,10 @@
 .ui-select--center .ui-select__value{text-align:center}
 .ui-selector--center .ui-selector__option{justify-content:center;text-align:center}
 .ui-selector--center .ui-selector__option-main{flex:0 1 auto;text-align:center}
+
+/* Desktop selectors are rounded, unlike text fields. Preserve the existing
+   shared selector height and special header variants; Mobile is untouched. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace{--desktop-selector-radius:8px}
+ .v2-app--workspace :is(.ui-select__control,.duration-picker__button,.time-picker__button,.color-picker__trigger){border-radius:var(--desktop-selector-radius)}
+}

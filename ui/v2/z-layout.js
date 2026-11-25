@@ -170,11 +170,11 @@ export function syncV2DesktopZTitle(root, title = '') {
   if (node && node.textContent !== next) node.textContent = next;
 }
 
-/** Move an existing auxiliary form action into the fixed Desktop Q toolbar.
- * Preserve the original node/listeners. Mobile and non-Q surfaces are no-ops.
- * Primary save actions and contextual field controls stay with their owners.
+/** Move an explicitly selected page-level action into the Desktop Q toolbar.
+ * Keep its original node, listeners and any existing Save visibility wrapper.
+ * Mobile and non-Q surfaces are no-ops; field-local controls stay in place.
  */
-export function moveDesktopQTool(control) {
+export function moveDesktopQTool(control, { desktopLabel = '' } = {}) {
   const sheet = control?.closest?.('.v2-layer--standard');
   const body = control?.closest?.('[data-v2-q-body]');
   if (!sheet || !body || !sheet.closest('[data-v2-q="true"]')
@@ -195,6 +195,20 @@ export function moveDesktopQTool(control) {
     header.append(row);
     sheet.classList.add('desktop-q-fixed-tools');
   }
-  row.append(control);
+  const actions = control.closest('.modal-actions');
+  // The existing save controller owns this wrapper's visibility and inert
+  // state. Keep it around the same button, not in the scrollable Q body.
+  const slot = actions && actions.children.length === 1 && actions.firstElementChild === control
+    ? actions : control;
+  const previous = slot.parentElement;
+  if (desktopLabel) {
+    const originalLabel = control.getAttribute('aria-label') || control.textContent.trim();
+    control.setAttribute('aria-label', originalLabel);
+    control.title = originalLabel;
+    control.textContent = desktopLabel;
+  }
+  slot.classList.add('desktop-q-action-slot');
+  row.append(slot);
+  if (previous?.matches('.app-settings-panel') && !previous.children.length) previous.remove();
   return true;
 }

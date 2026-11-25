@@ -339,10 +339,16 @@
   /* Shared desktop side panel: the same Q shell for editors and Z presented as Q.
      Keep the approved View content start (36 + 38 + 80 = 154px), without linking to a page title. */
   .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard{
+    --v2-desktop-q-width:440px;
+    --v2-desktop-q-max-width:50%;
     --v2-desktop-q-header-height:calc(68px + env(safe-area-inset-top));
+    --v2-desktop-q-tool-height:42px;
+    --v2-desktop-q-button-width:112px;
+    --v2-desktop-q-button-height:36px;
+    --v2-desktop-q-button-gap:6px;
     --v2-desktop-q-content-start:154px;
     --v2-desktop-q-inset:clamp(18px,calc(25vw - 174px),40px);
-    top:0;left:auto;right:0;bottom:0;width:min(440px,50%);border-radius:var(--v2-z-radius) 0 0 0;
+    top:0;left:auto;right:0;bottom:0;width:min(var(--v2-desktop-q-width),var(--v2-desktop-q-max-width));min-width:0;max-width:var(--v2-desktop-q-max-width);border-radius:var(--v2-z-radius) 0 0 0;
     padding-inline:var(--v2-desktop-q-inset);
   }
   .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard>[data-v2-q-header]{
@@ -840,13 +846,17 @@
  .v2-app--workspace>.v2-layer-portal.is-anchored>.v2-layer-backdrop[data-v2-x-role="picker"]:has(>.v2-layer--bottom:is(.modal--time-picker-sheet,.modal--duration-picker-popover)){background:transparent}
 }
 
-/* Shared Desktop Q: auxiliary form actions belong to a fixed toolbar, not
-   the scrolling form or primary save footer. Opt in through moveDesktopQTool. */
+/* Shared Desktop Q: page-level actions belong to a fixed toolbar, not
+   the scrolling form. Opt in through moveDesktopQTool. */
 @media (min-width:768px) and (min-height:600px){
  .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-q-fixed-tools>[data-v2-q-header]>[data-v2-q-header-content]{padding-right:0!important;gap:0!important}
  .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-q-fixed-tools .desktop-q-heading{flex:0 0 68px;min-height:68px;max-height:68px}
- .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-q-fixed-tools .desktop-q-toolbar{box-sizing:border-box;height:var(--h-list-tool-row,42px);min-height:var(--h-list-tool-row,42px);max-height:var(--h-list-tool-row,42px);flex:0 0 var(--h-list-tool-row,42px);justify-content:flex-end;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;scrollbar-width:none}
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-q-fixed-tools .desktop-q-toolbar{box-sizing:border-box;height:var(--v2-desktop-q-tool-height);min-height:var(--v2-desktop-q-tool-height);max-height:var(--v2-desktop-q-tool-height);flex:0 0 var(--v2-desktop-q-tool-height);gap:var(--v2-desktop-q-button-gap);justify-content:flex-start;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;scrollbar-width:none}
  .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-q-fixed-tools .desktop-q-toolbar::-webkit-scrollbar{display:none}
- .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-q-fixed-tools .desktop-q-toolbar>.ui-button{box-sizing:border-box;flex:0 0 auto;width:auto;height:var(--h-tools,36px);min-height:var(--h-tools,36px);max-height:var(--h-tools,36px);padding:0 12px;margin:0;border-width:1px;border-radius:10px;font-size:13px;line-height:1;white-space:nowrap}
- .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-q-fixed-tools>[data-v2-q-body]{padding-top:max(12px,calc(var(--v2-desktop-q-content-start) - var(--v2-desktop-q-header-height) - var(--h-list-tool-row,42px)))}
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-q-fixed-tools .desktop-q-toolbar>.desktop-q-action-slot{box-sizing:border-box;flex:0 0 var(--v2-desktop-q-button-width);width:var(--v2-desktop-q-button-width);min-width:var(--v2-desktop-q-button-width);max-width:var(--v2-desktop-q-button-width);margin:0;padding:0}
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-q-fixed-tools .desktop-q-toolbar>.desktop-q-action-slot:is(.ui-button),.v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-q-fixed-tools .desktop-q-toolbar>.desktop-q-action-slot>.ui-button{box-sizing:border-box;width:var(--v2-desktop-q-button-width);min-width:var(--v2-desktop-q-button-width);max-width:var(--v2-desktop-q-button-width);height:var(--v2-desktop-q-button-height);min-height:var(--v2-desktop-q-button-height);max-height:var(--v2-desktop-q-button-height);padding:0 4px;margin:0;border-width:1px;border-radius:10px;font-size:12px;line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-q-fixed-tools .desktop-q-toolbar>.desktop-q-action-slot.modal-actions{position:static;height:var(--v2-desktop-q-button-height);min-height:var(--v2-desktop-q-button-height);max-height:var(--v2-desktop-q-button-height);display:grid;gap:0}
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-q-fixed-tools .desktop-q-toolbar>.desktop-q-action-slot.ui-compact-button{flex:0 0 var(--ui-compact-size);width:var(--ui-compact-size);min-width:var(--ui-compact-size);max-width:var(--ui-compact-size)}
+
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-q-fixed-tools>[data-v2-q-body]{padding-top:max(12px,calc(var(--v2-desktop-q-content-start) - var(--v2-desktop-q-header-height) - var(--v2-desktop-q-tool-height)))}
 }
