@@ -19,7 +19,6 @@ import {
   selectFile,
   setV2ZHeaderRows,
   shortDateTime,
-  shortDateTimeParts,
   textareaField,
   v2ListEntries,
   v2ListEntry,
@@ -177,13 +176,6 @@ function consentPerson(item, people) {
     return people.find((person) => (person.telegrams || []).some((value) => String(value || '').trim() === target)) || null;
   }
   return null;
-}
-
-function consentSubjectLabel(item, people = getAllPeople()) {
-  const person = consentPerson(item, people);
-  if (person) return [person.name, person.surname].filter(Boolean).join(' ') || person.phones?.[0] || 'Человек';
-  if (item.subjectType === 'CONTACT_POINT') return item.contactValue || 'Контакт';
-  return 'Человек';
 }
 
 function signedDocumentSnapshot(item) {
@@ -457,32 +449,18 @@ function confirmDocumentDeletion(root, layer, item) {
   });
 }
 
-function openSigningDetail(item) {
+function openSignedDocument(item) {
   const snapshot = signedDocumentSnapshot(item);
-  const person = consentSubjectLabel(item);
-  const parts = shortDateTimeParts(item.eventAt || item.acceptedAt || item.revokedAt || item.createdAt);
-  const title = signingDocumentTitle(item, snapshot);
-  const version = item.documentVersion || snapshot?.version || 1;
-  const moment = [parts.date, parts.time].filter(Boolean).join(' - ') || '—';
-
-  return mountModal(document.body, modal(
-    `<div class="documents-signing-info" data-signing-info>
-      <strong class="documents-signing-info__title">${escapeHtml(String(title))}</strong>
-      <span class="documents-signing-info__version">Версия ${escapeHtml(String(version))}</span>
-      <strong class="documents-signing-info__person">${escapeHtml(String(person))}</strong>
-      <span class="documents-signing-info__moment">${escapeHtml(String(moment))}</span>
-      <span class="documents-signing-info__status">${escapeHtml(consentStateText(item.status))}</span>
-      <span class="documents-signing-info__status">${escapeHtml(signingHistoryEventLabel(item))}</span>
-      ${item.subjectType === 'CONTACT_POINT' && item.contactValue ? `<span>${escapeHtml(item.contactValue)}</span>` : ''}
-      ${!snapshot ? '<span class="documents-signing-info__version">Текст подписанной версии недоступен в архиве</span>' : ''}
-    </div>`,
-    {
-      title: 'Информация о подписании',
-      variant: 's',
-      surface: 'app',
-      className: 'documents-signing-info-sheet',
-    },
-  ));
+  if (!snapshot) return openNotice({
+    title: 'Версия документа недоступна',
+    message: 'Подписанная версия не найдена в архиве. Текущая версия не подменяет подписанный документ.',
+  });
+  return openDocumentViewer({
+    title: snapshot.title || 'Документ',
+    version: item.documentVersion || snapshot.version || 1,
+    content: snapshot.text || '',
+    pdfDataUrl: documentPdfDataUrl(snapshot),
+  });
 }
 
 function setPrimaryVisible(source, visible) {
@@ -856,10 +834,7 @@ function bindMain(root, headerRows = []) {
     control.addEventListener('click', () => {
       const item = getConsents().find((event) => event.id === control.dataset.signingEvent);
       if (!item) return;
-      if(!root.hasAttribute('data-settings-embedded')) return openSigningDetail(item);
-      const snapshot=signedDocumentSnapshot(item);
-      if(!snapshot) return openNotice({title:'Версия документа недоступна',message:'Подписанная версия не найдена в архиве. Текущая версия не подменяет подписанный документ.'});
-      openDocumentViewer({title:snapshot.title||'Документ',version:item.documentVersion||snapshot.version||1,content:snapshot.text||'',pdfDataUrl:documentPdfDataUrl(snapshot)});
+      openSignedDocument(item);
     });
   });
 }
