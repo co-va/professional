@@ -41,12 +41,12 @@ function titleFontSize(lines = []) {
   return Math.max(8.5, Math.min(10.5, 440 / longest));
 }
 
-function documentBody({ title, version, meta, subject = '', subjectPhone = '', lines, statusMarkup = '' } = {}) {
+function documentBody({ title, version, meta, subject = '', subjectPhone = '', eventLabel = '', lines, statusMarkup = '' } = {}) {
   return `
     <span class="document-tile__body">
       ${subject ? `<span class="document-tile__identity"><span class="document-tile__person">${text(subject)}</span>${subjectPhone ? `<span class="document-tile__phone">${text(subjectPhone)}</span>` : ''}</span>` : ''}
       <strong class="document-tile__title" style="--document-title-size:${titleFontSize(lines)}px">${lines.map((line) => `<span>${text(line)}</span>`).join(' ')}</strong>
-      ${version !== '' ? `<span class="document-tile__version">Версия ${text(version)}</span>` : ''}
+      ${version !== '' ? `<span class="document-tile__version">Версия ${text(version)}${eventLabel ? ` · ${text(eventLabel)}` : ''}</span>` : ''}
     </span>
     <span class="document-tile__footer">
       <small class="document-tile__meta">${meta ? text(meta) : '&nbsp;'}</small>
@@ -60,6 +60,7 @@ export function documentTile({
   meta = '',
   subject = '',
   subjectPhone = '',
+  eventLabel = '',
   status = '',
   statusState = '',
   interactive = true,
@@ -99,7 +100,7 @@ export function documentTile({
     : '';
   return `<${tag} class="document-tile${className ? ` ${text(className)}` : ''}"${attrs}>
     <span class="document-tile__fold" aria-hidden="true"></span>
-    ${documentBody({ title, version, meta, subject, subjectPhone, lines, statusMarkup })}
+    ${documentBody({ title, version, meta, subject, subjectPhone, eventLabel, lines, statusMarkup })}
   </${tag}>`;
 }
 

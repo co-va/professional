@@ -210,6 +210,34 @@ function signedDocumentSnapshot(item) {
   ) || null;
 }
 
+// Titles for the timeline are descriptive metadata only. Never substitute the
+// current document body for an unavailable signed snapshot.
+function signingDocumentTitle(item, snapshot = signedDocumentSnapshot(item)) {
+  const id = String(item.documentId || '');
+  const version = Number(item.documentVersion || 0);
+  const historyTitle = getDocumentHistory().find(entry => entry.documentId === id
+    && Number(entry.documentVersion || 0) === version && entry.documentTitle)?.documentTitle;
+  const fallback = {
+    'pdn-agreement': 'Политика обработки персональных данных',
+    'pdn-consent': 'Согласие на обработку персональных данных',
+    'messages-consent': 'Согласие на рекламные и маркетинговые сообщения',
+  };
+  return snapshot?.title || historyTitle || fallback[id]
+    || getDocuments().find(document => document.id === id)?.title || 'Документ (название недоступно)';
+}
+
+function signingSubjectTypeLabel(item) {
+  if (item.subjectType === 'ACCOUNT') return 'Аккаунт';
+  if (item.subjectType !== 'CONTACT_POINT') return 'Тип не определён';
+  return ({ PHONE: 'Телефон', EMAIL: 'Электронная почта', TELEGRAM: 'Telegram' })[item.contactType] || 'Контакт';
+}
+
+function signingHistoryEventLabel(item) {
+  const subject = signingSubjectTypeLabel(item);
+  if (item.documentId === 'messages-consent' && item.subjectType === 'CONTACT_POINT') return 'Канал: ' + subject;
+  return subject;
+}
+
 function openDocument(item) {
   if (!item) return null;
   return openDocumentViewer({
@@ -279,16 +307,18 @@ function historyCard(item, people, index) {
   const snapshot = signedDocumentSnapshot(item);
   const date = shortDateTime(item.eventAt || item.acceptedAt || item.revokedAt || item.createdAt, '');
   const { name, phone } = mobileHistorySubject(item, people);
+  const title = signingDocumentTitle(item, snapshot);
   return documentTile({
-    title: snapshot?.title || item.documentId || 'Документ',
+    title,
     version: item.documentVersion || snapshot?.version || 1,
     subject: name || 'Имя не указано',
     subjectPhone: phone || 'Телефон не указан',
+    eventLabel: signingHistoryEventLabel(item),
     meta: date,
     status: consentStateText(item.status),
     statusState: consentStateKind(item.status),
     data: `data-signing-event="${escapeHtml(String(item.id || ''))}" data-history-person="${escapeHtml(name)}" data-history-phone="${escapeHtml(phone)}" data-history-order="${index}"`,
-    aria: `Открыть факт подписания ${snapshot?.title || item.documentId || 'документа'}: ${name || 'Имя не указано'}${phone ? ', ' + phone : ''}`,
+    aria: `Открыть факт подписания ${title}: ${name || 'Имя не указано'}${phone ? ', ' + phone : ''}`,
   });
 }
 
@@ -492,7 +522,7 @@ function openSigningDetail(item) {
   const snapshot = signedDocumentSnapshot(item);
   const person = consentSubjectLabel(item);
   const parts = shortDateTimeParts(item.eventAt || item.acceptedAt || item.revokedAt || item.createdAt);
-  const title = snapshot?.title || item.documentId || 'Документ';
+  const title = signingDocumentTitle(item, snapshot);
   const version = item.documentVersion || snapshot?.version || 1;
   const moment = [parts.date, parts.time].filter(Boolean).join(' - ') || '—';
 
@@ -503,6 +533,9 @@ function openSigningDetail(item) {
       <strong class="documents-signing-info__person">${escapeHtml(String(person))}</strong>
       <span class="documents-signing-info__moment">${escapeHtml(String(moment))}</span>
       <span class="documents-signing-info__status">${escapeHtml(consentStateText(item.status))}</span>
+      <span class="documents-signing-info__status">${escapeHtml(signingHistoryEventLabel(item))}</span>
+      ${item.subjectType === 'CONTACT_POINT' && item.contactValue ? `<span>${escapeHtml(item.contactValue)}</span>` : ''}
+      ${!snapshot ? '<span class="documents-signing-info__version">Текст подписанной версии недоступен в архиве</span>' : ''}
     </div>`,
     {
       title: 'Информация о подписании',
