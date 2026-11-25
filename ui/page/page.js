@@ -46,8 +46,8 @@ export function sortedTableRows(rows = [], key = '', descending = false) {
 export function dataTable({ columns = [], rows = [], caption = '', sortKey = '', descending = false, compact = false } = {}) {
   const values = sortKey ? sortedTableRows(rows, sortKey, descending) : rows;
   return `<div class="ui-data-table${compact ? ' ui-data-table--compact' : ''}" tabindex="0" role="region" aria-label="${escapeHtml(caption)}"><table>
-    <caption${compact ? ' class="sr-only"' : ''}>${escapeHtml(caption)}</caption><thead><tr>${columns.map(c => `<th scope="col"${c.narrow ? ' data-table-narrow' : ''} aria-sort="${sortKey === c.key ? descending ? 'descending' : 'ascending' : 'none'}">${typeof c.header === 'function' ? c.header() : c.sortable === false ? escapeHtml(c.label) : `<button type="button" data-table-sort="${escapeHtml(c.key)}">${escapeHtml(c.label)}${sortKey === c.key ? descending ? ' ↓' : ' ↑' : ''}</button>`}</th>`).join('')}</tr></thead>
-    <tbody>${values.map(row => `<tr>${columns.map(c => `<td${c.narrow ? ' data-table-narrow' : ''}>${typeof c.render === 'function' ? c.render(row) : escapeHtml(row[c.key] ?? '')}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+    <caption${compact ? ' class="sr-only"' : ''}>${escapeHtml(caption)}</caption><thead><tr>${columns.map(c => `<th scope="col" data-table-column="${escapeHtml(c.key)}"${c.narrow ? ' data-table-narrow' : ''} aria-sort="${sortKey === c.key ? descending ? 'descending' : 'ascending' : 'none'}">${typeof c.header === 'function' ? c.header() : c.sortable === false ? escapeHtml(c.label) : `<button type="button" data-table-sort="${escapeHtml(c.key)}">${escapeHtml(c.label)}${sortKey === c.key ? descending ? ' ↓' : ' ↑' : ''}</button>`}</th>`).join('')}</tr></thead>
+    <tbody>${values.map(row => `<tr>${columns.map(c => `<td data-table-column="${escapeHtml(c.key)}"${c.narrow ? ' data-table-narrow' : ''}>${typeof c.render === 'function' ? c.render(row) : escapeHtml(row[c.key] ?? '')}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
 }
 
 export function bindDataTable(root, onSort) {

@@ -61,6 +61,7 @@ import { getRecord, getRecords } from '../record/index.js';
 import { getProcedures, hasCurrentProceduresSnapshot } from '../service/procedures/data.js';
 import { getWorkplaces, isWorkplacesServerReady } from '../profile/workplaces/data.js';
 import { loadRecordCreationOperationalState } from '../runtime/operational-state.js';
+import { loadFinanceState } from '../runtime/auxiliary-state.js';
 import { saveCardAppearanceTemplate } from '../card-appearance-templates.js';
 import { getPeopleFilters, getPeopleSortMode, setPeopleFilters, setPeopleSortMode } from './view-state.js';
 import { buildPersonRelationshipSections } from './programs.js';
@@ -490,14 +491,18 @@ function desktopPeopleTable(root, items, visitIndex) {
   const check = (data, aria, checked) => `<label class="ui-compact-check">${checkControl({ data, aria, checked })}</label>`;
   const columns = [
     { key: 'select', label: '', narrow: true, sortable: false, header: () => check('data-people-select-all', 'Выбрать все видимые контакты', allSelected), render: row => check(`data-people-select="${escapeHtml(row.key)}"`, `Выбрать ${row.name}`, selected.has(row.key)) },
-    { key: 'name', label: 'Клиент', sortable:false, render: row => `<button type="button" class="people-table-person" data-person="${escapeHtml(row.key)}"><span class="people-table-person__name">${row.code ? `<span class="people-table-person__code">${escapeHtml(row.code)}</span> ` : ''}${escapeHtml(row.name)}</span>${row.phone ? `<span class="people-table-person__phone">${escapeHtml(row.phone)}</span>` : ''}</button>` },
+    { key: 'code', label: 'Код', sortable:false },
+    { key: 'name', label: 'Клиент', sortable:false, render: row => `<button type="button" class="people-table-person" data-person="${escapeHtml(row.key)}"><span class="people-table-person__name">${escapeHtml(row.name)}</span>${row.phone ? `<span class="people-table-person__phone">${escapeHtml(row.phone)}</span>` : ''}</button>` },
     { key: 'firstVisit', label: 'Первое посещение', sortable: false, header: () => '<span>Первое</span><span>посещение</span>', render: row => escapeHtml(row.firstVisit ? formatPersonVisitDate(row.firstVisit) : '') },
     { key: 'lastVisit', label: 'Последнее посещение', sortable:false, header: () => '<span>Последнее</span><span>посещение</span>', render: row => escapeHtml(row.lastVisit ? formatPersonVisitDate(row.lastVisit) : '') },
+    { key:'visitCount', label:'Количество посещений', sortable:false, header:()=>'<span>Количество</span><span>посещений</span>' },
+    { key:'paidTotal', label:'Оплачено', sortable:false, render:row=>row.paidTotal == null ? '—' : escapeHtml(money(row.paidTotal)) },
+    { key:'debt', label:'Задолженность', sortable:false, render:row=>row.debt == null ? '—' : row.debt > 0.009 ? escapeHtml(money(row.debt)) : '' },
   ];
   const rows = items.map(person => {
     const display = personDisplay(person);
     const metadata = visitIndex.get(String(person.key)) || {};
-    return { key: person.key, code: display.uei, name: display.name, phone: display.phone, firstVisit: metadata.firstVisit || '', lastVisit: metadata.lastVisit || '' };
+    return { key: person.key, code: display.uei, name: display.name, phone: display.phone, firstVisit: metadata.firstVisit || '', lastVisit: metadata.lastVisit || '', visitCount:metadata.visitCount ?? 0, paidTotal:metadata.paidTotal, debt:metadata.debt };
   });
   return dataTable({ columns, rows, caption: 'Клиенты', compact: true });
 }
@@ -547,7 +552,7 @@ function refreshPeopleList(root) {
   }
   const query = root.peopleSearchInput?.value || '';
   const desktop = isV2DesktopWorkspace(root.closest('[data-v2-app]'));
-  const visitIndex = desktop ? buildPersonVisitIndex() : null;
+  const visitIndex = desktop ? (root.peopleVisitIndex ||= buildPersonVisitIndex({ finance:root.peopleFinanceReady === true })) : null;
   const items = visiblePeople(root, visitIndex);
   host.innerHTML = desktop ? desktopPeopleTable(root, items, visitIndex) : listMarkup(items, query);
   if (desktop) bindDesktopPeopleTable(root, host, items);
@@ -566,6 +571,9 @@ function listContext() {
 export function renderPeople(root, options = {}) {
   root.peopleOptions = options;
   const wide = isV2DesktopWorkspace(root.closest('[data-v2-app]'));
+  root.peopleVisitIndex = null;
+  root.peopleFinanceReady = false;
+  root.peopleMetricsDispose?.();
   root.innerHTML = page([
     wide ? workspaceHeaderContext({title:'Клиенты'}) : listContext(),
     `<section><div data-people-list-host></div></section>`,
@@ -623,11 +631,39 @@ export function renderPeople(root, options = {}) {
   root.peopleSearchInput?.addEventListener('input', () => refreshPeopleList(root));
   root.querySelector('[data-people-list-settings]')?.addEventListener('click', () => openListSettings(root, options));
   root.querySelector('[data-add]')?.addEventListener('click', () => openAddMenu(root, options));
+  if (wide) {
+    const host = root.querySelector('[data-people-list-host]');
+    let disposed = false;
+    let queued = false;
+    const current = () => !disposed && host?.isConnected && root.querySelector('[data-people-list-host]') === host;
+    const invalidate = () => {
+      if (!current() || queued) return;
+      queued = true;
+      queueMicrotask(() => {
+        queued = false;
+        if (!current()) return;
+        root.peopleVisitIndex = null;
+        refreshPeopleList(root);
+      });
+    };
+    const events = ['professional:records-changed','professional:dds-changed','professional:people-changed'];
+    events.forEach(event=>window.addEventListener(event,invalidate));
+    const dispose = () => { disposed = true; events.forEach(event=>window.removeEventListener(event,invalidate)); };
+    root.peopleMetricsDispose = dispose;
+    void loadFinanceState().then(()=>{
+      if (!current()) return;
+      root.peopleFinanceReady = true;
+      invalidate();
+    }).catch(error=>{
+      if (current()) console.error('Не удалось загрузить показатели оплат клиентов',error);
+    });
+    return () => root.peopleMetricsDispose?.();
+  }
 }
 
 function openSortSettings(root, anchor = null) {
   if (anchor && isV2DesktopWorkspace(root.closest('[data-v2-app]'))) {
-    const labels = {nameAsc:'Имя — А–Я',nameDesc:'Имя — Я–А',ueiAsc:'Код — по возрастанию',ueiDesc:'Код — по убыванию',lastAsc:'Посещение — сначала ранние',lastDesc:'Посещение — сначала недавние'};
+    const labels = {nameAsc:'Имя — от А до Я',nameDesc:'Имя — от Я до А',ueiAsc:'Код — по возрастанию',ueiDesc:'Код — по убыванию',lastAsc:'Посещение — сначала ранние',lastDesc:'Посещение — сначала недавние'};
     const markup = '<div class="people-action-menu">' + sortOptions().map(option =>
       button(escapeHtml(labels[option.value] || option.label), {variant:'secondary',data:`data-people-sort-choice="${escapeHtml(option.value)}" aria-pressed="${option.value === getPeopleSortMode()}"`})
     ).join('') + '</div>';
