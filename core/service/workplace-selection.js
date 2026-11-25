@@ -256,7 +256,7 @@ export function bindServiceWorkplaceAssignments(root, {
     const available = catalog.filter((space) => !assignments.has(space.id));
     if (!available.length) {
       const layer = mountModal(desktopTool ? addButton : document.body, modal('<div class="muted">Все рабочие пространства уже добавлены.</div>',
-        { variant: 'x', xRole: 'picker' }));
+        { variant: 'x', xRole: 'picker', className: desktopTool ? 'desktop-q-action-popup service-workplace-picker' : '' }));
       return layer;
     }
     const content = sharedList({ className: 'ui-list--dense', items: available.map((space) => ({
@@ -265,7 +265,7 @@ export function bindServiceWorkplaceAssignments(root, {
       data: `data-service-workplace-choose="${escapeHtml(space.id)}"`,
       aria: `Выбрать ${space.name}`,
     })) });
-    const picker = mountModal(desktopTool ? addButton : document.body, modal(content, { variant: 'x', xRole: 'picker', title: 'Рабочее пространство' }));
+    const picker = mountModal(desktopTool ? addButton : document.body, modal(content, { variant: 'x', xRole: 'picker', title: 'Рабочее пространство', className: desktopTool ? 'desktop-q-action-popup service-workplace-picker' : '' }));
     picker?.querySelectorAll('[data-service-workplace-choose]').forEach((choice) => {
       choice.addEventListener('click', () => {
         const id = choice.dataset.serviceWorkplaceChoose;

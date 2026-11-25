@@ -47,3 +47,17 @@
  .v2-app--workspace{--desktop-selector-radius:8px}
  .v2-app--workspace :is(.ui-select__control,.duration-picker__button,.time-picker__button,.color-picker__trigger){border-radius:var(--desktop-selector-radius)}
 }
+
+/* Generalize the accepted Contacts picker presentation to the ordinary
+   shared selector. Leave the already accepted Contacts variants alone. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace>.v2-layer-portal.is-anchored>.v2-layer-backdrop[data-v2-x-role="picker"]:has(>.v2-layer--bottom:has(>[data-ui-selector]):not(.people-filter-selector)){background:transparent}
+ .v2-app--workspace>.v2-layer-portal.is-anchored>.v2-layer-backdrop[data-v2-x-role="picker"]>.v2-layer--bottom:has(>[data-ui-selector]):not(.people-filter-selector){background:var(--white);border-radius:var(--radius-control);padding:8px}
+ .v2-app--workspace>.v2-layer-portal.is-anchored>.v2-layer-backdrop[data-v2-x-role="picker"]>.v2-layer--bottom:has(>[data-ui-selector]):not(.people-filter-selector) :is([data-ui-selector],.ui-selector__wheel,.ui-selector__viewport){background:transparent;border:0;border-radius:0;box-shadow:none}
+ .v2-app--workspace>.v2-layer-portal.is-anchored>.v2-layer-backdrop[data-v2-x-role="picker"]>.v2-layer--bottom:has(>[data-ui-selector]):not(.people-filter-selector) .ui-selector__viewport{padding:0}
+ .v2-app--workspace>.v2-layer-portal.is-anchored>.v2-layer-backdrop[data-v2-x-role="picker"]>.v2-layer--bottom:has(>[data-ui-selector]):not(.people-filter-selector) .ui-selector__option{height:var(--ui-selector-control-height);min-height:var(--ui-selector-control-height);max-height:var(--ui-selector-control-height);background:transparent;justify-content:flex-start;text-align:left;font-size:13px;padding:8px}
+ .v2-app--workspace>.v2-layer-portal.is-anchored>.v2-layer-backdrop[data-v2-x-role="picker"]>.v2-layer--bottom:has(>[data-ui-selector]):not(.people-filter-selector) .ui-selector__option-main{text-align:left}
+ .v2-app--workspace>.v2-layer-portal.is-anchored>.v2-layer-backdrop[data-v2-x-role="picker"]>.v2-layer--bottom:has(>[data-ui-selector]):not(.people-filter-selector) .ui-selector__option.is-current,.v2-app--workspace>.v2-layer-portal.is-anchored>.v2-layer-backdrop[data-v2-x-role="picker"]>.v2-layer--bottom:has(>[data-ui-selector]):not(.people-filter-selector) .ui-selector__option:active{background:var(--surface-soft);border-radius:8px}
+ .v2-app--workspace>.v2-layer-portal.is-anchored>.v2-layer-backdrop[data-v2-x-role="picker"]>.v2-layer--bottom:has(>[data-ui-selector]):not(.people-filter-selector) .ui-selector__search-wrap{background:transparent;padding:4px 4px 8px}
+ .v2-app--workspace>.v2-layer-portal.is-anchored>.v2-layer-backdrop[data-v2-x-role="picker"]>.v2-layer--bottom:has(>[data-ui-selector]):not(.people-filter-selector) .ui-selector__search{border-radius:var(--desktop-selector-radius,8px)}
+}
