@@ -21,7 +21,7 @@ import { getWorkplaces } from '../../profile/workplaces/data.js';
 import { renderServiceOverviewLayout, notifyServiceContext } from '../context.js';
 import { procedureCardAppearance, procedureCardFields, procedureCardPhoto } from '../card-presentation.js';
 import { bindProcedureEditor, initialProcedure, procedureEditorForm } from './form.js';
-import { bindServiceWorkplaceAssignments, serviceWorkplaceAddButton } from '../workplace-selection.js';
+import { bindServiceWorkplaceAssignments, serviceWorkplaceAddButton, serviceWorkplaceControls, serviceOverviewWorkplaces } from '../workplace-selection.js';
 import { commitDeleteProcedure, getProcedures, commitReorderProcedures, commitProcedureWorkplace } from './data.js';
 import { scheduleServiceStatistics, serviceItemStatistics, serviceSpentText } from '../statistics.js';
 import { renderServiceGroupTree } from '../catalog-grouping.js';
@@ -93,12 +93,13 @@ function procedureOverviewCard(procedure, statistics = null) {
 
 function procedureWorkplaceCards(procedure, statistics = null) {
   const byId = new Map(getWorkplaces().map((workplace) => [String(workplace.key || workplace.id || ''), workplace]));
-  const cards = (procedure.workplaces || []).map((selection) => {
+  const cards = serviceOverviewWorkplaces(procedure.workplaces).map((selection) => {
     const id = String(selection.workplaceId || selection.id || selection.key || '');
     const workplace = byId.get(id) || selection;
     const group = statistics?.byWorkplace.get(id) || null;
     return miniCard({
       title: workplace.name || selection.name || 'Рабочее пространство',
+      subtitle: selection.unassigned ? 'Не назначено' : '',
       interactive: byId.has(id),
       data: `data-service-workplace-open="${escapeHtml(id)}"`,
       aria: `Настройки ${workplace.name || selection.name || 'Рабочее пространство'}`,
@@ -144,7 +145,7 @@ export function openProcedureEditor(root, existing = null, {
   onDeleted = () => {},
   defaultWorkplace = null,
 } = {}) {
-  const draft = initialProcedure(existing, defaultWorkplace);
+  const draft = initialProcedure(existing, defaultWorkplace || serviceWorkplaceControls().sole);
   const body = [
     procedureEditorForm(draft),
     actionBlock(button('Сохранить', { type: 'button', data: 'data-procedure-editor-primary', aria: 'Сохранить услугу' })),
@@ -191,14 +192,15 @@ function renderProcedureOverview(layer, baseRoot, id, { onChanged = () => {}, st
     return;
   }
   layer.dataset.serviceOverview = 'procedure:' + id;
+  const { showAdd } = serviceWorkplaceControls();
   const consumablesAction = button('Расходник', { variant: 'secondary', className: 'v2-desktop-tool-accent', data: 'data-procedure-open-consumables' });
   renderServiceOverviewLayout(layer, {
     title: procedure.name || 'Услуга',
     card: procedureOverviewCard(procedure, statistics),
     workplaceCards: procedureWorkplaceCards(procedure, statistics),
-    actions: serviceWorkplaceAddButton() + consumablesAction,
+    actions: (showAdd ? serviceWorkplaceAddButton() : '') + consumablesAction,
     mobileActions: consumablesAction,
-    mobileAdd: { label: '+', data: 'data-service-workplace-add', aria: 'Добавить рабочее пространство' },
+    mobileAdd: showAdd ? { label: '+', data: 'data-service-workplace-add', aria: 'Добавить рабочее пространство' } : null,
   });
   bindServiceWorkplaceAssignments(layer, {
     overview: true,

@@ -26,7 +26,7 @@ import {
 } from '../../../ui/ui.js';
 import { getWorkplaces } from '../../profile/workplaces/data.js';
 import { renderServiceOverviewLayout, notifyServiceContext } from '../context.js';
-import { bindServiceWorkplaceAssignments, serviceWorkplaceAddButton } from '../workplace-selection.js';
+import { bindServiceWorkplaceAssignments, serviceWorkplaceAddButton, serviceWorkplaceControls, serviceOverviewWorkplaces } from '../workplace-selection.js';
 import { moveDesktopQTool, pinDesktopQDanger } from '../../../ui/v2/z-layout.js';
 import { setSharedActionVisible } from '../../../ui/page/page.js';
 import { productEditorSignature } from '../editor-signature.js';
@@ -48,7 +48,7 @@ function initialProduct(existing = null) {
     name: '',
     cost: { mode: 'amount', amount: '', free: false },
     about: '',
-    workplaces: [],
+    workplaces: serviceWorkplaceControls().sole ? [{ ...serviceWorkplaceControls().sole, visibleInPublicBooking: false }] : [],
   };
 }
 
@@ -124,12 +124,13 @@ function productOverviewCard(product, statistics = null) {
 
 function productWorkplaceCards(product, statistics = null) {
   const byId = new Map(getWorkplaces().map((workplace) => [String(workplace.key || workplace.id || ''), workplace]));
-  const cards = (product.workplaces || []).map((selection) => {
+  const cards = serviceOverviewWorkplaces(product.workplaces).map((selection) => {
     const id = String(selection.workplaceId || selection.id || selection.key || '');
     const workplace = byId.get(id) || selection;
     const group = statistics?.byWorkplace.get(id) || null;
     return miniCard({
       title: workplace.name || selection.name || 'Рабочее пространство',
+      subtitle: selection.unassigned ? 'Не назначено' : '',
       interactive: byId.has(id),
       data: `data-service-workplace-open="${escapeHtml(id)}"`,
       aria: `Настройки ${workplace.name || selection.name || 'Рабочее пространство'}`,
@@ -354,7 +355,25 @@ export async function openStockSaleCreate(root, { onChanged = () => {} } = {}) {
     return null;
   }
   const { openItemEditor } = await import('../../inventory/inventory.js');
-  return openItemEditor(root, '', { usage: 'sale' }, () => onChanged());
+  return openItemEditor(root, '', { usage: 'sale' }, async (savedId) => {
+    // Stock creation retains its own owner. Only the new sale presentation
+    // is assigned to the sole workplace, never a pre-existing stock item.
+    try {
+      const { sole } = serviceWorkplaceControls();
+      const product = getProducts().find(item => String(item.inventoryItemId) === String(savedId));
+      if (sole && product && !(product.workplaces || []).some(row =>
+        String(row.workplaceId || row.key || row.id) === sole.workplaceId)) {
+        await commitInventoryProductWorkplace(savedId, sole.workplaceId, {
+          ...sole, visibleInPublicBooking: false,
+        });
+      }
+    } catch (error) {
+      openNotice({ title: 'Рабочее пространство', message: error instanceof Error
+        ? error.message : 'Не удалось назначить рабочее пространство. Товар сохранён.' });
+    } finally {
+      onChanged();
+    }
+  });
 }
 
 // One editor for legacy Service data; stocked items always open Inventory.
@@ -488,13 +507,14 @@ function renderProductOverview(layer, baseRoot, id, { onChanged = () => {}, stat
     return;
   }
   layer.dataset.serviceOverview = 'product:' + id;
+  const { showAdd } = serviceWorkplaceControls();
   renderServiceOverviewLayout(layer, {
     title: product.name || 'Товар',
     card: productOverviewCard(product, statistics),
     workplaceCards: productWorkplaceCards(product, statistics),
-    actions: serviceWorkplaceAddButton(),
+    actions: showAdd ? serviceWorkplaceAddButton() : '',
     mobileActions: '',
-    mobileAdd: { label: '+', data: 'data-service-workplace-add', aria: 'Добавить рабочее пространство' },
+    mobileAdd: showAdd ? { label: '+', data: 'data-service-workplace-add', aria: 'Добавить рабочее пространство' } : null,
   });
   bindServiceWorkplaceAssignments(layer, {
     overview: true,

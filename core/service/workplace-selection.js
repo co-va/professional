@@ -22,6 +22,24 @@ function options() {
     name: String(space.name || 'Рабочее пространство'),
   })).filter((space) => space.id);
 }
+export function serviceWorkplaceControls() {
+  const catalog = options();
+  const sole = catalog.length === 1 ? catalog[0] : null;
+  return {
+    showAdd: catalog.length > 1,
+    sole: sole ? { workplaceId: sole.id, name: sole.name } : null,
+  };
+}
+
+// An existing unassigned item must remain editable without an Add button.
+// Do not persist or count this provisional card as an assignment.
+export function serviceOverviewWorkplaces(selected = []) {
+  const rows = Array.isArray(selected) ? selected : [];
+  const { sole } = serviceWorkplaceControls();
+  return sole && !rows.some(row => idOf(row) === sole.workplaceId)
+    ? [...rows, { ...sole, unassigned: true }]
+    : rows;
+}
 function hasPrice(cost) {
   return Boolean(cost && typeof cost === 'object' && (
     cost.free === true || cost.amount !== '' && cost.amount != null
@@ -56,7 +74,7 @@ export function bindServiceWorkplaceAssignments(root, {
   const catalog = options();
   const list = overview ? root : root.querySelector('[data-service-workplace-prices]');
   const addButton = root.querySelector('[data-service-workplace-add]');
-  if (!list || !addButton) return { read: () => [] };
+  if (!list || (!overview && !addButton)) return { read: () => [] };
   const desktopTool = overview ? isV2DesktopWorkspace(root.closest('[data-v2-app]')) : moveDesktopQTool(addButton);
   if (desktopTool && !overview) {
     // Only page-level actions, not local price/assignment editor controls.
@@ -287,7 +305,9 @@ export function bindServiceWorkplaceAssignments(root, {
 
   if (overview) {
     list.querySelectorAll('[data-service-workplace-open]').forEach(card => {
-      card.addEventListener('click', () => edit(card.dataset.serviceWorkplaceOpen));
+      card.addEventListener('click', () => edit(card.dataset.serviceWorkplaceOpen, {
+        isNew: !assignments.has(card.dataset.serviceWorkplaceOpen),
+      }));
     });
   } else {
     list.addEventListener('click', (event) => {
@@ -295,7 +315,7 @@ export function bindServiceWorkplaceAssignments(root, {
       if (row && list.contains(row)) edit(row.dataset.serviceWorkplaceOpen);
     });
   }
-  addButton.addEventListener('click', () => {
+  addButton?.addEventListener('click', () => {
     const available = catalog.filter((space) => !assignments.has(space.id));
     if (!available.length) {
       const layer = mountModal(desktopTool ? addButton : document.body, modal('<div class="muted">Все рабочие пространства уже добавлены.</div>',
