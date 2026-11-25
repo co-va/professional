@@ -177,9 +177,9 @@ function personHistoryMarkup(items = [], query = '') {
   })));
 }
 
-function personQContext(person, { settings = false } = {}) {
+function personQContext(person, { settings = false, title = name(person) } = {}) {
   return workspaceHeaderContext({
-    title: name(person),
+    title,
     a: {
       kind: 'avatar',
       image: person.photo || '',
@@ -256,7 +256,7 @@ export async function openPersonHistoryQ(root, person, options = {}) {
   const search = layer.querySelector('[data-person-history-search]');
   // On Desktop, paint the new Q and a loading state before doing the synchronous
   // Journal/Finance projection. Keep the original immediate Mobile path.
-  const desktopOverview = Boolean(root?.closest?.('.people-desktop-overview-q'));
+  const desktopOverview = Boolean(root?.closest?.('.people-desktop-overview-q, .people-desktop-overview-z'));
   if (desktopOverview) {
     if (host) host.innerHTML = emptyState('История', 'Загружаем данные…');
     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
@@ -1063,9 +1063,12 @@ function overviewCard(person) {
 }
 
 function desktopPersonOverviewTools(layer, person, options = {}) {
-  const header = layer.closest('[data-v2-q="true"]')?.querySelector('[data-v2-q-header-content]');
+  const fullPage = layer.classList.contains('people-desktop-overview-z');
+  const header = fullPage
+    ? layer.querySelector(':scope > [data-v2-z-header] > [data-v2-z-header-content]')
+    : layer.closest('[data-v2-q="true"]')?.querySelector('[data-v2-q-header-content]');
   if (!header) return;
-  header.innerHTML = `<div class="people-overview-heading"><h2 class="v2-q-title">Клиент</h2></div>
+  const markup = `<div class="people-overview-heading">${fullPage ? compactButton({ kind: 'previous', data: 'data-v2-z-close', aria: 'Вернуться к клиентам' }) : ''}<h2 class="v2-q-title">Клиент</h2></div>
   <div class="people-overview-toolbar" data-v2-layer-gesture-ignore>
     ${select({ name: 'personOverviewProgram', aria: 'Программы', value: '', options: [
       { value: '', label: 'Программы' },
@@ -1075,8 +1078,11 @@ function desktopPersonOverviewTools(layer, person, options = {}) {
       ${compactButton({ kind: 'document', data: 'data-person-overview-documents title="Документы"', aria: 'Документы' })}
       ${compactButton({ kind: 'history', data: 'data-person-overview-history title="История"', aria: 'История' })}
       ${button('Записать', { className: 'people-overview-record', data: 'data-person-overview-record' })}
+      ${fullPage ? button('Удалить', { variant: 'danger', className: 'people-overview-delete', data: 'data-person-overview-delete' }) : ''}
     </div>
   </div>`;
+  if (fullPage) setV2ZHeaderRows(layer, [markup]);
+  else header.innerHTML = markup;
   header.querySelector('[data-person-overview-documents]')?.addEventListener('click', () => openPersonDocuments(layer, person));
   header.querySelector('[data-person-overview-history]')?.addEventListener('click', () => void openPersonHistoryQ(layer, person, options));
   const programInput = header.querySelector('[name="personOverviewProgram"]');
@@ -1106,8 +1112,8 @@ async function renderPersonOverview(layer, baseRoot, key, options = {}) {
   }
   const relationships = await buildPersonRelationshipSections(person);
   if (!layer.isConnected) return;
-  // Z2 Header stays empty (apart from its shared dismiss control).
-  // The contact card and its programs belong to the same scrollable Z2 Body.
+  // Mobile retains its existing Z2 and V. The desktop Client list opens Z2 on H.
+  const fullPage = layer.classList.contains('people-desktop-overview-z');
   const desktop = layer.hasAttribute('data-desktop-person-overview');
   const contextOptions = {
     ...options,
@@ -1118,10 +1124,10 @@ async function renderPersonOverview(layer, baseRoot, key, options = {}) {
     },
   };
   layer.innerHTML = page([
-    desktop ? personQContext(person) : personContext(person),
+    desktop ? personQContext(person, fullPage ? { title: 'Клиент' } : {}) : personContext(person),
     overviewCard(person),
     relationships.markup,
-    desktop ? actionBlock(
+    desktop && !fullPage ? actionBlock(
       button('Удалить', { variant: 'danger', data: 'data-person-overview-delete data-ui-keyboard-action="auxiliary"' }),
       { className: 'people-overview-footer' },
     ) : '',
@@ -1129,12 +1135,12 @@ async function renderPersonOverview(layer, baseRoot, key, options = {}) {
   setV2ZHeaderRows(layer, []);
   bindPersonContext(layer, person, contextOptions);
   if (desktop) desktopPersonOverviewTools(layer, person, contextOptions);
-  relationships.bind(layer, (detail) => openPersonRelationshipQ(baseRoot, person, detail, {
+  relationships.bind(layer, (detail) => openPersonRelationshipQ(fullPage ? layer : baseRoot, person, detail, {
     ...options,
     onNativeChanged: () => renderPersonOverview(layer, baseRoot, person.key, options),
   }));
   layer.querySelector('[data-person-card]')?.addEventListener('click', () => {
-    openPersonEdit(baseRoot, person.key, {
+    openPersonEdit(fullPage ? layer : baseRoot, person.key, {
       onSaved: (nextKey) => void renderPersonOverview(layer, baseRoot, nextKey || person.key, options),
     });
   });
@@ -1168,6 +1174,23 @@ async function openPersonRelationshipQ(root, person, detail, options = {}) {
 function openPersonOverview(root, key, options = {}) {
   if (!key) return null;
   if (isV2DesktopWorkspace(root.closest?.('[data-v2-app]') || document.querySelector('.v2-app--workspace'))) {
+    // Only navigation from the Clients list replaces its H work area. Preserve
+    // other entry points (including Journal) until their own review.
+    if (root.querySelector?.('[data-people-list-host]')) {
+      const layer = mountV2ZLayer(root, v2ZLayer('', { className: 'people-overview-layer people-desktop-overview-z' }), {
+        stack: true,
+        onClose: options.onClose || null,
+      });
+      if (!layer) return null;
+      layer.setAttribute('data-desktop-person-overview', '');
+      layer.innerHTML = page([workspaceHeaderContext({title:'Клиент'}), emptyState('Клиент', 'Загружаем данные…')]);
+      setV2ZHeaderRows(layer, ['<div class="people-overview-heading">'+compactButton({kind:'previous',data:'data-v2-z-close',aria:'Вернуться к клиентам'})+'<h2>Клиент</h2></div>']);
+      void renderPersonOverview(layer, root, key, options).catch(error => {
+        if (layer.isConnected) layer.innerHTML = page([workspaceHeaderContext({title:'Клиент'}), emptyState('Клиент', 'Не удалось открыть клиента.')]);
+        console.error(error);
+      });
+      return layer;
+    }
     const layer = mountModal(root, modal('<div data-desktop-person-overview></div>', { title:'Клиент', variant:'q', surface:'app', className:'people-desktop-overview-q' }));
     const host = layer?.querySelector('[data-desktop-person-overview]');
     if (!host) return layer;

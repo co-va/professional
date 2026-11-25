@@ -695,3 +695,24 @@
  .v2-app--workspace :is(.people-overview-tools,.desktop-q-tools) .ui-compact-button:hover{background:var(--surface-soft)}
  .v2-app--workspace .people-overview-record{width:auto;height:34px;min-height:34px;padding:0 12px;border-radius:8px;font-size:13px;white-space:nowrap;touch-action:manipulation}
 }
+
+/* Desktop Clients Z2: the same H surface as the list, not a Q. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.people-desktop-overview-z{padding:36px 36px 48px}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.people-desktop-overview-z>[data-v2-z-header]{max-width:1240px;width:100%;align-self:center;grid-template-columns:minmax(0,1fr)!important;padding-bottom:24px!important}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.people-desktop-overview-z>[data-v2-z-header]>[data-v2-z-header-content]{grid-column:1!important;padding:0!important}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.people-desktop-overview-z>[data-v2-z-header]>[data-v2-z-dismiss]{display:none!important}
+ .v2-app--workspace .people-desktop-overview-z>[data-v2-z-body]{max-width:1240px;width:100%;align-self:center}
+ .v2-app--workspace .people-desktop-overview-z .people-overview-heading{height:auto;gap:12px;padding:0;margin:0 0 20px}
+ .v2-app--workspace .people-desktop-overview-z .people-overview-heading h2{margin:0;color:var(--white);font-size:30px;line-height:1.2;font-weight:720;letter-spacing:-.035em}
+ .v2-app--workspace .people-desktop-overview-z .people-overview-heading .ui-compact-button,.v2-app--workspace .people-desktop-overview-z .people-overview-tools .ui-compact-button{color:var(--white)}
+ .v2-app--workspace .people-desktop-overview-z .people-overview-toolbar{justify-content:flex-start;flex-wrap:wrap;gap:12px}
+ .v2-app--workspace .people-desktop-overview-z .people-overview-tools{margin-left:auto;flex-wrap:wrap}
+ .v2-app--workspace .people-desktop-overview-z .people-overview-record{background:#E0D6D6;color:#41484F;border-color:#E0D6D6}
+ .v2-app--workspace .people-desktop-overview-z .people-overview-delete{width:auto;height:34px;min-height:34px;padding:0 12px;border-radius:8px;font-size:13px;white-space:nowrap}
+ .v2-app--workspace .people-desktop-overview-z [data-person-card]{width:min(338px,100%);max-width:338px;align-self:flex-start}
+}
+@media (min-width:768px) and (max-width:1023px) and (min-height:600px){
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.people-desktop-overview-z{padding:26px 26px 36px}
+ .v2-app--workspace .people-desktop-overview-z .people-overview-tools{margin-left:0}
+}
