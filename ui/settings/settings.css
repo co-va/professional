@@ -41,3 +41,32 @@
 .settings-overview-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-bottom:12px}
 .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .settings-overview-panel :is(.v2-section__title,.ui-state-view__title,.ui-state-view__separator){color:var(--text)}
 .settings-overview-panel .v2-section:last-child{margin-bottom:0}
+
+/* Settings Desktop: cards own controls, only explicit triggers disclose a panel. */
+.settings-overview-card{min-height:220px;justify-content:flex-start;cursor:default;box-sizing:border-box;padding:16px;gap:10px}
+.settings-overview-trigger{position:relative;display:flex;flex-direction:column;justify-content:space-between;align-items:flex-start;gap:12px;width:100%;flex:1;min-width:0;border:0;padding:0;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer}
+.settings-overview-trigger[aria-expanded="true"] .settings-overview-arrow{transform:rotate(180deg)}
+.settings-overview-card--inline>div{width:100%;min-width:0}
+.settings-overview-card[data-settings-inline="documents"]{min-height:110px}
+.settings-inline-heading,.settings-documents-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.settings-inline-heading>strong,.settings-document-toggle{font-size:14px;font-weight:680}
+.settings-document-toggle{display:flex;align-items:center;gap:8px;border:0;background:transparent;color:inherit;cursor:pointer;padding:0}
+.settings-h-action.ui-button{box-sizing:border-box;width:auto;height:36px;min-height:36px;max-height:36px;max-width:100%;padding:0 10px;margin:0;border:1px solid #E0D6D6;background:#E0D6D6;color:#41484F;border-radius:10px;font-size:12px;line-height:1.15;white-space:normal}
+.settings-tag-add{align-self:flex-end}
+.settings-booking-fields{gap:8px;min-width:0}
+.settings-booking-fields .input-action-row{min-width:0;grid-template-columns:minmax(0,1fr) auto}
+.settings-booking-fields .input-action-row input{width:100%;min-width:0}
+.settings-inline-welcome{margin-top:12px;gap:8px}
+.settings-inline-welcome .settings-h-action{justify-self:end}
+.settings-overview [hidden]{display:none!important}
+.settings-overview-panel[data-settings-panel="integrations"]{padding:0;border:0;background:transparent}
+.settings-overview-panel[data-settings-panel="integrations"] .mini-card-rail{justify-content:flex-start;padding:0;scroll-padding-inline:0;scroll-snap-type:none;gap:12px}
+.settings-overview-panel[data-settings-panel="integrations"] .mini-card-rail>.mini-card{scroll-snap-align:none;margin:0}
+.settings-list-heading{display:flex;justify-content:space-between;color:var(--text-secondary);font-size:12px;padding:0 12px 8px}
+.settings-overview .list-entries{border-radius:12px;overflow:hidden;background:var(--white)}
+.v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .settings-overview .list-entries>.list-entry:last-child{border-bottom:0}
+.settings-documents-actions{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-left:auto}
+.settings-documents-heading .segment-control{width:auto;min-width:150px;max-width:100%}
+.settings-document-group h3{font-size:13px;margin:10px 0 8px;color:var(--text-secondary)}
+.settings-document-list,.settings-overview [data-inline-document-templates]{margin-top:12px}
+.settings-overview .settings-document-list .list-entry__background,.settings-overview [data-inline-document-templates] .list-entry__background{display:grid;place-items:center;background:transparent;color:var(--text-secondary)}

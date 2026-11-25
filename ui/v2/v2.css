@@ -1077,3 +1077,11 @@
  .v2-app--workspace .desktop-q-toolbar>.desktop-q-online-booking{order:-1;flex:0 1 auto;min-width:0;height:var(--v2-desktop-q-button-height);max-height:var(--v2-desktop-q-button-height);gap:5px}
  .v2-app--workspace .desktop-q-toolbar>.desktop-q-online-booking .ui-compact-check__label{min-width:0;font-size:12px;line-height:1.15;font-weight:700;white-space:normal;overflow-wrap:normal}
 }
+
+/* Desktop technical reader: full viewport veil and straight right-side paper. Mobile unchanged. */
+@media (min-width:768px) and (min-height:600px){
+ body:has(.v2-app--workspace)>.v2-layer-backdrop--technical{width:100%;max-width:none;margin:0;background:rgba(0,0,0,.58)}
+ body:has(.v2-app--workspace)>.v2-layer-backdrop--technical>.v2-layer--technical{top:0;right:0;bottom:0;left:auto;width:min(50vw,760px);height:100dvh;max-height:none;border-radius:0;transform:none;animation:v2-standard-in .18s ease-out both}
+ body:has(.v2-app--workspace)>.v2-layer-backdrop--technical>.v2-layer--technical.document-viewer-sheet--compact{width:min(440px,50vw)}
+ body:has(.v2-app--workspace)>.v2-layer-backdrop--technical>.v2-layer--technical>.v2-layer__technical-body{padding:56px 24px 24px}
+}

@@ -123,6 +123,7 @@ export function openDocumentViewer({
   version = '',
   content = '',
   pdfDataUrl = '',
+  compact = false,
 } = {}) {
   const body = pdfDataUrl
     ? `<iframe class="document-viewer__pdf" src="${text(pdfDataUrl)}#toolbar=0&navpanes=0" title="${text(title)}"></iframe>`
@@ -133,7 +134,7 @@ export function openDocumentViewer({
       title,
       variant: 'technical',
       surface: 'app',
-      className: 'document-viewer-sheet',
+      className: 'document-viewer-sheet'+(compact?' document-viewer-sheet--compact':''),
     },
   ));
   layer?.classList.add('document-viewer-backdrop');

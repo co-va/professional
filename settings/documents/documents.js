@@ -282,6 +282,24 @@ function historyMarkup() {
   return documentTiles(items.map(historyCard));
 }
 
+function desktopDocumentList() {
+  if(currentView==='history') {
+    const items=historyItems();
+    return items.length ? v2ListEntries(items.map(item=>v2ListEntry({
+      initial:'▤',title:signedDocumentSnapshot(item)?.title||item.documentId||'Документ',
+      subtitle:shortDateTime(item.eventAt||item.acceptedAt||item.revokedAt||item.createdAt,''),
+      rightTop:consentStateText(item.status),rightBottom:'Версия '+(item.documentVersion||1),
+      data:'data-signing-event="'+escapeHtml(item.id)+'"'
+    }))) : emptyState('Истории подписаний пока нет','Здесь появятся факты подписания, отказа и отзыва.');
+  }
+  const group=(title,items)=>'<section class="settings-document-group"><h3>'+title+'</h3>'+ (items.length?v2ListEntries(items.map(item=>v2ListEntry({
+    initial:'▤',title:item.title||'Документ',subtitle:documentTypeText(item),
+    rightTop:'Версия '+visibleDocumentVersion(item),rightBottom:documentMoment(item)?shortDateTime(documentMoment(item),''):'',
+    data:'data-profile-document="'+escapeHtml(item.id)+'"'
+  }))):emptyState('Документов пока нет',''))+'</section>';
+  return group('Основные документы',coreDocuments())+group('Другие документы',otherDocuments());
+}
+
 function contentMarkup() {
   return currentView === 'history' ? historyMarkup() : documentsMarkup();
 }
@@ -678,12 +696,36 @@ function openSettingsMenu(root) {
 
 function bindMain(root) {
   bindSettings(root, root);
-  root.querySelector('[data-settings-document-templates]')?.addEventListener('click', () => openTemplatesLayer(root));
+  root.querySelector('[data-settings-document-templates]')?.addEventListener('click', () => {
+    const host=root.querySelector('[data-inline-document-templates]');
+    if(!host) return openTemplatesLayer(root);
+    host.hidden=!host.hidden;
+    root.dataset.templatesExpanded=String(!host.hidden);
+    if(host.hidden) return;
+    const items=templates();
+    host.innerHTML=items.length?v2ListEntries(items.map(item=>v2ListEntry({
+      initial:'▤',title:item.title||'Шаблон',subtitle:item.sourceMode==='CUSTOM'?'Ваш вариант':'Системный шаблон',
+      rightTop:'Версия '+(item.version||1),data:'data-inline-template-open="'+escapeHtml(item.id)+'"'
+    }))):emptyState('Шаблоны недоступны','Базовые шаблоны Реестра не загрузились.');
+    host.querySelectorAll('[data-inline-template-open]').forEach(control=>control.addEventListener('click',()=>{
+      const item=templates().find(candidate=>candidate.id===control.dataset.inlineTemplateOpen);
+      if(item) openTemplateEditor(root,item);
+    }));
+  });
+  root.querySelector('[data-settings-document-create]')?.addEventListener('click',()=>openNewDocumentEditor(root));
+  root.querySelector('[data-settings-document-pdf]')?.addEventListener('click',()=>void choosePdf(root));
+  root.querySelector('[data-settings-document-toggle]')?.addEventListener('click',()=>{
+    const host=root.querySelector('[data-documents-content]');
+    host.hidden=!host.hidden;
+    root.dataset.documentsExpanded=String(!host.hidden);
+    root.querySelector('[data-settings-document-toggle]').setAttribute('aria-expanded',String(!host.hidden));
+  });
   root.querySelector('[data-settings-document-add]')?.addEventListener('click', () => openAddDocumentMenu(root));
 
   initSegmentControls(root);
   root.querySelector('[name="documentsView"]')?.addEventListener('change', (event) => {
     currentView = event.target.value === 'history' ? 'history' : 'documents';
+    if(root.hasAttribute('data-settings-embedded')) root.dataset.documentsExpanded='true';
     renderMain(root);
   });
 
@@ -703,6 +745,17 @@ function bindMain(root) {
 }
 
 function renderMain(root) {
+  if(root.hasAttribute('data-settings-embedded')) {
+    const expanded=root.dataset.documentsExpanded==='true';
+    const tools=button('Создать документ',{className:'settings-h-action',data:'data-settings-document-create'})+button('Загрузить PDF',{className:'settings-h-action',data:'data-settings-document-pdf'})+button('Шаблоны',{className:'settings-h-action',data:'data-settings-document-templates'});
+    root.innerHTML=`<div class="settings-documents-heading"><button type="button" class="settings-document-toggle" data-settings-document-toggle aria-expanded="${expanded}">Документы <span aria-hidden="true">⌄</span></button><div class="settings-documents-actions">${tools}</div>${segmentControl(VIEWS,{value:currentView,name:'documentsView',aria:'Документы и история подписаний'})}</div>
+      <div data-inline-document-templates hidden></div>
+      <section class="settings-document-list" data-documents-content${expanded?'':' hidden'}>${desktopDocumentList()}</section>`;
+    bindMain(root);
+    if(root.dataset.templatesExpanded==='true') root.querySelector('[data-settings-document-templates]')?.click();
+    window.dispatchEvent(new CustomEvent('va-tools:v2-context-changed'));
+    return;
+  }
   root.innerHTML = page([
     root.hasAttribute('data-settings-embedded')
       ? settingsSectionHeader(root,{title:'Документы'},[{label:'Шаблоны',data:'data-settings-document-templates'},{label:'+ Документ',data:'data-settings-document-add'}])

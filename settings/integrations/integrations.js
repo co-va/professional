@@ -165,7 +165,7 @@ function bindTelegramX(layer, baseRoot, state = {}) {
   const help = layer.querySelector('[data-telegram-help] [data-info-trigger]');
   help?.addEventListener('click', () => {
     const info = telegramInfoDocument(state);
-    openDocumentViewer({ title: info.title, content: info.content });
+    openDocumentViewer({ title: info.title, content: info.content, compact: true });
   });
   if (state?.error) return;
   const form = layer.querySelector('[data-telegram-integration-form]');
@@ -200,7 +200,7 @@ function bindEmailX(layer, baseRoot, state = {}) {
   const help = layer.querySelector('[data-email-help] [data-info-trigger]');
   help?.addEventListener('click', () => {
     const info = emailInfoDocument(state);
-    openDocumentViewer({ title: info.title, content: info.content });
+    openDocumentViewer({ title: info.title, content: info.content, compact: true });
   });
   if (state?.error) return;
   const form = layer.querySelector('[data-email-integration-form]');

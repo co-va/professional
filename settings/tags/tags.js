@@ -1,4 +1,6 @@
 import { settingsSectionHeader } from '../settings.js';
+import { moveDesktopQTool } from '../../ui/v2/z-layout.js';
+import { isV2DesktopWorkspace } from '../../ui/v2/geometry.js';
 import {
   actionBlock,
   button,
@@ -195,7 +197,8 @@ function renderList(root) {
     settingsSectionHeader(root,{
       title: 'Ярлыки',
       c: { label: '+', data: 'data-tag-add', aria: 'Добавить ярлык' },
-    },[{label:'+ Ярлык',data:'data-tag-add'}]),
+    }),
+    root.hasAttribute('data-settings-embedded') ? '<div class="settings-list-heading"><span>Название</span><span>Назначений</span></div>' : '',
     tags.length
       ? `<div class="settings-tags-v2">${v2ListEntries(tags.map((tag) =>
           tagRow(tag, tagAssignments(tag, sources).length)))}</div>`
@@ -212,7 +215,13 @@ function renderList(root) {
   window.dispatchEvent(new CustomEvent('va-tools:v2-context-changed'));
 }
 
+export function addEmbeddedTag(root) {
+  if (!root?.querySelector('.settings-list-heading')) return;
+  return openTagEditor({ onSaved: () => renderList(root) });
+}
+
 export function openTagEditor({ existing = null, onSaved = () => {} } = {}) {
+  const desktop = isV2DesktopWorkspace(document.querySelector('.v2-app--workspace'));
   const title = existing ? 'Изменить ярлык' : 'Новый ярлык';
   const html = `<form class="compact-form" data-tag-form>
     ${colorPicker({ name: 'tagColor', value: existing?.color || '#F6D32D' })}
@@ -223,17 +232,23 @@ export function openTagEditor({ existing = null, onSaved = () => {} } = {}) {
       placeholder: 'Название ярлыка',
       required: true,
     })}
-    ${button('Сохранить', { type: 'submit' })}
+    ${desktop ? actionBlock(button('Сохранить', { type: 'submit' })) : button('Сохранить', { type: 'submit' })}
   </form>`;
   const layer = mountModal(document.body, modal(html, {
     title,
-    variant: 'x',
+    variant: desktop ? 'q' : 'x',
     surface: 'app',
     className: 'modal--form-sheet',
   }));
   if (!layer) return null;
   initColorPickers(layer);
   const form = layer.querySelector('[data-tag-form]');
+  if(desktop && form) {
+    form.id='settings-tag-editor-form';
+    const save=form.querySelector('button[type="submit"]');
+    save?.setAttribute('form',form.id);
+    moveDesktopQTool(save);
+  }
   form?.insertAdjacentHTML('beforeend', '<p class="form-error" role="alert" data-tag-save-error hidden></p>');
   let busy = false;
   let created = null;
@@ -249,7 +264,7 @@ export function openTagEditor({ existing = null, onSaved = () => {} } = {}) {
       : { ...(created || createTag({ name, color })), name, color };
     if (!existing) created = saved;
     const errorNode = layer.querySelector('[data-tag-save-error]');
-    const submit = form.querySelector('button[type="submit"]');
+    const submit = layer.querySelector('button[type="submit"]');
     busy = true;
     if (submit) submit.disabled = true;
     if (errorNode) errorNode.hidden = true;
@@ -285,6 +300,9 @@ export async function renderTags(root) {
       loadBusinessState(),
       loadOperationalState({ full: true }),
       loadAuxiliaryState('service'),
+      loadAuxiliaryState('tags').then(remote=>{
+        if (!Array.isArray(remote?.tags)) throw new Error('Сервер не вернул список ярлыков');
+      }),
     ]);
     if (root.firstElementChild !== loadingView) return;
     renderList(root);

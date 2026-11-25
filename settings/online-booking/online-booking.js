@@ -199,7 +199,50 @@ function bindBookingRules(root) {
   });
 }
 
+function renderInlineBooking(root) {
+  const workplaces = publicRouteState.workplaces.filter(item=>item.key && item.slug);
+  const options = [{value:'',label:'Выбрать рабочее пространство'},...workplaces.map(item=>({value:item.key,label:item.name||'Без названия'}))];
+  const saved = getBookingSettings();
+  root.innerHTML = `<div class="settings-inline-heading"><strong>Онлайн-запись</strong>${button('Приветствие',{className:'settings-h-action',data:'data-inline-welcome aria-expanded="false"'})}</div>
+    <div class="form-grid settings-booking-fields">
+      ${copyLinkField('Общая ссылка',bookingLink(publicRouteState.profileSlug),'general')}
+      ${select({label:'Рабочее пространство',name:'bookingWorkplace',value:'',options,aria:'Выбрать рабочее пространство для онлайн-записи'})}
+      ${copyLinkField('Ссылка рабочего пространства','','workplace')}
+    </div>
+    <form class="form-grid settings-inline-welcome" data-inline-welcome-form hidden>
+      ${field({label:'Заголовок',name:'welcomeTitle',value:saved.welcomeTitle,maxlength:90})}
+      ${textareaField({label:'Текст',name:'welcomeText',value:saved.welcomeText,rows:4,maxlength:500})}
+      ${button('Сохранить',{type:'submit',className:'settings-h-action',data:'data-inline-welcome-save hidden'})}
+    </form>`;
+  bindCopyButtons(root);
+  const copy = root.querySelector('[data-copy-booking-link="workplace"]');
+  const link = copy?.closest('.input-action-row')?.querySelector('input');
+  if(copy) copy.disabled=true;
+  root.querySelector('input[name="bookingWorkplace"]')?.addEventListener('change',event=>{
+    const workplace=workplaces.find(item=>item.key===event.target.value);
+    if(link) link.value=workplace?bookingLink(publicRouteState.profileSlug,workplace.slug):'';
+    if(copy) copy.disabled=!link?.value;
+  });
+  const toggle=root.querySelector('[data-inline-welcome]');
+  const form=root.querySelector('[data-inline-welcome-form]');
+  const save=form?.querySelector('[data-inline-welcome-save]');
+  let baseline=saved;
+  const sync=()=>{if(save)save.hidden=settingsSignature(welcomeDraft(form,baseline))===settingsSignature(baseline);};
+  toggle?.addEventListener('click',()=>{form.hidden=!form.hidden;toggle.setAttribute('aria-expanded',String(!form.hidden));});
+  form?.addEventListener('input',sync);
+  form?.addEventListener('change',sync);
+  form?.addEventListener('submit',event=>{
+    event.preventDefault();
+    baseline=saveBookingSettings(welcomeDraft(form,getBookingSettings()));
+    sync();
+    form.hidden=true;
+    toggle?.setAttribute('aria-expanded','false');
+  });
+  sync();
+}
+
 function renderReady(root) {
+  if(root.hasAttribute('data-settings-embedded')) return renderInlineBooking(root);
   const workplaces = publicRouteState.workplaces.filter((item) => item.key && item.slug);
   const options = [
     { value: '', label: 'Выбрать рабочее пространство' },
@@ -229,6 +272,10 @@ function renderReady(root) {
 }
 
 function renderUnavailable(root, title, message) {
+  if(root.hasAttribute('data-settings-embedded')) {
+    root.innerHTML='<strong class="settings-overview-card-title">Онлайн-запись</strong>'+emptyState(title,message);
+    return;
+  }
   mountScreen(root, emptyState(title, message));
 }
 
