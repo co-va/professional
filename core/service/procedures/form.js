@@ -1,4 +1,5 @@
 import { createServiceSaveController } from '../editor-actions.js';
+import { isV2DesktopWorkspace } from '../../../ui/v2/geometry.js';
 import { collectCost, validateCostDefinition, costField, durationPicker, field, initCostFields, initDurationPickers, setSharedProfilePrimary, textareaField } from '../../../ui/ui.js';
 import { getProcedures, commitProcedure, commitProcedureWorkplace } from './data.js';
 import { procedureEditorSignature, rebaseWorkplaceAssignmentSignature } from '../editor-signature.js';
@@ -61,6 +62,17 @@ export function bindProcedureEditor(root, {
   const form = root.querySelector('[data-procedure-editor-form]');
   const primary = root.querySelector('[data-procedure-editor-primary]');
   if (!form || !primary) return { save: async () => null };
+
+  // Desktop prioritizes booking parameters above the main data. Relocate
+  // original form nodes before binding, so Tab order and FormData agree.
+  if (root.closest('[data-v2-q="true"]') && isV2DesktopWorkspace(root.closest('[data-v2-app]'))) {
+    const group = form.querySelector(':scope > .list-entries:has([data-procedure-group-toggle])');
+    const capacity = form.querySelector(':scope > [data-procedure-group-capacity]');
+    const online = form.querySelector('[data-procedure-online-check]')?.closest('.ui-compact-check');
+    if (group?.parentElement === form && capacity?.parentElement === form && online?.parentElement === form) {
+      form.prepend(group, online, capacity);
+    }
+  }
 
   initCostFields(root);
   initDurationPickers(root);
