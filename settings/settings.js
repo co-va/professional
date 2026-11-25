@@ -67,7 +67,15 @@ export function settingsOverviewMarkup(visible) {
   const available = new Map(visible.map(folder => [folder[0], folder[1]]));
   const top = ['online-booking','integrations','data-transfer'].filter(id => available.has(id));
   const middle = ['notifications','tags'].filter(id => available.has(id));
-  const card = id => '<button type="button" class="settings-overview-card" data-settings-tile="'+id+'" aria-expanded="false" aria-controls="settings-panel-'+id+'"><span>'+available.get(id)+'</span><span aria-hidden="true" class="settings-overview-arrow">⌄</span></button>';
+  const summaries = {
+    'online-booking': 'Ссылки, приветствие и правила',
+    integrations: 'Telegram и Email',
+    'data-transfer': 'Импорт из Excel и история переносов',
+    notifications: 'События и способы доставки',
+    tags: 'Создание и назначение ярлыков',
+    documents: 'Документы, шаблоны и история подписаний',
+  };
+  const card = id => '<button type="button" class="settings-overview-card" data-settings-tile="'+id+'" aria-expanded="false" aria-controls="settings-panel-'+id+'"><strong class="settings-overview-card-title">'+available.get(id)+'</strong><span class="settings-overview-card-summary">'+summaries[id]+'</span><span aria-hidden="true" class="settings-overview-arrow">⌄</span></button>';
   const panel = id => '<section id="settings-panel-'+id+'" class="settings-overview-panel" data-settings-panel="'+id+'" hidden><div data-settings-embedded></div></section>';
   return workspaceHeaderContext({title:'Настройки'})+'<div class="settings-overview">'+
     (top.length ? '<div class="settings-overview-section">'+columnLayout(top.map(card),{columns:top.length,ariaLabel:'Онлайн-запись, интеграции и перенос данных'})+top.map(panel).join('')+'</div>' : '')+
