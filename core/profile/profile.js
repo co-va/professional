@@ -326,7 +326,7 @@ async function openWorkplaceQ(root,existing,navigateBack,options={}){
   // Do not open a draft with default rules before the server snapshot is loaded.
   if(canUseCapability('online_booking.access')){
     try{await loadOperationalState({full:true});}
-    catch(error){showProfileError(root,error?.message||'Не удалось загрузить правила онлайн-записи.');return;}
+    catch(error){showProfileError(error?.message||'Не удалось загрузить правила онлайн-записи.');return;}
     if(!root.isConnected)return;
   }
   // The F profile owns Header B. Q owns only its canonical in-sheet title.
