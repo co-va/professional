@@ -736,7 +736,8 @@
  .v2-app--workspace :is(.people-documents-popup,.desktop-table-popup)>.v2-layer__gesture-zone{display:none}
  .v2-app--workspace :is(.people-documents-popup,.desktop-table-popup) .ui-data-table--compact{border-radius:10px;overflow:hidden}
  .v2-app--workspace :is(.people-documents-popup,.desktop-table-popup) .ui-data-table--compact table{width:100%;table-layout:fixed;border-collapse:collapse}
- .v2-app--workspace :is(.people-documents-popup,.desktop-table-popup) .ui-data-table--compact th{background:#E0D6D6;color:#41484F;font-size:12px;font-weight:750}
+ .v2-app--workspace :is(.people-documents-popup,.desktop-table-popup,.service-consumables-q) .ui-data-table--compact th{background:#E0D6D6;color:#41484F;font-size:12px;font-weight:750}
+ .v2-app--workspace :is(.service-consumable-picker,.service-consumables-q) .ui-data-table--compact th{height:var(--h-list-row);box-sizing:border-box;font-style:italic;text-transform:uppercase;line-height:1.2}
  .v2-app--workspace :is(.people-documents-popup,.desktop-table-popup) .ui-data-table--compact :is(th,td){box-sizing:border-box;padding:8px 10px;vertical-align:middle;text-align:left}
  .v2-app--workspace :is(.people-documents-popup,.desktop-table-popup) .ui-data-table--compact td{height:44px;font-size:13px;color:#41484F}
  .v2-app--workspace :is(.people-documents-popup,.desktop-table-popup) .ui-data-table--compact :is(th,td)[data-table-column="icon"]{width:38px;text-align:center;padding:4px}
@@ -794,7 +795,8 @@
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-desktop-tool-context>.ui-compact-button:focus-visible{outline-color:var(--white)}
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-desktop-tool-actions{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:8px;margin-left:auto;min-width:0}
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-desktop-tool-actions>.ui-button{box-sizing:border-box;width:auto;height:var(--h-tools);min-height:var(--h-tools);max-height:var(--h-tools);padding:0 12px;margin:0;border:1px solid var(--white);border-radius:10px;background:var(--white);color:#41484F;font-size:13px;line-height:1;white-space:nowrap}
- .v2-app--workspace[data-v2-desktop-surface="list"] .v2-desktop-tool-actions>:is(.v2-desktop-tool-primary,.v2-desktop-tool-accent){background:#E0D6D6;border-color:#E0D6D6;color:#41484F}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-desktop-tool-actions>:is(.v2-desktop-tool-primary,.v2-desktop-tool-accent),
+ .v2-app--workspace .desktop-q-toolbar>.desktop-q-action-slot.v2-desktop-tool-primary{background:#E0D6D6;border-color:#E0D6D6;color:#41484F}
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-desktop-tool-actions>.v2-desktop-tool-primary{display:grid;place-items:center;width:var(--h-tools);min-width:var(--h-tools);padding:0}
  .v2-app--workspace[data-v2-desktop-surface="list"] :is(.v2-desktop-tool-context,.v2-desktop-tool-actions)>.segment-control{box-sizing:border-box;width:auto;min-width:0;height:var(--h-tools);min-height:var(--h-tools);margin:0}
  .v2-app--workspace[data-v2-desktop-surface="list"] :is(.v2-desktop-tool-context,.v2-desktop-tool-actions)>.segment-control>button{flex:1 0 auto}
@@ -864,6 +866,7 @@
  .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-q-fixed-tools .desktop-q-toolbar>.desktop-q-action-slot:is(.ui-button),.v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-q-fixed-tools .desktop-q-toolbar>.desktop-q-action-slot>.ui-button{box-sizing:border-box;width:var(--v2-desktop-q-button-width);min-width:var(--v2-desktop-q-button-width);max-width:var(--v2-desktop-q-button-width);height:var(--v2-desktop-q-button-height);min-height:var(--v2-desktop-q-button-height);max-height:var(--v2-desktop-q-button-height);padding:0 4px;margin:0;border-width:1px;border-radius:10px;font-size:12px;line-height:1.15;white-space:normal;overflow-wrap:normal;overflow:hidden;text-overflow:clip}
  .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-q-fixed-tools .desktop-q-toolbar>.desktop-q-action-slot.modal-actions{position:static;height:var(--v2-desktop-q-button-height);min-height:var(--v2-desktop-q-button-height);max-height:var(--v2-desktop-q-button-height);display:grid;gap:0}
  .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-q-fixed-tools .desktop-q-toolbar>.desktop-q-action-slot.ui-compact-button{flex:0 0 var(--ui-compact-size);width:var(--ui-compact-size);min-width:var(--ui-compact-size);max-width:var(--ui-compact-size)}
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-q-fixed-tools .desktop-q-toolbar>.desktop-q-action-slot.ui-compact-button.v2-desktop-tool-primary{flex:0 0 var(--h-tools);width:var(--h-tools);min-width:var(--h-tools);max-width:var(--h-tools);height:var(--h-tools);min-height:var(--h-tools);max-height:var(--h-tools);border:1px solid #E0D6D6;border-radius:10px;font-size:24px}
 
  .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-q-fixed-tools>[data-v2-q-body]{padding-top:max(12px,calc(var(--v2-desktop-q-content-start) - var(--v2-desktop-q-header-height) - var(--v2-desktop-q-tool-height)))}
 }
@@ -995,7 +998,8 @@
  .v2-app--workspace>.v2-layer-portal.is-anchored>.v2-layer-backdrop[data-v2-x-role="picker"]:has(>.desktop-table-popup){background:transparent}
  .v2-app--workspace .desktop-table-popup .desktop-table-picker-tools{display:flex;align-items:center;gap:8px;position:sticky;top:0;z-index:2;background:var(--v2-inner-surface,#F5F5F3);padding-bottom:8px}
  .v2-app--workspace .desktop-table-popup .desktop-table-picker-tools>.field{flex:1 1 auto;min-width:0;margin:0}
- .v2-app--workspace .desktop-table-popup .desktop-table-picker-tools>.ui-compact-button{flex:0 0 var(--ui-compact-size);align-self:flex-end;margin-bottom:5px}
+ .v2-app--workspace .desktop-table-popup .desktop-table-picker-tools>.field>span:empty{display:none}
+ .v2-app--workspace .desktop-table-popup.service-consumable-picker .desktop-table-picker-tools{flex:0 0 auto;padding-bottom:12px}
  .v2-app--workspace .desktop-table-popup .ui-data-table--compact td:has(>.desktop-table-picker-item){padding:0}
  .v2-app--workspace .desktop-table-popup .desktop-table-picker-item{box-sizing:border-box;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;min-height:44px;width:100%;padding:4px 10px!important;cursor:pointer;font-size:13px;line-height:16px}
  .v2-app--workspace .desktop-table-popup .desktop-table-picker-item>strong{font-weight:500;overflow-wrap:anywhere;text-align:left}
@@ -1027,10 +1031,9 @@
 /* Consumables editor: the shared compact table, one header and one row
    per norm/position. The Q width is local and retains the global 50% cap. */
 @media (min-width:768px) and (min-height:600px){
- .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.service-consumables-q{--v2-desktop-q-width:520px}
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.service-consumables-q{--v2-desktop-q-width:520px;--v2-desktop-q-content-start:166px}
  .v2-app--workspace .service-consumables-q [data-procedure-consumable-items]>.ui-data-table--compact{border-radius:10px;overflow:hidden}
  .v2-app--workspace .service-consumables-q .ui-data-table--compact table{width:100%;min-width:0;table-layout:fixed;border-collapse:collapse}
- .v2-app--workspace .service-consumables-q .ui-data-table--compact th{background:var(--button-secondary,#E0D6D6);color:#41484F;font-size:12px;font-weight:750}
  .v2-app--workspace .service-consumables-q .ui-data-table--compact :is(th,td){box-sizing:border-box;padding:4px 8px;vertical-align:middle;text-align:left}
  .v2-app--workspace .service-consumables-q .ui-data-table--compact td{height:44px;font-size:13px;color:#41484F}
  .v2-app--workspace .service-consumables-q .ui-data-table--compact :is(th,td)[data-table-column="quantity"]{width:80px;padding-inline:4px}

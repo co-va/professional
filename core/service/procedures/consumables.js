@@ -143,11 +143,11 @@ export function openConsumablePicker(selected, onPick, { anchor = null, multiple
   const desktop = isV2DesktopWorkspace(anchor?.closest('[data-v2-app]') || document.querySelector('.v2-app--workspace'));
   if (desktop && anchor) anchor.dataset.v2AnchorWidth = '520';
   const title = groupMode ? 'Группы' : 'Позиции';
-  const searchField = field({ label: 'Поиск', name: 'consumableSearch', type: 'search',
+  const searchField = field({ label: '', name: 'consumableSearch', type: 'search',
+    data: 'aria-label="Поиск"',
     placeholder: groupMode ? 'Название группы' : 'Название, производитель или артикул' });
   const panel = (desktop
-    ? '<div class="desktop-table-picker-tools">' + searchField +
-      compactButton({ kind: 'remove', data: 'data-consumable-picker-close', aria: 'Закрыть' }) + '</div>'
+    ? '<div class="desktop-table-picker-tools">' + searchField + '</div>'
     : searchField) +
     '<div data-consumable-choices></div>' +
     (multiple ? actionBlock(button('Применить', { data: 'data-consumable-picker-apply' }), { className: 'consumable-picker-apply' }) : '');
@@ -189,7 +189,6 @@ export function openConsumablePicker(selected, onPick, { anchor = null, multiple
       onPick(row.payload);
     }
   };
-  layer.querySelector('[data-consumable-picker-close]')?.addEventListener('click', () => layer.v2Close?.());
   apply?.addEventListener('click', () => {
     if (!chosen.size) return;
     const result = [...chosen.values()];
@@ -254,7 +253,7 @@ export async function openProcedureConsumables(procedureId, onSaved = () => {}) 
   const panel = '<div data-procedure-consumable-items></div>' +
     '<p class="ui-list__secondary" data-procedure-consumable-cost></p>' +
     '<div class="app-settings-panel">' +
-      compactButton({ kind: 'add', data: 'data-procedure-consumable-add', aria: 'Добавить расходник' }) +
+      compactButton({ kind: 'add', className: 'v2-desktop-tool-primary', data: 'data-procedure-consumable-add', aria: 'Добавить расходник' }) +
     '</div>' +
     '<div class="form-error" role="alert" data-procedure-consumable-error></div>' +
     actionBlock(button('Применить', { data: 'data-procedure-consumable-save' }));
