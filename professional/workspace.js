@@ -327,7 +327,7 @@ function syncWorkspaceHeader(surface) {
     titleRoot.querySelector('.page-header h1'),
     fallbackTitle,
   );
-  if (isV2DesktopWorkspace(app)) syncV2DesktopZTitle(titleRoot, root === 'journal' && titleRoot === surface ? 'Журнал' : title);
+  if (isV2DesktopWorkspace(surface.closest('[data-v2-app]'))) syncV2DesktopZTitle(titleRoot, root === 'journal' && titleRoot === surface ? 'Журнал' : title);
   const subtitle = context?.dataset.workspaceSubtitle || '';
   const aContext = contextRoot.querySelector('[data-workspace-a-context]');
   const dSource = contextRoot.querySelector('[data-workspace-d-action]');
