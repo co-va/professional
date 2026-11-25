@@ -38,9 +38,12 @@ function telegramMiniCard(state = {}, { interactive = false } = {}) {
   const connected = Boolean(state?.connected);
   const bot = String(state?.botUsername || '').trim();
   return miniCard({
-    title: 'Telegram',
-    value: connected && bot ? bot : '',
-    subtitle: telegramSubtitle(state),
+    detailsLayout: {
+      heading: 'Telegram',
+      body: connected && bot ? bot : '',
+      stats: [{ value: telegramSubtitle(state) }],
+    },
+    className: 'settings-integration-card',
     interactive,
     data: interactive ? 'data-integration-open="telegram"' : '',
     aria: interactive ? 'Открыть Telegram' : '',
@@ -55,9 +58,12 @@ function emailSubtitle(state = {}) {
 function emailMiniCard(state = {}, { interactive = false } = {}) {
   const email = String(state?.email || state?.suggestedEmail || '').trim();
   return miniCard({
-    title: 'Email',
-    value: email,
-    subtitle: emailSubtitle(state),
+    detailsLayout: {
+      heading: 'Email',
+      body: email,
+      stats: [{ value: emailSubtitle(state) }],
+    },
+    className: 'settings-integration-card',
     interactive,
     data: interactive ? 'data-integration-open="email"' : '',
     aria: interactive ? 'Открыть Email' : '',

@@ -82,6 +82,14 @@
 .settings-integration-nav .ui-compact-button:disabled{opacity:.3;cursor:default}
 .settings-integration-rail.mini-card-rail{padding:0;scroll-padding-inline:0;scroll-snap-type:none;gap:12px;justify-content:flex-start;touch-action:pan-x}
 .settings-integration-rail.mini-card-rail>.mini-card{flex:0 0 min(290px,100%);margin:0;scroll-snap-align:none}
+/* Integration cards have a single non-scrolling data body: the whole card
+   belongs to the horizontal rail, unlike long vertically scrolling records. */
+.settings-integration-card.mini-card{touch-action:pan-x;overflow:clip}
+.settings-integration-card>.mini-card__record-center{overflow:visible;overscroll-behavior:auto;touch-action:pan-x}
+.settings-integration-card .mini-card__details-title{font-size:16px}
+.settings-integration-card .mini-card__details-stats{grid-template-columns:minmax(0,1fr)}
+.settings-integration-card .mini-card__details-stat{text-align:right}
+.settings-integration-card .mini-card__details-stat-label:empty{display:none}
 .settings-tag-chips.tag-list{align-items:flex-start;align-content:flex-start;padding:0;gap:8px}
 .settings-tag-chips .tag{border:0;min-height:30px;padding:5px 12px;font-size:13px;font-weight:600;cursor:pointer;max-width:100%;overflow-wrap:anywhere}
 .settings-documents-switch{display:flex;justify-content:flex-start;margin-top:8px}
