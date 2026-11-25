@@ -35,3 +35,11 @@
 .segment-control button:disabled{background:var(--button-secondary);color:var(--text-secondary)}
 
 .segment-control--two{grid-template-columns:repeat(2,1fr);width:min(100%,430px);margin:0 auto 20px}
+
+/* Desktop H/F: use the existing segment-control shape in both the sidebar
+   and the ordinary tool row. Only the dark-surface palette is shared. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace :is([data-v2-desktop-calendar],.v2-desktop-tool-context,.v2-desktop-tool-actions)>.segment-control{background:transparent;border-color:var(--text-secondary)}
+ .v2-app--workspace :is([data-v2-desktop-calendar],.v2-desktop-tool-context,.v2-desktop-tool-actions)>.segment-control>button{background:transparent;color:var(--white)}
+ .v2-app--workspace :is([data-v2-desktop-calendar],.v2-desktop-tool-context,.v2-desktop-tool-actions)>.segment-control>button.is-active{background:#E0D6D6;color:#41484F}
+}
