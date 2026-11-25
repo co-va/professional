@@ -650,7 +650,14 @@
  }
  .people-card-appearance-q [data-v2-q-body]{padding-top:48px}
  .people-card-appearance-q [data-entity-card-appearance-constructor]{width:100%;max-width:360px;margin-inline:auto}
- .people-card-appearance-q .ui-select__control{height:34px;min-height:34px;max-height:34px;border-radius:8px;font-size:13px;padding:0 23px 0 9px}
- .people-card-appearance-q .ui-select__selection,.people-card-appearance-q .ui-select__text,.people-card-appearance-q .ui-select__value{justify-content:flex-start;text-align:left;font-size:13px}
- .people-card-appearance-q .ui-select__meta{font-size:11px}
+ .people-card-appearance-q .ui-select__control{box-sizing:border-box;height:48px;min-height:48px;max-height:48px;border-radius:8px;font-size:16px;padding:0 28px;text-align:center;justify-content:center}
+ .people-card-appearance-q .ui-select__selection{justify-content:center}
+ .people-card-appearance-q .ui-select__text{display:flex;align-items:center;justify-content:center;gap:8px;text-align:center;max-width:100%}
+ .people-card-appearance-q .ui-select__value{display:block;flex:0 1 auto;max-height:none;white-space:nowrap;text-overflow:ellipsis;font-size:16px;line-height:1.2;text-align:center}
+ .people-card-appearance-q .ui-select__meta{flex:0 0 auto;font-size:14px;line-height:1.2;white-space:nowrap}
+ .people-card-appearance-q .ui-select__meta[hidden]{display:none}
+ .people-card-field-selector .ui-selector__option{justify-content:center;text-align:center;min-height:42px;font-size:16px}
+ .people-card-field-selector .ui-selector__option-main{display:flex;flex-wrap:nowrap;align-items:center;justify-content:center;gap:8px;text-align:center}
+ .people-card-field-selector .ui-selector__option-label{min-width:0}
+ .people-card-field-selector .ui-selector__option-main small{flex:0 0 auto;font-size:14px;white-space:nowrap}
 }

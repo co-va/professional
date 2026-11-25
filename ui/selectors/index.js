@@ -135,7 +135,9 @@ function openSelector(trigger) {
   </div>`;
 
   const desktopContactSelector = Boolean(trigger.closest('.people-filter-popup, .people-card-appearance-q'));
-  const modalRoot = mountModal(trigger, modal(content, { variant: 'x', title: 'Выбор', xRole: 'picker', className:desktopContactSelector ? 'people-action-popup people-filter-selector' : '' }));
+  const desktopCardField = Boolean(trigger.matches('[data-card-line-field]') && trigger.closest('.people-card-appearance-q'));
+  const popupClass = desktopContactSelector ? 'people-action-popup people-filter-selector' + (desktopCardField ? ' people-card-field-selector' : '') : '';
+  const modalRoot = mountModal(trigger, modal(content, { variant: 'x', title: 'Выбор', xRole: 'picker', className:popupClass }));
   const surface = modalRoot?.querySelector('[data-ui-selector]');
   if (!surface) return;
   surface.uiSourceInput = input;
