@@ -1,5 +1,6 @@
 import { apiRequest } from './auth.js';
 import { actionBlock, button, escapeHtml, initSegmentControls, modal, mountModal, segmentControl, v2Section } from '../ui/ui.js';
+import { moveDesktopQTool } from '../ui/v2/z-layout.js';
 
 let activeFlow = null;
 async function request(path = '', options = {}) {
@@ -50,6 +51,18 @@ function content(data, {manage = false} = {}) {
       actionBlock(button('Продолжить работать', {data:'data-commercial-protected-close'}));
   }
   return selectionContent(data);
+}
+function placeCommercialAction(layer) {
+  // The current body owns the action; replace the old toolbar action when a
+  // tariff confirmation transitions to pending payment within the same Q.
+  const body = layer.querySelector('[data-v2-q-body]');
+  const action = body?.querySelector('[data-commercial-confirm], [data-commercial-check], [data-commercial-protected-close]');
+  if (!action) return;
+  const prior = layer.querySelector('[data-v2-q-header-content] .desktop-q-toolbar');
+  const old = prior?.querySelector('[data-commercial-confirm], [data-commercial-check], [data-commercial-protected-close]');
+  if (moveDesktopQTool(action) && old && old !== action) {
+    (old.closest('.desktop-q-action-slot') || old).remove();
+  }
 }
 function bindPending(layer, finish) {
   layer.querySelector('[data-commercial-check]')?.addEventListener('click', async (event) => {
@@ -119,6 +132,7 @@ function bindSelection(layer, data, finish) {
             const notice = host.querySelector('[data-commercial-error]');
             if (notice) notice.textContent = result.invoice.error;
           }
+          placeCommercialAction(layer);
           bindPending(layer,finish);
           return;
         }
@@ -161,6 +175,7 @@ export function openCommercialLiveFlow({required = false,manage = false} = {}) {
       const close = layer.querySelector('[data-modal-close]');
       if (required) close?.remove();
       else close?.addEventListener('click',() => resolve({cancelled:true}),{once:true});
+      placeCommercialAction(layer);
       bind(layer,data,resolve,{manage});
     });
   })().finally(() => {activeFlow = null;});

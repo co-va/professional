@@ -257,12 +257,18 @@ function openProfileSettings(root,navigateBack,options={}){
 
 function renderDesktopProfileTools(root,navigateBack,options,workplacesAllowed,title){
   const actions=profileSettingsActions(root,navigateBack,options)
-    .filter(action=>!['controls','logout'].includes(action.id));
+    .filter(action=>!['controls','logout','demo-status'].includes(action.id))
+    .map(action=>{
+      if(action.id==='live-request')return {...action,label:'DEMO',aria:action.label};
+      if(action.id==='live-tools')return {...action,label:'LIVE',aria:action.label};
+      if(action.id==='password')return {...action,label:'Пароль',aria:action.label};
+      return action;
+    });
   const add=workplacesAllowed?button('<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>',{
     variant:'secondary',className:'v2-desktop-tool-primary',data:'data-profile-desktop-add',aria:'Добавить рабочее пространство',
   }):'';
   const markup='<div class="v2-desktop-tool-row" data-profile-desktop-toolbar><div class="v2-desktop-tool-actions">'+
-    actions.map(action=>button(action.label,{variant:'secondary',data:'data-profile-desktop-action="'+action.id+'"',disabled:Boolean(action.disabled)})).join('')+add+'</div></div>';
+    actions.map(action=>button(action.label,{variant:'secondary',className:'v2-desktop-tool-accent',data:'data-profile-desktop-action="'+action.id+'"',aria:action.aria||action.label,disabled:Boolean(action.disabled)})).join('')+add+'</div></div>';
   const [row]=setV2ZHeaderRows(root,[markup],{desktopTitle:title});
   row?.querySelectorAll('[data-profile-desktop-action]').forEach(control=>{
     const action=actions.find(item=>item.id===control.dataset.profileDesktopAction);
