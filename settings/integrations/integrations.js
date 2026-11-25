@@ -11,6 +11,7 @@ import {
 } from '../../core/integrations/telegram.js';
 import {
   button,
+  compactButton,
   emptyState,
   field,
   infoUI,
@@ -294,16 +295,44 @@ function openEmail(root, state = null) {
 function renderIntegrationCards(root, telegramState = {}, emailState = {}) {
   const host = root.querySelector('[data-integrations-list]');
   if (!host) return;
+  const embedded=root.hasAttribute('data-settings-embedded');
   host.innerHTML = miniCardRail([
     telegramMiniCard(telegramState, { interactive: true }),
     emailMiniCard(emailState, { interactive: true }),
-  ]);
+  ],{className:embedded?'settings-integration-rail':''});
+  if(embedded){
+    const rail=host.querySelector('[data-mini-card-rail]');
+    const prev=root.querySelector('[data-integration-prev]');
+    const next=root.querySelector('[data-integration-next]');
+    rail?.setAttribute('data-v2-layer-gesture-ignore','');
+    const sync=()=>{
+      if(!rail||!prev||!next)return;
+      const max=Math.max(0,rail.scrollWidth-rail.clientWidth);
+      prev.disabled=rail.scrollLeft<=1;
+      next.disabled=rail.scrollLeft>=max-1;
+    };
+    const step=dir=>{
+      const card=rail?.firstElementChild;
+      if(!card)return;
+      rail.scrollBy({left:dir*(card.getBoundingClientRect().width+12),behavior:'smooth'});
+    };
+    prev?.addEventListener('click',()=>step(-1));
+    next?.addEventListener('click',()=>step(1));
+    rail?.addEventListener('scroll',sync,{passive:true});
+    requestAnimationFrame(sync);
+    if(rail && typeof ResizeObserver==='function'){
+      const observer=new ResizeObserver(()=>{if(!rail.isConnected)observer.disconnect();else sync();});
+      observer.observe(rail);
+    }
+  }
   host.querySelector('[data-integration-open="telegram"]')?.addEventListener('click', () => openTelegram(root, telegramState));
   host.querySelector('[data-integration-open="email"]')?.addEventListener('click', () => openEmail(root, emailState));
 }
 
 async function renderIntegrations(root) {
-  root.innerHTML = page([settingsSectionHeader(root,{ title: 'Интеграции' }), '<div data-integrations-list></div>']);
+  root.innerHTML = root.hasAttribute('data-settings-embedded')
+    ? '<div class="settings-inline-heading"><strong>Интеграции</strong><div class="settings-integration-nav">'+compactButton({kind:'previous',data:'data-integration-prev',aria:'Предыдущая интеграция'})+compactButton({kind:'next',data:'data-integration-next',aria:'Следующая интеграция'})+'</div></div><div data-integrations-list></div>'
+    : page([settingsSectionHeader(root,{ title: 'Интеграции' }), '<div data-integrations-list></div>']);
   const host = root.querySelector('[data-integrations-list]');
   if (host) host.innerHTML = emptyState('Загрузка', 'Проверяем интеграции.');
   const [telegramResult, emailResult] = await Promise.allSettled([getTelegramBotConnection(), getEmailConnection()]);
@@ -315,5 +344,5 @@ async function renderIntegrations(root) {
   window.dispatchEvent(new CustomEvent('va-tools:v2-context-changed'));
 }
 
-export function render(root) { void renderIntegrations(root); }
+export function render(root) { return renderIntegrations(root); }
 export { renderIntegrations };

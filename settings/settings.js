@@ -76,11 +76,11 @@ export function settingsOverviewMarkup(visible) {
     documents: 'Документы, шаблоны и история подписаний',
   };
   const card = id => {
-    if (id === 'online-booking' || id === 'documents') return '<section class="settings-overview-card settings-overview-card--inline" data-settings-inline="'+id+'"><div data-settings-embedded></div></section>';
+    if (['online-booking','integrations','tags','documents'].includes(id)) return '<section class="settings-overview-card settings-overview-card--inline" data-settings-inline="'+id+'"><div data-settings-embedded></div></section>';
     const trigger = '<button type="button" class="settings-overview-trigger" data-settings-tile="'+id+'" aria-expanded="false" aria-controls="settings-panel-'+id+'"><strong class="settings-overview-card-title">'+available.get(id)+'</strong><span class="settings-overview-card-summary">'+summaries[id]+'</span><span aria-hidden="true" class="settings-overview-arrow">⌄</span></button>';
-    return '<section class="settings-overview-card">'+trigger+(id==='tags'?button('+ Добавить',{className:'settings-h-action settings-tag-add',data:'data-settings-tag-add'}):'')+'</section>';
+    return '<section class="settings-overview-card">'+trigger+'</section>';
   };
-  const panel = id => ['online-booking','documents'].includes(id) ? '' : '<section id="settings-panel-'+id+'" class="settings-overview-panel" data-settings-panel="'+id+'" hidden><div data-settings-embedded></div></section>';
+  const panel = id => ['online-booking','integrations','tags','documents'].includes(id) ? '' : '<section id="settings-panel-'+id+'" class="settings-overview-panel" data-settings-panel="'+id+'" hidden><div data-settings-embedded></div></section>';
   return workspaceHeaderContext({title:'Настройки'})+'<div class="settings-overview">'+
     (top.length ? '<div class="settings-overview-section">'+columnLayout(top.map(card),{columns:top.length,ariaLabel:'Онлайн-запись, интеграции и перенос данных'})+top.map(panel).join('')+'</div>' : '')+
     (middle.length ? '<div class="settings-overview-section">'+columnLayout(middle.map(card),{columns:middle.length,ariaLabel:'Уведомления и ярлыки'})+middle.map(panel).join('')+'</div>' : '')+
@@ -127,14 +127,6 @@ function renderDesktopSettings(root) {
     }
   };
   for (const card of cards) card.addEventListener('click', () => void open(card.dataset.settingsTile));
-  overview.querySelector('[data-settings-tag-add]')?.addEventListener('click', async () => {
-    const target = panels.find(panel => panel.dataset.settingsPanel === 'tags');
-    if (!target) return;
-    if (target.hidden) await open('tags');
-    if (pending.has('tags') || !mounted.has('tags') || !overview.isConnected) return;
-    const module = await visible.find(item => item[0] === 'tags')[3]();
-    if (overview.isConnected) module.addEmbeddedTag(target.querySelector('[data-settings-embedded]'));
-  });
   for (const inline of overview.querySelectorAll('[data-settings-inline]')) {
     const id = inline.dataset.settingsInline;
     const folder = visible.find(item => item[0] === id);

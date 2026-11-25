@@ -1,5 +1,4 @@
 import { settingsSectionHeader } from '../settings.js';
-import { moveDesktopQTool } from '../../ui/v2/z-layout.js';
 import { isV2DesktopWorkspace } from '../../ui/v2/geometry.js';
 import {
   actionBlock,
@@ -192,6 +191,20 @@ function openTagAssignments(tag, onSaved) {
 
 function renderList(root) {
   const tags = getTags();
+  if(root.hasAttribute('data-settings-embedded')){
+    root.innerHTML='<div class="settings-inline-heading"><strong>Ярлыки</strong>'+button('+ Добавить',{className:'settings-h-action',data:'data-tag-add'})+'</div><div class="tag-list settings-tag-chips">'+tags.map(tag=>{
+      const color=/^#[0-9a-fA-F]{6}$/.test(tag.color)?tag.color:'#E8E1DC';
+      const n=parseInt(color.slice(1),16);
+      const light=(0.299*(n>>16)+0.587*((n>>8)&255)+0.114*(n&255))>145;
+      return '<button type="button" class="tag" data-tag-chip="'+escapeHtml(tag.id)+'" style="background:'+color+';color:'+(light?'#171819':'#fff')+'">'+escapeHtml(tag.name)+'</button>';
+    }).join('')+'</div>'+(tags.length?'':'<p class="muted settings-tags-empty">Ярлыков пока нет</p>');
+    root.querySelector('[data-tag-add]')?.addEventListener('click',()=>openTagEditor({onSaved:()=>renderList(root)}));
+    root.querySelectorAll('[data-tag-chip]').forEach(control=>control.addEventListener('click',()=>{
+      const tag=getTags().find(item=>item.id===control.dataset.tagChip);
+      if(tag)openTagAssignments(tag,()=>renderList(root));
+    }));
+    return;
+  }
   const sources = currentSources();
   root.innerHTML = page([
     settingsSectionHeader(root,{
@@ -215,11 +228,6 @@ function renderList(root) {
   window.dispatchEvent(new CustomEvent('va-tools:v2-context-changed'));
 }
 
-export function addEmbeddedTag(root) {
-  if (!root?.querySelector('.settings-list-heading')) return;
-  return openTagEditor({ onSaved: () => renderList(root) });
-}
-
 export function openTagEditor({ existing = null, onSaved = () => {} } = {}) {
   const desktop = isV2DesktopWorkspace(document.querySelector('.v2-app--workspace'));
   const title = existing ? 'Изменить ярлык' : 'Новый ярлык';
@@ -232,23 +240,17 @@ export function openTagEditor({ existing = null, onSaved = () => {} } = {}) {
       placeholder: 'Название ярлыка',
       required: true,
     })}
-    ${desktop ? actionBlock(button('Сохранить', { type: 'submit' })) : button('Сохранить', { type: 'submit' })}
+    ${button('Сохранить', { type: 'submit', className:desktop?'settings-h-action':'' })}
   </form>`;
   const layer = mountModal(document.body, modal(html, {
     title,
-    variant: desktop ? 'q' : 'x',
+    variant: 'x',
     surface: 'app',
-    className: 'modal--form-sheet',
+    className: 'modal--form-sheet'+(desktop?' settings-tag-editor-x':''),
   }));
   if (!layer) return null;
   initColorPickers(layer);
   const form = layer.querySelector('[data-tag-form]');
-  if(desktop && form) {
-    form.id='settings-tag-editor-form';
-    const save=form.querySelector('button[type="submit"]');
-    save?.setAttribute('form',form.id);
-    moveDesktopQTool(save);
-  }
   form?.insertAdjacentHTML('beforeend', '<p class="form-error" role="alert" data-tag-save-error hidden></p>');
   let busy = false;
   let created = null;
