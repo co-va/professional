@@ -34,7 +34,7 @@ export function renderServiceOverviewLayout(layer, {
     serviceHeaderContext({ title }),
     ...(desktop
       ? ['<div class="service-desktop-overview-cards">' + card +
-        (workplaceCards.length ? '<div class="service-desktop-workplace-cards">' + workplaceCards.join('') + '</div>' : '') +
+        (workplaceCards.length ? miniCardRail(workplaceCards, { className: 'service-desktop-workplace-cards' }) : '') +
         '</div>']
       : [card, workplaceCards.length ? miniCardRail(workplaceCards) : '',
         actions ? '<div class="app-settings-panel">' + actions + '</div>' : '']),

@@ -3,6 +3,7 @@ import {
   list, modal, mountModal, openNotice,
 } from '../../../ui/ui.js';
 import { setSharedActionVisible } from '../../../ui/page/page.js';
+import { moveDesktopQTool } from '../../../ui/v2/z-layout.js';
 import { getInventoryItems } from '../../inventory/data.js';
 import { loadInventory } from '../../inventory/service.js';
 import { commitProcedureConsumables, getProcedures } from './data.js';
@@ -83,7 +84,7 @@ export function procedureConsumableSummary(rows = [], items = []) {
 }
 
 function costSummaryText(rows, inventory) {
-  if (!rows.length) return 'Расходники не выбраны.';
+  if (!rows.length) return '';
   const result = procedureConsumableSummary(rows, inventory);
   if (!result.calculated) return 'Себестоимость: не рассчитана';
   return result.complete ? 'Себестоимость: ' + money(result.total)
@@ -153,7 +154,7 @@ export async function openProcedureConsumables(procedureId, onSaved = () => {}) 
     '<div class="form-error" role="alert" data-procedure-consumable-error></div>' +
     actionBlock(button('Применить', { data: 'data-procedure-consumable-save' }));
   const layer = mountModal(document.body, modal(panel, {
-    title: 'Расходник', variant: 'q', surface: 'app',
+    title: 'Расходник', variant: 'q', surface: 'app', className: 'service-consumables-q',
   }));
   if (!layer) return null;
   const host = layer.querySelector('[data-procedure-consumable-items]');
@@ -161,11 +162,18 @@ export async function openProcedureConsumables(procedureId, onSaved = () => {}) 
   const errorNode = layer.querySelector('[data-procedure-consumable-error]');
   const save = layer.querySelector('[data-procedure-consumable-save]');
   const actions = save?.closest('.modal-actions');
+  const add = layer.querySelector('[data-procedure-consumable-add]');
+  const desktop = moveDesktopQTool(add);
+  if (desktop) moveDesktopQTool(save, { desktopLabel: 'Сохранить' });
   let saving = false;
   const sync = () => {
-    if (costNode) costNode.textContent = costSummaryText(rows, getInventoryItems());
+    if (costNode) {
+      costNode.hidden = !rows.length;
+      costNode.textContent = costSummaryText(rows, getInventoryItems());
+    }
     setSharedActionVisible(actions, signature(rows) !== initial);
     if (save) save.disabled = saving;
+    if (add) add.disabled = saving;
   };
   const render = () => {
     const inventory = new Map(getInventoryItems().map(item => [String(item.itemId), item]));
@@ -190,7 +198,9 @@ export async function openProcedureConsumables(procedureId, onSaved = () => {}) 
             aria: 'Убрать ' + title }) +
         '</div>';
       }).join('') + '</div>'
-      : emptyState('Расходников пока нет', 'Выберите товары, используемые в услуге.');
+      : desktop
+        ? list({ className: 'ui-list--dense', items: [{ title: 'Расходников пока нет', className: 'service-consumable-empty-row' }] })
+        : emptyState('Расходников пока нет');
     sync();
   };
   host.addEventListener('input', event => {
@@ -209,7 +219,8 @@ export async function openProcedureConsumables(procedureId, onSaved = () => {}) 
     rows.splice(index, 1);
     render();
   });
-  layer.querySelector('[data-procedure-consumable-add]')?.addEventListener('click', async () => {
+  add?.addEventListener('click', async () => {
+    if (saving) return;
     try { await inventoryLoad; }
     catch (error) {
       openNotice({ title: 'Расходник',

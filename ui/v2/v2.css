@@ -972,7 +972,18 @@
 @media (min-width:768px) and (min-height:600px){
  .v2-app--workspace .service-desktop-overview-cards{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:flex-start;gap:16px;width:100%;min-width:0}
  .v2-app--workspace .service-desktop-overview-cards>.entity-visual-card{flex:0 0 min(338px,100%);width:min(338px,100%);max-width:338px;margin:0}
- .v2-app--workspace .service-desktop-workplace-cards{display:flex;flex:1 1 290px;min-width:min(290px,100%);flex-wrap:wrap;gap:12px;align-items:flex-start;justify-content:flex-start}
- .v2-app--workspace .service-desktop-workplace-cards>.mini-card{flex:0 0 min(var(--mini-card-width),100%);width:min(var(--mini-card-width),100%);margin:0;box-shadow:none;color:#111}
+ .v2-app--workspace .service-desktop-workplace-cards{display:flex;flex:1 1 290px;width:0;max-width:100%;min-width:min(290px,100%);flex-wrap:nowrap;gap:12px;align-items:flex-start;justify-content:flex-start;overflow-x:auto;overflow-y:hidden;padding:0;scroll-padding-inline:0;touch-action:pan-x}
+ .v2-app--workspace .service-desktop-workplace-cards>.mini-card{flex:0 0 min(var(--mini-card-width),100%);width:min(var(--mini-card-width),100%);margin:0;box-shadow:none;color:#111;scroll-snap-align:start}
  .v2-app--workspace .service-desktop-workplace-cards :is(.mini-card__row-label,.mini-card__row-value){color:#111}
+}
+
+/* Desktop consumables use the same compact List frame for populated and
+   empty states. Keep the existing stock quantity input and remove control. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace .service-consumables-q [data-procedure-consumable-items]>.ui-list{box-sizing:border-box;border-radius:var(--radius-control,14px);height:auto;min-height:0;gap:0;padding:0;margin:0}
+ .v2-app--workspace .service-consumables-q [data-procedure-consumable-items] .ui-list__item{box-sizing:border-box;min-height:var(--h-list-row);padding:4px 12px}
+ .v2-app--workspace .service-consumables-q [data-procedure-consumable-items] .service-consumable-empty-row{height:44px;min-height:44px;max-height:44px;flex:0 0 44px}
+ .v2-app--workspace .service-consumables-q .service-consumable-empty-row .ui-list__title{color:var(--text-secondary);font-weight:400}
+ .v2-app--workspace .service-consumables-q [data-procedure-consumable-cost]:not([hidden]){margin:8px 0 0}
+ .v2-app--workspace .service-consumables-q [data-procedure-consumable-cost][hidden]{display:none!important}
 }
