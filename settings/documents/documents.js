@@ -53,6 +53,12 @@ const VIEWS = [
   { value: 'history', label: 'История' },
 ];
 
+const HISTORY_SORT_OPTIONS = [
+  { value: 'date', label: 'По дате' },
+  { value: 'name', label: 'По имени (А–Я)' },
+  { value: 'version', label: 'По версии' },
+];
+
 const USER_PDF_FILE_LIMIT = 15 * 1024 * 1024;
 const USER_PDF_TOTAL_LIMIT = 30 * 1024 * 1024;
 
@@ -300,7 +306,7 @@ function historyCard(item, people, index) {
     meta: date,
     status: consentStateText(item.status),
     statusState: consentStateKind(item.status),
-    data: `data-signing-event="${escapeHtml(String(item.id || ''))}" data-history-person="${escapeHtml(name)}" data-history-phone="${escapeHtml(phone)}" data-history-order="${index}"`,
+    data: `data-signing-event="${escapeHtml(String(item.id || ''))}" data-history-person="${escapeHtml(name)}" data-history-phone="${escapeHtml(phone)}" data-history-version="${escapeHtml(String(item.documentVersion || snapshot?.version || 1))}" data-history-order="${index}"`,
     aria: `Открыть факт подписания ${title}: ${name || 'Имя не указано'}${phone ? ', ' + phone : ''}`,
   });
 }
@@ -323,9 +329,7 @@ function mobileDocumentsHeaderRows() {
   })];
   if (currentView === 'history') rows.push(`<div class="mobile-document-history-tools" data-v2-layer-gesture-ignore>
     <div class="ui-search-field">${field({ name: 'documentHistoryQuery', type: 'search', placeholder: 'Поиск', autocomplete: 'off', data: 'aria-label="Поиск по имени, фамилии или телефону"' })}</div>
-    ${select({ name: 'documentHistorySort', value: 'date', options: [
-      { value: 'date', label: 'По дате' }, { value: 'name', label: 'По имени (А–Я)' },
-    ], triggerKind: 'sort', pickerTitle: 'Сортировка', aria: 'Сортировка' })}
+    ${select({ name: 'documentHistorySort', value: 'date', options: HISTORY_SORT_OPTIONS, triggerKind: 'sort', pickerTitle: 'Сортировка', aria: 'Сортировка' })}
   </div>`);
   return rows;
 }
@@ -343,9 +347,16 @@ function bindDocumentHistory(root, tools) {
   const empty = root.querySelector('[data-history-no-results]');
   let mode = 'date';
   const order = () => {
-    cards.sort((a, b) => (mode === 'name' ? Number(!a.dataset.historyPerson) - Number(!b.dataset.historyPerson)
-      || a.dataset.historyPerson.localeCompare(b.dataset.historyPerson, 'ru', { sensitivity: 'base' }) : 0)
-      || Number(a.dataset.historyOrder) - Number(b.dataset.historyOrder));
+    cards.sort((a, b) => {
+      const byName = () => Number(!a.dataset.historyPerson) - Number(!b.dataset.historyPerson)
+        || a.dataset.historyPerson.localeCompare(b.dataset.historyPerson, 'ru', { sensitivity: 'base' });
+      const version = node => {
+        const value = Number(node.dataset.historyVersion);
+        return Number.isFinite(value) && value > 0 ? value : 0;
+      };
+      const primary = mode === 'name' ? byName() : mode === 'version' ? version(b) - version(a) : 0;
+      return primary || Number(a.dataset.historyOrder) - Number(b.dataset.historyOrder);
+    });
     for (const card of cards) host.append(card);
   };
   const filter = () => {
@@ -363,7 +374,7 @@ function bindDocumentHistory(root, tools) {
   };
   query?.addEventListener('input', filter);
   sort?.addEventListener('change', () => {
-    mode = sort.value === 'name' ? 'name' : 'date';
+    mode = HISTORY_SORT_OPTIONS.some(option => option.value === sort.value) ? sort.value : 'date';
     order();
   });
 }
@@ -388,7 +399,7 @@ function desktopDocumentList() {
         title,subtitle:[shortDateTime(item.eventAt||item.acceptedAt||item.revokedAt||item.createdAt,''),signingHistoryEventLabel(item)].filter(Boolean).join(' · '),
         rightTop:String(item.documentVersion||snapshot?.version||1),
         statusMark:{symbol:item.status==='revoked'?'×':item.status==='declined'?'—':'✓',label:consentStateText(item.status)},
-        data:`data-signing-event="${escapeHtml(item.id)}" data-history-person="${escapeHtml(name)}" data-history-phone="${escapeHtml(phone)}" data-history-order="${index}"`,
+        data:`data-signing-event="${escapeHtml(item.id)}" data-history-person="${escapeHtml(name)}" data-history-phone="${escapeHtml(phone)}" data-history-version="${escapeHtml(String(item.documentVersion || snapshot?.version || 1))}" data-history-order="${index}"`,
       });
     });
     return '<div class="settings-document-table settings-document-table--history"><div class="settings-document-list-heading settings-document-list-heading--history"><span class="settings-history-heading-main"><span aria-hidden="true"></span><span>Имя / Телефон</span><span>Наименование / Дата</span></span><span>Версия</span><span>Статус</span></div>'
@@ -762,7 +773,7 @@ function syncDesktopHistoryToolbar(root) {
 function renderDesktopHistoryToolbar(root) {
   const toolbar = desktopHistoryToolbar(root);
   if (!toolbar) return;
-  toolbar.innerHTML = currentView === 'history' ? `<div class="settings-history-tools people-desktop-tools">${field({name:'documentHistoryQuery',type:'search',placeholder:'Поиск',autocomplete:'off',data:'aria-label="Поиск по имени, фамилии или телефону"'})}<div class="people-desktop-actions people-desktop-query-tools">${select({name:'documentHistorySort',value:'date',options:[{value:'date',label:'По дате'},{value:'name',label:'По имени (А–Я)'}],triggerKind:'sort',pickerTitle:'Сортировка',aria:'Сортировка'})}</div></div>` : '';
+  toolbar.innerHTML = currentView === 'history' ? `<div class="settings-history-tools people-desktop-tools">${field({name:'documentHistoryQuery',type:'search',placeholder:'Поиск',autocomplete:'off',data:'aria-label="Поиск по имени, фамилии или телефону"'})}<div class="people-desktop-actions people-desktop-query-tools">${select({name:'documentHistorySort',value:'date',options:HISTORY_SORT_OPTIONS,triggerKind:'sort',pickerTitle:'Сортировка',aria:'Сортировка'})}</div></div>` : '';
   syncDesktopHistoryToolbar(root);
 }
 
