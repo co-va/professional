@@ -56,7 +56,7 @@ export function bindServiceWorkplaceAssignments(root, {
   const list = root.querySelector('[data-service-workplace-prices]');
   const addButton = root.querySelector('[data-service-workplace-add]');
   if (!list || !addButton) return { read: () => [] };
-  const desktopTool = moveDesktopQTool(addButton, { desktopLabel: '+ Пространство' });
+  const desktopTool = moveDesktopQTool(addButton);
   if (desktopTool) {
     // Only page-level actions, not local price/assignment editor controls.
     const remove = root.querySelector('[data-procedure-editor-delete], [data-product-editor-delete], [data-service-retail-product-delete]');
