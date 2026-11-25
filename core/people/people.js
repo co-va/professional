@@ -254,6 +254,14 @@ export async function openPersonHistoryQ(root, person, options = {}) {
   }
   const host = layer.querySelector('[data-person-history-host]');
   const search = layer.querySelector('[data-person-history-search]');
+  // On Desktop, paint the new Q and a loading state before doing the synchronous
+  // Journal/Finance projection. Keep the original immediate Mobile path.
+  const desktopOverview = Boolean(root?.closest?.('.people-desktop-overview-q'));
+  if (desktopOverview) {
+    if (host) host.innerHTML = emptyState('История', 'Загружаем данные…');
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    if (!layer.isConnected) return layer;
+  }
   // Show existing Journal records immediately; audit History enriches the list.
   let sourceItems = getCurrentPersonHistory(person.key);
   const refreshHistory = async () => {
@@ -1057,14 +1065,17 @@ function overviewCard(person) {
 function desktopPersonOverviewTools(layer, person, options = {}) {
   const header = layer.closest('[data-v2-q="true"]')?.querySelector('[data-v2-q-header-content]');
   if (!header) return;
-  header.innerHTML = `<div class="people-overview-toolbar">
-    <h2 class="v2-q-title">Клиент</h2>
-    ${compactButton({ kind: 'document', data: 'data-person-overview-documents title="Документы"', aria: 'Документы' })}
-    ${compactButton({ kind: 'history', data: 'data-person-overview-history title="История"', aria: 'История' })}
+  header.innerHTML = `<div class="people-overview-heading"><h2 class="v2-q-title">Клиент</h2></div>
+  <div class="people-overview-toolbar" data-v2-layer-gesture-ignore>
     ${select({ name: 'personOverviewProgram', aria: 'Программы', value: '', options: [
       { value: '', label: 'Программы' },
       ...personProgramActionTypes().map(item => ({ value: item.id, label: item.label })),
     ] })}
+    <div class="people-overview-tools">
+      ${compactButton({ kind: 'document', data: 'data-person-overview-documents title="Документы"', aria: 'Документы' })}
+      ${compactButton({ kind: 'history', data: 'data-person-overview-history title="История"', aria: 'История' })}
+      ${button('Записать', { className: 'people-overview-record', data: 'data-person-overview-record' })}
+    </div>
   </div>`;
   header.querySelector('[data-person-overview-documents]')?.addEventListener('click', () => openPersonDocuments(layer, person));
   header.querySelector('[data-person-overview-history]')?.addEventListener('click', () => void openPersonHistoryQ(layer, person, options));
@@ -1077,7 +1088,12 @@ function desktopPersonOverviewTools(layer, person, options = {}) {
     if (value) value.textContent = 'Программы';
     openPersonProgramActions(layer, person, { onChanged: options.onProgramChanged, initialKind: kind });
   });
-  layer.querySelector('[data-person-overview-record]')?.addEventListener('click', () => void openPersonRecordCreation({ person }));
+  header.querySelector('[data-person-overview-record]')?.addEventListener('click', async (event) => {
+    const control = event.currentTarget;
+    control.disabled = true;
+    try { await openPersonRecordCreation({ person }); }
+    finally { if (control.isConnected) control.disabled = false; }
+  });
   layer.querySelector('[data-person-overview-delete]')?.addEventListener('click', () => confirmDelete(layer, person, options.onDeleted));
 }
 
@@ -1106,8 +1122,7 @@ async function renderPersonOverview(layer, baseRoot, key, options = {}) {
     overviewCard(person),
     relationships.markup,
     desktop ? actionBlock(
-      button('Записать', { data: 'data-person-overview-record data-ui-keyboard-action="auxiliary"' })
-      + button('Удалить', { variant: 'delete-outline', data: 'data-person-overview-delete data-ui-keyboard-action="auxiliary"' }),
+      button('Удалить', { variant: 'danger', data: 'data-person-overview-delete data-ui-keyboard-action="auxiliary"' }),
       { className: 'people-overview-footer' },
     ) : '',
   ]);
@@ -1153,7 +1168,7 @@ async function openPersonRelationshipQ(root, person, detail, options = {}) {
 function openPersonOverview(root, key, options = {}) {
   if (!key) return null;
   if (isV2DesktopWorkspace(root.closest?.('[data-v2-app]') || document.querySelector('.v2-app--workspace'))) {
-    const layer = mountModal(root, modal('<div data-desktop-person-overview></div>', { title:'Клиент', variant:'q', surface:'app' }));
+    const layer = mountModal(root, modal('<div data-desktop-person-overview></div>', { title:'Клиент', variant:'q', surface:'app', className:'people-desktop-overview-q' }));
     const host = layer?.querySelector('[data-desktop-person-overview]');
     if (!host) return layer;
     const close = layer.v2Close?.bind(layer);
