@@ -509,8 +509,7 @@
    height:44px;box-sizing:border-box;padding:4px 12px;font-size:13px;color:var(--text);border-bottom:1px solid #E0D6D6;
  }
  .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact td>button{font-weight:650}
- .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact tbody tr{cursor:pointer}
- .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact tbody tr:hover{background:var(--surface-soft)}
+ .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact tbody tr{cursor:default}
  .v2-app--workspace>.v2-header>.v2-desktop-toolbar-context,
  .v2-app--workspace>.v2-header>.v2-desktop-toolbar-user,
  .v2-app--workspace>.v2-header .v2-desktop-toolbar-divider,
@@ -625,4 +624,20 @@
 /* Desktop Contacts: keep the complete debt heading on one line, without changing the common heading font. */
 @media (min-width:768px) and (min-height:600px){
  .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact :is(th,td)[data-table-column="debt"]{width:146px;min-width:146px;white-space:nowrap;overflow-wrap:normal;word-break:normal}
+}
+
+/* Desktop Contacts: counter matches the H title; selection and opening are
+   separate native controls. No row-wide click target. */
+@media (min-width:768px) and (min-height:600px){
+ .people-desktop-title{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:0 0 24px}
+ [data-people-desktop-toolbar] .people-desktop-title h2{margin:0}
+ .people-desktop-title>[data-people-count]{color:var(--white);font-size:30px;line-height:1.2;font-weight:720;letter-spacing:-.035em;font-variant-numeric:tabular-nums;white-space:nowrap}
+ .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact :is(th,td)[data-table-column="select"]{padding:0 4px;text-align:center}
+ .v2-app--workspace [data-people-list-host] .ui-compact-check{position:relative;display:inline-grid;place-items:center;width:36px;height:40px;min-height:40px;touch-action:manipulation}
+ .v2-app--workspace [data-people-list-host] .ui-compact-check .ui-check-input{inset:0;width:100%;height:100%;margin:0;pointer-events:auto;cursor:pointer}
+ .v2-app--workspace [data-people-list-host] .ui-compact-check .ui-compact-check__mark{pointer-events:none}
+ .v2-app--workspace [data-people-list-host] .ui-check-input:indeterminate+.ui-compact-check__mark::after{content:'−';font-weight:750;color:var(--text)}
+ .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact :is(th,td)[data-table-column="open"]{width:36px;min-width:36px;padding:0 2px;text-align:center}
+ .v2-app--workspace [data-people-list-host] .ui-data-table--compact td>.people-table-open{display:grid;place-items:center;width:32px;height:40px;margin:auto;color:#41484F;touch-action:manipulation;cursor:pointer}
+ .v2-app--workspace [data-people-list-host] .people-table-open:hover{background:var(--surface-soft);border-radius:8px}
 }

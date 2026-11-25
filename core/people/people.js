@@ -487,17 +487,18 @@ function listMarkup(items, query = '') {
 function desktopPeopleTable(root, items, visitIndex) {
   if (!items.length) return listMarkup(items, root.peopleSearchInput?.value || '');
   const selected = root.peopleSelectedKeys ||= new Set();
-  const allSelected = items.every(person => selected.has(person.key));
+  const allSelected = items.every(person => selected.has(String(person.key)));
   const check = (data, aria, checked) => `<label class="ui-compact-check">${checkControl({ data, aria, checked })}</label>`;
   const columns = [
-    { key: 'select', label: '', narrow: true, sortable: false, header: () => check('data-people-select-all', 'Выбрать все видимые контакты', allSelected), render: row => check(`data-people-select="${escapeHtml(row.key)}"`, `Выбрать ${row.name}`, selected.has(row.key)) },
+    { key: 'select', label: '', narrow: true, sortable: false, header: () => check('data-people-select-all', 'Выбрать все видимые контакты', allSelected), render: row => check(`data-people-select="${escapeHtml(row.key)}"`, `Выбрать ${row.name}`, selected.has(String(row.key))) },
     { key: 'code', label: 'Код', sortable:false },
-    { key: 'name', label: 'Клиент', sortable:false, render: row => `<button type="button" class="people-table-person" data-person="${escapeHtml(row.key)}"><span class="people-table-person__name">${escapeHtml(row.name)}</span>${row.phone ? `<span class="people-table-person__phone">${escapeHtml(row.phone)}</span>` : ''}</button>` },
+    { key: 'name', label: 'Клиент', sortable:false, render: row => `<div class="people-table-person"><span class="people-table-person__name">${escapeHtml(row.name)}</span>${row.phone ? `<span class="people-table-person__phone">${escapeHtml(row.phone)}</span>` : ''}</div>` },
     { key:'visitCount', label:'Количество посещений', sortable:false, header:()=>'<span>Количество</span><span>посещений</span>' },
     { key:'paidTotal', label:'Оплачено', sortable:false, render:row=>row.paidTotal == null ? '—' : escapeHtml(money(row.paidTotal)) },
     { key:'debt', label:'Задолженность', sortable:false, render:row=>row.debt == null ? '—' : row.debt > 0.009 ? escapeHtml(money(row.debt)) : '' },
     { key: 'firstVisit', label: 'Первое посещение', sortable: false, header: () => '<span>Первое</span><span>посещение</span>', render: row => escapeHtml(row.firstVisit ? formatPersonVisitDate(row.firstVisit) : '') },
     { key: 'lastVisit', label: 'Последнее посещение', sortable:false, header: () => '<span>Последнее</span><span>посещение</span>', render: row => escapeHtml(row.lastVisit ? formatPersonVisitDate(row.lastVisit) : '') },
+    { key:'open',label:'',narrow:true,sortable:false,render:row=>`<button type="button" class="people-table-open" data-person="${escapeHtml(row.key)}" aria-label="Открыть клиента ${escapeHtml(row.name)}"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>` },
   ];
   const rows = items.map(person => {
     const display = personDisplay(person);
@@ -507,15 +508,24 @@ function desktopPeopleTable(root, items, visitIndex) {
   return dataTable({ columns, rows, caption: 'Клиенты', compact: true });
 }
 
+function updateDesktopPeopleCount(root, total, selected = 0) {
+  const counter = root.peopleCounter;
+  if (!counter?.isConnected) return;
+  counter.textContent = total == null ? '—' : selected ? `${selected} / ${total}` : String(total);
+  counter.setAttribute('aria-label',total == null ? 'Количество клиентов уточняется' : `Клиентов в списке: ${total}. Выбрано: ${selected}`);
+}
+
 function bindDesktopPeopleTable(root, host, items) {
-  const selected = root.peopleSelectedKeys;
-  if (!selected) return;
+  const selected = root.peopleSelectedKeys ||= new Set();
   const all = host.querySelector('[data-people-select-all]');
   const sync = () => {
     const inputs = [...host.querySelectorAll('[data-people-select]')];
-    if (!all) return;
-    all.checked = inputs.length > 0 && inputs.every(input => input.checked);
-    all.indeterminate = !all.checked && inputs.some(input => input.checked);
+    const selectedCount = inputs.filter(input => input.checked).length;
+    if (all) {
+      all.checked = inputs.length > 0 && selectedCount === inputs.length;
+      all.indeterminate = selectedCount > 0 && !all.checked;
+    }
+    updateDesktopPeopleCount(root,items.length,selectedCount);
   };
   host.querySelectorAll('[data-people-select]').forEach(input => input.addEventListener('change', () => {
     if (input.checked) selected.add(input.dataset.peopleSelect);
@@ -523,15 +533,11 @@ function bindDesktopPeopleTable(root, host, items) {
     sync();
   }));
   all?.addEventListener('change', () => {
-    items.forEach(person => { if (all.checked) selected.add(person.key); else selected.delete(person.key); });
+    items.forEach(person => { if (all.checked) selected.add(String(person.key)); else selected.delete(String(person.key)); });
     host.querySelectorAll('[data-people-select]').forEach(input => { input.checked = all.checked; });
     sync();
   });
   sync();
-  host.querySelectorAll('tbody tr').forEach(row => row.addEventListener('click', event => {
-    if (event.target.closest('button,input,label')) return;
-    row.querySelector('[data-person]')?.click();
-  }));
 }
 
 function visiblePeople(root, visitIndex = null) {
@@ -544,10 +550,12 @@ function refreshPeopleList(root) {
   if (!host) return;
   if (currentPeopleFilters().loyaltyMode && root.peopleLoyaltyLoading) {
     host.textContent='Загружаем контакты…';
+    updateDesktopPeopleCount(root,null);
     return;
   }
   if (currentPeopleFilters().loyaltyMode && root.peopleLoyaltyError) {
     host.textContent=root.peopleLoyaltyError;
+    updateDesktopPeopleCount(root,null);
     return;
   }
   const query = root.peopleSearchInput?.value || '';
@@ -585,7 +593,7 @@ export function renderPeople(root, options = {}) {
   ]);
   const search = field({ name:'peopleSearch', type:'search', placeholder:wide?'Поиск по имени или коду':'Поиск по имени или UEI', autocomplete:'off', data:'data-people-search' });
   const [searchRow] = setV2ZHeaderRows(root, [wide ? `<section data-people-desktop-toolbar>
-    <h2>Клиенты</h2>
+    <div class="people-desktop-title"><h2>Клиенты</h2><output data-people-count aria-live="polite">—</output></div>
     <div class="people-desktop-tools">${search}
       <div class="people-desktop-actions">
         ${button('Фильтр',{variant:'secondary',data:'data-people-desktop-filter'})}
@@ -598,6 +606,7 @@ export function renderPeople(root, options = {}) {
       </div>
     </div></section>` : `<div class="people-search ui-search-field">${search}</div>`]);
   root.peopleSearchInput = searchRow?.querySelector('[data-people-search]') || null;
+  root.peopleCounter = searchRow?.querySelector('[data-people-count]') || null;
   root.peopleRefreshPresentation = () => refreshPeopleList(root);
   searchRow?.querySelector('[data-people-desktop-filter]')?.addEventListener('click', event => openFilterSettings(root, event.currentTarget));
   searchRow?.querySelector('[data-people-desktop-excel]')?.addEventListener('click', event => openPeopleExcelMenu(root, {
