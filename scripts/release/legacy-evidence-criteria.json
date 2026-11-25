@@ -1,0 +1,590 @@
+{
+  "version": 1,
+  "cutoff": "2202ec57ee273563a35491cc55295c6f0731302c",
+  "note": "Однократное согласование исторических идентификаторов Professional closure map с каталогом Core. Исходные SHA, файлы, kind, result, remaining, checks и подтверждения владельца не изменяются. Новые записи проходят исходный строгий parser без миграции.",
+  "entries": [
+    {
+      "sha": "18c38a32d30b9c3095879dab9cb11f0321b0190a",
+      "from": [
+        "shared.mini-card"
+      ],
+      "to": [
+        "integration.external",
+        "platform"
+      ]
+    },
+    {
+      "sha": "f630e8bad5f8ba0c04571523c58540009240161d",
+      "from": [
+        "records.prof",
+        "shared.modal"
+      ],
+      "to": [
+        "records.prof",
+        "platform"
+      ]
+    },
+    {
+      "sha": "ce01e0d8c9cdfbe91aff5c4da6f30d1cc3b9b644",
+      "from": [
+        "shared.button",
+        "shared.modal"
+      ],
+      "to": [
+        "platform"
+      ]
+    },
+    {
+      "sha": "f3a537074c0df26cf81f08686d9c2e706b0702aa",
+      "from": [
+        "shared.modal"
+      ],
+      "to": [
+        "workspace.hours",
+        "platform"
+      ]
+    },
+    {
+      "sha": "e7d2cb575098d8c6247d063ebbb52c59749d3a40",
+      "from": [
+        "shared.modal",
+        "records.prof"
+      ],
+      "to": [
+        "records.prof",
+        "workspace.profile",
+        "platform"
+      ]
+    },
+    {
+      "sha": "fcf120240be0a6855077fd67086090965dab3b73",
+      "from": [
+        "shared.modal"
+      ],
+      "to": [
+        "workspace.profile",
+        "platform"
+      ]
+    },
+    {
+      "sha": "6cccd86340da1009f584a665f73fa4a00b3bb7b3",
+      "from": [
+        "shared.modal"
+      ],
+      "to": [
+        "workspace.profile",
+        "platform"
+      ]
+    },
+    {
+      "sha": "b72d3c6bcfb43d746affee1dcf6b1b65292bfbd2",
+      "from": [
+        "records.prof",
+        "shared.modal"
+      ],
+      "to": [
+        "records.prof",
+        "workspace.hours",
+        "platform"
+      ]
+    },
+    {
+      "sha": "467004d0218907ec7f45442a8bad3f653a7a61ce",
+      "from": [
+        "records.prof",
+        "shared.modal"
+      ],
+      "to": [
+        "records.prof",
+        "workspace.hours",
+        "platform"
+      ]
+    },
+    {
+      "sha": "47df0cb0851358687b287853aebf2e585fd8aca8",
+      "from": [
+        "shared.modal"
+      ],
+      "to": [
+        "workspace.profile"
+      ]
+    },
+    {
+      "sha": "9c4bdf88b47382ad5dba5e3378f75d0001a2b13e",
+      "from": [
+        "records.prof",
+        "shared.modal"
+      ],
+      "to": [
+        "records.prof",
+        "workspace.hours",
+        "workspace.profile",
+        "platform"
+      ]
+    },
+    {
+      "sha": "bbfcf1f62c2fc722361c53a738b03df79860e8ed",
+      "from": [
+        "shared.shell",
+        "shared.modal"
+      ],
+      "to": [
+        "communications.notifications",
+        "platform"
+      ]
+    },
+    {
+      "sha": "30e9aa61851677e58e6c4305d45588df4fc2ff88",
+      "from": [
+        "shared.list",
+        "shared.modal"
+      ],
+      "to": [
+        "communications.notifications",
+        "platform"
+      ]
+    },
+    {
+      "sha": "a8178323b25217f479a41fbd4c60580171356dfc",
+      "from": [
+        "shared.list"
+      ],
+      "to": [
+        "communications.notifications",
+        "platform"
+      ]
+    },
+    {
+      "sha": "e9e40cc90fa0f5cfe2d124ddecea5ac6cfd8d091",
+      "from": [
+        "shared.list",
+        "shared.modal"
+      ],
+      "to": [
+        "communications.notifications",
+        "platform"
+      ]
+    },
+    {
+      "sha": "d2058dc928a511138d4729e889e2fd84483a24c8",
+      "from": [
+        "shared.list",
+        "shared.modal"
+      ],
+      "to": [
+        "communications.notifications",
+        "platform"
+      ]
+    },
+    {
+      "sha": "6f74bb239699212514dd4d6a2ffe4f231f5a82e6",
+      "from": [
+        "shared.list",
+        "shared.modal"
+      ],
+      "to": [
+        "communications.notifications",
+        "platform"
+      ]
+    },
+    {
+      "sha": "a8f16a81b78db7903239039a150fab856cdd8386",
+      "from": [
+        "records.prof",
+        "shared.modal"
+      ],
+      "to": [
+        "records.prof",
+        "documents.contracts",
+        "config.visibility",
+        "platform"
+      ]
+    },
+    {
+      "sha": "394d93a1ab3a2757860d6b826a21b1cabdd04ba2",
+      "from": [
+        "shared.modal",
+        "shared.mini-card"
+      ],
+      "to": [
+        "integration.external",
+        "platform"
+      ]
+    },
+    {
+      "sha": "18a59d8fca483829c0726fc7fab9b38181e84c2f",
+      "from": [
+        "shared.modal",
+        "catalog.prof"
+      ],
+      "to": [
+        "catalog.prof",
+        "platform"
+      ]
+    },
+    {
+      "sha": "8183763eda15ff9fd5c9de844844c95f612c3034",
+      "from": [
+        "shared.modal"
+      ],
+      "to": [
+        "catalog.prof",
+        "platform"
+      ]
+    },
+    {
+      "sha": "9a77a051c1e1bf02c9a408f490c49ec29353cf00",
+      "from": [
+        "shared.modal"
+      ],
+      "to": [
+        "platform"
+      ]
+    },
+    {
+      "sha": "e0cbc11c01ffab8a33c0c055456b6078ad468c2e",
+      "from": [
+        "shared.modal"
+      ],
+      "to": [
+        "platform"
+      ]
+    },
+    {
+      "sha": "be601d5bef497673b729d9e90db451d9e5d0db4f",
+      "from": [
+        "catalog.prof",
+        "shared.modal"
+      ],
+      "to": [
+        "catalog.prof",
+        "platform"
+      ]
+    },
+    {
+      "sha": "b45cc3e4d22845da9f96c3ccf7e3c511638c5728",
+      "from": [
+        "catalog.prof",
+        "shared.modal"
+      ],
+      "to": [
+        "catalog.prof",
+        "platform"
+      ]
+    },
+    {
+      "sha": "0f42040fff2b6878698394472e1f1d0fd9423df6",
+      "from": [
+        "shared.modal"
+      ],
+      "to": [
+        "config.visibility",
+        "platform"
+      ]
+    },
+    {
+      "sha": "ba59b7b853104227a15e634f7c2b4735837c121f",
+      "from": [
+        "catalog.prof",
+        "shared.modal"
+      ],
+      "to": [
+        "catalog.prof",
+        "platform"
+      ]
+    },
+    {
+      "sha": "b0c77c2fb6f1d9cb77ed952c1d9ae64b77f17329",
+      "from": [
+        "catalog.prof",
+        "shared.modal"
+      ],
+      "to": [
+        "catalog.prof",
+        "platform"
+      ]
+    },
+    {
+      "sha": "e6c1cc65a53186be902dd65aa548dd9613c8bebd",
+      "from": [
+        "shared.modal",
+        "catalog.prof"
+      ],
+      "to": [
+        "catalog.prof",
+        "platform"
+      ]
+    },
+    {
+      "sha": "3bc2c94764af3f673896a3909a943fc90de27b60",
+      "from": [
+        "catalog.prof",
+        "shared.modal"
+      ],
+      "to": [
+        "catalog.prof",
+        "platform"
+      ]
+    },
+    {
+      "sha": "fb6caca34311ef2af2df0323f94819c8879f7d28",
+      "from": [
+        "catalog.prof",
+        "shared.modal"
+      ],
+      "to": [
+        "catalog.prof",
+        "platform"
+      ]
+    },
+    {
+      "sha": "d00bf731063d44b0865d782c0eb8a61b712e0a1b",
+      "from": [
+        "shared.modal"
+      ],
+      "to": [
+        "platform"
+      ]
+    },
+    {
+      "sha": "83bb65ed39d897156ec086a58c9a2d43cd524018",
+      "from": [
+        "shared.modal"
+      ],
+      "to": [
+        "platform"
+      ]
+    },
+    {
+      "sha": "7a6fb6ca1edc6ae7359129c5a0d7f2ef81ed14c0",
+      "from": [
+        "shared.modal"
+      ],
+      "to": [
+        "platform"
+      ]
+    },
+    {
+      "sha": "bbc1aa7b4c0c8d60e6b691aabe3b49ccf513fefa",
+      "from": [
+        "shared.modal"
+      ],
+      "to": [
+        "platform"
+      ]
+    },
+    {
+      "sha": "26ab224ef31457021d77befc099ec2ca3aaa5ab4",
+      "from": [
+        "catalog.prof",
+        "shared.modal"
+      ],
+      "to": [
+        "catalog.prof",
+        "platform"
+      ]
+    },
+    {
+      "sha": "ab888a36fbe190ddc50a4077c02a486c90187a21",
+      "from": [
+        "catalog.prof",
+        "shared.modal"
+      ],
+      "to": [
+        "catalog.prof",
+        "platform"
+      ]
+    },
+    {
+      "sha": "a8f5da2b0a0c8b146e6f656afedaec359e7ba99d",
+      "from": [
+        "catalog.prof",
+        "shared.modal"
+      ],
+      "to": [
+        "catalog.prof",
+        "platform"
+      ]
+    },
+    {
+      "sha": "6cb99a52e65654b9dcc5a7864b232246d031ba3d",
+      "from": [
+        "catalog.prof",
+        "shared.modal"
+      ],
+      "to": [
+        "catalog.prof",
+        "platform"
+      ]
+    },
+    {
+      "sha": "dec2f4bb0bac359d79ef59716bf2a1475eee61bd",
+      "from": [
+        "catalog.prof",
+        "shared.modal"
+      ],
+      "to": [
+        "catalog.prof",
+        "platform"
+      ]
+    },
+    {
+      "sha": "4008d218565f8ace3d747dc526ccc17cb0f335a8",
+      "from": [
+        "catalog.prof",
+        "shared.modal"
+      ],
+      "to": [
+        "catalog.prof",
+        "platform"
+      ]
+    },
+    {
+      "sha": "0f931f4904917b1b685d5d9d5bb55d88bc3a53eb",
+      "from": [
+        "catalog.prof",
+        "shared.modal"
+      ],
+      "to": [
+        "catalog.prof",
+        "platform"
+      ]
+    },
+    {
+      "sha": "2ae730461a25965528458ebfbcf7837a809611f4",
+      "from": [
+        "shared.modal",
+        "shared.time-record",
+        "catalog.prof"
+      ],
+      "to": [
+        "catalog.prof",
+        "time.schedule",
+        "platform"
+      ]
+    },
+    {
+      "sha": "eb77c078138d1f40df5c5ad58b1b2d348ae4b862",
+      "from": [
+        "start.contacts"
+      ],
+      "to": [
+        "contacts.prof",
+        "platform"
+      ]
+    },
+    {
+      "sha": "fc1e81fd965e0a0b8b7bb9581fe243735e93cc69",
+      "from": [
+        "shared.shell",
+        "shared.modal",
+        "contacts.prof"
+      ],
+      "to": [
+        "contacts.prof",
+        "config.visibility",
+        "platform"
+      ]
+    },
+    {
+      "sha": "f9c4960751a42e9a421d992751cd92fe94ba830d",
+      "from": [
+        "shared.card-appearance"
+      ],
+      "to": [
+        "loyalty.balances"
+      ]
+    },
+    {
+      "sha": "3b697966d6de7aaf6cb99e880b041c62708248ee",
+      "from": [
+        "shared.modal"
+      ],
+      "to": [
+        "loyalty.balances"
+      ]
+    },
+    {
+      "sha": "ed88886697a9951714a74ce892b313b33e7d9e82",
+      "from": [
+        "shared.modal"
+      ],
+      "to": [
+        "loyalty.balances"
+      ]
+    },
+    {
+      "sha": "95bf38b6890745e78b1d03f94a9b931edf5aa7ba",
+      "from": [
+        "shared.modal"
+      ],
+      "to": [
+        "loyalty.balances"
+      ]
+    },
+    {
+      "sha": "46d257001f96e5d918e17d99f2ee6491dfe15dac",
+      "from": [
+        "shared.modal"
+      ],
+      "to": [
+        "loyalty.balances",
+        "platform"
+      ]
+    },
+    {
+      "sha": "4b999ab597ab19557202bbede6dd4eaaae6f15fe",
+      "from": [
+        "contacts.prof",
+        "shared.modal"
+      ],
+      "to": [
+        "contacts.prof",
+        "platform"
+      ]
+    },
+    {
+      "sha": "41cbddde565913d23c71148ad5ad393858fddae3",
+      "from": [
+        "contacts.prof",
+        "shared.modal"
+      ],
+      "to": [
+        "contacts.prof",
+        "loyalty.programs",
+        "platform"
+      ]
+    },
+    {
+      "sha": "1e2c412c0734fc629529da741efb79c435e222d3",
+      "from": [
+        "shared.modal",
+        "contacts.prof",
+        "platform"
+      ],
+      "to": [
+        "contacts.prof",
+        "platform"
+      ]
+    },
+    {
+      "sha": "04b2a5d95399cbc9293e69ab6e82df23ee6646c9",
+      "from": [
+        "platform",
+        "contacts.prof",
+        "loyalty.prof",
+        "records.prof",
+        "workspace.profile"
+      ],
+      "to": [
+        "platform",
+        "contacts.prof",
+        "loyalty.balances",
+        "records.prof",
+        "workspace.profile",
+        "config.visibility",
+        "finance.prof"
+      ]
+    }
+  ]
+}

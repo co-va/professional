@@ -50,7 +50,7 @@ jobs:
           git -C "$gate_dir" checkout --detach -q FETCH_HEAD
           test "$(git -C "$gate_dir" rev-parse HEAD)" = "$CORE_GATE_SHA"
           node "$gate_dir/tests/release-evidence.test.mjs"
-          node "$gate_dir/scripts/check-release-evidence.mjs" "$BASE_SHA" "$HEAD_SHA" professional
+          node scripts/release/check-evidence-history.mjs "$gate_dir/scripts/check-release-evidence.mjs" "$BASE_SHA" "$HEAD_SHA" professional
 
       - name: Repository boundaries and exact duplicates
         if: success() || failure()
