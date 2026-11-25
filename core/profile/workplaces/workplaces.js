@@ -1,5 +1,5 @@
 import { actionBlock, button, collectLinks, colorPicker, escapeHtml, field, initColorPickers, initLinks, initTimePickers, links, mountModal, modal, phoneField, select, textareaField, timePicker } from '../../../ui/ui.js';
-import { notificationSettings } from '../../../ui/settings/index.js';
+import { compactCheck } from '../../../ui/selection/check-list.js';
 import { moveDesktopQTool, pinDesktopQDanger } from '../../../ui/v2/z-layout.js';
 import { isV2DesktopWorkspace } from '../../../ui/v2/geometry.js';
 import { getProfile } from '../data.js';
@@ -67,12 +67,11 @@ export function workplaceForm(existing=null){
     ${select({label:'Валюта',name:'workplaceCurrency',value:w.currency||defaults.currency||'',options:currencies})}
     ${colorField}
     <div class="workplace-form__visibility">
-      ${notificationSettings([{
-        label:'Показывать в общей онлайн-записи',
-        labelLines:['Показывать в общей','онлайн-записи'],
+      ${compactCheck({
+        label:'Онлайн-запись',
         checked:w.visibleInPublicBooking!==false,
         data:'data-workplace-public-booking-visibility',
-      }],{showStatus:false})}
+      })}
     </div>
     ${links({links:w.links||[],name:'workplace-links',label:'Ссылки',compact:true,addInHeader:true})}
     ${textareaField({label:'О рабочем пространстве',name:'workplaceAbout',value:w.about||'',placeholder:'Коротко о рабочем пространстве'})}
@@ -161,6 +160,16 @@ export function bindWorkplaceForm(root,existing=null,{onSaved=()=>{},onDeleted=(
       form.id ||= 'workplace-data-'+crypto.randomUUID();
       primary.setAttribute('form',form.id);
       moveDesktopQTool(primary);
+    }
+    // Same compact checkbox and toolbar placement as the Service workplace Q.
+    // Its change listener already updates the hidden field inside the form.
+    const toolbar=root.querySelector('[data-v2-q-header-content] > .desktop-q-toolbar');
+    const visibility=form.querySelector('.workplace-form__visibility');
+    const online=visibility?.querySelector('.ui-compact-check');
+    if(toolbar&&online){
+      online.classList.add('desktop-q-online-booking');
+      toolbar.prepend(online);
+      if(!visibility.children.length)visibility.remove();
     }
     const remove=root.querySelector('[data-delete-workplace-form]');
     const body=form.closest('[data-v2-q-body]');
