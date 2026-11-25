@@ -42,9 +42,13 @@ try {
   assert.equal(await journalBody.evaluate(node=>getComputedStyle(node).borderTopLeftRadius),'34px','Journal retains full Z body');
   assert.equal((await geometry()).background,'rgb(47, 51, 56)','Journal controls on H');
   assert.equal(await shell.locator('[data-v2-root-item="profile"]').count(),0,'Desktop F excludes Profile');
-  assert.equal(await shell.locator('[data-v2-root-item="workplaces"]').count(),1,'Desktop F includes workplaces');
+  // Owner-approved Desktop header; do not restore the retired F entry.
+  assert.equal(await shell.locator('[data-v2-root-item="workplaces"]').count(),0,'Desktop F excludes workplaces');
   assert.equal(await shell.locator('[data-desktop-profile]').isVisible(),true,'Profile in right toolbar');
-  await page.evaluate(()=>{location.hash='workplaces';});
+  const workplaces= shell.locator('[data-v2-header] [data-desktop-workplaces]');
+  assert.equal(await workplaces.count(),1,'One workplace control in Header');
+  assert.equal(await workplaces.isVisible(),true,'Desktop workplaces accessible in Header');
+  await workplaces.click();
   await page.waitForFunction(()=>document.querySelector('.v2-app--workspace')?.dataset.v2DesktopSurface==='list');
   assert.deepEqual(await geometry(),{background:'rgb(47, 51, 56)',radius:'0px'},'Desktop profile is on H, not white Z');
   await page.setViewportSize({width:390,height:844});

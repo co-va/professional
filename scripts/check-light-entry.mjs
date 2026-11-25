@@ -17,7 +17,7 @@ const start = workspace.slice(workspace.indexOf('export async function renderAut
 assert.match(start, /await loadAccess\(\)/);
 assert.doesNotMatch(start.slice(0, start.indexOf('renderWorkspace();')), /loadBusinessState\(|loadFinanceState\(|loadOperationalState\(|loadProfileState\(|ensureServerSync\(/);
 assert.match(workspace, /async function ensureWorkspaceState/);
-assert.match(workspace, /await ensureWorkspaceState\(section\);\s*ensureServerSync\(\)/);
+assert.match(workspace, /await ensureWorkspaceState\(section\);\s*if \(version !== workspaceRenderVersion \|\| !surface\.isConnected\) return null;\s*ensureServerSync\(\)/, 'Only a current, attached surface starts sync after loading');
 assert.match(serverSync, /getActiveScopes/);
 assert.match(serverSync, /snapshots\.clear\(\)/);
 assert.doesNotMatch(read('core/profile/runtime.js'), /if\(!full&&/);
@@ -33,7 +33,7 @@ assert.match(access, /apiRequest\('\/saas-access\/me'\)/);
 assert.match(access, /capabilityMap = new Map/);
 assert.match(access, /getCapability\(key\)/);
 assert.match(access, /capability\.enabled === true/);
-assert.match(workspace, /function allowedRootItems\(\)\s*\{[\s\S]*?\.filter\(\(item\) => sectionAllowed\(item\.id\)\)/);
+assert.match(workspace, /function allowedRootItems\(wide = false\)\s*\{[\s\S]*?\.filter\(\(item\) => sectionAllowed\(item\.id\)\)/);
 assert.match(workspace, /function sectionAllowed\(section\)/);
 assert.match(workspace, /canUseCapability\(item\.capability\)/);
 assert.match(workspace, /if \(section === 'finance'\) return financeNavigationItems\(\)/);

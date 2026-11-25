@@ -35,9 +35,7 @@ const markerOrder = [
   "name: 'procedureCost'",
   "name: 'procedureDescription'",
   "procedureGroupBookingFields({",
-  "data-procedure-online-check",
   "serviceGroupFields('procedures',",
-  "serviceWorkplaceAssignmentList()",
 ];
 const positions = markerOrder.map((marker) => source.indexOf(marker));
 assert.ok(positions.every((position) => position >= 0), 'All current form sections must exist');
@@ -46,8 +44,13 @@ assert.match(readFileSync('core/service/procedures/group-booking-ui.js', 'utf8')
 assert.match(source, /createServiceSaveController\(primary, \{/);
 const sharedActions = readFileSync('core/service/editor-actions.js', 'utf8');
 assert.match(sharedActions, /setSharedActionVisible\(actions, changed\)/, 'Shared Save visibility must follow dirty state');
-assert.match(source, /if \(saving \|\| assignmentSaving \|\| !syncDirty\(\)\) return null/, 'Unchanged or busy form must not submit');
-assert.match(source, /onChange: \(workplaces\) => \{[\s\S]*?syncDirty\(\)/, 'Workplace changes must sync');
+assert.match(source, /if \(saving \|\| !syncDirty\(\)\) return null/, 'Unchanged or busy form must not submit');
+assert.doesNotMatch(source, /data-procedure-online-check|serviceWorkplaceAssignmentList\(|bindServiceWorkplaceAssignments\(/, 'Approved Q contains only procedure parameters; assignments belong to Z2');
+assert.match(source, /capacityInput\.setAttribute\('form', form\.id\)/, 'Relocated capacity remains in FormData');
+assert.match(source, /capacityInput\.addEventListener\('input', syncDirty\)/);
+assert.match(source, /capacityInput\.addEventListener\('change', syncDirty\)/);
+assert.match(source, /onChange: syncDirty/, 'Group toggle updates dirty state');
+assert.match(source, /await commitProcedure\(item\)/, 'Save awaits the server owner');
 assert.match(source, /if \(event\.target\.closest\('\[data-cost-mode\]'\)\) syncDirty\(\)/, 'Cost-mode changes must sync');
 assert.match(source, /form\.addEventListener\('input', syncDirty\)/, 'Text changes must sync');
 assert.match(source, /form\.addEventListener\('change', syncDirty\)/, 'Input changes must sync');
