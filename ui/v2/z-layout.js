@@ -70,7 +70,8 @@ function surfaceHeader(content = '', { kind = 'z', dismiss = true } = {}) {
   const data = kind === 'q' ? 'data-v2-q-header' : 'data-v2-z-header';
   const contentData = kind === 'q' ? 'data-v2-q-header-content' : 'data-v2-z-header-content';
   const contentStyle = visibleWorkAreaStyle(SURFACE_HEADER_CONTENT_STYLE, kind);
-  return `<div ${data} style="${SURFACE_HEADER_STYLE}">${dismiss ? v2ZDismissAffordance() : ''}<div ${contentData} style="${contentStyle}">${content}</div></div>`;
+  const desktopClose = kind === 'q' && dismiss ? '<button type="button" class="v2-layer__close v2-desktop-q-close" data-v2-q-close aria-label="Закрыть">×</button>' : '';
+  return `<div ${data} style="${SURFACE_HEADER_STYLE}">${dismiss ? v2ZDismissAffordance() : ''}<div ${contentData} style="${contentStyle}">${content}</div>${desktopClose}</div>`;
 }
 
 function surfaceBody(content = '', { kind = 'z' } = {}) {

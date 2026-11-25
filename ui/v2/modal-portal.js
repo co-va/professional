@@ -361,7 +361,7 @@ export function mountV2Layer(html, { root = null } = {}) {
   });
   node.addEventListener('click', (event) => {
     if (event.target.closest('[data-v2-layer-close]')) node.v2Close?.();
-    if (qLayer && event.target.closest('[data-v2-z-dismiss]') && !requestBack()) node.v2Close?.();
+    if (qLayer && event.target.closest('[data-v2-z-dismiss], [data-v2-q-close]') && !requestBack()) node.v2Close?.();
   });
   return node;
 }
