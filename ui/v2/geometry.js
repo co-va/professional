@@ -1,3 +1,11 @@
+// Desktop presentation belongs to the existing Professional workspace only.
+export const V2_DESKTOP_MEDIA = '(min-width: 768px) and (min-height: 600px)';
+
+export function isV2DesktopWorkspace(app) {
+  return Boolean(app?.classList?.contains('v2-app--workspace')
+    && typeof window !== 'undefined' && window.matchMedia?.(V2_DESKTOP_MEDIA).matches);
+}
+
 export function v2ModalPortalGeometry(hostRect = {}, viewport = {}) {
   const viewportLeft = Number(viewport.offsetLeft ?? 0);
   const viewportTop = Number(viewport.offsetTop ?? 0);

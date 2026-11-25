@@ -69,7 +69,7 @@
 /* C exists only when the current context has an add action. */
 .v2-header__slot--c .v2-header__control{box-sizing:border-box;width:max-content;min-width:42px;height:42px;padding:0 12px;border:1px solid #fff;border-radius:12px;background:#111;color:#fff;white-space:nowrap}
 .v2-header__slot--c .v2-header__control--white{border-color:#111;background:#fff;color:#111}
-.v2-header__slot--c .v2-header__control--danger{border-color:var(--v2-danger);background:var(--v2-danger);color:#fff}
+.v2-header__slot--c .v2-header__control--danger{border-color:var(--ui-delete-foreground);background:var(--ui-delete-background);color:var(--ui-delete-foreground)}
 .v2-header__slot--c .v2-header__control:disabled{border-color:#B7B7B7;background:var(--v2-disabled);color:#777}
 .v2-header__slot--c .v2-header__control:active{transform:translateY(1px);filter:brightness(.92)}
 
@@ -78,8 +78,9 @@
 .v2-header__slot--d .v2-header__control--chat{width:42px;min-width:42px;height:42px;border:0;border-radius:0;padding:0;background:transparent;color:#fff}
 .v2-header__back{font-size:32px;line-height:1;font-weight:400;transform:translateY(-1px)}
 .v2-header__control--text{border-radius:12px;white-space:nowrap}
-.v2-header__control--danger{border-color:var(--v2-danger);background:var(--v2-danger);color:#fff}
+.v2-header__control--danger{border-color:var(--ui-delete-foreground);background:var(--ui-delete-background);color:var(--ui-delete-foreground)}
 .v2-header__control:disabled{background:var(--v2-disabled);color:#777;opacity:1}
+.v2-header__control--danger:disabled,.v2-header__slot--c .v2-header__control--danger:disabled{border-color:var(--ui-delete-foreground);background:var(--ui-delete-background);color:var(--ui-delete-foreground);opacity:.55}
 .v2-header__icon{width:22px;height:22px;display:grid;place-items:center}.v2-header__icon svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.v2-header__icon--chat svg{width:24px;height:24px;fill:currentColor;stroke:none}
 .v2-header__badge{position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;padding:0 5px;border-radius:999px;display:grid;place-items:center;background:var(--v2-danger);color:#fff;font-size:10px;font-weight:850}
 
@@ -306,3 +307,791 @@
 .v2-app .v2-primary-source-only{display:none!important}
 
 .v2-header.is-modal-locked{pointer-events:none}
+
+/* The same workspace and shared components, arranged for a wide viewport.
+   No separate desktop data model or palette. Phone layout is unchanged. */
+.v2-header__desktop-account,.v2-desktop-footer,.v2-desktop-q-close{display:none}
+@media (min-width:768px) and (min-height:600px){
+  .app-shell:has(>.v2-app--workspace){width:100%;max-width:none}
+  .v2-app--workspace{--v2-desktop-sidebar-width:312px;--v2-z-viewport-overscan:0px;--v2-edge:0px;width:100%;max-width:none}
+  .v2-app--workspace>.v2-header{grid-template-columns:52px calc(var(--v2-desktop-sidebar-width) - 76px) minmax(0,1fr) auto 46px}
+  .v2-app--workspace .v2-header__desktop-account{display:block;grid-column:2;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:16px;font-weight:650}
+  .v2-app--workspace .v2-header__title{grid-column:3}
+  .v2-app--workspace [data-v2-desktop-context-redundant]>.v2-header__title{visibility:hidden}
+  .v2-app--workspace .v2-header__slot--c{grid-column:4}
+  .v2-app--workspace .v2-header__slot--d{grid-column:5}
+  .v2-app--workspace>.v2-app__stage{display:grid;grid-template-columns:var(--v2-desktop-sidebar-width) minmax(0,1fr)}
+  .v2-app--workspace>.v2-app__stage>.v2-front{grid-column:2;grid-row:1;min-width:0;transform:none;animation:none;transition:none;will-change:auto}
+  .v2-app--workspace>.v2-app__stage>.v2-front>[data-v2-z]{width:100%;margin-left:0}
+  .v2-app--workspace>.v2-app__stage>.v2-front>[data-v2-z]>[data-v2-z-header]>[data-v2-z-dismiss],.v2-app--workspace .v2-edge-swipe-zone{display:none}
+  .v2-app--workspace .v2-fe-deck{position:relative;grid-column:1;grid-row:1;inset:auto;min-height:0;display:flex;flex-direction:column;gap:4px;padding:0 16px 20px;opacity:1;pointer-events:auto;overflow:auto;overscroll-behavior:contain;perspective:none;transform-style:flat}
+  .v2-app--workspace .v2-card-deck--x{display:contents;pointer-events:auto;transform:none;opacity:1;filter:none}
+  .v2-app--workspace .v2-card-deck--y{position:static;order:var(--v2-desktop-nav-order);flex:none;display:flex;gap:2px;padding-left:36px;align-items:stretch;opacity:1;pointer-events:auto;overflow:visible;scroll-snap-type:none;transform:none;perspective:none}
+  .v2-app--workspace .v2-card-deck::before,.v2-app--workspace .v2-card-deck::after{display:none}
+  .v2-app--workspace .v2-card-deck .v2-card-deck__card{order:var(--v2-desktop-nav-order);width:100%;height:auto;min-height:48px;margin:0;padding:12px 14px;flex-direction:row;align-items:center;justify-content:flex-start;gap:12px;border:0;border-radius:10px;background:transparent;color:var(--v2-white);box-shadow:none;transform:none;opacity:1;filter:none;z-index:auto;touch-action:manipulation;scroll-snap-align:none;will-change:auto}
+  .v2-app--workspace .v2-card-deck .v2-card-deck__card.is-active{background:#484e54}
+  .v2-app--workspace .v2-card-deck .v2-card-deck__card strong{font-size:14px;font-weight:500;line-height:1.15}
+  .v2-app--workspace .v2-card-deck .v2-card-deck__card.is-active strong{font-weight:650}
+  .v2-app--workspace .v2-card-deck--y .v2-card-deck__card{min-height:36px;padding:8px 12px}
+  .v2-app--workspace .v2-card-deck--y .v2-card-deck__card strong{font-size:13px}
+  .v2-app--workspace .v2-nav-icon{width:24px;height:24px}
+  .v2-app--workspace .v2-f-nested{display:none}
+  .v2-app--workspace .v2-desktop-footer{display:block;order:999;margin-top:auto;padding:12px 14px;color:var(--text-muted);font-size:12px}
+  /* One Desktop Q frame. Coordinates are relative to the safe top edge:
+     title/close center 34px; toolbar center 89px; body begins at 166px. */
+  .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard{
+    --v2-desktop-q-width:440px;
+    --v2-desktop-q-max-width:50%;
+    --v2-desktop-q-title-height:68px;
+    --v2-desktop-q-secondary-tool-height:0px;
+    --v2-desktop-q-header-height:calc(var(--v2-desktop-q-title-height) + var(--v2-desktop-q-tool-height) + var(--v2-desktop-q-secondary-tool-height) + env(safe-area-inset-top));
+    --v2-desktop-q-tool-height:42px;
+    --v2-desktop-q-button-width:112px;
+    --v2-desktop-q-button-height:36px;
+    --v2-desktop-q-button-gap:6px;
+    --v2-desktop-q-content-start:166px;
+    --v2-desktop-q-inset:clamp(18px,calc(25vw - 174px),40px);
+    top:0;left:auto;right:0;bottom:0;width:min(var(--v2-desktop-q-width),var(--v2-desktop-q-max-width));min-width:0;max-width:var(--v2-desktop-q-max-width);border-radius:var(--v2-z-radius) 0 0 0;
+    padding-inline:var(--v2-desktop-q-inset);
+  }
+  /* Optional second tool row consumes existing space above the common body baseline. */
+  .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard:has(>[data-v2-q-header]>[data-v2-q-header-content]>[data-desktop-q-secondary-tools]){
+    --v2-desktop-q-secondary-tool-height:52px;
+  }
+  .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard>[data-v2-q-header]{
+    height:var(--v2-desktop-q-header-height)!important;
+    min-height:var(--v2-desktop-q-header-height)!important;
+    max-height:var(--v2-desktop-q-header-height)!important;
+    margin:0 calc(-1 * var(--v2-desktop-q-inset))!important;
+    padding:env(safe-area-inset-top) var(--v2-desktop-q-inset) 0!important;
+    grid-template-columns:minmax(0,1fr)!important;
+  }
+  .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard>[data-v2-q-header]>[data-v2-q-header-content]{
+    grid-column:1!important;padding:0!important;gap:0!important;
+    display:grid!important;grid-template-columns:minmax(0,1fr);
+    grid-template-rows:var(--v2-desktop-q-title-height) var(--v2-desktop-q-tool-height) var(--v2-desktop-q-secondary-tool-height);
+    height:calc(var(--v2-desktop-q-title-height) + var(--v2-desktop-q-tool-height) + var(--v2-desktop-q-secondary-tool-height));
+    align-items:center;
+  }
+  .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard>[data-v2-q-header]>[data-v2-q-header-content]>:is(.v2-q-title,.desktop-q-heading,.people-overview-heading){
+    grid-row:1;grid-column:1;box-sizing:border-box;min-width:0;padding-right:28px;
+  }
+  .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard>[data-v2-q-header]>[data-v2-q-header-content]>:not(.v2-q-title,.desktop-q-heading,.people-overview-heading,[data-desktop-q-secondary-tools]){
+    grid-row:2;grid-column:1;min-width:0;align-self:center;
+  }
+  .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard>[data-v2-q-header]>[data-v2-q-header-content]>[data-desktop-q-secondary-tools]{
+    grid-row:3;grid-column:1;min-width:0;align-self:center;
+  }
+  .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard>[data-v2-q-header]>[data-v2-z-dismiss]{display:none!important}
+  .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard>[data-v2-q-header]>.v2-desktop-q-close{
+    display:grid;place-items:center;top:calc(env(safe-area-inset-top) + 34px);
+    right:calc(18px + env(safe-area-inset-right));width:var(--ui-compact-size,28px);height:var(--ui-compact-size,28px);
+    padding:0;line-height:1;transform:translateY(-50%);cursor:pointer;touch-action:manipulation;
+  }
+  .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard>[data-v2-q-body]{padding-top:calc(var(--v2-desktop-q-content-start) - var(--v2-desktop-q-title-height) - var(--v2-desktop-q-tool-height) - var(--v2-desktop-q-secondary-tool-height))}
+
+  .v2-app--workspace>.v2-layer-portal>.v2-layer-backdrop>.v2-layer--top{top:0;left:50%;right:auto;width:min(440px,100%);max-height:80%;translate:-50% 0;border-radius:14px}
+}
+
+/* Desktop F retains the calendar above its scrollable navigation. */
+.v2-desktop-calendar{display:none}
+@media (min-width:768px) and (min-height:600px){
+  .v2-app--workspace>.v2-app__stage{grid-template-rows:auto minmax(0,1fr)}
+  .v2-app--workspace>.v2-app__stage>.v2-front{grid-row:1/3}
+  .v2-app--workspace>.v2-app__stage>.v2-fe-deck{grid-row:2}
+  .v2-app--workspace .v2-desktop-calendar:not([hidden]){display:block;grid-column:1;grid-row:1;min-width:0;max-height:62dvh;overflow:auto;padding:0 12px 12px;color:var(--white)}
+  .v2-app--workspace>.v2-layer-portal>.v2-layer-backdrop>.v2-layer--bottom{top:50%;left:50%;right:auto;bottom:auto;width:min(440px,90%);height:auto;max-height:85%;min-height:0;translate:-50% -50%;border-radius:14px;animation:none}
+  .v2-app--workspace>.v2-layer-portal.is-anchored>.v2-layer-backdrop>.v2-layer--bottom{top:var(--v2-anchor-top,auto);left:var(--v2-anchor-left);right:auto;bottom:var(--v2-anchor-bottom,auto);width:var(--v2-anchor-width);height:auto;max-height:var(--v2-anchor-max-height);min-height:0;translate:none;padding:12px;animation:none;box-shadow:0 12px 32px rgba(0,0,0,.20)}
+  .v2-app--workspace>.v2-layer-portal.is-anchored .v2-layer__gesture-zone{display:none}
+}
+
+.v2-desktop-list-actions{display:none}
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace .people-search:has(.v2-desktop-list-actions){display:flex;align-items:center;gap:12px}
+ .v2-app--workspace .people-search>.field{flex:1;min-width:0}
+ .v2-app--workspace .v2-desktop-list-actions{display:flex;align-items:center;gap:8px}
+ .v2-app--workspace .v2-desktop-list-actions .ui-button{width:auto}
+}
+
+/* Approved wide layout: Journal alone is edge-attached Z. Other sections
+   use the admin-style H workspace with independent, content-height lists.
+   Keep existing Z header/body owners and Mobile geometry intact. */
+@media (min-width:768px) and (min-height:600px){
+  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front{background:var(--v2-base)}
+  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z{
+    width:100%;height:100%;min-height:0;margin:0;padding:0 36px 36px;
+    border-radius:0;background:var(--v2-base);box-shadow:none;color:var(--white);
+  }
+  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z--layer{
+    inset:0;width:100%;transform:none;animation:none;transition:none;
+  }
+  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z.is-v2-obscured{visibility:hidden}
+  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z>[data-v2-z-header]{
+    background:var(--v2-base)!important;margin:0!important;padding:0 0 16px!important;
+    min-height:0!important;grid-template-columns:24px minmax(0,1fr)!important;
+  }
+  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z:not(.v2-z--layer)>[data-v2-z-header]{grid-template-columns:minmax(0,1fr)!important}
+  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z:not(.v2-z--layer)>[data-v2-z-header]>[data-v2-z-header-content]{grid-column:1!important;padding:0!important}
+  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z>[data-v2-z-body]{scrollbar-width:auto;scrollbar-gutter:stable}
+  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z>[data-v2-z-body]::-webkit-scrollbar{display:revert}
+  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-workspace-surface{min-height:0}
+  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z :is(.v2-section__title,.ui-state-view__separator,.ui-state-view__title,.v2-profile-empty){color:var(--white)}
+  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z :is(.ui-list,.ui-folder-list,.ui-data-table,.entity-details,.agreements-summary,.empty-state,.ui-state-view__rows,.ui-state-view__empty){color:var(--text)}
+  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .field :is(input,textarea,select){color:var(--text)}
+  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .form-grid:not(.form-grid .form-grid){background:var(--white);color:var(--text);padding:16px;border-radius:var(--radius-control)}
+  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .v2-section:has(>.v2-section__content>.form-grid) .v2-section__title{color:var(--white)}
+  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .ui-state-view__row{min-height:42px;padding:8px 12px}
+  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .ui-folder-list__item{min-height:44px}
+  .v2-app--workspace[data-v2-desktop-surface="journal"] .v2-front>[data-v2-z]{background:var(--v2-inner-surface);border-radius:var(--v2-z-radius) 0 0 0}
+}
+@media (min-width:768px) and (max-width:1024px) and (min-height:600px){
+  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z{padding:0 18px 24px}
+}
+
+/* Journal header controls belong to H; only the working body manifests Z. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace[data-v2-desktop-surface="journal"] .v2-front>[data-v2-z]{background:var(--v2-base);border-radius:0;box-shadow:none;padding:0}
+ .v2-app--workspace[data-v2-desktop-surface="journal"] .v2-front>[data-v2-z]>[data-v2-z-header]{background:var(--v2-base)!important;margin:0!important;padding:0 20px 12px!important;grid-template-columns:minmax(0,1fr)!important;color:var(--white)}
+ .v2-app--workspace[data-v2-desktop-surface="journal"] .v2-front>[data-v2-z]>[data-v2-z-header]>[data-v2-z-header-content]{grid-column:1!important;padding:0!important}
+ .v2-app--workspace[data-v2-desktop-surface="journal"] .v2-front>[data-v2-z]>[data-v2-z-body]{background:var(--v2-inner-surface);border-radius:var(--v2-z-radius) 0 0 0;padding:16px 18px 24px}
+ .v2-app--workspace .v2-journal-desktop-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+ .v2-app--workspace .v2-journal-desktop-toolbar [data-journal-primary-navigation]:empty{display:none}
+ .v2-app--workspace .v2-journal-desktop-toolbar .segment-control{width:auto;min-width:130px;margin:0;background:transparent;border-color:var(--text-secondary)}
+ .v2-app--workspace .v2-journal-desktop-toolbar .segment-control button{min-height:28px;background:transparent;color:var(--white)}
+ .v2-app--workspace .v2-journal-desktop-toolbar .segment-control button.is-active{background:var(--text-secondary)}
+ .v2-app--workspace .v2-journal-desktop-actions{display:flex;align-items:center;gap:8px;margin-left:auto}
+ .v2-app--workspace .v2-journal-desktop-actions .ui-button{width:auto;height:32px;min-height:32px;border-radius:var(--radius-control);font-size:13px;padding:0 12px}
+ .v2-app--workspace .v2-journal-desktop-toolbar [data-journal-period-navigation]{color:var(--white)}
+ .v2-app--workspace .v2-journal-desktop-toolbar [data-journal-period-navigation] .ui-compact-button{color:var(--white);border-color:var(--text-secondary)}
+ .v2-app--workspace .journal-list-viewport{height:auto;min-height:0;overflow:visible}
+ .v2-app--workspace .ui-data-table--compact tr.journal-list-record--active td{background:#EFFFBB}
+ .v2-app--workspace .ui-data-table--compact tr.journal-list-record--paid td{background:#DDE8D7}
+ .v2-app--workspace .ui-data-table--compact tr.journal-list-record--no-show td,.v2-app--workspace .ui-data-table--compact tr.journal-list-record--cancelled td{background:#F1DADA}
+ .v2-app--workspace .ui-data-table--compact tr.journal-list-record--deleted td{background:#FDD2D2;color:#EB4C42}
+}
+
+/* Admin-style working area: one section title on H, breathing room, white
+   compact list panels. The approved V remains a separate floating action. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace[data-v2-desktop-surface="list"]>.v2-header .v2-header__title{visibility:visible;padding-left:28px;font-size:24px;font-weight:720}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z{padding-top:24px}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z>[data-v2-z-header]{padding-bottom:20px!important}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z>[data-v2-z-body]{padding-bottom:72px}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z :is([data-service-group-catalog],[data-inventory-stock-list]) .inventory-editor-panel{background:var(--white);color:var(--text);border-color:var(--border)}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-group-catalog]{display:grid;gap:16px;min-width:0}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-group-catalog]>:is(.inventory-editor-panel,.list-entries){border:1px solid var(--border);border-radius:var(--radius-control);background:var(--white);overflow:hidden}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-group-catalog]>.inventory-editor-panel>details>summary.inventory-editor-summary{box-sizing:border-box;height:var(--h-list-row);min-height:var(--h-list-row);max-height:var(--h-list-row);line-height:20px;padding:11px 16px;background:#E0D6D6;color:#41484F;font-size:13px;font-weight:750;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-group-catalog] .inventory-editor-panel:has(>.inventory-editor-heading__controls)>details>summary.inventory-editor-summary{padding-right:124px}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-group-catalog] .inventory-editor-panel>.inventory-editor-heading__controls{top:0;right:28px;height:var(--h-list-row);align-items:center;justify-content:flex-end;color:var(--text)}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-group-catalog] .inventory-editor-heading__controls>.ui-list__secondary{display:block;width:auto;min-width:0;margin:0;color:var(--text);font-size:15px;font-weight:750;line-height:20px;font-variant-numeric:tabular-nums;white-space:nowrap;text-align:right;overflow-wrap:normal}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-group-catalog]>.inventory-editor-panel>details[open]>summary.inventory-editor-summary{border-bottom:1px solid var(--border)}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-group-catalog]>.inventory-editor-panel>details>.inventory-editor-panel__body{padding:0}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-group-catalog]>.inventory-editor-panel>details>.inventory-editor-panel__body>.list-entries>.list-entry:last-child{border-bottom:0}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-group-catalog]>.list-entries>.list-entry:last-child{border-bottom:0}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-group-catalog] .inventory-editor-summary{box-sizing:border-box;height:var(--h-list-row);min-height:var(--h-list-row);max-height:var(--h-list-row);line-height:20px;padding:11px 16px;color:#41484F;font-size:13px;font-weight:750;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-group-catalog] .inventory-editor-panel__body{padding:0 12px 12px}
+}
+@media (min-width:768px) and (max-width:1024px) and (min-height:600px){
+ .v2-app--workspace[data-v2-desktop-surface="list"]>.v2-header .v2-header__title{padding-left:10px}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z{padding-top:20px}
+}
+
+/* Admin toolbar geometry and session controls; desktop only. Keep A at left temporarily. */
+.v2-desktop-toolbar-context,.v2-desktop-toolbar-user{display:none}
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace>.v2-header{height:68px;min-height:68px;flex:0 0 68px;padding:0 32px 0 16px;grid-template-columns:48px calc(var(--v2-desktop-sidebar-width) - 96px) minmax(0,1fr) auto auto auto;gap:10px}
+ .v2-app--workspace>.v2-header>.v2-header__title{display:none!important}
+ .v2-app--workspace>.v2-header>.v2-desktop-toolbar-context{display:flex;grid-column:3;grid-row:1;align-items:center;gap:9px;color:#D1D4D6;font-size:13px;white-space:nowrap;min-width:0;overflow:hidden}
+ .v2-desktop-toolbar-context>span:last-child{color:var(--white);font-weight:650;overflow:hidden;text-overflow:ellipsis}
+ .v2-desktop-toolbar-divider{color:var(--text-muted)}
+ .v2-app--workspace>.v2-header>.v2-desktop-toolbar-user{display:flex;grid-column:6;grid-row:1;align-items:center;gap:10px;color:#D1D4D6;font-size:12px;min-width:0}
+ .v2-desktop-toolbar-user>button{border:0;background:transparent;color:inherit;cursor:pointer;font:inherit}
+ .v2-desktop-toolbar-user>button[data-desktop-profile]{padding:0;white-space:nowrap;max-width:180px;overflow:hidden;text-overflow:ellipsis}
+ .v2-desktop-toolbar-user>button:not([data-desktop-profile]){box-sizing:border-box;display:grid;place-items:center;flex:0 0 36px;width:36px;height:36px;padding:0;border-radius:10px;color:var(--white)}
+ .v2-desktop-toolbar-user>button svg{display:block;width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+ .v2-desktop-toolbar-user>button:hover{background:rgba(255,255,255,.09)}
+ .v2-app--workspace>.v2-header>.v2-header__slot--c{grid-column:4;grid-row:1}
+ .v2-app--workspace>.v2-header>.v2-header__slot--d{grid-column:5;grid-row:1}
+}
+@media (min-width:768px) and (max-width:1024px) and (min-height:600px){
+ .v2-app--workspace>.v2-header{padding-right:12px;gap:6px;grid-template-columns:48px calc(var(--v2-desktop-sidebar-width) - 82px) minmax(0,1fr) auto auto auto}
+ .v2-desktop-toolbar-user>button[data-desktop-profile]{max-width:120px}
+ .v2-app--workspace>.v2-header>.v2-desktop-toolbar-user{gap:4px}
+}
+
+/* Desktop Y belongs only to the right work area, never to F/E or the calendar.
+   Keep the current note rail until its new presentation is approved. */
+@media (min-width:768px) and (min-height:600px){
+  .v2-app--workspace>.v2-app__stage>.v2-front{
+    display:flex;flex-direction:column;
+  }
+  .v2-app--workspace>.v2-app__stage>.v2-front>[data-v2-y-host]{
+    flex:0 0 auto;width:100%;min-width:0;
+  }
+  .v2-app--workspace>.v2-app__stage>.v2-front>[data-v2-z]:not([data-v2-z-layer]){
+    flex:1 1 auto;height:auto;min-height:0;
+  }
+}
+
+/* Contacts: match the approved Admin working area, not the mobile list.
+   Exact Admin pearl #E0D6D6 and header ink #41484F, scoped to this screen. */
+@media (min-width:768px) and (min-height:600px){
+ .people-desktop-tools{display:flex;align-items:center;gap:12px}
+ .people-desktop-tools>.field{width:min(300px,100%);min-width:180px}
+ .people-desktop-tools>.field input[type="search"]{height:36px;min-height:36px;max-height:36px;border-radius:10px;font-size:13px}
+ .people-desktop-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+ .people-desktop-actions .ui-button{box-sizing:border-box;width:auto;height:var(--h-tools);min-height:var(--h-tools);max-height:var(--h-tools);padding:0 12px;border-width:1px;border-radius:10px;font-size:13px;line-height:1}
+ .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) [data-people-list-host]{min-height:0}
+ .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact{
+   border-radius:14px;background:var(--white);border-color:var(--border);
+ }
+ .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact th{
+   height:var(--h-list-row);box-sizing:border-box;padding:4px 12px;background:#E0D6D6;color:#41484F;
+   font-size:12px;font-weight:750;line-height:1.2;letter-spacing:0;text-transform:uppercase;white-space:normal;
+   border-bottom:1px solid #E0D6D6;
+ }
+ .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact td{
+   height:var(--h-list-row);box-sizing:border-box;padding:4px 12px;font-size:13px;color:var(--text);border-bottom:1px solid #E0D6D6;
+ }
+ .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact td>button{font-weight:650}
+ .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact tbody tr{cursor:default}
+ .v2-app--workspace>.v2-header>.v2-desktop-toolbar-context,
+ .v2-app--workspace>.v2-header>.v2-desktop-toolbar-user,
+ .v2-app--workspace>.v2-header .v2-desktop-toolbar-divider,
+ .v2-app--workspace>.v2-header .v2-desktop-toolbar-user>button:not([data-desktop-profile]){color:#E0D6D6}
+ .v2-app--workspace>.v2-header:has(.v2-desktop-toolbar-context){border-bottom:1px solid rgba(255,255,255,.14)}
+}
+@media (min-width:768px) and (max-width:1024px) and (min-height:600px){
+ .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact td{padding:4px 8px}
+}
+
+/* Contacts: approved pearl controls; equal compact date columns.
+   Import/export menu composition is pending owner approval. */
+@media (min-width:768px) and (min-height:600px){
+ .people-desktop-tools>.field{flex:1 1 180px;max-width:300px;width:auto;min-width:140px}
+ .people-desktop-actions--right{margin-left:auto}
+ .people-desktop-actions .ui-button{background:var(--white);color:#41484F;border-color:var(--white)}
+ .people-desktop-query-tools .ui-compact-button{color:var(--white);background:transparent;border:1px solid var(--white);border-radius:6px}
+ .people-desktop-query-tools .ui-compact-button[aria-pressed="true"]{background:transparent;color:#E0D6D6;border-color:#E0D6D6}
+ .people-desktop-query-tools .ui-compact-button:focus-visible{outline-color:var(--white)}
+ .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact :is(th,td):is([data-table-column="firstVisit"],[data-table-column="lastVisit"]){
+   box-sizing:border-box;width:110px;min-width:110px;max-width:110px;text-align:center;padding:4px 6px;
+ }
+ .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact th:is([data-table-column="firstVisit"],[data-table-column="lastVisit"])>span{display:block;white-space:nowrap}
+ .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact td:is([data-table-column="firstVisit"],[data-table-column="lastVisit"]){font-variant-numeric:tabular-nums;white-space:nowrap}
+}
+
+/* Contacts Desktop: approved compact action card, using the existing X portal.
+   Mobile and all other X presentations retain their original geometry. */
+@media (min-width:768px) and (min-height:600px){
+ .people-desktop-actions .people-desktop-icon{display:grid;place-items:center;width:36px;min-width:36px;padding:0}
+ .people-desktop-actions .people-desktop-add{background:#E0D6D6;border-color:#E0D6D6}
+ .v2-app--workspace>.v2-layer-portal.is-anchored>.v2-layer-backdrop>.v2-layer--bottom:is(.people-action-popup,.desktop-q-action-popup){
+   border-radius:14px;background:var(--white);padding:8px;overflow:auto;
+ }
+ :is(.people-action-menu,.desktop-q-action-menu){display:grid;gap:0}
+ :is(.people-action-menu,.desktop-q-action-menu)>.ui-button{
+   display:flex;align-items:center;gap:12px;width:100%;min-height:42px;height:auto;padding:10px 12px;
+   border:0;border-radius:0;background:transparent;color:#41484F;text-align:left;
+   font-size:14px;font-weight:550;white-space:normal;
+ }
+ :is(.people-action-menu,.desktop-q-action-menu)>.ui-button+.ui-button{border-top:1px solid #E0D6D6}
+ :is(.people-action-menu,.desktop-q-action-menu)>.ui-button svg{flex:0 0 20px}
+ :is(.people-action-menu,.desktop-q-action-menu)>.ui-button:hover,:is(.people-action-menu,.desktop-q-action-menu)>.ui-button:focus-visible{background:var(--surface-soft);outline-offset:-2px}
+ .people-action-popup>[data-add-choice-error]:empty{display:none}
+}
+
+/* Contacts Desktop: the table is the only vertical scroll owner. Keep the
+   actual table header in the same table so columns never drift. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z:has([data-people-desktop-toolbar])>[data-v2-z-body]{
+   display:flex;flex-direction:column;overflow:hidden!important;
+   padding-bottom:0;scrollbar-gutter:auto;
+ }
+ .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) :is([data-v2-workspace-surface],.ui-page,section:has(>[data-people-list-host]),[data-people-list-host]){
+   display:flex;flex-direction:column;flex:1 1 auto;min-height:0;min-width:0;
+ }
+ .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) [data-people-list-host]>.ui-data-table--compact{
+   flex:0 1 auto;min-height:0;overflow:auto;overscroll-behavior:none;
+ }
+ .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) [data-people-list-host]>.ui-data-table--compact table{
+   border-collapse:separate;border-spacing:0;
+ }
+ .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) [data-people-list-host]>.ui-data-table--compact thead th{
+   position:sticky;top:0;z-index:2;background:#E0D6D6;
+ }
+}
+
+/* One contact cell, two unchanged visit columns, compact rounded Contacts X. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .people-table-person{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;width:100%;min-width:0;line-height:1.15}
+ .people-table-person__name{font-size:13px;font-weight:650;overflow-wrap:anywhere}
+  .people-table-person__phone{font-size:12px;font-weight:400;color:var(--text-secondary);white-space:nowrap;font-variant-numeric:tabular-nums}
+ .people-sort-popup :is(.people-action-menu,.desktop-q-action-menu)>.ui-button[aria-pressed="true"]{font-weight:750;background:var(--surface-soft);border-radius:8px}
+ .v2-app--workspace>.v2-layer-portal.is-anchored>.v2-layer-backdrop>.v2-layer--bottom.people-filter-popup{padding:16px}
+ .people-filter-popup [data-people-filter-fields]>.form-grid{gap:8px}
+ .people-filter-popup [data-people-filter-fields] .field.ui-select:has(>span){display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);align-items:center;gap:10px}
+ .people-filter-popup [data-people-filter-fields] .field>span{font-size:13px;color:#41484F;line-height:1.2}
+ .people-filter-popup .ui-select__control{height:34px;min-height:34px;max-height:34px;border-radius:8px;font-size:13px;padding:0 23px 0 9px}
+ .people-filter-popup .ui-select__selection,.people-filter-popup .ui-select__text,.people-filter-popup .ui-select__value{justify-content:flex-start;text-align:left;font-size:13px}
+ .v2-layer--bottom.people-filter-popup [data-people-filter-actions]:not([hidden]){margin-top:12px;background:transparent}
+ .people-filter-popup [data-people-filter-action]{height:36px;min-height:36px;border-radius:10px;font-size:13px}
+ .people-filter-popup [hidden]{display:none!important}
+ .people-filter-selector .ui-selector__wheel{border:0;border-radius:10px}
+ .people-filter-selector .ui-selector__viewport{padding:0 4px}
+ .people-filter-selector .ui-selector__option{height:auto;min-height:36px;max-height:none;justify-content:flex-start;font-size:13px;text-align:left;padding:8px}
+ .people-filter-selector .ui-selector__option-main{text-align:left}
+ .people-filter-selector .ui-selector__option.is-current{background:var(--surface-soft);border-radius:8px}
+}
+
+/* Desktop Clients: preserve the approved 110px date columns, make Code visible,
+   and reserve independent metric columns. Horizontal overflow stays in the table. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace [data-people-list-host]>.ui-data-table--compact [data-table-column="code"]{width:72px;min-width:72px;text-align:left;font-variant-numeric:tabular-nums}
+ .v2-app--workspace [data-people-list-host]>.ui-data-table--compact td[data-table-column="code"]{font-size:14px;font-weight:750;color:#111}
+ .v2-app--workspace [data-people-list-host]>.ui-data-table--compact [data-table-column="name"]{min-width:155px}
+ .v2-app--workspace [data-people-list-host]>.ui-data-table--compact [data-table-column="visitCount"]{width:96px;min-width:96px;text-align:center;font-variant-numeric:tabular-nums}
+ .v2-app--workspace [data-people-list-host]>.ui-data-table--compact :is([data-table-column="paidTotal"],[data-table-column="debt"]){width:112px;min-width:112px;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+ .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact th:is([data-table-column="visitCount"],[data-table-column="paidTotal"],[data-table-column="debt"]){padding:4px 6px}
+ .v2-app--workspace [data-people-list-host]>.ui-data-table--compact th[data-table-column="visitCount"]>span{display:block;white-space:nowrap}
+}
+
+/* Desktop Contacts: three logical groups, without extra data columns.
+   Add 16px leading whitespace at each new group, retaining the existing
+   110px date content area and equal date alignment. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact :is(th,td)[data-table-column="visitCount"]{
+   width:112px;min-width:112px;padding-left:22px;padding-right:6px;
+ }
+ .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact :is(th,td)[data-table-column="firstVisit"]{
+   width:126px;min-width:126px;max-width:126px;padding-left:22px;padding-right:6px;
+ }
+}
+
+/* Desktop Contacts: keep the complete debt heading on one line, without changing the common heading font. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact :is(th,td)[data-table-column="debt"]{width:146px;min-width:146px;white-space:nowrap;overflow-wrap:normal;word-break:normal}
+}
+
+/* Desktop Contacts: counter matches the H title; selection and opening are
+   separate native controls. No row-wide click target. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact :is(th,td)[data-table-column="select"]{padding:0 4px;text-align:center}
+ .v2-app--workspace [data-people-list-host] .ui-compact-check{position:relative;display:inline-grid;place-items:center;width:36px;height:40px;min-height:40px;touch-action:manipulation}
+ .v2-app--workspace [data-people-list-host] .ui-compact-check .ui-check-input{inset:0;width:100%;height:100%;margin:0;pointer-events:auto;cursor:pointer}
+ .v2-app--workspace [data-people-list-host] .ui-compact-check .ui-compact-check__mark{pointer-events:none}
+ .v2-app--workspace [data-people-list-host] .ui-check-input:indeterminate+.ui-compact-check__mark::after{content:'−';font-weight:750;color:var(--text)}
+ .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact :is(th,td)[data-table-column="open"]{width:36px;min-width:36px;padding:0 2px;text-align:center}
+ .v2-app--workspace [data-people-list-host] .ui-data-table--compact td>.people-table-open{display:grid;place-items:center;width:32px;height:40px;margin:auto;color:#41484F;touch-action:manipulation;cursor:pointer}
+ .v2-app--workspace [data-people-list-host] .people-table-open:hover{background:var(--surface-soft);border-radius:8px}
+}
+
+/* Desktop Contacts / View: content-specific constructor and selector styles only. */
+@media (min-width:768px) and (min-height:600px){
+ .people-card-appearance-q [data-entity-card-appearance-constructor]{width:100%;max-width:360px;margin-inline:auto}
+ .people-card-appearance-q .ui-select__control{box-sizing:border-box;height:48px;min-height:48px;max-height:48px;border-radius:8px;font-size:16px;padding:0 28px;text-align:center;justify-content:center}
+ .people-card-appearance-q .ui-select__selection{justify-content:center}
+ .people-card-appearance-q .ui-select__text{display:flex;align-items:center;justify-content:center;gap:8px;text-align:center;max-width:100%}
+ .people-card-appearance-q .ui-select__value{display:block;flex:0 1 auto;max-height:none;white-space:nowrap;text-overflow:ellipsis;font-size:16px;line-height:1.2;text-align:center}
+ .people-card-appearance-q .ui-select__meta{flex:0 0 auto;font-size:14px;line-height:1.2;white-space:nowrap}
+ .people-card-appearance-q .ui-select__meta[hidden]{display:none}
+ .people-card-field-selector .ui-selector__option{justify-content:center;text-align:center;min-height:42px;font-size:16px}
+ .people-card-field-selector .ui-selector__option-main{display:flex;flex-wrap:nowrap;align-items:center;justify-content:center;gap:8px;text-align:center}
+ .people-card-field-selector .ui-selector__option-label{min-width:0}
+ .people-card-field-selector .ui-selector__option-main small{flex:0 0 auto;font-size:14px;white-space:nowrap}
+}
+
+/* Desktop Person overview: two header rows, shared Q and standard full footer. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace :is(.people-overview-heading,.desktop-q-heading){height:var(--v2-desktop-q-title-height,68px);display:flex;align-items:center;padding-right:28px}
+ .v2-app--workspace :is(.people-overview-toolbar,.desktop-q-toolbar){display:flex;align-items:center;justify-content:space-between;gap:12px;min-width:0}
+ .v2-app--workspace .people-overview-toolbar>.ui-select{flex:0 1 128px;min-width:94px}
+ .v2-app--workspace .people-overview-toolbar .ui-select__control{height:36px;min-height:36px;max-height:36px;border-radius:8px;font-size:13px;padding:0 18px 0 6px;touch-action:manipulation}
+ .v2-app--workspace .people-overview-toolbar .ui-select__value{font-size:13px;white-space:nowrap}
+ .v2-app--workspace :is(.people-overview-tools,.desktop-q-tools){display:flex;align-items:center;justify-content:flex-end;gap:16px;flex:0 0 auto}
+ .v2-app--workspace :is(.people-overview-tools,.desktop-q-tools) .ui-compact-button{color:var(--text);border-radius:8px;touch-action:manipulation}
+ .v2-app--workspace :is(.people-overview-tools,.desktop-q-tools) .ui-compact-button:hover{background:var(--surface-soft)}
+ .v2-app--workspace .people-overview-record{width:auto;height:36px;min-height:36px;max-height:36px;padding:0 12px;border-radius:8px;font-size:13px;white-space:nowrap;touch-action:manipulation}
+}
+
+/* Shared desktop H grid: the title starts at the left work-area inset,
+   the text back control ends at the right inset; never center the work area.
+   Keep mobile Z and all Q geometry intact. */
+[data-h-title-row]{display:none}
+@media (min-width:768px) and (min-height:600px){
+.v2-app--workspace{--h-inset:36px;--h-top:36px;--h-bottom:48px;--h-title:36px;--h-gap:24px;--h-tools:36px;--h-list-tool-row:42px;--h-list-row:44px;--h-content-gap:24px}
+.v2-app--workspace [data-v2-z-header]>[data-v2-z-dismiss]{display:none!important;visibility:hidden!important;pointer-events:none!important}
+.v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z{padding:var(--h-top) var(--h-inset) var(--h-bottom)}
+.v2-app--workspace[data-v2-desktop-surface] .v2-front>.v2-z>[data-v2-z-header]{display:grid!important;grid-template-columns:minmax(0,1fr)!important;grid-template-rows:var(--h-title) minmax(var(--h-tools),auto);align-items:center;gap:var(--h-gap);width:100%;max-width:none;align-self:stretch;min-height:0!important;margin:0!important;padding:0 0 var(--h-content-gap)!important;background:var(--v2-base)!important}
+.v2-app--workspace .v2-front>.v2-z>[data-v2-z-header]>[data-h-title-row]{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;justify-items:end;column-gap:16px;width:100%;min-width:0;text-align:left!important}
+.v2-app--workspace [data-h-title-row]>[data-h-title]{grid-column:1;justify-self:start;display:block;width:100%;min-width:0;margin:0!important;padding:0!important;text-align:left!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--white);font-size:30px;line-height:1.2;font-weight:720;letter-spacing:-.035em}
+.v2-app--workspace [data-h-title-row]>[data-h-accessory]{grid-column:2;justify-self:end}
+.v2-app--workspace [data-h-accessory]:empty{display:none}
+.v2-app--workspace [data-h-accessory]>:is([data-people-count],[data-service-count]){color:var(--white);font-size:30px;line-height:1.2;font-weight:720;letter-spacing:-.035em;font-variant-numeric:tabular-nums;white-space:nowrap}
+.v2-app--workspace [data-h-back]{grid-column:3;justify-self:end;display:none;background:transparent;border:0;padding:0;color:var(--white);font:inherit;font-size:14px;line-height:1.2;min-height:36px;cursor:pointer}
+.v2-app--workspace .v2-front>.v2-z--layer[data-v2-dismissible="true"]>[data-v2-z-header] [data-h-back]{display:block}
+.v2-app--workspace[data-v2-desktop-surface] .v2-front>.v2-z>[data-v2-z-header]>[data-v2-z-header-content]{grid-column:1!important;grid-row:2;min-height:var(--h-tools);justify-content:center;align-self:stretch;margin:0!important;padding:0!important}
+.v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z>[data-v2-z-body]{max-width:none;width:100%;align-self:stretch;scrollbar-gutter:auto}
+.v2-app--workspace[data-v2-desktop-surface="journal"] .v2-front>.v2-z:not(.v2-z--layer)>[data-v2-z-header]{width:calc(100% - 2 * var(--h-inset));margin-inline:var(--h-inset)!important;padding:var(--h-top) 0 var(--h-content-gap)!important}
+.v2-app--workspace .people-desktop-overview-z .people-overview-toolbar{justify-content:space-between;flex-wrap:wrap;gap:12px;min-height:var(--h-tools)}
+.v2-app--workspace .people-desktop-overview-z .people-overview-tools{margin-left:auto;flex-wrap:wrap}
+.v2-app--workspace .people-desktop-overview-z .people-overview-tools .ui-compact-button{color:var(--white)}
+.v2-app--workspace .people-desktop-overview-z .people-overview-record{background:#E0D6D6;color:#41484F;border-color:#E0D6D6;height:36px;min-height:36px}
+.v2-app--workspace .people-desktop-overview-z .people-overview-toolbar .ui-select__control{height:36px;min-height:36px;max-height:36px}
+.v2-app--workspace .people-desktop-overview-z [data-person-card]{width:min(338px,100%);max-width:338px;align-self:flex-start}
+.v2-app--workspace .v2-front>.v2-z .v2-desktop-danger-footer{left:auto;right:var(--h-inset);width:max-content}
+.v2-app--workspace .v2-front>.v2-z .v2-desktop-danger-footer>.ui-button{box-sizing:border-box;width:160px;min-width:160px;height:var(--h-tools);min-height:var(--h-tools);max-height:var(--h-tools);margin:0;padding:0 12px;border-width:1px;border-radius:10px;font-size:13px;line-height:1}
+}
+@media (min-width:768px) and (max-width:1024px) and (min-height:600px){.v2-app--workspace{--h-inset:26px;--h-top:26px;--h-bottom:36px}}
+
+/* Desktop document list uses the existing X portal and compact table.
+   Do not change Mobile document tiles or already accepted X menus. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace>.v2-layer-portal>.v2-layer-backdrop>.v2-layer--bottom:is(.people-documents-popup,.desktop-table-popup){
+   border-radius:14px;padding:12px;width:min(520px,calc(100% - 16px));
+   box-shadow:0 8px 24px rgba(0,0,0,.18);animation:v2-desktop-documents-in .16s ease-out both
+ }
+ .v2-app--workspace>.v2-layer-portal.is-anchored>.v2-layer-backdrop>.v2-layer--bottom:is(.people-documents-popup,.desktop-table-popup){width:var(--v2-anchor-width);max-height:var(--v2-anchor-max-height)}
+ .v2-app--workspace :is(.people-documents-popup,.desktop-table-popup)>.v2-layer__gesture-zone{display:none}
+ .v2-app--workspace :is(.people-documents-popup,.desktop-table-popup) .ui-data-table--compact{border-radius:10px;overflow:hidden}
+ .v2-app--workspace :is(.people-documents-popup,.desktop-table-popup) .ui-data-table--compact table{width:100%;table-layout:fixed;border-collapse:collapse}
+ /* Q uses the exact existing documents popup header, not the H-list header. */
+ .v2-app--workspace :is(.people-documents-popup,.desktop-table-popup,.service-consumables-q) .ui-data-table--compact th{background:#E0D6D6;color:#41484F;font-size:12px;font-weight:750;box-sizing:border-box;padding:8px 10px;vertical-align:middle;text-align:left}
+ .v2-app--workspace :is(.people-documents-popup,.desktop-table-popup) .ui-data-table--compact td{box-sizing:border-box;padding:8px 10px;vertical-align:middle;text-align:left}
+ .v2-app--workspace :is(.people-documents-popup,.desktop-table-popup) .ui-data-table--compact td{height:44px;font-size:13px;color:#41484F}
+ .v2-app--workspace :is(.people-documents-popup,.desktop-table-popup) .ui-data-table--compact :is(th,td)[data-table-column="icon"]{width:38px;text-align:center;padding:4px}
+ .v2-app--workspace :is(.people-documents-popup,.desktop-table-popup) .ui-data-table--compact :is(th,td)[data-table-column="date"]{width:88px;white-space:nowrap;font-variant-numeric:tabular-nums;text-align:right}
+ .v2-app--workspace :is(.people-documents-popup,.desktop-table-popup) .ui-data-table--compact :is(th,td)[data-table-column="status"]{width:44px;text-align:center;padding:4px}
+ .v2-app--workspace :is(.people-documents-popup,.desktop-table-popup) .document-tile__status-mark{margin:auto}
+ .v2-app--workspace :is(.people-documents-popup,.desktop-table-popup) td[data-table-column="title"]{overflow-wrap:anywhere;line-height:1.25}
+ .v2-app--workspace>.v2-layer-portal>.v2-layer-backdrop>.v2-layer--bottom:is(.people-documents-popup,.desktop-table-popup).is-dismissing{animation:none;opacity:0;transform:translateY(-4px);transition:opacity .15s ease,transform .15s ease}
+}
+@keyframes v2-desktop-documents-in{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
+@media (prefers-reduced-motion:reduce){.v2-app--workspace :is(.people-documents-popup,.desktop-table-popup){animation:none!important;transition:none!important}}
+
+/* All deletion confirmations: safe action first, destructive action second.
+   Keep the Mobile sheet geometry; Desktop confirmations are centered on a
+   dimmed H backdrop, not anchored popups. Technical viewers and Q unchanged. */
+[data-v2-delete-confirmation] .modal-actions>.v2-confirmation-safe{background:var(--text);border-color:var(--text);color:var(--white)}
+[data-v2-delete-confirmation] .modal-actions>.v2-confirmation-destructive{background:var(--ui-delete-background);border-color:var(--ui-delete-foreground);color:var(--ui-delete-foreground)}
+[data-v2-delete-confirmation] .modal-actions>.v2-confirmation-destructive:disabled{background:var(--ui-delete-background);border-color:var(--ui-delete-foreground);color:var(--ui-delete-foreground);opacity:.55}
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace>.v2-layer-portal>.v2-layer-backdrop[data-v2-delete-confirmation]>.v2-layer--bottom{border-radius:14px;padding:28px 32px;width:min(440px,calc(100% - 32px));box-shadow:0 12px 32px rgba(0,0,0,.24);animation:v2-desktop-confirm-in .16s ease-out both;color:#41484F}
+ .v2-app--workspace [data-v2-delete-confirmation] .modal-title{margin-bottom:24px}
+ .v2-app--workspace [data-v2-delete-confirmation] .modal-title h2{color:#41484F}
+ .v2-app--workspace [data-v2-delete-confirmation] .modal-title p{margin-top:8px;font-size:15px;line-height:1.5;color:#41484F}
+ .v2-app--workspace [data-v2-delete-confirmation] .modal-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;justify-items:stretch;align-items:center;margin-top:24px}
+ .v2-app--workspace [data-v2-delete-confirmation] .modal-actions>:is(.v2-confirmation-safe,.v2-confirmation-destructive){box-sizing:border-box;width:100%;min-width:0;max-width:160px;height:var(--h-tools,36px);min-height:var(--h-tools,36px);max-height:var(--h-tools,36px);margin:0;padding:0 10px;border-width:1px;border-radius:10px;font-size:13px;line-height:1}
+ .v2-app--workspace [data-v2-delete-confirmation] .modal-actions>.v2-confirmation-destructive{grid-column:1;grid-row:1;justify-self:start}
+ .v2-app--workspace [data-v2-delete-confirmation] .modal-actions>.v2-confirmation-safe{grid-column:2;grid-row:1;justify-self:end}
+ /* Document confirmation: owner explicitly requests the destructive action on the right. */
+ .v2-app--workspace [data-v2-delete-confirmation] .document-delete-confirmation .modal-actions>.v2-confirmation-destructive{grid-column:2;justify-self:end}
+ .v2-app--workspace [data-v2-delete-confirmation] .document-delete-confirmation .modal-actions>.v2-confirmation-safe{grid-column:1;justify-self:start}
+ .v2-app--workspace [data-v2-delete-confirmation] .v2-layer__gesture-zone{display:none}
+ .v2-app--workspace>.v2-layer-portal>.v2-layer-backdrop[data-v2-delete-confirmation]>.v2-layer--bottom.is-dismissing{animation:none;opacity:0;transform:translateY(0);transition:opacity .15s ease}
+}
+@keyframes v2-desktop-confirm-in{from{opacity:0}to{opacity:1}}
+@media (prefers-reduced-motion:reduce){[data-v2-delete-confirmation]>.v2-layer{animation:none!important;transition:none!important}}
+
+/* Desktop Clients: search/filter empty result uses the existing empty-state,
+   with the same rounded H card as an actually empty client collection. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) [data-people-list-host]>.empty-state{border-radius:var(--radius-control,14px);overflow:hidden}
+}
+
+/* Shared Desktop form actions: reuse the approved H-tool dimensions without
+   changing the Mobile button contract or inline/menu/paired controls. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace :is(.form-grid>.ui-button[type="submit"],.profile-actions>.ui-button:only-child):not(.v2-confirmation-safe,.v2-confirmation-destructive){
+   box-sizing:border-box;width:160px;min-width:0;max-width:100%;height:var(--h-tools,36px);min-height:var(--h-tools,36px);max-height:var(--h-tools,36px);margin-inline:auto 0;justify-self:end;padding:0 12px;border-width:1px;border-radius:10px;font-size:13px;line-height:1;
+ }
+}
+
+/* Ordinary Desktop H tool row: same approved geometry/palette as Clients.
+   Only explicit opt-in rows use this; Mobile and Journal do not. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-desktop-tool-row{display:flex;align-items:center;justify-content:space-between;min-width:0;gap:12px}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-desktop-tool-context{display:flex;align-items:center;gap:8px;min-width:0}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-desktop-tool-context>.ui-compact-button{color:var(--white);background:transparent;border:1px solid var(--white);border-radius:6px}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-desktop-tool-context>.ui-compact-button:focus-visible{outline-color:var(--white)}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-desktop-tool-actions{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:8px;margin-left:auto;min-width:0}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-desktop-tool-actions>.ui-button{box-sizing:border-box;width:auto;height:var(--h-tools);min-height:var(--h-tools);max-height:var(--h-tools);padding:0 12px;margin:0;border:1px solid var(--white);border-radius:10px;background:var(--white);color:#41484F;font-size:13px;line-height:1;white-space:nowrap}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-desktop-tool-actions>:is(.v2-desktop-tool-primary,.v2-desktop-tool-accent),
+ .v2-app--workspace .desktop-q-toolbar>.desktop-q-action-slot.v2-desktop-tool-primary{background:#E0D6D6;border-color:#E0D6D6;color:#41484F}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-desktop-tool-actions>.v2-desktop-tool-primary{display:grid;place-items:center;width:var(--h-tools);min-width:var(--h-tools);padding:0}
+ .v2-app--workspace[data-v2-desktop-surface="list"] :is(.v2-desktop-tool-context,.v2-desktop-tool-actions)>.segment-control{box-sizing:border-box;width:auto;min-width:0;height:var(--h-tools);min-height:var(--h-tools);margin:0}
+ .v2-app--workspace[data-v2-desktop-surface="list"] :is(.v2-desktop-tool-context,.v2-desktop-tool-actions)>.segment-control>button{flex:1 0 auto}
+ .v2-app--workspace[data-v2-desktop-surface="list"] :is(.v2-desktop-tool-context,.v2-desktop-tool-actions) :is(.ui-button,.segment-control>button):focus-visible{outline:2px solid var(--white);outline-offset:-3px}
+}
+
+/* Canonical single-line Desktop list toolbar. Preserve the accepted Clients
+   baseline (42px), but make it explicit, never an intrinsic field height.
+   Other legacy surfaces opt in as they are adapted; Journal/Mobile untouched. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z>[data-v2-z-header]:has(>[data-v2-z-header-content]>[data-v2-z-header-row]>:is([data-people-desktop-toolbar],.v2-desktop-tool-row)){
+   grid-template-rows:var(--h-title) var(--h-list-tool-row);
+ }
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z :is(.people-desktop-tools,.v2-desktop-tool-row){
+   box-sizing:border-box;height:var(--h-list-tool-row);min-height:var(--h-list-tool-row);max-height:var(--h-list-tool-row);
+   flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;
+ }
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z :is(.people-desktop-tools,.v2-desktop-tool-row)::-webkit-scrollbar{display:none}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .people-desktop-tools>.field:has(>input[type="search"]){gap:0}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .people-desktop-tools>.field:has(>input[type="search"])>span:empty{display:none}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z :is(.people-desktop-actions,.v2-desktop-tool-context,.v2-desktop-tool-actions){flex:0 0 auto;flex-wrap:nowrap}
+}
+
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace [data-people-list-host] .ui-compact-check{display:grid;margin:auto}
+ .v2-app--workspace [data-people-list-host] .people-table-person__name{white-space:nowrap;overflow-wrap:normal}
+}
+
+/* Service Desktop: one visible catalogue panel, same stationary 44px header
+   and independently scrolling body as the accepted Clients list. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z:has([data-service-desktop-group-list])>[data-v2-z-body]{display:flex;flex-direction:column;overflow:hidden!important;padding-bottom:0;scrollbar-gutter:auto}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z:has([data-service-desktop-group-list]) :is([data-v2-workspace-surface],.ui-page,[data-service-catalog]){display:flex;flex-direction:column;flex:1 1 auto;min-height:0;min-width:0}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-desktop-group-list]{display:flex;flex-direction:column;flex:0 1 auto;min-height:0;min-width:0;border:1px solid var(--border);border-radius:var(--radius-control);overflow:hidden;background:var(--white)}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .service-desktop-group-header{box-sizing:border-box;display:flex;align-items:center;justify-content:space-between;gap:16px;flex:0 0 var(--h-list-row);height:var(--h-list-row);min-height:var(--h-list-row);max-height:var(--h-list-row);padding:0 12px 0 16px;background:#E0D6D6;color:#41484F;border-bottom:1px solid var(--border);font-size:12px;font-weight:750;font-style:italic;line-height:1.2;text-transform:uppercase}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .service-desktop-group-select{display:flex;min-width:0;max-width:100%;flex:0 1 auto;gap:0}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .service-desktop-group-select .ui-select__control{width:auto;height:36px;min-height:36px;max-height:36px;padding:0 24px 0 0;background:transparent;border:0;border-radius:0;color:#41484F;font-size:inherit;font-weight:inherit;font-style:inherit;text-transform:inherit}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .service-desktop-group-select :is(.ui-select__selection,.ui-select__text){min-width:0;justify-content:flex-start;text-align:left}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .service-desktop-group-select .ui-select__value{display:block;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;text-align:left}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .service-desktop-group-select .ui-select__chevron{right:4px;color:#41484F}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .service-desktop-price-title{flex:0 0 auto;text-align:right;white-space:nowrap}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .service-desktop-group-title{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .service-desktop-group-header .service-desktop-group-select .ui-select__value{font-style:italic;text-transform:inherit}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-desktop-group-list] :is([data-procedure],[data-product])>.list-entry__content{grid-template-columns:36px minmax(0,1fr) auto}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-desktop-group-list] :is([data-procedure],[data-product]) .list-entry__right{grid-column:3;justify-self:end}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .service-desktop-group-body[data-service-group-catalog]{display:block;flex:0 1 auto;min-height:0;overflow:auto;overscroll-behavior:none}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-group-branch][hidden]{display:none!important}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-group-branch]>.list-entries:last-child>.list-entry:last-child{border-bottom:0}
+}
+
+/* A field picker is a local selector, not a dimmed Desktop X editor.
+   Keep the existing portal/outside-dismiss behavior and Q underneath. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace>.v2-layer-portal.is-anchored>.v2-layer-backdrop[data-v2-x-role="picker"]:has(>.v2-layer--bottom:is(.modal--time-picker-sheet,.modal--duration-picker-popover)){background:transparent}
+}
+
+/* Shared Desktop Q: page-level actions belong to a fixed toolbar, not
+   the scrolling form. Opt in through moveDesktopQTool. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-q-fixed-tools .desktop-q-toolbar{box-sizing:border-box;height:var(--v2-desktop-q-tool-height);min-height:var(--v2-desktop-q-tool-height);max-height:var(--v2-desktop-q-tool-height);flex:0 0 var(--v2-desktop-q-tool-height);gap:var(--v2-desktop-q-button-gap);justify-content:flex-start;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;scrollbar-width:none}
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-q-fixed-tools .desktop-q-toolbar::before{content:"";flex:1 0 0;min-width:0}
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-q-fixed-tools .desktop-q-toolbar>.desktop-q-action-slot[data-ui-action-hidden],.v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-q-fixed-tools .desktop-q-toolbar>.desktop-q-action-slot[hidden]{display:none!important}
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-q-fixed-tools .desktop-q-toolbar::-webkit-scrollbar{display:none}
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-q-fixed-tools .desktop-q-toolbar>.desktop-q-action-slot{box-sizing:border-box;flex:0 0 var(--v2-desktop-q-button-width);width:var(--v2-desktop-q-button-width);min-width:var(--v2-desktop-q-button-width);max-width:var(--v2-desktop-q-button-width);margin:0;padding:0}
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-q-fixed-tools .desktop-q-toolbar>.desktop-q-action-slot:is(.ui-button),.v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-q-fixed-tools .desktop-q-toolbar>.desktop-q-action-slot>.ui-button{box-sizing:border-box;width:var(--v2-desktop-q-button-width);min-width:var(--v2-desktop-q-button-width);max-width:var(--v2-desktop-q-button-width);height:var(--v2-desktop-q-button-height);min-height:var(--v2-desktop-q-button-height);max-height:var(--v2-desktop-q-button-height);padding:0 4px;margin:0;border-width:1px;border-radius:10px;font-size:12px;line-height:1.15;white-space:normal;overflow-wrap:normal;overflow:hidden;text-overflow:clip}
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-q-fixed-tools .desktop-q-toolbar>.desktop-q-action-slot.modal-actions{position:static;height:var(--v2-desktop-q-button-height);min-height:var(--v2-desktop-q-button-height);max-height:var(--v2-desktop-q-button-height);display:grid;gap:0}
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-q-fixed-tools .desktop-q-toolbar>.desktop-q-action-slot.ui-compact-button{flex:0 0 var(--ui-compact-size);width:var(--ui-compact-size);min-width:var(--ui-compact-size);max-width:var(--ui-compact-size)}
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-q-fixed-tools .desktop-q-toolbar>.desktop-q-action-slot.ui-compact-button.v2-desktop-tool-primary{flex:0 0 var(--h-tools);width:var(--h-tools);min-width:var(--h-tools);max-width:var(--h-tools);height:var(--h-tools);min-height:var(--h-tools);max-height:var(--h-tools);border:1px solid #E0D6D6;border-radius:10px;font-size:24px}
+
+}
+
+/* Service uses the existing accepted Desktop density for form-contained
+   settings rows and workplace lists as well as the main catalog. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-catalog]>.list-entries{border:1px solid var(--border);border-radius:var(--radius-control);background:var(--white);overflow:hidden}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-catalog]>.list-entries>.list-entry:last-child{border-bottom:0}
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard:is(.service-procedure-editor-layer,.service-product-editor-layer) [data-v2-q-body] .list-entries:not(.desktop-inline-group-booking):has(>[class~="list-entry"] [data-procedure-group-toggle]){gap:0;border:1px solid var(--border);border-radius:var(--radius-control);overflow:hidden;background:var(--white)}
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard:is(.service-procedure-editor-layer,.service-product-editor-layer) .list-entry:has([data-procedure-group-toggle]):not(.desktop-inline-group-booking>.list-entry){height:var(--h-list-row);min-height:var(--h-list-row);max-height:var(--h-list-row);box-shadow:none;transform:none}
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard:is(.service-procedure-editor-layer,.service-product-editor-layer) .list-entry:has([data-procedure-group-toggle]):not(.desktop-inline-group-booking>.list-entry) .list-entry__content{height:100%;min-height:0;padding:4px 12px;background:var(--white)}
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard:is(.service-procedure-editor-layer,.service-product-editor-layer) .list-entry:has([data-procedure-group-toggle]):not(.desktop-inline-group-booking>.list-entry) .list-entry__text{gap:2px;min-width:0}
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard:is(.service-procedure-editor-layer,.service-product-editor-layer) .list-entry:has([data-procedure-group-toggle]):not(.desktop-inline-group-booking>.list-entry) .list-entry__main strong{font-size:14px;line-height:16px}
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard:is(.service-procedure-editor-layer,.service-product-editor-layer) .list-entry:has([data-procedure-group-toggle]):not(.desktop-inline-group-booking>.list-entry) .list-entry__main small{font-size:12px;line-height:14px;white-space:nowrap;text-overflow:ellipsis;overflow:hidden}
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard:is(.service-procedure-editor-layer,.service-product-editor-layer) .list-entry:has([data-procedure-group-toggle]):not(.desktop-inline-group-booking>.list-entry) .list-entry__toggle{height:var(--ui-compact-size)}
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard:is(.service-procedure-editor-layer,.service-product-editor-layer) [data-service-workplace-prices]>.ui-list{border-radius:var(--radius-control)}
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard:is(.service-procedure-editor-layer,.service-product-editor-layer) [data-service-workplace-prices]>.ui-list:empty{display:none}
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard:is(.service-procedure-editor-layer,.service-product-editor-layer) [data-service-workplace-prices] .ui-list__item{height:var(--h-list-row);min-height:var(--h-list-row);max-height:var(--h-list-row);padding:4px 12px}
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard:is(.service-procedure-editor-layer,.service-product-editor-layer) [data-service-workplace-prices] :is(.ui-list__title,.ui-list__secondary){white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard:is(.service-procedure-editor-layer,.service-product-editor-layer) [data-service-workplace-prices] .ui-list__title{font-size:14px;line-height:16px}
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard:is(.service-procedure-editor-layer,.service-product-editor-layer) [data-service-workplace-prices] .ui-list__secondary{font-size:12px;line-height:14px;margin-top:2px}
+ .v2-app--workspace>.v2-layer-portal.is-anchored>.v2-layer-backdrop[data-v2-x-role="picker"]:has(>.service-workplace-picker){background:transparent}
+ .v2-app--workspace>.v2-layer-portal.is-anchored>.v2-layer-backdrop[data-v2-x-role="picker"]>.v2-layer--bottom.service-workplace-picker .ui-list{border:0;background:transparent}
+ .v2-app--workspace>.v2-layer-portal.is-anchored>.v2-layer-backdrop[data-v2-x-role="picker"]>.v2-layer--bottom.service-workplace-picker .ui-list__item{height:var(--ui-field-height);min-height:var(--ui-field-height);max-height:var(--ui-field-height);padding:4px 8px;background:transparent}
+ .v2-app--workspace>.v2-layer-portal.is-anchored>.v2-layer-backdrop[data-v2-x-role="picker"]>.v2-layer--bottom.service-workplace-picker .ui-list__title{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ .v2-app--workspace>.v2-layer-portal.is-anchored>.v2-layer-backdrop[data-v2-x-role="picker"]>.v2-layer--bottom.service-workplace-picker .ui-list__item:is(:hover,:focus-visible){background:var(--surface-soft);border-radius:8px}
+}
+
+/* Desktop group booking is a single rounded white row: label, input, toggle. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace :is(.desktop-inline-group-booking, .desktop-workplace-editor .desktop-inline-group-booking){display:block;box-sizing:border-box;border:1px solid var(--border);background:var(--white);box-shadow:none;overflow:hidden;border-radius:14px}
+ .v2-app--workspace .desktop-inline-group-booking>.list-entry{height:calc(var(--ui-field-height) - 2px);min-height:calc(var(--ui-field-height) - 2px);max-height:calc(var(--ui-field-height) - 2px);border:0;box-shadow:none;transform:none;background:transparent;overflow:visible}
+ .v2-app--workspace .desktop-inline-group-booking .list-entry__background{display:none}
+ .v2-app--workspace .desktop-inline-group-booking .list-entry__content{display:grid;box-sizing:border-box;height:100%;min-height:0;max-height:none;grid-template-columns:minmax(0,1fr) minmax(72px,100px) 42px;align-items:center;gap:8px;padding:0 10px;background:transparent}
+ .v2-app--workspace .desktop-inline-group-booking .list-entry__text{display:block}
+ .v2-app--workspace .desktop-inline-group-booking .list-entry__main strong{font-size:13px;line-height:16px;white-space:nowrap;overflow-wrap:normal}
+ .v2-app--workspace .desktop-inline-group-booking .list-entry__main small{display:none}
+ .v2-app--workspace .desktop-inline-group-booking .list-entry__toggle{width:42px;height:var(--ui-compact-size);justify-self:end}
+ .v2-app--workspace .desktop-inline-capacity{min-width:0;width:100%;align-self:center}
+ .v2-app--workspace .desktop-inline-capacity>.field{display:block;margin:0}
+ .v2-app--workspace .desktop-inline-capacity>.field>span{display:none}
+ .v2-app--workspace .desktop-inline-capacity input[type="number"]{box-sizing:border-box;width:100%;height:36px;min-height:36px;max-height:36px;padding:4px 10px;text-align:left;border-radius:0;font-size:16px;appearance:textfield;-moz-appearance:textfield}
+ .v2-app--workspace .desktop-inline-capacity input[type="number"]::-webkit-inner-spin-button,.v2-app--workspace .desktop-inline-capacity input[type="number"]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+ .v2-app--workspace .desktop-inline-capacity input[type="number"]:disabled{opacity:1;color:var(--text);-webkit-text-fill-color:var(--text)}
+}
+/* Desktop Q destructive action follows the accepted Clients Z footer:
+   isolated, fixed bottom right, never in the action toolbar. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard>[data-v2-q-body]>.v2-desktop-danger-footer{left:auto;right:var(--v2-desktop-q-inset);width:max-content;margin:0;background:var(--v2-inner-surface)}
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard>[data-v2-q-body]>.v2-desktop-danger-footer>.ui-button{box-sizing:border-box;width:160px;min-width:160px;max-width:160px;height:var(--v2-desktop-q-button-height);min-height:var(--v2-desktop-q-button-height);max-height:var(--v2-desktop-q-button-height);margin:0;padding:0 12px;border-width:1px;border-radius:10px;font-size:13px;line-height:1}
+}
+
+/* Local Service X editor: the same form density, explicit Desktop close,
+   ordinary actions above the data and the destructive action below. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace .desktop-workplace-editor{padding:0;gap:12px}
+ .v2-app--workspace .desktop-workplace-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:36px}
+ .v2-app--workspace .desktop-workplace-heading>.service-workplace-price-editor__title{min-width:0;flex:1}
+ .v2-app--workspace .desktop-workplace-heading>.desktop-workplace-close{position:static;flex:0 0 var(--ui-compact-size);width:var(--ui-compact-size);height:var(--ui-compact-size);padding:0;border-radius:8px;line-height:1;cursor:pointer}
+ .v2-app--workspace .desktop-workplace-tools{display:flex;justify-content:flex-end;align-items:center;gap:6px;min-height:42px;height:42px;max-height:42px}
+ .v2-app--workspace .desktop-workplace-tools :is(.ui-button){box-sizing:border-box;width:112px;min-width:112px;max-width:112px;height:36px;min-height:36px;max-height:36px;margin:0;padding:0 4px;border-radius:10px;font-size:12px}
+ .v2-app--workspace .desktop-workplace-editor>.desktop-workplace-danger-footer{display:flex;justify-content:flex-end;align-items:center;margin-top:8px}
+ .v2-app--workspace .desktop-workplace-editor>.desktop-workplace-danger-footer>.ui-button{box-sizing:border-box;width:160px;min-width:160px;max-width:160px;height:36px;min-height:36px;max-height:36px;margin:0;padding:0 12px;border-radius:10px;font-size:13px}
+}
+
+/* Shared Desktop View Q: fixed action line above a fixed selector line.
+   The existing Q toolbar styles own Save; empty lines retain their geometry. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-appearance-q .entity-card-appearance-q__selectors{box-sizing:border-box;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:center;gap:8px;min-height:var(--v2-desktop-q-button-height);height:var(--v2-desktop-q-button-height);max-height:var(--v2-desktop-q-button-height);padding-right:0}
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-appearance-q .entity-card-appearance-q__selectors>.ui-select{min-width:0;width:100%;margin:0}
+}
+
+/* The shared color palette is an anchored Desktop picker, not a central editor. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace>.v2-layer-portal.is-anchored>.v2-layer-backdrop[data-v2-x-role="picker"]:has(>.modal--color-sheet){background:transparent}
+ .v2-app--workspace>.v2-layer-portal.is-anchored>.v2-layer-backdrop[data-v2-x-role="picker"]>.v2-layer--bottom.modal--color-sheet{height:auto;min-height:0;max-height:var(--v2-anchor-max-height);padding:12px;border-radius:14px;background:var(--white);overflow:auto}
+}
+
+/* Service groups Desktop: reuse Q toolbar, destructive footer and the dense
+   workplace list geometry. No card stacks or nested edit X. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace .desktop-service-groups-q [data-desktop-group-content] .ui-list{border-radius:var(--radius-control);gap:0}
+ .v2-app--workspace .desktop-service-groups-q [data-desktop-group-content] .ui-list__item{box-sizing:border-box;height:var(--h-list-row);min-height:var(--h-list-row);max-height:var(--h-list-row);padding:4px 12px}
+ .v2-app--workspace .desktop-service-groups-q [data-desktop-group-content] .ui-list__title{font-size:14px;line-height:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ .v2-app--workspace .desktop-service-groups-q [data-desktop-group-content] .ui-list__secondary{font-size:12px;line-height:14px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ .v2-app--workspace .desktop-service-groups-q [data-desktop-group-content] .ui-list__item>.list-entry__reorder-handle{height:var(--ui-compact-size);width:var(--ui-compact-size);flex-basis:var(--ui-compact-size)}
+ .v2-app--workspace .desktop-service-groups-q [data-desktop-group-content] .ui-list__right-secondary{font-size:13px;line-height:16px;font-variant-numeric:tabular-nums;white-space:nowrap}
+ .v2-app--workspace .desktop-service-groups-q [data-service-group-value-list] .desktop-group-empty-row .ui-list__title{color:var(--text-secondary);font-weight:400}
+}
+
+/* Service group directory keeps original LS2. Only value rows use the dense
+   workplace-style list, including a single empty row in the same frame. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace .desktop-service-groups-q .desktop-group-values{display:grid;gap:6px;min-width:0}
+ .v2-app--workspace .desktop-service-groups-q [data-service-group-value-list]>.ui-list--dense.list-entries{box-sizing:border-box;border-radius:var(--radius-control,14px);min-height:0;height:auto;gap:0;padding:0;margin:0}
+ .v2-app--workspace .desktop-service-groups-q [data-service-group-value-list] .ui-list__item.desktop-group-empty-row{height:44px;min-height:44px;max-height:44px;padding:4px 12px;flex:0 0 44px}
+}
+
+/* Shared Service Z2: the existing visual card and workplace mini-cards
+   start on the same line, aligned at the H origin. The statistics column
+   wraps independently; it never pushes the main card or centres the rail. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace .service-desktop-overview-cards{display:flex;flex-direction:column;align-items:stretch;gap:calc(var(--h-gap) + var(--h-tools) + var(--h-content-gap));width:100%;min-width:0}
+ .v2-app--workspace .service-desktop-overview-cards>.entity-visual-card{align-self:flex-start;flex:0 0 auto;width:min(338px,100%);max-width:338px;margin:0}
+ .v2-app--workspace .service-desktop-workplace-cards{display:flex;flex:0 0 auto;width:100%;max-width:100%;min-width:0;flex-wrap:nowrap;gap:12px;align-items:flex-start;justify-content:flex-start;overflow-x:auto;overflow-y:hidden;padding:0;scroll-padding-inline:0;scroll-snap-type:none;touch-action:pan-x;user-select:none;-webkit-user-select:none}
+ .v2-app--workspace .service-desktop-workplace-cards>.mini-card{flex:0 0 min(var(--mini-card-width),100%);width:min(var(--mini-card-width),100%);margin:0;box-shadow:none;color:#111;scroll-snap-align:none;touch-action:pan-x}
+ .v2-app--workspace .service-desktop-workplace-cards>.mini-card>.mini-card__record-center{overflow:visible;overscroll-behavior:auto;touch-action:pan-x}
+ .v2-app--workspace .service-desktop-workplace-cards :is(.mini-card__row-label,.mini-card__row-value){color:#111}
+}
+
+/* Desktop consumables use the same compact List frame for populated and
+   empty states. Keep the existing stock quantity input and remove control. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace .service-consumables-q [data-procedure-consumable-items]>.ui-list{box-sizing:border-box;border-radius:var(--radius-control,14px);height:auto;min-height:0;gap:0;padding:0;margin:0}
+ .v2-app--workspace .service-consumables-q [data-procedure-consumable-items] .ui-list__item{box-sizing:border-box;min-height:var(--h-list-row);padding:4px 12px}
+ .v2-app--workspace .service-consumables-q [data-procedure-consumable-items] .service-consumable-empty-row{height:44px;min-height:44px;max-height:44px;flex:0 0 44px}
+ .v2-app--workspace .service-consumables-q .service-consumable-empty-row .ui-list__title{color:var(--text-secondary);font-weight:400}
+ .v2-app--workspace .service-consumables-q [data-procedure-consumable-cost]:not([hidden]){margin:8px 0 0}
+ .v2-app--workspace .service-consumables-q [data-procedure-consumable-cost][hidden]{display:none!important}
+}
+
+/* Shared compact anchored table picker: search and explicit close stay above
+   the scrolling result list, the same compact table geometry as documents. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace>.v2-layer-portal.is-anchored>.v2-layer-backdrop[data-v2-x-role="picker"]:has(>.desktop-table-popup){background:transparent}
+ .v2-app--workspace .desktop-table-popup .desktop-table-picker-tools{display:flex;align-items:center;gap:8px;position:sticky;top:0;z-index:2;background:var(--v2-inner-surface,#F5F5F3);padding-bottom:8px}
+ .v2-app--workspace .desktop-table-popup .desktop-table-picker-tools>.field{flex:1 1 auto;min-width:0;margin:0}
+ .v2-app--workspace .desktop-table-popup .desktop-table-picker-tools>.field>span:empty{display:none}
+ .v2-app--workspace .desktop-table-popup.service-consumable-picker .desktop-table-picker-tools{flex:0 0 auto;padding-bottom:12px}
+ .v2-app--workspace .desktop-table-popup .ui-data-table--compact td:has(>.desktop-table-picker-item){padding:0}
+ .v2-app--workspace .desktop-table-popup .desktop-table-picker-item{box-sizing:border-box;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;min-height:44px;width:100%;padding:4px 10px!important;cursor:pointer;font-size:13px;line-height:16px}
+ .v2-app--workspace .desktop-table-popup .desktop-table-picker-item>strong{font-weight:500;overflow-wrap:anywhere;text-align:left}
+ .v2-app--workspace .desktop-table-popup .desktop-table-picker-item>small{font-size:11px;color:var(--text-secondary);overflow-wrap:anywhere;text-align:left}
+ .v2-app--workspace .desktop-table-popup .desktop-table-picker-item:is(:hover,:focus-visible){background:var(--surface-soft)}
+}
+
+/* Shared product/group picker: natural-size popup, persistent search and
+   apply; only the result list scrolls, never the whole selection form. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace .desktop-table-popup.service-consumable-picker{display:flex;flex-direction:column;min-height:0;overflow:hidden}
+ .v2-app--workspace .desktop-table-popup.service-consumable-picker>[data-consumable-choices]{flex:0 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain}
+ .v2-app--workspace .desktop-table-popup.service-consumable-picker>.consumable-picker-apply{flex:0 0 auto;position:static;margin:8px 0 0;display:flex;justify-content:flex-end}
+ .v2-app--workspace .desktop-table-popup.service-consumable-picker>.consumable-picker-apply[hidden]{display:none!important}
+ .v2-app--workspace .desktop-table-popup.service-consumable-picker>.consumable-picker-apply>.ui-button{width:112px;height:36px;min-height:36px;border-radius:10px;font-size:13px}
+ .v2-app--workspace .desktop-table-popup .desktop-table-picker-check{display:grid;grid-template-columns:var(--ui-compact-size,28px) minmax(0,1fr);align-items:center;gap:10px}
+ .v2-app--workspace .desktop-table-popup td:has(.desktop-table-picker-check){padding:0}
+ .v2-app--workspace .desktop-table-popup .desktop-table-picker-check .ui-check-input{pointer-events:none}
+}
+.desktop-table-picker-copy{min-width:0;display:grid;gap:2px;text-align:left}
+.desktop-table-picker-copy>strong{font-size:13px;font-weight:500;overflow-wrap:anywhere}
+.desktop-table-picker-copy>small{font-size:11px;color:var(--text-secondary);overflow-wrap:anywhere}
+.service-consumable-inline-quantity{display:flex;align-items:center;gap:6px;flex:0 0 auto}
+.service-consumable-inline-quantity>.field{width:70px;margin:0}
+.service-consumable-inline-quantity>.field>span:empty{display:none}
+.service-consumable-inline-quantity>.field>input{box-sizing:border-box;min-width:0;width:100%;height:34px;min-height:34px;padding:4px 6px;border-radius:0}
+.service-consumable-inline-quantity>span{font-size:12px;min-width:23px}
+
+/* Consumables editor: the shared compact table, one header and one row
+   per norm/position. The Q width is local and retains the global 50% cap. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.service-consumables-q{--v2-desktop-q-width:520px}
+ .v2-app--workspace .service-consumables-q [data-procedure-consumable-items]>.ui-data-table--compact{border-radius:10px;overflow:hidden}
+ .v2-app--workspace .service-consumables-q .ui-data-table--compact table{width:100%;min-width:0;table-layout:fixed;border-collapse:collapse}
+ .v2-app--workspace .service-consumables-q .ui-data-table--compact td{box-sizing:border-box;padding:4px 8px;vertical-align:middle;text-align:left}
+ .v2-app--workspace .service-consumables-q .ui-data-table--compact td{height:44px;font-size:13px;color:#41484F}
+ .v2-app--workspace .service-consumables-q .ui-data-table--compact :is(th,td)[data-table-column="quantity"]{width:80px;padding-inline:4px}
+ .v2-app--workspace .service-consumables-q .ui-data-table--compact :is(th,td)[data-table-column="unit"]{width:68px;padding-inline:4px;text-align:center}
+ .v2-app--workspace .service-consumables-q .ui-data-table--compact :is(th,td)[data-table-column="remove"]{width:36px;padding-inline:4px;text-align:center}
+ .v2-app--workspace .service-consumables-q .ui-data-table--compact td[data-table-column="remove"]>.ui-compact-button{margin:auto}
+ .v2-app--workspace .service-consumables-q .service-consumable-title,.v2-app--workspace .service-consumables-q .service-consumable-subtitle{display:block;line-height:1.2;overflow-wrap:anywhere}
+ .v2-app--workspace .service-consumables-q .service-consumable-title{font-weight:600}
+ .v2-app--workspace .service-consumables-q .service-consumable-subtitle{font-size:11px;color:var(--text-secondary);margin-top:2px}
+ .v2-app--workspace .service-consumables-q td[data-table-column="unit"]>.ui-select{width:100%;min-width:0;margin:0}
+ .v2-app--workspace .service-consumables-q td[data-table-column="unit"] .ui-select__control{box-sizing:border-box;min-width:0;width:100%;height:34px;min-height:34px;max-height:34px;padding:0 15px 0 4px;font-size:12px}
+ .v2-app--workspace .service-consumables-q td[data-table-column="unit"] .ui-select__value{min-width:0;white-space:nowrap}
+}
+
+/* All Q tool rows share the same 36px control line. Compact icon glyphs
+   keep their original size, but their hit areas align with text buttons. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace [data-v2-q-header-content]>:is(.desktop-q-toolbar,.people-overview-toolbar){box-sizing:border-box;height:var(--v2-desktop-q-tool-height);min-height:var(--v2-desktop-q-tool-height);max-height:var(--v2-desktop-q-tool-height);align-items:center}
+ .v2-app--workspace [data-v2-q-header-content] :is(.desktop-q-toolbar,.people-overview-toolbar) :is(.ui-button,.ui-select__control,.ui-compact-button){box-sizing:border-box;height:var(--v2-desktop-q-button-height);min-height:var(--v2-desktop-q-button-height);max-height:var(--v2-desktop-q-button-height)}
+ .v2-app--workspace [data-v2-q-header-content] :is(.desktop-q-toolbar,.people-overview-toolbar) .ui-select{margin:0;min-width:0}
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard>[data-v2-q-header]>[data-v2-q-header-content]>[data-desktop-q-secondary-tools] :is(.ui-button,.ui-select__control,.ui-compact-button){box-sizing:border-box;height:var(--v2-desktop-q-button-height);min-height:var(--v2-desktop-q-button-height);max-height:var(--v2-desktop-q-button-height)}
+ .v2-app--workspace [data-v2-q-header-content]>.people-history-search{margin:0}
+}
+
+/* Service booking options use the shared Q tool rows, not the form. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace .desktop-q-toolbar>.desktop-q-online-booking{order:-1;flex:0 1 auto;min-width:0;height:var(--v2-desktop-q-button-height);max-height:var(--v2-desktop-q-button-height);gap:5px}
+ .v2-app--workspace .desktop-q-toolbar>.desktop-q-online-booking .ui-compact-check__label{min-width:0;font-size:12px;line-height:1.15;font-weight:700;white-space:normal;overflow-wrap:normal}
+}
+
+/* One Desktop veil for Q/X/S and technical layers; preserve Mobile geometry. */
+@media (min-width:768px) and (min-height:600px){
+ body:has(.v2-app--workspace){--v2-desktop-modal-veil:rgba(0,0,0,.58)}
+ .v2-app--workspace>.v2-layer-portal>.v2-layer-backdrop,
+ body:has(.v2-app--workspace)>.v2-layer-backdrop--technical{background:var(--v2-desktop-modal-veil)}
+ body:has(.v2-app--workspace)>.v2-layer-backdrop--technical{width:100%;max-width:none;margin:0}
+ body:has(.v2-app--workspace)>.v2-layer-backdrop--technical>.v2-layer--technical{top:0;right:0;bottom:0;left:auto;width:min(50vw,760px);height:100dvh;max-height:none;border-radius:0;transform:none;animation:v2-standard-in .18s ease-out both}
+ body:has(.v2-app--workspace)>.v2-layer-backdrop--technical>.v2-layer--technical.document-viewer-sheet--compact{width:min(440px,50vw)}
+ body:has(.v2-app--workspace)>.v2-layer-backdrop--technical>.v2-layer--technical{--v2-technical-title-top:max(56px,calc(env(safe-area-inset-top) + 20px))}
+ body:has(.v2-app--workspace)>.v2-layer-backdrop--technical>.v2-layer--technical>.v2-layer__technical-body{padding:var(--v2-technical-title-top) 24px 24px}
+ body:has(.v2-app--workspace)>.v2-layer-backdrop--technical>.v2-layer--technical>.v2-layer__close{top:var(--v2-technical-title-top);right:24px;width:var(--ui-compact-size,28px);height:var(--ui-compact-size,28px);display:grid;place-items:center;padding:0;line-height:1;cursor:pointer}
+ body:has(.v2-app--workspace)>.v2-layer-backdrop--technical>.v2-layer--technical:has(.document-page__version)>.v2-layer__close{top:calc(var(--v2-technical-title-top) + 28px)}
+ body:has(.v2-app--workspace)>.v2-layer-backdrop--technical>.v2-layer--technical .document-page__version{line-height:16px}
+ body:has(.v2-app--workspace)>.v2-layer-backdrop--technical>.v2-layer--technical .document-page h1{padding-right:40px}
+ body:has(.v2-app--workspace)>.v2-layer-backdrop--technical>.v2-layer--technical:has(.document-viewer__pdf)>.v2-layer__close{top:calc(env(safe-area-inset-top) + 12px)}
+}

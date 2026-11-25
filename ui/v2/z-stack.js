@@ -49,6 +49,20 @@ function nextLayerDepth(host, dismissible) {
   return layers.length + 1;
 }
 
+// Explicit workspace navigation discards the previous section's nested Z
+// surfaces without running their Back/onClose callbacks.
+export function disposeV2ZStack(app) {
+  const host = app?.querySelector?.('[data-v2-front]') || app?.querySelector?.('.v2-app__stage');
+  if (!host) return;
+  const layers = [...host.querySelectorAll(':scope > [data-v2-z-layer]')];
+  for (const layer of layers.reverse()) {
+    if (typeof layer.v2Dispose === 'function') layer.v2Dispose();
+    else layer.remove();
+  }
+  app.classList.toggle('has-z-layer', false);
+  syncV2ZStackInteraction(app, host);
+}
+
 export function mountV2ZLayer(root, html, { onClose = null, stack = false, dismissible = true } = {}) {
   const app = root?.closest?.('[data-v2-app]') || document.querySelector('[data-v2-app]');
   const stage = app?.querySelector?.('.v2-app__stage');

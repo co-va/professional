@@ -2,11 +2,12 @@ import { retainV2EdgeHost } from './lifecycle.js';
 import { rootApp } from './root-app.js';
 import { bindV2ZDismissAffordance } from './z-affordance.js';
 import { bindV2StableZFrame } from './z-stack.js';
+import { isV2DesktopWorkspace, V2_DESKTOP_MEDIA } from './geometry.js';
 
 export function setV2DeckOpen(root, open) {
   const app = rootApp(root);
   if (!app) return false;
-  const next = Boolean(open);
+  const next = Boolean(open) && !isV2DesktopWorkspace(app);
   if (next) app.classList.remove('is-z-entering');
   app.classList.toggle('is-deck-open', next);
   app.classList.remove('is-revealing-deck');
@@ -45,7 +46,8 @@ export function initV2WorkspaceInteraction(root, {
 
   const fCards = [...(fDeck?.querySelectorAll?.('[data-v2-card-item]') || [])];
   const eCards = [...(eDeck?.querySelectorAll?.('[data-v2-card-item]') || [])];
-  let fActiveIndex = Math.max(0, fCards.findIndex((card) => String(card.getAttribute('data-v2-card-item') || '') === String(activeId || '')));
+  const rootIndex = () => fCards.findIndex((card) => String(card.getAttribute('data-v2-card-item') || '') === String(activeId || ''));
+  let fActiveIndex = isV2DesktopWorkspace(app) ? rootIndex() : Math.max(0, rootIndex());
   let eActiveIndex = Math.max(0, eCards.findIndex((card) => String(card.getAttribute('data-v2-card-item') || '') === String(eActiveId || '')));
   let open = Boolean(deckOpen);
   let secondaryOpen = Boolean(open && eOpen && eCards.length);
@@ -55,6 +57,7 @@ export function initV2WorkspaceInteraction(root, {
   const disposers = [];
   const scrollFrames = new Map();
   const cardId = (card) => String(card?.getAttribute('data-v2-card-item') || '');
+  const desktop = () => isV2DesktopWorkspace(app);
   const deckIsOpen = () => app.classList.contains('is-deck-open');
   const secondaryIsOpen = () => app.classList.contains('is-e-open');
 
@@ -69,9 +72,12 @@ export function initV2WorkspaceInteraction(root, {
 
   setActiveCard(fCards, fActiveIndex);
   setActiveCard(eCards, eActiveIndex);
+  // Keep E directly below its F item in the wide layout. These variables are unused on mobile.
+  fCards.forEach((card, index) => card.style.setProperty('--v2-desktop-nav-order', String(index * 2)));
+  eDeck?.style.setProperty('--v2-desktop-nav-order', String(fActiveIndex * 2 + 1));
 
   const updateDeckGeometry = (deck, cards, axis) => {
-    if (!deck || !cards.length) return -1;
+    if (desktop() || !deck || !cards.length) return -1;
     const center = axis === 'y' ? Number(deck.clientHeight || 0) / 2 : Number(deck.clientWidth || 0) / 2;
     const scroll = axis === 'y' ? Number(deck.scrollTop || 0) : Number(deck.scrollLeft || 0);
 
@@ -133,7 +139,7 @@ export function initV2WorkspaceInteraction(root, {
 
   const centerCard = (card, axis, behavior = 'auto') => {
     const deck = card?.closest?.('[data-v2-card-deck]');
-    if (!card || !deck) return;
+    if (desktop() || !card || !deck) return;
     const target = axis === 'y'
       ? Math.max(0, Math.min(
         Math.max(0, Number(deck.scrollHeight || 0) - Number(deck.clientHeight || 0)),
@@ -294,7 +300,7 @@ export function initV2WorkspaceInteraction(root, {
     () => fActiveIndex,
     (index) => { fActiveIndex = index; },
     (id) => onRootSelect?.(id),
-    () => deckIsOpen() && !secondaryIsOpen() && !app.classList.contains('has-v2-modal'),
+    () => (desktop() || (deckIsOpen() && !secondaryIsOpen())) && !app.classList.contains('has-v2-modal'),
   );
   bindNativeDeck(
     eDeck,
@@ -303,12 +309,12 @@ export function initV2WorkspaceInteraction(root, {
     () => eActiveIndex,
     (index) => { eActiveIndex = index; },
     (id) => onSecondarySelect?.(id),
-    () => secondaryIsOpen() && !app.classList.contains('has-v2-modal'),
+    () => (desktop() || secondaryIsOpen()) && !app.classList.contains('has-v2-modal'),
   );
 
   const eDown = (event) => {
     if (app.classList.contains('has-v2-modal')) return;
-    if (!secondaryIsOpen() || !eDeck?.contains(event.target)) return;
+    if (desktop() || !secondaryIsOpen() || !eDeck?.contains(event.target)) return;
     if (event.pointerType === 'mouse' && event.button !== 0) return;
     eGesture = { id:event.pointerId, x:event.clientX, y:event.clientY, dx:0, axis:'pending' };
   };
@@ -400,6 +406,7 @@ export function initV2WorkspaceInteraction(root, {
   const disposeZDismissAffordance = bindV2ZDismissAffordance(z, {
     onDismiss: dismissBaseZ,
     isEnabled: () => bindZ
+      && !desktop()
       && !deckIsOpen()
       && !app.classList.contains('has-v2-modal')
       && !app.querySelector('[data-v2-z-layer]'),
@@ -408,7 +415,7 @@ export function initV2WorkspaceInteraction(root, {
 
   const zDown = (event) => {
     if (app.classList.contains('has-v2-modal')) return;
-    if (!bindZ || deckIsOpen() || zGesture || app.querySelector('[data-v2-z-layer]')) return;
+    if (desktop() || !bindZ || deckIsOpen() || zGesture || app.querySelector('[data-v2-z-layer]')) return;
     if (event.target.closest?.('[data-v2-layer], [data-v2-z-layer]')) return;
     if (event.pointerType === 'mouse' && event.button !== 0) return;
     if (edgeHost === stage) {
@@ -469,6 +476,20 @@ export function initV2WorkspaceInteraction(root, {
 
   setOpen(open, false);
   setEOpen(secondaryOpen, false);
+  const wideMedia = typeof window.matchMedia === 'function' ? window.matchMedia(V2_DESKTOP_MEDIA) : null;
+  const syncPresentation = () => {
+    if (!desktop()) return;
+    clearZGesture();
+    eCancel();
+    fActiveIndex = rootIndex();
+    eActiveIndex = Math.max(0, eCards.findIndex(card => cardId(card) === String(eActiveId)));
+    setActiveCard(fCards, fActiveIndex);
+    setActiveCard(eCards, eActiveIndex);
+    eDeck?.style.setProperty('--v2-desktop-nav-order', String(fActiveIndex * 2 + 1));
+    setOpen(false);
+  };
+  wideMedia?.addEventListener?.('change', syncPresentation);
+  disposers.push(() => wideMedia?.removeEventListener?.('change', syncPresentation));
 
   return () => {
     clearZGesture();

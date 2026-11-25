@@ -1,4 +1,5 @@
 import { rootApp } from './root-app.js';
+import { isV2DesktopWorkspace } from './geometry.js';
 const menuHeaderState = new WeakMap();
 
 function captureHeader(header) {
@@ -60,7 +61,7 @@ export function setV2MenuHeaderState(root, open) {
   const header = app?.querySelector?.(':scope > [data-v2-header]');
   if (!app || !header) return Boolean(open);
 
-  if (open) {
+  if (open && !isV2DesktopWorkspace(app)) {
     if (header.dataset.v2MenuHeader === 'true' && menuHeaderState.has(header)) return true;
     if (!menuHeaderState.has(header)) menuHeaderState.set(header, captureHeader(header));
     applyMenuHeader(header, menuHeaderState.get(header));

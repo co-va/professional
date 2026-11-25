@@ -1,6 +1,8 @@
 import {
   actionBlock,
   button,
+  compactButton,
+  dataTable,
   collectLinks,
   details,
   collectRepeatedEntries,
@@ -53,15 +55,18 @@ import { openPeopleExcelMenu } from './excel.js';
 import { openContactImportBatches } from './contact-import-review.js';
 import { personCardAppearance, personCardFields } from './card-presentation.js';
 import { getCurrentPersonHistory, getPersonHistory } from './history.js';
-import { getPersonMetadata } from './metadata.js';
+import { formatPersonVisitDate, buildPersonVisitIndex } from './metadata.js';
+import { checkControl } from '../../ui/selection/check-list.js';
+import { isV2DesktopWorkspace } from '../../ui/v2/geometry.js';
 import { getRecord, getRecords } from '../record/index.js';
 import { getProcedures, hasCurrentProceduresSnapshot } from '../service/procedures/data.js';
 import { getWorkplaces, isWorkplacesServerReady } from '../profile/workplaces/data.js';
 import { loadRecordCreationOperationalState } from '../runtime/operational-state.js';
+import { loadFinanceState } from '../runtime/auxiliary-state.js';
 import { saveCardAppearanceTemplate } from '../card-appearance-templates.js';
 import { getPeopleFilters, getPeopleSortMode, setPeopleFilters, setPeopleSortMode } from './view-state.js';
 import { buildPersonRelationshipSections } from './programs.js';
-import { openPersonProgramActions } from '../loyalty/person-program-actions.js';
+import { openPersonProgramActions, personProgramActionTypes } from '../loyalty/person-program-actions.js';
 import { listPersonDeposits } from '../loyalty/deposit/data.js';
 import { peopleHasAssignedDiscount, peopleAssignedPrograms, peopleProgramOptions, refreshPeopleLoyaltyData } from './loyalty-filter.js';
 import { openPersonRecordCreation } from './record-creation.js';
@@ -76,7 +81,8 @@ function notifyContext() {
   window.dispatchEvent(new CustomEvent('va-tools:v2-context-changed'));
 }
 
-function sortItems(items, mode) {
+function sortItems(items, mode, visitIndex = null) {
+  const visits = mode.startsWith('last') ? (visitIndex || buildPersonVisitIndex()) : null;
   return [...items].sort((a, b) => {
     if (mode.startsWith('name')) {
       const compared = name(a).localeCompare(name(b), 'ru');
@@ -86,8 +92,8 @@ function sortItems(items, mode) {
       const compared = String(personDisplay(a).uei || '').localeCompare(String(personDisplay(b).uei || ''), 'ru', { numeric: true });
       return mode === 'ueiDesc' ? -compared : compared;
     }
-    const av = getPersonMetadata(a.key).lastVisit ? Date.parse(getPersonMetadata(a.key).lastVisit) : 0;
-    const bv = getPersonMetadata(b.key).lastVisit ? Date.parse(getPersonMetadata(b.key).lastVisit) : 0;
+    const av = Date.parse(visits?.get(String(a.key))?.lastVisit || '') || 0;
+    const bv = Date.parse(visits?.get(String(b.key))?.lastVisit || '') || 0;
     return mode === 'lastDesc' ? bv - av : av - bv;
   });
 }
@@ -131,12 +137,33 @@ function personDocumentTile(person, documentItem) {
   });
 }
 
-function openPersonDocuments(root, person) {
+function desktopPersonDocumentsList(person, documents) {
+  const people = getAllPeople();
+  return dataTable({
+    compact: true, caption: 'Документы / согласия',
+    columns: [
+      { key: 'icon', label: '', sortable: false, narrow: true, render: () => '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M8 13h8M8 17h8"/></svg>' },
+      { key: 'title', label: 'Документ', sortable: false },
+      { key: 'date', label: 'Дата', sortable: false, narrow: true },
+      { key: 'status', label: '', sortable: false, narrow: true, render: row => row.signed ? '<span class="document-tile__status-mark" aria-label="Подписано" title="Подписано">✓</span>' : '' },
+    ],
+    rows: documents.map(item => {
+      const state = getPersonConsentState(person, item, people);
+      return { title: item.title || 'Документ', date: state.active ? consentSignedMoment(state.fact) : '', signed: state.active };
+    }),
+  });
+}
+
+function openPersonDocuments(root, person, anchor = null) {
+  const desktop = isV2DesktopWorkspace(root.closest('[data-v2-app]'));
   const documents = personDocuments(person);
   const body = documents.length
-    ? documentTiles(documents.map((item) => personDocumentTile(person, item)), { layout: 'rail' })
+    ? (desktop ? desktopPersonDocumentsList(person, documents) : documentTiles(documents.map((item) => personDocumentTile(person, item)), { layout: 'rail' }))
     : emptyState('Документов пока нет', 'Документы и согласия этого человека появятся здесь.');
-  return mountModal(root, modal(body, { title: 'Документы / согласия', variant: 'x', surface: 'app' }));
+  return mountModal(desktop && anchor ? anchor : root, modal(body, {
+    title: 'Документы / согласия', variant: 'x', surface: 'app',
+    className: desktop ? 'people-documents-popup' : '',
+  }));
 }
 
 function historyItems(items = [], query = '') {
@@ -171,9 +198,9 @@ function personHistoryMarkup(items = [], query = '') {
   })));
 }
 
-function personQContext(person, { settings = false } = {}) {
+function personQContext(person, { settings = false, title = name(person) } = {}) {
   return workspaceHeaderContext({
-    title: name(person),
+    title,
     a: {
       kind: 'avatar',
       image: person.photo || '',
@@ -248,6 +275,14 @@ export async function openPersonHistoryQ(root, person, options = {}) {
   }
   const host = layer.querySelector('[data-person-history-host]');
   const search = layer.querySelector('[data-person-history-search]');
+  // On Desktop, paint the new Q and a loading state before doing the synchronous
+  // Journal/Finance projection. Keep the original immediate Mobile path.
+  const desktopOverview = Boolean(root?.closest?.('.people-desktop-overview-q, .people-desktop-overview-z'));
+  if (desktopOverview) {
+    if (host) host.innerHTML = emptyState('История', 'Загружаем данные…');
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    if (!layer.isConnected) return layer;
+  }
   // Show existing Journal records immediately; audit History enriches the list.
   let sourceItems = getCurrentPersonHistory(person.key);
   const refreshHistory = async () => {
@@ -479,25 +514,98 @@ function listMarkup(items, query = '') {
   }));
 }
 
-function visiblePeople(root) {
+function desktopPeopleTable(root, items, visitIndex) {
+  if (!items.length) {
+    const filtered = Boolean(root.peopleSearchInput?.value?.trim()) || Object.values(currentPeopleFilters()).some(Boolean);
+    return filtered
+      ? emptyState('Клиенты не найдены', 'Измените условия поиска или фильтрации.')
+      : emptyState('Клиентов пока нет', 'Добавьте человека кнопкой «+».');
+  }
+  const selected = root.peopleSelectedKeys ||= new Set();
+  const allSelected = items.every(person => selected.has(String(person.key)));
+  const check = (data, aria, checked) => `<label class="ui-compact-check">${checkControl({ data, aria, checked })}</label>`;
+  const columns = [
+    { key: 'select', label: '', narrow: true, sortable: false, header: () => check('data-people-select-all', 'Выбрать все видимые контакты', allSelected), render: row => check(`data-people-select="${escapeHtml(row.key)}"`, `Выбрать ${row.name}`, selected.has(String(row.key))) },
+    { key: 'code', label: 'Код', sortable:false },
+    { key: 'name', label: 'Клиент', sortable:false, render: row => `<div class="people-table-person"><span class="people-table-person__name">${escapeHtml(row.name)}</span>${row.phone ? `<span class="people-table-person__phone">${escapeHtml(row.phone)}</span>` : ''}</div>` },
+    { key:'visitCount', label:'Количество посещений', sortable:false, header:()=>'<span>Количество</span><span>посещений</span>' },
+    { key:'paidTotal', label:'Оплачено', sortable:false, render:row=>row.paidTotal == null ? '—' : escapeHtml(money(row.paidTotal)) },
+    { key:'debt', label:'Задолженность', sortable:false, render:row=>row.debt == null ? '—' : row.debt > 0.009 ? escapeHtml(money(row.debt)) : '' },
+    { key: 'firstVisit', label: 'Первое посещение', sortable: false, header: () => '<span>Первое</span><span>посещение</span>', render: row => escapeHtml(row.firstVisit ? formatPersonVisitDate(row.firstVisit) : '') },
+    { key: 'lastVisit', label: 'Последнее посещение', sortable:false, header: () => '<span>Последнее</span><span>посещение</span>', render: row => escapeHtml(row.lastVisit ? formatPersonVisitDate(row.lastVisit) : '') },
+    { key:'open',label:'',narrow:true,sortable:false,render:row=>`<button type="button" class="people-table-open" data-person="${escapeHtml(row.key)}" aria-label="Открыть клиента ${escapeHtml(row.name)}"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>` },
+  ];
+  const rows = items.map(person => {
+    const display = personDisplay(person);
+    const metadata = visitIndex.get(String(person.key)) || {};
+    return { key: person.key, code: display.uei, name: display.name, phone: display.phone, firstVisit: metadata.firstVisit || '', lastVisit: metadata.lastVisit || '', visitCount:metadata.visitCount ?? 0, paidTotal:metadata.paidTotal, debt:metadata.debt };
+  });
+  return dataTable({ columns, rows, caption: 'Клиенты', compact: true });
+}
+
+function updateDesktopPeopleCount(root, total, selected = 0) {
+  const counter = root.peopleCounter;
+  if (!counter?.isConnected) return;
+  counter.textContent = total == null ? '—' : selected ? `${selected} / ${total}` : String(total);
+  counter.setAttribute('aria-label',total == null ? 'Количество клиентов уточняется' : `Клиентов в списке: ${total}. Выбрано: ${selected}`);
+}
+
+function bindDesktopPeopleTable(root, host, items) {
+  const selected = root.peopleSelectedKeys ||= new Set();
+  const all = host.querySelector('[data-people-select-all]');
+  const sync = () => {
+    const inputs = [...host.querySelectorAll('[data-people-select]')];
+    const selectedCount = inputs.filter(input => input.checked).length;
+    if (all) {
+      all.checked = inputs.length > 0 && selectedCount === inputs.length;
+      all.indeterminate = selectedCount > 0 && !all.checked;
+    }
+    updateDesktopPeopleCount(root,items.length,selectedCount);
+  };
+  host.querySelectorAll('[data-people-select]').forEach(input => input.addEventListener('change', () => {
+    if (input.checked) selected.add(input.dataset.peopleSelect);
+    else selected.delete(input.dataset.peopleSelect);
+    sync();
+  }));
+  all?.addEventListener('change', () => {
+    items.forEach(person => { if (all.checked) selected.add(String(person.key)); else selected.delete(String(person.key)); });
+    host.querySelectorAll('[data-people-select]').forEach(input => { input.checked = all.checked; });
+    sync();
+  });
+  sync();
+}
+
+function visiblePeople(root, visitIndex = null) {
   const query = root.peopleSearchInput?.value || '';
-  return filterPeople(applyPeopleFilters(sortItems(getPeople(), getPeopleSortMode())), query);
+  return filterPeople(applyPeopleFilters(sortItems(getPeople(), getPeopleSortMode(), visitIndex)), query);
 }
 
 function refreshPeopleList(root) {
   const host = root.querySelector('[data-people-list-host]');
   if (!host) return;
+  const toolbar = root.closest('[data-v2-z]')?.querySelector('[data-people-desktop-toolbar]');
+  const filterActive = Object.values(currentPeopleFilters()).some(Boolean);
+  const sortActive = getPeopleSortMode() !== 'nameAsc';
+  for (const [selector, active] of [['[data-people-desktop-filter]', filterActive], ['[data-people-desktop-sort]', sortActive]]) {
+    const control = toolbar?.querySelector(selector);
+    if (control && control.getAttribute('aria-pressed') !== String(active)) control.setAttribute('aria-pressed', String(active));
+  }
   if (currentPeopleFilters().loyaltyMode && root.peopleLoyaltyLoading) {
     host.textContent='Загружаем контакты…';
+    updateDesktopPeopleCount(root,null);
     return;
   }
   if (currentPeopleFilters().loyaltyMode && root.peopleLoyaltyError) {
     host.textContent=root.peopleLoyaltyError;
+    updateDesktopPeopleCount(root,null);
     return;
   }
   const query = root.peopleSearchInput?.value || '';
-  const items = visiblePeople(root);
-  host.innerHTML = listMarkup(items, query);
+  const desktop = isV2DesktopWorkspace(root.closest('[data-v2-app]'));
+  const visitIndex = desktop ? (root.peopleVisitIndex ||= buildPersonVisitIndex({ finance:root.peopleFinanceReady === true })) : null;
+  const items = visiblePeople(root, visitIndex);
+  host.innerHTML = desktop ? desktopPeopleTable(root, items, visitIndex) : listMarkup(items, query);
+  if (desktop) bindDesktopPeopleTable(root, host, items);
   host.querySelectorAll('[data-person]').forEach((node) => {
     node.addEventListener('click', () => openPersonOverview(root, node.dataset.person, root.peopleOptions || {}));
   });
@@ -512,19 +620,50 @@ function listContext() {
 
 export function renderPeople(root, options = {}) {
   root.peopleOptions = options;
+  const wide = isV2DesktopWorkspace(root.closest('[data-v2-app]'));
+  root.peopleVisitIndex = null;
+  root.peopleFinanceReady = false;
+  root.peopleMetricsDispose?.();
   root.innerHTML = page([
-    listContext(),
+    wide ? workspaceHeaderContext({title:'Клиенты'}) : listContext(),
     `<section><div data-people-list-host></div></section>`,
-    button('+', {
+    wide ? '' : button('+', {
       className: 'v2-primary-source-only',
       data: 'data-add data-v2-primary-action data-v2-primary-label="+"',
       aria: 'Добавить клиента',
     }),
   ]);
-  const [searchRow] = setV2ZHeaderRows(root, [`<div class="people-search ui-search-field">
-    ${field({ name: 'peopleSearch', type: 'search', placeholder: 'Поиск по имени или UEI', autocomplete: 'off', data: 'data-people-search' })}
-  </div>`]);
+  const search = field({ name:'peopleSearch', type:'search', placeholder:wide?'Поиск по имени или коду':'Поиск по имени или UEI', autocomplete:'off', data:'data-people-search' });
+  const [searchRow] = setV2ZHeaderRows(root, [wide ? `<section data-people-desktop-toolbar>
+    <div class="people-desktop-tools">${search}
+      <div class="people-desktop-actions people-desktop-query-tools">
+        ${compactButton({kind:'filter',data:'data-people-desktop-filter title="Фильтр" aria-haspopup="dialog" aria-pressed="false"'})}
+        ${compactButton({kind:'sort',data:'data-people-desktop-sort title="Сортировка" aria-haspopup="dialog" aria-pressed="false"'})}
+      </div>
+      <div class="people-desktop-actions people-desktop-actions--right">
+        ${button('<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3v18m-4-4 4 4 4-4M17 21V3m-4 4 4-4 4 4"/></svg>',{variant:'secondary',className:'people-desktop-icon',data:'data-people-desktop-excel title="Обмен данными" aria-haspopup="dialog"',aria:'Обмен данными'})}
+        ${button('Вид',{variant:'secondary',data:'data-people-desktop-view'})}
+        ${button('<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>',{variant:'secondary',className:'people-desktop-icon people-desktop-add',data:'data-people-desktop-add title="Добавить клиента" aria-haspopup="dialog"',aria:'Добавить клиента'})}
+      </div>
+    </div></section>` : `<div class="people-search ui-search-field">${search}</div>`], {
+    desktopTitle: wide ? 'Клиенты' : null,
+    desktopAccessory: wide ? '<output data-people-count aria-live="polite">—</output>' : '',
+  });
   root.peopleSearchInput = searchRow?.querySelector('[data-people-search]') || null;
+  root.peopleCounter = wide ? root.closest('[data-v2-z]')?.querySelector('[data-people-count]') || null : null;
+  root.peopleRefreshPresentation = () => refreshPeopleList(root);
+  searchRow?.querySelector('[data-people-desktop-filter]')?.addEventListener('click', event => openFilterSettings(root, event.currentTarget));
+  searchRow?.querySelector('[data-people-desktop-excel]')?.addEventListener('click', event => openPeopleExcelMenu(root, {
+    anchor:event.currentTarget,
+    getRows: () => {
+      if (currentPeopleFilters().loyaltyMode && (root.peopleLoyaltyLoading || root.peopleLoyaltyError)) throw new Error('Список ещё загружается. Повторите выгрузку после обновления.');
+      return visiblePeople(root);
+    },
+    onLoaded: () => renderPeople(root, options)
+  }));
+  searchRow?.querySelector('[data-people-desktop-sort]')?.addEventListener('click', event => openSortSettings(root,event.currentTarget));
+  searchRow?.querySelector('[data-people-desktop-view]')?.addEventListener('click', () => openPeopleAppearanceQ(root,options));
+  searchRow?.querySelector('[data-people-desktop-add]')?.addEventListener('click', event => openAddMenu(root,options,event.currentTarget));
   root.peopleLoyaltyLoading=Boolean(currentPeopleFilters().loyaltyMode);
   root.peopleLoyaltyError='';
   refreshPeopleList(root);
@@ -543,10 +682,51 @@ export function renderPeople(root, options = {}) {
   root.peopleSearchInput?.addEventListener('input', () => refreshPeopleList(root));
   root.querySelector('[data-people-list-settings]')?.addEventListener('click', () => openListSettings(root, options));
   root.querySelector('[data-add]')?.addEventListener('click', () => openAddMenu(root, options));
+  if (wide) {
+    const host = root.querySelector('[data-people-list-host]');
+    let disposed = false;
+    let queued = false;
+    const current = () => !disposed && host?.isConnected && root.querySelector('[data-people-list-host]') === host;
+    const invalidate = () => {
+      if (!current() || queued) return;
+      queued = true;
+      queueMicrotask(() => {
+        queued = false;
+        if (!current()) return;
+        root.peopleVisitIndex = null;
+        refreshPeopleList(root);
+      });
+    };
+    const events = ['professional:records-changed','professional:dds-changed','professional:people-changed'];
+    events.forEach(event=>window.addEventListener(event,invalidate));
+    const dispose = () => { disposed = true; events.forEach(event=>window.removeEventListener(event,invalidate)); };
+    root.peopleMetricsDispose = dispose;
+    void loadFinanceState().then(()=>{
+      if (!current()) return;
+      root.peopleFinanceReady = true;
+      invalidate();
+    }).catch(error=>{
+      if (current()) console.error('Не удалось загрузить показатели оплат клиентов',error);
+    });
+    return () => root.peopleMetricsDispose?.();
+  }
 }
 
-function openSortSettings(root) {
-  const layer = mountModal(root, modal(`<div class="form-grid">${select({
+function openSortSettings(root, anchor = null) {
+  if (anchor && isV2DesktopWorkspace(root.closest('[data-v2-app]'))) {
+    const labels = {nameAsc:'Имя — от А до Я',nameDesc:'Имя — от Я до А',ueiAsc:'Код — по возрастанию',ueiDesc:'Код — по убыванию',lastAsc:'Посещение — сначала ранние',lastDesc:'Посещение — сначала недавние'};
+    const markup = '<div class="people-action-menu">' + sortOptions().map(option =>
+      button(escapeHtml(labels[option.value] || option.label), {variant:'secondary',data:`data-people-sort-choice="${escapeHtml(option.value)}" aria-pressed="${option.value === getPeopleSortMode()}"`})
+    ).join('') + '</div>';
+    const layer = mountModal(anchor,modal(markup,{title:'Сортировка',variant:'x',surface:'app',xRole:'action',className:'people-action-popup people-sort-popup'}));
+    layer?.querySelectorAll('[data-people-sort-choice]').forEach(node=>node.addEventListener('click',()=>{
+      setPeopleSortMode(node.dataset.peopleSortChoice);
+      layer.v2Close?.();
+      refreshPeopleList(root);
+    }));
+    return layer;
+  }
+  const layer = mountModal(anchor || root, modal(`<div class="form-grid">${select({
     label: 'Сортировка',
     value: getPeopleSortMode(),
     options: sortOptions(),
@@ -613,28 +793,55 @@ function peopleFilterFields(filters = {}) {
   </div>`;
 }
 
-function openFilterSettings(root) {
+function openFilterSettings(root, anchor = null) {
+  const desktopMenu = Boolean(anchor && isV2DesktopWorkspace(root.closest('[data-v2-app]')));
   let applied = currentPeopleFilters();
   let draft = { ...applied };
   const hasFilters = (filters) => Object.values(filters).some(Boolean);
   const sameFilters = (left, right) => Object.keys(applied).every((key) => String(left[key] || '') === String(right[key] || ''));
-  const layer = mountModal(root, modal(`
+  const layer = mountModal(anchor || root, modal(`
     <div data-people-filter-fields>${peopleFilterFields(draft)}</div>
     <div class="modal-actions" data-people-filter-actions hidden>
-      ${button('Применить', { data: 'data-people-filter-action' })}
-    </div>`, { title: 'Фильтр', variant: 'x', surface: 'app' }));
+      ${button(desktopMenu ? 'Сбросить' : 'Применить', { data: 'data-people-filter-action', variant: desktopMenu ? 'secondary' : 'primary' })}
+    </div>`, { title: 'Фильтр', variant: 'x', surface: 'app', className: desktopMenu ? 'people-action-popup people-filter-popup' : '' }));
   if (!layer) return null;
   initDatePickers(layer);
   const action = layer.querySelector('[data-people-filter-action]');
   const actions = layer.querySelector('[data-people-filter-actions]');
   let loyaltyReady=false;
   let loyaltyError='';
-  const programHost=layer.querySelector('[data-people-program-filter]');
+  let programHost=layer.querySelector('[data-people-program-filter]');
   const refreshProgramSelect=()=>{
     if(programHost && draft.loyaltyMode==='program')programHost.innerHTML=peopleProgramSelect(draft);
   };
 
+  const validDates = filters => filters.recordPeriod !== 'range' || (
+    /^\d{4}-\d{2}-\d{2}$/.test(filters.recordFrom)
+    && /^\d{4}-\d{2}-\d{2}$/.test(filters.recordTo)
+    && filters.recordFrom <= filters.recordTo);
+  const applyDesktopFilters = () => {
+    if (!desktopMenu) return;
+    // Incomplete date edits must not create an empty or invalid result.
+    const next = { ...draft };
+    if (!validDates(next)) {
+      next.recordPeriod = applied.recordPeriod;
+      next.recordFrom = applied.recordFrom;
+      next.recordTo = applied.recordTo;
+    }
+    if (sameFilters(next, applied)) return;
+    applied = setPeopleFilters(next);
+    root.peopleLoyaltyLoading = Boolean(applied.loyaltyMode) && !loyaltyReady && !loyaltyError;
+    root.peopleLoyaltyError = applied.loyaltyMode && loyaltyError ? 'Не удалось загрузить программы. Повторите попытку.' : '';
+    refreshPeopleList(root);
+  };
   const updateAction = () => {
+    if (desktopMenu) {
+      action.disabled = false;
+      action.textContent = 'Сбросить';
+      action.classList.add('ui-button--secondary');
+      actions.hidden = !hasFilters(applied) && !hasFilters(draft);
+      return;
+    }
     const changed = !sameFilters(draft, applied);
     const datesValid = draft.recordPeriod !== 'range' || (
       /^\d{4}-\d{2}-\d{2}$/.test(draft.recordFrom)
@@ -647,7 +854,7 @@ function openFilterSettings(root) {
     action.classList.toggle('ui-button--secondary', reset);
   };
 
-  // Changes are drafts until the only action button is pressed.
+  // Desktop applies valid selections immediately; Mobile retains explicit Apply.
   layer.addEventListener('change', (event) => {
     const keyByName = {
       peopleGenderFilter: 'gender',
@@ -681,11 +888,12 @@ function openFilterSettings(root) {
       const rangeHost = layer.querySelector('[data-people-record-range]');
       if (rangeHost) rangeHost.hidden = draft.recordPeriod !== 'range';
     }
+    applyDesktopFilters();
     updateAction();
   });
 
   action.addEventListener('click', () => {
-    if (!sameFilters(draft, applied)) {
+    if (!desktopMenu && !sameFilters(draft, applied)) {
       if (action.disabled) return;
       applied = setPeopleFilters(draft);
       root.peopleLoyaltyLoading=false;
@@ -694,7 +902,7 @@ function openFilterSettings(root) {
       layer.v2Close?.();
       return;
     }
-    if (!hasFilters(applied)) return;
+    if (!hasFilters(applied) && !(desktopMenu && hasFilters(draft))) return;
     applied = setPeopleFilters({});
     draft = { ...applied };
     root.peopleLoyaltyLoading=false;
@@ -703,6 +911,7 @@ function openFilterSettings(root) {
     if (fields) {
       fields.innerHTML = peopleFilterFields(draft);
       initDatePickers(fields);
+      programHost = layer.querySelector('[data-people-program-filter]');
     }
     refreshPeopleList(root);
     updateAction();
@@ -711,9 +920,14 @@ function openFilterSettings(root) {
   // Fetch real assignments and available program definitions without delaying X opening.
   void refreshPeopleLoyaltyData().then(()=>{
     loyaltyReady=true;
+    if (desktopMenu && root.isConnected && currentPeopleFilters().loyaltyMode) {
+      root.peopleLoyaltyLoading=false;
+      root.peopleLoyaltyError='';
+      refreshPeopleList(root);
+    }
     if(!layer.isConnected)return;
     refreshProgramSelect();
-    if(currentPeopleFilters().loyaltyMode){
+    if(!desktopMenu && currentPeopleFilters().loyaltyMode){
       root.peopleLoyaltyLoading=false;
       root.peopleLoyaltyError='';
       refreshPeopleList(root);
@@ -722,6 +936,11 @@ function openFilterSettings(root) {
   }).catch(()=>{
     loyaltyReady=false;
     loyaltyError='Не удалось загрузить программы';
+    if (desktopMenu && root.isConnected && currentPeopleFilters().loyaltyMode) {
+      root.peopleLoyaltyLoading=false;
+      root.peopleLoyaltyError='Не удалось загрузить программы. Повторите попытку.';
+      refreshPeopleList(root);
+    }
     if(!layer.isConnected)return;
     if(programHost && draft.loyaltyMode==='program')programHost.textContent=loyaltyError;
     updateAction();
@@ -811,6 +1030,7 @@ function openPeopleAppearanceQ(root, options = {}) {
   };
   return openEntityCardAppearanceQ(root, {
     title: 'Вид',
+    className: isV2DesktopWorkspace(root.closest('[data-v2-app]')) ? 'people-card-appearance-q' : '',
     typeLabel: 'Карта',
     typeOptions: [{ value: 'person', label: 'Клиент' }],
     initialType: 'person',
@@ -830,15 +1050,17 @@ function openPeopleAppearanceQ(root, options = {}) {
 }
 
 
-function openAddMenu(root, options = {}) {
+function openAddMenu(root, options = {}, anchor = null) {
   const allowReal = canUseRealPersonalData();
-  const layer = mountModal(root, modal(`<div class="modal-actions">
-    ${button('Из контакта', { variant: 'secondary', data: 'data-add-from-contacts' })}
-    ${button('Внести вручную', { variant: 'secondary', data: 'data-add-manual' })}
+  const desktopMenu = Boolean(anchor && isV2DesktopWorkspace(root.closest('[data-v2-app]')));
+  const layer = mountModal(anchor || root, modal(`<div class="${desktopMenu ? 'people-action-menu' : 'modal-actions'}">
+    ${button(desktopMenu ? '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2"/><circle cx="12" cy="9" r="2.5"/><path d="M8 16c0-3 8-3 8 0M2 7h2m-2 5h2m-2 5h2"/></svg><span>Из контактов</span>' : 'Из контакта', { variant: 'secondary', data: 'data-add-from-contacts' })}
+    ${button(desktopMenu ? '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="7" r="3"/><path d="M3 20v-2a6 6 0 0 1 12 0v2m4-12v6m-3-3h6"/></svg><span>Внести вручную</span>' : 'Внести вручную', { variant: 'secondary', data: 'data-add-manual' })}
   </div><div class="form-error" data-add-choice-error></div>`, {
     title: 'Добавить клиента',
     variant: 'x',
     surface: 'app',
+    className: desktopMenu ? 'people-action-popup' : '',
   }));
   if (!layer) return null;
 
@@ -913,6 +1135,46 @@ function overviewCard(person) {
   });
 }
 
+function desktopPersonOverviewTools(layer, person, options = {}) {
+  const fullPage = layer.classList.contains('people-desktop-overview-z');
+  const header = fullPage
+    ? layer.querySelector(':scope > [data-v2-z-header] > [data-v2-z-header-content]')
+    : layer.closest('[data-v2-q="true"]')?.querySelector('[data-v2-q-header-content]');
+  if (!header) return;
+  const markup = `${fullPage ? '' : '<div class="people-overview-heading"><h2 class="v2-q-title">Клиент</h2></div>'}
+  <div class="people-overview-toolbar" data-v2-layer-gesture-ignore>
+    ${select({ name: 'personOverviewProgram', aria: 'Программы', value: '', options: [
+      { value: '', label: 'Программы' },
+      ...personProgramActionTypes().map(item => ({ value: item.id, label: item.label })),
+    ] })}
+    <div class="people-overview-tools">
+      ${compactButton({ kind: 'document', data: 'data-person-overview-documents data-v2-anchor-width="520" title="Документы"', aria: 'Документы' })}
+      ${compactButton({ kind: 'history', data: 'data-person-overview-history title="История"', aria: 'История' })}
+      ${button('Записать', { className: 'people-overview-record', data: 'data-person-overview-record' })}
+    </div>
+  </div>`;
+  if (fullPage) setV2ZHeaderRows(layer, [markup], { desktopTitle: 'Клиент' });
+  else header.innerHTML = markup;
+  header.querySelector('[data-person-overview-documents]')?.addEventListener('click', (event) => openPersonDocuments(layer, person, event.currentTarget));
+  header.querySelector('[data-person-overview-history]')?.addEventListener('click', () => void openPersonHistoryQ(layer, person, options));
+  const programInput = header.querySelector('[name="personOverviewProgram"]');
+  programInput?.addEventListener('change', () => {
+    const kind = programInput.value;
+    if (!kind) return;
+    programInput.value = '';
+    const value = header.querySelector('.ui-select__value');
+    if (value) value.textContent = 'Программы';
+    openPersonProgramActions(layer, person, { onChanged: options.onProgramChanged, initialKind: kind });
+  });
+  header.querySelector('[data-person-overview-record]')?.addEventListener('click', async (event) => {
+    const control = event.currentTarget;
+    control.disabled = true;
+    try { await openPersonRecordCreation({ person }); }
+    finally { if (control.isConnected) control.disabled = false; }
+  });
+  layer.querySelector('[data-person-overview-delete]')?.addEventListener('click', () => confirmDelete(layer, person, options.onDeleted));
+}
+
 async function renderPersonOverview(layer, baseRoot, key, options = {}) {
   const person = getAllPeople().find((item) => item.key === key);
   if (!person) {
@@ -921,28 +1183,36 @@ async function renderPersonOverview(layer, baseRoot, key, options = {}) {
     return;
   }
   const relationships = await buildPersonRelationshipSections(person);
-  // Z2 Header stays empty (apart from its shared dismiss control).
-  // The contact card and its programs belong to the same scrollable Z2 Body.
-  layer.innerHTML = page([
-    personContext(person),
-    overviewCard(person),
-    relationships.markup,
-  ]);
-  setV2ZHeaderRows(layer, []);
-  bindPersonContext(layer, person, {
+  if (!layer.isConnected) return;
+  // Mobile retains its existing Z2 and V. The desktop Client list opens Z2 on H.
+  const fullPage = layer.classList.contains('people-desktop-overview-z');
+  const desktop = layer.hasAttribute('data-desktop-person-overview');
+  const contextOptions = {
     ...options,
     onProgramChanged: () => void renderPersonOverview(layer, baseRoot, person.key, options),
     onDeleted: () => {
       layer.v2Close?.();
       renderPeople(baseRoot, options);
     },
-  });
-  relationships.bind(layer, (detail) => openPersonRelationshipQ(baseRoot, person, detail, {
+  };
+  layer.innerHTML = page([
+    desktop ? personQContext(person, fullPage ? { title: 'Клиент' } : {}) : personContext(person),
+    overviewCard(person),
+    relationships.markup,
+    desktop ? actionBlock(
+      button('Удалить', { variant: 'danger', data: 'data-person-overview-delete data-ui-keyboard-action="auxiliary"' }),
+      { className: fullPage ? 'v2-desktop-danger-footer' : 'people-overview-footer' },
+    ) : '',
+  ]);
+  setV2ZHeaderRows(layer, []);
+  bindPersonContext(layer, person, contextOptions);
+  if (desktop) desktopPersonOverviewTools(layer, person, contextOptions);
+  relationships.bind(layer, (detail) => openPersonRelationshipQ(fullPage ? layer : baseRoot, person, detail, {
     ...options,
     onNativeChanged: () => renderPersonOverview(layer, baseRoot, person.key, options),
   }));
   layer.querySelector('[data-person-card]')?.addEventListener('click', () => {
-    openPersonEdit(baseRoot, person.key, {
+    openPersonEdit(fullPage ? layer : baseRoot, person.key, {
       onSaved: (nextKey) => void renderPersonOverview(layer, baseRoot, nextKey || person.key, options),
     });
   });
@@ -975,6 +1245,36 @@ async function openPersonRelationshipQ(root, person, detail, options = {}) {
 
 function openPersonOverview(root, key, options = {}) {
   if (!key) return null;
+  if (isV2DesktopWorkspace(root.closest?.('[data-v2-app]') || document.querySelector('.v2-app--workspace'))) {
+    // Only navigation from the Clients list replaces its H work area. Preserve
+    // other entry points (including Journal) until their own review.
+    if (root.querySelector?.('[data-people-list-host]')) {
+      const layer = mountV2ZLayer(root, v2ZLayer('', { className: 'people-overview-layer people-desktop-overview-z' }), {
+        stack: true,
+        onClose: options.onClose || null,
+      });
+      if (!layer) return null;
+      layer.setAttribute('data-desktop-person-overview', '');
+      layer.innerHTML = page([workspaceHeaderContext({title:'Клиент'}), emptyState('Клиент', 'Загружаем данные…')]);
+      setV2ZHeaderRows(layer, [], { desktopTitle: 'Клиент' });
+      void renderPersonOverview(layer, root, key, options).catch(error => {
+        if (layer.isConnected) layer.innerHTML = page([workspaceHeaderContext({title:'Клиент'}), emptyState('Клиент', 'Не удалось открыть клиента.')]);
+        console.error(error);
+      });
+      return layer;
+    }
+    const layer = mountModal(root, modal('<div data-desktop-person-overview></div>', { title:'Клиент', variant:'q', surface:'app', className:'people-desktop-overview-q' }));
+    const host = layer?.querySelector('[data-desktop-person-overview]');
+    if (!host) return layer;
+    const close = layer.v2Close?.bind(layer);
+    host.v2Close = () => layer.v2Close?.();
+    if (close && options.onClose) layer.v2Close = () => { if (layer.isConnected) { close(); options.onClose(); } };
+    void renderPersonOverview(host, root, key, options).catch(error => {
+      if (host.isConnected) host.textContent = 'Не удалось открыть клиента.';
+      console.error(error);
+    });
+    return layer;
+  }
   const layer = mountV2ZLayer(root, v2ZLayer('', { className: 'people-overview-layer' }), {
     stack: true,
     onClose: options.onClose || null,

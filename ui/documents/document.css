@@ -216,3 +216,30 @@ button.document-tile,.document-tile__open,.document-tile__toggle{cursor:pointer}
 .documents-signing-info__person{margin-top:5px;font-size:16px;line-height:1.2;font-weight:720}
 .documents-signing-info__moment,.documents-signing-info__status{font-size:14px;line-height:1.2}
 .documents-signing-info__status{font-weight:680}
+
+/* Account consent cards: horizontal scrolling is owned by the rail, not Q.
+   Do not change other document rails or the approved tile dimensions. */
+.account-consent-carousel{min-width:0;width:100%}
+.account-consent-navigation{display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-bottom:4px}
+.account-consent-navigation[hidden]{display:none}
+.document-tiles--rail.account-consent-rail{position:relative;min-width:0;max-width:100%;touch-action:pan-x;overscroll-behavior-x:contain;scroll-snap-type:none;scroll-behavior:auto;overflow-anchor:none}
+.account-consent-rail>.document-tile{scroll-snap-align:none;touch-action:pan-x}
+
+/* Mobile signing history only: existing document tile with explicit signer. */
+.mobile-document-history-tools{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px;min-width:0}
+.mobile-document-history-tools .ui-search-field{padding:0;min-width:0}
+.mobile-document-history-tools .field{min-width:0;margin:0}
+.mobile-document-history .document-tile__body{padding-top:0;gap:8px}
+.mobile-document-history .document-tile__identity{display:grid;gap:2px;padding-right:28px;margin-bottom:5px;min-width:0}
+.mobile-document-history .document-tile__person,.mobile-document-history .document-tile__phone{font-size:12px;line-height:1.2;font-weight:400;overflow-wrap:anywhere}
+.mobile-document-history .document-tile__person{color:var(--v2-ink,#111)}
+.mobile-document-history .document-tile__phone{color:var(--v2-muted,#6f7478)}
+.mobile-document-history .document-tile__meta{white-space:nowrap}
+.mobile-document-history .document-tile[hidden],.mobile-document-history-empty[hidden]{display:none}
+
+/* Optional independent edit action on a document tile. Reading remains a real separate button. */
+.document-tile--editable{padding:0}
+.document-tile--editable .document-tile__edit{position:absolute;z-index:3;top:7px;left:12px;font-size:20px;font-weight:400;color:var(--v2-ink,var(--text));border:0;background:transparent}
+.documents-mobile-editor-controls{display:grid;gap:16px;margin-top:18px}
+.documents-mobile-editor-controls .list-entries{padding:0}
+.documents-mobile-editor-controls .ui-button{margin:0}

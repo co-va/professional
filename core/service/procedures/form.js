@@ -1,10 +1,9 @@
 import { createServiceSaveController } from '../editor-actions.js';
 import { collectCost, validateCostDefinition, costField, durationPicker, field, initCostFields, initDurationPickers, setSharedProfilePrimary, textareaField } from '../../../ui/ui.js';
-import { getProcedures, commitProcedure, commitProcedureWorkplace } from './data.js';
-import { procedureEditorSignature, rebaseWorkplaceAssignmentSignature } from '../editor-signature.js';
-import { bindServiceWorkplaceAssignments, serviceWorkplaceAssignmentList } from '../workplace-selection.js';
-import { compactCheck } from '../../../ui/selection/check-list.js';
-import { procedureGroupBookingFields, bindProcedureGroupBooking } from './group-booking-ui.js';
+import { getProcedures, commitProcedure } from './data.js';
+import { procedureEditorSignature } from '../editor-signature.js';
+import { moveDesktopQTool, pinDesktopQDanger } from '../../../ui/v2/z-layout.js';
+import { procedureGroupBookingFields, bindProcedureGroupBooking, adaptDesktopGroupBooking } from './group-booking-ui.js';
 import { serviceGroupFields, readServiceGroupFields, bindServiceGroupFields } from '../catalog-grouping.js';
 
 export function initialProcedure(existing = null, defaultWorkplace = null) {
@@ -46,9 +45,7 @@ export function procedureEditorForm(procedure = initialProcedure()) {
       capacityData: 'data-procedure-group-capacity',
       capacityName: 'procedureGroupCapacity',
     })}
-    ${compactCheck({ label: 'Для онлайн-записи', checked: procedure.visibleInPublicBooking !== false, data: 'data-procedure-online-check' })}
     ${serviceGroupFields('procedures', procedure.groupValues || {})}
-    ${serviceWorkplaceAssignmentList()}
     <div class="form-error" data-procedure-editor-error></div>
   </form>`;
 }
@@ -61,6 +58,13 @@ export function bindProcedureEditor(root, {
   const form = root.querySelector('[data-procedure-editor-form]');
   const primary = root.querySelector('[data-procedure-editor-primary]');
   if (!form || !primary) return { save: async () => null };
+
+  if (root.closest('[data-v2-q="true"]')) {
+    adaptDesktopGroupBooking(form, {
+      toggleSelector: '[data-procedure-group-toggle]',
+      capacitySelector: '[data-procedure-group-capacity]',
+    });
+  }
 
   initCostFields(root);
   initDurationPickers(root);
@@ -76,53 +80,38 @@ export function bindProcedureEditor(root, {
       description: data.get('procedureDescription'),
       groupEnabled: draft.groupBooking?.enabled === true,
       groupCapacity: data.get('procedureGroupCapacity'),
-      visibleInPublicBooking: onlineCheck?.checked !== false,
+      visibleInPublicBooking: draft.visibleInPublicBooking !== false,
       workplaces: draft.workplaces,
       groupValues: readServiceGroupFields(form),
     });
   };
-  const onlineCheck = root.querySelector('[data-procedure-online-check]');
   let initialSignature = signature();
   let saving = false;
-  let assignmentSaving = false;
   const { syncDirty, currentVisibility } = createServiceSaveController(primary, {
     signature,
     baseline: () => initialSignature,
-    busy: () => saving || assignmentSaving,
+    busy: () => saving,
   });
 
-  bindServiceWorkplaceAssignments(root, {
-    kind: 'procedure',
-    selected: draft.workplaces,
-    getBase: () => {
-      const stored = existing?.id ? getProcedures().find((item) => item.id === existing.id) || existing : null;
-      return {
-        cost: stored?.cost || collectCost(root, 'procedureCost'),
-        duration: stored?.duration ?? Number(form.querySelector('[name="procedureDuration"]')?.value || 0),
-        breakDuration: stored?.breakDuration ?? Number(form.querySelector('[name="procedureBreak"]')?.value || 0),
-        description: stored?.description ?? form.querySelector('[name="procedureDescription"]')?.value ?? '',
-        visibleInPublicBooking: stored?.visibleInPublicBooking ?? (onlineCheck?.checked !== false),
-        groupBooking: stored?.groupBooking || draft.groupBooking,
-      };
-    },
-    onChange: (workplaces) => {
-      draft.workplaces = workplaces;
-      syncDirty();
-    },
-    onPersistAssignment: async (workplaceId, assignment) => {
-      if (!existing?.id) return; // First Q Save creates a new Procedure.
-      if (saving || assignmentSaving) throw new Error('Дождитесь завершения сохранения.');
-      assignmentSaving = true;
-      syncDirty();
-      try {
-        await commitProcedureWorkplace(existing.id, workplaceId, assignment);
-        initialSignature = rebaseWorkplaceAssignmentSignature(initialSignature, workplaceId, assignment);
-      } finally {
-        assignmentSaving = false;
-        syncDirty();
-      }
-    },
-  });
+  moveDesktopQTool(primary);
+  const deleteButton = root.querySelector('[data-procedure-editor-delete]');
+  if (deleteButton) pinDesktopQDanger(deleteButton);
+
+  // The relocated capacity remains associated with the same form.
+  const groupTools = form.querySelector('.desktop-inline-group-booking');
+  const header = root.querySelector('[data-v2-q-header-content]');
+  const toolbar = header?.querySelector(':scope > .desktop-q-toolbar');
+  const capacityInput = groupTools?.querySelector('[name="procedureGroupCapacity"]');
+  if (groupTools && toolbar && capacityInput) {
+    form.id ||= 'procedure-editor-' + crypto.randomUUID();
+    capacityInput.setAttribute('form', form.id);
+    groupTools.setAttribute('data-desktop-q-secondary-tools', '');
+    groupTools.setAttribute('data-v2-layer-gesture-ignore', '');
+    header.append(groupTools);
+    // Outside the form, input/change no longer bubble to its listeners.
+    capacityInput.addEventListener('input', syncDirty);
+    capacityInput.addEventListener('change', syncDirty);
+  }
 
   bindProcedureGroupBooking(root, {
     toggleSelector: '[data-procedure-group-toggle]',
@@ -136,7 +125,6 @@ export function bindProcedureEditor(root, {
     },
     onChange: syncDirty,
   });
-  onlineCheck?.addEventListener('change', syncDirty);
 
   form.addEventListener('input', syncDirty);
   form.addEventListener('change', syncDirty);
@@ -145,7 +133,7 @@ export function bindProcedureEditor(root, {
   });
 
   const save = async () => {
-    if (saving || assignmentSaving || !syncDirty()) return null;
+    if (saving || !syncDirty()) return null;
     const data = new FormData(form);
     const name = String(data.get('procedureName') || '').trim();
     const error = root.querySelector('[data-procedure-editor-error]');
@@ -167,8 +155,9 @@ export function bindProcedureEditor(root, {
     }
     saving = true;
     setSharedProfilePrimary(primary, { visible: true, label: 'Сохранить', disabled: true });
+    const latest = existing?.id ? getProcedures().find(item => item.id === existing.id) || existing : null;
     const item = {
-      ...(existing || {}),
+      ...(latest || {}),
       id: existing?.id || crypto.randomUUID(),
       photo: String(draft.photo || existing?.photo || ''),
       name,
@@ -176,12 +165,12 @@ export function bindProcedureEditor(root, {
       duration: Number(data.get('procedureDuration') || 0),
       breakDuration: Number(data.get('procedureBreak') || 0),
       cost: price,
-      visibleInPublicBooking: onlineCheck?.checked !== false,
+      visibleInPublicBooking: (latest ?? draft).visibleInPublicBooking !== false,
       groupBooking: {
         enabled: groupEnabled,
         capacity: groupEnabled ? Math.min(999, groupCapacity) : Math.max(2, Math.floor(Number(draft.groupBooking?.capacity) || 2)),
       },
-      workplaces: Array.isArray(draft.workplaces) ? draft.workplaces.map((item) => ({ ...item })) : [],
+      workplaces: Array.isArray((latest ?? draft).workplaces) ? (latest ?? draft).workplaces.map((item) => ({ ...item })) : [],
       groupValues: readServiceGroupFields(form),
       createdAt: existing?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),

@@ -1,4 +1,5 @@
-import { ALL_WORKPLACES_ID, emptyState, escapeHtml, v2ListEntries, v2ListEntry, shortDate } from '../ui/ui.js';
+import { ALL_WORKPLACES_ID, emptyState, escapeHtml, v2ListEntries, v2ListEntry, shortDate, dataTable } from '../ui/ui.js';
+import { isV2DesktopWorkspace } from '../ui/v2/geometry.js';
 import { getWorkplaces } from '../core/workplace-time.js';
 import { getRecordPaymentState } from '../core/finance/index.js';
 import { getRecordsInRange } from '../core/record/index.js';
@@ -93,6 +94,31 @@ function bindRecordClicks(root, records) {
   }));
 }
 
+function renderDesktopRows(root, records, workplaces, focusId = '') {
+  const rows = records.map(record => {
+    const payment = paymentFor(record);
+    const presentation = recordPresentation(record, workplaces);
+    return { id: recordId(record), date: shortDate(record.date), time: [record.from, record.to].filter(Boolean).join(' – '),
+      name: personName(presentation.person), phone: presentation.person.phone || '', workplace: presentation.workplace,
+      services: (Array.isArray(record.procedures) ? record.procedures : []).map(item => item.name || item.title || '').filter(Boolean).join(', '),
+      amount: payment.imported || formatMoney(payment.total), statusClass: recordListStatusClass(record, { paid: payment.paid }) };
+  });
+  root.innerHTML = dataTable({ caption:'Записи', compact:true,
+    columns:[
+      {key:'date',label:'Дата',sortable:false},{key:'time',label:'Время',sortable:false},
+      {key:'name',label:'Клиент',sortable:false,render:row=>`<button type="button" data-journal-list-record="${escapeHtml(row.id)}">${escapeHtml(row.name)}</button>`},
+      {key:'phone',label:'Телефон',sortable:false},{key:'workplace',label:'Рабочее пространство',sortable:false},
+      {key:'services',label:'Услуги',sortable:false},{key:'amount',label:'Сумма',sortable:false}
+    ], rows });
+  [...root.querySelectorAll('tbody tr')].forEach((node,index)=>{
+    const row=rows[index];
+    if(row?.statusClass) row.statusClass.split(/\s+/).filter(Boolean).forEach(cls=>node.classList.add(cls));
+    if(focusId && row?.id===focusId) node.dataset.journalDesktopFocus='';
+  });
+  bindRecordClicks(root, records);
+  if(focusId) root.querySelector('[data-journal-desktop-focus]')?.scrollIntoView({block:'nearest'});
+}
+
 function renderTimeMode(root, records, workplaces) {
   const now = Date.now();
   const ordered = [...records].sort((a, b) =>
@@ -101,6 +127,7 @@ function renderTimeMode(root, records, workplaces) {
   const focusIndex = ordered.findIndex((record) =>
     recordAppointmentTime(record, 'to', recordZone(record, workplaces)) > now);
   const splitIndex = focusIndex >= 0 ? focusIndex : ordered.length;
+  if (isV2DesktopWorkspace(root.closest('[data-v2-app]'))) return renderDesktopRows(root, ordered, workplaces, recordId(ordered[splitIndex]));
   const entries = ordered.flatMap((record, index) => {
     const payment = paymentFor(record);
     const row = recordEntry(record, workplaces, {
@@ -128,6 +155,7 @@ function renderFlowMode(root, records, workplaces) {
   const pending = prepared.filter((item) => !item.completed).sort((a, b) =>
     recordActivityTime(b.record, b.payment.activity, { timeZone: b.timeZone })
       - recordActivityTime(a.record, a.payment.activity, { timeZone: a.timeZone }));
+  if (isV2DesktopWorkspace(root.closest('[data-v2-app]'))) return renderDesktopRows(root, [...completed,...pending].map(item=>item.record), workplaces, recordId(pending[0]?.record));
   const entries = [
     ...completed.map(({ record, payment }) => recordEntry(record, workplaces, { paid: payment.paid, amountDue: payment.total, imported: payment.imported })),
     anchorEntry(),

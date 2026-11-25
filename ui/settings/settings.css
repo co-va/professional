@@ -22,3 +22,194 @@
 .app-notification-row__label-line{display:block}
 .app-notification-row small{margin-top:4px;color:var(--text-secondary);font-weight:400}
 .app-notification-row.is-disabled{color:var(--text-secondary)}
+
+/* Desktop settings overview: same white 18px card surface and flat graphite
+   composition as Admin Overview; section-local only, no mobile change. */
+.settings-overview{display:grid;gap:var(--h-content-gap,24px);min-width:0}
+.settings-overview .column-layout{gap:14px}
+.settings-overview-section{display:grid;gap:12px;min-width:0}
+.settings-overview .column-layout{align-items:stretch}
+.settings-overview .column-layout__column{display:flex}
+.settings-overview-card{position:relative;display:flex;flex-direction:column;align-items:flex-start;justify-content:space-between;gap:12px;width:100%;min-width:0;min-height:116px;padding:18px 20px;background:var(--white);border:1px solid var(--border);border-radius:18px;color:var(--text);font:inherit;text-align:left;cursor:pointer;box-shadow:0 3px 10px rgba(0,0,0,.045)}
+.settings-overview-card-title{display:block;min-width:0;max-width:100%;font-size:14px;font-weight:680;line-height:1.3;overflow-wrap:break-word}
+.settings-overview-card-summary{display:block;min-width:0;max-width:100%;padding-right:24px;color:var(--text-secondary);font-size:12px;font-weight:500;line-height:1.4;overflow-wrap:break-word}
+.settings-overview-arrow{position:absolute;right:16px;bottom:17px;font-size:20px;line-height:1}
+.settings-overview-card[aria-expanded="true"]{border-color:#4B555D;box-shadow:0 0 0 1px #4B555D}
+.settings-overview-card[aria-expanded="true"] .settings-overview-arrow{transform:rotate(180deg)}
+.settings-overview-panel{min-width:0;padding:16px;background:var(--white);color:var(--text);border:1px solid var(--border);border-radius:18px}
+.settings-overview-panel[hidden]{display:none!important}
+.settings-overview-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .settings-overview-panel :is(.v2-section__title,.ui-state-view__title,.ui-state-view__separator){color:var(--text)}
+.settings-overview-panel .v2-section:last-child{margin-bottom:0}
+
+/* Settings Desktop: cards own controls, only explicit triggers disclose a panel. */
+.settings-overview-card{min-height:220px;justify-content:flex-start;cursor:default;box-sizing:border-box;padding:16px;gap:10px}
+.settings-overview-trigger{position:relative;display:flex;flex-direction:column;justify-content:space-between;align-items:flex-start;gap:12px;width:100%;flex:1;min-width:0;border:0;padding:0;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer}
+.settings-overview-trigger[aria-expanded="true"] .settings-overview-arrow{transform:rotate(180deg)}
+.settings-overview-card--inline>div{width:100%;min-width:0}
+.settings-overview-card[data-settings-inline="documents"]{min-height:110px}
+.settings-inline-heading,.settings-documents-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.settings-inline-heading>strong,.settings-document-toggle{font-size:14px;font-weight:680}
+.settings-document-toggle{display:flex;align-items:center;gap:8px;border:0;background:transparent;color:inherit;cursor:pointer;padding:0}
+.settings-h-action.ui-button{box-sizing:border-box;width:auto;height:36px;min-height:36px;max-height:36px;max-width:100%;padding:0 10px;margin:0;border:1px solid #E0D6D6;background:#E0D6D6;color:#41484F;border-radius:10px;font-size:12px;line-height:1.15;white-space:normal}
+.settings-tag-add{align-self:flex-end}
+.settings-booking-fields{gap:8px;min-width:0}
+.settings-booking-fields .input-action-row{min-width:0;grid-template-columns:minmax(0,1fr) auto}
+.settings-booking-fields .input-action-row input{width:100%;min-width:0}
+.settings-inline-welcome{margin:0;gap:8px;min-width:0}
+.settings-overview-panel[data-settings-welcome-panel]{width:100%;box-sizing:border-box}
+.settings-inline-welcome .settings-h-action{justify-self:end}
+.settings-overview .settings-detail-close.ui-compact-button{color:var(--text);font-weight:400;border:0;background:transparent;touch-action:manipulation}
+.settings-overview [hidden]{display:none!important}
+.settings-overview-panel[data-settings-panel="integrations"]{padding:0;border:0;background:transparent}
+.settings-overview-panel[data-settings-panel="integrations"] .mini-card-rail{justify-content:flex-start;padding:0;scroll-padding-inline:0;scroll-snap-type:none;gap:12px}
+.settings-overview-panel[data-settings-panel="integrations"] .mini-card-rail>.mini-card{scroll-snap-align:none;margin:0}
+.settings-list-heading{display:flex;justify-content:space-between;color:var(--text-secondary);font-size:12px;padding:0 12px 8px}
+.settings-overview .list-entries{border-radius:12px;overflow:hidden;background:var(--white)}
+.v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .settings-overview .list-entries>.list-entry:last-child{border-bottom:0}
+.settings-documents-actions{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-left:auto}
+.settings-documents-heading .segment-control{width:auto;min-width:150px;max-width:100%}
+.settings-document-group h3{font-size:13px;margin:10px 0 8px;color:var(--text-secondary)}
+.settings-document-list{margin-top:12px}
+.settings-overview .settings-document-list .list-entry__background{display:grid;place-items:center;background:transparent;color:var(--text-secondary)}
+
+/* Desktop settings: headings, H actions and embedded rail/chips. */
+.settings-overview-card-title,.settings-inline-heading>strong,.settings-document-toggle{font-size:20px;font-weight:730;color:var(--text);line-height:1.2}
+.settings-overview .settings-h-action.ui-button,.settings-tag-editor-x .settings-h-action.ui-button{background:var(--surface-dark,#2F3338);border:1px solid var(--surface-dark,#2F3338);color:var(--white,#fff)}
+.settings-outline-action.ui-button,.settings-tag-editor-x .settings-h-action.ui-button{box-sizing:border-box;width:auto;height:36px;min-height:36px;max-height:36px;padding:0 10px;margin:0;border-radius:10px;font-size:12px;line-height:1.15}
+.settings-outline-action.ui-button{background:var(--white);border:1px solid var(--surface-dark,#2F3338);color:var(--text)}
+.settings-tag-editor-x .settings-h-action.ui-button{justify-self:end}
+.settings-overview-card[data-settings-inline="integrations"] [data-settings-embedded]{display:flex;flex-direction:column;min-width:0}
+.settings-integration-nav{display:flex;gap:4px;flex:none}
+.settings-integration-nav .ui-compact-button:disabled{opacity:.3;cursor:default}
+.settings-integration-rail.mini-card-rail{padding:0;scroll-padding-inline:0;scroll-snap-type:none;gap:12px;justify-content:flex-start;touch-action:pan-x}
+.settings-integration-rail.mini-card-rail>.mini-card{flex:0 0 min(290px,100%);margin:0;scroll-snap-align:none}
+/* Integration cards have a single non-scrolling data body: the whole card
+   belongs to the horizontal rail, unlike long vertically scrolling records. */
+.settings-integration-card.mini-card{touch-action:pan-x;overflow:clip}
+.settings-integration-card>.mini-card__record-center{overflow:visible;overscroll-behavior:auto;touch-action:pan-x}
+.settings-integration-card .mini-card__details-title{font-size:16px}
+.settings-integration-card .mini-card__details-stats{grid-template-columns:minmax(0,1fr)}
+.settings-integration-card .mini-card__details-stat{text-align:right}
+.settings-integration-card .mini-card__details-stat-label:empty{display:none}
+.settings-tag-chips.tag-list{align-items:flex-start;align-content:flex-start;padding:0;gap:8px}
+.settings-tag-chips .tag{border:0;min-height:30px;padding:5px 12px;font-size:13px;font-weight:600;cursor:pointer;max-width:100%;overflow-wrap:anywhere}
+.settings-documents-switch{display:flex;justify-content:flex-start;margin-top:8px}
+.settings-documents-switch .segment-control{width:auto;min-width:180px;margin:0;border-color:var(--surface-dark,#2F3338)}
+.settings-documents-switch .segment-control button{min-width:90px;color:var(--text);background:var(--white)}
+.settings-documents-switch .segment-control button.is-active{background:var(--surface-dark,#2F3338);color:var(--white)}
+.settings-document-table{overflow:hidden;border-radius:12px;border:1px solid var(--border)}
+.settings-document-table .list-entries{border-radius:0}
+.settings-document-empty{box-sizing:border-box;display:grid;place-items:center;min-height:var(--h-list-row,44px);padding:8px 12px;background:var(--white);color:var(--text-secondary);font-size:13px;text-align:center}
+.settings-document-list-heading{display:grid;grid-template-columns:minmax(0,1fr) 74px 60px;gap:10px;align-items:center;background:#E0D6D6;color:#41484F;padding:9px 12px 9px 42px;font-size:12px;font-weight:650}
+.settings-document-list-heading>span:not(:first-child){text-align:center}
+.settings-document-row .list-entry__content{grid-template-columns:minmax(0,1fr) 74px 60px}
+.settings-document-row .list-entry__main.has-leading-icon{grid-template-columns:20px minmax(0,1fr);align-items:center;gap:10px}
+.settings-document-row .list-entry__right{justify-items:center;text-align:center}
+.settings-document-row .list-entry__status-mark{display:grid;place-items:center;justify-self:center;width:24px;height:24px;border:1px solid var(--border);border-radius:5px;color:var(--text);font-weight:700}
+.settings-document-row .list-entry__action{justify-self:center}
+.settings-document-row .list-entry__leading-icon{color:var(--text-secondary)}
+
+/* Desktop notifications: summary action on H, canonical list entries, inline editor. */
+.settings-notification-card-heading{width:100%;margin-bottom:0;min-height:36px;flex-wrap:nowrap}
+.settings-notification-card-actions{display:flex;align-items:center;gap:8px;flex:none;margin-left:auto}
+.settings-notification-card{cursor:pointer;gap:6px}
+.settings-notification-title{display:flex;align-items:center;gap:8px;min-height:28px;min-width:0;font:inherit;font-size:20px;font-weight:730;line-height:1.2;color:var(--text);background:transparent;border:0;padding:0;text-align:left;cursor:pointer}
+.settings-notification-chevron{display:grid;place-items:center;width:var(--ui-compact-size,28px);height:var(--ui-compact-size,28px);flex:none;font-size:20px;font-weight:400;line-height:1}
+.settings-notification-title[aria-expanded="true"] .settings-notification-chevron{transform:rotate(180deg)}
+.settings-notification-card [data-notification-delivery-card]{width:100%;min-width:0}
+.settings-notification-delivery-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 10px;min-width:0}
+.settings-notification-delivery-form>.settings-delivery-mode,.settings-notification-delivery-form>[data-notification-delivery-status]{grid-column:1/-1}
+.settings-notification-delivery-form>.ui-select{margin:0;min-width:0}
+.settings-notification-delivery-form [data-notification-delivery-status]:empty{display:none}
+.notification-desktop-master{display:flex;align-items:center;margin-bottom:12px}
+.notification-desktop-master .ui-compact-check__label{font-size:20px;font-weight:730}
+.notification-desktop-master .ui-check-input:indeterminate+.ui-compact-check__mark::after{content:'−';font-size:19px;font-weight:800;color:var(--text)}
+.notification-desktop-group{margin-top:16px;min-width:0}
+.notification-desktop-group h3{margin:0;padding:9px 12px;background:#E0D6D6;color:#41484F;font-size:14px;font-weight:650;border-radius:10px 10px 0 0}
+.notification-desktop-group>.list-entries{border:1px solid var(--border);border-top:0;border-radius:0 0 10px 10px}
+.notification-desktop-item+.notification-desktop-item{border-top:1px solid var(--border)}
+.notification-desktop-row{display:grid;grid-template-columns:var(--ui-compact-size,28px) minmax(0,1fr);align-items:center;gap:10px;padding:0 12px}
+.notification-desktop-row .notification-desktop-entry.list-entry{width:100%;min-width:0;background:transparent;border:0;box-shadow:none;padding:0;text-align:left}
+.notification-desktop-entry .list-entry__background{display:none}
+.notification-desktop-entry .list-entry__content{position:relative;inset:auto;display:flex;padding:8px 0;min-height:46px;align-items:center}
+.notification-desktop-entry .list-entry__main{min-width:0}
+.notification-desktop-entry[aria-expanded="true"]{font-weight:700}
+.notification-desktop-editor{padding:14px 12px 16px;border-top:1px solid var(--border);background:var(--v2-inner-surface,#F5F5F3)}
+.notification-editor-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:36px}
+.notification-editor-heading>strong{font-size:17px}
+.notification-editor-actions{display:flex;align-items:center;gap:8px;flex:none}
+.notification-editor-columns{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px;align-items:start}
+.notification-editor-columns>*{min-width:0}
+.notification-editor-preview{display:grid;gap:8px;padding:12px;background:var(--white);border:1px solid var(--border);border-radius:10px}
+.notification-editor-preview small,.notification-variables small{color:var(--text-secondary);font-size:12px}
+.notification-variables{display:grid;gap:8px}
+.notification-variable-chips{display:flex;gap:6px;flex-wrap:wrap}
+.notification-variable-chips .ui-button{font-weight:500}
+
+/* Mobile keeps its Z editor; the same variable tools and master control work in it. */
+.notification-mobile-master{display:flex;align-items:center;margin-bottom:12px}
+.notification-mobile-master .ui-compact-check__label{font-weight:700}
+.notification-editor-z .notification-variable-chips .ui-button{color:var(--text);background:var(--white);border-color:var(--border)}
+
+.notification-editor-z .notification-mobile-save-actions[hidden],.notification-editor-z [data-notification-mobile-save][hidden]{display:none!important}
+
+/* Mobile online-booking Z1: permanent link fields and inline welcome editor. */
+.settings-mobile-booking-links{min-width:0;gap:12px}
+.settings-mobile-booking-links .input-action-row{min-width:0;grid-template-columns:minmax(0,1fr) auto}
+.settings-mobile-booking-links .input-action-row input{width:100%;min-width:0}
+.settings-mobile-booking-welcome{display:grid;gap:12px;min-width:0;margin-top:8px}
+.settings-mobile-booking-welcome>strong{font-size:18px;line-height:1.2}
+
+/* Mobile integrations: shared vertical stack and natural vertical scrolling. */
+.settings-integration-stack .settings-integration-card,.settings-integration-stack .mini-card__record-center{touch-action:pan-y}
+
+/* Inline document editing belongs to the existing Desktop settings card. */
+.settings-inline-document-editor{min-width:0;padding:16px 12px;border-block:1px solid var(--border);background:var(--white)}
+.settings-inline-document-editor .settings-inline-heading>strong{font-size:14px;font-weight:680}
+.settings-inline-document-editor .settings-inline-heading{margin-bottom:12px}
+.settings-inline-document-editor .form-grid{min-width:0}
+.settings-inline-document-editor textarea{resize:vertical}
+.settings-document-row [data-desktop-document-actions]{color:var(--text);font-size:20px;font-weight:400}
+.settings-document-row:not(.settings-document-row--history) .list-entry__main{grid-column:1;grid-row:1}
+.settings-document-row:not(.settings-document-row--history) .list-entry__right{grid-column:2;grid-row:1}
+.settings-document-row:not(.settings-document-row--history) :is(.list-entry__action,.list-entry__delete){grid-column:3;grid-row:1;width:var(--ui-compact-size,28px);height:var(--ui-compact-size,28px);justify-self:center}
+.settings-document-row .list-entry__content:has(>.list-entry__delete)>.list-entry__action{justify-self:start}
+.settings-document-row .list-entry__content:has(>.list-entry__action)>.list-entry__delete{justify-self:end}
+.settings-document-row .list-entry__delete{color:var(--ui-delete-foreground)}
+
+/* Desktop table headings follow the established italic H-list convention. */
+.settings-document-list-heading,.notification-desktop-group h3,.settings-list-heading{font-style:italic}
+.settings-documents-switch{align-items:center;justify-content:flex-start;gap:12px;flex-wrap:wrap}
+[data-desktop-document-history-toolbar]{min-width:0;background:transparent}
+.settings-history-tools.people-desktop-tools{min-width:0;max-width:340px}
+.settings-history-tools.people-desktop-tools>.field{margin:0;gap:0}
+.settings-history-tools.people-desktop-tools>.field>span:empty{display:none}
+.settings-history-tools .people-desktop-query-tools .ui-select{margin:0;flex:0 0 auto}
+
+.settings-document-list-heading--history{padding-left:12px}
+.settings-history-heading-main,.settings-document-row--history .list-entry__main.has-leading-icon{display:grid;grid-template-columns:20px minmax(0,0.9fr) minmax(0,1.45fr);gap:10px;align-items:center;min-width:0}
+.settings-document-row--history .list-entry__content{padding-left:12px;padding-right:12px;min-height:44px}
+.settings-document-row--history .list-entry__text{min-width:0;gap:2px}
+.settings-document-row--history .list-entry__text :is(strong,small){white-space:normal;overflow-wrap:anywhere}
+.settings-document-row--history[hidden]{display:none!important}
+
+/* Desktop integration X: fields stay at the top, the common submit action at the bottom right. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace .modal--form-sheet:has(>form:is([data-telegram-integration-form],[data-email-integration-form])){display:flex;flex-direction:column}
+ .v2-app--workspace .modal--form-sheet>form:is([data-telegram-integration-form],[data-email-integration-form]){display:flex;flex-direction:column;flex:1 0 auto;gap:24px;min-width:0}
+ .v2-app--workspace .modal--form-sheet>form:is([data-telegram-integration-form],[data-email-integration-form])>.muted{order:1}
+ .v2-app--workspace .modal--form-sheet>form:is([data-telegram-integration-form],[data-email-integration-form])>.muted:empty{display:none}
+ .v2-app--workspace .modal--form-sheet>form:is([data-telegram-integration-form],[data-email-integration-form])>.ui-button[type="submit"]{order:2;align-self:flex-end;flex:none;margin-top:auto}
+}
+
+/* New document: use the canonical H toolbar; form contains only document content. */
+.documents-new-toolbar{box-sizing:border-box;display:flex;align-items:center;justify-content:space-between;min-height:var(--h-list-tool-row,42px);gap:12px}
+.documents-new-toolbar .v2-desktop-tool-context{flex:0 0 auto;min-width:0}
+.documents-new-toolbar .v2-desktop-tool-actions{flex:0 0 auto;min-height:var(--h-tools,36px);margin-left:auto}
+.documents-new-toolbar .documents-new-signable.app-setting-toggle{display:flex;align-items:center;gap:8px;width:auto;min-height:var(--h-tools,36px);height:var(--h-tools,36px);padding:0;border:0;background:transparent;color:var(--white);font-size:13px;font-weight:650;white-space:nowrap}
+.documents-new-toolbar .documents-new-signable .app-setting-toggle__switch{box-sizing:border-box;flex:0 0 42px;border:1px solid var(--white);background:var(--v2-base,var(--surface-dark));transition:background .16s ease,border-color .16s ease}
+.documents-new-toolbar .documents-new-signable .app-setting-toggle__switch span{box-sizing:border-box;top:2px;left:2px;border:1px solid var(--white);background:var(--v2-base,var(--surface-dark));box-shadow:none}
+.documents-new-toolbar .documents-new-signable.is-on .app-setting-toggle__switch{background:#E0D6D6;border-color:#E0D6D6}
+.documents-new-toolbar .documents-new-signable:focus-visible{outline:2px solid var(--white);outline-offset:2px}
+.documents-new-toolbar [data-new-document-save][hidden]{display:none!important}

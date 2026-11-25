@@ -1,6 +1,6 @@
 import { apiRequest } from '../../core/auth.js';
 import { disablePlatformPush, enablePlatformPush, getPlatformPushState } from '../../core/platform-notices.js';
-import { button, documentTile, documentTiles, emptyState, escapeHtml, field, modal, mountModal, openDocumentViewer, v2Section } from '../../ui/ui.js';
+import { button, compactButton, documentTile, documentTiles, emptyState, escapeHtml, field, modal, mountModal, openDocumentViewer, v2Section } from '../../ui/ui.js';
 import { notificationSettings } from '../../ui/settings/index.js';
 
 async function request(path, options = {}) {
@@ -12,7 +12,7 @@ async function request(path, options = {}) {
 
 function consentCards(consents) {
   if (!consents.length) return emptyState('Согласий пока нет', 'Здесь появятся актуальные согласия вашей учётной записи.');
-  return documentTiles(consents.map((item) => documentTile({
+  const tiles = documentTiles(consents.map((item) => documentTile({
     title:item.title || 'Документ',
     version:item.displayVersion || item.currentVersion || item.eventVersion || '',
     openData:`data-account-consent-open="${escapeHtml(item.key)}"`,
@@ -20,7 +20,12 @@ function consentCards(consents) {
     toggleChecked:Boolean(item.active),
     aria:`Открыть документ ${item.title || ''}`,
     toggleAria:`${item.active ? 'Отозвать' : 'Дать'} согласие: ${item.title || ''}`,
-  })), { layout:'rail' });
+  })), { layout:'rail', className:'account-consent-rail' });
+  return '<div class="account-consent-carousel" data-v2-layer-gesture-ignore>'+
+    '<div class="account-consent-navigation">'+
+    compactButton({kind:'previous',data:'data-account-consent-prev',aria:'Предыдущий документ'})+
+    compactButton({kind:'next',data:'data-account-consent-next',aria:'Следующий документ'})+
+    '</div>'+tiles+'</div>';
 }
 
 function serviceMarkup(state, pushState, emailState = {}) {
@@ -63,15 +68,45 @@ function openConsentDocument(item) {
   });
 }
 
+function bindConsentRail(root, scrollLeft=0) {
+  const rail=root.querySelector('.account-consent-rail');
+  if(!rail)return;
+  // Q must never claim horizontal swipes initiated within this rail.
+  rail.setAttribute('data-v2-layer-gesture-ignore','');
+  const prev=root.querySelector('[data-account-consent-prev]');
+  const next=root.querySelector('[data-account-consent-next]');
+  const sync=()=>{
+    const max=Math.max(0,rail.scrollWidth-rail.clientWidth);
+    if(prev)prev.disabled=rail.scrollLeft<=1;
+    if(next)next.disabled=rail.scrollLeft>=max-1;
+    const nav=prev?.parentElement;
+    if(nav)nav.hidden=max<=1;
+  };
+  const step=direction=>{
+    const max=Math.max(0,rail.scrollWidth-rail.clientWidth);
+    const origin=rail.firstElementChild?.offsetLeft||0;
+    const positions=[...new Set([0,...[...rail.children].map(tile=>Math.max(0,Math.min(max,tile.offsetLeft-origin))),max])].sort((a,b)=>a-b);
+    const from=rail.scrollLeft;
+    const target=direction>0?positions.find(value=>value>from+1):positions.slice().reverse().find(value=>value<from-1);
+    if(target!=null)rail.scrollTo({left:target,behavior:'smooth'});
+  };
+  prev?.addEventListener('click',()=>step(-1));
+  next?.addEventListener('click',()=>step(1));
+  rail.addEventListener('scroll',sync,{passive:true});
+  rail.scrollLeft=scrollLeft;
+  requestAnimationFrame(sync);
+}
 async function renderPanelState(root,state,pushState=null,emailState={}){
   const consents=Array.isArray(state.consents)?state.consents:[];
   const push=pushState || await getPlatformPushState().catch(()=>({supported:false,enabled:false,subscribed:false}));
+  const railPosition=root.querySelector('.account-consent-rail')?.scrollLeft||0;
   root.innerHTML=`
     ${v2Section('Уведомления',serviceMarkup(state,push,emailState))}
     <p class="form-error" data-controls-status role="status" aria-live="polite"></p>
     ${v2Section('Документы',consentCards(consents))}
   `;
 
+  bindConsentRail(root,railPosition);
   root.querySelectorAll('[data-account-consent-open]').forEach((control)=>{
     control.addEventListener('click',()=>{
       const item=consents.find((entry)=>entry.key===control.dataset.accountConsentOpen);

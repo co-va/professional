@@ -1,6 +1,10 @@
+import { dataTable } from '../../../ui/page/page.js';
+import { isV2DesktopWorkspace } from '../../../ui/v2/geometry.js';
+import { compactCheck } from '../../../ui/selection/check-list.js';
 import {
   actionBlock,
   button,
+  compactButton,
   datePicker,
   details,
   emptyState,
@@ -10,8 +14,6 @@ import {
   field,
   formValidationMessage,
   initDatePickers,
-  miniCard,
-  miniCardRail,
   modal,
   mountModal,
   mountV2ZLayer,
@@ -35,6 +37,7 @@ import { getProfile } from '../../profile/data.js';
 import { getAllPeople } from '../../people/data.js';
 import { personDisplay } from '../../people/presentation.js';
 import { getCardAppearanceTemplate, saveCardAppearanceTemplate } from '../../card-appearance-templates.js';
+import { flushBusinessPersistence, isBusinessServerReady } from '../../business-persistence.js';
 import { createUEI, getUEI, listUEIs, normalizeUEI, releaseUEI, replaceUEI } from '../../uei.js';
 import { crop, formObject, personOption as contactOption, openLoyaltySettingsMenu } from '../shared.js';
 import { openDepositExcelQ } from './excel.js';
@@ -189,31 +192,6 @@ function card(fields, { data = '', aria = '', interactive = true } = {}) {
   });
 }
 
-function depositInfo(deposit = {}) {
-  const terms = deposit?.terms && typeof deposit.terms === 'object' ? deposit.terms : {};
-  const benefitBalance = Math.max(0, Number(deposit?.benefitBalance || 0));
-  const refundableAmount = Math.max(0, Number(deposit?.refundableAmount ?? deposit?.principalBalance ?? 0));
-  const payment = depositFundingProgress(deposit);
-  const rows = [
-    { label: 'UEI', value: depositUei(deposit) },
-    { label: 'Контакт', value: contactLabel(depositPerson(deposit)) },
-    { label: 'Дата оформления', value: shortDateTime(deposit?.fundedAt, '—') },
-    ...(payment.fixed ? [{ label: 'Номинал', value: money(payment.nominal) }] : []),
-    { label: 'Внесено', value: money(payment.funded) },
-    ...(payment.fixed ? [{ label: payment.paid ? 'Платёж' : 'К оплате', value: payment.paid ? 'Оплачено' : money(payment.due) }] : []),
-    { label: 'Срок', value: terms?.termRule || 'Бессрочно' },
-    { label: 'Условие выгоды', value: terms?.benefit || 'Без дополнительной выгоды' },
-  ];
-  if (String(deposit?.benefitMode || 'none') === 'accrual' || benefitBalance > 0.009) {
-    rows.push({ label: 'Выгода в остатке', value: money(benefitBalance) });
-  }
-  if (deposit?.canRefund || refundableAmount > 0.009) {
-    rows.push({ label: 'К возврату', value: money(refundableAmount) });
-  }
-  rows.push({ label: 'Состояние', value: depositStatusLabel(deposit?.status) });
-  return details(rows);
-}
-
 function historyKindLabel(kind) {
   if (kind === 'deposit-funding') return 'Внесение';
   if (kind === 'deposit-benefit') return 'Выгода';
@@ -248,8 +226,7 @@ function depositHistoryNewest(deposit = {}) {
   return depositHistoryWithBalance(deposit).slice().reverse();
 }
 
-function historyListMarkup(deposit = {}) {
-  const items = depositHistoryNewest(deposit);
+function historyListMarkup(deposit = {}, items = depositHistoryNewest(deposit)) {
   if (!items.length) return emptyState('Истории пока нет', 'Движения депозита появятся здесь.');
   return v2ListEntries(items.map((item, index) => v2ListEntry({
     title: historyKindLabel(item?.kind),
@@ -261,17 +238,6 @@ function historyListMarkup(deposit = {}) {
     data: `data-deposit-history-entry="${index}"`,
     aria: `Открыть ${historyKindLabel(item?.kind).toLowerCase()}`,
   })));
-}
-
-function depositBalanceMiniCard(deposit = {}) {
-  return miniCardRail([miniCard({
-    title: 'Остаток',
-    value: money(deposit?.balance),
-    subtitle: depositStatusLabel(deposit?.status),
-    interactive: true,
-    data: 'data-deposit-history',
-    aria: 'Открыть историю депозита',
-  })]);
 }
 
 function historyOperationId(item = {}) {
@@ -342,20 +308,23 @@ async function openDepositHistoryEventS(root, item) {
   }));
 }
 
+function bindDepositHistory(root, items) {
+  root.querySelectorAll('[data-deposit-history-entry]').forEach((node) => {
+    node.addEventListener('click', () => {
+      const item = items[Number(node.dataset.depositHistoryEntry)];
+      if (item) void openDepositHistoryEventS(root, item);
+    });
+  });
+}
+
 function openDepositHistoryQ(root, deposit) {
   const items = depositHistoryNewest(deposit);
-  const layer = mountModal(root, modal(historyListMarkup(deposit), {
+  const layer = mountModal(root, modal(historyListMarkup(deposit, items), {
     variant: 'q',
     surface: 'app',
     title: 'История',
   }));
-  if (!layer) return null;
-  layer.querySelectorAll('[data-deposit-history-entry]').forEach((node) => {
-    node.addEventListener('click', () => {
-      const item = items[Number(node.dataset.depositHistoryEntry)];
-      if (item) void openDepositHistoryEventS(layer, item);
-    });
-  });
+  if (layer) bindDepositHistory(layer, items);
   return layer;
 }
 
@@ -365,8 +334,23 @@ function fundingEntries(deposit = {}) {
     .sort((a, b) => String(b?.occurredAt || '').localeCompare(String(a?.occurredAt || '')));
 }
 
-function issuedList(items = []) {
+function issuedList(items = [], desktop = false) {
   if (!items.length) return emptyState('Депозитов пока нет', 'Оформленные депозиты этой программы появятся здесь.');
+  if (desktop) return dataTable({
+    compact: true, caption: 'Оформленные депозиты',
+    columns: [
+      { key: 'code', label: 'Код', sortable: false },
+      { key: 'name', label: 'Клиент', sortable: false, render: row => `<button type="button" data-deposit-instance="${escapeHtml(row.id)}">${escapeHtml(row.name)}</button>` },
+      { key: 'nominal', label: 'Номинал', sortable: false }, { key: 'funded', label: 'Внесено', sortable: false },
+      { key: 'balance', label: 'Остаток', sortable: false }, { key: 'status', label: 'Состояние', sortable: false },
+    ],
+    rows: items.map(deposit => {
+      const payment = depositFundingProgress(deposit);
+      return { id: deposit.depositId, code: depositUei(deposit), name: contactLabel(depositPerson(deposit)),
+        nominal: payment.fixed ? money(payment.nominal) : 'Свободная сумма', funded: money(payment.funded), balance: money(deposit.balance),
+        status: deposit.status === 'active' && payment.fixed ? (payment.paid ? 'Оплачено' : 'К оплате ' + money(payment.due)) : depositStatusLabel(deposit.status) };
+    }),
+  });
   return v2ListEntries(items.map((deposit) => v2ListEntry({
     title: contactLabel(depositPerson(deposit)),
     subtitle: depositUei(deposit),
@@ -425,6 +409,7 @@ function openAppearanceQ(root, onSaved = () => {}) {
   const sample = programs[0] || {
     id: '', name: 'Депозит', amount: 30000, termRule: '12 месяцев', benefit: 'Условия программы', status: 'active',
   };
+  const assignedSample = getDepositInstances().find(item => String(item?.programId) === String(sample.id)) || getDepositInstances()[0];
   return openEntityCardAppearanceQ(root, {
     title: 'Вид',
     typeLabel: 'Карта',
@@ -434,17 +419,19 @@ function openAppearanceQ(root, onSaved = () => {}) {
     allowPhoto: true,
     resolve: () => ({
       appearance: depositCardAppearance(),
-      fields: programFields(sample, { editorPreview: true }),
+      fields: assignedSample ? assignedDepositFields(assignedSample) : programFields(sample, { editorPreview: true }),
       photo: depositCardPhoto(),
       photoPosition: depositCardPhotoPosition(),
     }),
     save: async ({ appearance, photo }) => {
+      if (!isBusinessServerReady()) throw new Error('Серверное сохранение недоступно');
       const current = getCardAppearanceTemplate(depositCardScope());
       saveCardAppearanceTemplate(depositCardScope(), {
         appearance,
         photo,
         photoPosition: current?.photoPosition || depositCardPhotoPosition(),
       });
+      await flushBusinessPersistence();
     },
     onSaved,
   });
@@ -883,8 +870,8 @@ function openProgramSettings(root, program, { person = null, rerender = async ()
   });
 }
 
-function openDepositSettings(root, layer, deposit, effectiveVisible, render, onChanged) {
-  return openDepositSettingsMenu({
+function depositInstanceSettings(root, layer, deposit, effectiveVisible, render, onChanged) {
+  return {
     title: deposit.programName || 'Депозит',
     checked: effectiveVisible,
     onToggle: async (checked) => {
@@ -922,6 +909,80 @@ function openDepositSettings(root, layer, deposit, effectiveVisible, render, onC
         },
       },
     ],
+  };
+}
+
+function openDepositSettings(root, layer, deposit, effectiveVisible, render, onChanged) {
+  const settings = depositInstanceSettings(root, layer, deposit, effectiveVisible, render, onChanged);
+  return openDepositSettingsMenu(settings);
+}
+
+function bindDesktopDepositTools(layer, settings) {
+  const header = layer.querySelector('[data-v2-q-header-content]');
+  if (!header) return;
+  header.innerHTML = `<div class="desktop-q-heading"><h2 class="v2-q-title">${escapeHtml(settings.title)}</h2></div>
+    <div class="desktop-q-toolbar" data-v2-layer-gesture-ignore>
+      ${compactCheck({ label: 'Показать', checked: settings.checked, data: 'data-deposit-desktop-visible', aria: 'Показать карту клиенту' })}
+      <div class="desktop-q-tools">
+        ${compactButton({ kind: 'payment', data: 'data-deposit-desktop-payment title="Платёж / Возврат"', aria: 'Платёж / Возврат' })}
+      </div>
+    </div>`;
+  const visible = header.querySelector('[data-deposit-desktop-visible]');
+  visible?.addEventListener('change', async () => {
+    const requested = Boolean(visible.checked);
+    visible.disabled = true;
+    try {
+      const resolved = await settings.onToggle(requested);
+      if (typeof resolved === 'boolean' && visible.isConnected) visible.checked = resolved;
+    } catch (error) {
+      if (visible.isConnected) visible.checked = !requested;
+      openNotice({ title: 'Настройки карты', message: error instanceof Error ? error.message : 'Не удалось сохранить видимость карты.' });
+    } finally {
+      if (visible.isConnected) visible.disabled = false;
+    }
+  });
+  header.querySelector('[data-deposit-desktop-payment]')?.addEventListener('click', (event) => {
+    const actions = settings.actions.filter(item => item.id === 'payment' || item.id === 'refund');
+    const menu = mountModal(event.currentTarget, modal(`<div class="desktop-q-action-menu">${actions.map(item => button(escapeHtml(item.label), {
+      variant: 'secondary', data: `data-deposit-desktop-operation="${escapeHtml(item.id)}"`,
+    })).join('')}</div>`, {
+      title: 'Платёж / Возврат', variant: 'x', surface: 'app', className: 'desktop-q-action-popup', xRole: 'action',
+    }));
+    if (!menu) return;
+    menu.querySelectorAll('[data-deposit-desktop-operation]').forEach(control => {
+      control.addEventListener('click', () => {
+        const action = actions.find(item => item.id === control.dataset.depositDesktopOperation);
+        if (!action) return;
+        menu.v2Close?.();
+        void action.onSelect();
+      });
+    });
+  });
+}
+
+function bindDepositDelete(layer, host, settings) {
+  host.querySelector('[data-deposit-instance-delete]')?.addEventListener('click', () => {
+    const action = settings.actions.find(item => item.id === 'delete');
+    if (!action) return;
+    const confirmation = mountModal(layer, modal(`<div class="modal-title"><h2>Удалить карту?</h2><p>${escapeHtml(settings.title)}</p></div>
+      <div class="modal-actions">
+        ${button('Удалить карту', { variant: 'danger', data: 'data-confirm-deposit-delete' })}
+        ${button('Отмена', { variant: 'secondary', data: 'data-cancel-deposit-delete' })}
+      </div>`, { title: 'Удалить карту', variant: 'x', surface: 'app' }));
+    if (!confirmation) return;
+    confirmation.querySelector('[data-cancel-deposit-delete]')?.addEventListener('click', () => confirmation.v2Close?.());
+    confirmation.querySelector('[data-confirm-deposit-delete]')?.addEventListener('click', async (event) => {
+      const control = event.currentTarget;
+      control.disabled = true;
+      try {
+        await action.onSelect();
+        confirmation.v2Close?.();
+      } catch (error) {
+        openNotice({ title: 'Удалить карту', message: error instanceof Error ? error.message : 'Не удалось удалить карту.' });
+      } finally {
+        if (control.isConnected) control.disabled = false;
+      }
+    });
   });
 }
 
@@ -955,19 +1016,33 @@ async function openDepositQ(root, depositId, onChanged = () => {}) {
       : inheritedVisible;
     const host = layer.querySelector('[data-deposit-instance-q-host]');
     if (!host) return;
+    const desktop = isV2DesktopWorkspace(layer.closest('[data-v2-app]'));
+    const header = layer.querySelector('[data-v2-q-header-content]');
+    if (!desktop && header?.querySelector('.desktop-q-toolbar')) header.innerHTML = `<h2 class="v2-q-title">${escapeHtml(deposit.programName || 'Депозит')}</h2>`;
+    const items = depositHistoryNewest(deposit);
+    const settings = depositInstanceSettings(root, layer, deposit, effectiveVisible, render, onChanged);
     host.innerHTML = page([
       depositHeaderContext({
         title: deposit.programName || 'Депозит',
-        settingsData: 'data-deposit-instance-settings',
+        settingsData: desktop ? '' : 'data-deposit-instance-settings',
         settingsAria: 'Настройки депозита',
       }),
-      depositInfo(deposit),
-      depositBalanceMiniCard(deposit),
+      personDepositCard(deposit, { interactive: !desktop, history: !desktop }),
+      desktop ? v2Section('История', historyListMarkup(deposit, items)) : '',
+      desktop ? actionBlock(button('Удалить карту', {
+        variant: 'danger', data: 'data-deposit-instance-delete data-ui-keyboard-action="auxiliary"',
+      })) : '',
     ]);
-    host.querySelector('[data-deposit-instance-settings]')?.addEventListener('click', () => {
+    if (desktop) bindDesktopDepositTools(layer, settings);
+    else host.querySelector('[data-deposit-instance-settings]')?.addEventListener('click', () => {
       openDepositSettings(root, layer, deposit, effectiveVisible, render, onChanged);
     });
-    host.querySelector('[data-deposit-history]')?.addEventListener('click', () => openDepositHistoryQ(root, deposit));
+    if (desktop) {
+      bindDepositHistory(host, items);
+      bindDepositDelete(layer, host, settings);
+    } else {
+      host.querySelector('[data-deposit-card-history]')?.addEventListener('click', () => openDepositHistoryQ(layer, deposit));
+    }
     notifyContext();
   };
 
@@ -997,7 +1072,7 @@ async function openProgramLayer(root, programId, { person = null, onChanged = ()
         settingsData: 'data-deposit-program-settings',
         settingsAria: 'Настройки депозитной программы',
       }),
-      v2Section('Оформленные депозиты', issuedList(issued)),
+      v2Section('Оформленные депозиты', issuedList(issued, isV2DesktopWorkspace(layer.closest('[data-v2-app]')))),
     ]);
     layer.querySelector('[data-deposit-program-settings]')?.addEventListener('click', () => openProgramSettings(root, program, {
       person,
@@ -1016,16 +1091,14 @@ async function openProgramLayer(root, programId, { person = null, onChanged = ()
   return layer;
 }
 
-function personDepositCard(deposit) {
+function assignedDepositFields(deposit) {
   const terms = deposit?.terms && typeof deposit.terms === 'object' ? deposit.terms : {};
   const nominal = Number(terms.amount);
   const funded = Number(deposit?.fundedAmount);
   const hasNominal = terms.amount !== undefined && terms.amount !== null && nominal > 0;
-  return entityVisualCard({
-    appearance: depositCardAppearance(),
-    fields: depositCardFields({
+  return depositCardFields({
       uei: getUEI('loyalty-deposit-program', deposit?.programId) || '',
-      title: `${String(deposit?.programName || 'Депозит')}: ${money(deposit?.balance)}`,
+      title: String(deposit?.programName || 'Депозит'),
       subtitle: terms.termRule || 'Бессрочно',
       status: deposit?.status === 'active' && depositFundingProgress(deposit).fixed
         ? (depositFundingProgress(deposit).paid ? 'Оплачено' : 'К оплате ' + money(depositFundingProgress(deposit).due))
@@ -1036,12 +1109,18 @@ function personDepositCard(deposit) {
       spent: depositSpentAmount(deposit),
       balance: deposit?.balance ?? null,
       toFund: hasNominal && Number.isFinite(funded) ? Math.max(0, nominal - funded) : null,
-    }),
+  });
+}
+
+function personDepositCard(deposit, { interactive = true, history = false } = {}) {
+  return entityVisualCard({
+    appearance: depositCardAppearance(),
+    fields: assignedDepositFields(deposit),
     image: depositCardPhoto(),
     imagePosition: depositCardPhotoPosition(),
-    interactive: true,
-    data: `data-person-program="deposit:${escapeHtml(deposit?.depositId || deposit?.id || '')}"`,
-    aria: `Открыть депозит ${deposit?.programName || ''}`,
+    interactive,
+    data: interactive ? (history ? 'data-deposit-card-history' : `data-person-program="deposit:${escapeHtml(deposit?.depositId || deposit?.id || '')}"`) : '',
+    aria: history && interactive ? 'Открыть историю депозита' : interactive ? `Открыть депозит ${deposit?.programName || ''}` : String(deposit?.programName || 'Депозит'),
   });
 }
 
@@ -1159,10 +1238,14 @@ export async function renderDeposit(root) {
       settingsAria: 'Настройки депозита',
       c: { label: '+', data: 'data-deposit-program-add', aria: 'Создать депозитную программу' },
     }),
-    programs.length ? entityCardStack(programs.map((program) => card(programFields(program), {
+    programs.length ? (isV2DesktopWorkspace(root.closest('[data-v2-app]')) ? dataTable({
+      compact: true, caption: 'Депозитные программы',
+      columns: [{ key: 'code', label: 'Код', sortable: false }, { key: 'name', label: 'Программа', sortable: false, render: row => `<button type="button" data-deposit-program="${escapeHtml(row.id)}">${escapeHtml(row.name)}</button>` }, { key: 'nominal', label: 'Номинал', sortable: false }, { key: 'term', label: 'Срок', sortable: false }, { key: 'benefit', label: 'Условие', sortable: false }],
+      rows: programs.map(program => ({ id: program.id, code: programUei(program), name: program.name || 'Депозит', nominal: Number(program.amount) > 0 ? money(program.amount) : 'Свободная сумма', term: program.termRule || 'Бессрочно', benefit: program.benefit || 'Без дополнительной выгоды' })),
+    }) : entityCardStack(programs.map((program) => card(programFields(program), {
       data: `data-deposit-program="${escapeHtml(program.id)}"`,
       aria: `Открыть депозитную программу ${program.name || ''}`,
-    }))) : emptyState('Депозитных программ пока нет', 'Создайте первую программу кнопкой «+».')
+    })))) : emptyState('Депозитных программ пока нет', 'Создайте первую программу кнопкой «+».')
   ]);
   const rerender = () => renderDeposit(root);
   root.querySelector('[data-deposit-settings]')?.addEventListener('click', () => openRootSettings(root, rerender));

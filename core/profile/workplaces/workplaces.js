@@ -1,6 +1,10 @@
-import { actionBlock, button, collectLinks, colorPicker, escapeHtml, field, initColorPickers, initLinks, initTimePickers, links, mountModal, modal, phoneField, select, textareaField, timePicker } from '../../../ui/ui.js';
-import { notificationSettings } from '../../../ui/settings/index.js';
+import { actionBlock, button, compactButton, openNotice, collectLinks, colorPicker, escapeHtml, field, initColorPickers, initLinks, initTimePickers, links, mountModal, modal, phoneField, select, textareaField, timePicker } from '../../../ui/ui.js';
+import { compactCheck } from '../../../ui/selection/check-list.js';
+import { moveDesktopQTool } from '../../../ui/v2/z-layout.js';
+import { isV2DesktopWorkspace } from '../../../ui/v2/geometry.js';
 import { getProfile } from '../data.js';
+import { canUseCapability } from '../../access.js';
+import { BOOKING_SLOT_STEPS, getWorkplaceBookingRules, normalizeWorkplaceBookingRules, saveWorkplaceBookingRules } from '../../booking-settings/index.js';
 import { deleteWorkplace as deleteWorkplaceData, getWorkplaceReferenceData, getWorkplaces, upsertWorkplace } from './data.js';
 
 function workplaceDefaults(){
@@ -24,6 +28,7 @@ export function workplaceForm(existing=null){
   const defaults=reference.defaults||{};
   const w=existing||emptyWorkplace();
   const cities=[...new Set([w.city,...(reference.cities||[])].filter(Boolean))];
+  const bookingRules = canUseCapability('online_booking.access') ? getWorkplaceBookingRules(w.key) : null;
   const currencies=(reference.currencies||[]).length
     ? reference.currencies
     : (w.currency?[{value:w.currency,label:w.currency}]:[]);
@@ -32,7 +37,7 @@ export function workplaceForm(existing=null){
     data:'data-workplace-primary',
     aria:'Сохранить',
   }));
-  // Destructive action must stay at the end of the scrollable Q form, never in the floating .modal-actions footer.
+  // Mobile keeps Delete at the end of the form. Desktop moves the same action into its own bottom row.
   const deletion=existing
     ? button('Удалить',{
         variant:'critical',
@@ -57,6 +62,8 @@ export function workplaceForm(existing=null){
     <input type="hidden" name="workplaceCardAppearance" value="${escapeHtml(JSON.stringify(w.cardAppearance||{}))}">
     <input type="hidden" name="visibleInPublicBooking" value="${w.visibleInPublicBooking===false?'false':'true'}">
     ${photoFields}
+    ${bookingRules ? `<input type="hidden" name="workplaceAllowCancellation" value="${bookingRules.allowClientCancellation?'true':'false'}">
+      <input type="hidden" name="workplaceAllowRescheduling" value="${bookingRules.allowClientRescheduling?'true':'false'}">` : ''}
     ${field({label:'Название',name:'workplaceName',value:w.name,placeholder:'Название рабочего пространства',required:true})}
     ${select({label:'Город *',name:'workplaceCity',value:w.city||'',options:cities,placeholder:'Город',searchable:true,allowCustom:false})}
     ${field({label:'Адрес',name:'workplaceAddress',value:w.address,placeholder:'Адрес'})}
@@ -64,13 +71,18 @@ export function workplaceForm(existing=null){
     ${scheduleField}
     ${select({label:'Валюта',name:'workplaceCurrency',value:w.currency||defaults.currency||'',options:currencies})}
     ${colorField}
-    <div class="workplace-form__visibility">
-      ${notificationSettings([{
-        label:'Показывать в общей онлайн-записи',
-        labelLines:['Показывать в общей','онлайн-записи'],
-        checked:w.visibleInPublicBooking!==false,
-        data:'data-workplace-public-booking-visibility',
-      }],{showStatus:false})}
+    <div class="workplace-booking-top">
+      <div class="workplace-booking-tools">
+        ${bookingRules ? `${compactButton({kind:'info',data:'data-workplace-booking-info',aria:'О шаге записи'})}
+        <div class="workplace-booking-step">
+          <span>Шаг</span>${select({name:'workplaceBookingSlotStep',value:String(bookingRules.preferredSlotStep),options:BOOKING_SLOT_STEPS.map(step=>({value:String(step),label:step+' мин'}))})}
+        </div>` : ''}
+      </div>
+      <div class="workplace-booking-checks${bookingRules?'':' workplace-booking-checks--single'}">
+        ${compactCheck({label:'Онлайн-запись',checked:w.visibleInPublicBooking!==false,data:'data-workplace-public-booking-visibility'})}
+        ${bookingRules ? `${compactCheck({label:'Отмена записи',checked:bookingRules.allowClientCancellation,data:'data-workplace-booking-cancel'})}
+        ${compactCheck({label:'Перенос записи',checked:bookingRules.allowClientRescheduling,data:'data-workplace-booking-reschedule'})}` : ''}
+      </div>
     </div>
     ${links({links:w.links||[],name:'workplace-links',label:'Ссылки',compact:true,addInHeader:true})}
     ${textareaField({label:'О рабочем пространстве',name:'workplaceAbout',value:w.about||'',placeholder:'Коротко о рабочем пространстве'})}
@@ -100,8 +112,13 @@ function collectWorkplaceForm(root,existing){
   const profile=getProfile();
   return {
     valid:Boolean(name&&city&&color),
+    bookingRules:data.has('workplaceBookingSlotStep')?normalizeWorkplaceBookingRules({
+      preferredSlotStep:Number(data.get('workplaceBookingSlotStep')),
+      allowClientCancellation:data.get('workplaceAllowCancellation')==='true',
+      allowClientRescheduling:data.get('workplaceAllowRescheduling')==='true',
+    }):null,
     item:{
-      key:existing?.key||crypto.randomUUID(),
+      key:existing?.key||form.dataset.workplaceDraftKey||(form.dataset.workplaceDraftKey=crypto.randomUUID()),
       profileId:profile.key,
       photo:String(data.get('workplacePhoto')||''),
       photoCropX:Number(data.get('workplacePhotoCropX')||50),
@@ -125,11 +142,13 @@ function collectWorkplaceForm(root,existing){
 }
 
 async function saveWorkplace(root,existing,onDone){
-  const {valid,item}=collectWorkplaceForm(root,existing);
+  const {valid,item,bookingRules}=collectWorkplaceForm(root,existing);
   const error=root.querySelector('[data-workplace-error]');
   if(!valid){if(error)error.textContent='Название, город и цвет обязательны.';return false}
   try{
     const saved=await upsertWorkplace(item);
+    if(!saved)throw Error('Сервер не подтвердил рабочее пространство.');
+    if(bookingRules && (!existing || JSON.stringify(bookingRules)!==JSON.stringify(getWorkplaceBookingRules(item.key)))) await saveWorkplaceBookingRules(item.key,bookingRules);
     if(error)error.textContent='';
     onDone?.(saved);
     return true;
@@ -152,8 +171,56 @@ export function bindWorkplaceForm(root,existing=null,{onSaved=()=>{},onDeleted=(
     setWorkplaceDraft(root,'visibleInPublicBooking',event.currentTarget.checked?'true':'false');
   });
 
+  for(const [selector,name] of [['[data-workplace-booking-cancel]','workplaceAllowCancellation'],['[data-workplace-booking-reschedule]','workplaceAllowRescheduling']]){
+    form.querySelector(selector)?.addEventListener('change',event=>setWorkplaceDraft(root,name,event.currentTarget.checked?'true':'false'));
+  }
+
+  form.querySelector('[data-workplace-booking-info]')?.addEventListener('click',()=>{
+    openNotice({title:'Шаг записи',message:'0 мин — предложения по целым часам; 15 мин — через 15 минут; 30 мин — через 30 минут. После занятого времени допускается запись сразу после окончания предыдущей либо через выбранный шаг (для 0 — через час). Обязательного перерыва нет. Применение в клиентской записи ещё не подключено.',action:'Закрыть'});
+  });
+
   const primary=root.querySelector('[data-workplace-primary]');
   const primaryActions=primary?.closest('.modal-actions');
+  if(isV2DesktopWorkspace(root.closest('[data-v2-app]'))){
+    if(primary){
+      form.id ||= 'workplace-data-'+crypto.randomUUID();
+      primary.setAttribute('form',form.id);
+      moveDesktopQTool(primary);
+    }
+    // Reuse the two existing Q tool rows without moving the content baseline.
+    const toolbar=root.querySelector('[data-v2-q-header-content] > .desktop-q-toolbar');
+    const top=form.querySelector('.workplace-booking-top');
+    const tools=top?.querySelector('.workplace-booking-tools');
+    const checks=top?.querySelector('.workplace-booking-checks');
+    if(toolbar && top && checks){
+      toolbar.classList.add('workplace-booking-toolbar');
+      const slot=tools?.querySelector('[name="workplaceBookingSlotStep"]');
+      if(slot){
+        // A relocated selector still belongs to the original form.
+        slot.setAttribute('form',form.id);
+        tools.addEventListener('input',()=>form.dispatchEvent(new Event('input',{bubbles:true})));
+        tools.addEventListener('change',()=>form.dispatchEvent(new Event('change',{bubbles:true})));
+      }
+      if(tools?.children.length) toolbar.prepend(tools);
+      checks.setAttribute('data-desktop-q-secondary-tools','');
+      checks.setAttribute('data-v2-layer-gesture-ignore','');
+      toolbar.after(checks);
+      top.remove();
+    }
+    const remove=root.querySelector('[data-delete-workplace-form]');
+    const body=form.closest('[data-v2-q-body]');
+    if(remove&&body){
+      remove.classList.remove('ui-button--critical','ui-button--delete-outline');
+      remove.classList.add('ui-button--danger');
+      const footer=body.ownerDocument.createElement('div');
+      // Desktop Delete is an independent, normal-flow footer, not a keyboard-managed modal-actions stack.
+      footer.className='desktop-workplace-danger-footer';
+      footer.setAttribute('data-workplace-desktop-footer','');
+      remove.setAttribute('data-ui-keyboard-action','auxiliary');
+      footer.append(remove);
+      body.after(footer);
+    }
+  }
   const initial=formSnapshot(form);
   let dirty=!existing;
 

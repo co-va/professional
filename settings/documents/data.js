@@ -293,7 +293,7 @@ export function saveDocument(document) {
   else items.push(next);
   saveDocuments(items);
 
-  if (versioned && !previous) {
+  if (versioned && (!previous || (!tracksDocumentVersions(previous) && !changedContent))) {
     recordDocumentHistory({
       documentId: next.id,
       documentTitle: next.title,

@@ -18,7 +18,7 @@ export function personCardFields(person = {}) {
   const fullName = [person.name, person.surname].filter(Boolean).join(' ');
   const discount = getPersonPriceCondition(person);
   return [
-    { value: 'uei', label: 'UEI', text: person.uei || '' },
+    { value: 'uei', label: 'Код', text: person.uei || '' },
     { value: 'name', label: 'Имя и фамилия', text: fullName },
     { value: 'firstName', label: 'Имя', text: person.name || '' },
     { value: 'surname', label: 'Фамилия', text: person.surname || '' },

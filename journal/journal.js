@@ -2,6 +2,7 @@ import { formatReportRubles as formatRubles, formatReportNumber as formatNumber 
 import { recordDurationHours } from '../core/time/index.js';
 import { viewNavigation, initViewNavigation, ALL_WORKPLACES_ID, modal, mountModal, openDayWorkplaceControl, openSharedProfileSettingsMenu, workspaceHeaderContext, button } from '../ui/ui.js';
 import { setV2ZHeaderRows, clearV2ZHeaderRows } from '../ui/v2/z-layout.js';
+import { isV2DesktopWorkspace, V2_DESKTOP_MEDIA } from '../ui/v2/geometry.js';
 import { getWorkplaceContext, setWorkplaceContext } from '../core/workplace-context.js';
 import { readOnlyReceipt } from '../ui/receipt/index.js';
 import { canUseCapability } from '../core/access.js';
@@ -58,9 +59,11 @@ function recordHasEnded(record = null, now = new Date()) {
 
 export function renderJournal(root, options = {}) {
   const availableViews = views.filter((view) => canUseCapability(view.capability));
-  let activeView = availableViews.some((view) => view.id === options.initialView)
+  const desktop = () => isV2DesktopWorkspace(root.closest('[data-v2-app]'));
+  const visibleViews = () => desktop() ? availableViews.filter(view => view.id !== 'month') : availableViews;
+  let activeView = visibleViews().some((view) => view.id === options.initialView)
     ? options.initialView
-    : (availableViews[0]?.id || 'day');
+    : (visibleViews()[0]?.id || (desktop() ? 'calendar-only' : 'day'));
   let listMode = 'flow';
   let monthMode = 'view';
   let graphControls = null;
@@ -74,7 +77,7 @@ export function renderJournal(root, options = {}) {
     .map(([mode, scope]) => [mode, getWorkplaceContext(contextWorkplaces, { scope }).workplaceId]));
   const currentWorkplaceMode = () => activeView === 'month'
     ? (monthMode === 'graph' ? 'graph' : 'month')
-    : activeView;
+    : activeView === 'calendar-only' ? 'day' : activeView;
   let selectedWorkplaceId = workplaceContexts[currentWorkplaceMode()];
   let selectedDate = professionalContext.date;
   let disposeActiveView = () => {};
@@ -89,6 +92,7 @@ export function renderJournal(root, options = {}) {
     setWorkplaceContext({ workplaceId: selectedWorkplaceId, date: selectedDate, scope: WORKPLACE_CONTEXT_SCOPES[mode] });
     // The Journal date is shared; its Day workplace selection is not.
     if (mode !== 'day') setWorkplaceContext({ date: selectedDate, scope: JOURNAL_CONTEXT_SCOPE });
+    options.onCalendarContextChange?.({ date: selectedDate, workplaceId: selectedWorkplaceId });
   };
 
   const restoreWorkplaceContext = () => {
@@ -547,6 +551,13 @@ export function renderJournal(root, options = {}) {
   const renderView = () => {
     // An inline Record/Event/Note editor owns the visible Z body until commit/cancel.
     if (!root.isConnected || root.querySelector('[data-record-creation-flow]')) return;
+    const displayedViews = visibleViews();
+    if (!displayedViews.some(view => view.id === activeView)) {
+      activeView = displayedViews[0]?.id || (desktop() ? 'calendar-only' : 'day');
+      monthMode = 'view';
+      restoreWorkplaceContext();
+      options.onViewChange?.(activeView);
+    }
     dayViewState = null;
     disposeActiveView();
     disposeActiveView = () => {};
@@ -556,13 +567,20 @@ export function renderJournal(root, options = {}) {
       persistProfessionalContext();
     }
 
-    const primaryNavigation = viewNavigation({ views: availableViews, activeView });
+    const wide = desktop();
+    const primaryNavigation = wide && displayedViews.length < 2 ? '' : viewNavigation({ views: displayedViews, activeView });
     const secondaryNavigation = activeView === 'list'
       ? viewNavigation({ views: listModes, activeView: listMode, ariaLabel: 'Режим списка' })
       : '<div data-journal-period-navigation></div>';
-    const headerRows = setV2ZHeaderRows(root, [primaryNavigation, secondaryNavigation]);
-    const primaryNavigationRoot = headerRows[0] || null;
-    const secondaryNavigationRoot = headerRows[1] || null;
+    const toolbar = wide ? `<div class="v2-journal-desktop-toolbar"><div data-journal-primary-navigation>${primaryNavigation}</div><div data-journal-secondary-navigation>${secondaryNavigation}</div><div class="v2-journal-desktop-actions">${activeView === 'day' ? button('Сегодня',{variant:'secondary',data:'data-journal-today'}) + button('Z-отчёт',{variant:'secondary',data:'data-journal-day-report'}) : ''}${activeView === 'list' ? button('Excel',{variant:'secondary',data:'data-journal-direct-excel'}) : ''}</div></div>` : '';
+    const headerRows = setV2ZHeaderRows(root, wide ? [toolbar] : [primaryNavigation, secondaryNavigation]);
+    const primaryNavigationRoot = wide ? headerRows[0]?.querySelector('[data-journal-primary-navigation]') : headerRows[0] || null;
+    const secondaryNavigationRoot = wide ? headerRows[0]?.querySelector('[data-journal-secondary-navigation]') : headerRows[1] || null;
+    if (wide) {
+      headerRows[0]?.querySelector('[data-journal-today]')?.addEventListener('click', () => { selectedDate = new Date(); persistProfessionalContext(); renderView(); });
+      headerRows[0]?.querySelector('[data-journal-day-report]')?.addEventListener('click', () => openJournalZReport());
+      headerRows[0]?.querySelector('[data-journal-direct-excel]')?.addEventListener('click', () => openJournalExcel(document.body,{onImported:()=>renderView()}));
+    }
     const periodNavigationRoot = secondaryNavigationRoot?.querySelector('[data-journal-period-navigation]') || null;
     const viewClass = activeView === 'list' ? ' class="journal-list-viewport"' : '';
     const headerOptions = journalHeader();
@@ -581,6 +599,7 @@ export function renderJournal(root, options = {}) {
     } else {
       syncJournalHeader();
     }
+    options.onCalendarContextChange?.({ date: selectedDate, workplaceId: selectedWorkplaceId });
     const viewRoot = root.querySelector('[data-journal-view]');
     if (activeView === 'day') {
       disposeActiveView = renderJournalDay(viewRoot, {
@@ -642,7 +661,8 @@ export function renderJournal(root, options = {}) {
           renderView();
         },
       }) || (() => {});
-    } else renderJournalList(viewRoot, { mode: listMode, workplaceId: selectedWorkplaceId });
+    } else if (activeView === 'list') renderJournalList(viewRoot, { mode: listMode, workplaceId: selectedWorkplaceId });
+    else viewRoot.replaceChildren();
 
     if (activeView === 'list' && secondaryNavigationRoot) {
       initViewNavigation(secondaryNavigationRoot, {
@@ -655,7 +675,7 @@ export function renderJournal(root, options = {}) {
       });
     }
     if (primaryNavigationRoot) {
-      initViewNavigation(primaryNavigationRoot, { views: availableViews, activeView, onChange: (nextView) => {
+      initViewNavigation(primaryNavigationRoot, { views: displayedViews, activeView, onChange: (nextView) => {
         if (nextView !== 'month') monthMode = 'view';
         activeView = nextView;
         restoreWorkplaceContext();
@@ -687,6 +707,21 @@ export function renderJournal(root, options = {}) {
   };
 
   window.addEventListener('professional:journal-note-focus-request', focusJournalNotes);
+  const selectDesktopDate = (event) => {
+    const nextDate = event.detail?.date;
+    if (!(nextDate instanceof Date) || Number.isNaN(nextDate.getTime()) || !availableViews.some(view => view.id === 'day')) return;
+    if (root.querySelector('[data-record-creation-flow]')) return;
+    selectedDate = nextDate;
+    activeView = 'day';
+    monthMode = 'view';
+    restoreWorkplaceContext();
+    persistProfessionalContext();
+    options.onViewChange?.(activeView);
+    renderView();
+  };
+  window.addEventListener('professional:desktop-journal-date', selectDesktopDate);
+  const wideMedia = window.matchMedia?.(V2_DESKTOP_MEDIA);
+  wideMedia?.addEventListener?.('change', renderView);
 
   let refreshQueued = false;
   const scheduleRefresh = () => {
@@ -715,6 +750,8 @@ export function renderJournal(root, options = {}) {
     root.removeEventListener('click', handleSettingsClick);
     refreshEvents.forEach((eventName) => window.removeEventListener(eventName, scheduleRefresh));
     window.removeEventListener('professional:journal-note-focus-request', focusJournalNotes);
+    window.removeEventListener('professional:desktop-journal-date', selectDesktopDate);
+    wideMedia?.removeEventListener?.('change', renderView);
     clearV2ZHeaderRows(root);
   };
 }

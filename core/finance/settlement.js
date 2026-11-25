@@ -79,7 +79,13 @@ function settlementWithCurrentConditions(settlement = null, { programPercent = 0
   return calculateSettlement(items, { pricePercent: currentProgramPercent });
 }
 
-export function resolveRecordSettlement(record = null, { pricePercent = null } = {}) {
+export function resolveRecordSettlement(record = null, { pricePercent = null, movements = null } = {}) {
+  // A paid snapshot is already authoritative. The list passes indexed movements
+  // so it does not rescan Finance or recalculate current loyalty for paid rows.
+  if (record?.id && Array.isArray(movements) && movements.length) {
+    const owned = normalizeStoredSettlement(getStoredSettlement('record', record.id));
+    if (owned) return owned;
+  }
   const condition = recordSettlementPriceCondition(record);
   const programPercent = pricePercent == null
     ? condition.percent
@@ -91,8 +97,8 @@ export function resolveRecordSettlement(record = null, { pricePercent = null } =
       // A paid Settlement is historical. Before payment, only the explicitly selected
       // program owns the locked program discount. Without one, an explicitly saved
       // correction remains the payment fact and personal discount is only the initial suggestion.
-      const movements = getActiveDDSMovementsForSource('record', record.id);
-      return movements.length
+      const sourceMovements = movements ?? getActiveDDSMovementsForSource('record', record.id);
+      return sourceMovements.length
         ? owned
         : settlementWithCurrentConditions(owned, {
           programPercent, personalPercent,
@@ -114,10 +120,10 @@ export function getRecordSettlement(record = null, { pricePercent = null } = {})
   return calculateSettlementTotals(settlement, getActiveDDSMovementsForSource('record', record.id));
 }
 
-export function getRecordPaymentState(record = null, { pricePercent = null } = {}) {
-  const settlement = resolveRecordSettlement(record, { pricePercent });
-  const movements = record?.id ? getActiveDDSMovementsForSource('record', record.id) : [];
-  const state = calculateSettlementPaymentState(settlement, movements);
+export function getRecordPaymentState(record = null, { pricePercent = null, movements = null } = {}) {
+  const settlement = resolveRecordSettlement(record, { pricePercent, movements });
+  const sourceMovements = movements ?? (record?.id ? getActiveDDSMovementsForSource('record', record.id) : []);
+  const state = calculateSettlementPaymentState(settlement, sourceMovements);
   const workplace = getWorkplaces().find((entry) =>
     String(entry?.key || '') === String(record?.workplaceId || ''));
   const ended = hasZonedIntervalEnded(record, workplace?.timeZone || '');

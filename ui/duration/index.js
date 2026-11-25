@@ -2,6 +2,7 @@ import { modal, mountModal } from '../modals/index.js';
 import { wheel, bindTimeWheel } from '../time/index.js';
 import { button } from '../buttons/index.js';
 import { escapeHtml } from '../utils/escape-html.js';
+import { isV2DesktopWorkspace } from '../v2/geometry.js';
 
 export function durationText(minutes=0){const m=Math.max(0,Number(minutes)||0),h=Math.floor(m/60),min=m%60;return h?`${h} ч${min?` ${min} мин`:''}`:`${min} мин`}
 
@@ -18,7 +19,14 @@ function open(host){
   const initialHour=hours.includes(currentHours)?currentHours:0;
   const initialMinute=minutes.includes(currentMinutes)?currentMinutes:0;
   const content=`<div class="modal-title"><h2>${escapeHtml(host.querySelector('.duration-picker__label')?.textContent||'Длительность')}</h2></div><div class="time-wheel" data-duration-wheel><div class="time-wheel__column"><span class="time-wheel__label">Часы</span><div class="time-wheel__viewport">${wheel({values:hours,selected:initialHour,type:'duration-hours',formatter:v=>`${v} ч`})}</div></div><div class="time-wheel__column"><span class="time-wheel__label">Минуты</span><div class="time-wheel__viewport">${wheel({values:minutes,selected:initialMinute,type:'duration-minutes',formatter:v=>`${v} мин`})}</div></div></div>${button('Сохранить',{data:'data-duration-save'})}`;
-  const modalRoot=mountModal(document.body,modal(content,{title:host.querySelector('.duration-picker__label')?.textContent||'Длительность',variant:'x'}));
+  const trigger=host.querySelector('[data-duration-open]');
+  const desktop=isV2DesktopWorkspace(host.closest('[data-v2-app]'));
+  const title=host.querySelector('.duration-picker__label')?.textContent||'Длительность';
+  // Desktop uses the same anchored picker presentation as the shared selector.
+  // Mobile keeps its original sheet, markup and interaction.
+  const modalRoot=desktop
+    ? mountModal(trigger,modal(content,{title,variant:'x',xRole:'picker',className:'modal--duration-picker-popover'}))
+    : mountModal(document.body,modal(content,{title,variant:'x'}));
   if(!modalRoot)return;
 
   const {syncColumn}=bindTimeWheel(modalRoot, {'duration-hours':initialHour,'duration-minutes':initialMinute});

@@ -6,6 +6,8 @@ export function v2Shell({
   body = '',
   deck = '',
   eDeck = '',
+  desktopFooter = '',
+  desktopCalendar = false,
   v = '',
   className = '',
   deckOpen = false,
@@ -14,13 +16,14 @@ export function v2Shell({
   zData = 'data-v2-z',
 } = {}) {
   const classes = ['v2-app', deck ? 'v2-app--with-deck' : '', eDeck ? 'has-e-deck' : '', deckOpen ? 'is-deck-open' : '', deckOpen && eOpen && eDeck ? 'is-e-open' : '', zEnter && !deckOpen ? 'is-z-entering' : '', className].filter(Boolean).join(' ');
-  const feDeck = deck || eDeck ? `<div class="v2-fe-deck" data-v2-fe>${deck}${eDeck}</div>` : '';
+  const feDeck = deck || eDeck ? `<div class="v2-fe-deck" data-v2-fe>${deck}${eDeck}${desktopFooter ? `<div class="v2-desktop-footer">${text(desktopFooter)}</div>` : ''} </div>` : '';
   return `<section class="${classes}" data-v2-app>
     ${header}
     <div class="v2-y-host" data-v2-y-host hidden></div>
     <div class="v2-app__stage">
+      ${desktopCalendar ? '<aside class="v2-desktop-calendar" data-v2-desktop-calendar></aside>' : ''}
       ${feDeck}
-      <div class="v2-front" data-v2-front style="width:calc(100% + 24px);height:calc(100% + 24px)">
+      <div class="v2-front" data-v2-front style="width:calc(100% + var(--v2-z-viewport-overscan,24px));height:calc(100% + var(--v2-z-viewport-overscan,24px))">
         <main class="v2-z" ${zData} data-v2-dismissible="false">
 ${v2ZFrame(body)}
 </main>

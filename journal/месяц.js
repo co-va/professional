@@ -3,7 +3,7 @@ import { renderJournalGraphMode } from './график.js';
 import { bindCalendarHeaderHost } from '../ui/calendar/index.js';
 import { getRecordPaymentState } from '../core/finance/index.js';
 import { createTimeGrid, shiftTimeDateKey, timeToMinutes } from '../core/time/index.js';
-import { getWorkplaces, getWorkingDays, getWorkingDayIndicators, resolveWorkingDayTime } from '../core/workplace-time.js';
+import { getWorkplaces, getWorkingDays, getWorkingDayIndicators, resolveWorkingDayTime, getWorkingDayTotalMinutes } from '../core/workplace-time.js';
 import { getRecordsInRange, recordVisualState } from '../core/record/index.js';
 import { getEvents } from '../core/event/index.js';
 
@@ -204,6 +204,15 @@ export function renderJournalMonth(root, {
     return () => { disposeHeader(); disposeGraph?.(); };
   }
 
+  mountJournalMonthCalendar(calendarRoot, { month, workplaceId, onDateSelect, onMonthChange });
+  return bindCalendarHeaderHost(calendarRoot, navigationRoot);
+}
+
+// Both Mobile Month and Desktop F use the same calendar and occupancy projection.
+export function mountJournalMonthCalendar(calendarRoot, {
+  month = new Date(), workplaceId = ALL_WORKPLACES_ID, selectedValue = '', schedule = false,
+  onDateSelect = () => {}, onMonthChange = () => {},
+} = {}) {
   const workingDays = getWorkingDays();
   const workplaces = getWorkplaces();
   const allMode = workplaceId === ALL_WORKPLACES_ID;
@@ -229,15 +238,22 @@ export function renderJournalMonth(root, {
     return { recordIndex, eventIndex };
   };
 
-  initCalendar(calendarRoot, {
+  return initCalendar(calendarRoot, {
     month,
+    selectedValue,
     workingDates: workingDatesForJournal(workingDays, workplaceId, allMode),
     renderDateContent: ({ dateKey, isCurrentMonth }) => {
       if (!isCurrentMonth) return '';
-      return dateContent(dayRecordData({
-        dateKey, workplaceId, allMode, workingDays, workplaces,
-        ...dataForDisplayedMonth(dateKey),
-      }));
+      const data = dayRecordData({ dateKey, workplaceId, allMode, workingDays, workplaces, ...dataForDisplayedMonth(dateKey) });
+      if (!schedule) return dateContent(data);
+      const bars = `<span class="calendar__graph-occupancy" aria-hidden="true">${data.minutes.paid + data.minutes.active + data.minutes.noShow > 0 ? '<span class="calendar__graph-occupancy-bar calendar__graph-occupancy-bar--record"></span>' : ''}${data.minutes.event > 0 ? '<span class="calendar__graph-occupancy-bar calendar__graph-occupancy-bar--event"></span>' : ''}</span>`;
+      if (allMode) {
+        const duration = getWorkingDayTotalMinutes(workingDays, workplaces, dateKey);
+        return `${bars}${duration > 0 ? `<span>${busyLabel(duration)}</span>` : ''}`;
+      }
+      const day = workingDays.find(item => item.date === dateKey && String(item.workplaceId) === String(workplaceId));
+      const time = day ? resolveWorkingDayTime(workplaces, day) : null;
+      return `${bars}${time ? `<span>${time.from}</span><span>${time.to}</span>` : ''}`;
     },
     resolveDateIndicators: ({ dateKey, isCurrentMonth }) => isCurrentMonth
       ? getWorkingDayIndicators(workingDays, workplaces, dateKey, { excludeWorkplaceId: allMode ? '' : workplaceId })
@@ -249,6 +265,4 @@ export function renderJournalMonth(root, {
     },
     onMonthChange,
   });
-
-  return bindCalendarHeaderHost(calendarRoot, navigationRoot);
 }

@@ -1,3 +1,5 @@
+import { settingsSectionHeader } from '../settings.js';
+import { isV2DesktopWorkspace } from '../../ui/v2/geometry.js';
 import {
   actionBlock,
   button,
@@ -12,7 +14,6 @@ import {
   select,
   v2ListEntry,
   v2ListEntries,
-  workspaceHeaderContext,
 } from '../../ui/ui.js';
 import { loadAuxiliaryState } from '../../core/runtime/auxiliary-state.js';
 import { loadBusinessState } from '../../core/runtime/business-state.js';
@@ -189,12 +190,27 @@ function openTagAssignments(tag, onSaved) {
 
 function renderList(root) {
   const tags = getTags();
+  if(root.hasAttribute('data-settings-embedded')){
+    root.innerHTML='<div class="settings-inline-heading"><strong>Ярлыки</strong>'+button('+ Добавить',{className:'settings-h-action',data:'data-tag-add'})+'</div><div class="tag-list settings-tag-chips">'+tags.map(tag=>{
+      const color=/^#[0-9a-fA-F]{6}$/.test(tag.color)?tag.color:'#E8E1DC';
+      const n=parseInt(color.slice(1),16);
+      const light=(0.299*(n>>16)+0.587*((n>>8)&255)+0.114*(n&255))>145;
+      return '<button type="button" class="tag" data-tag-chip="'+escapeHtml(tag.id)+'" style="background:'+color+';color:'+(light?'#171819':'#fff')+'">'+escapeHtml(tag.name)+'</button>';
+    }).join('')+'</div>'+(tags.length?'':'<p class="muted settings-tags-empty">Ярлыков пока нет</p>');
+    root.querySelector('[data-tag-add]')?.addEventListener('click',()=>openTagEditor({onSaved:()=>renderList(root)}));
+    root.querySelectorAll('[data-tag-chip]').forEach(control=>control.addEventListener('click',()=>{
+      const tag=getTags().find(item=>item.id===control.dataset.tagChip);
+      if(tag)openTagAssignments(tag,()=>renderList(root));
+    }));
+    return;
+  }
   const sources = currentSources();
   root.innerHTML = page([
-    workspaceHeaderContext({
+    settingsSectionHeader(root,{
       title: 'Ярлыки',
       c: { label: '+', data: 'data-tag-add', aria: 'Добавить ярлык' },
     }),
+    root.hasAttribute('data-settings-embedded') ? '<div class="settings-list-heading"><span>Название</span><span>Назначений</span></div>' : '',
     tags.length
       ? `<div class="settings-tags-v2">${v2ListEntries(tags.map((tag) =>
           tagRow(tag, tagAssignments(tag, sources).length)))}</div>`
@@ -212,6 +228,7 @@ function renderList(root) {
 }
 
 export function openTagEditor({ existing = null, onSaved = () => {} } = {}) {
+  const desktop = isV2DesktopWorkspace(document.querySelector('.v2-app--workspace'));
   const title = existing ? 'Изменить ярлык' : 'Новый ярлык';
   const html = `<form class="compact-form" data-tag-form>
     ${colorPicker({ name: 'tagColor', value: existing?.color || '#F6D32D' })}
@@ -222,13 +239,13 @@ export function openTagEditor({ existing = null, onSaved = () => {} } = {}) {
       placeholder: 'Название ярлыка',
       required: true,
     })}
-    ${button('Сохранить', { type: 'submit' })}
+    ${button('Сохранить', { type: 'submit', className:desktop?'settings-h-action':'' })}
   </form>`;
   const layer = mountModal(document.body, modal(html, {
     title,
     variant: 'x',
     surface: 'app',
-    className: 'modal--form-sheet',
+    className: 'modal--form-sheet'+(desktop?' settings-tag-editor-x':''),
   }));
   if (!layer) return null;
   initColorPickers(layer);
@@ -248,7 +265,7 @@ export function openTagEditor({ existing = null, onSaved = () => {} } = {}) {
       : { ...(created || createTag({ name, color })), name, color };
     if (!existing) created = saved;
     const errorNode = layer.querySelector('[data-tag-save-error]');
-    const submit = form.querySelector('button[type="submit"]');
+    const submit = layer.querySelector('button[type="submit"]');
     busy = true;
     if (submit) submit.disabled = true;
     if (errorNode) errorNode.hidden = true;
@@ -275,7 +292,7 @@ export async function renderTags(root) {
   // Settings normally loads only the tag catalog. Read all existing owners
   // before showing counts; unloaded entities must never silently count as 0.
   root.innerHTML = page([
-    workspaceHeaderContext({ title: 'Ярлыки' }),
+    settingsSectionHeader(root,{ title: 'Ярлыки' }),
     emptyState('Загрузка', 'Загружаем назначения ярлыков.'),
   ]);
   const loadingView = root.firstElementChild;
@@ -284,13 +301,16 @@ export async function renderTags(root) {
       loadBusinessState(),
       loadOperationalState({ full: true }),
       loadAuxiliaryState('service'),
+      loadAuxiliaryState('tags').then(remote=>{
+        if (!Array.isArray(remote?.tags)) throw new Error('Сервер не вернул список ярлыков');
+      }),
     ]);
     if (root.firstElementChild !== loadingView) return;
     renderList(root);
   } catch (error) {
     if (root.firstElementChild !== loadingView) return;
     root.innerHTML = page([
-      workspaceHeaderContext({ title: 'Ярлыки' }),
+      settingsSectionHeader(root,{ title: 'Ярлыки' }),
       emptyState('Не удалось загрузить назначения', String(error?.message || 'Повторите попытку.')),
       button('Повторить', { data: 'data-tags-retry' }),
     ]);

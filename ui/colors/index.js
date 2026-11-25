@@ -1,6 +1,7 @@
 import { modal, mountModal } from '../modals/index.js';
 import { button } from '../buttons/index.js';
 import { escapeHtml } from '../utils/escape-html.js';
+import { isV2DesktopWorkspace } from '../v2/geometry.js';
 
 export const COLOR_PALETTE = Object.freeze([
   '#FFFF00', '#FF1111', '#111111', '#777A7D', '#2C2A28', '#817A73', '#D7D1CA',
@@ -29,6 +30,17 @@ export function colorPicker({ name = 'color', value = COLOR_PALETTE[0], colors =
   return `<div class="color-picker" data-color-picker data-color-name="${escapeHtml(name)}" data-color-required="${required ? 'true' : 'false'}"><input type="hidden" name="${escapeHtml(name)}" value="${escapeHtml(selected)}" data-color-value><button type="button" class="color-picker__trigger" data-color-open><span class="color-picker__swatch${emptyClass}" data-color-swatch${swatchStyle}></span><span>Выбор цвета</span></button></div>`;
 }
 
+// Desktop uses the same anchored X picker as the shared select and duration controls.
+function mountColorPalette(root, content, title, anchor = null) {
+  const desktop = Boolean(anchor?.matches?.('button') && isV2DesktopWorkspace(anchor.closest('[data-v2-app]')));
+  return mountModal(desktop ? anchor : root, modal(content, {
+    variant: 'x',
+    title,
+    className: 'modal--color-sheet',
+    ...(desktop ? { xRole: 'picker' } : {}),
+  }));
+}
+
 export function initColorPickers(root, colors = COLOR_PALETTE) {
   const paletteColors = Array.isArray(colors) && colors.length ? colors : COLOR_PALETTE;
   root.querySelectorAll('[data-color-picker]').forEach((picker) => {
@@ -38,7 +50,7 @@ export function initColorPickers(root, colors = COLOR_PALETTE) {
     if (!value || !swatch || !open) return;
     open.onclick = () => {
       const palette = paletteColors.map((color) => `<button type="button" class="color-picker__option ${color === value.value ? 'is-selected' : ''}" data-color-option="${escapeHtml(color)}" aria-label="Цвет ${escapeHtml(color)}"><span style="background:${escapeHtml(color)}"></span></button>`).join('');
-      const m = mountModal(root, modal(`<div class="compact-form"><div class="color-picker__palette" data-color-palette>${palette}</div></div>`, { variant: 'x', title: 'Выбор цвета', className: 'modal--color-sheet' }));
+      const m = mountColorPalette(root, `<div class="compact-form"><div class="color-picker__palette" data-color-palette>${palette}</div></div>`, 'Выбор цвета', open);
       m?.querySelectorAll('[data-color-option]').forEach((option) => option.addEventListener('click', () => {
         value.value = option.dataset.colorOption || paletteColors[0];
         swatch.style.background = value.value;
@@ -54,17 +66,14 @@ export function openColorPickerAction({
   value = '',
   title = 'Выбор цвета',
   confirm = false,
+  anchor = null,
   onSelect = () => {},
 } = {}) {
   const selected = exactHex(value);
   let next = selected || COLOR_PALETTE[0];
   const palette = COLOR_PALETTE.map((color) => `<button type="button" class="color-picker__option ${color === selected ? 'is-selected' : ''}" data-shared-color-option="${escapeHtml(color)}" aria-label="Цвет ${escapeHtml(color)}"><span style="background:${escapeHtml(color)}"></span></button>`).join('');
   const content = `<div class="color-picker__palette" data-color-palette>${palette}</div>${confirm ? button('Сохранить', { data: 'data-shared-color-save' }) : ''}`;
-  const layer = mountModal(document.body, modal(content, {
-    variant: 'x',
-    title,
-    className: 'modal--color-sheet',
-  }));
+  const layer = mountColorPalette(document.body, content, title, anchor);
 
   const selectOption = (option) => {
     next = option.dataset.sharedColorOption || COLOR_PALETTE[0];

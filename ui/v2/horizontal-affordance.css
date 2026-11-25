@@ -19,3 +19,11 @@
   transform:translateY(-1px);
   pointer-events:none;
 }
+
+/* Desktop profile: real Compact controls replace the decorative overflow cue. */
+.v2-section.profile-workplace-rail-interactive .v2-section__title{display:flex;align-items:center;gap:8px}
+.v2-section.profile-workplace-rail-interactive .v2-section__title::after{content:none}
+.profile-workplace-rail-controls{display:flex;align-items:center;gap:4px;margin-left:auto}
+.profile-workplace-rail-controls[hidden]{display:none}
+.profile-workplace-rail-controls .ui-compact-button{color:inherit}
+.profile-workplace-rail-controls .ui-compact-button:disabled{opacity:.35;cursor:default}

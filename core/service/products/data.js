@@ -291,12 +291,11 @@ export async function commitServiceGroupOrder(keys = []) {
   return getServiceGroupEntries();
 }
 
-export async function commitServiceGroupLevels(kind, entries = []) {
-  if (!serviceKinds.has(kind)) throw new Error('Неизвестный раздел Сервиса.');
+function normalizeServiceGroupLevels(entries = []) {
   const levels = Array.isArray(entries) ? entries : [];
   const ids = new Set();
   const names = new Set();
-  const normalized = levels.map((entry, index) => {
+  return levels.map((entry, index) => {
     const id = String(entry.id || '').trim();
     const name = String(entry.name || '').trim();
     const nameKey = name.toLocaleLowerCase('ru-RU');
@@ -319,6 +318,11 @@ export async function commitServiceGroupLevels(kind, entries = []) {
     });
     return { id, name, values, position: index + 1 };
   });
+}
+
+export async function commitServiceGroupLevels(kind, entries = []) {
+  if (!serviceKinds.has(kind)) throw new Error('Неизвестный раздел Сервиса.');
+  const normalized = normalizeServiceGroupLevels(entries);
   await commitServiceCollection({
     read: readRawProducts,
     persist: values => queueAuxiliaryDataset('products', values),
@@ -343,6 +347,46 @@ export async function commitServiceGroupLevels(kind, entries = []) {
     },
   });
   return getServiceGroupLevels(kind);
+}
+
+// Move a definition between sections in ONE acknowledged configuration write.
+ // IDs and value IDs survive. No service or product assignments are rewritten.
+export async function commitServiceGroupSection(from, to, entry) {
+  if (!serviceKinds.has(from) || !serviceKinds.has(to) || from === to || !entry?.id)
+    throw new Error('Некорректный раздел группы.');
+  await commitServiceCollection({
+    read: readRawProducts,
+    persist: values => queueAuxiliaryDataset('products', values),
+    hydrate: values => { productsState = clone(values); },
+    mutate: values => {
+      const old = serviceGroupConfig(values);
+      const source = old?.levels?.[from] || [];
+      const destination = old?.levels?.[to] || [];
+      if (!source.some(group => group.id === entry.id))
+        throw new Error('Группа больше не существует.');
+      const nextLevels = {
+        ...old.levels,
+        [from]: normalizeServiceGroupLevels(source.filter(group => group.id !== entry.id)),
+        [to]: normalizeServiceGroupLevels([...destination, entry]),
+      };
+      const oldKey = serviceGroupKey(from, entry.id);
+      const newKey = serviceGroupKey(to, entry.id);
+      const allKeys = [...serviceKinds].flatMap(kind =>
+        (nextLevels[kind] || []).map(group => serviceGroupKey(kind, group.id)));
+      const priorOrder = (Array.isArray(old.order) ? old.order : [])
+        .map(key => key === oldKey ? newKey : key);
+      const order = [...new Set([...priorOrder.filter(key => allKeys.includes(key)), ...allKeys])];
+      const rank = new Map(order.map((key, index) => [key, index]));
+      for (const kind of [from, to]) {
+        nextLevels[kind] = nextLevels[kind].slice().sort((a, b) =>
+          rank.get(serviceGroupKey(kind, a.id)) - rank.get(serviceGroupKey(kind, b.id)))
+          .map((group, index) => ({ ...group, position: index + 1 }));
+      }
+      const config = { ...old, levels: nextLevels, order };
+      return values.map(row => row === old ? config : row);
+    },
+  });
+  return getServiceGroupEntries();
 }
 
 // A stocked Service product is edited without touching its Stock owner.

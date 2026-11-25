@@ -3,8 +3,15 @@ import { financeNavigationItems, renderFinanceSection } from '../core/finance/in
 import { inventoryNavigationItems, renderInventorySection } from '../core/inventory/index.js';
 import { loyaltyNavigationItems, renderLoyaltySection } from '../core/loyalty/index.js';
 import { renderJournal } from '../journal/journal.js';
+import { mountJournalMonthCalendar } from '../journal/месяц.js';
+import { renderJournalGraphMode } from '../journal/график.js';
+import { getWorkplaceContext, setWorkplaceContext } from '../core/workplace-context.js';
+import { getWorkplaces } from '../core/workplace-time.js';
+import { localDateKey } from '../core/time/index.js';
 import { settingsNavigationItems, renderSettingsSection } from '../settings/settings.js';
 import { render as renderProfile } from '../core/profile/profile.js';
+import { logout } from '../core/auth.js';
+import { openAccountControlsModal } from '../core/profile/account-controls.js';
 import { getProfile } from '../core/profile/data.js';
 import { renderChat } from '../chat/chat.js';
 import { getWorkplaces as getWorkplaceEntities } from '../core/profile/workplaces/data.js';
@@ -19,9 +26,13 @@ import { getJournalTimeUsages } from '../journal/time-usage-source.js';
 import { configureWorkplaceSource } from '../core/workplace-time.js';
 import { configureTimeUsageSource } from '../core/time/index.js';
 import { activateDemo, canUseCapability, getAccess, loadAccess } from '../core/access.js';
-import { mountV2ZLayer, openNotice, initV2WorkspaceInteraction, setV2DeckOpen, v2CardDeck, v2Header, v2Shell, v2Sticker, v2ZLayer } from '../ui/ui.js';
+import { ALL_WORKPLACES_ID, viewNavigation, initViewNavigation, select, button, modal, mountModal, mountV2ZLayer, openNotice, initV2WorkspaceInteraction, setV2DeckOpen, v2CardDeck, v2Header, v2Shell, v2Sticker, v2ZLayer } from '../ui/ui.js';
 import { startPlatformNotices } from '../core/platform-notices.js';
 import { setThemeColor } from '../ui/viewport/index.js';
+import { isV2DesktopWorkspace, V2_DESKTOP_MEDIA } from '../ui/v2/geometry.js';
+import { syncV2YPlacement } from '../ui/v2/y.js';
+import { syncV2DesktopZTitle } from '../ui/v2/z-layout.js';
+import { disposeV2ZStack } from '../ui/v2/z-stack.js';
 
 configureWorkplaceSource(getWorkplaceEntities);
 configureTimeUsageSource(getJournalTimeUsages);
@@ -45,6 +56,9 @@ const state = {
   navigationEnterZ: false,
   chatPersonKey: '',
   journalView: 'day',
+  desktopCalendarMode: 'records',
+  desktopCalendarMonth: null,
+  desktopCalendarContext: null,
   secondary: {
     finance: 'cash',
     inventory: 'stock',
@@ -107,7 +121,7 @@ function ensureServerSync() {
   startProfessionalServerSync({ initialRefresh: false, getActiveScopes: () => {
     if (state.activeSection === 'journal') return ['business'];
     if (state.activeSection === 'people') return ['business', 'documents'];
-    if (state.activeSection === 'profile') return ['profile'];
+    if (state.activeSection === 'profile' || state.activeSection === 'workplaces') return ['profile'];
     if (state.activeSection === 'finance') return ['finance'];
     if (state.activeSection === 'settings') return ['documents'];
     if (state.activeSection === 'loyalty') return ['business'];
@@ -128,6 +142,7 @@ function sectionAllowed(section) {
       .some((key) => canUseCapability(key));
   }
   if (section === 'profile') return canUseCapability('profile.access');
+  if (section === 'workplaces') return canUseCapability('workplaces.access');
   if (section === 'finance' || section === 'inventory' || section === 'loyalty' || section === 'settings') {
     return secondaryItems(section).length > 0;
   }
@@ -140,21 +155,24 @@ function allowedSections() {
 }
 
 function rootDisplayLabel(section) {
+  if (section === 'workplaces') return 'Рабочие пространства';
   const definition = rootDefinition(section);
   if (!definition) return '';
+  if (section === 'settings' && window.matchMedia?.(V2_DESKTOP_MEDIA).matches) return definition.label;
   const children = secondaryItems(section);
   return children.length === 1 ? children[0].label : definition.label;
 }
 
-function allowedRootItems() {
-  return ROOT_SECTIONS
+function allowedRootItems(wide = false) {
+  const sections = wide ? ROOT_SECTIONS.filter(item => item.id !== 'profile') : ROOT_SECTIONS;
+  return sections
     .filter((item) => sectionAllowed(item.id))
     .map(({ id }) => {
       const children = secondaryItems(id);
       return {
         id,
         label: rootDisplayLabel(id),
-        childrenCount: children.length > 1 ? children.length : 0,
+        childrenCount: wide && id === 'settings' ? 0 : children.length > 1 ? children.length : 0,
       };
     });
 }
@@ -165,7 +183,10 @@ function defaultSection() {
 }
 
 function normalizeRequestedSection(section) {
-  return String(section || '').trim();
+  const id = String(section || '').trim();
+  const wide = window.matchMedia?.(V2_DESKTOP_MEDIA).matches;
+  if (id === 'workplaces' && (!wide || sectionAllowed('profile'))) return 'profile';
+  return id;
 }
 function activeRootSection() {
   return state.activeSection === 'chat' ? state.lastRootSection : state.activeSection;
@@ -189,15 +210,23 @@ function ensureSecondary(section) {
 }
 
 function setNavigationOpen(open) {
-  state.navigationOpen = Boolean(open);
+  state.navigationOpen = Boolean(open) && !isV2DesktopWorkspace(app.querySelector('[data-v2-app]'));
   if (!state.navigationOpen) state.navigationLevel = 'f';
   setV2DeckOpen(app, state.navigationOpen);
+}
+
+function resetDesktopNavigationStack() {
+  const shell = app.querySelector(':scope > [data-v2-app].v2-app--workspace');
+  if (!isV2DesktopWorkspace(shell)) return;
+  disposeV2ZStack(shell);
+  state.navigationEnterZ = false;
 }
 
 function navigate(section, { navigationOpen = state.navigationOpen, updateHash = true, chatPersonKey = '' } = {}) {
   if (!workspaceReady) return;
   const next = normalizeRequestedSection(section);
   if (!sectionAllowed(next)) return;
+  resetDesktopNavigationStack();
   if (next === 'chat') {
     if (state.activeSection !== 'chat') state.lastRootSection = activeRootSection();
     state.activeSection = 'chat';
@@ -224,6 +253,7 @@ function selectSecondary(id) {
   state.navigationOpen = false;
   state.navigationLevel = 'f';
   state.navigationEnterZ = true;
+  resetDesktopNavigationStack();
   renderWorkspace();
   history.replaceState({}, '', `#${section}`);
 }
@@ -307,6 +337,7 @@ function syncWorkspaceHeader(surface) {
     titleRoot.querySelector('.page-header h1'),
     fallbackTitle,
   );
+  if (isV2DesktopWorkspace(surface.closest('[data-v2-app]'))) syncV2DesktopZTitle(titleRoot, root === 'journal' && titleRoot === surface ? 'Журнал' : title);
   const subtitle = context?.dataset.workspaceSubtitle || '';
   const aContext = contextRoot.querySelector('[data-workspace-a-context]');
   const dSource = contextRoot.querySelector('[data-workspace-d-action]');
@@ -326,8 +357,16 @@ function syncWorkspaceHeader(surface) {
       }
     : workspaceProfileASlot();
 
-  header.outerHTML = v2Header({
-    a: aSlot,
+  const accountSlot = workspaceProfileASlot();
+  const markup = v2Header({
+    a: isV2DesktopWorkspace(header.closest('[data-v2-app]')) ? accountSlot : aSlot,
+    desktopAccount: accountSlot.label,
+    desktopContextRedundant: false,
+    desktopToolbar: true,
+    desktopProfileAllowed: sectionAllowed('profile'),
+    desktopWorkplacesAllowed: sectionAllowed('workplaces'),
+    desktopWorkplacesActive: (root === 'profile' || root === 'workplaces') && state.activeSection !== 'chat',
+    desktopContext: state.activeSection === 'chat' ? 'Чат' : (root === 'workplaces' ? 'Рабочие пространства' : rootDisplayLabel(root)) + (root !== 'journal' && title && title !== rootDisplayLabel(root) ? ' / ' + title : ''),
     b: subtitle ? { label: title, subtitle } : title,
     c: cVisible ? {
       kind: 'text',
@@ -343,21 +382,50 @@ function syncWorkspaceHeader(surface) {
     } : null,
   });
 
-  app.querySelector('[data-v2-workspace-primary]')?.addEventListener('click', () => cSource?.click());
-  app.querySelector('[data-v2-workspace-chat]')?.addEventListener('click', () => {
+  // Keep the persistent header stable when context observers report the same state.
+  if (header.outerHTML !== markup) header.outerHTML = markup;
+  bindDesktopHeader(surface);
+  const primary = app.querySelector('[data-v2-workspace-primary]');
+  if (primary) primary.onclick = () => cSource?.click();
+  const chat = app.querySelector('[data-v2-workspace-chat]');
+  if (chat) chat.onclick = () => {
     if (dSource) {
       dSource.click();
       return;
     }
     if (state.activeSection === 'chat') navigate(state.lastRootSection, { navigationOpen: false });
     else navigate('chat', { navigationOpen: false });
-  });
+  };
+}
+
+function bindDesktopHeader(surface) {
+  const openProfile = () => navigate(sectionAllowed('profile') ? 'profile' : 'workplaces', { navigationOpen: false });
+  const profile = app.querySelector('[data-desktop-profile]');
+  if (profile) profile.onclick = openProfile;
+  const workplaces = app.querySelector('[data-desktop-workplaces]');
+  if (workplaces) workplaces.onclick = openProfile;
+  const notice = app.querySelector('[data-desktop-notices]');
+  if (notice) notice.onclick = () => openAccountControlsModal();
+  const exit = app.querySelector('[data-desktop-logout]');
+  if (exit) exit.onclick = () => {
+    exit.dataset.v2AnchorWidth = '180';
+    const popup = mountModal(exit, modal('<div class="desktop-q-action-menu">'+
+      button('Выйти', {variant:'danger',data:'data-desktop-confirm-logout'})+
+      button('Отмена', {variant:'secondary',data:'data-desktop-cancel-logout'})+'</div>', {
+      variant:'x',xRole:'picker',className:'desktop-q-action-popup',
+    }));
+    popup?.querySelector('[data-desktop-cancel-logout]')?.addEventListener('click',()=>popup.v2Close?.());
+    popup?.querySelector('[data-desktop-confirm-logout]')?.addEventListener('click',()=>{
+      popup.v2Close?.();
+      logout();
+    });
+  };
 }
 
 async function ensureWorkspaceState(section) {
   const secondary = section === 'finance' || section === 'settings' ? ensureSecondary(section) : '';
   const tasks = [];
-  if (section === 'journal' || section === 'profile' || section === 'people' || section === 'service' || section === 'settings') tasks.push(loadProfileState());
+  if (section === 'journal' || section === 'profile' || section === 'workplaces' || section === 'people' || section === 'service' || section === 'settings') tasks.push(loadProfileState());
   if (section === 'journal' || section === 'people' || section === 'loyalty') tasks.push(loadBusinessState());
   if (section === 'journal') tasks.push(loadOperationalState());
   if (section === 'service') tasks.push(loadOperationalState({ full: true }));
@@ -373,9 +441,103 @@ async function ensureWorkspaceState(section) {
   await Promise.all(tasks);
 }
 
-async function renderActiveWorkspaceSurface(surface) {
+function bindDesktopCalendar(shell) {
+  const host = shell?.querySelector('[data-v2-desktop-calendar]');
+  if (!host) return { dispose: () => {}, sync: () => {} };
+  let disposed = false;
+  let ready = false;
+  let loading = null;
+  let disposeGraph = () => {};
+  let graphActive = false;
+  const media = typeof window.matchMedia === 'function' ? window.matchMedia(V2_DESKTOP_MEDIA) : null;
+  const allowed = () => isV2DesktopWorkspace(shell) && canUseCapability('journal.month.access');
+  const modes = [{ id: 'records', label: 'Записи' }, ...(canUseCapability('timetable.access') ? [{ id: 'schedule', label: 'График' }] : [])];
+  const context = () => state.desktopCalendarContext || getWorkplaceContext([...getWorkplaces(), { key: ALL_WORKPLACES_ID }], { scope: 'journal' });
+  const render = () => {
+    if (disposed || !host.isConnected) return;
+    host.hidden = !allowed();
+    if (!allowed() || !ready) { disposeGraph(); disposeGraph = () => {}; graphActive = false; return; }
+    disposeGraph(); disposeGraph = () => {}; graphActive = false;
+    if (!modes.some(item => item.id === state.desktopCalendarMode)) state.desktopCalendarMode = 'records';
+    const active = state.desktopCalendarMode;
+    const selected = context();
+    const month = state.desktopCalendarMonth || selected.date;
+    const schedule = active === 'schedule';
+    const workplace = schedule ? getWorkplaceContext([...getWorkplaces(), { key: ALL_WORKPLACES_ID }], { scope: 'journal:graph' }).workplaceId : selected.workplaceId;
+    host.innerHTML = viewNavigation({ views: modes, activeView: active }) + '<div data-v2-sidebar-month></div>';
+    initViewNavigation(host, { views: modes, activeView: active, onChange: (mode) => {
+      state.desktopCalendarMode = mode;
+      render();
+    } });
+    const calendar = host.querySelector('[data-v2-sidebar-month]');
+    if (schedule) {
+      host.insertAdjacentHTML('beforeend', '<div data-sidebar-graph-controls></div><div data-sidebar-graph-actions></div>');
+      const controlsHost = host.querySelector('[data-sidebar-graph-controls]');
+      controlsHost.innerHTML = select({name:'sidebarGraphWorkplace',value:workplace || ALL_WORKPLACES_ID,options:[{value:ALL_WORKPLACES_ID,label:'Все пространства'},...getWorkplaces().map(item=>({value:item.key,label:item.name}))]}) + button('Рабочее время',{variant:'secondary',data:'data-sidebar-graph-time'});
+      let controls = null;
+      graphActive = true;
+      disposeGraph = renderJournalGraphMode({
+        root:host,calendarRoot:calendar,actionsRoot:host.querySelector('[data-sidebar-graph-actions]'),month,workplaceId:workplace || ALL_WORKPLACES_ID,
+        onMonthChange:nextMonth=>{state.desktopCalendarMonth=nextMonth;},
+        onWorkplaceChange:id=>{setWorkplaceContext({workplaceId:id,scope:'journal:graph'}); const time=controlsHost.querySelector('[data-sidebar-graph-time]'); if(time)time.disabled=id===ALL_WORKPLACES_ID;},
+        onControls:value=>{controls=value;},
+      }) || (()=>{});
+      controlsHost.querySelector('[name="sidebarGraphWorkplace"]')?.addEventListener('change',event=>controls?.selectWorkplace(event.target.value));
+      const time=controlsHost.querySelector('[data-sidebar-graph-time]');
+      if(time){time.disabled=!controls?.canEditTime?.();time.addEventListener('click',()=>controls?.openTime?.());}
+      return;
+    }
+    mountJournalMonthCalendar(calendar, {
+      month, workplaceId: workplace || ALL_WORKPLACES_ID, selectedValue: localDateKey(selected.date), schedule,
+      onMonthChange: (nextMonth) => { state.desktopCalendarMonth = nextMonth; },
+      onDateSelect: (date) => {
+        if (!canUseCapability('journal.day.access')) return;
+        state.desktopCalendarMonth = date;
+        if (state.activeSection === 'journal') {
+          window.dispatchEvent(new CustomEvent('professional:desktop-journal-date', { detail: { date } }));
+        } else {
+          setWorkplaceContext({ date, scope: 'journal' });
+          state.desktopCalendarContext = null;
+          state.journalView = 'day';
+          navigate('journal', { navigationOpen: false });
+        }
+      },
+    });
+  };
+  const sync = () => {
+    if (disposed || !host.isConnected) return;
+    host.hidden = !allowed();
+    if (!allowed()) { disposeGraph(); disposeGraph=()=>{}; graphActive=false; return; }
+    if (ready) { if(!graphActive) render(); return; }
+    if (loading) return;
+    loading = Promise.all([loadProfileState(), loadBusinessState(), loadOperationalState(), loadFinanceState()])
+      .then(() => { ready = true; render(); })
+      .catch(error => { if (!disposed) { host.textContent = 'Не удалось загрузить календарь'; console.error(error); } })
+      .finally(() => { loading = null; });
+  };
+  let queued = false;
+  const schedule = () => {
+    if (queued || disposed) return;
+    queued = true;
+    queueMicrotask(() => { queued = false; sync(); });
+  };
+  const events = ['professional:records-changed', 'professional:dds-changed', 'professional:time-usage-changed', 'professional:workplaces-changed'];
+  events.forEach(name => window.addEventListener(name, schedule));
+  media?.addEventListener?.('change', sync);
+  sync();
+  return { sync, dispose: () => {
+    disposed = true;
+    disposeGraph();
+    events.forEach(name => window.removeEventListener(name, schedule));
+    media?.removeEventListener?.('change', sync);
+  } };
+}
+
+async function renderActiveWorkspaceSurface(surface, calendarSync = () => {}) {
   const section = state.activeSection;
+  const version = workspaceRenderVersion;
   await ensureWorkspaceState(section);
+  if (version !== workspaceRenderVersion || !surface.isConnected) return null;
   ensureServerSync();
   const openNavigation = () => setNavigationOpen(true);
   if (section === 'people') return renderPeople(surface, {
@@ -389,13 +551,22 @@ async function renderActiveWorkspaceSurface(surface) {
   if (section === 'journal') {
     return renderJournal(surface, {
       initialView: state.journalView || 'day',
+      onCalendarContextChange: (context) => {
+        const previous = state.desktopCalendarContext;
+        const dateChanged = !previous || localDateKey(previous.date) !== localDateKey(context.date);
+        const workplaceChanged = !previous || previous.workplaceId !== context.workplaceId;
+        state.desktopCalendarContext = context;
+        if (dateChanged) state.desktopCalendarMonth = context.date;
+        if (dateChanged || workplaceChanged) calendarSync();
+      },
       onViewChange: (view) => {
         state.journalView = view;
       },
     });
   }
-  if (section === 'profile') return renderProfile(surface, openNavigation, {
+  if (section === 'profile' || section === 'workplaces') return renderProfile(surface, openNavigation, {
     accountEmail: authenticatedAccount?.account?.email || '',
+    desktopPart: section === 'workplaces' ? 'workplaces' : '',
   });
   if (section === 'service') {
     const { renderService } = await import('../core/service/service.js');
@@ -423,12 +594,13 @@ function renderWorkspace() {
     return;
   }
   const requested = normalizeRequestedSection(state.activeSection);
-  if (!sectionAllowed(requested)) state.activeSection = defaultSection();
+  state.activeSection = sectionAllowed(requested) ? requested : defaultSection();
   if (state.activeSection !== 'chat') state.lastRootSection = state.activeSection;
 
   const root = activeRootSection();
-  const rootItems = allowedRootItems();
-  const childItems = secondaryItems(root);
+  const wide = window.matchMedia?.(V2_DESKTOP_MEDIA).matches;
+  const rootItems = allowedRootItems(wide);
+  const childItems = wide && root === 'settings' ? [] : secondaryItems(root);
   const childActive = ensureSecondary(root);
   const rootDeck = v2CardDeck(rootItems, {
     axis: 'x',
@@ -445,8 +617,16 @@ function renderWorkspace() {
     level: 'e',
   }) : '';
 
+  const accountSlot = workspaceProfileASlot();
   const headerMarkup = v2Header({
-    a: workspaceProfileASlot(),
+    a: accountSlot,
+    desktopAccount: accountSlot.label,
+    desktopContextRedundant: false,
+    desktopToolbar: true,
+    desktopProfileAllowed: sectionAllowed('profile'),
+    desktopWorkplacesAllowed: sectionAllowed('workplaces'),
+    desktopWorkplacesActive: (root === 'profile' || root === 'workplaces') && state.activeSection !== 'chat',
+    desktopContext: state.activeSection === 'chat' ? 'Чат' : rootDisplayLabel(root),
     b: state.activeSection === 'chat' ? 'Чат' : rootDisplayLabel(root),
     d: sectionAllowed('chat') ? { kind: 'chat', data: 'data-v2-workspace-chat', aria: 'Чат' } : null,
   });
@@ -456,6 +636,8 @@ function renderWorkspace() {
       header: headerMarkup,
       deck: rootDeck,
       eDeck,
+      desktopFooter: 'Аквера',
+      desktopCalendar: true,
       deckOpen: state.navigationOpen,
       eOpen: state.navigationOpen && state.navigationLevel === 'e',
       zEnter: Boolean(state.navigationEnterZ),
@@ -495,12 +677,20 @@ function renderWorkspace() {
 
   state.navigationEnterZ = false;
 
+  // Preserve the shared Z DOM contract for Mobile and existing controllers.
+  // On wide screens only Journal manifests as a full Z surface; all other
+  // section roots are the ordinary H workspace, not a white page/modal.
+  if (shell) {
+    shell.dataset.v2DesktopSurface = state.activeSection === 'journal' ? 'journal' : 'list';
+    syncV2YPlacement(shell);
+  }
   const surface = shell?.querySelector('[data-v2-workspace-surface]');
   const disposers = [];
   let moduleDispose = () => {};
   let disposed = false;
   const renderVersion = ++workspaceRenderVersion;
 
+  bindDesktopHeader(surface);
   app.querySelector('[data-v2-workspace-chat]')?.addEventListener('click', () => navigate('chat', { navigationOpen: false }));
 
   if (shell) disposers.push(initV2WorkspaceInteraction(shell, {
@@ -517,7 +707,7 @@ function renderWorkspace() {
       state.navigationLevel = open ? 'e' : 'f';
     },
     onRootSelect: (id) => {
-      const hasE = secondaryItems(id).length > 1;
+      const hasE = secondaryItems(id).length > 1 && !isV2DesktopWorkspace(shell);
       state.navigationLevel = hasE ? 'e' : 'f';
       state.navigationEnterZ = !hasE;
       navigate(id, { navigationOpen: hasE });
@@ -526,6 +716,10 @@ function renderWorkspace() {
   }));
 
   const onV2ContextChanged = () => syncWorkspaceHeader(surface);
+  const wideMedia = typeof window.matchMedia === 'function' ? window.matchMedia(V2_DESKTOP_MEDIA) : null;
+  const onPresentationChange = () => renderWorkspace();
+  wideMedia?.addEventListener?.('change', onPresentationChange);
+  disposers.push(() => wideMedia?.removeEventListener?.('change', onPresentationChange));
   window.addEventListener('va-tools:v2-context-changed', onV2ContextChanged);
   disposers.push(() => window.removeEventListener('va-tools:v2-context-changed', onV2ContextChanged));
 
@@ -546,7 +740,9 @@ function renderWorkspace() {
     attributeFilter: ['class', 'disabled', 'aria-label', 'data-v2-primary-visible', 'data-v2-primary-label', 'data-v2-primary-variant'],
   });
 
-  const result = surface ? renderActiveWorkspaceSurface(surface) : null;
+  const desktopCalendar = bindDesktopCalendar(shell);
+  disposers.push(desktopCalendar.dispose);
+  const result = surface ? renderActiveWorkspaceSurface(surface, desktopCalendar.sync) : null;
   Promise.resolve(result).then((nextDispose) => {
     if (disposed || renderVersion !== workspaceRenderVersion) {
       if (typeof nextDispose === 'function') nextDispose();
@@ -556,6 +752,11 @@ function renderWorkspace() {
     syncWorkspaceHeader(surface);
   }).catch((error) => {
     console.error('Workspace UI render failed', error);
+    if (disposed || renderVersion !== workspaceRenderVersion || !surface?.isConnected) return;
+    if (isV2DesktopWorkspace(shell)) {
+      surface.innerHTML = '<div class="empty-state" data-workspace-load-error><strong>Не удалось открыть раздел</strong><span>Повторите попытку.</span><button type="button" class="ui-button" data-workspace-retry>Повторить</button></div>';
+      surface.querySelector('[data-workspace-retry]')?.addEventListener('click', () => renderWorkspace());
+    }
   });
   syncWorkspaceHeader(surface);
 
@@ -624,6 +825,9 @@ export async function renderAuthenticated(account = authenticatedAccount) {
 window.addEventListener('professional:auth-logout', () => {
   stopProfessionalPresence();
   authenticatedAccount = null;
+  state.desktopCalendarContext = null;
+  state.desktopCalendarMonth = null;
+  state.desktopCalendarMode = 'records';
   workspaceReady = false;
   disposeView();
   disposeView = () => {};

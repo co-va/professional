@@ -1,9 +1,8 @@
+import { settingsSectionHeader, settingsDetailHeading, setSettingsDetailOpen } from '../settings.js';
 import { buildBookingLink } from '../../core/booking-link/index.js';
 import { apiRequest, getCurrentAccount } from '../../core/auth.js';
 import { loadOperationalState } from '../../core/runtime/operational-state.js';
-import { settingsPanel } from '../../ui/settings/index.js';
 import {
-  BOOKING_SLOT_STEPS,
   getBookingSettings,
   normalizeBookingSettings,
   saveBookingSettings,
@@ -16,14 +15,9 @@ import {
   emptyState,
   escapeHtml,
   field,
-  modal,
-  mountModal,
-  openSharedProfileSettingsMenu,
   select,
   setCopyButtonCopied,
   textareaField,
-  v2Section,
-  workspaceHeaderContext,
 } from '../../ui/ui.js';
 
 let publicRouteState = { profileSlug: '', workplaces: [] };
@@ -68,12 +62,6 @@ function bindCopyButtons(root) {
   });
 }
 
-function selectedWorkplaceLink(workplaces, key) {
-  const selected = workplaces.find((item) => item.key === key) || null;
-  if (!selected?.slug) return '';
-  return copyLinkField(selected.name || 'Ссылка рабочего пространства', bookingLink(publicRouteState.profileSlug, selected.slug), 'workplace');
-}
-
 function settingsSignature(value) {
   return JSON.stringify(normalizeBookingSettings(value));
 }
@@ -93,145 +81,109 @@ function setWelcomeSaveVisible(host, visible) {
   if (actions) actions.hidden = !visible;
 }
 
-function openWelcomeQ(root) {
-  const saved = getBookingSettings();
-  const content = `${workspaceHeaderContext({ title: 'Приветствие' })}
-    <form class="form-grid" data-online-booking-welcome>
-      ${field({ label: 'Заголовок', name: 'welcomeTitle', value: saved.welcomeTitle, maxlength: 90 })}
-      ${textareaField({ label: 'Текст', name: 'welcomeText', value: saved.welcomeText, rows: 6, maxlength: 500 })}
-      ${actionBlock(button('Сохранить', {
-        type: 'submit',
-        data: 'data-online-booking-welcome-save',
-        aria: 'Сохранить приветствие',
-      }))}
-    </form>`;
-
-  const layer = mountModal(root, modal(content, {
-    title: 'Приветствие',
-    variant: 'q',
-    className: 'online-booking-welcome-q',
-  }));
-  if (!layer) return null;
-
-  const form = layer.querySelector('[data-online-booking-welcome]');
-  const updateDirty = () => {
-    setWelcomeSaveVisible(layer, Boolean(form) && settingsSignature(welcomeDraft(form, saved)) !== settingsSignature(saved));
-  };
-  form?.addEventListener('input', updateDirty);
-  form?.addEventListener('change', updateDirty);
-  form?.addEventListener('submit', (event) => {
-    event.preventDefault();
-    if (!form) return;
-    saveBookingSettings(welcomeDraft(form, saved));
-    layer.v2Close?.();
-  });
-  updateDirty();
-  return layer;
-}
-
-function openOnlineBookingSettings(root) {
-  return openSharedProfileSettingsMenu({
-    title: 'Настройки онлайн-записи',
-    actions: [
-      {
-        id: 'welcome',
-        label: 'Приветствие',
-        onSelect: () => openWelcomeQ(root),
-      },
-    ],
-  });
-}
-
 function mountScreen(root, body) {
-  root.innerHTML = `${workspaceHeaderContext({
-    title: 'Онлайн-запись',
-    v: {
-      data: 'data-online-booking-settings',
-      aria: 'Настройки онлайн-записи',
-    },
-  })}<div class="form-grid form-grid--relaxed">${body}</div>`;
-  root.querySelector('[data-online-booking-settings]')?.addEventListener('click', () => openOnlineBookingSettings(root));
+  root.innerHTML = `${settingsSectionHeader(root,{title:'Онлайн-запись'})}<div class="form-grid form-grid--relaxed">${body}</div>`;
 }
 
-// These settings are intentionally saved as preferences, not active permissions.
-// The User flow and Core admission rules must be connected together in a later step.
-const BOOKING_RULES = Object.freeze([
-  { key: 'allowClientCancellation', label: 'Разрешить отмену записи' },
-  { key: 'allowClientRescheduling', label: 'Разрешить перенос записи' },
-]);
-
-function bookingRulesMarkup() {
+function renderInlineBooking(root) {
+  // The editor belongs to the overview row, not to either summary card.
+  const panel = root.closest('.settings-overview-section')?.querySelector('[data-settings-welcome-panel]');
+  if (!panel) return;
+  const workplaces = publicRouteState.workplaces.filter(item=>item.key && item.slug);
+  const options = [{value:'',label:'Выбрать рабочее пространство'},...workplaces.map(item=>({value:item.key,label:item.name||'Без названия'}))];
   const saved = getBookingSettings();
-  return v2Section('Правила онлайн-записи', `<div class="form-grid">
-    ${select({
-      label: 'Шаг времени записи',
-      name: 'preferredBookingSlotStep',
-      value: String(saved.preferredSlotStep),
-      options: BOOKING_SLOT_STEPS.map((step) => ({ value: String(step), label: `${step} минут` })),
-      aria: 'Выбрать шаг времени онлайн-записи',
-    })}
-    ${settingsPanel(BOOKING_RULES.map(({ key, label }) => ({
-      type: 'toggle',
-      label,
-      checked: saved[key] === true,
-      data: `data-booking-rule="${key}"`,
-    })))}
-    <p class="muted">Настройки сохраняются, но пока не применяются к записи: подключение правил в User и Core запланировано отдельно.</p>
-  </div>`);
-}
-
-function bindBookingRules(root) {
-  root.querySelector('[name="preferredBookingSlotStep"]')?.addEventListener('change', (event) => {
-    saveBookingSettings({ ...getBookingSettings(), preferredSlotStep: Number(event.target.value) });
+  root.innerHTML = `<div class="settings-inline-heading"><strong>Онлайн-запись</strong>${button('Приветствие',{className:'settings-h-action',data:'data-inline-welcome aria-expanded="false" aria-controls="settings-online-welcome"'})}</div>
+    <div class="form-grid settings-booking-fields">
+      ${copyLinkField('Общая ссылка',bookingLink(publicRouteState.profileSlug),'general')}
+      ${select({label:'Рабочее пространство',name:'bookingWorkplace',value:'',options,aria:'Выбрать рабочее пространство для онлайн-записи'})}
+      ${copyLinkField('Ссылка рабочего пространства','','workplace')}
+    </div>`;
+  panel.hidden = true;
+  panel.innerHTML = `${settingsDetailHeading('Приветствие','settings-online-welcome')}
+    <form class="form-grid settings-inline-welcome" data-inline-welcome-form>
+      ${field({label:'Заголовок',name:'welcomeTitle',value:saved.welcomeTitle,maxlength:90})}
+      ${textareaField({label:'Текст',name:'welcomeText',value:saved.welcomeText,rows:4,maxlength:500})}
+      ${button('Сохранить',{type:'submit',className:'settings-h-action',data:'data-inline-welcome-save hidden'})}
+    </form>`;
+  bindCopyButtons(root);
+  const copy = root.querySelector('[data-copy-booking-link="workplace"]');
+  const link = copy?.closest('.input-action-row')?.querySelector('input');
+  if(copy) copy.disabled=true;
+  root.querySelector('input[name="bookingWorkplace"]')?.addEventListener('change',event=>{
+    const workplace=workplaces.find(item=>item.key===event.target.value);
+    if(link) link.value=workplace?bookingLink(publicRouteState.profileSlug,workplace.slug):'';
+    if(copy) copy.disabled=!link?.value;
   });
-  BOOKING_RULES.forEach(({ key }) => {
-    const control = root.querySelector(`[data-booking-rule="${key}"]`);
-    control?.addEventListener('click', () => {
-      const saved = getBookingSettings();
-      const next = saveBookingSettings({ ...saved, [key]: !saved[key] });
-      const checked = next[key] === true;
-      control.setAttribute('aria-pressed', checked ? 'true' : 'false');
-      control.classList.toggle('is-on', checked);
-      control.querySelector('.app-setting-toggle__switch')?.classList.toggle('is-on', checked);
-    });
+  const toggle=root.querySelector('[data-inline-welcome]');
+  const form=panel.querySelector('[data-inline-welcome-form]');
+  const save=form?.querySelector('[data-inline-welcome-save]');
+  let baseline=saved;
+  const sync=()=>{if(save)save.hidden=settingsSignature(welcomeDraft(form,baseline))===settingsSignature(baseline);};
+  toggle?.addEventListener('click',()=>{
+    setSettingsDetailOpen(panel,panel.hidden);
   });
+  form?.addEventListener('input',sync);
+  form?.addEventListener('change',sync);
+  form?.addEventListener('submit',event=>{
+    event.preventDefault();
+    baseline=saveBookingSettings(welcomeDraft(form,getBookingSettings()));
+    sync();
+    setSettingsDetailOpen(panel,false);
+  });
+  sync();
 }
 
 function renderReady(root) {
-  const workplaces = publicRouteState.workplaces.filter((item) => item.key && item.slug);
-  const options = [
-    { value: '', label: 'Выбрать рабочее пространство' },
-    ...workplaces.map((item) => ({ value: item.key, label: item.name || 'Без названия' })),
-  ];
-
-  mountScreen(root, `<div class="form-grid form-grid--relaxed">
-    ${copyLinkField('Общая ссылка', bookingLink(publicRouteState.profileSlug), 'general')}
-    ${select({
-      label: 'Рабочее пространство',
-      name: 'bookingWorkplace',
-      value: '',
-      options,
-      aria: 'Выбрать рабочее пространство для онлайн-записи',
-    })}
-    <div data-workplace-booking-link></div>
-  </div>${bookingRulesMarkup()}`);
-
+  if(root.hasAttribute('data-settings-embedded')) return renderInlineBooking(root);
+  const workplaces = publicRouteState.workplaces.filter(item=>item.key && item.slug);
+  const options = [{value:'',label:'Выбрать рабочее пространство'},...workplaces.map(item=>({value:item.key,label:item.name||'Без названия'}))];
+  const saved = getBookingSettings();
+  mountScreen(root,`<div class="form-grid settings-mobile-booking-links">
+    ${copyLinkField('Общая ссылка',bookingLink(publicRouteState.profileSlug),'general')}
+    ${select({label:'Рабочее пространство',name:'bookingWorkplace',value:'',options,aria:'Выбрать рабочее пространство для онлайн-записи'})}
+    ${copyLinkField('Ссылка рабочего пространства','','workplace')}
+  </div>
+  <section class="settings-mobile-booking-welcome">
+    <strong>Приветствие</strong>
+    <form class="form-grid" data-online-booking-welcome>
+      ${field({label:'Заголовок',name:'welcomeTitle',value:saved.welcomeTitle,maxlength:90})}
+      ${textareaField({label:'Текст',name:'welcomeText',value:saved.welcomeText,rows:6,maxlength:500})}
+      ${actionBlock(button('Сохранить',{type:'submit',data:'data-online-booking-welcome-save',aria:'Сохранить приветствие'}))}
+    </form>
+  </section>`);
   bindCopyButtons(root);
-  bindBookingRules(root);
-  root.querySelector('input[name="bookingWorkplace"]')?.addEventListener('change', (event) => {
-    const host = root.querySelector('[data-workplace-booking-link]');
-    if (!host) return;
-    host.innerHTML = selectedWorkplaceLink(workplaces, event.target.value);
-    bindCopyButtons(host);
+  const copy=root.querySelector('[data-copy-booking-link="workplace"]');
+  const link=copy?.closest('.input-action-row')?.querySelector('input');
+  if(copy)copy.disabled=true;
+  root.querySelector('input[name="bookingWorkplace"]')?.addEventListener('change',event=>{
+    const workplace=workplaces.find(item=>item.key===event.target.value);
+    if(link)link.value=workplace?bookingLink(publicRouteState.profileSlug,workplace.slug):'';
+    if(copy)copy.disabled=!link?.value;
   });
+  const form=root.querySelector('[data-online-booking-welcome]');
+  let baseline=saved;
+  const sync=()=>setWelcomeSaveVisible(root,settingsSignature(welcomeDraft(form,baseline))!==settingsSignature(baseline));
+  form?.addEventListener('input',sync);
+  form?.addEventListener('change',sync);
+  form?.addEventListener('submit',event=>{
+    event.preventDefault();
+    if(settingsSignature(welcomeDraft(form,baseline))===settingsSignature(baseline))return;
+    baseline=saveBookingSettings(welcomeDraft(form,getBookingSettings()));
+    sync();
+  });
+  sync();
 }
 
 function renderUnavailable(root, title, message) {
+  if(root.hasAttribute('data-settings-embedded')) {
+    root.innerHTML='<strong class="settings-overview-card-title">Онлайн-запись</strong>'+emptyState(title,message);
+    return;
+  }
   mountScreen(root, emptyState(title, message));
 }
 
 export function render(root) {
-  root.innerHTML = `${workspaceHeaderContext({ title: 'Онлайн-запись' })}${emptyState('Загрузка', 'Формируем ссылки онлайн-записи.')}`;
+  root.innerHTML = `${settingsSectionHeader(root,{ title: 'Онлайн-запись' })}${emptyState('Загрузка', 'Формируем ссылки онлайн-записи.')}`;
 
   void Promise.all([loadOperationalState({ full: true }), getCurrentAccount(), loadOwnerPublicRoute()])
     .then(([, account, publicRoute]) => {

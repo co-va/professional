@@ -1,5 +1,5 @@
 import { text } from './html.js';
-import { v2ModalPortalGeometry, v2QModalPortalGeometry } from './geometry.js';
+import { v2ModalPortalGeometry, v2QModalPortalGeometry, isV2DesktopWorkspace } from './geometry.js';
 import {
   activeV2ModalSurface,
   lockV2ModalSurface,
@@ -27,7 +27,7 @@ export function v2Layer(content = '', { kind = 'standard', title = '', className
   return `<div class="v2-layer-backdrop" data-v2-layer data-v2-layer-kind="${resolved}"><section class="v2-layer v2-layer--${resolved} ${text(className)}" role="dialog" aria-modal="true" aria-label="${text(title)}" tabindex="-1">${closeControl}${gestureZone}${body}</section></div>`;
 }
 
-function mountV2ModalPortal(host, app = null) {
+function mountV2ModalPortal(host, app = null, kind = 'standard', anchor = null) {
   if (!host) return null;
 
   const portal = document.createElement('div');
@@ -55,7 +55,28 @@ function mountV2ModalPortal(host, app = null) {
       width: appRect.width,
       height: appRect.height,
     };
-    let geometry = v2ModalPortalGeometry(hostRect, layoutViewport);
+    const wide = isV2DesktopWorkspace(app);
+    let geometry = v2ModalPortalGeometry(wide && (kind === 'top' || kind === 'bottom') ? appRect : hostRect, layoutViewport);
+    const anchorRect = wide && kind === 'bottom' && anchor?.isConnected ? anchor.getBoundingClientRect() : null;
+    const anchored = Boolean(anchorRect && anchorRect.width > 0 && anchorRect.height > 0);
+    portal.classList.toggle('is-anchored', anchored);
+    if (anchored) {
+      const gap = 6;
+      // An explicit preferred width is presentation metadata, not a second portal.
+      const requestedWidth = Number(anchor.dataset.v2AnchorWidth);
+      const explicitWidth = Number.isFinite(requestedWidth) && requestedWidth > 0;
+      const preferredWidth = explicitWidth ? requestedWidth : anchor.matches('[data-people-desktop-filter]') ? 360 : 240;
+      const width = Math.min(Math.max(anchorRect.width, preferredWidth), explicitWidth ? preferredWidth : 380, Math.max(0, appRect.width - 16));
+      const left = Math.max(8, Math.min(anchorRect.left - appRect.left, appRect.width - width - 8));
+      const below = Math.max(0, appRect.bottom - anchorRect.bottom - gap - 8);
+      const above = Math.max(0, anchorRect.top - appRect.top - gap - 8);
+      const openAbove = below < 280 && above > below;
+      portal.style.setProperty('--v2-anchor-left', `${left}px`);
+      portal.style.setProperty('--v2-anchor-width', `${width}px`);
+      portal.style.setProperty('--v2-anchor-top', openAbove ? 'auto' : `${anchorRect.bottom - appRect.top + gap}px`);
+      portal.style.setProperty('--v2-anchor-bottom', openAbove ? `${appRect.bottom - anchorRect.top + gap}px` : 'auto');
+      portal.style.setProperty('--v2-anchor-max-height', `${Math.max(0, openAbove ? above : below)}px`);
+    }
     if (qLayer && app) {
       geometry = v2ModalPortalGeometry(appRect, layoutViewport);
       const headerBottom = app.querySelector?.('[data-v2-header]')?.getBoundingClientRect?.().bottom;
@@ -185,6 +206,51 @@ function applyXTransitionPolicy(node) {
   if (xLayerRole(parent) === 'action') parent.v2Close?.();
 }
 
+// Deletion confirmations share one safety policy across Mobile and Desktop.
+ // Only explicit delete-confirm actions or destructive actions in a deletion
+ // dialog qualify; ordinary action menus and edit forms are not rearranged.
+function prepareV2DeletionConfirmation(node) {
+  if (node.dataset.v2LayerKind !== 'bottom') return null;
+  const sheet = node.querySelector(':scope > .v2-layer');
+  if (!sheet) return null;
+  const normalize = value => String(value || '').trim().toLocaleLowerCase('ru');
+  const title = normalize(sheet.getAttribute('aria-label'));
+  const heading = normalize(sheet.querySelector('.modal-title h2')?.textContent);
+  const isDeleteTitle = /^(?:удалить|удаление|снять с продажи|снятие с продажи)(?:$|[\s?])/;
+  const isDeleteAction = /^(?:удалить|да,?\s+удалить|снять с продажи)(?:$|[\s?])/;
+  const isCancel = /^(?:отмена|отменить|не удалять|нет|нет,?\s+отмена)$/;
+  for (const group of sheet.querySelectorAll('.modal-actions')) {
+    const controls = [...group.children].filter(child => child.matches('button'));
+    if (controls.length < 1 || controls.length > 2) continue;
+    const destructive = controls.find(control => {
+      const explicit = [...control.attributes].some(attr => /^data-/.test(attr.name)
+        && /(?:confirm.*(?:delete|remove)|(?:delete|remove).*confirm)/i.test(attr.name));
+      return explicit || ((isDeleteTitle.test(title) || isDeleteTitle.test(heading))
+        && isDeleteAction.test(normalize(control.textContent))
+        && control.matches('.ui-button--danger,.ui-button--critical,.ui-button--delete-outline'));
+    });
+    if (!destructive) continue;
+    let cancel = controls.find(control => control !== destructive && isCancel.test(normalize(control.textContent)));
+    if (controls.length === 2 && !cancel) continue;
+    const created = !cancel;
+    if (created) {
+      cancel = document.createElement('button');
+      cancel.type = 'button';
+      cancel.className = 'ui-button';
+      cancel.textContent = 'Отмена';
+      cancel.setAttribute('data-v2-confirmation-cancel', '');
+    }
+    group.insertBefore(cancel, destructive);
+    cancel.classList.add('v2-confirmation-safe');
+    destructive.classList.add('v2-confirmation-destructive');
+    cancel.setAttribute('data-modal-autofocus', '');
+    node.setAttribute('data-v2-delete-confirmation', '');
+    sheet.setAttribute('role', 'alertdialog');
+    return created ? cancel : null;
+  }
+  return null;
+}
+
 export function mountV2Layer(html, { root = null } = {}) {
   const template = document.createElement('template');
   template.innerHTML = String(html || '').trim();
@@ -195,14 +261,18 @@ export function mountV2Layer(html, { root = null } = {}) {
   const qLayer = node.dataset.v2Q === 'true';
 
   if (!technical && !canOpenApplicationModal(node)) return null;
+  const generatedCancel = prepareV2DeletionConfirmation(node);
+  const deletionConfirmation = node.hasAttribute('data-v2-delete-confirmation');
 
   const host = technical ? document.body : activeV2ModalSurface(root);
   if (!host) return null;
   if (!technical) applyXTransitionPolicy(node);
   const app = technical ? null : host.closest?.('[data-v2-app]');
+  const active = document.activeElement;
+  const anchor = deletionConfirmation ? null : (root?.matches?.('button') ? root : (kind === 'bottom' && active?.matches?.('.v2-desktop-v') && app?.contains(active) ? active : null));
   const lockedStage = technical ? null : lockV2StageInteraction(app);
   const releaseHeaderLock = technical ? () => {} : lockModalHeader(app);
-  const portalOwner = technical ? null : mountV2ModalPortal(host, app);
+  const portalOwner = technical ? null : mountV2ModalPortal(host, app, kind, anchor);
   portalOwner?.setQLayer?.(qLayer);
   const mountHost = portalOwner?.portal || host;
   node.classList.add(technical ? 'v2-layer-backdrop--technical' : 'v2-layer-backdrop--contained');
@@ -329,6 +399,7 @@ export function mountV2Layer(html, { root = null } = {}) {
 
   node.v2Close = close;
   node.remove = close;
+  generatedCancel?.addEventListener('click', () => node.v2Close?.());
   document.addEventListener('pointerdown', handleOutsidePointerDown, true);
   document.addEventListener('pointermove', handleOutsidePointerMove, true);
   document.addEventListener('pointerup', handleOutsidePointerUp, true);
@@ -340,8 +411,16 @@ export function mountV2Layer(html, { root = null } = {}) {
     onDismiss: () => node.v2Close?.(),
   });
   node.addEventListener('click', (event) => {
+    // Technical is mounted on document.body, outside the application portal.
+    // Only its own veil may dismiss it; clicks in the document must stay inside.
+    if (technical && event.target === node) {
+      event.preventDefault();
+      event.stopPropagation();
+      node.v2Close?.();
+      return;
+    }
     if (event.target.closest('[data-v2-layer-close]')) node.v2Close?.();
-    if (qLayer && event.target.closest('[data-v2-z-dismiss]') && !requestBack()) node.v2Close?.();
+    if (qLayer && event.target.closest('[data-v2-z-dismiss], [data-v2-q-close]') && !requestBack()) node.v2Close?.();
   });
   return node;
 }

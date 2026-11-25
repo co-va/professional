@@ -1,3 +1,4 @@
+import { settingsSectionHeader } from '../settings.js';
 import {
   beginEmailConnection,
   disconnectEmail,
@@ -10,16 +11,17 @@ import {
 } from '../../core/integrations/telegram.js';
 import {
   button,
+  compactButton,
   emptyState,
   field,
   infoUI,
   miniCard,
   miniCardRail,
+  miniCardStack,
   modal,
   mountModal,
   openDocumentViewer,
   page,
-  workspaceHeaderContext,
 } from '../../ui/ui.js';
 
 const TELEGRAM_SETUP_GUIDE = `1. Откройте Telegram.\n\nВ поиске найдите официального бота @BotFather и откройте его.\n\n2. Создайте нового бота.\n\nОтправьте BotFather команду /newbot.\n\n3. Укажите название.\n\nBotFather попросит написать название бота. Введите любое понятное вам название. Это название будут видеть пользователи в Telegram.\n\n4. Создайте username.\n\nBotFather попросит придумать уникальное имя пользователя. Username обязательно должен заканчиваться на bot. Если выбранное имя занято, Telegram попросит выбрать другое.\n\n5. Получите токен.\n\nПосле создания BotFather пришлёт токен бота — длинную строку из цифр и символов.\n\n6. Скопируйте токен.\n\nСкопируйте его целиком. Не изменяйте токен и не передавайте его другим людям: он даёт доступ к управлению ботом.\n\n7. Вернитесь в приложение.\n\nОткройте Интеграции → Telegram, вставьте токен в поле «Токен Telegram-бота» и нажмите «Подключить».\n\n8. Готово.\n\nПосле подключения бот принимает и отправляет сообщения через Telegram.`;
@@ -36,9 +38,12 @@ function telegramMiniCard(state = {}, { interactive = false } = {}) {
   const connected = Boolean(state?.connected);
   const bot = String(state?.botUsername || '').trim();
   return miniCard({
-    title: 'Telegram',
-    value: connected && bot ? bot : '',
-    subtitle: telegramSubtitle(state),
+    detailsLayout: {
+      heading: 'Telegram',
+      body: connected && bot ? bot : '',
+      stats: [{ value: telegramSubtitle(state) }],
+    },
+    className: 'settings-integration-card',
     interactive,
     data: interactive ? 'data-integration-open="telegram"' : '',
     aria: interactive ? 'Открыть Telegram' : '',
@@ -53,9 +58,12 @@ function emailSubtitle(state = {}) {
 function emailMiniCard(state = {}, { interactive = false } = {}) {
   const email = String(state?.email || state?.suggestedEmail || '').trim();
   return miniCard({
-    title: 'Email',
-    value: email,
-    subtitle: emailSubtitle(state),
+    detailsLayout: {
+      heading: 'Email',
+      body: email,
+      stats: [{ value: emailSubtitle(state) }],
+    },
+    className: 'settings-integration-card',
     interactive,
     data: interactive ? 'data-integration-open="email"' : '',
     aria: interactive ? 'Открыть Email' : '',
@@ -164,7 +172,7 @@ function bindTelegramX(layer, baseRoot, state = {}) {
   const help = layer.querySelector('[data-telegram-help] [data-info-trigger]');
   help?.addEventListener('click', () => {
     const info = telegramInfoDocument(state);
-    openDocumentViewer({ title: info.title, content: info.content });
+    openDocumentViewer({ title: info.title, content: info.content, compact: true });
   });
   if (state?.error) return;
   const form = layer.querySelector('[data-telegram-integration-form]');
@@ -199,7 +207,7 @@ function bindEmailX(layer, baseRoot, state = {}) {
   const help = layer.querySelector('[data-email-help] [data-info-trigger]');
   help?.addEventListener('click', () => {
     const info = emailInfoDocument(state);
-    openDocumentViewer({ title: info.title, content: info.content });
+    openDocumentViewer({ title: info.title, content: info.content, compact: true });
   });
   if (state?.error) return;
   const form = layer.querySelector('[data-email-integration-form]');
@@ -293,16 +301,47 @@ function openEmail(root, state = null) {
 function renderIntegrationCards(root, telegramState = {}, emailState = {}) {
   const host = root.querySelector('[data-integrations-list]');
   if (!host) return;
-  host.innerHTML = miniCardRail([
+  const embedded=root.hasAttribute('data-settings-embedded');
+  const cards = [
     telegramMiniCard(telegramState, { interactive: true }),
     emailMiniCard(emailState, { interactive: true }),
-  ]);
+  ];
+  host.innerHTML = embedded
+    ? miniCardRail(cards,{className:'settings-integration-rail'})
+    : miniCardStack(cards,{className:'settings-integration-stack'});
+  if(embedded){
+    const rail=host.querySelector('[data-mini-card-rail]');
+    const prev=root.querySelector('[data-integration-prev]');
+    const next=root.querySelector('[data-integration-next]');
+    rail?.setAttribute('data-v2-layer-gesture-ignore','');
+    const sync=()=>{
+      if(!rail||!prev||!next)return;
+      const max=Math.max(0,rail.scrollWidth-rail.clientWidth);
+      prev.disabled=rail.scrollLeft<=1;
+      next.disabled=rail.scrollLeft>=max-1;
+    };
+    const step=dir=>{
+      const card=rail?.firstElementChild;
+      if(!card)return;
+      rail.scrollBy({left:dir*(card.getBoundingClientRect().width+12),behavior:'smooth'});
+    };
+    prev?.addEventListener('click',()=>step(-1));
+    next?.addEventListener('click',()=>step(1));
+    rail?.addEventListener('scroll',sync,{passive:true});
+    requestAnimationFrame(sync);
+    if(rail && typeof ResizeObserver==='function'){
+      const observer=new ResizeObserver(()=>{if(!rail.isConnected)observer.disconnect();else sync();});
+      observer.observe(rail);
+    }
+  }
   host.querySelector('[data-integration-open="telegram"]')?.addEventListener('click', () => openTelegram(root, telegramState));
   host.querySelector('[data-integration-open="email"]')?.addEventListener('click', () => openEmail(root, emailState));
 }
 
 async function renderIntegrations(root) {
-  root.innerHTML = page([workspaceHeaderContext({ title: 'Интеграции' }), '<div data-integrations-list></div>']);
+  root.innerHTML = root.hasAttribute('data-settings-embedded')
+    ? '<div class="settings-inline-heading"><strong>Интеграции</strong><div class="settings-integration-nav">'+compactButton({kind:'previous',data:'data-integration-prev',aria:'Предыдущая интеграция'})+compactButton({kind:'next',data:'data-integration-next',aria:'Следующая интеграция'})+'</div></div><div data-integrations-list></div>'
+    : page([settingsSectionHeader(root,{ title: 'Интеграции' }), '<div data-integrations-list></div>']);
   const host = root.querySelector('[data-integrations-list]');
   if (host) host.innerHTML = emptyState('Загрузка', 'Проверяем интеграции.');
   const [telegramResult, emailResult] = await Promise.allSettled([getTelegramBotConnection(), getEmailConnection()]);
@@ -314,5 +353,5 @@ async function renderIntegrations(root) {
   window.dispatchEvent(new CustomEvent('va-tools:v2-context-changed'));
 }
 
-export function render(root) { void renderIntegrations(root); }
+export function render(root) { return renderIntegrations(root); }
 export { renderIntegrations };

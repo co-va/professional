@@ -13,6 +13,7 @@ function v2NavigationIcon(id = '') {
     special: '<path d="M4 8h16M4 16h16M8 4 4 8l4 4M16 12l4 4-4 4"></path>',
     'z-report': '<path d="M5 4h14L6 20h13"></path>',
     timetable: '<rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M7 3v4M17 3v4M3 10h18"></path>',
+    workplaces: '<path d="m3 11 9-7 9 7v9h-6v-6H9v6H3Z"></path>',
     home: '<path d="m3 11 9-7 9 7v9h-6v-6H9v6H3Z"></path>',
     journal: '<path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3Z"></path><path d="M8 4v16"></path>',
     history: '<path d="M4 7h16M4 12h16M4 17h11"></path><circle cx="2.5" cy="7" r=".8"></circle><circle cx="2.5" cy="12" r=".8"></circle><circle cx="2.5" cy="17" r=".8"></circle>',

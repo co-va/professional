@@ -21,3 +21,20 @@
 .journal-event__time{font-size:.78em;opacity:.75}
 .journal-event__title{font-weight:700}
 .journal-usage__overlap{position:absolute;right:6px;bottom:4px;display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 4px;border:1px solid currentColor;border-radius:9px;background:var(--white);font-size:11px;font-weight:800;line-height:1}
+
+/* Desktop wheel picker: same anchored presentation as select(), never a
+   separate centered editor. Preserve the shared wheel runtime and Mobile. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace>.v2-layer-portal.is-anchored>.v2-layer-backdrop>.v2-layer--bottom:is(.modal--time-picker-sheet,.modal--duration-picker-popover){background:var(--white);border-radius:var(--radius-control);padding:12px;min-height:0;gap:0}
+ .v2-app--workspace>.v2-layer-portal.is-anchored>.v2-layer-backdrop>.v2-layer--bottom:is(.modal--time-picker-sheet,.modal--duration-picker-popover) .modal-title{margin:0 0 10px}
+ .v2-app--workspace>.v2-layer-portal.is-anchored>.v2-layer-backdrop>.v2-layer--bottom:is(.modal--time-picker-sheet,.modal--duration-picker-popover) .modal-title h2{font-size:14px;line-height:20px;font-weight:650;color:#41484F}
+ .v2-app--workspace>.v2-layer-portal.is-anchored>.v2-layer-backdrop>.v2-layer--bottom:is(.modal--time-picker-sheet,.modal--duration-picker-popover) .time-wheel{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+ .v2-app--workspace>.v2-layer-portal.is-anchored>.v2-layer-backdrop>.v2-layer--bottom:is(.modal--time-picker-sheet,.modal--duration-picker-popover) .time-wheel__column{gap:4px}
+ .v2-app--workspace>.v2-layer-portal.is-anchored>.v2-layer-backdrop>.v2-layer--bottom:is(.modal--time-picker-sheet,.modal--duration-picker-popover) .time-wheel__label{font-size:12px;line-height:16px;text-align:center;color:#41484F}
+ .v2-app--workspace>.v2-layer-portal.is-anchored>.v2-layer-backdrop>.v2-layer--bottom:is(.modal--time-picker-sheet,.modal--duration-picker-popover) .time-wheel__viewport{height:108px;padding:36px 0;border:1px solid var(--border);border-radius:8px;background:var(--white)}
+ .v2-app--workspace>.v2-layer-portal.is-anchored>.v2-layer-backdrop>.v2-layer--bottom:is(.modal--time-picker-sheet,.modal--duration-picker-popover) .time-wheel__viewport::before,.v2-app--workspace>.v2-layer-portal.is-anchored>.v2-layer-backdrop>.v2-layer--bottom:is(.modal--time-picker-sheet,.modal--duration-picker-popover) .time-wheel__viewport::after{height:36px}
+ .v2-app--workspace>.v2-layer-portal.is-anchored>.v2-layer-backdrop>.v2-layer--bottom:is(.modal--time-picker-sheet,.modal--duration-picker-popover) .time-wheel__item{height:36px;font-size:15px}
+ .v2-app--workspace>.v2-layer-portal.is-anchored>.v2-layer-backdrop>.v2-layer--bottom:is(.modal--time-picker-sheet,.modal--duration-picker-popover) .time-wheel__item.is-selected{color:var(--text);font-weight:700}
+ .v2-app--workspace>.v2-layer-portal.is-anchored>.v2-layer-backdrop>.v2-layer--bottom:is(.modal--time-picker-sheet,.modal--duration-picker-popover)>.ui-button{box-sizing:border-box;width:160px;max-width:100%;height:var(--h-tools,36px);min-height:var(--h-tools,36px);max-height:var(--h-tools,36px);padding:0 12px;margin:12px 0 0 auto;border-width:1px;border-radius:10px;font-size:13px;line-height:1}
+ .v2-app--workspace>.v2-layer-portal.is-anchored>.v2-layer-backdrop>.v2-layer--bottom:is(.modal--time-picker-sheet,.modal--duration-picker-popover):has(>[data-time-clear])>.ui-button{width:100%;margin-top:8px}
+}

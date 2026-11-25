@@ -36,6 +36,11 @@ async function request(path = '', method = 'GET', body = null) {
   return result;
 }
 
+export async function loadConsumptionGroups() {
+  const result = await request();
+  return Array.isArray(result.groups) ? result.groups : [];
+}
+
 // These are references to physical stock items, not additional physical stock.
 // Do not update inventory movements, lots, prices or stock balances here.
 export function consumptionGroupDraft(group = null) {

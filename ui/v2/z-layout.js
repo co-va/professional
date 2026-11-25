@@ -1,4 +1,5 @@
 import { v2ZDismissAffordance } from './z-affordance.js';
+import { isV2DesktopWorkspace } from './geometry.js';
 
 const Z_VIEWPORT_OVERSCAN = 'var(--v2-z-viewport-overscan)';
 // One geometry and one 12px spacing token for Z and Q.
@@ -70,7 +71,9 @@ function surfaceHeader(content = '', { kind = 'z', dismiss = true } = {}) {
   const data = kind === 'q' ? 'data-v2-q-header' : 'data-v2-z-header';
   const contentData = kind === 'q' ? 'data-v2-q-header-content' : 'data-v2-z-header-content';
   const contentStyle = visibleWorkAreaStyle(SURFACE_HEADER_CONTENT_STYLE, kind);
-  return `<div ${data} style="${SURFACE_HEADER_STYLE}">${dismiss ? v2ZDismissAffordance() : ''}<div ${contentData} style="${contentStyle}">${content}</div></div>`;
+  const desktopClose = kind === 'q' && dismiss ? '<button type="button" class="v2-layer__close v2-desktop-q-close" data-v2-q-close aria-label="Закрыть">×</button>' : '';
+  const desktopHeading = kind === 'z' ? '<div data-h-title-row><h2 data-h-title></h2><div data-h-accessory></div><button type="button" data-h-back data-v2-z-close>Назад</button></div>' : '';
+  return `<div ${data} style="${SURFACE_HEADER_STYLE}">${dismiss ? v2ZDismissAffordance() : ''}${desktopHeading}<div ${contentData} style="${contentStyle}">${content}</div>${desktopClose}</div>`;
 }
 
 function surfaceBody(content = '', { kind = 'z' } = {}) {
@@ -137,11 +140,14 @@ function bindV2ZHeaderOwner(root) {
   Z_HEADER_OWNER_BOUND.add(root);
 }
 
-export function setV2ZHeaderRows(root, rows = []) {
+export function setV2ZHeaderRows(root, rows = [], { desktopTitle = null, desktopAccessory = '' } = {}) {
   const surface = resolveZSurface(root);
   const host = surface?.querySelector?.(':scope > [data-v2-z-header] > [data-v2-z-header-content]');
   if (!host) return [];
   bindV2ZHeaderOwner(root);
+  const accessory = surface.querySelector(':scope > [data-v2-z-header] > [data-h-title-row] > [data-h-accessory]');
+  if (accessory) accessory.innerHTML = desktopAccessory;
+  if (desktopTitle !== null) syncV2DesktopZTitle(surface, desktopTitle);
   const values = (Array.isArray(rows) ? rows : [rows]).filter((row) => String(row || '').trim());
   host.innerHTML = values.map((row, index) => `<div data-v2-z-header-row="${index}" style="min-width:0">${row}</div>`).join('');
   host.querySelectorAll(':scope > [data-v2-z-header-row] > *').forEach((node) => {
@@ -154,4 +160,73 @@ export function clearV2ZHeaderRows(root) {
   const surface = resolveZSurface(root);
   const host = surface?.querySelector?.(':scope > [data-v2-z-header] > [data-v2-z-header-content]');
   if (host) host.replaceChildren();
+  surface?.querySelector(':scope > [data-v2-z-header] > [data-h-title-row] > [data-h-accessory]')?.replaceChildren();
+}
+
+export function syncV2DesktopZTitle(root, title = '') {
+  const surface = resolveZSurface(root);
+  const node = surface?.querySelector(':scope > [data-v2-z-header] > [data-h-title-row] > [data-h-title]');
+  const next = String(title || '');
+  if (node && node.textContent !== next) node.textContent = next;
+}
+
+/** Move an explicitly selected page-level action into the Desktop Q toolbar.
+ * Keep its original node, listeners and any existing Save visibility wrapper.
+ * Mobile and non-Q surfaces are no-ops; field-local controls stay in place.
+ */
+export function moveDesktopQTool(control, { desktopLabel = '' } = {}) {
+  // Destructive page actions must remain separate at the bottom right.
+  if (control?.matches?.('.ui-button--danger,.ui-button--critical,.ui-button--delete-outline')) return false;
+  const sheet = control?.closest?.('.v2-layer--standard');
+  const body = control?.closest?.('[data-v2-q-body]');
+  if (!sheet || !body || !sheet.closest('[data-v2-q="true"]')
+      || !isV2DesktopWorkspace(sheet.closest('[data-v2-app]'))) return false;
+  const header = sheet.querySelector(':scope > [data-v2-q-header] > [data-v2-q-header-content]');
+  if (!header) return false;
+  let row = header.querySelector(':scope > .desktop-q-toolbar');
+  if (!row) {
+    const heading = header.querySelector(':scope > .v2-q-title');
+    if (!heading) return false;
+    const wrapper = header.ownerDocument.createElement('div');
+    wrapper.className = 'desktop-q-heading';
+    heading.replaceWith(wrapper);
+    wrapper.append(heading);
+    row = header.ownerDocument.createElement('div');
+    row.className = 'desktop-q-toolbar';
+    row.setAttribute('data-v2-layer-gesture-ignore', '');
+    header.append(row);
+    sheet.classList.add('desktop-q-fixed-tools');
+  }
+  const actions = control.closest('.modal-actions');
+  // The existing save controller owns this wrapper's visibility and inert
+  // state. Keep it around the same button, not in the scrollable Q body.
+  const slot = actions && actions.children.length === 1 && actions.firstElementChild === control
+    ? actions : control;
+  const previous = slot.parentElement;
+  if (desktopLabel) {
+    const originalLabel = control.getAttribute('aria-label') || control.textContent.trim();
+    control.setAttribute('aria-label', originalLabel);
+    control.title = originalLabel;
+    control.textContent = desktopLabel;
+  }
+  slot.classList.add('desktop-q-action-slot');
+  row.append(slot);
+  if (previous?.matches('.app-settings-panel') && !previous.children.length) previous.remove();
+  return true;
+}
+
+/** Desktop Q destructive footer, using the existing measured modal-actions
+ * owner. The original control and its confirmation handler are retained. */
+export function pinDesktopQDanger(control) {
+  if (!control?.matches?.('.ui-button--danger,.ui-button--critical,.ui-button--delete-outline')) return false;
+  const sheet = control.closest('.v2-layer--standard');
+  const body = control.closest('[data-v2-q-body]');
+  if (!sheet || !body || !sheet.closest('[data-v2-q="true"]')
+      || !isV2DesktopWorkspace(sheet.closest('[data-v2-app]'))) return false;
+  const footer = control.parentElement;
+  if (footer?.parentElement !== body || footer.children.length !== 1) return false;
+  footer.classList.remove('app-settings-panel');
+  footer.classList.add('modal-actions', 'v2-desktop-danger-footer');
+  control.setAttribute('data-ui-keyboard-action', 'auxiliary');
+  return true;
 }

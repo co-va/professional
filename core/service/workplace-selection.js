@@ -1,4 +1,6 @@
 import { modal, mountModal } from '../../ui/modals/index.js';
+import { moveDesktopQTool, pinDesktopQDanger } from '../../ui/v2/z-layout.js';
+import { isV2DesktopWorkspace } from '../../ui/v2/geometry.js';
 import { escapeHtml } from '../../ui/utils/escape-html.js';
 import { button } from '../../ui/buttons/index.js';
 import { collectCost, costField, initCostFields, validateCostDefinition, costListParts } from '../../ui/cost/index.js';
@@ -6,7 +8,6 @@ import { durationPicker, durationText, initDurationPickers } from '../../ui/dura
 import { textareaField } from '../../ui/inputs/index.js';
 import { compactCheck } from '../../ui/selection/check-list.js';
 import { list as sharedList } from '../../ui/lists/list.js';
-import { procedureGroupBookingFields, bindProcedureGroupBooking } from './procedures/group-booking-ui.js';
 import { costSnapshot } from './editor-signature.js';
 import { getWorkplaces } from '../profile/workplaces/data.js';
 
@@ -20,6 +21,24 @@ function options() {
     id: key(space.key || space.id),
     name: String(space.name || 'Рабочее пространство'),
   })).filter((space) => space.id);
+}
+export function serviceWorkplaceControls() {
+  const catalog = options();
+  const sole = catalog.length === 1 ? catalog[0] : null;
+  return {
+    showAdd: catalog.length > 1,
+    sole: sole ? { workplaceId: sole.id, name: sole.name } : null,
+  };
+}
+
+// An existing unassigned item must remain editable without an Add button.
+// Do not persist or count this provisional card as an assignment.
+export function serviceOverviewWorkplaces(selected = []) {
+  const rows = Array.isArray(selected) ? selected : [];
+  const { sole } = serviceWorkplaceControls();
+  return sole && !rows.some(row => idOf(row) === sole.workplaceId)
+    ? [...rows, { ...sole, unassigned: true }]
+    : rows;
 }
 function hasPrice(cost) {
   return Boolean(cost && typeof cost === 'object' && (
@@ -44,6 +63,7 @@ export function serviceWorkplaceAddButton() {
 
 export function bindServiceWorkplaceAssignments(root, {
   selected = [],
+  overview = false,
   kind = 'procedure',
   getBase = () => ({}),
   onChange = () => {},
@@ -52,9 +72,17 @@ export function bindServiceWorkplaceAssignments(root, {
   const assignments = new Map((Array.isArray(selected) ? selected : [])
     .map((item) => [idOf(item), { ...item }]).filter(([id]) => id));
   const catalog = options();
-  const list = root.querySelector('[data-service-workplace-prices]');
+  const list = overview ? root : root.querySelector('[data-service-workplace-prices]');
   const addButton = root.querySelector('[data-service-workplace-add]');
-  if (!list || !addButton) return { read: () => [] };
+  if (!list || (!overview && !addButton)) return { read: () => [] };
+  const desktopTool = overview ? isV2DesktopWorkspace(root.closest('[data-v2-app]')) : moveDesktopQTool(addButton);
+  if (desktopTool && !overview) {
+    // Only page-level actions, not local price/assignment editor controls.
+    const remove = root.querySelector('[data-procedure-editor-delete], [data-product-editor-delete], [data-service-retail-product-delete]');
+    const primary = root.querySelector('[data-procedure-editor-primary], [data-product-editor-primary], [data-service-retail-price-apply]');
+    if (remove) pinDesktopQDanger(remove);
+    if (primary) moveDesktopQTool(primary);
+  }
   const isProcedure = kind === 'procedure';
   // Preserve legacy assignments even if a workplace was archived or is
   // temporarily missing from the current list. Never erase them on Q Save.
@@ -64,6 +92,7 @@ export function bindServiceWorkplaceAssignments(root, {
     name: catalog.find((space) => space.id === id)?.name || assignment.name || 'Рабочее пространство',
   }));
   const render = () => {
+    if (overview) return;
     const base = getBase();
     list.innerHTML = sharedList({ className: 'ui-list--dense', items: read()
       .filter((item) => catalog.some((space) => space.id === item.workplaceId))
@@ -93,43 +122,35 @@ export function bindServiceWorkplaceAssignments(root, {
       duration: minutes(current.duration ?? base.duration),
       breakDuration: minutes(current.breakDuration ?? base.breakDuration),
       description: String(current.description ?? base.description ?? ''),
-      visibleInPublicBooking: current.visibleInPublicBooking ?? base.visibleInPublicBooking ?? true,
-      groupBooking: current.groupBooking || base.groupBooking || { enabled: false, capacity: 2 },
+      visibleInPublicBooking: !isProcedure
+        ? current.visibleInPublicBooking === true
+        : overview
+          ? base.visibleInPublicBooking !== false && current.visibleInPublicBooking !== false
+          : current.visibleInPublicBooking ?? base.visibleInPublicBooking ?? true,
     };
     const signature = (value) => JSON.stringify({
       cost: costSnapshot(value.cost),
       duration: isProcedure ? minutes(value.duration) : null,
       breakDuration: isProcedure ? minutes(value.breakDuration) : null,
       description: String(value.description),
-      visibleInPublicBooking: isProcedure ? value.visibleInPublicBooking !== false : null,
-      groupBooking: isProcedure ? {
-        enabled: value.groupBooking?.enabled === true,
-        capacity: value.groupBooking?.enabled === true
-          ? Math.max(2, Math.floor(Number(value.groupBooking?.capacity) || 2)) : null,
-      } : null,
+      visibleInPublicBooking: value.visibleInPublicBooking === true,
     });
     const originalSignature = signature(values);
     const content = `<div class="compact-form service-workplace-price-editor" data-service-workplace-editor>
-      <strong class="service-workplace-price-editor__title">${escapeHtml(space.name)}</strong>
+      ${overview ? '' : `<strong class="service-workplace-price-editor__title">${escapeHtml(space.name)}</strong>`}
       ${isProcedure ? `<div class="work-time-row__fields">
         ${durationPicker({ name: 'localDuration', label: 'Длительность', value: values.duration })}
         ${durationPicker({ name: 'localBreak', label: 'Перерыв', value: values.breakDuration })}
       </div>` : ''}
       ${costField({ name: 'workplaceCost', value: values.cost })}
       ${textareaField({ label: 'Описание', name: 'localDescription', value: values.description, rows: 3 })}
-      ${isProcedure ? `<div class="service-workplace-extra">
-        ${compactCheck({ label: 'Для онлайн-записи', checked: values.visibleInPublicBooking !== false, data: 'data-local-online' })}
-        ${procedureGroupBookingFields({
-          enabled: values.groupBooking.enabled === true,
-          capacity: values.groupBooking.capacity,
-          toggleData: 'data-local-group-toggle',
-          capacityData: 'data-local-group-count',
-          capacityName: 'localCapacity',
-        })}
-      </div>` : ''}
+      <div class="service-workplace-extra">
+        ${compactCheck({ label: 'Онлайн-запись', checked: values.visibleInPublicBooking === true, data: 'data-local-online' })}
+      </div>
       <div class="form-error" role="alert" data-service-workplace-error></div>
+      ${overview ? '</div>' : ''}
       <div class="modal-actions">
-        <div data-service-workplace-apply-host${isNew ? '' : ' hidden'}>
+        <div data-service-workplace-apply-host${overview && desktopTool ? ' class="modal-actions"' : ''}${isNew ? '' : ' hidden'}>
           ${button('Применить', { data: 'data-service-workplace-apply' })}
         </div>
         ${!isNew && hasPrice(current.cost) ? button('Отменить', {
@@ -140,22 +161,71 @@ export function bindServiceWorkplaceAssignments(root, {
           variant: 'danger', data: 'data-service-workplace-remove',
         }) : ''}
       </div>
-    </div>`;
-    const layer = mountModal(document.body, modal(content, { variant: 'x', xRole: 'editor', title: space.name }));
+    ${overview ? '' : '</div>'}`;
+    const layer = mountModal(document.body, modal(content, {
+      variant: overview ? 'q' : 'x', xRole: overview ? '' : 'editor', title: space.name, surface: overview ? 'app' : '',
+    }));
     if (!layer) return;
+    if (overview && desktopTool) {
+      const primary = layer.querySelector('[data-service-workplace-apply]');
+      const cancel = layer.querySelector('[data-service-workplace-cancel-price]');
+      const remove = layer.querySelector('[data-service-workplace-remove]');
+      const actions = primary?.closest('[data-service-workplace-apply-host]')?.parentElement;
+      // Move only individual actions; the visibility wrapper travels with Save.
+      if (cancel) moveDesktopQTool(cancel);
+      if (primary) moveDesktopQTool(primary);
+      if (remove && actions) {
+        const danger = actions.ownerDocument.createElement('div');
+        danger.className = 'app-settings-panel';
+        actions.before(danger);
+        danger.append(remove);
+        pinDesktopQDanger(remove);
+      }
+      if (actions && !actions.children.length) actions.remove();
+      const header = layer.querySelector('[data-v2-q-header-content]');
+      const toolbar = header?.querySelector(':scope > .desktop-q-toolbar');
+      const extra = layer.querySelector('.service-workplace-extra');
+      const online = extra?.querySelector('.ui-compact-check');
+      if (toolbar && online) {
+        online.classList.add('desktop-q-online-booking');
+        toolbar.prepend(online);
+        if (!extra.children.length) extra.remove();
+      }
+    } else if (desktopTool) {
+      const editor = layer.querySelector('[data-service-workplace-editor]');
+      const title = editor?.querySelector('.service-workplace-price-editor__title');
+      const footer = editor?.querySelector('.modal-actions');
+      if (editor && title && footer) {
+        const header = editor.ownerDocument.createElement('div');
+        header.className = 'desktop-workplace-heading';
+        title.replaceWith(header);
+        header.append(title);
+        const close = editor.ownerDocument.createElement('button');
+        close.type = 'button';
+        close.className = 'v2-layer__close desktop-workplace-close';
+        close.setAttribute('aria-label', 'Закрыть');
+        close.setAttribute('data-modal-close', '');
+        close.textContent = '×';
+        header.append(close);
+        const tools = editor.ownerDocument.createElement('div');
+        tools.className = 'desktop-workplace-tools';
+        for (const action of footer.querySelectorAll('[data-service-workplace-apply-host], [data-service-workplace-cancel-price]')) tools.append(action);
+        header.after(tools);
+        footer.classList.add('desktop-workplace-danger-footer');
+        if (!footer.children.length) footer.hidden = true;
+        editor.classList.add('desktop-workplace-editor');
+      }
+    }
     initCostFields(layer);
     if (isProcedure) initDurationPickers(layer);
     let saving = false;
-    let localGroupEnabled = values.groupBooking.enabled === true;
     const readValues = () => {
-      const groupEnabled = localGroupEnabled;
       return {
         cost: collectCost(layer, 'workplaceCost'),
         duration: isProcedure ? Number(layer.querySelector('[name="localDuration"]')?.value || 0) : 0,
         breakDuration: isProcedure ? Number(layer.querySelector('[name="localBreak"]')?.value || 0) : 0,
         description: layer.querySelector('[name="localDescription"]')?.value || '',
-        visibleInPublicBooking: !isProcedure || Boolean(layer.querySelector('[data-local-online]')?.checked),
-        groupBooking: { enabled: groupEnabled, capacity: Number(layer.querySelector('[name="localCapacity"]')?.value || 2) },
+        visibleInPublicBooking: Boolean(layer.querySelector('[data-local-online]')?.checked),
       };
     };
     const actions = layer.querySelector('[data-service-workplace-apply]');
@@ -169,13 +239,6 @@ export function bindServiceWorkplaceAssignments(root, {
         .forEach((node) => { node.disabled = saving; });
       return changed;
     };
-    if (isProcedure) bindProcedureGroupBooking(layer, {
-      toggleSelector: '[data-local-group-toggle]',
-      capacitySelector: '[data-local-group-count]',
-      isEnabled: () => localGroupEnabled,
-      toggle: () => { localGroupEnabled = !localGroupEnabled; },
-      onChange: sync,
-    });
     layer.addEventListener('input', sync);
     layer.addEventListener('change', sync);
     sync();
@@ -220,10 +283,11 @@ export function bindServiceWorkplaceAssignments(root, {
       if (isProcedure) {
         assign('duration', minutes(draft.duration), minutes(base.duration));
         assign('breakDuration', minutes(draft.breakDuration), minutes(base.breakDuration));
-        assign('visibleInPublicBooking', draft.visibleInPublicBooking, base.visibleInPublicBooking !== false);
-        assign('groupBooking', draft.groupBooking, base.groupBooking || { enabled: false, capacity: 2 },
-          (a, b) => eq(Boolean(a?.enabled), Boolean(b?.enabled))
-            && (!a?.enabled || Number(a.capacity) === Number(b.capacity)));
+        if (overview) assignment.visibleInPublicBooking = draft.visibleInPublicBooking;
+        else assign('visibleInPublicBooking', draft.visibleInPublicBooking, base.visibleInPublicBooking !== false);
+        delete assignment.groupBooking;
+      } else {
+        assignment.visibleInPublicBooking = draft.visibleInPublicBooking === true;
       }
       void apply(assignment);
     });
@@ -239,15 +303,23 @@ export function bindServiceWorkplaceAssignments(root, {
     });
   };
 
-  list.addEventListener('click', (event) => {
-    const row = event.target.closest('[data-service-workplace-open]');
-    if (row && list.contains(row)) edit(row.dataset.serviceWorkplaceOpen);
-  });
-  addButton.addEventListener('click', () => {
+  if (overview) {
+    list.querySelectorAll('[data-service-workplace-open]').forEach(card => {
+      card.addEventListener('click', () => edit(card.dataset.serviceWorkplaceOpen, {
+        isNew: !assignments.has(card.dataset.serviceWorkplaceOpen),
+      }));
+    });
+  } else {
+    list.addEventListener('click', (event) => {
+      const row = event.target.closest('[data-service-workplace-open]');
+      if (row && list.contains(row)) edit(row.dataset.serviceWorkplaceOpen);
+    });
+  }
+  addButton?.addEventListener('click', () => {
     const available = catalog.filter((space) => !assignments.has(space.id));
     if (!available.length) {
-      const layer = mountModal(document.body, modal('<div class="muted">Все рабочие пространства уже добавлены.</div>',
-        { variant: 'x', xRole: 'picker' }));
+      const layer = mountModal(desktopTool ? addButton : document.body, modal('<div class="muted">Все рабочие пространства уже добавлены.</div>',
+        { variant: 'x', xRole: 'picker', className: desktopTool ? 'desktop-q-action-popup service-workplace-picker' : '' }));
       return layer;
     }
     const content = sharedList({ className: 'ui-list--dense', items: available.map((space) => ({
@@ -256,7 +328,7 @@ export function bindServiceWorkplaceAssignments(root, {
       data: `data-service-workplace-choose="${escapeHtml(space.id)}"`,
       aria: `Выбрать ${space.name}`,
     })) });
-    const picker = mountModal(document.body, modal(content, { variant: 'x', xRole: 'picker', title: 'Рабочее пространство' }));
+    const picker = mountModal(desktopTool ? addButton : document.body, modal(content, { variant: 'x', xRole: 'picker', title: 'Рабочее пространство', className: desktopTool ? 'desktop-q-action-popup service-workplace-picker' : '' }));
     picker?.querySelectorAll('[data-service-workplace-choose]').forEach((choice) => {
       choice.addEventListener('click', () => {
         const id = choice.dataset.serviceWorkplaceChoose;

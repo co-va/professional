@@ -100,6 +100,10 @@
 
 /* Empty zones do not introduce duplicate separators; populated rows use the same paper geometry. */
 .mini-card__record-head:empty,.mini-card__record-footer:empty{display:none}
+/* A header followed immediately by the existing rows divider needs no
+   second grey border. Record/detail layouts keep their own separators. */
+.mini-card--surface-default:has(>.mini-card__record-center>.mini-card__rows:first-child)>.mini-card__record-head,
+.mini-card--surface-photo:has(>.mini-card__record-center>.mini-card__rows:first-child)>.mini-card__record-head{border-bottom:0}
 .mini-card__record-center>.mini-card__rows{margin-top:0}
 .mini-card__record-center>.mini-card__lines{min-width:0}
 .mini-card .mini-card__head{min-width:0}

@@ -29,6 +29,10 @@ export function v2ListEntry({
   image = '',
   initial = '?',
   leadingSwatch = '',
+  leadingIcon = '',
+  identityTitle = '',
+  identitySubtitle = '',
+  statusMark = null,
   interactive = true,
   data = '',
   className = '',
@@ -57,6 +61,8 @@ export function v2ListEntry({
   const secondLine = subtitle || '\u00a0';
   const subtitleHtml = subtitle || !omitEmptySubtitle ? `<small>${escapeHtml(secondLine)}</small>` : '';
   const swatch = leadingSwatch ? `<span class="list-entry__swatch" style="--list-entry-swatch:${escapeHtml(leadingSwatch)}" aria-hidden="true"></span>` : '';
+  const leading = leadingIcon === 'document' ? '<span class="list-entry__leading-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M8 13h8M8 17h8"/></svg></span>' : '';
+  const mark = statusMark ? '<span class="list-entry__status-mark" title="'+escapeHtml(statusMark.label||'')+'" aria-label="'+escapeHtml(statusMark.label||'')+'">'+escapeHtml(statusMark.symbol||'')+'</span>' : '';
   const right = rightTop || rightBottom
     ? `<span class="list-entry__right">${rightTop ? `<strong>${escapeHtml(rightTop)}</strong>` : ''}${rightBottom ? `<small>${escapeHtml(rightBottom)}</small>` : ''}</span>`
     : '';
@@ -91,8 +97,8 @@ export function v2ListEntry({
   return `<${tag} class="${classes}"${attrs}${style}>
     <span class="list-entry__background" aria-hidden="true">${image ? '' : `<span>${escapeHtml(initial)}</span>`}</span>
     <span class="list-entry__content">
-      ${reorderAction}<span class="list-entry__main${swatch ? ' has-swatch' : ''}">${swatch}<span class="list-entry__text">${firstLine}<strong>${escapeHtml(title)}</strong>${subtitleHtml}</span></span>
-      ${right}${toggleAction}${action}${deleteAction}${selectionAction}
+      ${reorderAction}<span class="list-entry__main${swatch ? ' has-swatch' : ''}${leading ? ' has-leading-icon' : ''}">${swatch}${leading}${identityTitle || identitySubtitle ? `<span class="list-entry__text list-entry__identity"><strong>${escapeHtml(identityTitle)}</strong><small>${escapeHtml(identitySubtitle)}</small></span>` : ''}<span class="list-entry__text">${firstLine}<strong>${escapeHtml(title)}</strong>${subtitleHtml}</span></span>
+      ${right}${mark}${toggleAction}${action}${deleteAction}${selectionAction}
     </span>
   </${tag}>`;
 }

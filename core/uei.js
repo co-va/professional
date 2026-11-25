@@ -90,7 +90,7 @@ export function getUEI(entityType, entityId) { return readStore().relations[rela
 export function getMembers(uei) {
   const normalized = normalizeUEI(uei);
   if (normalized === EMPTY) return [];
-  return [...(readStore().entities[normalized]?.members || [])];
+  return [...(storeState.entities[normalized]?.members || [])];
 }
 
 export function getOptions(entityType, entityId) {

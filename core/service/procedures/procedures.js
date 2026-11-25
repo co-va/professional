@@ -8,23 +8,21 @@ import {
   escapeHtml,
   initV2ListReorder,
   miniCard,
-  miniCardRail,
   modal,
   mountModal,
   openNotice,
   mountV2ZLayer,
-  page,
   v2ListEntries,
   v2ListEntry,
   v2ZLayer,
   workplaceCountText,
 } from '../../../ui/ui.js';
 import { getWorkplaces } from '../../profile/workplaces/data.js';
-import { serviceHeaderContext, notifyServiceContext } from '../context.js';
+import { renderServiceOverviewLayout, notifyServiceContext } from '../context.js';
 import { procedureCardAppearance, procedureCardFields, procedureCardPhoto } from '../card-presentation.js';
 import { bindProcedureEditor, initialProcedure, procedureEditorForm } from './form.js';
-import { serviceWorkplaceAddButton } from '../workplace-selection.js';
-import { commitDeleteProcedure, getProcedures, commitReorderProcedures } from './data.js';
+import { bindServiceWorkplaceAssignments, serviceWorkplaceAddButton, serviceWorkplaceControls, serviceOverviewWorkplaces } from '../workplace-selection.js';
+import { commitDeleteProcedure, getProcedures, commitReorderProcedures, commitProcedureWorkplace } from './data.js';
 import { scheduleServiceStatistics, serviceItemStatistics, serviceSpentText } from '../statistics.js';
 import { renderServiceGroupTree } from '../catalog-grouping.js';
 
@@ -47,15 +45,16 @@ function procedureRow(procedure) {
   });
 }
 
-export function renderProcedureCatalog(host, { root = host, onChanged = () => {} } = {}) {
+export function renderProcedureCatalog(host, { root = host, onChanged = () => {}, desktop = false, onCount = () => {} } = {}) {
   const items = getProcedures();
+  if (desktop) onCount(items.length);
   const grouped = items.length
     ? renderServiceGroupTree(items, 'procedures', procedureRow,
       ids => commitReorderProcedures(ids),
       error => openNotice({
         title: 'Порядок',
         message: error instanceof Error ? error.message : 'Не удалось сохранить порядок услуг.',
-      }))
+      }), { desktop, onCount })
     : null;
   host.innerHTML = items.length
     ? grouped?.html || v2ListEntries(items.map(procedureRow))
@@ -94,12 +93,16 @@ function procedureOverviewCard(procedure, statistics = null) {
 
 function procedureWorkplaceCards(procedure, statistics = null) {
   const byId = new Map(getWorkplaces().map((workplace) => [String(workplace.key || workplace.id || ''), workplace]));
-  const cards = (procedure.workplaces || []).map((selection) => {
+  const cards = serviceOverviewWorkplaces(procedure.workplaces).map((selection) => {
     const id = String(selection.workplaceId || selection.id || selection.key || '');
     const workplace = byId.get(id) || selection;
     const group = statistics?.byWorkplace.get(id) || null;
     return miniCard({
       title: workplace.name || selection.name || 'Рабочее пространство',
+      subtitle: selection.unassigned ? 'Не назначено' : '',
+      interactive: byId.has(id),
+      data: `data-service-workplace-open="${escapeHtml(id)}"`,
+      aria: `Настройки ${workplace.name || selection.name || 'Рабочее пространство'}`,
       rows: [
         { label: 'Кол-во', value: statistics ? String(group?.count || 0) : '—' },
         { label: 'Время', value: statistics ? serviceSpentText(group?.minutes || 0) : '—' },
@@ -107,7 +110,7 @@ function procedureWorkplaceCards(procedure, statistics = null) {
       ],
     });
   });
-  return cards.length ? miniCardRail(cards) : '';
+  return cards;
 }
 
 function confirmDeleteProcedure(procedure, onDeleted) {
@@ -134,7 +137,7 @@ function confirmDeleteProcedure(procedure, onDeleted) {
   return layer;
 }
 
-// The service Q editor owns editing, workplace assignment and deletion.
+// The procedure Q owns only its own parameters and deletion.
 // Neither overview nor editor needs a V/settings menu.
 export function openProcedureEditor(root, existing = null, {
   onChanged = () => {},
@@ -142,11 +145,10 @@ export function openProcedureEditor(root, existing = null, {
   onDeleted = () => {},
   defaultWorkplace = null,
 } = {}) {
-  const draft = initialProcedure(existing, defaultWorkplace);
+  const draft = initialProcedure(existing, defaultWorkplace || serviceWorkplaceControls().sole);
   const body = [
     procedureEditorForm(draft),
     actionBlock(button('Сохранить', { type: 'button', data: 'data-procedure-editor-primary', aria: 'Сохранить услугу' })),
-    `<div class="app-settings-panel service-workplace-add-panel">${serviceWorkplaceAddButton()}</div>`,
     existing ? `<div class="app-settings-panel">${button('Удалить услугу', {
       type: 'button',
       variant: 'danger',
@@ -190,14 +192,27 @@ function renderProcedureOverview(layer, baseRoot, id, { onChanged = () => {}, st
     return;
   }
   layer.dataset.serviceOverview = 'procedure:' + id;
-  layer.innerHTML = page([
-    serviceHeaderContext({ title: procedure.name || 'Услуга' }),
-    procedureOverviewCard(procedure, statistics),
-    procedureWorkplaceCards(procedure, statistics),
-    '<div class="app-settings-panel">' +
-      button('Расходник', { variant: 'secondary', data: 'data-procedure-open-consumables' }) +
-    '</div>',
-  ]);
+  const { showAdd } = serviceWorkplaceControls();
+  const consumablesAction = button('Расходник', { variant: 'secondary', className: 'v2-desktop-tool-accent', data: 'data-procedure-open-consumables' });
+  renderServiceOverviewLayout(layer, {
+    title: procedure.name || 'Услуга',
+    card: procedureOverviewCard(procedure, statistics),
+    workplaceCards: procedureWorkplaceCards(procedure, statistics),
+    actions: (showAdd ? serviceWorkplaceAddButton() : '') + consumablesAction,
+    mobileActions: consumablesAction,
+    mobileAdd: showAdd ? { label: '+', data: 'data-service-workplace-add', aria: 'Добавить рабочее пространство' } : null,
+  });
+  bindServiceWorkplaceAssignments(layer, {
+    overview: true,
+    kind: 'procedure',
+    selected: procedure.workplaces,
+    getBase: () => getProcedures().find(item => String(item.id) === String(id)) || procedure,
+    onPersistAssignment: (workplaceId, assignment) => commitProcedureWorkplace(id, workplaceId, assignment),
+    onChange: () => {
+      if (layer.isConnected) renderProcedureOverview(layer, baseRoot, id, { onChanged, statistics });
+      onChanged();
+    },
+  });
   layer.querySelector('[data-procedure-open-consumables]')?.addEventListener('click', async () => {
     const { openProcedureConsumables } = await import('./consumables.js');
     if (!layer.isConnected) return;
