@@ -63,7 +63,7 @@ function serviceSettingsActions(root, rerender) {
             // write could overwrite saved stock-linked retail presentations.
             await loadAuxiliaryState('service');
             if (!root?.isConnected) return;
-            openServiceGroupingQ({ onSaved: rerender });
+            openServiceGroupingQ({ onSaved: rerender, desktop: isV2DesktopWorkspace(root.closest('[data-v2-app]')) });
           } catch (cause) {
             openNotice({ title: 'Группы', message: cause instanceof Error
               ? cause.message : 'Не удалось загрузить группы.' });

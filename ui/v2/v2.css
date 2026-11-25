@@ -944,3 +944,13 @@
  .v2-app--workspace>.v2-layer-portal.is-anchored>.v2-layer-backdrop[data-v2-x-role="picker"]:has(>.modal--color-sheet){background:transparent}
  .v2-app--workspace>.v2-layer-portal.is-anchored>.v2-layer-backdrop[data-v2-x-role="picker"]>.v2-layer--bottom.modal--color-sheet{height:auto;min-height:0;max-height:var(--v2-anchor-max-height);padding:12px;border-radius:14px;background:var(--white);overflow:auto}
 }
+
+/* Service groups Desktop: reuse Q toolbar, destructive footer and the dense
+   workplace list geometry. No card stacks or nested edit X. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace .desktop-service-groups-q [data-desktop-group-content] .ui-list{border-radius:var(--radius-control);gap:0}
+ .v2-app--workspace .desktop-service-groups-q [data-desktop-group-content] .ui-list__item{box-sizing:border-box;height:var(--h-list-row);min-height:var(--h-list-row);max-height:var(--h-list-row);padding:4px 12px}
+ .v2-app--workspace .desktop-service-groups-q [data-desktop-group-content] .ui-list__title{font-size:14px;line-height:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ .v2-app--workspace .desktop-service-groups-q [data-desktop-group-content] .ui-list__secondary{font-size:12px;line-height:14px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ .v2-app--workspace .desktop-service-groups-q [data-desktop-group-content] .ui-list__item>.list-entry__reorder-handle{height:var(--ui-compact-size);width:var(--ui-compact-size);flex-basis:var(--ui-compact-size)}
+}
