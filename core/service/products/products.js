@@ -26,10 +26,10 @@ import {
 } from '../../../ui/ui.js';
 import { getWorkplaces } from '../../profile/workplaces/data.js';
 import { renderServiceOverviewLayout, notifyServiceContext } from '../context.js';
-import { bindServiceWorkplaceAssignments, serviceWorkplaceAssignmentList, serviceWorkplaceAddButton } from '../workplace-selection.js';
+import { bindServiceWorkplaceAssignments, serviceWorkplaceAddButton } from '../workplace-selection.js';
+import { moveDesktopQTool, pinDesktopQDanger } from '../../../ui/v2/z-layout.js';
 import { setSharedActionVisible } from '../../../ui/page/page.js';
-import { compactCheck } from '../../../ui/selection/check-list.js';
-import { productEditorSignature, rebaseWorkplaceAssignmentSignature } from '../editor-signature.js';
+import { productEditorSignature } from '../editor-signature.js';
 import { scheduleServiceStatistics, serviceItemStatistics } from '../statistics.js';
 import { renderServiceGroupTree, serviceGroupFields, readServiceGroupFields, bindServiceGroupFields } from '../catalog-grouping.js';
 import { productCardAppearance, productCardFields, productCardPhoto } from '../card-presentation.js';
@@ -130,6 +130,9 @@ function productWorkplaceCards(product, statistics = null) {
     const group = statistics?.byWorkplace.get(id) || null;
     return miniCard({
       title: workplace.name || selection.name || 'Рабочее пространство',
+      interactive: byId.has(id),
+      data: `data-service-workplace-open="${escapeHtml(id)}"`,
+      aria: `Настройки ${workplace.name || selection.name || 'Рабочее пространство'}`,
       rows: [
         { label: 'Кол-во', value: statistics ? String(group?.count || 0) : '—' },
         { label: 'Сумма', value: statistics ? money(group?.revenue || 0) : '—' },
@@ -234,18 +237,11 @@ function openInventoryRetailEditorQ(itemId, {
       value: product.about || '', rows: 5, maxlength: 5000,
       placeholder: 'Описание товара для будущего публичного показа' }),
     serviceGroupFields('products', product.groupValues || {}),
-    '<div class="app-settings-panel">',
-    compactCheck({ label: 'Для онлайн-записи', checked: false, disabled: true }),
-    '</div>',
-    serviceWorkplaceAssignmentList(),
     '<div class="form-error" data-service-retail-price-error role="alert"></div>',
     '</form>',
     actionBlock(button('Сохранить', {
       type: 'button', data: 'data-service-retail-price-apply',
     })),
-    '<div class="app-settings-panel service-workplace-add-panel">',
-    serviceWorkplaceAddButton(),
-    '</div>',
     '<div class="app-settings-panel">',
     button('Снять с продажи', {
       type: 'button', variant: 'danger', data: 'data-service-retail-product-delete',
@@ -291,19 +287,9 @@ function openInventoryRetailEditorQ(itemId, {
     onChanged();
   };
 
-  bindServiceWorkplaceAssignments(layer, {
-    kind: 'product',
-    selected: product.workplaces,
-    getBase: () => ({
-      cost: getProducts().find(item => item.inventoryOwned
-        && String(item.inventoryItemId) === String(itemId))?.cost || product.cost,
-      description: about.value,
-    }),
-    onPersistAssignment: async (workplaceId, assignment) => {
-      await commitInventoryProductWorkplace(itemId, workplaceId, assignment);
-      publish();
-    },
-  });
+  moveDesktopQTool(primary);
+  const deleteButton = layer.querySelector('[data-service-retail-product-delete]');
+  if (deleteButton) pinDesktopQDanger(deleteButton);
 
   form.addEventListener('input', sync);
   form.addEventListener('change', sync);
@@ -350,7 +336,6 @@ function productEditorForm(product) {
     ${costField({ value: product.cost || {}, name: 'productCost' })}
     ${textareaField({ label: 'Описание', name: 'productAbout', value: product.about || '', rows: 7, maxlength: 5000, placeholder: 'Описание товара' })}
     ${serviceGroupFields('products', product.groupValues || {})}
-    ${serviceWorkplaceAssignmentList()}
     <div class="form-error" role="alert" data-product-editor-error></div>
   </form>`;
 }
@@ -386,7 +371,6 @@ export function openProductEditor(root, existing = null, {
   const body = [
     productEditorForm(draft),
     actionBlock(button('Сохранить', { type: 'button', data: 'data-product-editor-primary', aria: 'Сохранить товар' })),
-    `<div class="app-settings-panel service-workplace-add-panel">${serviceWorkplaceAddButton()}</div>`,
     existing ? `<div class="app-settings-panel">${button('Удалить товар', {
       type: 'button',
       variant: 'danger',
@@ -419,47 +403,21 @@ export function openProductEditor(root, existing = null, {
   };
   let initialSignature = signature();
   let saving = false;
-  let assignmentSaving = false;
   const { syncDirty, currentVisibility } = createServiceSaveController(primary, {
     signature,
     baseline: () => initialSignature,
-    busy: () => saving || assignmentSaving,
+    busy: () => saving,
   });
 
-  bindServiceWorkplaceAssignments(layer, {
-    kind: 'product',
-    selected: draft.workplaces,
-    getBase: () => {
-      const stored = existing?.id ? getProducts().find((item) => item.id === existing.id) || existing : null;
-      return {
-        cost: stored?.cost || collectCost(layer, 'productCost'),
-        description: stored?.about ?? form.querySelector('[name="productAbout"]')?.value ?? '',
-      };
-    },
-    onChange: (workplaces) => {
-      draft.workplaces = workplaces;
-      syncDirty();
-    },
-    onPersistAssignment: async (workplaceId, assignment) => {
-      if (!existing?.id) return;
-      if (saving || assignmentSaving) throw new Error('Дождитесь завершения сохранения.');
-      assignmentSaving = true;
-      syncDirty();
-      try {
-        await commitProductWorkplace(existing.id, workplaceId, assignment);
-        initialSignature = rebaseWorkplaceAssignmentSignature(initialSignature, workplaceId, assignment);
-      } finally {
-        assignmentSaving = false;
-        syncDirty();
-      }
-    },
-  });
+  moveDesktopQTool(primary);
+  const deleteButton = layer.querySelector('[data-product-editor-delete]');
+  if (deleteButton) pinDesktopQDanger(deleteButton);
 
   form.addEventListener('input', syncDirty);
   form.addEventListener('change', syncDirty);
 
   const save = async () => {
-    if (saving || assignmentSaving || !syncDirty()) return null;
+    if (saving || !syncDirty()) return null;
     const data = new FormData(form);
     const name = String(data.get('productName') || '').trim();
     const error = layer.querySelector('[data-product-editor-error]');
@@ -475,15 +433,16 @@ export function openProductEditor(root, existing = null, {
     }
     saving = true;
     setSharedProfilePrimary(primary, { visible: true, label: 'Сохранить', disabled: true });
+    const latest = existing?.id ? getProducts().find(item => item.id === existing.id) || existing : null;
     const item = {
-      ...(existing || {}),
+      ...(latest || {}),
       id: existing?.id || crypto.randomUUID(),
       photo: String(draft.photo || existing?.photo || ''),
       name,
       cost: price,
       about: String(data.get('productAbout') || '').trim(),
       groupValues: readServiceGroupFields(form),
-      workplaces: Array.isArray(draft.workplaces) ? draft.workplaces.map((value) => ({ ...value })) : [],
+      workplaces: Array.isArray((latest ?? draft).workplaces) ? (latest ?? draft).workplaces.map((value) => ({ ...value })) : [],
       createdAt: existing?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -533,6 +492,25 @@ function renderProductOverview(layer, baseRoot, id, { onChanged = () => {}, stat
     title: product.name || 'Товар',
     card: productOverviewCard(product, statistics),
     workplaceCards: productWorkplaceCards(product, statistics),
+    actions: serviceWorkplaceAddButton(),
+    mobileActions: '',
+    mobileAdd: { label: '+', data: 'data-service-workplace-add', aria: 'Добавить рабочее пространство' },
+  });
+  bindServiceWorkplaceAssignments(layer, {
+    overview: true,
+    kind: 'product',
+    selected: product.workplaces,
+    getBase: () => {
+      const latest = getProducts().find(item => String(item.id) === String(id)) || product;
+      return { cost: latest.cost, description: latest.about ?? '' };
+    },
+    onPersistAssignment: (workplaceId, assignment) => product.inventoryItemId
+      ? commitInventoryProductWorkplace(product.inventoryItemId, workplaceId, assignment)
+      : commitProductWorkplace(id, workplaceId, assignment),
+    onChange: () => {
+      if (layer.isConnected) renderProductOverview(layer, baseRoot, id, { onChanged, statistics });
+      onChanged();
+    },
   });
   layer.querySelector('[data-product-open-editor]')?.addEventListener('click', () => {
     openProductEditor(baseRoot, product, {

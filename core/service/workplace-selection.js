@@ -104,16 +104,18 @@ export function bindServiceWorkplaceAssignments(root, {
       duration: minutes(current.duration ?? base.duration),
       breakDuration: minutes(current.breakDuration ?? base.breakDuration),
       description: String(current.description ?? base.description ?? ''),
-      visibleInPublicBooking: overview
-        ? base.visibleInPublicBooking !== false && current.visibleInPublicBooking !== false
-        : current.visibleInPublicBooking ?? base.visibleInPublicBooking ?? true,
+      visibleInPublicBooking: !isProcedure
+        ? current.visibleInPublicBooking === true
+        : overview
+          ? base.visibleInPublicBooking !== false && current.visibleInPublicBooking !== false
+          : current.visibleInPublicBooking ?? base.visibleInPublicBooking ?? true,
     };
     const signature = (value) => JSON.stringify({
       cost: costSnapshot(value.cost),
       duration: isProcedure ? minutes(value.duration) : null,
       breakDuration: isProcedure ? minutes(value.breakDuration) : null,
       description: String(value.description),
-      visibleInPublicBooking: isProcedure ? value.visibleInPublicBooking !== false : null,
+      visibleInPublicBooking: value.visibleInPublicBooking === true,
     });
     const originalSignature = signature(values);
     const content = `<div class="compact-form service-workplace-price-editor" data-service-workplace-editor>
@@ -124,9 +126,9 @@ export function bindServiceWorkplaceAssignments(root, {
       </div>` : ''}
       ${costField({ name: 'workplaceCost', value: values.cost })}
       ${textareaField({ label: 'Описание', name: 'localDescription', value: values.description, rows: 3 })}
-      ${isProcedure ? `<div class="service-workplace-extra">
-        ${compactCheck({ label: 'Для онлайн-записи', checked: values.visibleInPublicBooking !== false, data: 'data-local-online' })}
-      </div>` : ''}
+      <div class="service-workplace-extra">
+        ${compactCheck({ label: isProcedure ? 'Для онлайн-записи' : 'Показывать в онлайн-записи', checked: values.visibleInPublicBooking === true, data: 'data-local-online' })}
+      </div>
       <div class="form-error" role="alert" data-service-workplace-error></div>
       ${overview ? '</div>' : ''}
       <div class="modal-actions">
@@ -166,7 +168,7 @@ export function bindServiceWorkplaceAssignments(root, {
       const toolbar = header?.querySelector(':scope > .desktop-q-toolbar');
       const extra = layer.querySelector('.service-workplace-extra');
       const online = extra?.querySelector('.ui-compact-check');
-      if (isProcedure && toolbar && online) {
+      if (toolbar && online) {
         online.classList.add('desktop-q-online-booking');
         toolbar.prepend(online);
         if (!extra.children.length) extra.remove();
@@ -205,7 +207,7 @@ export function bindServiceWorkplaceAssignments(root, {
         duration: isProcedure ? Number(layer.querySelector('[name="localDuration"]')?.value || 0) : 0,
         breakDuration: isProcedure ? Number(layer.querySelector('[name="localBreak"]')?.value || 0) : 0,
         description: layer.querySelector('[name="localDescription"]')?.value || '',
-        visibleInPublicBooking: !isProcedure || Boolean(layer.querySelector('[data-local-online]')?.checked),
+        visibleInPublicBooking: Boolean(layer.querySelector('[data-local-online]')?.checked),
       };
     };
     const actions = layer.querySelector('[data-service-workplace-apply]');
@@ -266,6 +268,8 @@ export function bindServiceWorkplaceAssignments(root, {
         if (overview) assignment.visibleInPublicBooking = draft.visibleInPublicBooking;
         else assign('visibleInPublicBooking', draft.visibleInPublicBooking, base.visibleInPublicBooking !== false);
         delete assignment.groupBooking;
+      } else {
+        assignment.visibleInPublicBooking = draft.visibleInPublicBooking === true;
       }
       void apply(assignment);
     });
