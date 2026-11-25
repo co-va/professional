@@ -363,7 +363,7 @@
   .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard>[data-v2-q-body]{padding-top:max(38px,calc(var(--v2-desktop-q-content-start) - var(--v2-desktop-q-header-height)))}
 
   .v2-app--workspace>.v2-layer-portal>.v2-layer-backdrop[data-v2-layer-kind="top"]{background:transparent}
-  .v2-app--workspace>.v2-layer-portal>.v2-layer-backdrop>.v2-layer--top{top:0;left:50%;right:auto;width:min(440px,100%);max-height:80%;translate:-50% 0;border-radius:0}
+  .v2-app--workspace>.v2-layer-portal>.v2-layer-backdrop>.v2-layer--top{top:0;left:50%;right:auto;width:min(440px,100%);max-height:80%;translate:-50% 0;border-radius:14px}
 }
 
 /* Desktop F retains the calendar above its scrollable navigation. */
@@ -374,7 +374,7 @@
   .v2-app--workspace>.v2-app__stage>.v2-fe-deck{grid-row:2}
   .v2-app--workspace .v2-desktop-calendar:not([hidden]){display:block;grid-column:1;grid-row:1;min-width:0;max-height:62dvh;overflow:auto;padding:0 12px 12px;color:var(--white)}
   .v2-app--workspace>.v2-layer-portal>.v2-layer-backdrop[data-v2-layer-kind="bottom"]{background:transparent}
-  .v2-app--workspace>.v2-layer-portal>.v2-layer-backdrop>.v2-layer--bottom{top:50%;left:50%;right:auto;bottom:auto;width:min(440px,90%);height:auto;max-height:85%;min-height:0;translate:-50% -50%;animation:none}
+  .v2-app--workspace>.v2-layer-portal>.v2-layer-backdrop>.v2-layer--bottom{top:50%;left:50%;right:auto;bottom:auto;width:min(440px,90%);height:auto;max-height:85%;min-height:0;translate:-50% -50%;border-radius:14px;animation:none}
   .v2-app--workspace>.v2-layer-portal.is-anchored>.v2-layer-backdrop>.v2-layer--bottom{top:var(--v2-anchor-top,auto);left:var(--v2-anchor-left);right:auto;bottom:var(--v2-anchor-bottom,auto);width:var(--v2-anchor-width);height:auto;max-height:var(--v2-anchor-max-height);min-height:0;translate:none;padding:12px;animation:none;box-shadow:0 12px 32px rgba(0,0,0,.20)}
   .v2-app--workspace>.v2-layer-portal.is-anchored .v2-layer__gesture-zone{display:none}
 }
@@ -736,3 +736,18 @@
 }
 @keyframes v2-desktop-documents-in{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
 @media (prefers-reduced-motion:reduce){.v2-app--workspace .people-documents-popup{animation:none!important;transition:none!important}}
+
+/* All deletion confirmations: safe action first, destructive action second.
+   Keep the Mobile sheet geometry; Desktop confirmations are centered on a
+   dimmed H backdrop, not anchored popups. Technical viewers and Q unchanged. */
+[data-v2-delete-confirmation] .modal-actions>.v2-confirmation-safe{background:var(--text);border-color:var(--text);color:var(--white)}
+[data-v2-delete-confirmation] .modal-actions>.v2-confirmation-destructive{background:#FDD2D2;border-color:#EB4C42;color:#EB4C42}
+[data-v2-delete-confirmation] .modal-actions>.v2-confirmation-destructive:disabled{background:var(--button-secondary);border-color:#B7B7B7;color:#777}
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace>.v2-layer-portal>.v2-layer-backdrop[data-v2-delete-confirmation]{background:rgba(0,0,0,.46)}
+ .v2-app--workspace>.v2-layer-portal>.v2-layer-backdrop[data-v2-delete-confirmation]>.v2-layer--bottom{border-radius:14px;padding:20px;width:min(400px,calc(100% - 32px));box-shadow:0 12px 32px rgba(0,0,0,.24);animation:v2-desktop-confirm-in .16s ease-out both}
+ .v2-app--workspace [data-v2-delete-confirmation] .v2-layer__gesture-zone{display:none}
+ .v2-app--workspace>.v2-layer-portal>.v2-layer-backdrop[data-v2-delete-confirmation]>.v2-layer--bottom.is-dismissing{animation:none;opacity:0;transform:translateY(0);transition:opacity .15s ease}
+}
+@keyframes v2-desktop-confirm-in{from{opacity:0}to{opacity:1}}
+@media (prefers-reduced-motion:reduce){[data-v2-delete-confirmation]>.v2-layer{animation:none!important;transition:none!important}}

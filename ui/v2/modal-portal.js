@@ -206,6 +206,51 @@ function applyXTransitionPolicy(node) {
   if (xLayerRole(parent) === 'action') parent.v2Close?.();
 }
 
+// Deletion confirmations share one safety policy across Mobile and Desktop.
+ // Only explicit delete-confirm actions or destructive actions in a deletion
+ // dialog qualify; ordinary action menus and edit forms are not rearranged.
+function prepareV2DeletionConfirmation(node) {
+  if (node.dataset.v2LayerKind !== 'bottom') return null;
+  const sheet = node.querySelector(':scope > .v2-layer');
+  if (!sheet) return null;
+  const normalize = value => String(value || '').trim().toLocaleLowerCase('ru');
+  const title = normalize(sheet.getAttribute('aria-label'));
+  const heading = normalize(sheet.querySelector('.modal-title h2')?.textContent);
+  const isDeleteTitle = /^(?:удалить|удаление|снять с продажи|снятие с продажи)(?:$|[\s?])/;
+  const isDeleteAction = /^(?:удалить|да,?\s+удалить|снять с продажи)(?:$|[\s?])/;
+  const isCancel = /^(?:отмена|отменить|не удалять|нет|нет,?\s+отмена)$/;
+  for (const group of sheet.querySelectorAll('.modal-actions')) {
+    const controls = [...group.children].filter(child => child.matches('button'));
+    if (controls.length < 1 || controls.length > 2) continue;
+    const destructive = controls.find(control => {
+      const explicit = [...control.attributes].some(attr => /^data-/.test(attr.name)
+        && /(?:confirm.*(?:delete|remove)|(?:delete|remove).*confirm)/i.test(attr.name));
+      return explicit || ((isDeleteTitle.test(title) || isDeleteTitle.test(heading))
+        && isDeleteAction.test(normalize(control.textContent))
+        && control.matches('.ui-button--danger,.ui-button--critical,.ui-button--delete-outline'));
+    });
+    if (!destructive) continue;
+    let cancel = controls.find(control => control !== destructive && isCancel.test(normalize(control.textContent)));
+    if (controls.length === 2 && !cancel) continue;
+    const created = !cancel;
+    if (created) {
+      cancel = document.createElement('button');
+      cancel.type = 'button';
+      cancel.className = 'ui-button';
+      cancel.textContent = 'Отмена';
+      cancel.setAttribute('data-v2-confirmation-cancel', '');
+    }
+    group.insertBefore(cancel, destructive);
+    cancel.classList.add('v2-confirmation-safe');
+    destructive.classList.add('v2-confirmation-destructive');
+    cancel.setAttribute('data-modal-autofocus', '');
+    node.setAttribute('data-v2-delete-confirmation', '');
+    sheet.setAttribute('role', 'alertdialog');
+    return created ? cancel : null;
+  }
+  return null;
+}
+
 export function mountV2Layer(html, { root = null } = {}) {
   const template = document.createElement('template');
   template.innerHTML = String(html || '').trim();
@@ -216,13 +261,15 @@ export function mountV2Layer(html, { root = null } = {}) {
   const qLayer = node.dataset.v2Q === 'true';
 
   if (!technical && !canOpenApplicationModal(node)) return null;
+  const generatedCancel = prepareV2DeletionConfirmation(node);
+  const deletionConfirmation = node.hasAttribute('data-v2-delete-confirmation');
 
   const host = technical ? document.body : activeV2ModalSurface(root);
   if (!host) return null;
   if (!technical) applyXTransitionPolicy(node);
   const app = technical ? null : host.closest?.('[data-v2-app]');
   const active = document.activeElement;
-  const anchor = root?.matches?.('button') ? root : (kind === 'bottom' && active?.matches?.('.v2-desktop-v') && app?.contains(active) ? active : null);
+  const anchor = deletionConfirmation ? null : (root?.matches?.('button') ? root : (kind === 'bottom' && active?.matches?.('.v2-desktop-v') && app?.contains(active) ? active : null));
   const lockedStage = technical ? null : lockV2StageInteraction(app);
   const releaseHeaderLock = technical ? () => {} : lockModalHeader(app);
   const portalOwner = technical ? null : mountV2ModalPortal(host, app, kind, anchor);
@@ -352,6 +399,7 @@ export function mountV2Layer(html, { root = null } = {}) {
 
   node.v2Close = close;
   node.remove = close;
+  generatedCancel?.addEventListener('click', () => node.v2Close?.());
   document.addEventListener('pointerdown', handleOutsidePointerDown, true);
   document.addEventListener('pointermove', handleOutsidePointerMove, true);
   document.addEventListener('pointerup', handleOutsidePointerUp, true);
