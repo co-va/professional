@@ -216,7 +216,10 @@ export function bindWorkplaceForm(root,existing=null,{onSaved=()=>{},onDeleted=(
       footer.className='app-settings-panel';
       footer.append(remove);
       body.append(footer);
-      pinDesktopQDanger(remove);
+      if(pinDesktopQDanger(remove)){
+        // Keep the destructive action outside the scrolling form, in the Q footer.
+        body.after(footer);
+      }
     }
   }
   const initial=formSnapshot(form);

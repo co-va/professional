@@ -30,3 +30,10 @@
   .v2-app--workspace .desktop-q-toolbar.workplace-booking-toolbar>.workplace-booking-tools{order:-1;flex:0 0 auto}
   .v2-app--workspace [data-v2-q-header-content] .desktop-q-toolbar.workplace-booking-toolbar .workplace-booking-tools>.ui-compact-button{width:var(--ui-compact-size);height:var(--ui-compact-size);min-height:var(--ui-compact-size);max-height:var(--ui-compact-size);flex:0 0 var(--ui-compact-size)}
 }
+
+/* Desktop workplace Q: a real, non-scrolling bottom action row. */
+@media(min-width:768px) and (min-height:600px){
+  .v2-app--workspace .v2-workplace-data-layer>.v2-desktop-danger-footer{display:flex;justify-content:flex-end;align-items:center;flex:0 0 auto;margin:0;padding:12px 0 0;background:var(--v2-inner-surface)}
+  .v2-app--workspace .v2-workplace-data-layer>.v2-desktop-danger-footer>.ui-button{box-sizing:border-box;width:160px;min-width:160px;max-width:160px;height:var(--v2-desktop-q-button-height);min-height:var(--v2-desktop-q-button-height);max-height:var(--v2-desktop-q-button-height);margin:0;padding:0 12px;border-radius:10px;font-size:13px;line-height:1}
+  html.keyboard-open .v2-app--workspace .v2-workplace-data-layer>.v2-desktop-danger-footer{display:none}
+}
