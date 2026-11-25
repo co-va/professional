@@ -188,3 +188,12 @@
 .settings-document-row--history .list-entry__text{min-width:0;gap:2px}
 .settings-document-row--history .list-entry__text :is(strong,small){white-space:normal;overflow-wrap:anywhere}
 .settings-document-row--history[hidden]{display:none!important}
+
+/* Desktop integration X: fields stay at the top, the common submit action at the bottom right. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace .modal--form-sheet:has(>form:is([data-telegram-integration-form],[data-email-integration-form])){display:flex;flex-direction:column}
+ .v2-app--workspace .modal--form-sheet>form:is([data-telegram-integration-form],[data-email-integration-form]){display:flex;flex-direction:column;flex:1 0 auto;gap:24px;min-width:0}
+ .v2-app--workspace .modal--form-sheet>form:is([data-telegram-integration-form],[data-email-integration-form])>.muted{order:1}
+ .v2-app--workspace .modal--form-sheet>form:is([data-telegram-integration-form],[data-email-integration-form])>.muted:empty{display:none}
+ .v2-app--workspace .modal--form-sheet>form:is([data-telegram-integration-form],[data-email-integration-form])>.ui-button[type="submit"]{order:2;align-self:flex-end;flex:none;margin-top:auto}
+}
