@@ -17,6 +17,7 @@ import {
   infoUI,
   miniCard,
   miniCardRail,
+  miniCardStack,
   modal,
   mountModal,
   openDocumentViewer,
@@ -302,10 +303,13 @@ function renderIntegrationCards(root, telegramState = {}, emailState = {}) {
   const host = root.querySelector('[data-integrations-list]');
   if (!host) return;
   const embedded=root.hasAttribute('data-settings-embedded');
-  host.innerHTML = miniCardRail([
+  const cards = [
     telegramMiniCard(telegramState, { interactive: true }),
     emailMiniCard(emailState, { interactive: true }),
-  ],{className:embedded?'settings-integration-rail':''});
+  ];
+  host.innerHTML = embedded
+    ? miniCardRail(cards,{className:'settings-integration-rail'})
+    : miniCardStack(cards,{className:'settings-integration-stack'});
   if(embedded){
     const rail=host.querySelector('[data-mini-card-rail]');
     const prev=root.querySelector('[data-integration-prev]');

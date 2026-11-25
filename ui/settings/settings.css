@@ -159,3 +159,6 @@
 .settings-mobile-booking-links .input-action-row input{width:100%;min-width:0}
 .settings-mobile-booking-welcome{display:grid;gap:12px;min-width:0;margin-top:8px}
 .settings-mobile-booking-welcome>strong{font-size:18px;line-height:1.2}
+
+/* Mobile integrations: shared vertical stack and natural vertical scrolling. */
+.settings-integration-stack .settings-integration-card,.settings-integration-stack .mini-card__record-center{touch-action:pan-y}
