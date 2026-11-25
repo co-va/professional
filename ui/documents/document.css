@@ -216,3 +216,11 @@ button.document-tile,.document-tile__open,.document-tile__toggle{cursor:pointer}
 .documents-signing-info__person{margin-top:5px;font-size:16px;line-height:1.2;font-weight:720}
 .documents-signing-info__moment,.documents-signing-info__status{font-size:14px;line-height:1.2}
 .documents-signing-info__status{font-weight:680}
+
+/* Account consent cards: horizontal scrolling is owned by the rail, not Q.
+   Do not change other document rails or the approved tile dimensions. */
+.account-consent-carousel{min-width:0;width:100%}
+.account-consent-navigation{display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-bottom:4px}
+.account-consent-navigation[hidden]{display:none}
+.document-tiles--rail.account-consent-rail{position:relative;min-width:0;max-width:100%;touch-action:pan-x;overscroll-behavior-x:contain;scroll-snap-type:none;scroll-behavior:auto;overflow-anchor:none}
+.account-consent-rail>.document-tile{scroll-snap-align:none;touch-action:pan-x}

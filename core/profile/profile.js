@@ -116,13 +116,16 @@ function openProfileData(root,navigateBack,options={}){
   return openSharedProfileDataEditor({
     root,
     title:'Данные профиля',
-    fields:profileDataFields(current,emails),
+    fields:profileDataFields(current,emails)+(isV2DesktopWorkspace(root.closest('[data-v2-app]'))
+      ?v2Section('Безопасность',button('Изменить пароль',{variant:'outline',data:'data-profile-change-password'})):''),
+
     read:collectProfileData,
     validate:(values)=>!values.name||!values.phones.length||!values.profession
       ?'Имя, телефон и профессия обязательны.':'',
     persist:saveProfileData,
     onSaved:()=>renderProfile(root,navigateBack,options),
     onOpen:(layer)=>{
+      layer.querySelector('[data-profile-change-password]')?.addEventListener('click',()=>openSharedPasswordAction({onSubmit:({currentPassword,newPassword})=>changePassword(currentPassword,newPassword)}));
       if(!accountEmail)return;
       const primary=layer.querySelector('[data-repeated-name="profileEmails"] [data-repeated-row] input[name="profileEmails"]');
       if(!primary)return;
@@ -257,11 +260,10 @@ function openProfileSettings(root,navigateBack,options={}){
 
 function renderDesktopProfileTools(root,navigateBack,options,workplacesAllowed,title){
   const actions=profileSettingsActions(root,navigateBack,options)
-    .filter(action=>!['controls','logout','demo-status'].includes(action.id))
+    .filter(action=>!['controls','logout','demo-status','password'].includes(action.id))
     .map(action=>{
       if(action.id==='live-request')return {...action,label:'DEMO',aria:action.label};
       if(action.id==='live-tools')return {...action,label:'LIVE',aria:action.label};
-      if(action.id==='password')return {...action,label:'Пароль',aria:action.label};
       return action;
     });
   const add=workplacesAllowed?button('<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>',{

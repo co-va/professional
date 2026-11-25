@@ -26,7 +26,7 @@ import { getJournalTimeUsages } from '../journal/time-usage-source.js';
 import { configureWorkplaceSource } from '../core/workplace-time.js';
 import { configureTimeUsageSource } from '../core/time/index.js';
 import { activateDemo, canUseCapability, getAccess, loadAccess } from '../core/access.js';
-import { ALL_WORKPLACES_ID, viewNavigation, initViewNavigation, select, button, mountV2ZLayer, openNotice, initV2WorkspaceInteraction, setV2DeckOpen, v2CardDeck, v2Header, v2Shell, v2Sticker, v2ZLayer } from '../ui/ui.js';
+import { ALL_WORKPLACES_ID, viewNavigation, initViewNavigation, select, button, modal, mountModal, mountV2ZLayer, openNotice, initV2WorkspaceInteraction, setV2DeckOpen, v2CardDeck, v2Header, v2Shell, v2Sticker, v2ZLayer } from '../ui/ui.js';
 import { startPlatformNotices } from '../core/platform-notices.js';
 import { setThemeColor } from '../ui/viewport/index.js';
 import { isV2DesktopWorkspace, V2_DESKTOP_MEDIA } from '../ui/v2/geometry.js';
@@ -406,7 +406,19 @@ function bindDesktopHeader(surface) {
   const notice = app.querySelector('[data-desktop-notices]');
   if (notice) notice.onclick = () => openAccountControlsModal();
   const exit = app.querySelector('[data-desktop-logout]');
-  if (exit) exit.onclick = () => logout();
+  if (exit) exit.onclick = () => {
+    exit.dataset.v2AnchorWidth = '180';
+    const popup = mountModal(exit, modal('<div class="desktop-q-action-menu">'+
+      button('Выйти', {variant:'danger',data:'data-desktop-confirm-logout'})+
+      button('Отмена', {variant:'secondary',data:'data-desktop-cancel-logout'})+'</div>', {
+      variant:'x',xRole:'picker',className:'desktop-q-action-popup',
+    }));
+    popup?.querySelector('[data-desktop-cancel-logout]')?.addEventListener('click',()=>popup.v2Close?.());
+    popup?.querySelector('[data-desktop-confirm-logout]')?.addEventListener('click',()=>{
+      popup.v2Close?.();
+      logout();
+    });
+  };
 }
 
 async function ensureWorkspaceState(section) {
