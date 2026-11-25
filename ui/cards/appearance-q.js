@@ -77,20 +77,22 @@ export function openEntityCardAppearanceQ(root, {
     });
     const selectors = `<div class="entity-card-appearance-q__selectors">${typeSelector}${targetSelector}</div>`;
     if (desktop) {
-      // Both header rows remain mounted even when their controls are absent.
-      headerHost.innerHTML = `<div class="desktop-q-toolbar desktop-appearance-q__actions" data-v2-layer-gesture-ignore>${actionBlock(saveMarkup, { className: 'desktop-q-action-slot' })}</div>${selectors}`;
-      host.innerHTML = '<div data-entity-card-appearance-constructor></div>';
+      // The shared Q reserves the title/close line even without a title.
+      // Save is in the standard tools line; the selector pair starts the body.
+      headerHost.innerHTML = `<div class="desktop-q-toolbar" data-v2-layer-gesture-ignore>${actionBlock(saveMarkup, { className: 'desktop-q-action-slot' })}</div>`;
+      host.innerHTML = `${selectors}<div data-entity-card-appearance-constructor></div>`;
     } else {
       headerHost.innerHTML = typeSelector || targetSelector ? selectors : '';
       host.innerHTML = `<div data-entity-card-appearance-constructor></div>${actionBlock(saveMarkup)}`;
     }
 
-    headerHost.querySelector('[name="entityCardAppearanceType"]')?.addEventListener('change', (event) => {
+    const selectorHost = desktop ? host : headerHost;
+    selectorHost.querySelector('[name="entityCardAppearanceType"]')?.addEventListener('change', (event) => {
       type = String(event.target.value || '');
       target = String(defaultTarget(type) || 'all');
       render();
     });
-    headerHost.querySelector('[name="entityCardAppearanceTarget"]')?.addEventListener('change', (event) => {
+    selectorHost.querySelector('[name="entityCardAppearanceTarget"]')?.addEventListener('change', (event) => {
       target = String(event.target.value || '');
       render();
     });

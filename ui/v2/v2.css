@@ -336,29 +336,42 @@
   .v2-app--workspace .v2-nav-icon{width:24px;height:24px}
   .v2-app--workspace .v2-f-nested{display:none}
   .v2-app--workspace .v2-desktop-footer{display:block;order:999;margin-top:auto;padding:12px 14px;color:var(--text-muted);font-size:12px}
-  /* Shared desktop side panel: the same Q shell for editors and Z presented as Q.
-     Keep the approved View content start (36 + 38 + 80 = 154px), without linking to a page title. */
+  /* One Desktop Q frame. Coordinates are relative to the safe top edge:
+     title/close center 34px; toolbar center 89px; body begins at 166px. */
   .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard{
     --v2-desktop-q-width:440px;
     --v2-desktop-q-max-width:50%;
-    --v2-desktop-q-header-height:calc(68px + env(safe-area-inset-top));
+    --v2-desktop-q-title-height:68px;
+    --v2-desktop-q-header-height:calc(var(--v2-desktop-q-title-height) + var(--v2-desktop-q-tool-height) + env(safe-area-inset-top));
     --v2-desktop-q-tool-height:42px;
     --v2-desktop-q-button-width:112px;
     --v2-desktop-q-button-height:36px;
     --v2-desktop-q-button-gap:6px;
-    --v2-desktop-q-content-start:154px;
+    --v2-desktop-q-content-start:166px;
     --v2-desktop-q-inset:clamp(18px,calc(25vw - 174px),40px);
     top:0;left:auto;right:0;bottom:0;width:min(var(--v2-desktop-q-width),var(--v2-desktop-q-max-width));min-width:0;max-width:var(--v2-desktop-q-max-width);border-radius:var(--v2-z-radius) 0 0 0;
     padding-inline:var(--v2-desktop-q-inset);
   }
   .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard>[data-v2-q-header]{
+    height:var(--v2-desktop-q-header-height)!important;
     min-height:var(--v2-desktop-q-header-height)!important;
+    max-height:var(--v2-desktop-q-header-height)!important;
     margin:0 calc(-1 * var(--v2-desktop-q-inset))!important;
     padding:env(safe-area-inset-top) var(--v2-desktop-q-inset) 0!important;
     grid-template-columns:minmax(0,1fr)!important;
   }
   .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard>[data-v2-q-header]>[data-v2-q-header-content]{
-    grid-column:1!important;padding-left:0!important;padding-right:28px!important;
+    grid-column:1!important;padding:0!important;gap:0!important;
+    display:grid!important;grid-template-columns:minmax(0,1fr);
+    grid-template-rows:var(--v2-desktop-q-title-height) var(--v2-desktop-q-tool-height);
+    height:calc(var(--v2-desktop-q-title-height) + var(--v2-desktop-q-tool-height));
+    align-items:center;
+  }
+  .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard>[data-v2-q-header]>[data-v2-q-header-content]>:is(.v2-q-title,.desktop-q-heading,.people-overview-heading){
+    grid-row:1;grid-column:1;box-sizing:border-box;min-width:0;padding-right:28px;
+  }
+  .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard>[data-v2-q-header]>[data-v2-q-header-content]>:not(.v2-q-title,.desktop-q-heading,.people-overview-heading){
+    grid-row:2;grid-column:1;min-width:0;align-self:center;
   }
   .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard>[data-v2-q-header]>[data-v2-z-dismiss]{display:none!important}
   .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard>[data-v2-q-header]>.v2-desktop-q-close{
@@ -366,7 +379,7 @@
     right:calc(18px + env(safe-area-inset-right));width:var(--ui-compact-size,28px);height:var(--ui-compact-size,28px);
     padding:0;line-height:1;transform:translateY(-50%);cursor:pointer;touch-action:manipulation;
   }
-  .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard>[data-v2-q-body]{padding-top:max(38px,calc(var(--v2-desktop-q-content-start) - var(--v2-desktop-q-header-height)))}
+  .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard>[data-v2-q-body]{padding-top:calc(var(--v2-desktop-q-content-start) - var(--v2-desktop-q-title-height) - var(--v2-desktop-q-tool-height))}
 
   .v2-app--workspace>.v2-layer-portal>.v2-layer-backdrop[data-v2-layer-kind="top"]{background:transparent}
   .v2-app--workspace>.v2-layer-portal>.v2-layer-backdrop>.v2-layer--top{top:0;left:50%;right:auto;width:min(440px,100%);max-height:80%;translate:-50% 0;border-radius:14px}
@@ -683,16 +696,15 @@
 
 /* Desktop Person overview: two header rows, shared Q and standard full footer. */
 @media (min-width:768px) and (min-height:600px){
- .v2-app--workspace :is(.people-desktop-overview-q,.loyalty-deposit-instance-q:has(.desktop-q-toolbar))>[data-v2-q-header]>[data-v2-q-header-content]{padding-right:0!important;gap:8px!important}
- .v2-app--workspace :is(.people-overview-heading,.desktop-q-heading){height:68px;display:flex;align-items:center;padding-right:28px}
+ .v2-app--workspace :is(.people-overview-heading,.desktop-q-heading){height:var(--v2-desktop-q-title-height,68px);display:flex;align-items:center;padding-right:28px}
  .v2-app--workspace :is(.people-overview-toolbar,.desktop-q-toolbar){display:flex;align-items:center;justify-content:space-between;gap:12px;min-width:0}
  .v2-app--workspace .people-overview-toolbar>.ui-select{flex:0 1 128px;min-width:94px}
- .v2-app--workspace .people-overview-toolbar .ui-select__control{height:34px;min-height:34px;max-height:34px;border-radius:8px;font-size:13px;padding:0 18px 0 6px;touch-action:manipulation}
+ .v2-app--workspace .people-overview-toolbar .ui-select__control{height:36px;min-height:36px;max-height:36px;border-radius:8px;font-size:13px;padding:0 18px 0 6px;touch-action:manipulation}
  .v2-app--workspace .people-overview-toolbar .ui-select__value{font-size:13px;white-space:nowrap}
  .v2-app--workspace :is(.people-overview-tools,.desktop-q-tools){display:flex;align-items:center;justify-content:flex-end;gap:16px;flex:0 0 auto}
  .v2-app--workspace :is(.people-overview-tools,.desktop-q-tools) .ui-compact-button{color:var(--text);border-radius:8px;touch-action:manipulation}
  .v2-app--workspace :is(.people-overview-tools,.desktop-q-tools) .ui-compact-button:hover{background:var(--surface-soft)}
- .v2-app--workspace .people-overview-record{width:auto;height:34px;min-height:34px;padding:0 12px;border-radius:8px;font-size:13px;white-space:nowrap;touch-action:manipulation}
+ .v2-app--workspace .people-overview-record{width:auto;height:36px;min-height:36px;max-height:36px;padding:0 12px;border-radius:8px;font-size:13px;white-space:nowrap;touch-action:manipulation}
 }
 
 /* Shared desktop H grid: the title starts at the left work-area inset,
@@ -856,8 +868,6 @@
 /* Shared Desktop Q: page-level actions belong to a fixed toolbar, not
    the scrolling form. Opt in through moveDesktopQTool. */
 @media (min-width:768px) and (min-height:600px){
- .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-q-fixed-tools>[data-v2-q-header]>[data-v2-q-header-content]{padding-right:0!important;gap:0!important}
- .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-q-fixed-tools .desktop-q-heading{flex:0 0 68px;min-height:68px;max-height:68px}
  .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-q-fixed-tools .desktop-q-toolbar{box-sizing:border-box;height:var(--v2-desktop-q-tool-height);min-height:var(--v2-desktop-q-tool-height);max-height:var(--v2-desktop-q-tool-height);flex:0 0 var(--v2-desktop-q-tool-height);gap:var(--v2-desktop-q-button-gap);justify-content:flex-start;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;scrollbar-width:none}
  .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-q-fixed-tools .desktop-q-toolbar::before{content:"";flex:1 0 0;min-width:0}
  .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-q-fixed-tools .desktop-q-toolbar>.desktop-q-action-slot[data-ui-action-hidden],.v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-q-fixed-tools .desktop-q-toolbar>.desktop-q-action-slot[hidden]{display:none!important}
@@ -868,7 +878,6 @@
  .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-q-fixed-tools .desktop-q-toolbar>.desktop-q-action-slot.ui-compact-button{flex:0 0 var(--ui-compact-size);width:var(--ui-compact-size);min-width:var(--ui-compact-size);max-width:var(--ui-compact-size)}
  .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-q-fixed-tools .desktop-q-toolbar>.desktop-q-action-slot.ui-compact-button.v2-desktop-tool-primary{flex:0 0 var(--h-tools);width:var(--h-tools);min-width:var(--h-tools);max-width:var(--h-tools);height:var(--h-tools);min-height:var(--h-tools);max-height:var(--h-tools);border:1px solid #E0D6D6;border-radius:10px;font-size:24px}
 
- .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-q-fixed-tools>[data-v2-q-body]{padding-top:max(12px,calc(var(--v2-desktop-q-content-start) - var(--v2-desktop-q-header-height) - var(--v2-desktop-q-tool-height)))}
 }
 
 /* Service uses the existing accepted Desktop density for form-contained
@@ -937,10 +946,9 @@
    The existing Q toolbar styles own Save; empty lines retain their geometry. */
 @media (min-width:768px) and (min-height:600px){
  .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-appearance-q{--desktop-appearance-selector-height:var(--ui-field-height,46px)}
- .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-appearance-q.desktop-q-fixed-tools .desktop-appearance-q__actions{height:68px;min-height:68px;max-height:68px;flex:0 0 68px;padding-right:36px}
  .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-appearance-q .entity-card-appearance-q__selectors{box-sizing:border-box;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:center;gap:8px;min-height:var(--desktop-appearance-selector-height);height:var(--desktop-appearance-selector-height);max-height:var(--desktop-appearance-selector-height);flex:0 0 var(--desktop-appearance-selector-height);padding-right:0}
  .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-appearance-q .entity-card-appearance-q__selectors>.ui-select{min-width:0;width:100%;margin:0}
- .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-appearance-q.desktop-q-fixed-tools>[data-v2-q-body]{padding-top:max(12px,calc(var(--v2-desktop-q-content-start) - var(--v2-desktop-q-header-height) - var(--desktop-appearance-selector-height)))}
+ .v2-app--workspace .desktop-appearance-q [data-entity-card-appearance-q]{display:grid;gap:12px;min-width:0}
 }
 
 /* The shared color palette is an anchored Desktop picker, not a central editor. */
@@ -1031,7 +1039,7 @@
 /* Consumables editor: the shared compact table, one header and one row
    per norm/position. The Q width is local and retains the global 50% cap. */
 @media (min-width:768px) and (min-height:600px){
- .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.service-consumables-q{--v2-desktop-q-width:520px;--v2-desktop-q-content-start:166px}
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.service-consumables-q{--v2-desktop-q-width:520px}
  .v2-app--workspace .service-consumables-q [data-procedure-consumable-items]>.ui-data-table--compact{border-radius:10px;overflow:hidden}
  .v2-app--workspace .service-consumables-q .ui-data-table--compact table{width:100%;min-width:0;table-layout:fixed;border-collapse:collapse}
  .v2-app--workspace .service-consumables-q .ui-data-table--compact td{box-sizing:border-box;padding:4px 8px;vertical-align:middle;text-align:left}
@@ -1046,4 +1054,13 @@
  .v2-app--workspace .service-consumables-q td[data-table-column="unit"]>.ui-select{width:100%;min-width:0;margin:0}
  .v2-app--workspace .service-consumables-q td[data-table-column="unit"] .ui-select__control{box-sizing:border-box;min-width:0;width:100%;height:34px;min-height:34px;max-height:34px;padding:0 15px 0 4px;font-size:12px}
  .v2-app--workspace .service-consumables-q td[data-table-column="unit"] .ui-select__value{min-width:0;white-space:nowrap}
+}
+
+/* All Q tool rows share the same 36px control line. Compact icon glyphs
+   keep their original size, but their hit areas align with text buttons. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace [data-v2-q-header-content]>:is(.desktop-q-toolbar,.people-overview-toolbar){box-sizing:border-box;height:var(--v2-desktop-q-tool-height);min-height:var(--v2-desktop-q-tool-height);max-height:var(--v2-desktop-q-tool-height);align-items:center}
+ .v2-app--workspace [data-v2-q-header-content] :is(.desktop-q-toolbar,.people-overview-toolbar) :is(.ui-button,.ui-select__control,.ui-compact-button){box-sizing:border-box;height:var(--v2-desktop-q-button-height);min-height:var(--v2-desktop-q-button-height);max-height:var(--v2-desktop-q-button-height)}
+ .v2-app--workspace [data-v2-q-header-content] :is(.desktop-q-toolbar,.people-overview-toolbar) .ui-select{margin:0;min-width:0}
+ .v2-app--workspace [data-v2-q-header-content]>.people-history-search{margin:0}
 }
