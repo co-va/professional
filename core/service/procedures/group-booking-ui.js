@@ -29,11 +29,14 @@ export function adaptDesktopGroupBooking(container, { toggleSelector, capacitySe
   const input = capacity?.querySelector('input[type="number"]');
   const online = container.querySelector(onlineSelector)?.closest('.ui-compact-check');
   if (!group || group.parentElement !== container || capacity?.parentElement !== container || online?.parentElement !== container || !input) return false;
+  const row = group.querySelector('.list-entry__content');
+  if (!row || toggle.parentElement !== row) return false;
   group.classList.add('desktop-inline-group-booking');
   capacity.classList.add('desktop-inline-capacity');
   input.setAttribute('aria-label', 'Максимум людей');
   input.title = 'Максимум людей';
-  group.append(capacity);
+  // Keep one white row: original title, numeric input, original toggle.
+  row.insertBefore(capacity, toggle);
   container.prepend(group, online);
   return true;
 }

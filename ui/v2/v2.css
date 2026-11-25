@@ -888,21 +888,22 @@
  .v2-app--workspace>.v2-layer-portal.is-anchored>.v2-layer-backdrop[data-v2-x-role="picker"]>.v2-layer--bottom.service-workplace-picker .ui-list__item:is(:hover,:focus-visible){background:var(--surface-soft);border-radius:8px}
 }
 
-/* Desktop group booking is one line of form fields, not a mobile card.
-   The right-hand column matches the existing cost/duration half-field grid. */
+/* Desktop group booking is a single rounded white row: label, input, toggle. */
 @media (min-width:768px) and (min-height:600px){
- .v2-app--workspace :is(.desktop-inline-group-booking, .desktop-workplace-editor .desktop-inline-group-booking){display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:center;gap:8px;border:0;background:transparent;box-shadow:none;overflow:visible;border-radius:0}
- .v2-app--workspace .desktop-inline-group-booking>.list-entry{height:var(--ui-field-height);min-height:var(--ui-field-height);max-height:var(--ui-field-height);box-shadow:none;transform:none;background:transparent;overflow:visible}
+ .v2-app--workspace :is(.desktop-inline-group-booking, .desktop-workplace-editor .desktop-inline-group-booking){display:block;box-sizing:border-box;border:1px solid var(--border);background:var(--white);box-shadow:none;overflow:hidden;border-radius:14px}
+ .v2-app--workspace .desktop-inline-group-booking>.list-entry{height:calc(var(--ui-field-height) - 2px);min-height:calc(var(--ui-field-height) - 2px);max-height:calc(var(--ui-field-height) - 2px);border:0;box-shadow:none;transform:none;background:transparent;overflow:visible}
  .v2-app--workspace .desktop-inline-group-booking .list-entry__background{display:none}
- .v2-app--workspace .desktop-inline-group-booking .list-entry__content{box-sizing:border-box;height:var(--ui-field-height);min-height:var(--ui-field-height);max-height:var(--ui-field-height);grid-template-columns:minmax(0,1fr) 42px;gap:4px;padding:0;background:transparent}
+ .v2-app--workspace .desktop-inline-group-booking .list-entry__content{display:grid;box-sizing:border-box;height:100%;min-height:0;max-height:none;grid-template-columns:minmax(0,1fr) minmax(72px,100px) 42px;align-items:center;gap:8px;padding:0 10px;background:transparent}
  .v2-app--workspace .desktop-inline-group-booking .list-entry__text{display:block}
- .v2-app--workspace .desktop-inline-group-booking .list-entry__main strong{font-size:13px;line-height:16px;white-space:normal;overflow-wrap:normal}
+ .v2-app--workspace .desktop-inline-group-booking .list-entry__main strong{font-size:13px;line-height:16px;white-space:nowrap;overflow-wrap:normal}
  .v2-app--workspace .desktop-inline-group-booking .list-entry__main small{display:none}
  .v2-app--workspace .desktop-inline-group-booking .list-entry__toggle{width:42px;height:var(--ui-compact-size);justify-self:end}
  .v2-app--workspace .desktop-inline-capacity{min-width:0;width:100%;align-self:center}
  .v2-app--workspace .desktop-inline-capacity>.field{display:block;margin:0}
  .v2-app--workspace .desktop-inline-capacity>.field>span{display:none}
- .v2-app--workspace .desktop-inline-capacity input[type="number"]{box-sizing:border-box;width:100%;height:var(--ui-field-height);min-height:var(--ui-field-height);max-height:var(--ui-field-height);padding:10px 12px;text-align:left;border-radius:0;font-size:16px}
+ .v2-app--workspace .desktop-inline-capacity input[type="number"]{box-sizing:border-box;width:100%;height:36px;min-height:36px;max-height:36px;padding:4px 10px;text-align:left;border-radius:0;font-size:16px;appearance:textfield;-moz-appearance:textfield}
+ .v2-app--workspace .desktop-inline-capacity input[type="number"]::-webkit-inner-spin-button,.v2-app--workspace .desktop-inline-capacity input[type="number"]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+ .v2-app--workspace .desktop-inline-capacity input[type="number"]:disabled{opacity:1;color:var(--text);-webkit-text-fill-color:var(--text)}
 }
 /* Desktop Q destructive action follows the accepted Clients Z footer:
    isolated, fixed bottom right, never in the action toolbar. */
