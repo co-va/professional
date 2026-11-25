@@ -515,7 +515,12 @@ function listMarkup(items, query = '') {
 }
 
 function desktopPeopleTable(root, items, visitIndex) {
-  if (!items.length) return listMarkup(items, root.peopleSearchInput?.value || '');
+  if (!items.length) {
+    const filtered = Boolean(root.peopleSearchInput?.value?.trim()) || Object.values(currentPeopleFilters()).some(Boolean);
+    return filtered
+      ? emptyState('Клиенты не найдены', 'Измените условия поиска или фильтрации.')
+      : emptyState('Клиентов пока нет', 'Добавьте человека кнопкой «+».');
+  }
   const selected = root.peopleSelectedKeys ||= new Set();
   const allSelected = items.every(person => selected.has(String(person.key)));
   const check = (data, aria, checked) => `<label class="ui-compact-check">${checkControl({ data, aria, checked })}</label>`;
@@ -797,7 +802,7 @@ function openFilterSettings(root, anchor = null) {
   const layer = mountModal(anchor || root, modal(`
     <div data-people-filter-fields>${peopleFilterFields(draft)}</div>
     <div class="modal-actions" data-people-filter-actions hidden>
-      ${button('Применить', { data: 'data-people-filter-action' })}
+      ${button(desktopMenu ? 'Сбросить' : 'Применить', { data: 'data-people-filter-action', variant: desktopMenu ? 'secondary' : 'primary' })}
     </div>`, { title: 'Фильтр', variant: 'x', surface: 'app', className: desktopMenu ? 'people-action-popup people-filter-popup' : '' }));
   if (!layer) return null;
   initDatePickers(layer);
@@ -805,12 +810,38 @@ function openFilterSettings(root, anchor = null) {
   const actions = layer.querySelector('[data-people-filter-actions]');
   let loyaltyReady=false;
   let loyaltyError='';
-  const programHost=layer.querySelector('[data-people-program-filter]');
+  let programHost=layer.querySelector('[data-people-program-filter]');
   const refreshProgramSelect=()=>{
     if(programHost && draft.loyaltyMode==='program')programHost.innerHTML=peopleProgramSelect(draft);
   };
 
+  const validDates = filters => filters.recordPeriod !== 'range' || (
+    /^\d{4}-\d{2}-\d{2}$/.test(filters.recordFrom)
+    && /^\d{4}-\d{2}-\d{2}$/.test(filters.recordTo)
+    && filters.recordFrom <= filters.recordTo);
+  const applyDesktopFilters = () => {
+    if (!desktopMenu) return;
+    // Incomplete date edits must not create an empty or invalid result.
+    const next = { ...draft };
+    if (!validDates(next)) {
+      next.recordPeriod = applied.recordPeriod;
+      next.recordFrom = applied.recordFrom;
+      next.recordTo = applied.recordTo;
+    }
+    if (sameFilters(next, applied)) return;
+    applied = setPeopleFilters(next);
+    root.peopleLoyaltyLoading = Boolean(applied.loyaltyMode) && !loyaltyReady && !loyaltyError;
+    root.peopleLoyaltyError = applied.loyaltyMode && loyaltyError ? 'Не удалось загрузить программы. Повторите попытку.' : '';
+    refreshPeopleList(root);
+  };
   const updateAction = () => {
+    if (desktopMenu) {
+      action.disabled = false;
+      action.textContent = 'Сбросить';
+      action.classList.add('ui-button--secondary');
+      actions.hidden = !hasFilters(applied) && !hasFilters(draft);
+      return;
+    }
     const changed = !sameFilters(draft, applied);
     const datesValid = draft.recordPeriod !== 'range' || (
       /^\d{4}-\d{2}-\d{2}$/.test(draft.recordFrom)
@@ -823,7 +854,7 @@ function openFilterSettings(root, anchor = null) {
     action.classList.toggle('ui-button--secondary', reset);
   };
 
-  // Changes are drafts until the only action button is pressed.
+  // Desktop applies valid selections immediately; Mobile retains explicit Apply.
   layer.addEventListener('change', (event) => {
     const keyByName = {
       peopleGenderFilter: 'gender',
@@ -857,11 +888,12 @@ function openFilterSettings(root, anchor = null) {
       const rangeHost = layer.querySelector('[data-people-record-range]');
       if (rangeHost) rangeHost.hidden = draft.recordPeriod !== 'range';
     }
+    applyDesktopFilters();
     updateAction();
   });
 
   action.addEventListener('click', () => {
-    if (!sameFilters(draft, applied)) {
+    if (!desktopMenu && !sameFilters(draft, applied)) {
       if (action.disabled) return;
       applied = setPeopleFilters(draft);
       root.peopleLoyaltyLoading=false;
@@ -870,7 +902,7 @@ function openFilterSettings(root, anchor = null) {
       layer.v2Close?.();
       return;
     }
-    if (!hasFilters(applied)) return;
+    if (!hasFilters(applied) && !(desktopMenu && hasFilters(draft))) return;
     applied = setPeopleFilters({});
     draft = { ...applied };
     root.peopleLoyaltyLoading=false;
@@ -879,6 +911,7 @@ function openFilterSettings(root, anchor = null) {
     if (fields) {
       fields.innerHTML = peopleFilterFields(draft);
       initDatePickers(fields);
+      programHost = layer.querySelector('[data-people-program-filter]');
     }
     refreshPeopleList(root);
     updateAction();
@@ -887,9 +920,14 @@ function openFilterSettings(root, anchor = null) {
   // Fetch real assignments and available program definitions without delaying X opening.
   void refreshPeopleLoyaltyData().then(()=>{
     loyaltyReady=true;
+    if (desktopMenu && root.isConnected && currentPeopleFilters().loyaltyMode) {
+      root.peopleLoyaltyLoading=false;
+      root.peopleLoyaltyError='';
+      refreshPeopleList(root);
+    }
     if(!layer.isConnected)return;
     refreshProgramSelect();
-    if(currentPeopleFilters().loyaltyMode){
+    if(!desktopMenu && currentPeopleFilters().loyaltyMode){
       root.peopleLoyaltyLoading=false;
       root.peopleLoyaltyError='';
       refreshPeopleList(root);
@@ -898,6 +936,11 @@ function openFilterSettings(root, anchor = null) {
   }).catch(()=>{
     loyaltyReady=false;
     loyaltyError='Не удалось загрузить программы';
+    if (desktopMenu && root.isConnected && currentPeopleFilters().loyaltyMode) {
+      root.peopleLoyaltyLoading=false;
+      root.peopleLoyaltyError='Не удалось загрузить программы. Повторите попытку.';
+      refreshPeopleList(root);
+    }
     if(!layer.isConnected)return;
     if(programHost && draft.loyaltyMode==='program')programHost.textContent=loyaltyError;
     updateAction();
