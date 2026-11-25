@@ -1,4 +1,4 @@
-import { settingsSectionHeader } from '../settings.js';
+import { settingsSectionHeader, settingsDetailHeading, setSettingsDetailOpen } from '../settings.js';
 import {
   actionBlock,
   button,
@@ -701,29 +701,30 @@ function openSettingsMenu(root) {
 
 function bindMain(root) {
   bindSettings(root, root);
-  root.querySelector('[data-settings-document-templates]')?.addEventListener('click', () => {
-    const host=root.querySelector('[data-inline-document-templates]');
-    if(!host) return openTemplatesLayer(root);
-    host.hidden=!host.hidden;
-    root.dataset.templatesExpanded=String(!host.hidden);
-    if(host.hidden) return;
+  const renderInlineTemplates = host => {
     const items=templates();
-    host.innerHTML=items.length?v2ListEntries(items.map(item=>v2ListEntry({
+    host.innerHTML=settingsDetailHeading('Шаблоны','settings-document-templates')+(items.length?v2ListEntries(items.map(item=>v2ListEntry({
       initial:'▤',title:item.title||'Шаблон',subtitle:item.sourceMode==='CUSTOM'?'Ваш вариант':'Системный шаблон',
       rightTop:'Версия '+(item.version||1),data:'data-inline-template-open="'+escapeHtml(item.id)+'"'
-    }))):emptyState('Шаблоны недоступны','Базовые шаблоны Реестра не загрузились.');
+    }))):emptyState('Шаблоны недоступны','Базовые шаблоны Реестра не загрузились.'));
     host.querySelectorAll('[data-inline-template-open]').forEach(control=>control.addEventListener('click',()=>{
       const item=templates().find(candidate=>candidate.id===control.dataset.inlineTemplateOpen);
       if(item) openTemplateEditor(root,item);
     }));
+  };
+  root.querySelector('[data-settings-document-templates]')?.addEventListener('click', () => {
+    const host=root.querySelector('[data-inline-document-templates]');
+    if(!host) return openTemplatesLayer(root);
+    setSettingsDetailOpen(host,host.hidden);
+    if(!host.hidden) renderInlineTemplates(host);
   });
+  const restoredTemplates = root.querySelector('[data-inline-document-templates]:not([hidden])');
+  if(restoredTemplates) renderInlineTemplates(restoredTemplates);
   root.querySelector('[data-settings-document-create]')?.addEventListener('click',()=>openNewDocumentEditor(root));
   root.querySelector('[data-settings-document-pdf]')?.addEventListener('click',()=>void choosePdf(root));
   root.querySelector('[data-settings-document-toggle]')?.addEventListener('click',()=>{
     const host=root.querySelector('[data-documents-content]');
-    host.hidden=!host.hidden;
-    root.dataset.documentsExpanded=String(!host.hidden);
-    root.querySelector('[data-settings-document-toggle]').setAttribute('aria-expanded',String(!host.hidden));
+    setSettingsDetailOpen(host,host.hidden);
   });
   root.querySelector('[data-settings-document-add]')?.addEventListener('click', () => openAddDocumentMenu(root));
 
@@ -731,11 +732,11 @@ function bindMain(root) {
   if(root.hasAttribute('data-settings-embedded')) root.querySelector('.settings-documents-switch')?.addEventListener('click',event=>{
     if(!event.target.closest('button'))return;
     const host=root.querySelector('[data-documents-content]');
-    if(host?.hidden){host.hidden=false;root.dataset.documentsExpanded='true';root.querySelector('[data-settings-document-toggle]')?.setAttribute('aria-expanded','true');}
+    if(host?.hidden) setSettingsDetailOpen(host,true);
   });
   root.querySelector('[name="documentsView"]')?.addEventListener('change', (event) => {
     currentView = event.target.value === 'history' ? 'history' : 'documents';
-    if(root.hasAttribute('data-settings-embedded')) root.dataset.documentsExpanded='true';
+    if(root.hasAttribute('data-settings-embedded')) setSettingsDetailOpen(root.querySelector('[data-documents-content]'),true);
     renderMain(root);
   });
 
@@ -770,12 +771,12 @@ function bindMain(root) {
 function renderMain(root) {
   if(root.hasAttribute('data-settings-embedded')) {
     const expanded=root.dataset.documentsExpanded==='true';
-    const tools=button('Создать документ',{className:'settings-h-action',data:'data-settings-document-create'})+button('Загрузить PDF',{variant:'outline',className:'settings-outline-action',data:'data-settings-document-pdf'})+button('Шаблоны',{variant:'outline',className:'settings-outline-action',data:'data-settings-document-templates'});
-    root.innerHTML=`<div class="settings-documents-heading"><button type="button" class="settings-document-toggle" data-settings-document-toggle aria-expanded="${expanded}">Документы <span aria-hidden="true">⌄</span></button><div class="settings-documents-actions">${tools}</div></div><div class="settings-documents-switch">${segmentControl(VIEWS,{value:currentView,name:'documentsView',aria:'Документы и история подписаний'})}</div>
-      <div data-inline-document-templates hidden></div>
-      <section class="settings-document-list" data-documents-content${expanded?'':' hidden'}>${desktopDocumentList()}</section>`;
+    const templatesExpanded=root.dataset.templatesExpanded==='true';
+    const tools=button('Создать документ',{className:'settings-h-action',data:'data-settings-document-create'})+button('Загрузить PDF',{variant:'outline',className:'settings-outline-action',data:'data-settings-document-pdf'})+button('Шаблоны',{variant:'outline',className:'settings-outline-action',data:'data-settings-document-templates aria-controls="settings-document-templates" aria-expanded="'+templatesExpanded+'"'});
+    root.innerHTML=`<div class="settings-documents-heading"><button type="button" class="settings-document-toggle" data-settings-document-toggle aria-controls="settings-document-content" aria-expanded="${expanded}">Документы <span aria-hidden="true">⌄</span></button><div class="settings-documents-actions">${tools}</div></div><div class="settings-documents-switch">${segmentControl(VIEWS,{value:currentView,name:'documentsView',aria:'Документы и история подписаний'})}</div>
+      <div id="settings-document-templates" data-inline-document-templates data-settings-detail data-settings-detail-state="templatesExpanded"${templatesExpanded?'':' hidden'}></div>
+      <section id="settings-document-content" class="settings-document-list" data-documents-content data-settings-detail data-settings-detail-state="documentsExpanded"${expanded?'':' hidden'}>${settingsDetailHeading(currentView==='history'?'История':'Документы','settings-document-content')}${desktopDocumentList()}</section>`;
     bindMain(root);
-    if(root.dataset.templatesExpanded==='true') root.querySelector('[data-settings-document-templates]')?.click();
     window.dispatchEvent(new CustomEvent('va-tools:v2-context-changed'));
     return;
   }

@@ -1,4 +1,4 @@
-import { settingsSectionHeader } from '../settings.js';
+import { settingsSectionHeader, settingsDetailHeading, setSettingsDetailOpen } from '../settings.js';
 import { buildBookingLink } from '../../core/booking-link/index.js';
 import { apiRequest, getCurrentAccount } from '../../core/auth.js';
 import { loadOperationalState } from '../../core/runtime/operational-state.js';
@@ -213,7 +213,7 @@ function renderInlineBooking(root) {
       ${copyLinkField('Ссылка рабочего пространства','','workplace')}
     </div>`;
   panel.hidden = true;
-  panel.innerHTML = `<div class="settings-inline-heading"><strong>Приветствие</strong></div>
+  panel.innerHTML = `${settingsDetailHeading('Приветствие','settings-online-welcome')}
     <form class="form-grid settings-inline-welcome" data-inline-welcome-form>
       ${field({label:'Заголовок',name:'welcomeTitle',value:saved.welcomeTitle,maxlength:90})}
       ${textareaField({label:'Текст',name:'welcomeText',value:saved.welcomeText,rows:4,maxlength:500})}
@@ -234,8 +234,7 @@ function renderInlineBooking(root) {
   let baseline=saved;
   const sync=()=>{if(save)save.hidden=settingsSignature(welcomeDraft(form,baseline))===settingsSignature(baseline);};
   toggle?.addEventListener('click',()=>{
-    panel.hidden=!panel.hidden;
-    toggle.setAttribute('aria-expanded',String(!panel.hidden));
+    setSettingsDetailOpen(panel,panel.hidden);
   });
   form?.addEventListener('input',sync);
   form?.addEventListener('change',sync);
@@ -243,8 +242,7 @@ function renderInlineBooking(root) {
     event.preventDefault();
     baseline=saveBookingSettings(welcomeDraft(form,getBookingSettings()));
     sync();
-    panel.hidden=true;
-    toggle?.setAttribute('aria-expanded','false');
+    setSettingsDetailOpen(panel,false);
   });
   sync();
 }

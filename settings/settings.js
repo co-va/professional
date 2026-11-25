@@ -1,5 +1,5 @@
 import { canUseCapability } from '../core/access.js';
-import { button, columnLayout, emptyState, folderList, pageHeader, workspaceHeaderContext } from '../ui/ui.js';
+import { button, compactButton, columnLayout, emptyState, folderList, pageHeader, workspaceHeaderContext } from '../ui/ui.js';
 import { isV2DesktopWorkspace } from '../ui/v2/geometry.js';
 import { loadTenantDocumentArchive } from '../core/runtime/tenant-document-archive.js';
 
@@ -63,6 +63,36 @@ export function settingsSectionHeader(root, context, actions = []) {
   })).join('')+'</div>' : '';
 }
 
+// Desktop inline details are transient surfaces: one open at a time, no
+// remount of the section owner and no implicit save/discard of form drafts.
+export function settingsDetailHeading(title, id) {
+  return '<div class="settings-inline-heading"><strong>'+title+'</strong>'+compactButton({
+    kind:'remove',className:'settings-detail-close',data:'data-settings-detail-close="'+id+'"',aria:'Закрыть '+title,
+  })+'</div>';
+}
+
+export function setSettingsDetailOpen(panel, open) {
+  const overview = panel?.closest('.settings-overview');
+  if (!overview || !panel.matches('[data-settings-detail]')) return;
+  const set = (detail, visible) => {
+    detail.hidden = !visible;
+    for (const control of overview.querySelectorAll('[aria-controls]')) {
+      if (control.getAttribute('aria-controls') === detail.id) control.setAttribute('aria-expanded',String(visible));
+    }
+    const stateKey = detail.dataset.settingsDetailState;
+    if (stateKey) {
+      const host = detail.closest('[data-settings-embedded]');
+      if (host) host.dataset[stateKey] = String(visible);
+    }
+  };
+  if (open) {
+    for (const detail of overview.querySelectorAll('[data-settings-detail]')) {
+      if (detail !== panel) set(detail,false);
+    }
+  }
+  set(panel,Boolean(open));
+}
+
 export function settingsOverviewMarkup(visible) {
   const available = new Map(visible.map(folder => [folder[0], folder[1]]));
   const top = ['online-booking','integrations','data-transfer'].filter(id => available.has(id));
@@ -76,13 +106,13 @@ export function settingsOverviewMarkup(visible) {
     documents: 'Документы, шаблоны и история подписаний',
   };
   const card = id => {
-    if (['online-booking','integrations','tags','documents'].includes(id)) return '<section class="settings-overview-card settings-overview-card--inline" data-settings-inline="'+id+'"><div data-settings-embedded></div></section>';
+    if (['online-booking','integrations','tags','documents'].includes(id)) return '<section class="settings-overview-card settings-overview-card--inline" data-settings-inline="'+id+'" data-settings-section-owner="'+id+'"><div data-settings-embedded></div></section>';
     const trigger = '<button type="button" class="settings-overview-trigger" data-settings-tile="'+id+'" aria-expanded="false" aria-controls="settings-panel-'+id+'"><strong class="settings-overview-card-title">'+available.get(id)+'</strong><span class="settings-overview-card-summary">'+summaries[id]+'</span><span aria-hidden="true" class="settings-overview-arrow">⌄</span></button>';
-    return '<section class="settings-overview-card">'+trigger+'</section>';
+    return '<section class="settings-overview-card" data-settings-section-owner="'+id+'">'+trigger+'</section>';
   };
-  const panel = id => ['online-booking','integrations','tags','documents'].includes(id) ? '' : '<section id="settings-panel-'+id+'" class="settings-overview-panel" data-settings-panel="'+id+'" hidden><div data-settings-embedded></div></section>';
+  const panel = id => ['online-booking','integrations','tags','documents'].includes(id) ? '' : '<section id="settings-panel-'+id+'" class="settings-overview-panel" data-settings-panel="'+id+'" data-settings-detail data-settings-section-owner="'+id+'" hidden>'+settingsDetailHeading(available.get(id),'settings-panel-'+id)+'<div data-settings-embedded></div></section>';
   const welcomePanel = available.has('online-booking')
-    ? '<section id="settings-online-welcome" class="settings-overview-panel" data-settings-welcome-panel hidden></section>'
+    ? '<section id="settings-online-welcome" class="settings-overview-panel" data-settings-welcome-panel data-settings-detail data-settings-section-owner="online-booking" hidden></section>'
     : '';
   return workspaceHeaderContext({title:'Настройки'})+'<div class="settings-overview">'+
     (top.length ? '<div class="settings-overview-section">'+columnLayout(top.map(card),{columns:top.length,ariaLabel:'Онлайн-запись, интеграции и перенос данных'})+welcomePanel+top.map(panel).join('')+'</div>' : '')+
@@ -97,14 +127,34 @@ function renderDesktopSettings(root) {
   const overview = root.querySelector('.settings-overview');
   const mounted = new Set();
   const pending = new Set();
+  // Capture before local button handlers (including modal triggers). A click
+  // inside a detail is still a click within its owning section.
+  overview.addEventListener('click', event => {
+    const close = event.target.closest('[data-settings-detail-close]');
+    if (close) {
+      const detail = overview.querySelectorAll('[data-settings-detail]');
+      const panel = [...detail].find(item => item.id === close.dataset.settingsDetailClose);
+      if (panel) {
+        setSettingsDetailOpen(panel,false);
+        [...overview.querySelectorAll('[aria-controls]')].find(control=>control.getAttribute('aria-controls')===panel.id)?.focus({preventScroll:true});
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+    const owner = event.target.closest('[data-settings-section-owner]')?.dataset.settingsSectionOwner;
+    if (!owner) return;
+    for (const panel of overview.querySelectorAll('[data-settings-detail]:not([hidden])')) {
+      if (panel.closest('[data-settings-section-owner]')?.dataset.settingsSectionOwner !== owner) setSettingsDetailOpen(panel,false);
+    }
+  },true);
   const cards = [...overview.querySelectorAll('[data-settings-tile]')];
   const panels = [...overview.querySelectorAll('[data-settings-panel]')];
   const open = async id => {
     const target = panels.find(panel => panel.dataset.settingsPanel === id);
     if (!target) return;
     const show = target.hidden;
-    for (const card of cards) card.setAttribute('aria-expanded', String(show && card.dataset.settingsTile === id));
-    for (const panel of panels) panel.hidden = !show || panel !== target;
+    setSettingsDetailOpen(target,show);
     if (!show || mounted.has(id) || pending.has(id)) return;
     const folder = visible.find(item => item[0] === id);
     const host = target.querySelector('[data-settings-embedded]');

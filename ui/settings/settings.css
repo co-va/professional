@@ -59,6 +59,7 @@
 .settings-inline-welcome{margin:0;gap:8px;min-width:0}
 .settings-overview-panel[data-settings-welcome-panel]{width:100%;box-sizing:border-box}
 .settings-inline-welcome .settings-h-action{justify-self:end}
+.settings-overview .settings-detail-close.ui-compact-button{color:var(--text);font-weight:400;border:0;background:transparent;touch-action:manipulation}
 .settings-overview [hidden]{display:none!important}
 .settings-overview-panel[data-settings-panel="integrations"]{padding:0;border:0;background:transparent}
 .settings-overview-panel[data-settings-panel="integrations"] .mini-card-rail{justify-content:flex-start;padding:0;scroll-padding-inline:0;scroll-snap-type:none;gap:12px}
