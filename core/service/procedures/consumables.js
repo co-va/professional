@@ -1,9 +1,10 @@
 import {
-  actionBlock, button, compactButton, emptyState, escapeHtml, field,
+  actionBlock, button, compactButton, dataTable, emptyState, escapeHtml, field,
   list, modal, mountModal, openNotice,
 } from '../../../ui/ui.js';
 import { setSharedActionVisible } from '../../../ui/page/page.js';
 import { moveDesktopQTool } from '../../../ui/v2/z-layout.js';
+import { isV2DesktopWorkspace } from '../../../ui/v2/geometry.js';
 import { getInventoryItems } from '../../inventory/data.js';
 import { loadInventory } from '../../inventory/service.js';
 import { commitProcedureConsumables, getProcedures } from './data.js';
@@ -91,16 +92,24 @@ function costSummaryText(rows, inventory) {
     : 'Рассчитано: ' + money(result.total) + ' · не все расходы указаны';
 }
 
-export function openConsumablePicker(selected, onPick) {
-  const panel = field({ label: 'Поиск', name: 'consumableSearch',
-    type: 'search', placeholder: 'Товар, производитель или артикул' }) +
+export function openConsumablePicker(selected, onPick, { anchor = null } = {}) {
+  const desktop = isV2DesktopWorkspace(anchor?.closest('[data-v2-app]') || document.querySelector('.v2-app--workspace'));
+  if (desktop && anchor) anchor.dataset.v2AnchorWidth = '520';
+  const panel = (desktop
+    ? '<div class="desktop-table-picker-tools">' +
+      field({ label: 'Поиск', name: 'consumableSearch', type: 'search', placeholder: 'Товар, производитель или артикул' }) +
+      compactButton({ kind: 'remove', data: 'data-consumable-picker-close', aria: 'Закрыть' }) +
+      '</div>'
+    : field({ label: 'Поиск', name: 'consumableSearch', type: 'search', placeholder: 'Товар, производитель или артикул' })) +
     '<div data-consumable-choices></div>';
-  const layer = mountModal(document.body, modal(panel, {
+  const layer = mountModal(desktop && anchor ? anchor : document.body, modal(panel, {
     title: 'Выбрать товар', variant: 'x',
+    ...(desktop ? { className: 'desktop-table-popup service-consumable-picker', surface: 'app', xRole: 'picker' } : {}),
   }));
   if (!layer) return null;
   const search = layer.querySelector('[name="consumableSearch"]');
   const host = layer.querySelector('[data-consumable-choices]');
+  layer.querySelector('[data-consumable-picker-close]')?.addEventListener('click', () => layer.v2Close?.());
   const render = () => {
     const needle = String(search?.value || '').trim().toLocaleLowerCase('ru-RU');
     const items = getInventoryItems().filter(item => !selected.has(String(item.itemId))
@@ -109,7 +118,21 @@ export function openConsumablePicker(selected, onPick) {
     // Stock products use the canonical dense List, not full-size V2 cards.
     // Keep huge catalogues responsive: searching reveals further matches.
     const visible = items.slice(0, 80);
-    host.innerHTML = items.length ? list({
+    host.innerHTML = items.length ? (desktop ? dataTable({
+      compact: true, caption: 'Товары',
+      columns: [
+        { key: 'title', label: 'Товар', sortable: false, render: row =>
+          '<button type="button" class="desktop-table-picker-item" data-consumable-pick="' +
+            escapeHtml(row.itemId) + '" aria-label="Добавить ' + escapeHtml(row.title) + '">' +
+            '<strong>' + escapeHtml(row.title) + '</strong>' +
+            (row.secondary ? '<small>' + escapeHtml(row.secondary) + '</small>' : '') +
+          '</button>' },
+      ],
+      rows: visible.map(item => ({
+        itemId: item.itemId, title: item.name || 'Товар',
+        secondary: [item.manufacturer, item.sku].filter(Boolean).join(' · '),
+      })),
+    }) : list({
       className: 'ui-list--dense',
       items: visible.map(item => ({
         title: item.name || 'Товар',
@@ -118,10 +141,14 @@ export function openConsumablePicker(selected, onPick) {
         data: 'data-consumable-pick="' + escapeHtml(item.itemId) + '"',
         aria: 'Добавить ' + (item.name || 'товар'),
       })),
-    }) + (items.length > visible.length
+    })) + (items.length > visible.length
       ? '<p class="ui-list__secondary">Показано ' + visible.length +
         ' из ' + items.length + '. Уточните поиск.</p>' : '')
-      : emptyState('Товары не найдены', 'Измените поиск или добавьте товар на склад.');
+      : desktop ? dataTable({
+        compact: true, caption: 'Товары',
+        columns: [{ key: 'title', label: 'Товар', sortable: false }],
+        rows: [{ title: 'Товары не найдены' }],
+      }) : emptyState('Товары не найдены', 'Измените поиск или добавьте товар на склад.');
     host.querySelectorAll('[data-consumable-pick]').forEach(node =>
       node.addEventListener('click', () => {
         const itemId = node.dataset.consumablePick;
@@ -231,7 +258,7 @@ export async function openProcedureConsumables(procedureId, onSaved = () => {}) 
     openConsumablePicker(new Set(rows.map(row => String(row.itemId))), item => {
       rows.push(item);
       render();
-    });
+    }, { anchor: add });
   });
   save?.addEventListener('click', async () => {
     if (saving) return;

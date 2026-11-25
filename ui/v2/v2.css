@@ -728,26 +728,26 @@
 /* Desktop document list uses the existing X portal and compact table.
    Do not change Mobile document tiles or already accepted X menus. */
 @media (min-width:768px) and (min-height:600px){
- .v2-app--workspace>.v2-layer-portal>.v2-layer-backdrop>.v2-layer--bottom.people-documents-popup{
+ .v2-app--workspace>.v2-layer-portal>.v2-layer-backdrop>.v2-layer--bottom:is(.people-documents-popup,.desktop-table-popup){
    border-radius:14px;padding:12px;width:min(520px,calc(100% - 16px));
    box-shadow:0 8px 24px rgba(0,0,0,.18);animation:v2-desktop-documents-in .16s ease-out both
  }
- .v2-app--workspace>.v2-layer-portal.is-anchored>.v2-layer-backdrop>.v2-layer--bottom.people-documents-popup{width:var(--v2-anchor-width);max-height:var(--v2-anchor-max-height)}
- .v2-app--workspace .people-documents-popup>.v2-layer__gesture-zone{display:none}
- .v2-app--workspace .people-documents-popup .ui-data-table--compact{border-radius:10px;overflow:hidden}
- .v2-app--workspace .people-documents-popup .ui-data-table--compact table{width:100%;table-layout:fixed;border-collapse:collapse}
- .v2-app--workspace .people-documents-popup .ui-data-table--compact th{background:#E0D6D6;color:#41484F;font-size:12px;font-weight:750}
- .v2-app--workspace .people-documents-popup .ui-data-table--compact :is(th,td){box-sizing:border-box;padding:8px 10px;vertical-align:middle;text-align:left}
- .v2-app--workspace .people-documents-popup .ui-data-table--compact td{height:44px;font-size:13px;color:#41484F}
- .v2-app--workspace .people-documents-popup .ui-data-table--compact :is(th,td)[data-table-column="icon"]{width:38px;text-align:center;padding:4px}
- .v2-app--workspace .people-documents-popup .ui-data-table--compact :is(th,td)[data-table-column="date"]{width:88px;white-space:nowrap;font-variant-numeric:tabular-nums;text-align:right}
- .v2-app--workspace .people-documents-popup .ui-data-table--compact :is(th,td)[data-table-column="status"]{width:44px;text-align:center;padding:4px}
- .v2-app--workspace .people-documents-popup .document-tile__status-mark{margin:auto}
- .v2-app--workspace .people-documents-popup td[data-table-column="title"]{overflow-wrap:anywhere;line-height:1.25}
- .v2-app--workspace>.v2-layer-portal>.v2-layer-backdrop>.v2-layer--bottom.people-documents-popup.is-dismissing{animation:none;opacity:0;transform:translateY(-4px);transition:opacity .15s ease,transform .15s ease}
+ .v2-app--workspace>.v2-layer-portal.is-anchored>.v2-layer-backdrop>.v2-layer--bottom:is(.people-documents-popup,.desktop-table-popup){width:var(--v2-anchor-width);max-height:var(--v2-anchor-max-height)}
+ .v2-app--workspace :is(.people-documents-popup,.desktop-table-popup)>.v2-layer__gesture-zone{display:none}
+ .v2-app--workspace :is(.people-documents-popup,.desktop-table-popup) .ui-data-table--compact{border-radius:10px;overflow:hidden}
+ .v2-app--workspace :is(.people-documents-popup,.desktop-table-popup) .ui-data-table--compact table{width:100%;table-layout:fixed;border-collapse:collapse}
+ .v2-app--workspace :is(.people-documents-popup,.desktop-table-popup) .ui-data-table--compact th{background:#E0D6D6;color:#41484F;font-size:12px;font-weight:750}
+ .v2-app--workspace :is(.people-documents-popup,.desktop-table-popup) .ui-data-table--compact :is(th,td){box-sizing:border-box;padding:8px 10px;vertical-align:middle;text-align:left}
+ .v2-app--workspace :is(.people-documents-popup,.desktop-table-popup) .ui-data-table--compact td{height:44px;font-size:13px;color:#41484F}
+ .v2-app--workspace :is(.people-documents-popup,.desktop-table-popup) .ui-data-table--compact :is(th,td)[data-table-column="icon"]{width:38px;text-align:center;padding:4px}
+ .v2-app--workspace :is(.people-documents-popup,.desktop-table-popup) .ui-data-table--compact :is(th,td)[data-table-column="date"]{width:88px;white-space:nowrap;font-variant-numeric:tabular-nums;text-align:right}
+ .v2-app--workspace :is(.people-documents-popup,.desktop-table-popup) .ui-data-table--compact :is(th,td)[data-table-column="status"]{width:44px;text-align:center;padding:4px}
+ .v2-app--workspace :is(.people-documents-popup,.desktop-table-popup) .document-tile__status-mark{margin:auto}
+ .v2-app--workspace :is(.people-documents-popup,.desktop-table-popup) td[data-table-column="title"]{overflow-wrap:anywhere;line-height:1.25}
+ .v2-app--workspace>.v2-layer-portal>.v2-layer-backdrop>.v2-layer--bottom:is(.people-documents-popup,.desktop-table-popup).is-dismissing{animation:none;opacity:0;transform:translateY(-4px);transition:opacity .15s ease,transform .15s ease}
 }
 @keyframes v2-desktop-documents-in{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
-@media (prefers-reduced-motion:reduce){.v2-app--workspace .people-documents-popup{animation:none!important;transition:none!important}}
+@media (prefers-reduced-motion:reduce){.v2-app--workspace :is(.people-documents-popup,.desktop-table-popup){animation:none!important;transition:none!important}}
 
 /* All deletion confirmations: safe action first, destructive action second.
    Keep the Mobile sheet geometry; Desktop confirmations are centered on a
@@ -987,4 +987,18 @@
  .v2-app--workspace .service-consumables-q .service-consumable-empty-row .ui-list__title{color:var(--text-secondary);font-weight:400}
  .v2-app--workspace .service-consumables-q [data-procedure-consumable-cost]:not([hidden]){margin:8px 0 0}
  .v2-app--workspace .service-consumables-q [data-procedure-consumable-cost][hidden]{display:none!important}
+}
+
+/* Shared compact anchored table picker: search and explicit close stay above
+   the scrolling result list, the same compact table geometry as documents. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace>.v2-layer-portal.is-anchored>.v2-layer-backdrop[data-v2-x-role="picker"]:has(>.desktop-table-popup){background:transparent}
+ .v2-app--workspace .desktop-table-popup .desktop-table-picker-tools{display:flex;align-items:center;gap:8px;position:sticky;top:0;z-index:2;background:var(--v2-inner-surface,#F5F5F3);padding-bottom:8px}
+ .v2-app--workspace .desktop-table-popup .desktop-table-picker-tools>.field{flex:1 1 auto;min-width:0;margin:0}
+ .v2-app--workspace .desktop-table-popup .desktop-table-picker-tools>.ui-compact-button{flex:0 0 var(--ui-compact-size);align-self:flex-end;margin-bottom:5px}
+ .v2-app--workspace .desktop-table-popup .ui-data-table--compact td:has(>.desktop-table-picker-item){padding:0}
+ .v2-app--workspace .desktop-table-popup .desktop-table-picker-item{box-sizing:border-box;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;min-height:44px;width:100%;padding:4px 10px!important;cursor:pointer;font-size:13px;line-height:16px}
+ .v2-app--workspace .desktop-table-popup .desktop-table-picker-item>strong{font-weight:500;overflow-wrap:anywhere;text-align:left}
+ .v2-app--workspace .desktop-table-popup .desktop-table-picker-item>small{font-size:11px;color:var(--text-secondary);overflow-wrap:anywhere;text-align:left}
+ .v2-app--workspace .desktop-table-popup .desktop-table-picker-item:is(:hover,:focus-visible){background:var(--surface-soft)}
 }
