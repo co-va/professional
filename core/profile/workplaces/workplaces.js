@@ -1,4 +1,4 @@
-import { actionBlock, button, collectLinks, colorPicker, escapeHtml, field, initColorPickers, initLinks, initTimePickers, links, mountModal, modal, phoneField, select, textareaField, timePicker } from '../../../ui/ui.js';
+import { actionBlock, button, compactButton, openNotice, collectLinks, colorPicker, escapeHtml, field, initColorPickers, initLinks, initTimePickers, links, mountModal, modal, phoneField, select, textareaField, timePicker } from '../../../ui/ui.js';
 import { compactCheck } from '../../../ui/selection/check-list.js';
 import { moveDesktopQTool, pinDesktopQDanger } from '../../../ui/v2/z-layout.js';
 import { isV2DesktopWorkspace } from '../../../ui/v2/geometry.js';
@@ -62,6 +62,21 @@ export function workplaceForm(existing=null){
     <input type="hidden" name="workplaceCardAppearance" value="${escapeHtml(JSON.stringify(w.cardAppearance||{}))}">
     <input type="hidden" name="visibleInPublicBooking" value="${w.visibleInPublicBooking===false?'false':'true'}">
     ${photoFields}
+    ${bookingRules ? `<input type="hidden" name="workplaceAllowCancellation" value="${bookingRules.allowClientCancellation?'true':'false'}">
+      <input type="hidden" name="workplaceAllowRescheduling" value="${bookingRules.allowClientRescheduling?'true':'false'}">` : ''}
+    <div class="workplace-booking-top">
+      <div class="workplace-booking-first">
+        ${compactCheck({label:'Онлайн-запись',checked:w.visibleInPublicBooking!==false,data:'data-workplace-public-booking-visibility'})}
+        ${bookingRules ? `<div class="workplace-booking-step">
+          <span>Шаг записи</span>${select({name:'workplaceBookingSlotStep',aria:'Шаг записи',value:String(bookingRules.preferredSlotStep),options:BOOKING_SLOT_STEPS.map(step=>({value:String(step),label:step+' мин'}))})}
+          ${compactButton({kind:'info',data:'data-workplace-booking-info',aria:'О шаге записи'})}
+        </div>` : ''}
+      </div>
+      ${bookingRules ? `<div class="workplace-booking-checks">
+        ${compactCheck({label:'Отмена записи',checked:bookingRules.allowClientCancellation,data:'data-workplace-booking-cancel'})}
+        ${compactCheck({label:'Перенос записи',checked:bookingRules.allowClientRescheduling,data:'data-workplace-booking-reschedule'})}
+      </div>` : ''}
+    </div>
     ${field({label:'Название',name:'workplaceName',value:w.name,placeholder:'Название рабочего пространства',required:true})}
     ${select({label:'Город *',name:'workplaceCity',value:w.city||'',options:cities,placeholder:'Город',searchable:true,allowCustom:false})}
     ${field({label:'Адрес',name:'workplaceAddress',value:w.address,placeholder:'Адрес'})}
@@ -69,22 +84,6 @@ export function workplaceForm(existing=null){
     ${scheduleField}
     ${select({label:'Валюта',name:'workplaceCurrency',value:w.currency||defaults.currency||'',options:currencies})}
     ${colorField}
-    <div class="workplace-form__visibility">
-      ${compactCheck({
-        label:'Онлайн-запись',
-        checked:w.visibleInPublicBooking!==false,
-        data:'data-workplace-public-booking-visibility',
-      })}
-    </div>
-    ${bookingRules ? `<div class="form-grid" data-workplace-booking-rules>
-      <strong>Правила онлайн-записи</strong>
-      ${select({label:'Шаг времени записи',name:'workplaceBookingSlotStep',value:String(bookingRules.preferredSlotStep),options:BOOKING_SLOT_STEPS.map(step=>({value:String(step),label:step+' мин'}))})}
-      <input type="hidden" name="workplaceAllowCancellation" value="${bookingRules.allowClientCancellation?'true':'false'}">
-      ${compactCheck({label:'Разрешить отмену записи',checked:bookingRules.allowClientCancellation,data:'data-workplace-booking-cancel'})}
-      <input type="hidden" name="workplaceAllowRescheduling" value="${bookingRules.allowClientRescheduling?'true':'false'}">
-      ${compactCheck({label:'Разрешить перенос записи',checked:bookingRules.allowClientRescheduling,data:'data-workplace-booking-reschedule'})}
-      <small class="muted">Правила сохраняются для этого пространства. Применение в клиентской записи ещё не подключено.</small>
-    </div>` : ''}
     ${links({links:w.links||[],name:'workplace-links',label:'Ссылки',compact:true,addInHeader:true})}
     ${textareaField({label:'О рабочем пространстве',name:'workplaceAbout',value:w.about||'',placeholder:'Коротко о рабочем пространстве'})}
     <div class="form-error" data-workplace-error></div>
@@ -113,7 +112,7 @@ function collectWorkplaceForm(root,existing){
   const profile=getProfile();
   return {
     valid:Boolean(name&&city&&color),
-    bookingRules:form.querySelector('[data-workplace-booking-rules]')?normalizeWorkplaceBookingRules({
+    bookingRules:data.has('workplaceBookingSlotStep')?normalizeWorkplaceBookingRules({
       preferredSlotStep:Number(data.get('workplaceBookingSlotStep')),
       allowClientCancellation:data.get('workplaceAllowCancellation')==='true',
       allowClientRescheduling:data.get('workplaceAllowRescheduling')==='true',
@@ -176,6 +175,10 @@ export function bindWorkplaceForm(root,existing=null,{onSaved=()=>{},onDeleted=(
     form.querySelector(selector)?.addEventListener('change',event=>setWorkplaceDraft(root,name,event.currentTarget.checked?'true':'false'));
   }
 
+  form.querySelector('[data-workplace-booking-info]')?.addEventListener('click',()=>{
+    openNotice({title:'Шаг записи',message:'0 мин — предложения по целым часам; 15 мин — через 15 минут; 30 мин — через 30 минут. После занятого времени допускается запись сразу после окончания предыдущей либо через выбранный шаг (для 0 — через час). Обязательного перерыва нет. Применение в клиентской записи ещё не подключено.',action:'Закрыть'});
+  });
+
   const primary=root.querySelector('[data-workplace-primary]');
   const primaryActions=primary?.closest('.modal-actions');
   if(isV2DesktopWorkspace(root.closest('[data-v2-app]'))){
@@ -183,16 +186,6 @@ export function bindWorkplaceForm(root,existing=null,{onSaved=()=>{},onDeleted=(
       form.id ||= 'workplace-data-'+crypto.randomUUID();
       primary.setAttribute('form',form.id);
       moveDesktopQTool(primary);
-    }
-    // Same compact checkbox and toolbar placement as the Service workplace Q.
-    // Its change listener already updates the hidden field inside the form.
-    const toolbar=root.querySelector('[data-v2-q-header-content] > .desktop-q-toolbar');
-    const visibility=form.querySelector('.workplace-form__visibility');
-    const online=visibility?.querySelector('.ui-compact-check');
-    if(toolbar&&online){
-      online.classList.add('desktop-q-online-booking');
-      toolbar.prepend(online);
-      if(!visibility.children.length)visibility.remove();
     }
     const remove=root.querySelector('[data-delete-workplace-form]');
     const body=form.closest('[data-v2-q-body]');

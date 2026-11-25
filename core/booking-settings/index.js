@@ -3,7 +3,16 @@ import { apiRequest } from '../auth.js';
 
 let bookingSettingsState = null;
 
-export const BOOKING_SLOT_STEPS = Object.freeze([5, 10, 15, 30, 60]);
+export const BOOKING_SLOT_STEPS = Object.freeze([0, 15, 30]);
+
+function normalizePreferredStep(value, fallback = 15) {
+  if (value === null || value === undefined || value === '') return fallback;
+  const step = Number(value);
+  if (BOOKING_SLOT_STEPS.includes(step)) return step;
+  if (step === 60) return 0;
+  if (step === 5 || step === 10) return 15;
+  return fallback;
+}
 
 export const DEFAULT_BOOKING_SETTINGS = Object.freeze({
   welcomeTitle: 'Рады видеть вас',
@@ -20,7 +29,7 @@ export const DEFAULT_BOOKING_SETTINGS = Object.freeze({
 export function normalizeWorkplaceBookingRules(value = {}, fallback = DEFAULT_BOOKING_SETTINGS) {
   const source = value && typeof value === 'object' ? value : {};
   return {
-    preferredSlotStep: BOOKING_SLOT_STEPS.includes(Number(source.preferredSlotStep)) ? Number(source.preferredSlotStep) : fallback.preferredSlotStep,
+    preferredSlotStep: normalizePreferredStep(source.preferredSlotStep,normalizePreferredStep(fallback.preferredSlotStep)),
     allowClientCancellation: typeof source.allowClientCancellation === 'boolean' ? source.allowClientCancellation : fallback.allowClientCancellation === true,
     allowClientRescheduling: typeof source.allowClientRescheduling === 'boolean' ? source.allowClientRescheduling : fallback.allowClientRescheduling === true,
   };
@@ -35,8 +44,7 @@ export function normalizeBookingSettings(value = {}) {
     // Active booking remains unchanged until the server and User honor the preferences.
     // Public booking continues to use natural starts.
     slotStep: 0,
-    preferredSlotStep: BOOKING_SLOT_STEPS.includes(Number(source.preferredSlotStep))
-      ? Number(source.preferredSlotStep) : defaults.preferredSlotStep,
+    preferredSlotStep: normalizePreferredStep(source.preferredSlotStep,defaults.preferredSlotStep),
     allowClientCancellation: source.allowClientCancellation === true,
     allowClientRescheduling: source.allowClientRescheduling === true,
     // Keep the same server-owned operational dataset; no local shadow store.

@@ -16,3 +16,11 @@
 
 /* Independent controls must never visually touch the destructive action. */
 .service-workplace-add-panel{margin-top:16px;margin-bottom:16px}
+
+/* Workplace Q: no standalone rules section; shared controls at the top. */
+.workplace-booking-top{display:grid;gap:8px;min-width:0}
+.workplace-booking-first,.workplace-booking-checks{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px 12px;min-width:0}
+.workplace-booking-step{display:flex;align-items:center;gap:6px;min-width:0;flex:0 0 auto}
+.workplace-booking-step>span{font-size:13px;font-weight:600;white-space:nowrap}
+.workplace-booking-step .ui-select{width:86px;min-width:86px;max-width:86px;margin:0}
+.workplace-booking-step .ui-select__control{min-width:0}
