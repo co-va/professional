@@ -1,4 +1,5 @@
 import {
+  button,
   emptyState,
   initViewNavigation,
   openSharedProfileSettingsMenu,
@@ -14,6 +15,7 @@ import { openServiceGroupingQ } from './catalog-grouping.js';
 import { hasCurrentProceduresSnapshot } from './procedures/data.js';
 import { loadInventory } from '../inventory/service.js';
 import { serviceHeaderContext, notifyServiceContext } from './context.js';
+import { isV2DesktopWorkspace } from '../../ui/v2/geometry.js';
 
 const views = [
   { id: 'procedures', label: 'Услуги' },
@@ -40,10 +42,8 @@ function loadProductsModule() {
   return productsModulePromise;
 }
 
-function openServiceSettings(root, rerender) {
-  return openSharedProfileSettingsMenu({
-    title: 'Настройки',
-    actions: [
+function serviceSettingsActions(root, rerender) {
+  return [
       {
         id: 'appearance',
         label: 'Вид',
@@ -69,8 +69,7 @@ function openServiceSettings(root, rerender) {
           }
         },
       },
-    ],
-  });
+  ];
 }
 
 export function renderService(root, navigateBack = () => {}) {
@@ -85,15 +84,18 @@ export function renderService(root, navigateBack = () => {}) {
     disposeCatalog = () => {};
     const view = views.some((item) => item.id === activeView) ? activeView : 'procedures';
 
+    const desktop = isV2DesktopWorkspace(root.closest('[data-v2-app]'));
+    const actions = serviceSettingsActions(root, renderCurrent);
+    const addAria = view === 'products' ? 'Добавить товар' : 'Добавить услугу';
     root.innerHTML = page([
       serviceHeaderContext({
         title: 'Сервис',
-        settingsData: 'data-service-settings',
+        settingsData: desktop ? '' : 'data-service-settings',
         settingsAria: 'Настройки сервиса',
-        c: {
+        c: desktop ? null : {
           label: '+',
           data: 'data-service-add',
-          aria: view === 'products' ? 'Добавить товар' : 'Добавить услугу',
+          aria: addAria,
         },
       }),
       '<div data-service-catalog></div>',
@@ -103,14 +105,25 @@ export function renderService(root, navigateBack = () => {}) {
     // Use the same stationary Z header slot as Inventory; do not alter Shared
     // surface geometry or introduce a second header inside the Z body.
     const navMarkup = viewNavigation({ views, activeView: view, ariaLabel: 'Сервис' });
-    const headerRows = setV2ZHeaderRows(root, [navMarkup]);
+    const toolbar = desktop ? `<div class="v2-desktop-tool-row" data-service-desktop-toolbar>
+      <div class="v2-desktop-tool-actions">
+        ${navMarkup}
+        ${actions.map(action => button(action.label, { variant: 'secondary', data: `data-service-tool="${action.id}"` })).join('')}
+        ${button('<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>', { variant: 'secondary', className: 'v2-desktop-tool-primary', data: 'data-service-add', aria: addAria })}
+      </div>
+    </div>` : navMarkup;
+    const headerRows = setV2ZHeaderRows(root, [toolbar]);
     const navigationRoot = headerRows[0] || root;
     if (!headerRows.length) {
       // Direct-mounted previews without a Z surface retain a usable control.
-      root.querySelector('[data-service-catalog]')?.insertAdjacentHTML('beforebegin', navMarkup);
+      root.querySelector('[data-service-catalog]')?.insertAdjacentHTML('beforebegin', toolbar);
     }
 
-    root.querySelector('[data-service-settings]')?.addEventListener('click', () => openServiceSettings(root, renderCurrent));
+    root.querySelector('[data-service-settings]')?.addEventListener('click', () => openSharedProfileSettingsMenu({ title: 'Настройки', actions }));
+    navigationRoot.querySelectorAll('[data-service-tool]').forEach(control => {
+      const action = actions.find(item => item.id === control.dataset.serviceTool);
+      if (action) control.addEventListener('click', action.onSelect);
+    });
 
     initViewNavigation(navigationRoot, {
       views,
@@ -137,7 +150,7 @@ export function renderService(root, navigateBack = () => {}) {
       });
     }
 
-    root.querySelector('[data-service-add]')?.addEventListener('click', async () => {
+    (desktop ? navigationRoot : root).querySelector('[data-service-add]')?.addEventListener('click', async () => {
       const module = view === 'products' ? await loadProductsModule() : await loadProceduresModule();
       if (!root?.isConnected || version !== renderVersion) return;
       if (view === 'products') void module.openStockSaleCreate(root, { onChanged: renderCurrent });

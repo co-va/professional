@@ -772,3 +772,16 @@
    box-sizing:border-box;width:160px;min-width:0;max-width:100%;height:var(--h-tools,36px);min-height:var(--h-tools,36px);max-height:var(--h-tools,36px);margin-inline:auto 0;justify-self:end;padding:0 12px;border-width:1px;border-radius:10px;font-size:13px;line-height:1;
  }
 }
+
+/* Ordinary Desktop H tool row: same approved geometry/palette as Clients.
+   Only explicit opt-in rows use this; Mobile and Journal do not. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-desktop-tool-row{display:flex;align-items:center;justify-content:flex-end;min-width:0;min-height:var(--h-tools);gap:12px}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-desktop-tool-actions{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:8px;margin-left:auto;min-width:0}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-desktop-tool-actions>.ui-button{box-sizing:border-box;width:auto;height:var(--h-tools);min-height:var(--h-tools);max-height:var(--h-tools);padding:0 12px;margin:0;border:1px solid var(--white);border-radius:10px;background:var(--white);color:#41484F;font-size:13px;line-height:1;white-space:nowrap}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-desktop-tool-actions>.v2-desktop-tool-primary{display:grid;place-items:center;width:var(--h-tools);min-width:var(--h-tools);padding:0;background:#E0D6D6;border-color:#E0D6D6}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-desktop-tool-actions>.segment-control{box-sizing:border-box;display:flex;width:auto;min-width:0;max-width:100%;height:var(--h-tools);min-height:var(--h-tools);margin:0;padding:0;gap:0;border:1px solid var(--white);border-radius:10px;background:transparent;overflow:hidden}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-desktop-tool-actions>.segment-control>button{box-sizing:border-box;flex:0 0 auto;width:auto;height:100%;min-height:0;margin:0;padding:0 14px;border:0;border-radius:0;background:transparent;color:var(--white);font-size:13px;white-space:nowrap}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-desktop-tool-actions>.segment-control>button.is-active{background:#E0D6D6;color:#41484F}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-desktop-tool-actions :is(.ui-button,.segment-control>button):focus-visible{outline:2px solid var(--white);outline-offset:-3px}
+}
