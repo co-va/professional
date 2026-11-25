@@ -145,3 +145,8 @@
 .notification-variables{display:grid;gap:8px}
 .notification-variable-chips{display:flex;gap:6px;flex-wrap:wrap}
 .notification-variable-chips .ui-button{font-weight:500}
+
+/* Mobile keeps its Z editor; the same variable tools and master control work in it. */
+.notification-mobile-master{display:flex;align-items:center;margin-bottom:12px}
+.notification-mobile-master .ui-compact-check__label{font-weight:700}
+.notification-editor-z .notification-variable-chips .ui-button{color:var(--text);background:var(--white);border-color:var(--border)}

@@ -217,16 +217,13 @@ function editorSignature(form) {
 }
 
 function editorMarkup(event, current) {
-  const variableText = (Array.isArray(event.variables) ? event.variables : [])
-    .map((value) => `{{${escapeHtml(value)}}}`)
-    .join(', ');
   return `${workspaceHeaderContext({ title: event.title })}
     ${v2Section('Предпросмотр', previewMarkup(current.titleTemplate, current.bodyTemplate))}
     ${v2Section('Сообщение', `
       <form class="form-grid" data-notification-policy-form>
         ${field({ label: 'Заголовок сообщения', name: 'titleTemplate', value: current.titleTemplate, required: true })}
         ${textareaField({ label: 'Текст сообщения', name: 'bodyTemplate', value: current.bodyTemplate, rows: 7, required: true })}
-        ${variableText ? `<div class="muted">Доступно: ${variableText}</div>` : ''}
+        ${notificationVariableMarkup(event)}
         <div class="muted" data-notification-editor-status aria-live="polite"></div>
         <button type="button" class="v2-workspace-source-hidden" data-v2-primary-action data-v2-primary-label="Сохранить" data-v2-primary-visible="false" aria-label="Сохранить сообщение">Сохранить</button>
       </form>
@@ -261,6 +258,7 @@ function openEditor(root, routing, event) {
   };
 
   form?.addEventListener('input', redraw);
+  if(form) bindNotificationVariables(form, redraw);
   primary?.addEventListener('click', () => form?.requestSubmit());
   form?.addEventListener('submit', async (submitEvent) => {
     submitEvent.preventDefault();
@@ -292,6 +290,28 @@ const VARIABLE_LABELS = Object.freeze({
   investment:'Название инвестиции', status:'Статус участия',
   'person.name':'Имя клиента', 'person.surname':'Фамилия клиента',
 });
+
+function notificationVariableMarkup(event) {
+  const variables=Array.isArray(event.variables)?event.variables:[];
+  return variables.length?`<div class="notification-variables"><small>Подставить данные в заголовок или текст</small><div class="notification-variable-chips">${variables.map(key=>`<button type="button" class="settings-outline-action ui-button" data-notification-variable="${escapeHtml(key)}" title="${escapeHtml('{{'+key+'}}')}">${escapeHtml(VARIABLE_LABELS[key]||key)}</button>`).join('')}</div><small>Выберите поле и нажмите нужную переменную. При отправке она заменится фактическими данными.</small></div>`:'';
+}
+
+function bindNotificationVariables(form, redraw) {
+  const title=form.elements.titleTemplate;
+  const body=form.elements.bodyTemplate;
+  let active=body;
+  [title,body].forEach(input=>input.addEventListener('focus',()=>{active=input;}));
+  form.querySelectorAll('[data-notification-variable]').forEach(control=>{
+    control.addEventListener('pointerdown',event=>event.preventDefault());
+    control.addEventListener('click',()=>{
+      const token='{{'+control.dataset.notificationVariable+'}}';
+      const start=active.selectionStart??active.value.length,end=active.selectionEnd??start;
+      active.setRangeText(token,start,end,'end');
+      active.focus({preventScroll:true});
+      redraw();
+    });
+  });
+}
 
 function desktopGroups(catalog) {
   const groups = new Map(['Запись','Финансы','Лояльность','Документы и согласия'].map(name=>[name,[]]));
@@ -325,7 +345,6 @@ function desktopCatalogMarkup(catalog,routing) {
 
 function desktopEditor(panel,event,routing,close) {
   const current=policyFor(routing,event);
-  const variables=Array.isArray(event.variables)?event.variables:[];
   panel.innerHTML=`<form class="form-grid" data-notification-policy-form>
     <div class="notification-editor-heading"><strong>${escapeHtml(event.title)}</strong><div class="notification-editor-actions">
       ${button('Сохранить',{type:'submit',className:'settings-h-action',data:'data-notification-editor-save hidden'})}
@@ -334,7 +353,7 @@ function desktopEditor(panel,event,routing,close) {
     <div class="notification-editor-columns"><div class="form-grid">
       ${field({label:'Заголовок',name:'titleTemplate',value:current.titleTemplate,required:true})}
       ${textareaField({label:'Текст',name:'bodyTemplate',value:current.bodyTemplate,rows:5,required:true})}
-      ${variables.length?`<div class="notification-variables"><small>Подставить данные в заголовок или текст</small><div class="notification-variable-chips">${variables.map(key=>`<button type="button" class="settings-outline-action ui-button" data-notification-variable="${escapeHtml(key)}" title="${escapeHtml('{{'+key+'}}')}">${escapeHtml(VARIABLE_LABELS[key]||key)}</button>`).join('')}</div><small>Выберите поле и нажмите нужную переменную. При отправке она заменится фактическими данными.</small></div>`:''}
+      ${notificationVariableMarkup(event)}
       <div class="muted" data-notification-editor-status aria-live="polite"></div>
     </div><div class="notification-editor-preview"><strong>Предпросмотр</strong><small>Пример сообщения</small>${previewMarkup(current.titleTemplate,current.bodyTemplate)}</div></div>
   </form>`;
@@ -344,26 +363,14 @@ function desktopEditor(panel,event,routing,close) {
   const save=form.querySelector('[data-notification-editor-save]');
   const preview=form.querySelector('[data-notification-preview]');
   const status=form.querySelector('[data-notification-editor-status]');
-  let baseline=editorSignature(form),active=body,busy=false;
+  let baseline=editorSignature(form),busy=false;
   const redraw=()=>{
     preview.innerHTML=messageBubble({direction:'outbound',body:[renderTemplate(title.value),renderTemplate(body.value)].filter(Boolean).join('\n\n')},{viewer:'profile'});
     save.hidden=editorSignature(form)===baseline;
     save.disabled=busy;
   };
-  [title,body].forEach(input=>input.addEventListener('focus',()=>{active=input;}));
   form.addEventListener('input',redraw);
-  form.querySelectorAll('[data-notification-variable]').forEach(control=>{
-    control.addEventListener('pointerdown',event=>event.preventDefault());
-    control.addEventListener('click',()=>{
-      const key=control.dataset.notificationVariable;
-      if(!variables.includes(key))return;
-      const token='{{'+key+'}}';
-      const start=active.selectionStart??active.value.length,end=active.selectionEnd??start;
-      active.setRangeText(token,start,end,'end');
-      active.focus({preventScroll:true});
-      redraw();
-    });
-  });
+  bindNotificationVariables(form,redraw);
   form.querySelector('[data-notification-editor-close]').addEventListener('click',close);
   form.addEventListener('submit',async e=>{
     e.preventDefault();
@@ -406,13 +413,7 @@ function bindDesktopEditors(root,host,catalog,routing) {
 }
 
 function groupedEvents(catalog = []) {
-  const groups = new Map();
-  for (const event of Array.isArray(catalog) ? catalog : []) {
-    const group = text(event?.group) || 'Другие';
-    if (!groups.has(group)) groups.set(group, []);
-    groups.get(group).push(event);
-  }
-  return groups;
+  return new Map(desktopGroups(Array.isArray(catalog)?catalog:[]));
 }
 
 function eventRow(event, policy) {
@@ -430,15 +431,7 @@ function allEventsEnabled(catalog, routing) {
 }
 
 function serviceControlMarkup(catalog, routing) {
-  return v2Section('Сервисные уведомления', `<div class="app-notification-list">
-    <div class="app-notification-row">
-      ${compactCheck({checked: allEventsEnabled(catalog, routing), data: 'data-notification-service-enabled', aria: 'Все сервисные уведомления'})}
-      <span>
-        <strong>Все сервисные уведомления</strong>
-        <small>Включить или выключить весь список</small>
-      </span>
-    </div>
-  </div>`);
+  return `<div class="notification-mobile-master">${compactCheck({label:'Сервисные уведомления',checked:allEventsEnabled(catalog,routing),data:'data-notification-service-enabled',aria:'Все сервисные уведомления'})}</div>`;
 }
 
 function catalogMarkup(catalog, routing) {
