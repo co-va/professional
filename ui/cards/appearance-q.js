@@ -75,18 +75,18 @@ export function openEntityCardAppearanceQ(root, {
       data: 'data-card-q-save',
       aria: 'Сохранить вид карты',
     });
-    const selectors = `<div class="entity-card-appearance-q__selectors">${typeSelector}${targetSelector}</div>`;
+    const selectors = `<div class="entity-card-appearance-q__selectors"${desktop ? ' data-desktop-q-secondary-tools data-v2-layer-gesture-ignore' : ''}>${typeSelector}${targetSelector}</div>`;
     if (desktop) {
       // The shared Q reserves the title/close line even without a title.
-      // Save is in the standard tools line; the selector pair starts the body.
-      headerHost.innerHTML = `<div class="desktop-q-toolbar" data-v2-layer-gesture-ignore>${actionBlock(saveMarkup, { className: 'desktop-q-action-slot' })}</div>`;
-      host.innerHTML = `${selectors}<div data-entity-card-appearance-constructor></div>`;
+      // Save and selectors occupy fixed tool rows above the sole body constructor.
+      headerHost.innerHTML = `<div class="desktop-q-toolbar" data-v2-layer-gesture-ignore>${actionBlock(saveMarkup, { className: 'desktop-q-action-slot' })}</div>${selectors}`;
+      host.innerHTML = '<div data-entity-card-appearance-constructor></div>';
     } else {
       headerHost.innerHTML = typeSelector || targetSelector ? selectors : '';
       host.innerHTML = `<div data-entity-card-appearance-constructor></div>${actionBlock(saveMarkup)}`;
     }
 
-    const selectorHost = desktop ? host : headerHost;
+    const selectorHost = headerHost;
     selectorHost.querySelector('[name="entityCardAppearanceType"]')?.addEventListener('change', (event) => {
       type = String(event.target.value || '');
       target = String(defaultTarget(type) || 'all');
