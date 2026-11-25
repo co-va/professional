@@ -964,3 +964,14 @@
  .v2-app--workspace .desktop-service-groups-q [data-service-group-value-list]>.ui-list--dense.list-entries{box-sizing:border-box;border-radius:var(--radius-control,14px);min-height:0;height:auto;gap:0;padding:0;margin:0}
  .v2-app--workspace .desktop-service-groups-q [data-service-group-value-list] .ui-list__item.desktop-group-empty-row{height:44px;min-height:44px;max-height:44px;padding:4px 12px;flex:0 0 44px}
 }
+
+/* Shared Service Z2: the existing visual card and workplace mini-cards
+   start on the same line, aligned at the H origin. The statistics column
+   wraps independently; it never pushes the main card or centres the rail. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace .service-desktop-overview-cards{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:flex-start;gap:16px;width:100%;min-width:0}
+ .v2-app--workspace .service-desktop-overview-cards>.entity-visual-card{flex:0 0 min(338px,100%);width:min(338px,100%);max-width:338px;margin:0}
+ .v2-app--workspace .service-desktop-workplace-cards{display:flex;flex:1 1 290px;min-width:min(290px,100%);flex-wrap:wrap;gap:12px;align-items:flex-start;justify-content:flex-start}
+ .v2-app--workspace .service-desktop-workplace-cards>.mini-card{flex:0 0 min(var(--mini-card-width),100%);width:min(var(--mini-card-width),100%);margin:0;box-shadow:none;color:#111}
+ .v2-app--workspace .service-desktop-workplace-cards :is(.mini-card__row-label,.mini-card__row-value){color:#111}
+}

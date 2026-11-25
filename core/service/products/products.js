@@ -13,12 +13,10 @@ import {
   initCostFields,
   initV2ListReorder,
   miniCard,
-  miniCardRail,
   modal,
   mountModal,
   openNotice,
   mountV2ZLayer,
-  page,
   setSharedProfilePrimary,
   textareaField,
   v2ListEntries,
@@ -27,7 +25,7 @@ import {
   workplaceCountText,
 } from '../../../ui/ui.js';
 import { getWorkplaces } from '../../profile/workplaces/data.js';
-import { serviceHeaderContext, notifyServiceContext } from '../context.js';
+import { renderServiceOverviewLayout, notifyServiceContext } from '../context.js';
 import { bindServiceWorkplaceAssignments, serviceWorkplaceAssignmentList, serviceWorkplaceAddButton } from '../workplace-selection.js';
 import { setSharedActionVisible } from '../../../ui/page/page.js';
 import { compactCheck } from '../../../ui/selection/check-list.js';
@@ -138,7 +136,7 @@ function productWorkplaceCards(product, statistics = null) {
       ],
     });
   });
-  return cards.length ? miniCardRail(cards) : '';
+  return cards;
 }
 
 function confirmDeleteProduct(product, onDeleted) {
@@ -531,11 +529,11 @@ function renderProductOverview(layer, baseRoot, id, { onChanged = () => {}, stat
     return;
   }
   layer.dataset.serviceOverview = 'product:' + id;
-  layer.innerHTML = page([
-    serviceHeaderContext({ title: product.name || 'Товар' }),
-    productOverviewCard(product, statistics),
-    productWorkplaceCards(product, statistics),
-  ]);
+  renderServiceOverviewLayout(layer, {
+    title: product.name || 'Товар',
+    card: productOverviewCard(product, statistics),
+    workplaceCards: productWorkplaceCards(product, statistics),
+  });
   layer.querySelector('[data-product-open-editor]')?.addEventListener('click', () => {
     openProductEditor(baseRoot, product, {
       onSaved: (saved) => {

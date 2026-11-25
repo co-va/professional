@@ -8,19 +8,17 @@ import {
   escapeHtml,
   initV2ListReorder,
   miniCard,
-  miniCardRail,
   modal,
   mountModal,
   openNotice,
   mountV2ZLayer,
-  page,
   v2ListEntries,
   v2ListEntry,
   v2ZLayer,
   workplaceCountText,
 } from '../../../ui/ui.js';
 import { getWorkplaces } from '../../profile/workplaces/data.js';
-import { serviceHeaderContext, notifyServiceContext } from '../context.js';
+import { renderServiceOverviewLayout, notifyServiceContext } from '../context.js';
 import { procedureCardAppearance, procedureCardFields, procedureCardPhoto } from '../card-presentation.js';
 import { bindProcedureEditor, initialProcedure, procedureEditorForm } from './form.js';
 import { serviceWorkplaceAddButton } from '../workplace-selection.js';
@@ -108,7 +106,7 @@ function procedureWorkplaceCards(procedure, statistics = null) {
       ],
     });
   });
-  return cards.length ? miniCardRail(cards) : '';
+  return cards;
 }
 
 function confirmDeleteProcedure(procedure, onDeleted) {
@@ -191,14 +189,12 @@ function renderProcedureOverview(layer, baseRoot, id, { onChanged = () => {}, st
     return;
   }
   layer.dataset.serviceOverview = 'procedure:' + id;
-  layer.innerHTML = page([
-    serviceHeaderContext({ title: procedure.name || 'Услуга' }),
-    procedureOverviewCard(procedure, statistics),
-    procedureWorkplaceCards(procedure, statistics),
-    '<div class="app-settings-panel">' +
-      button('Расходник', { variant: 'secondary', data: 'data-procedure-open-consumables' }) +
-    '</div>',
-  ]);
+  renderServiceOverviewLayout(layer, {
+    title: procedure.name || 'Услуга',
+    card: procedureOverviewCard(procedure, statistics),
+    workplaceCards: procedureWorkplaceCards(procedure, statistics),
+    actions: button('Расходник', { variant: 'secondary', data: 'data-procedure-open-consumables' }),
+  });
   layer.querySelector('[data-procedure-open-consumables]')?.addEventListener('click', async () => {
     const { openProcedureConsumables } = await import('./consumables.js');
     if (!layer.isConnected) return;
