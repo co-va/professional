@@ -1,5 +1,7 @@
 import { actionBlock, button, collectLinks, colorPicker, escapeHtml, field, initColorPickers, initLinks, initTimePickers, links, mountModal, modal, phoneField, select, textareaField, timePicker } from '../../../ui/ui.js';
 import { notificationSettings } from '../../../ui/settings/index.js';
+import { moveDesktopQTool, pinDesktopQDanger } from '../../../ui/v2/z-layout.js';
+import { isV2DesktopWorkspace } from '../../../ui/v2/geometry.js';
 import { getProfile } from '../data.js';
 import { deleteWorkplace as deleteWorkplaceData, getWorkplaceReferenceData, getWorkplaces, upsertWorkplace } from './data.js';
 
@@ -154,6 +156,24 @@ export function bindWorkplaceForm(root,existing=null,{onSaved=()=>{},onDeleted=(
 
   const primary=root.querySelector('[data-workplace-primary]');
   const primaryActions=primary?.closest('.modal-actions');
+  if(isV2DesktopWorkspace(root.closest('[data-v2-app]'))){
+    if(primary){
+      form.id ||= 'workplace-data-'+crypto.randomUUID();
+      primary.setAttribute('form',form.id);
+      moveDesktopQTool(primary);
+    }
+    const remove=root.querySelector('[data-delete-workplace-form]');
+    const body=form.closest('[data-v2-q-body]');
+    if(remove&&body){
+      remove.classList.remove('ui-button--critical','ui-button--delete-outline');
+      remove.classList.add('ui-button--danger');
+      const footer=body.ownerDocument.createElement('div');
+      footer.className='app-settings-panel';
+      footer.append(remove);
+      body.append(footer);
+      pinDesktopQDanger(remove);
+    }
+  }
   const initial=formSnapshot(form);
   let dirty=!existing;
 
