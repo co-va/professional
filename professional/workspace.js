@@ -9,7 +9,7 @@ import { getWorkplaceContext, setWorkplaceContext } from '../core/workplace-cont
 import { getWorkplaces } from '../core/workplace-time.js';
 import { localDateKey } from '../core/time/index.js';
 import { settingsNavigationItems, renderSettingsSection } from '../settings/settings.js';
-import { render as renderProfile, openDesktopProfileQ } from '../core/profile/profile.js';
+import { render as renderProfile } from '../core/profile/profile.js';
 import { logout } from '../core/auth.js';
 import { openAccountControlsModal } from '../core/profile/account-controls.js';
 import { getProfile } from '../core/profile/data.js';
@@ -184,8 +184,7 @@ function defaultSection() {
 function normalizeRequestedSection(section) {
   const id = String(section || '').trim();
   const wide = window.matchMedia?.(V2_DESKTOP_MEDIA).matches;
-  if (wide && id === 'profile' && sectionAllowed('workplaces')) return 'workplaces';
-  if (!wide && id === 'workplaces') return 'profile';
+  if (id === 'workplaces' && (!wide || sectionAllowed('profile'))) return 'profile';
   return id;
 }
 function activeRootSection() {
@@ -365,7 +364,7 @@ function syncWorkspaceHeader(surface) {
     desktopToolbar: true,
     desktopProfileAllowed: sectionAllowed('profile'),
     desktopWorkplacesAllowed: sectionAllowed('workplaces'),
-    desktopWorkplacesActive: root === 'workplaces' && state.activeSection !== 'chat',
+    desktopWorkplacesActive: (root === 'profile' || root === 'workplaces') && state.activeSection !== 'chat',
     desktopContext: state.activeSection === 'chat' ? 'Чат' : (root === 'workplaces' ? 'Рабочие пространства' : rootDisplayLabel(root)) + (root !== 'journal' && title && title !== rootDisplayLabel(root) ? ' / ' + title : ''),
     b: subtitle ? { label: title, subtitle } : title,
     c: cVisible ? {
@@ -399,10 +398,11 @@ function syncWorkspaceHeader(surface) {
 }
 
 function bindDesktopHeader(surface) {
+  const openProfile = () => navigate(sectionAllowed('profile') ? 'profile' : 'workplaces', { navigationOpen: false });
   const profile = app.querySelector('[data-desktop-profile]');
-  if (profile) profile.onclick = () => openDesktopProfileQ(surface, { accountEmail: authenticatedAccount?.account?.email || '', onSaved: () => syncWorkspaceHeader(surface) });
+  if (profile) profile.onclick = openProfile;
   const workplaces = app.querySelector('[data-desktop-workplaces]');
-  if (workplaces) workplaces.onclick = () => navigate('workplaces', { navigationOpen: false });
+  if (workplaces) workplaces.onclick = openProfile;
   const notice = app.querySelector('[data-desktop-notices]');
   if (notice) notice.onclick = () => openAccountControlsModal();
   const exit = app.querySelector('[data-desktop-logout]');
@@ -612,7 +612,7 @@ function renderWorkspace() {
     desktopToolbar: true,
     desktopProfileAllowed: sectionAllowed('profile'),
     desktopWorkplacesAllowed: sectionAllowed('workplaces'),
-    desktopWorkplacesActive: root === 'workplaces' && state.activeSection !== 'chat',
+    desktopWorkplacesActive: (root === 'profile' || root === 'workplaces') && state.activeSection !== 'chat',
     desktopContext: state.activeSection === 'chat' ? 'Чат' : rootDisplayLabel(root),
     b: state.activeSection === 'chat' ? 'Чат' : rootDisplayLabel(root),
     d: sectionAllowed('chat') ? { kind: 'chat', data: 'data-v2-workspace-chat', aria: 'Чат' } : null,
