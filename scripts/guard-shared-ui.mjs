@@ -232,7 +232,12 @@ assert(['repeated-fields/index.js','links/index.js','tags/index.js','workplaces/
 
 assert(inputs.includes('.array-group[data-repeated-add-placement="header"] .array-group__header{display:flex;align-items:center;justify-content:space-between'), 'Repeated-field add buttons must remain right-aligned');
 assert(list.includes('min-height:78px'), 'V2 list entry geometry changed');
-assert(count(list, '.list-entry{') === 1, 'V2 list entry geometry must have one owner');
+// The exact base selector has one owner. A scoped Desktop H adaptation
+// in the same stylesheet is not a second unscoped list component.
+const baseListRuleCount = source => (source.replace(/\/\*[\s\S]*?\*\//g, '').match(/(?:^|[{}])\s*\.list-entry\s*\{/g) || []).length;
+assert(baseListRuleCount(list) === 1, 'V2 list entry geometry must have one base rule');
+assert(walk('ui').filter(file => file.endsWith('.css') && file !== 'ui/lists/list-entry.css').every(file => baseListRuleCount(read(file)) === 0), 'V2 list entry base geometry must not be redeclared by a second UI owner');
+assert(list.includes('min-height:var(--h-list-row);max-height:var(--h-list-row)') && list.includes('[data-v2-desktop-surface="list"]'), 'Desktop H uses the accepted scoped list-row token');
 
 assert(header.includes("kind === 'chat'"), 'Shared D chat control missing');
 assert(v2.includes('.v2-header__slot--d .v2-header__control--chat'), 'Shared D chat geometry missing');
