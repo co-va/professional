@@ -226,5 +226,13 @@ button.document-tile,.document-tile__open,.document-tile__toggle{cursor:pointer}
 .account-consent-rail>.document-tile{scroll-snap-align:none;touch-action:pan-x}
 
 /* Mobile signing history only: existing document tile with explicit signer. */
-.mobile-document-history .document-tile__person{font-size:14px;line-height:1.2;font-weight:700;overflow-wrap:anywhere}
+.mobile-document-history-tools{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px;min-width:0}
+.mobile-document-history-tools .ui-search-field{padding:0;min-width:0}
+.mobile-document-history-tools .field{min-width:0;margin:0}
+.mobile-document-history .document-tile__body{padding-top:0;gap:8px}
+.mobile-document-history .document-tile__identity{display:grid;gap:2px;padding-right:28px;margin-bottom:5px;min-width:0}
+.mobile-document-history .document-tile__person,.mobile-document-history .document-tile__phone{font-size:12px;line-height:1.2;font-weight:400;overflow-wrap:anywhere}
+.mobile-document-history .document-tile__person{color:var(--v2-ink,#111)}
+.mobile-document-history .document-tile__phone{color:var(--v2-muted,#6f7478)}
+.mobile-document-history .document-tile__meta{white-space:nowrap}
 .mobile-document-history .document-tile[hidden],.mobile-document-history-empty[hidden]{display:none}

@@ -2,6 +2,7 @@ import { settingsDetailHeading, setSettingsDetailOpen } from '../settings.js';
 import {
   actionBlock,
   button,
+  compactButton,
   documentTile,
   documentTiles,
   emptyState,
@@ -14,8 +15,8 @@ import {
   openNotice,
   page,
   segmentControl,
-  select,
   selectFile,
+  setV2ZHeaderRows,
   shortDateTime,
   shortDateTimeParts,
   textareaField,
@@ -26,7 +27,7 @@ import {
 } from '../../ui/ui.js';
 import { readOnlyReceipt } from '../../ui/receipt/index.js';
 import { escapeHtml } from '../../ui/utils/escape-html.js';
-import { phonesMatch } from '../../core/phone/index.js';
+import { formatPhone, phonesMatch } from '../../core/phone/index.js';
 import { getAllPeople } from '../../core/people/data.js';
 import {
   createStandaloneDocument,
@@ -265,23 +266,29 @@ function historyItems() {
 
 function mobileHistorySubject(item, people) {
   const person = consentPerson(item, people);
-  const name = person ? [person.name, person.surname].filter(Boolean).join(' ').trim() : '';
-  return name || person?.phones?.[0] || person?.emails?.[0] || item.contactValue || 'Подписавший не определён';
+  const members = person ? [person, ...people.filter(candidate => candidate !== person && person.uei && candidate.uei === person.uei)] : [];
+  const named = members.find(candidate => [candidate.name, candidate.surname].some(value => String(value || '').trim()));
+  const name = named ? [named.name, named.surname].map(value => String(value || '').trim()).filter(Boolean).join(' ') : '';
+  const eventPhone = item.subjectType === 'CONTACT_POINT' && item.contactType === 'PHONE' ? String(item.contactValue || '').trim() : '';
+  const rawPhone = eventPhone || members.flatMap(candidate => candidate.phones || []).find(Boolean) || '';
+  const phone = rawPhone ? formatPhone(rawPhone) || rawPhone : '';
+  return { name, phone };
 }
 
 function historyCard(item, people, index) {
   const snapshot = signedDocumentSnapshot(item);
   const date = shortDateTime(item.eventAt || item.acceptedAt || item.revokedAt || item.createdAt, '');
-  const subject = mobileHistorySubject(item, people);
+  const { name, phone } = mobileHistorySubject(item, people);
   return documentTile({
     title: snapshot?.title || item.documentId || 'Документ',
     version: item.documentVersion || snapshot?.version || 1,
-    subject,
+    subject: name || 'Имя не указано',
+    subjectPhone: phone || 'Телефон не указан',
     meta: date,
     status: consentStateText(item.status),
     statusState: consentStateKind(item.status),
-    data: `data-signing-event="${escapeHtml(String(item.id || ''))}" data-history-person="${escapeHtml(subject)}" data-history-order="${index}"`,
-    aria: `Открыть факт подписания ${snapshot?.title || item.documentId || 'документа'}: ${subject}`,
+    data: `data-signing-event="${escapeHtml(String(item.id || ''))}" data-history-person="${escapeHtml(name)}" data-history-phone="${escapeHtml(phone)}" data-history-order="${index}"`,
+    aria: `Открыть факт подписания ${snapshot?.title || item.documentId || 'документа'}: ${name || 'Имя не указано'}${phone ? ', ' + phone : ''}`,
   });
 }
 
@@ -290,47 +297,68 @@ function historyMarkup() {
   if (!items.length) return emptyState('Истории подписаний пока нет', 'Здесь появятся факты подписания, отказа и отзыва.');
   const people = getAllPeople();
   return `
-    <div class="form-grid" data-mobile-document-history-tools>
-      ${field({ label: 'Поиск по клиенту', name: 'documentHistoryQuery', type: 'search', placeholder: 'Имя или фамилия', autocomplete: 'off' })}
-      ${select({ label: 'Сортировка', name: 'documentHistorySort', value: 'date', options: [
-        { value: 'date', label: 'По дате' },
-        { value: 'name', label: 'По имени (А–Я)' },
-      ] })}
-    </div>
     ${documentTiles(items.map((item, index) => historyCard(item, people, index)), { className: 'mobile-document-history' })}
-    <div class="mobile-document-history-empty" data-history-no-results hidden>${emptyState('Ничего не найдено', 'Измените имя или фамилию.')}</div>
+    <div class="mobile-document-history-empty" data-history-no-results hidden>${emptyState('Ничего не найдено', 'Измените имя, фамилию или телефон.')}</div>
   `;
+}
+
+function mobileDocumentsHeaderRows() {
+  const rows = [segmentControl(VIEWS, {
+    value: currentView,
+    name: 'documentsView',
+    aria: 'Документы и история подписаний',
+  })];
+  if (currentView === 'history') rows.push(`<div class="mobile-document-history-tools" data-v2-layer-gesture-ignore>
+    <div class="ui-search-field">${field({ name: 'documentHistoryQuery', type: 'search', placeholder: 'Поиск', autocomplete: 'off', data: 'aria-label="Поиск по имени, фамилии или телефону"' })}</div>
+    ${compactButton({ kind: 'sort', data: 'data-mobile-history-sort aria-haspopup="dialog"', aria: 'Сортировка' })}
+  </div>`);
+  return rows;
 }
 
 function normalizeHistoryQuery(value) {
   return String(value || '').trim().toLocaleLowerCase('ru').replaceAll('ё', 'е');
 }
 
-function bindMobileHistory(root) {
+function bindMobileHistory(root, tools) {
   const host = root.querySelector('.mobile-document-history');
   if (!host) return;
   const cards = [...host.querySelectorAll('[data-history-person]')];
-  const query = root.querySelector('[name="documentHistoryQuery"]');
-  const sort = root.querySelector('[name="documentHistorySort"]');
+  const query = tools?.querySelector('[name="documentHistoryQuery"]');
+  const sort = tools?.querySelector('[data-mobile-history-sort]');
   const empty = root.querySelector('[data-history-no-results]');
+  let mode = 'date';
   const order = () => {
-    const byName = sort?.value === 'name';
-    cards.sort((a, b) => (byName ? a.dataset.historyPerson.localeCompare(b.dataset.historyPerson, 'ru', { sensitivity: 'base' }) : 0)
+    cards.sort((a, b) => (mode === 'name' ? Number(!a.dataset.historyPerson) - Number(!b.dataset.historyPerson)
+      || a.dataset.historyPerson.localeCompare(b.dataset.historyPerson, 'ru', { sensitivity: 'base' }) : 0)
       || Number(a.dataset.historyOrder) - Number(b.dataset.historyOrder));
     for (const card of cards) host.append(card);
   };
   const filter = () => {
-    const tokens = normalizeHistoryQuery(query?.value).split(/\s+/).filter(Boolean);
+    const value = normalizeHistoryQuery(query?.value);
+    const phoneQuery = /^[+\d\s()\-]+$/.test(value) ? value.replace(/\D/g, '') : '';
+    const tokens = value.split(/\s+/).filter(Boolean);
     let count = 0;
     for (const card of cards) {
       const subject = normalizeHistoryQuery(card.dataset.historyPerson);
-      card.hidden = !tokens.every(token => subject.includes(token));
+      const phone = String(card.dataset.historyPhone || '').replace(/\D/g, '');
+      card.hidden = phoneQuery ? !phone.includes(phoneQuery) : !tokens.every(token => subject.includes(token));
       if (!card.hidden) count++;
     }
     if (empty) empty.hidden = count !== 0;
   };
   query?.addEventListener('input', filter);
-  sort?.addEventListener('change', order);
+  sort?.addEventListener('click', () => {
+    const options = [{ value: 'date', label: 'По дате' }, { value: 'name', label: 'По имени (А–Я)' }];
+    const layer = mountModal(sort, modal(`<div class="compact-form">${options.map(option => button(option.label, {
+      variant: option.value === mode ? 'primary' : 'outline',
+      data: `data-history-sort-choice="${option.value}" aria-pressed="${option.value === mode}"`,
+    })).join('')}</div>`, { title: 'Сортировка', variant: 'x', surface: 'app', xRole: 'action', className: 'modal--form-sheet' }));
+    layer?.querySelectorAll('[data-history-sort-choice]').forEach(control => control.addEventListener('click', () => {
+      mode = control.dataset.historySortChoice === 'name' ? 'name' : 'date';
+      order();
+      layer.v2Close?.();
+    }));
+  });
 }
 
 function desktopDocumentList() {
@@ -750,7 +778,7 @@ function openSettingsMenu(root) {
   return layer;
 }
 
-function bindMain(root) {
+function bindMain(root, headerRows = []) {
   bindSettings(root, root);
   const renderInlineTemplates = host => {
     const items=templates();
@@ -780,12 +808,14 @@ function bindMain(root) {
   root.querySelector('[data-settings-document-add]')?.addEventListener('click', () => openAddDocumentMenu(root));
 
   initSegmentControls(root);
+  for (const row of headerRows) initSegmentControls(row);
   if(root.hasAttribute('data-settings-embedded')) root.querySelector('.settings-documents-switch')?.addEventListener('click',event=>{
     if(!event.target.closest('button'))return;
     const host=root.querySelector('[data-documents-content]');
     if(host?.hidden) setSettingsDetailOpen(host,true);
   });
-  root.querySelector('[name="documentsView"]')?.addEventListener('change', (event) => {
+  const viewInput = headerRows[0]?.querySelector('[name="documentsView"]') || root.querySelector('[name="documentsView"]');
+  viewInput?.addEventListener('change', (event) => {
     currentView = event.target.value === 'history' ? 'history' : 'documents';
     if(root.hasAttribute('data-settings-embedded')) setSettingsDetailOpen(root.querySelector('[data-documents-content]'),true);
     renderMain(root);
@@ -807,7 +837,7 @@ function bindMain(root) {
     });
   });
 
-  if (!root.hasAttribute('data-settings-embedded')) bindMobileHistory(root);
+  if (!root.hasAttribute('data-settings-embedded')) bindMobileHistory(root, headerRows[1] || root);
   root.querySelectorAll('[data-signing-event]').forEach((control) => {
     control.addEventListener('click', () => {
       const item = getConsents().find((event) => event.id === control.dataset.signingEvent);
@@ -837,15 +867,14 @@ function renderMain(root) {
       title: 'Документы',
       c: currentView === 'documents' ? { label: '+', data: 'data-settings-document-add', aria: 'Добавить документ' } : null,
     }),
-    segmentControl(VIEWS, {
-      value: currentView,
-      name: 'documentsView',
-      aria: 'Документы и история подписаний',
-    }),
     `<section class="documents-content" data-documents-content>${contentMarkup()}</section>`,
     currentView === 'documents' ? actionBlock(button('Шаблоны', { variant: 'outline', data: 'data-settings-document-templates' })) : '',
   ]);
-  bindMain(root);
+  const rows = mobileDocumentsHeaderRows();
+  const headerRows = setV2ZHeaderRows(root, rows);
+  // The standalone legacy settings renderer has no Z shell. Keep its controls reachable.
+  if (!headerRows.length) root.querySelector('[data-documents-content]')?.insertAdjacentHTML('beforebegin', rows.join(''));
+  bindMain(root, headerRows);
   window.dispatchEvent(new CustomEvent('va-tools:v2-context-changed'));
 }
 
