@@ -55,7 +55,7 @@ import { openPeopleExcelMenu } from './excel.js';
 import { openContactImportBatches } from './contact-import-review.js';
 import { personCardAppearance, personCardFields } from './card-presentation.js';
 import { getCurrentPersonHistory, getPersonHistory } from './history.js';
-import { getPersonMetadata, formatPersonVisitDate, buildPersonVisitIndex } from './metadata.js';
+import { formatPersonVisitDate, buildPersonVisitIndex } from './metadata.js';
 import { checkControl } from '../../ui/selection/check-list.js';
 import { isV2DesktopWorkspace } from '../../ui/v2/geometry.js';
 import { getRecord, getRecords } from '../record/index.js';

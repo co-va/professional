@@ -115,14 +115,6 @@ export function procedureConsumableSummary(rows = [], items = []) {
   return { total, calculated, missing, complete: rows.length > 0 && missing === 0 };
 }
 
-function costSummaryText(rows, inventory) {
-  if (!rows.length) return '';
-  const result = procedureConsumableSummary(rows, inventory);
-  if (!result.calculated) return 'Себестоимость: не рассчитана';
-  return result.complete ? 'Себестоимость: ' + money(result.total)
-    : 'Рассчитано: ' + money(result.total) + ' · не все расходы указаны';
-}
-
 // Group norms and concrete stock items have separate identities. A norm is
 // never converted into an arbitrary physical item or a stock movement.
 export function normalizeProcedureGroupNorms(value = []) {

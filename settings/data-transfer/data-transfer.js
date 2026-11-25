@@ -1,6 +1,6 @@
 import { settingsSectionHeader } from '../settings.js';
 import { apiRequest } from '../../core/auth.js';
-import { actionBlock, button, select, page, details, workspaceHeaderContext, selectFile, openNotice, dataTable, bindDataTable } from '../../ui/ui.js';
+import { actionBlock, button, select, page, details, selectFile, openNotice, dataTable, bindDataTable } from '../../ui/ui.js';
 import { settingToggle } from '../../ui/settings/index.js';
 import { escapeHtml } from '../../ui/utils/escape-html.js';
 async function request(path, body = {}) {

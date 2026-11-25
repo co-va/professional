@@ -14,7 +14,6 @@ import {
   select,
   v2ListEntry,
   v2ListEntries,
-  workspaceHeaderContext,
 } from '../../ui/ui.js';
 import { loadAuxiliaryState } from '../../core/runtime/auxiliary-state.js';
 import { loadBusinessState } from '../../core/runtime/business-state.js';
