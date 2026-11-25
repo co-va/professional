@@ -1,8 +1,5 @@
 .workplace-form__color{display:grid;gap:6px}.work-time-row{display:grid;gap:6px}.work-time-row__label{color:var(--text-secondary);font-size:13px}.work-time-row__fields{display:grid;grid-template-columns:1fr 1fr;gap:8px}.work-time-row__fields .field{grid-template-columns:auto 1fr;align-items:center;gap:7px}.work-time-row__fields .field>span{font-size:13px}.workplace-content{width:100%;min-width:0;display:grid;justify-items:center;gap:3px}.workplace-content__name{width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;line-height:1.15;font-weight:700}.workplace-content__primary,.workplace-content__secondary{font-size:12px;line-height:1.15;white-space:nowrap}.workplace-content__primary{font-weight:600}.workplace-content__secondary{font-weight:500;color:var(--text-secondary)}.workplace-control-list{display:grid;gap:0}.workplace-control-actions{display:grid;gap:8px;margin-top:12px}.workplace-control-time{display:grid;gap:10px}.workplace-selector{display:grid;gap:8px}.workplace-select-row{display:grid;grid-template-columns:minmax(0,1fr) var(--ui-compact-size);gap:8px;align-items:end}.workplace-select-row>.cost-field{grid-column:1/-1}.workplace-selector .cost-field{margin-top:4px}@media(max-width:360px){.work-time-row__fields{gap:6px}.workplace-select-row{grid-template-columns:minmax(0,1fr) 36px}}
 
-/* Workplace Q visibility section: steady rhythm between color and links. */
-.workplace-form__visibility{min-width:0;padding:8px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
-.workplace-form__visibility .app-notification-row{min-height:48px;align-items:center;padding:0;border:0}
 .workplace-form>.ui-links--compact{margin-top:0}
 
 /* Service editor layout uses shared V2 List Entries, buttons and form controls. */
@@ -17,10 +14,19 @@
 /* Independent controls must never visually touch the destructive action. */
 .service-workplace-add-panel{margin-top:16px;margin-bottom:16px}
 
-/* Workplace Q: no standalone rules section; shared controls at the top. */
-.workplace-booking-top{display:grid;gap:8px;min-width:0}
-.workplace-booking-first,.workplace-booking-checks{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px 12px;min-width:0}
-.workplace-booking-step{display:flex;align-items:center;gap:6px;min-width:0;flex:0 0 auto}
-.workplace-booking-step>span{font-size:13px;font-weight:600;white-space:nowrap}
+/* Workplace Q: one tool row and one equal-column checkbox row. */
+.workplace-booking-top{display:grid;gap:12px;min-width:0}
+.workplace-booking-tools{display:flex;align-items:center;gap:12px;min-width:0}
+.workplace-booking-tools:empty{display:none}
+.workplace-booking-step{display:flex;align-items:center;gap:8px;min-width:0}
+.workplace-booking-step>span{font-size:14px;font-weight:600;white-space:nowrap}
 .workplace-booking-step .ui-select{width:86px;min-width:86px;max-width:86px;margin:0}
 .workplace-booking-step .ui-select__control{min-width:0}
+.workplace-booking-checks{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));align-items:center;gap:8px;min-width:0}
+.workplace-booking-checks--single{grid-template-columns:1fr}
+.workplace-booking-checks>.ui-compact-check{display:grid;grid-template-columns:var(--ui-compact-size,28px) minmax(0,1fr);align-items:center;gap:6px;justify-self:stretch}
+.workplace-booking-checks .ui-compact-check__label{min-width:0;font-size:14px;line-height:1.2;white-space:normal;overflow-wrap:normal}
+@media(min-width:768px) and (min-height:600px){
+  .v2-app--workspace .desktop-q-toolbar.workplace-booking-toolbar>.workplace-booking-tools{order:-1;flex:0 0 auto}
+  .v2-app--workspace [data-v2-q-header-content] .desktop-q-toolbar.workplace-booking-toolbar .workplace-booking-tools>.ui-compact-button{width:var(--ui-compact-size);height:var(--ui-compact-size);min-height:var(--ui-compact-size);max-height:var(--ui-compact-size);flex:0 0 var(--ui-compact-size)}
+}

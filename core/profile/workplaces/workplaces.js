@@ -65,17 +65,17 @@ export function workplaceForm(existing=null){
     ${bookingRules ? `<input type="hidden" name="workplaceAllowCancellation" value="${bookingRules.allowClientCancellation?'true':'false'}">
       <input type="hidden" name="workplaceAllowRescheduling" value="${bookingRules.allowClientRescheduling?'true':'false'}">` : ''}
     <div class="workplace-booking-top">
-      <div class="workplace-booking-first">
-        ${compactCheck({label:'Онлайн-запись',checked:w.visibleInPublicBooking!==false,data:'data-workplace-public-booking-visibility'})}
+      <div class="workplace-booking-tools">
         ${bookingRules ? `<div class="workplace-booking-step">
-          <span>Шаг записи</span>${select({name:'workplaceBookingSlotStep',aria:'Шаг записи',value:String(bookingRules.preferredSlotStep),options:BOOKING_SLOT_STEPS.map(step=>({value:String(step),label:step+' мин'}))})}
-          ${compactButton({kind:'info',data:'data-workplace-booking-info',aria:'О шаге записи'})}
-        </div>` : ''}
+          <span>Шаг</span>${select({name:'workplaceBookingSlotStep',value:String(bookingRules.preferredSlotStep),options:BOOKING_SLOT_STEPS.map(step=>({value:String(step),label:step+' мин'}))})}
+        </div>
+        ${compactButton({kind:'info',data:'data-workplace-booking-info',aria:'О шаге записи'})}` : ''}
       </div>
-      ${bookingRules ? `<div class="workplace-booking-checks">
-        ${compactCheck({label:'Отмена записи',checked:bookingRules.allowClientCancellation,data:'data-workplace-booking-cancel'})}
-        ${compactCheck({label:'Перенос записи',checked:bookingRules.allowClientRescheduling,data:'data-workplace-booking-reschedule'})}
-      </div>` : ''}
+      <div class="workplace-booking-checks${bookingRules?'':' workplace-booking-checks--single'}">
+        ${compactCheck({label:'Онлайн-запись',checked:w.visibleInPublicBooking!==false,data:'data-workplace-public-booking-visibility'})}
+        ${bookingRules ? `${compactCheck({label:'Отмена записи',checked:bookingRules.allowClientCancellation,data:'data-workplace-booking-cancel'})}
+        ${compactCheck({label:'Перенос записи',checked:bookingRules.allowClientRescheduling,data:'data-workplace-booking-reschedule'})}` : ''}
+      </div>
     </div>
     ${field({label:'Название',name:'workplaceName',value:w.name,placeholder:'Название рабочего пространства',required:true})}
     ${select({label:'Город *',name:'workplaceCity',value:w.city||'',options:cities,placeholder:'Город',searchable:true,allowCustom:false})}
@@ -186,6 +186,26 @@ export function bindWorkplaceForm(root,existing=null,{onSaved=()=>{},onDeleted=(
       form.id ||= 'workplace-data-'+crypto.randomUUID();
       primary.setAttribute('form',form.id);
       moveDesktopQTool(primary);
+    }
+    // Reuse the two existing Q tool rows without moving the content baseline.
+    const toolbar=root.querySelector('[data-v2-q-header-content] > .desktop-q-toolbar');
+    const top=form.querySelector('.workplace-booking-top');
+    const tools=top?.querySelector('.workplace-booking-tools');
+    const checks=top?.querySelector('.workplace-booking-checks');
+    if(toolbar && top && checks){
+      toolbar.classList.add('workplace-booking-toolbar');
+      const slot=tools?.querySelector('[name="workplaceBookingSlotStep"]');
+      if(slot){
+        // A relocated selector still belongs to the original form.
+        slot.setAttribute('form',form.id);
+        tools.addEventListener('input',()=>form.dispatchEvent(new Event('input',{bubbles:true})));
+        tools.addEventListener('change',()=>form.dispatchEvent(new Event('change',{bubbles:true})));
+      }
+      if(tools?.children.length) toolbar.prepend(tools);
+      checks.setAttribute('data-desktop-q-secondary-tools','');
+      checks.setAttribute('data-v2-layer-gesture-ignore','');
+      toolbar.after(checks);
+      top.remove();
     }
     const remove=root.querySelector('[data-delete-workplace-form]');
     const body=form.closest('[data-v2-q-body]');
