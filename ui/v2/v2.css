@@ -455,14 +455,14 @@
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-group-catalog]{display:grid;gap:16px;min-width:0}
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-group-catalog]>:is(.inventory-editor-panel,.list-entries){border:1px solid var(--border);border-radius:var(--radius-control);background:var(--white);overflow:hidden}
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-group-catalog]>.inventory-editor-panel>details>summary.inventory-editor-summary{box-sizing:border-box;min-height:44px;line-height:20px;padding:12px 16px;background:#E0D6D6;color:#41484F;font-size:13px;font-weight:750;overflow-wrap:anywhere}
- .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-group-catalog]>.inventory-editor-panel:has(>.inventory-editor-heading__controls)>details>summary.inventory-editor-summary{padding-right:110px}
- .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-group-catalog]>.inventory-editor-panel>.inventory-editor-heading__controls{top:0;right:12px;height:44px;color:#41484F}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-group-catalog] .inventory-editor-panel:has(>.inventory-editor-heading__controls)>details>summary.inventory-editor-summary{padding-right:100px}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-group-catalog] .inventory-editor-panel>.inventory-editor-heading__controls{top:0;right:16px;height:44px;align-items:center;justify-content:flex-end;color:#41484F}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-group-catalog] .inventory-editor-heading__controls>.ui-list__secondary{display:block;width:auto;min-width:0;margin:0;color:#41484F;font-size:13px;font-weight:750;line-height:20px;font-variant-numeric:tabular-nums;white-space:nowrap;text-align:right;overflow-wrap:normal}
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-group-catalog]>.inventory-editor-panel>details[open]>summary.inventory-editor-summary{border-bottom:1px solid var(--border)}
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-group-catalog]>.inventory-editor-panel>details>.inventory-editor-panel__body{padding:0}
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-group-catalog]>.inventory-editor-panel>details>.inventory-editor-panel__body>.list-entries>.list-entry:last-child{border-bottom:0}
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-group-catalog]>.list-entries>.list-entry:last-child{border-bottom:0}
- .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-group-catalog] .inventory-editor-summary{min-height:44px;padding:12px 16px;color:var(--text);font-size:14px}
- .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-group-catalog] .inventory-editor-heading__controls{color:var(--text-secondary)}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-group-catalog] .inventory-editor-summary{box-sizing:border-box;min-height:44px;line-height:20px;padding:12px 16px;color:#41484F;font-size:13px;font-weight:750}
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-group-catalog] .inventory-editor-panel__body{padding:0 12px 12px}
 }
 @media (min-width:768px) and (max-width:1024px) and (min-height:600px){
