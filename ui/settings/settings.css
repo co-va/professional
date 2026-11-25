@@ -174,12 +174,12 @@
 /* Desktop table headings follow the established italic H-list convention. */
 .settings-document-list-heading,.notification-desktop-group h3,.settings-list-heading{font-style:italic}
 .settings-documents-switch{align-items:center;justify-content:flex-start;gap:12px;flex-wrap:wrap}
-.settings-history-tools.people-desktop-tools{min-width:0;flex:0 1 340px;max-width:340px}
+[data-desktop-document-history-toolbar]{min-width:0;background:transparent}
+.settings-history-tools.people-desktop-tools{min-width:0;max-width:340px}
 .settings-history-tools.people-desktop-tools>.field{margin:0;gap:0}
 .settings-history-tools.people-desktop-tools>.field>span:empty{display:none}
 .settings-history-tools .people-desktop-query-tools .ui-select{margin:0;flex:0 0 auto}
-.settings-history-tools .people-desktop-query-tools .ui-compact-button{color:var(--text);border-color:var(--border)}
-.settings-history-tools .people-desktop-query-tools .ui-compact-button:focus-visible{outline-color:var(--text)}
+
 .settings-document-list-heading--history{padding-left:12px}
 .settings-history-heading-main,.settings-document-row--history .list-entry__main.has-leading-icon{display:grid;grid-template-columns:20px minmax(0,0.9fr) minmax(0,1.45fr);gap:10px;align-items:center;min-width:0}
 .settings-document-row--history .list-entry__content{padding-left:12px;padding-right:12px;min-height:44px}

@@ -120,7 +120,7 @@ export function settingsOverviewMarkup(visible) {
   return workspaceHeaderContext({title:'Настройки'})+'<div class="settings-overview">'+
     (top.length ? '<div class="settings-overview-section">'+columnLayout(top.map(card),{columns:top.length,ariaLabel:'Онлайн-запись, интеграции и перенос данных'})+welcomePanel+top.map(panel).join('')+'</div>' : '')+
     (middle.length ? '<div class="settings-overview-section">'+columnLayout(middle.map(card),{columns:middle.length,ariaLabel:'Уведомления и ярлыки'})+middle.map(panel).join('')+'</div>' : '')+
-    (available.has('documents') ? '<div class="settings-overview-section">'+card('documents')+panel('documents')+'</div>' : '')+
+    (available.has('documents') ? '<div class="settings-overview-section"><div data-desktop-document-history-toolbar data-settings-section-owner="documents" hidden></div>'+card('documents')+panel('documents')+'</div>' : '')+
     '</div>';
 }
 

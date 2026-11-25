@@ -881,15 +881,35 @@ function openDesktopDocumentEditor(root, control, item) {
   sync();
 }
 
+function desktopHistoryToolbar(root) {
+  return root.closest('[data-settings-inline="documents"]')?.parentElement?.querySelector('[data-desktop-document-history-toolbar]') || null;
+}
+
+function syncDesktopHistoryToolbar(root) {
+  const toolbar = desktopHistoryToolbar(root);
+  if (toolbar) toolbar.hidden = currentView !== 'history' || root.querySelector('[data-documents-content]')?.hidden !== false;
+}
+
+function renderDesktopHistoryToolbar(root) {
+  const toolbar = desktopHistoryToolbar(root);
+  if (!toolbar) return;
+  toolbar.innerHTML = currentView === 'history' ? `<div class="settings-history-tools people-desktop-tools">${field({name:'documentHistoryQuery',type:'search',placeholder:'Поиск',autocomplete:'off',data:'aria-label="Поиск по имени, фамилии или телефону"'})}<div class="people-desktop-actions people-desktop-query-tools">${select({name:'documentHistorySort',value:'date',options:[{value:'date',label:'По дате'},{value:'name',label:'По имени (А–Я)'}],triggerKind:'sort',pickerTitle:'Сортировка',aria:'Сортировка'})}</div></div>` : '';
+  syncDesktopHistoryToolbar(root);
+}
+
 function bindMain(root, headerRows = []) {
   bindSettings(root, root);
   root.querySelector('[data-settings-document-templates]')?.addEventListener('click', () => openTemplatesLayer(root));
-  root.querySelector('[data-documents-content]')?.addEventListener('settings-detail-closed', () => closeDesktopDocumentEditor(root));
+  root.querySelector('[data-documents-content]')?.addEventListener('settings-detail-closed', () => {
+    closeDesktopDocumentEditor(root);
+    syncDesktopHistoryToolbar(root);
+  });
   root.querySelector('[data-settings-document-create]')?.addEventListener('click',()=>openNewDocumentEditor(root));
   root.querySelector('[data-settings-document-pdf]')?.addEventListener('click',()=>void choosePdf(root));
   root.querySelector('[data-settings-document-toggle]')?.addEventListener('click',()=>{
     const host=root.querySelector('[data-documents-content]');
     setSettingsDetailOpen(host,host.hidden);
+    syncDesktopHistoryToolbar(root);
   });
   root.querySelector('[data-settings-document-add]')?.addEventListener('click', () => openAddDocumentMenu(root));
 
@@ -925,7 +945,7 @@ function bindMain(root, headerRows = []) {
     });
   });
 
-  bindDocumentHistory(root, headerRows[1] || root);
+  bindDocumentHistory(root, desktopHistoryToolbar(root) || headerRows[1] || root);
   root.querySelectorAll('[data-signing-event]').forEach((control) => {
     control.addEventListener('click', () => {
       const item = getConsents().find((event) => event.id === control.dataset.signingEvent);
@@ -942,8 +962,9 @@ function renderMain(root) {
   if(root.hasAttribute('data-settings-embedded')) {
     const expanded=root.dataset.documentsExpanded==='true';
     const tools=button('Загрузить PDF',{variant:'outline',className:'settings-outline-action',data:'data-settings-document-pdf'})+button('Создать документ',{className:'settings-h-action',data:'data-settings-document-create'});
-    root.innerHTML=`<div class="settings-documents-heading"><button type="button" class="settings-document-toggle" data-settings-document-toggle aria-controls="settings-document-content" aria-expanded="${expanded}">Документы <span aria-hidden="true">⌄</span></button><div class="settings-documents-actions">${tools}</div></div><div class="settings-documents-switch">${currentView==='history'? `<div class="settings-history-tools people-desktop-tools">${field({name:'documentHistoryQuery',type:'search',placeholder:'Поиск',autocomplete:'off',data:'aria-label="Поиск по имени, фамилии или телефону"'})}<div class="people-desktop-actions people-desktop-query-tools">${select({name:'documentHistorySort',value:'date',options:[{value:'date',label:'По дате'},{value:'name',label:'По имени (А–Я)'}],triggerKind:'sort',pickerTitle:'Сортировка',aria:'Сортировка'})}</div></div>`:''}${segmentControl(VIEWS,{value:currentView,name:'documentsView',aria:'Документы и история подписаний'})}</div>
+    root.innerHTML=`<div class="settings-documents-heading"><button type="button" class="settings-document-toggle" data-settings-document-toggle aria-controls="settings-document-content" aria-expanded="${expanded}">Документы <span aria-hidden="true">⌄</span></button><div class="settings-documents-actions">${tools}</div></div><div class="settings-documents-switch">${segmentControl(VIEWS,{value:currentView,name:'documentsView',aria:'Документы и история подписаний'})}</div>
       <section id="settings-document-content" class="settings-document-list" data-documents-content data-settings-detail data-settings-detail-state="documentsExpanded"${expanded?'':' hidden'}>${settingsDetailHeading(currentView==='history'?'История':'Документы','settings-document-content')}${desktopDocumentList()}</section>`;
+    renderDesktopHistoryToolbar(root);
     bindMain(root);
     window.dispatchEvent(new CustomEvent('va-tools:v2-context-changed'));
     return;
