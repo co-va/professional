@@ -145,7 +145,7 @@ export function bindServiceWorkplaceAssignments(root, {
       ${costField({ name: 'workplaceCost', value: values.cost })}
       ${textareaField({ label: 'Описание', name: 'localDescription', value: values.description, rows: 3 })}
       <div class="service-workplace-extra">
-        ${compactCheck({ label: isProcedure ? 'Для онлайн-записи' : 'Показывать в онлайн-записи', checked: values.visibleInPublicBooking === true, data: 'data-local-online' })}
+        ${compactCheck({ label: 'Онлайн-запись', checked: values.visibleInPublicBooking === true, data: 'data-local-online' })}
       </div>
       <div class="form-error" role="alert" data-service-workplace-error></div>
       ${overview ? '</div>' : ''}
