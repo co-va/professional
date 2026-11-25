@@ -18,7 +18,8 @@ try {
     const url=new URL(r.request().url());
     if(isApi(url.href)) {
       const body=url.pathname.endsWith('/auth/me')?{account:{id:'preview-smoke',email:'preview@example.invalid'},tenantId:'preview-smoke'}:
-        url.pathname.endsWith('/saas-access/me')?{tenantId:'preview-smoke',status:'ACTIVE',commercialMode:'LIVE',capabilities:['profile.access','workplaces.access','journal.day.access'].map(key=>({key,valueType:'BOOLEAN',enabled:true}))}:{};
+        url.pathname.endsWith('/saas-access/me')?{tenantId:'preview-smoke',status:'ACTIVE',commercialMode:'LIVE',capabilities:['profile.access','workplaces.access','journal.day.access'].map(key=>({key,valueType:'BOOLEAN',enabled:true}))}:
+        url.pathname.endsWith('/business-state/operational')?{procedures:[],days:[]} :{};
       return r.fulfill({status:200,contentType:'application/json',body:JSON.stringify(body)});
     }
     if(url.origin!==new URL(target).origin) return r.abort();
