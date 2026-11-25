@@ -2,6 +2,7 @@ import { settingsDetailHeading, setSettingsDetailOpen } from '../settings.js';
 import {
   actionBlock,
   button,
+  compactButton,
   documentTile,
   documentTiles,
   emptyState,
@@ -402,8 +403,9 @@ function desktopDocumentList() {
     subtitle:documentMoment(item)?shortDateTime(documentMoment(item),''):'',omitEmptySubtitle:true,
     rightTop:String(visibleDocumentVersion(item)),
     data:'data-profile-document="'+escapeHtml(item.id)+'"',
-    actionData:(isCoreDocument(item)||canDeleteDocument(item))?'data-desktop-document-actions="'+escapeHtml(item.id)+'"':'',
-    actionAria:'Действия документа'
+    actionData:(isCoreDocument(item)||canDeleteDocument(item))?'data-desktop-document-actions="'+escapeHtml(item.id)+'" aria-expanded="false"':'',
+    actionIcon:isCoreDocument(item)?'✎':'×',
+    actionAria:isCoreDocument(item)?'Редактировать документ':isRknGuide(item)?'Убрать документ':'Удалить документ'
   })))+'</div>':emptyState('Документов пока нет',''))+'</section>';
   return group('Основные документы',coreDocuments())+group('Другие документы',otherDocuments());
 }
@@ -428,6 +430,37 @@ function detailReceipt(item) {
     value: parts.date ? [parts.date, parts.time].filter(Boolean).join(' · ') : '—',
   });
   return readOnlyReceipt({ title: 'Информация о документе', items: rows });
+}
+
+function confirmDocumentDeletion(root, layer, item) {
+  const rkn = isRknGuide(item);
+  const confirm = mountModal(document.body, modal(
+    `<div class="compact-form">
+      <p>${rkn
+        ? 'Документ будет убран из отображения. Системный файл останется в архиве.'
+        : 'Документ будет удалён из текущих документов. Уже существующие факты подписания не удаляются.'}</p>
+      ${button(rkn ? 'Убрать' : 'Удалить', { variant: 'critical', data: 'data-confirm-document-delete' })}
+    </div>`,
+    {
+      title: rkn ? 'Убрать документ' : 'Удалить документ',
+      variant: 'x',
+      surface: 'app',
+      className: 'modal--form-sheet',
+    },
+  ));
+  confirm?.querySelector('[data-confirm-document-delete]')?.addEventListener('click', () => {
+    try {
+      deleteDocument(item.id);
+      confirm.v2Close?.();
+      layer?.v2Close?.();
+      renderMain(root);
+    } catch (error) {
+      openNotice({
+        title: 'Документ не удалён',
+        message: error instanceof Error ? error.message : 'Не удалось удалить документ',
+      });
+    }
+  });
 }
 
 function openDocumentDetailSettings(root, layer, item) {
@@ -456,34 +489,7 @@ function openDocumentDetailSettings(root, layer, item) {
 
   sheet.querySelector('[data-detail-delete]')?.addEventListener('click', () => {
     sheet.v2Close?.();
-    const rkn = isRknGuide(item);
-    const confirm = mountModal(document.body, modal(
-      `<div class="compact-form">
-        <p>${rkn
-          ? 'Документ будет убран из отображения. Системный файл останется в архиве.'
-          : 'Документ будет удалён из текущих документов. Уже существующие факты подписания не удаляются.'}</p>
-        ${button(rkn ? 'Убрать' : 'Удалить', { variant: 'critical', data: 'data-confirm-document-delete' })}
-      </div>`,
-      {
-        title: rkn ? 'Убрать документ' : 'Удалить документ',
-        variant: 'x',
-        surface: 'app',
-        className: 'modal--form-sheet',
-      },
-    ));
-    confirm?.querySelector('[data-confirm-document-delete]')?.addEventListener('click', () => {
-      try {
-        deleteDocument(item.id);
-        confirm.v2Close?.();
-        layer?.v2Close?.();
-        renderMain(root);
-      } catch (error) {
-        openNotice({
-          title: 'Документ не удалён',
-          message: error instanceof Error ? error.message : 'Не удалось удалить документ',
-        });
-      }
-    });
+    confirmDocumentDeletion(root, layer, item);
   });
 
   return sheet;
@@ -805,27 +811,69 @@ function openSettingsMenu(root) {
   return layer;
 }
 
+function closeDesktopDocumentEditor(root) {
+  root.querySelector('[data-inline-document-editor]')?.remove();
+  for (const action of root.querySelectorAll('[data-desktop-document-actions][aria-expanded="true"]')) {
+    action.setAttribute('aria-expanded', 'false');
+  }
+}
+
+function openDesktopDocumentEditor(root, control, item) {
+  const existing = root.querySelector('[data-inline-document-editor]');
+  const same = existing?.dataset.inlineDocumentEditor === item.id;
+  closeDesktopDocumentEditor(root);
+  if (same) return;
+  const row = control.closest('[data-profile-document]');
+  if (!row) return;
+  const template = templates().find(entry => entry.id === item.id) || item;
+  row.insertAdjacentHTML('afterend', `<section class="settings-inline-document-editor" data-inline-document-editor="${escapeHtml(item.id)}">
+    <div class="settings-inline-heading">
+      <strong>Редактирование документа</strong>
+      <div class="settings-documents-actions">
+        ${button('Сохранить', { className: 'settings-h-action', data: 'data-inline-document-save hidden', aria: 'Сохранить документ' })}
+        ${compactButton({ kind: 'remove', className: 'settings-detail-close', data: 'data-inline-document-close', aria: 'Закрыть редактор' })}
+      </div>
+    </div>
+    <form class="form-grid" data-inline-document-form>
+      ${field({ label: 'Название', name: 'documentTitle', value: template.title || '', required: true })}
+      ${textareaField({ label: 'Текст документа', name: 'documentText', value: template.text || '', rows: 12, placeholder: 'Текст документа' })}
+    </form>
+  </section>`);
+  const editor = root.querySelector('[data-inline-document-editor]');
+  const form = editor.querySelector('[data-inline-document-form]');
+  const save = editor.querySelector('[data-inline-document-save]');
+  control.setAttribute('aria-expanded', 'true');
+  const draft = () => ({
+    title: String(form.querySelector('[name="documentTitle"]')?.value || '').trim(),
+    text: String(form.querySelector('[name="documentText"]')?.value || ''),
+  });
+  const sync = () => {
+    const next = draft();
+    save.hidden = !next.title || (next.title === String(template.title || '') && next.text === String(template.text || ''));
+  };
+  form.addEventListener('input', sync);
+  form.addEventListener('change', sync);
+  form.addEventListener('submit', event => { event.preventDefault(); if (!save.hidden) save.click(); });
+  editor.querySelector('[data-inline-document-close]')?.addEventListener('click', () => {
+    closeDesktopDocumentEditor(root);
+    control.focus({ preventScroll: true });
+  });
+  save.addEventListener('click', () => {
+    if (save.hidden) return;
+    const next = draft();
+    saveDocument({ ...template, ...next, documentClass: DOCUMENT_CLASS.CORE_LEGAL, sourceMode: 'CUSTOM' });
+    renderMain(root);
+    const updatedControl = [...root.querySelectorAll('[data-desktop-document-actions]')].find(action => action.dataset.desktopDocumentActions === item.id);
+    const updatedItem = currentProfileDocuments().find(document => document.id === item.id);
+    if (updatedControl && updatedItem) openDesktopDocumentEditor(root, updatedControl, updatedItem);
+  });
+  sync();
+}
+
 function bindMain(root, headerRows = []) {
   bindSettings(root, root);
-  const renderInlineTemplates = host => {
-    const items=templates();
-    host.innerHTML=settingsDetailHeading('Шаблоны','settings-document-templates')+(items.length?v2ListEntries(items.map(item=>v2ListEntry({
-      initial:'▤',title:item.title||'Шаблон',subtitle:item.sourceMode==='CUSTOM'?'Ваш вариант':'Системный шаблон',
-      rightTop:'Версия '+(item.version||1),data:'data-inline-template-open="'+escapeHtml(item.id)+'"'
-    }))):emptyState('Шаблоны недоступны','Базовые шаблоны Реестра не загрузились.'));
-    host.querySelectorAll('[data-inline-template-open]').forEach(control=>control.addEventListener('click',()=>{
-      const item=templates().find(candidate=>candidate.id===control.dataset.inlineTemplateOpen);
-      if(item) openTemplateEditor(root,item);
-    }));
-  };
-  root.querySelector('[data-settings-document-templates]')?.addEventListener('click', () => {
-    const host=root.querySelector('[data-inline-document-templates]');
-    if(!host) return openTemplatesLayer(root);
-    setSettingsDetailOpen(host,host.hidden);
-    if(!host.hidden) renderInlineTemplates(host);
-  });
-  const restoredTemplates = root.querySelector('[data-inline-document-templates]:not([hidden])');
-  if(restoredTemplates) renderInlineTemplates(restoredTemplates);
+  root.querySelector('[data-settings-document-templates]')?.addEventListener('click', () => openTemplatesLayer(root));
+  root.querySelector('[data-documents-content]')?.addEventListener('settings-detail-closed', () => closeDesktopDocumentEditor(root));
   root.querySelector('[data-settings-document-create]')?.addEventListener('click',()=>openNewDocumentEditor(root));
   root.querySelector('[data-settings-document-pdf]')?.addEventListener('click',()=>void choosePdf(root));
   root.querySelector('[data-settings-document-toggle]')?.addEventListener('click',()=>{
@@ -852,7 +900,9 @@ function bindMain(root, headerRows = []) {
     const open=event=>{
       event.preventDefault();event.stopPropagation();
       const item=currentProfileDocuments().find(doc=>doc.id===control.dataset.desktopDocumentActions);
-      if(item)openDocumentDetailSettings(root,null,item);
+      if (!item) return;
+      if (isCoreDocument(item)) openDesktopDocumentEditor(root, control, item);
+      else if (canDeleteDocument(item)) confirmDocumentDeletion(root, null, item);
     };
     control.addEventListener('click',open);
     control.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' ')open(event);});
@@ -880,10 +930,8 @@ function bindMain(root, headerRows = []) {
 function renderMain(root) {
   if(root.hasAttribute('data-settings-embedded')) {
     const expanded=root.dataset.documentsExpanded==='true';
-    const templatesExpanded=root.dataset.templatesExpanded==='true';
-    const tools=button('Шаблоны',{variant:'outline',className:'settings-outline-action',data:'data-settings-document-templates aria-controls="settings-document-templates" aria-expanded="'+templatesExpanded+'"'})+button('Загрузить PDF',{variant:'outline',className:'settings-outline-action',data:'data-settings-document-pdf'})+button('Создать документ',{className:'settings-h-action',data:'data-settings-document-create'});
+    const tools=button('Загрузить PDF',{variant:'outline',className:'settings-outline-action',data:'data-settings-document-pdf'})+button('Создать документ',{className:'settings-h-action',data:'data-settings-document-create'});
     root.innerHTML=`<div class="settings-documents-heading"><button type="button" class="settings-document-toggle" data-settings-document-toggle aria-controls="settings-document-content" aria-expanded="${expanded}">Документы <span aria-hidden="true">⌄</span></button><div class="settings-documents-actions">${tools}</div></div><div class="settings-documents-switch">${segmentControl(VIEWS,{value:currentView,name:'documentsView',aria:'Документы и история подписаний'})}</div>
-      <div id="settings-document-templates" data-inline-document-templates data-settings-detail data-settings-detail-state="templatesExpanded"${templatesExpanded?'':' hidden'}></div>
       <section id="settings-document-content" class="settings-document-list" data-documents-content data-settings-detail data-settings-detail-state="documentsExpanded"${expanded?'':' hidden'}>${settingsDetailHeading(currentView==='history'?'История':'Документы','settings-document-content')}${desktopDocumentList()}</section>`;
     bindMain(root);
     window.dispatchEvent(new CustomEvent('va-tools:v2-context-changed'));

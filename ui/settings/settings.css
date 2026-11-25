@@ -70,8 +70,8 @@
 .settings-documents-actions{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-left:auto}
 .settings-documents-heading .segment-control{width:auto;min-width:150px;max-width:100%}
 .settings-document-group h3{font-size:13px;margin:10px 0 8px;color:var(--text-secondary)}
-.settings-document-list,.settings-overview [data-inline-document-templates]{margin-top:12px}
-.settings-overview .settings-document-list .list-entry__background,.settings-overview [data-inline-document-templates] .list-entry__background{display:grid;place-items:center;background:transparent;color:var(--text-secondary)}
+.settings-document-list{margin-top:12px}
+.settings-overview .settings-document-list .list-entry__background{display:grid;place-items:center;background:transparent;color:var(--text-secondary)}
 
 /* Desktop settings: headings, H actions and embedded rail/chips. */
 .settings-overview-card-title,.settings-inline-heading>strong,.settings-document-toggle{font-size:20px;font-weight:730;color:var(--text);line-height:1.2}
@@ -162,3 +162,11 @@
 
 /* Mobile integrations: shared vertical stack and natural vertical scrolling. */
 .settings-integration-stack .settings-integration-card,.settings-integration-stack .mini-card__record-center{touch-action:pan-y}
+
+/* Inline document editing belongs to the existing Desktop settings card. */
+.settings-inline-document-editor{min-width:0;padding:16px 12px;border-block:1px solid var(--border);background:var(--white)}
+.settings-inline-document-editor .settings-inline-heading>strong{font-size:14px;font-weight:680}
+.settings-inline-document-editor .settings-inline-heading{margin-bottom:12px}
+.settings-inline-document-editor .form-grid{min-width:0}
+.settings-inline-document-editor textarea{resize:vertical}
+.settings-document-row [data-desktop-document-actions]{color:var(--text);font-size:20px;font-weight:400}
