@@ -68,6 +68,8 @@ export function documentTile({
   aria = '',
   className = '',
   openData = '',
+  editData = '',
+  editAria = '',
   toggleData = '',
   toggleChecked = false,
   toggleDisabled = false,
@@ -91,6 +93,16 @@ export function documentTile({
         ${documentBody({ title, version, meta, lines })}
       </button>
       <button type="button" class="document-tile__toggle${toggleChecked ? ' is-on' : ''}"${toggleAttrs} aria-pressed="${toggleChecked ? 'true' : 'false'}" aria-label="${text(toggleAria || title)}"${toggleDisabled ? ' disabled' : ''}><span aria-hidden="true"></span></button>
+    </article>`;
+  }
+
+  if (String(editData || '').trim()) {
+    return `<article class="document-tile document-tile--editable${className ? ` ${text(className)}` : ''}">
+      <span class="document-tile__fold" aria-hidden="true"></span>
+      <button type="button" class="document-tile__open"${dataAttributes(openData || data)} aria-label="${text(aria || title)}">
+        ${documentBody({ title, version, meta, subject, subjectPhone, eventLabel, lines, statusMarkup })}
+      </button>
+      <button type="button" class="document-tile__edit ui-compact-button"${dataAttributes(editData)} aria-label="${text(editAria || 'Редактировать документ')}">✎</button>
     </article>`;
   }
 

@@ -26,7 +26,6 @@ import {
   v2ZLayer,
   workspaceHeaderContext,
 } from '../../ui/ui.js';
-import { readOnlyReceipt } from '../../ui/receipt/index.js';
 import { escapeHtml } from '../../ui/utils/escape-html.js';
 import { formatPhone, phonesMatch } from '../../core/phone/index.js';
 import { getAllPeople } from '../../core/people/data.js';
@@ -59,17 +58,6 @@ const USER_PDF_FILE_LIMIT = 15 * 1024 * 1024;
 const USER_PDF_TOTAL_LIMIT = 30 * 1024 * 1024;
 
 let currentView = 'documents';
-
-function headerContext(title = 'Документы', c = null, v = null) {
-  return workspaceHeaderContext({
-    title,
-    v: v || {
-      data: 'data-documents-settings',
-      aria: 'Настройки документов',
-    },
-    c,
-  });
-}
 
 function isRknGuide(item = {}) {
   return item?.attachment?.type === 'RKN_GUIDE_PDF'
@@ -264,7 +252,9 @@ function documentCard(item, data) {
     version: visibleDocumentVersion(item),
     meta: [documentTypeText(item), date].filter(Boolean).join(' · '),
     data,
-    aria: `Открыть информацию о документе ${item.title || 'Документ'}`,
+    editData: canEditDesktopDocument(item) || canDeleteDocument(item) ? `data-mobile-document-edit="${escapeHtml(item.id)}"` : '',
+    editAria: canEditDesktopDocument(item) ? 'Редактировать документ' : 'Управление файлом',
+    aria: `Открыть документ ${item.title || 'Документ'}`,
   });
 }
 
@@ -275,13 +265,13 @@ function documentsMarkup() {
     <section class="document-group document-group--core" data-document-group="core">
       <h3 class="document-group__title">Основные документы</h3>
       ${core.length
-        ? documentTiles(core.map((item) => documentCard(item, `data-profile-document="${String(item.id || '')}"`)), { layout: 'rail' })
+        ? documentTiles(core.map((item) => documentCard(item, `data-profile-document="${escapeHtml(item.id || '')}"`)), { layout: 'rail' })
         : emptyState('Основные документы не загрузились', 'Обновите раздел.')}
     </section>
     <section class="document-group document-group--other" data-document-group="other">
       <h3 class="document-group__title">Другие документы</h3>
       ${other.length
-        ? documentTiles(other.map((item) => documentCard(item, `data-profile-document="${String(item.id || '')}"`)), { layout: 'rail' })
+        ? documentTiles(other.map((item) => documentCard(item, `data-profile-document="${escapeHtml(item.id || '')}"`)), { layout: 'rail' })
         : emptyState('Других документов пока нет', 'Здесь появятся PDF-помощники и добавленные вами документы.')}
     </section>
   `;
@@ -431,24 +421,6 @@ function contentMarkup() {
   return currentView === 'history' ? historyMarkup() : documentsMarkup();
 }
 
-function bindSettings(scope, root) {
-  scope.querySelector('[data-documents-settings]')?.addEventListener('click', () => openSettingsMenu(root));
-}
-
-function detailReceipt(item) {
-  const moment = documentMoment(item);
-  const parts = shortDateTimeParts(moment);
-  const rows = [{ label: 'Тип', value: documentTypeText(item) }];
-  const version = visibleDocumentVersion(item);
-  if (version !== '') rows.push({ label: 'Версия', value: String(version) });
-  if (canSignDocument(item)) rows.push({ label: 'Подписание', value: 'Доступно' });
-  rows.push({
-    label: canDeleteDocument(item) ? 'Добавлен' : 'Обновлён',
-    value: parts.date ? [parts.date, parts.time].filter(Boolean).join(' · ') : '—',
-  });
-  return readOnlyReceipt({ title: 'Информация о документе', items: rows });
-}
-
 function confirmDocumentDeletion(root, layer, item) {
   const rkn = isRknGuide(item);
   const desktop = root.hasAttribute('data-settings-embedded');
@@ -485,67 +457,6 @@ function confirmDocumentDeletion(root, layer, item) {
   });
 }
 
-function openDocumentDetailSettings(root, layer, item) {
-  const actions = [];
-  if (isCoreDocument(item)) {
-    actions.push(button('Открыть шаблон', { variant: 'outline', data: 'data-detail-template' }));
-  } else if (canDeleteDocument(item)) {
-    actions.push(button(isRknGuide(item) ? 'Убрать документ' : 'Удалить документ', { variant: 'critical', data: 'data-detail-delete' }));
-  }
-  const sheet = mountModal(document.body, modal(
-    `<div class="compact-form">${actions.join('')}</div>`,
-    {
-      title: 'Настройки документа',
-      variant: 'x',
-      surface: 'app',
-      className: 'modal--form-sheet',
-    },
-  ));
-  if (!sheet) return null;
-
-  sheet.querySelector('[data-detail-template]')?.addEventListener('click', () => {
-    sheet.v2Close?.();
-    const template = templates().find((entry) => entry.id === item.id);
-    if (template) openTemplateEditor(root, template);
-  });
-
-  sheet.querySelector('[data-detail-delete]')?.addEventListener('click', () => {
-    sheet.v2Close?.();
-    confirmDocumentDeletion(root, layer, item);
-  });
-
-  return sheet;
-}
-
-function openDocumentDetail(root, item) {
-  const layer = mountV2ZLayer(root, v2ZLayer('', { className: 'documents-detail-layer' }), { stack: true });
-  if (!layer) return null;
-
-  layer.innerHTML = page([
-    headerContext('Документ', null, {
-      data: 'data-document-detail-settings',
-      aria: 'Настройки документа',
-    }),
-    `<section class="document-detail" data-document-detail>
-      ${documentTiles([
-        documentTile({
-          title: item.title || 'Документ',
-          version: visibleDocumentVersion(item),
-          meta: documentTypeText(item),
-          data: 'data-document-content-open',
-          aria: 'Открыть содержимое документа',
-        }),
-      ])}
-      ${detailReceipt(item)}
-    </section>`,
-  ]);
-
-  layer.querySelector('[data-document-content-open]')?.addEventListener('click', () => openDocument(item));
-  layer.querySelector('[data-document-detail-settings]')?.addEventListener('click', () => openDocumentDetailSettings(root, layer, item));
-  window.dispatchEvent(new CustomEvent('va-tools:v2-context-changed'));
-  return layer;
-}
-
 function openSigningDetail(item) {
   const snapshot = signedDocumentSnapshot(item);
   const person = consentSubjectLabel(item);
@@ -574,93 +485,10 @@ function openSigningDetail(item) {
   ));
 }
 
-function renderTemplatesLayer(layer, root) {
-  const items = templates();
-  layer.innerHTML = page([
-    headerContext('Шаблоны'),
-    items.length
-      ? documentTiles(items.map((item) => documentTile({
-          title: item.title || 'Шаблон',
-          version: item.version || 1,
-          meta: item.sourceMode === 'CUSTOM' ? 'Ваш вариант' : 'Системный шаблон',
-          data: `data-template-open="${String(item.id || '')}"`,
-          aria: `Открыть шаблон ${item.title || ''}`,
-        })), { layout: 'rail' })
-      : emptyState('Шаблоны недоступны', 'Базовые шаблоны Реестра не загрузились.'),
-  ]);
-
-  bindSettings(layer, root);
-  layer.querySelectorAll('[data-template-open]').forEach((control) => {
-    control.addEventListener('click', () => {
-      const item = templates().find((template) => template.id === control.dataset.templateOpen);
-      if (item) renderTemplateEditor(layer, root, item);
-    });
-  });
-  window.dispatchEvent(new CustomEvent('va-tools:v2-context-changed'));
-}
-
-function openTemplatesLayer(root) {
-  const layer = mountV2ZLayer(root, v2ZLayer('', { className: 'documents-templates-layer' }), { stack: true });
-  if (!layer) return null;
-  renderTemplatesLayer(layer, root);
-  return layer;
-}
-
 function setPrimaryVisible(source, visible) {
   if (!source) return;
   const actions = source.closest('.modal-actions');
   if (actions) actions.hidden = !visible;
-}
-
-function renderTemplateEditor(layer, root, item) {
-  layer.innerHTML = page([
-    headerContext(item.title || 'Шаблон'),
-    `<form class="form-grid" data-template-form>
-      ${field({ label: 'Название', name: 'documentTitle', value: item.title || '', required: true })}
-      ${textareaField({ label: 'Текст документа', name: 'documentText', value: item.text || '', rows: 16, placeholder: 'Текст документа' })}
-    </form>`,
-    actionBlock(button('Сохранить', {
-      data: 'data-template-save',
-      aria: 'Сохранить шаблон',
-    })),
-  ]);
-
-  const form = layer.querySelector('[data-template-form]');
-  const primary = layer.querySelector('[data-template-save]');
-  const initialTitle = String(item.title || '');
-  const initialText = String(item.text || '');
-
-  const sync = () => {
-    const title = String(form?.querySelector('[name="documentTitle"]')?.value || '').trim();
-    const body = String(form?.querySelector('[name="documentText"]')?.value || '');
-    setPrimaryVisible(primary, Boolean(title) && (title !== initialTitle || body !== initialText));
-  };
-  form?.addEventListener('input', sync);
-  form?.addEventListener('change', sync);
-
-  primary?.addEventListener('click', () => {
-    const title = String(form?.querySelector('[name="documentTitle"]')?.value || '').trim();
-    if (!title) return;
-    const saved = saveDocument({
-      ...item,
-      documentClass: DOCUMENT_CLASS.CORE_LEGAL,
-      title,
-      text: String(form?.querySelector('[name="documentText"]')?.value || ''),
-      sourceMode: 'CUSTOM',
-    });
-    renderMain(root);
-    renderTemplateEditor(layer, root, saved);
-  });
-
-  bindSettings(layer, root);
-  setPrimaryVisible(primary, false);
-}
-
-function openTemplateEditor(root, item) {
-  const layer = mountV2ZLayer(root, v2ZLayer('', { className: 'documents-template-editor' }), { stack: true });
-  if (!layer) return null;
-  renderTemplateEditor(layer, root, item);
-  return layer;
 }
 
 function userPdfStoredBytes() {
@@ -673,8 +501,8 @@ function userPdfStoredBytes() {
 function signableSetting(checked = false) {
   return v2ListEntries([
     v2ListEntry({
-      title: 'Для подписания',
-      subtitle: 'Если включено, PDF становится пользовательским документом, а не обычным файлом',
+      title: 'Подписание клиентом',
+      omitEmptySubtitle: true,
       interactive: false,
       toggleData: 'data-document-signable',
       toggleAria: 'Разрешить использовать документ для подписания',
@@ -701,7 +529,7 @@ function renderNewDocumentEditor(layer, root, draft = {}) {
     <div class="v2-desktop-tool-actions">${saveButton}</div>
   </div>` : '';
   layer.innerHTML = page([
-    desktop ? workspaceHeaderContext({title:'Новый документ'}) : headerContext('Новый документ'),
+    workspaceHeaderContext({title:'Новый документ'}),
     attachment ? documentTiles([
       documentTile({
         title: draft.title || attachment.fileName || 'PDF',
@@ -760,7 +588,6 @@ function renderNewDocumentEditor(layer, root, draft = {}) {
     renderMain(root);
   });
 
-  if (!desktop) bindSettings(layer, root);
   sync();
 }
 
@@ -825,29 +652,64 @@ function openAddDocumentMenu(root) {
   return layer;
 }
 
-function openSettingsMenu(root) {
-  const layer = mountModal(document.body, modal(
-    `<div class="compact-form">
-      ${button('Шаблоны', { data: 'data-open-document-templates', variant: 'outline' })}
-      ${button('Добавить документ', { data: 'data-add-profile-document' })}
-    </div>`,
-    {
-      title: 'Документы',
-      variant: 'x',
-      surface: 'app',
-      className: 'modal--form-sheet',
-    },
-  ));
+function openMobileDocumentEditor(root, item) {
+  const layer = mountV2ZLayer(root, v2ZLayer('', {className:'documents-mobile-editor'}), {stack:true});
   if (!layer) return null;
-
-  layer.querySelector('[data-open-document-templates]')?.addEventListener('click', () => {
-    layer.v2Close?.();
-    openTemplatesLayer(root);
+  const editable = canEditDesktopDocument(item);
+  const core = isCoreDocument(item);
+  const attachment = item.attachment;
+  let signable = canSignDocument(item);
+  const initialSignable = signable;
+  const initialTitle = String(item.title || '');
+  const initialText = String(item.text || '');
+  layer.innerHTML = page([
+    workspaceHeaderContext({title:editable ? 'Редактирование документа' : 'Документ'}),
+    `<form class="form-grid" data-mobile-document-form>
+      ${field({label:'Название',name:'documentTitle',value:initialTitle,required:true,disabled:!editable})}
+      ${attachment || !editable ? '' : textareaField({label:'Текст документа',name:'documentText',value:initialText,rows:16,placeholder:'Текст документа'})}
+    </form>`,
+    `<div class="documents-mobile-editor-controls">
+      ${editable && !core ? signableSetting(signable) : ''}
+      ${canDeleteDocument(item) ? button(isRknGuide(item)?'Убрать документ':'Удалить',{variant:'critical',data:'data-mobile-document-delete'}) : ''}
+    </div>`,
+    editable ? actionBlock(button('Сохранить',{data:'data-mobile-document-save',aria:'Сохранить документ'})) : '',
+  ]);
+  const form = layer.querySelector('[data-mobile-document-form]');
+  const save = layer.querySelector('[data-mobile-document-save]');
+  const toggle = layer.querySelector('[data-document-signable]');
+  const draft = () => ({
+    title:String(form?.querySelector('[name="documentTitle"]')?.value || '').trim(),
+    text:attachment ? initialText : String(form?.querySelector('[name="documentText"]')?.value || ''),
   });
-  layer.querySelector('[data-add-profile-document]')?.addEventListener('click', () => {
-    layer.v2Close?.();
-    openAddDocumentMenu(root);
+  const dirty = () => {
+    const next = draft();
+    return Boolean(editable && next.title && (attachment || next.text.trim()) &&
+      (next.title !== initialTitle || next.text !== initialText || signable !== initialSignable));
+  };
+  const sync = () => setPrimaryVisible(save, dirty());
+  toggle?.addEventListener('click', () => {
+    signable = !signable;
+    toggle.setAttribute('aria-pressed', String(signable));
+    toggle.classList.toggle('is-on', signable);
+    toggle.querySelector('.app-setting-toggle__switch')?.classList.toggle('is-on', signable);
+    sync();
   });
+  form?.addEventListener('input', sync);
+  form?.addEventListener('change', sync);
+  form?.addEventListener('submit', event => {event.preventDefault(); if(dirty()) save?.click();});
+  save?.addEventListener('click', () => {
+    if (!dirty()) return;
+    // Promote a plain PDF when signing is enabled; never demote a versioned
+    // document, since its signed history must retain the original version.
+    const documentClass = !core && signable && isFileDocument(item) ? DOCUMENT_CLASS.USER_DOCUMENT : item.documentClass;
+    saveDocument({...item,...draft(),documentClass,signable:core ? item.signable : signable,sourceMode:'CUSTOM'});
+    layer.v2Close?.();
+    currentView = 'documents';
+    renderMain(root);
+  });
+  layer.querySelector('[data-mobile-document-delete]')?.addEventListener('click', () => confirmDocumentDeletion(root,layer,item));
+  sync();
+  window.dispatchEvent(new CustomEvent('va-tools:v2-context-changed'));
   return layer;
 }
 
@@ -927,8 +789,6 @@ function renderDesktopHistoryToolbar(root) {
 }
 
 function bindMain(root, headerRows = []) {
-  bindSettings(root, root);
-  root.querySelector('[data-settings-document-templates]')?.addEventListener('click', () => openTemplatesLayer(root));
   root.querySelector('[data-documents-content]')?.addEventListener('settings-detail-closed', () => {
     closeDesktopDocumentEditor(root);
     syncDesktopHistoryToolbar(root);
@@ -977,10 +837,17 @@ function bindMain(root, headerRows = []) {
     control.addEventListener('click',remove);
     control.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' ')remove(event);});
   });
+  root.querySelectorAll('[data-mobile-document-edit]').forEach(control => {
+    control.addEventListener('click', event => {
+      event.stopPropagation();
+      const item = currentProfileDocuments().find(doc => doc.id === control.dataset.mobileDocumentEdit);
+      if (item && (canEditDesktopDocument(item) || canDeleteDocument(item))) openMobileDocumentEditor(root,item);
+    });
+  });
   root.querySelectorAll('[data-profile-document]').forEach((control) => {
     control.addEventListener('click', () => {
       const item = currentProfileDocuments().find((document) => document.id === control.dataset.profileDocument);
-      if (item) root.hasAttribute('data-settings-embedded') ? openDocument(item) : openDocumentDetail(root,item);
+      if (item) openDocument(item);
     });
   });
 
@@ -1014,7 +881,6 @@ function renderMain(root) {
       c: currentView === 'documents' ? { label: '+', data: 'data-settings-document-add', aria: 'Добавить документ' } : null,
     }),
     `<section class="documents-content" data-documents-content>${contentMarkup()}</section>`,
-    currentView === 'documents' ? actionBlock(button('Шаблоны', { variant: 'outline', data: 'data-settings-document-templates' })) : '',
   ]);
   const rows = mobileDocumentsHeaderRows();
   const headerRows = setV2ZHeaderRows(root, rows);

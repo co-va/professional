@@ -236,3 +236,10 @@ button.document-tile,.document-tile__open,.document-tile__toggle{cursor:pointer}
 .mobile-document-history .document-tile__phone{color:var(--v2-muted,#6f7478)}
 .mobile-document-history .document-tile__meta{white-space:nowrap}
 .mobile-document-history .document-tile[hidden],.mobile-document-history-empty[hidden]{display:none}
+
+/* Optional independent edit action on a document tile. Reading remains a real separate button. */
+.document-tile--editable{padding:0}
+.document-tile--editable .document-tile__edit{position:absolute;z-index:3;top:7px;left:12px;font-size:20px;font-weight:400;color:var(--v2-ink,var(--text));border:0;background:transparent}
+.documents-mobile-editor-controls{display:grid;gap:16px;margin-top:18px}
+.documents-mobile-editor-controls .list-entries{padding:0}
+.documents-mobile-editor-controls .ui-button{margin:0}
