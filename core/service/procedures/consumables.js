@@ -113,9 +113,9 @@ export function openConsumablePicker(selected, onPick, { anchor = null, multiple
   const groupMode = Array.isArray(groupRows);
   const desktop = isV2DesktopWorkspace(anchor?.closest('[data-v2-app]') || document.querySelector('.v2-app--workspace'));
   if (desktop && anchor) anchor.dataset.v2AnchorWidth = '520';
-  const title = groupMode ? 'Группы расхода' : 'Товары';
+  const title = groupMode ? 'Группы' : 'Позиции';
   const searchField = field({ label: 'Поиск', name: 'consumableSearch', type: 'search',
-    placeholder: groupMode ? 'Название группы' : 'Товар, производитель или артикул' });
+    placeholder: groupMode ? 'Название группы' : 'Название, производитель или артикул' });
   const panel = (desktop
     ? '<div class="desktop-table-picker-tools">' + searchField +
       compactButton({ kind: 'remove', data: 'data-consumable-picker-close', aria: 'Закрыть' }) + '</div>'
@@ -143,7 +143,7 @@ export function openConsumablePicker(selected, onPick, { anchor = null, multiple
     payload: { groupId: String(group.groupId), name: group.name, unit: group.unit, quantity: null },
     search: [group.name],
   })) : getInventoryItems().map(item => ({
-    id: String(item.itemId), title: item.name || 'Товар',
+    id: String(item.itemId), title: item.name || 'Позиция',
     secondary: [item.manufacturer, item.sku].filter(Boolean).join(' · '),
     payload: { itemId: String(item.itemId), quantity: null, unit: procedureConsumableUnit(item) },
     search: [item.name, item.manufacturer, item.sku],
@@ -183,18 +183,18 @@ export function openConsumablePicker(selected, onPick, { anchor = null, multiple
     };
     if (desktop) host.innerHTML = dataTable({
       compact: true, caption: title,
-      columns: [{ key: 'title', label: groupMode ? 'Группа' : 'Товар', sortable: false,
+      columns: [{ key: 'title', label: groupMode ? 'Группа' : 'Позиция', sortable: false,
         render: row => row.id ? rowMarkup(row) : escapeHtml(row.title) }],
-      rows: visible.length ? visible : [{ title: groupMode ? 'Группы не найдены' : 'Товары не найдены' }],
+      rows: visible.length ? visible : [{ title: groupMode ? 'Группы не найдены' : 'Позиции не найдены' }],
     });
     else if (multiple) host.innerHTML = visible.length
       ? '<div class="ui-check-list">' + visible.map(row => rowMarkup(row).replace('desktop-table-picker-item desktop-table-picker-check','ui-check-list__item')).join('') + '</div>'
-      : emptyState(groupMode ? 'Группы не найдены' : 'Товары не найдены');
+      : emptyState(groupMode ? 'Группы не найдены' : 'Позиции не найдены');
     else host.innerHTML = visible.length ? list({
       className: 'ui-list--dense',
       items: visible.map(row => ({ title: row.title, secondary: row.secondary, interactive: true,
         data: 'data-consumable-pick="' + escapeHtml(row.id) + '"', aria: 'Добавить ' + row.title })),
-    }) : emptyState(groupMode ? 'Группы не найдены' : 'Товары не найдены');
+    }) : emptyState(groupMode ? 'Группы не найдены' : 'Позиции не найдены');
     if (items.length > visible.length) host.insertAdjacentHTML('beforeend',
       '<p class="ui-list__secondary">Показано ' + visible.length + ' из ' + items.length + '</p>');
     host.querySelectorAll('[data-consumable-pick]').forEach(node =>
@@ -225,10 +225,7 @@ export async function openProcedureConsumables(procedureId, onSaved = () => {}) 
   const panel = '<div data-procedure-consumable-items></div>' +
     '<p class="ui-list__secondary" data-procedure-consumable-cost></p>' +
     '<div class="app-settings-panel">' +
-      button('+ Группа', { variant: 'secondary', data: 'data-procedure-consumable-group-add' }) +
-    '</div>' +
-    '<div class="app-settings-panel">' +
-      button('+ Товар', { variant: 'secondary', data: 'data-procedure-consumable-add' }) +
+      compactButton({ kind: 'add', data: 'data-procedure-consumable-add', aria: 'Добавить расходник' }) +
     '</div>' +
     '<div class="form-error" role="alert" data-procedure-consumable-error></div>' +
     actionBlock(button('Применить', { data: 'data-procedure-consumable-save' }));
@@ -242,12 +239,8 @@ export async function openProcedureConsumables(procedureId, onSaved = () => {}) 
   const save = layer.querySelector('[data-procedure-consumable-save]');
   const actions = save?.closest('.modal-actions');
   const add = layer.querySelector('[data-procedure-consumable-add]');
-  const addGroup = layer.querySelector('[data-procedure-consumable-group-add]');
-  const desktop = moveDesktopQTool(addGroup);
-  if (desktop) {
-    moveDesktopQTool(add);
-    moveDesktopQTool(save, { desktopLabel: 'Сохранить' });
-  }
+  const desktop = moveDesktopQTool(add);
+  if (desktop) moveDesktopQTool(save, { desktopLabel: 'Сохранить' });
   let saving = false;
   const sync = () => {
     if (costNode) {
@@ -270,7 +263,6 @@ export async function openProcedureConsumables(procedureId, onSaved = () => {}) 
     setSharedActionVisible(actions, signature() !== initial);
     if (save) save.disabled = saving;
     if (add) add.disabled = saving;
-    if (addGroup) addGroup.disabled = saving;
   };
   const render = () => {
     const inventory = new Map(getInventoryItems().map(item => [String(item.itemId), item]));
@@ -291,7 +283,7 @@ export async function openProcedureConsumables(procedureId, onSaved = () => {}) 
     host.innerHTML = rows.length || norms.length ? '<div class="ui-list ui-list--dense">' + normMarkup +
       rows.map((row, index) => {
         const item = inventory.get(String(row.itemId));
-        const title = item?.name || 'Товар недоступен';
+        const title = item?.name || 'Позиция недоступна';
         const unit = row.unit || (item ? procedureConsumableUnit(item) : '');
         return '<div class="ui-list__item" data-consumable-row="' + index + '">' +
           '<span class="ui-list__main">' +
@@ -345,7 +337,7 @@ export async function openProcedureConsumables(procedureId, onSaved = () => {}) 
     rows.splice(index, 1);
     render();
   });
-  addGroup?.addEventListener('click', async () => {
+  const chooseGroup = async () => {
     if (saving) return;
     try { await groupLoad; }
     catch (error) {
@@ -356,9 +348,9 @@ export async function openProcedureConsumables(procedureId, onSaved = () => {}) 
     openConsumablePicker(new Set(norms.map(row => String(row.groupId))), picked => {
       norms.push(...picked);
       render();
-    }, { anchor: addGroup, multiple: true, groupRows: stockGroups });
-  });
-  add?.addEventListener('click', async () => {
+    }, { anchor: add, multiple: true, groupRows: stockGroups });
+  };
+  const choosePosition = async () => {
     if (saving) return;
     try { await inventoryLoad; }
     catch (error) {
@@ -371,6 +363,27 @@ export async function openProcedureConsumables(procedureId, onSaved = () => {}) 
       rows.push(...item);
       render();
     }, { anchor: add, multiple: true });
+  };
+  add?.addEventListener('click', () => {
+    if (saving) return;
+    if (desktop) add.dataset.v2AnchorWidth = '240';
+    const menu = mountModal(desktop ? add : layer, modal(
+      '<div class="' + (desktop ? 'desktop-q-action-menu' : 'modal-actions') + '">' +
+        button('+ Группа', { variant: 'secondary', data: 'data-consumable-choice-group' }) +
+        button('+ Позиция', { variant: 'secondary', data: 'data-consumable-choice-position' }) +
+      '</div>', {
+        title: 'Добавить расходник', variant: 'x', surface: 'app', xRole: 'action',
+        className: desktop ? 'desktop-q-action-popup' : '',
+      }));
+    if (!menu) return;
+    menu.querySelector('[data-consumable-choice-group]')?.addEventListener('click', () => {
+      menu.v2Close?.();
+      if (layer.isConnected) void chooseGroup();
+    });
+    menu.querySelector('[data-consumable-choice-position]')?.addEventListener('click', () => {
+      menu.v2Close?.();
+      if (layer.isConnected) void choosePosition();
+    });
   });
   save?.addEventListener('click', async () => {
     if (saving) return;
