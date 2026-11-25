@@ -1,5 +1,6 @@
 import { modal, mountModal } from '../../ui/modals/index.js';
 import { moveDesktopQTool, pinDesktopQDanger } from '../../ui/v2/z-layout.js';
+import { isV2DesktopWorkspace } from '../../ui/v2/geometry.js';
 import { escapeHtml } from '../../ui/utils/escape-html.js';
 import { button } from '../../ui/buttons/index.js';
 import { collectCost, costField, initCostFields, validateCostDefinition, costListParts } from '../../ui/cost/index.js';
@@ -7,7 +8,6 @@ import { durationPicker, durationText, initDurationPickers } from '../../ui/dura
 import { textareaField } from '../../ui/inputs/index.js';
 import { compactCheck } from '../../ui/selection/check-list.js';
 import { list as sharedList } from '../../ui/lists/list.js';
-import { procedureGroupBookingFields, bindProcedureGroupBooking, adaptDesktopGroupBooking } from './procedures/group-booking-ui.js';
 import { costSnapshot } from './editor-signature.js';
 import { getWorkplaces } from '../profile/workplaces/data.js';
 
@@ -45,6 +45,7 @@ export function serviceWorkplaceAddButton() {
 
 export function bindServiceWorkplaceAssignments(root, {
   selected = [],
+  overview = false,
   kind = 'procedure',
   getBase = () => ({}),
   onChange = () => {},
@@ -53,11 +54,11 @@ export function bindServiceWorkplaceAssignments(root, {
   const assignments = new Map((Array.isArray(selected) ? selected : [])
     .map((item) => [idOf(item), { ...item }]).filter(([id]) => id));
   const catalog = options();
-  const list = root.querySelector('[data-service-workplace-prices]');
+  const list = overview ? root : root.querySelector('[data-service-workplace-prices]');
   const addButton = root.querySelector('[data-service-workplace-add]');
   if (!list || !addButton) return { read: () => [] };
-  const desktopTool = moveDesktopQTool(addButton);
-  if (desktopTool) {
+  const desktopTool = overview ? isV2DesktopWorkspace(root.closest('[data-v2-app]')) : moveDesktopQTool(addButton);
+  if (desktopTool && !overview) {
     // Only page-level actions, not local price/assignment editor controls.
     const remove = root.querySelector('[data-procedure-editor-delete], [data-product-editor-delete], [data-service-retail-product-delete]');
     const primary = root.querySelector('[data-procedure-editor-primary], [data-product-editor-primary], [data-service-retail-price-apply]');
@@ -73,6 +74,7 @@ export function bindServiceWorkplaceAssignments(root, {
     name: catalog.find((space) => space.id === id)?.name || assignment.name || 'Рабочее пространство',
   }));
   const render = () => {
+    if (overview) return;
     const base = getBase();
     list.innerHTML = sharedList({ className: 'ui-list--dense', items: read()
       .filter((item) => catalog.some((space) => space.id === item.workplaceId))
@@ -102,8 +104,9 @@ export function bindServiceWorkplaceAssignments(root, {
       duration: minutes(current.duration ?? base.duration),
       breakDuration: minutes(current.breakDuration ?? base.breakDuration),
       description: String(current.description ?? base.description ?? ''),
-      visibleInPublicBooking: current.visibleInPublicBooking ?? base.visibleInPublicBooking ?? true,
-      groupBooking: current.groupBooking || base.groupBooking || { enabled: false, capacity: 2 },
+      visibleInPublicBooking: overview
+        ? base.visibleInPublicBooking !== false && current.visibleInPublicBooking !== false
+        : current.visibleInPublicBooking ?? base.visibleInPublicBooking ?? true,
     };
     const signature = (value) => JSON.stringify({
       cost: costSnapshot(value.cost),
@@ -111,15 +114,10 @@ export function bindServiceWorkplaceAssignments(root, {
       breakDuration: isProcedure ? minutes(value.breakDuration) : null,
       description: String(value.description),
       visibleInPublicBooking: isProcedure ? value.visibleInPublicBooking !== false : null,
-      groupBooking: isProcedure ? {
-        enabled: value.groupBooking?.enabled === true,
-        capacity: value.groupBooking?.enabled === true
-          ? Math.max(2, Math.floor(Number(value.groupBooking?.capacity) || 2)) : null,
-      } : null,
     });
     const originalSignature = signature(values);
     const content = `<div class="compact-form service-workplace-price-editor" data-service-workplace-editor>
-      <strong class="service-workplace-price-editor__title">${escapeHtml(space.name)}</strong>
+      ${overview ? '' : `<strong class="service-workplace-price-editor__title">${escapeHtml(space.name)}</strong>`}
       ${isProcedure ? `<div class="work-time-row__fields">
         ${durationPicker({ name: 'localDuration', label: 'Длительность', value: values.duration })}
         ${durationPicker({ name: 'localBreak', label: 'Перерыв', value: values.breakDuration })}
@@ -128,17 +126,11 @@ export function bindServiceWorkplaceAssignments(root, {
       ${textareaField({ label: 'Описание', name: 'localDescription', value: values.description, rows: 3 })}
       ${isProcedure ? `<div class="service-workplace-extra">
         ${compactCheck({ label: 'Для онлайн-записи', checked: values.visibleInPublicBooking !== false, data: 'data-local-online' })}
-        ${procedureGroupBookingFields({
-          enabled: values.groupBooking.enabled === true,
-          capacity: values.groupBooking.capacity,
-          toggleData: 'data-local-group-toggle',
-          capacityData: 'data-local-group-count',
-          capacityName: 'localCapacity',
-        })}
       </div>` : ''}
       <div class="form-error" role="alert" data-service-workplace-error></div>
+      ${overview ? '</div>' : ''}
       <div class="modal-actions">
-        <div data-service-workplace-apply-host${isNew ? '' : ' hidden'}>
+        <div data-service-workplace-apply-host${overview && desktopTool ? ' class="modal-actions"' : ''}${isNew ? '' : ' hidden'}>
           ${button('Применить', { data: 'data-service-workplace-apply' })}
         </div>
         ${!isNew && hasPrice(current.cost) ? button('Отменить', {
@@ -149,10 +141,37 @@ export function bindServiceWorkplaceAssignments(root, {
           variant: 'danger', data: 'data-service-workplace-remove',
         }) : ''}
       </div>
-    </div>`;
-    const layer = mountModal(document.body, modal(content, { variant: 'x', xRole: 'editor', title: space.name }));
+    ${overview ? '' : '</div>'}`;
+    const layer = mountModal(document.body, modal(content, {
+      variant: overview ? 'q' : 'x', xRole: overview ? '' : 'editor', title: space.name, surface: overview ? 'app' : '',
+    }));
     if (!layer) return;
-    if (desktopTool) {
+    if (overview && desktopTool) {
+      const primary = layer.querySelector('[data-service-workplace-apply]');
+      const cancel = layer.querySelector('[data-service-workplace-cancel-price]');
+      const remove = layer.querySelector('[data-service-workplace-remove]');
+      const actions = primary?.closest('[data-service-workplace-apply-host]')?.parentElement;
+      // Move only individual actions; the visibility wrapper travels with Save.
+      if (cancel) moveDesktopQTool(cancel);
+      if (primary) moveDesktopQTool(primary);
+      if (remove && actions) {
+        const danger = actions.ownerDocument.createElement('div');
+        danger.className = 'app-settings-panel';
+        actions.before(danger);
+        danger.append(remove);
+        pinDesktopQDanger(remove);
+      }
+      if (actions && !actions.children.length) actions.remove();
+      const header = layer.querySelector('[data-v2-q-header-content]');
+      const toolbar = header?.querySelector(':scope > .desktop-q-toolbar');
+      const extra = layer.querySelector('.service-workplace-extra');
+      const online = extra?.querySelector('.ui-compact-check');
+      if (isProcedure && toolbar && online) {
+        online.classList.add('desktop-q-online-booking');
+        toolbar.prepend(online);
+        if (!extra.children.length) extra.remove();
+      }
+    } else if (desktopTool) {
       const editor = layer.querySelector('[data-service-workplace-editor]');
       const title = editor?.querySelector('.service-workplace-price-editor__title');
       const footer = editor?.querySelector('.modal-actions');
@@ -175,35 +194,18 @@ export function bindServiceWorkplaceAssignments(root, {
         footer.classList.add('desktop-workplace-danger-footer');
         if (!footer.children.length) footer.hidden = true;
         editor.classList.add('desktop-workplace-editor');
-        if (isProcedure) {
-          const extra = editor.querySelector('.service-workplace-extra');
-          if (adaptDesktopGroupBooking(extra, {
-            toggleSelector: '[data-local-group-toggle]',
-            capacitySelector: '[data-local-group-count]',
-            onlineSelector: '[data-local-online]',
-          })) tools.after(extra);
-        }
       }
     }
     initCostFields(layer);
     if (isProcedure) initDurationPickers(layer);
     let saving = false;
-    let localGroupEnabled = values.groupBooking.enabled === true;
     const readValues = () => {
-      const groupEnabled = localGroupEnabled;
       return {
         cost: collectCost(layer, 'workplaceCost'),
         duration: isProcedure ? Number(layer.querySelector('[name="localDuration"]')?.value || 0) : 0,
         breakDuration: isProcedure ? Number(layer.querySelector('[name="localBreak"]')?.value || 0) : 0,
         description: layer.querySelector('[name="localDescription"]')?.value || '',
         visibleInPublicBooking: !isProcedure || Boolean(layer.querySelector('[data-local-online]')?.checked),
-        groupBooking: {
-          enabled: groupEnabled,
-          capacity: Number((() => {
-            const field = layer.querySelector('[name="localCapacity"]');
-            return field?.disabled && field.dataset.enabledCapacity !== undefined ? field.dataset.enabledCapacity : field?.value;
-          })() || 2),
-        },
       };
     };
     const actions = layer.querySelector('[data-service-workplace-apply]');
@@ -217,13 +219,6 @@ export function bindServiceWorkplaceAssignments(root, {
         .forEach((node) => { node.disabled = saving; });
       return changed;
     };
-    if (isProcedure) bindProcedureGroupBooking(layer, {
-      toggleSelector: '[data-local-group-toggle]',
-      capacitySelector: '[data-local-group-count]',
-      isEnabled: () => localGroupEnabled,
-      toggle: () => { localGroupEnabled = !localGroupEnabled; },
-      onChange: sync,
-    });
     layer.addEventListener('input', sync);
     layer.addEventListener('change', sync);
     sync();
@@ -268,10 +263,9 @@ export function bindServiceWorkplaceAssignments(root, {
       if (isProcedure) {
         assign('duration', minutes(draft.duration), minutes(base.duration));
         assign('breakDuration', minutes(draft.breakDuration), minutes(base.breakDuration));
-        assign('visibleInPublicBooking', draft.visibleInPublicBooking, base.visibleInPublicBooking !== false);
-        assign('groupBooking', draft.groupBooking, base.groupBooking || { enabled: false, capacity: 2 },
-          (a, b) => eq(Boolean(a?.enabled), Boolean(b?.enabled))
-            && (!a?.enabled || Number(a.capacity) === Number(b.capacity)));
+        if (overview) assignment.visibleInPublicBooking = draft.visibleInPublicBooking;
+        else assign('visibleInPublicBooking', draft.visibleInPublicBooking, base.visibleInPublicBooking !== false);
+        delete assignment.groupBooking;
       }
       void apply(assignment);
     });
@@ -287,10 +281,16 @@ export function bindServiceWorkplaceAssignments(root, {
     });
   };
 
-  list.addEventListener('click', (event) => {
-    const row = event.target.closest('[data-service-workplace-open]');
-    if (row && list.contains(row)) edit(row.dataset.serviceWorkplaceOpen);
-  });
+  if (overview) {
+    list.querySelectorAll('[data-service-workplace-open]').forEach(card => {
+      card.addEventListener('click', () => edit(card.dataset.serviceWorkplaceOpen));
+    });
+  } else {
+    list.addEventListener('click', (event) => {
+      const row = event.target.closest('[data-service-workplace-open]');
+      if (row && list.contains(row)) edit(row.dataset.serviceWorkplaceOpen);
+    });
+  }
   addButton.addEventListener('click', () => {
     const available = catalog.filter((space) => !assignments.has(space.id));
     if (!available.length) {

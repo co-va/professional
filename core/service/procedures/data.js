@@ -90,8 +90,16 @@ export async function resetProcedureCardAppearances() {
 }
 
 
+// Group booking belongs to the procedure, not its workplace assignments.
+// Normalize legacy local overrides on the next explicit write of that procedure.
+function withoutLocalGroupBooking(item) {
+  if (!Array.isArray(item.workplaces) || !item.workplaces.some(space => Object.hasOwn(space, 'groupBooking'))) return item;
+  return { ...item, workplaces: item.workplaces.map(({ groupBooking, ...space }) => space) };
+}
+
 // Committed write: the canonical owner is hydrated only after server ACK.
 export async function commitProcedure(item) {
+  item = withoutLocalGroupBooking(item);
   await commitServiceCollection({
     read: readRawProcedures,
     persist: (values) => queueOperationalDataset('procedures', values),
@@ -131,7 +139,18 @@ export async function commitProcedureWorkplace(entityId, workplaceId, assignment
     read: readRawProcedures,
     persist: (values) => queueOperationalDataset('procedures', values),
     hydrate: hydrateCurrentProceduresFromServer,
-    mutate: (values) => changeServiceItemWorkplace(values, entityId, workplaceId, assignment),
+    mutate: (values) => {
+      const next = assignment && typeof assignment.visibleInPublicBooking === 'boolean'
+        ? values.map(item => String(item.id) === String(entityId) && item.visibleInPublicBooking === false
+          ? { ...item, visibleInPublicBooking: true,
+            workplaces: (Array.isArray(item.workplaces) ? item.workplaces : []).map(space => ({
+              ...space, visibleInPublicBooking: false,
+            })) }
+          : item)
+        : values;
+      return changeServiceItemWorkplace(next, entityId, workplaceId, assignment)
+        .map(item => String(item.id) === String(entityId) ? withoutLocalGroupBooking(item) : item);
+    },
   });
 }
 

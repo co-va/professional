@@ -171,7 +171,12 @@ export function renderService(root, navigateBack = () => {}) {
         try {
           await loadAuxiliaryState('service');
           if (root?.isConnected && version === renderVersion)
-            module.openProcedureEditor(root, null, { onChanged: renderCurrent });
+            module.openProcedureEditor(root, null, {
+              onSaved: saved => {
+                renderCurrent();
+                if (root.isConnected) module.openProcedureOverview(root, saved.id, { onChanged: renderCurrent });
+              },
+            });
         } catch (cause) {
           openNotice({ title: 'Сервис', message: cause instanceof Error
             ? cause.message : 'Не удалось загрузить группы.' });

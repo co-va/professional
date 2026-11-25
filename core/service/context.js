@@ -27,17 +27,17 @@ export function notifyServiceContext() {
 
 // Both Service Z2 overviews use the same presentation; retain Mobile layout.
 export function renderServiceOverviewLayout(layer, {
-  title, card, workplaceCards = [], actions = '',
+  title, card, workplaceCards = [], actions = '', mobileActions = actions, mobileAdd = null,
 } = {}) {
   const desktop = isV2DesktopWorkspace(layer.closest('[data-v2-app]'));
   layer.innerHTML = page([
-    serviceHeaderContext({ title }),
+    serviceHeaderContext({ title, c: desktop ? null : mobileAdd }),
     ...(desktop
       ? ['<div class="service-desktop-overview-cards">' + card +
         (workplaceCards.length ? miniCardRail(workplaceCards, { className: 'service-desktop-workplace-cards' }) : '') +
         '</div>']
       : [card, workplaceCards.length ? miniCardRail(workplaceCards) : '',
-        actions ? '<div class="app-settings-panel">' + actions + '</div>' : '']),
+        mobileActions ? '<div class="app-settings-panel">' + mobileActions + '</div>' : '']),
   ]);
   if (desktop) setV2ZHeaderRows(layer, actions
     ? ['<div class="v2-desktop-tool-row" data-service-overview-toolbar><div class="v2-desktop-tool-actions">' + actions + '</div></div>']

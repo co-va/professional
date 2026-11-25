@@ -27,8 +27,8 @@ export function adaptDesktopGroupBooking(container, { toggleSelector, capacitySe
   const group = toggle?.closest('.list-entries');
   const capacity = container.querySelector(capacitySelector);
   const input = capacity?.querySelector('input[type="number"]');
-  const online = container.querySelector(onlineSelector)?.closest('.ui-compact-check');
-  if (!group || group.parentElement !== container || capacity?.parentElement !== container || online?.parentElement !== container || !input) return false;
+  const online = onlineSelector ? container.querySelector(onlineSelector)?.closest('.ui-compact-check') : null;
+  if (!group || group.parentElement !== container || capacity?.parentElement !== container || (onlineSelector && online?.parentElement !== container) || !input) return false;
   const row = group.querySelector('.list-entry__content');
   if (!row || toggle.parentElement !== row) return false;
   group.classList.add('desktop-inline-group-booking');
@@ -37,7 +37,8 @@ export function adaptDesktopGroupBooking(container, { toggleSelector, capacitySe
   input.title = 'Максимум людей';
   // Keep one white row: original title, numeric input, original toggle.
   row.insertBefore(capacity, toggle);
-  container.prepend(group, online);
+  if (online) container.prepend(group, online);
+  else container.prepend(group);
   return true;
 }
 
