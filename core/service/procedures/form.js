@@ -132,6 +132,25 @@ export function bindProcedureEditor(root, {
     },
   });
 
+  // The relocated capacity remains associated with the same form.
+  const groupTools = form.querySelector('.desktop-inline-group-booking');
+  const onlineTool = onlineCheck?.closest('.ui-compact-check');
+  const header = root.querySelector('[data-v2-q-header-content]');
+  const toolbar = header?.querySelector(':scope > .desktop-q-toolbar');
+  const capacityInput = groupTools?.querySelector('[name="procedureGroupCapacity"]');
+  if (groupTools && onlineTool?.parentElement === form && toolbar && capacityInput) {
+    form.id ||= 'procedure-editor-' + crypto.randomUUID();
+    capacityInput.setAttribute('form', form.id);
+    groupTools.setAttribute('data-desktop-q-secondary-tools', '');
+    groupTools.setAttribute('data-v2-layer-gesture-ignore', '');
+    onlineTool.classList.add('desktop-q-online-booking');
+    toolbar.prepend(onlineTool);
+    header.append(groupTools);
+    // Outside the form, input/change no longer bubble to its listeners.
+    capacityInput.addEventListener('input', syncDirty);
+    capacityInput.addEventListener('change', syncDirty);
+  }
+
   bindProcedureGroupBooking(root, {
     toggleSelector: '[data-procedure-group-toggle]',
     capacitySelector: '[data-procedure-group-capacity]',

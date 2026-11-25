@@ -1071,3 +1071,12 @@
  .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard>[data-v2-q-header]>[data-v2-q-header-content]>[data-desktop-q-secondary-tools] :is(.ui-button,.ui-select__control,.ui-compact-button){box-sizing:border-box;height:var(--v2-desktop-q-button-height);min-height:var(--v2-desktop-q-button-height);max-height:var(--v2-desktop-q-button-height)}
  .v2-app--workspace [data-v2-q-header-content]>.people-history-search{margin:0}
 }
+
+/* Service booking options use the shared Q tool rows, not the form. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace .desktop-q-toolbar>.desktop-q-online-booking{order:-1;flex:0 1 auto;min-width:0;height:var(--v2-desktop-q-button-height);max-height:var(--v2-desktop-q-button-height);gap:5px}
+ .v2-app--workspace .desktop-q-toolbar>.desktop-q-online-booking .ui-compact-check__label{min-width:0;font-size:12px;line-height:1.15;font-weight:700;white-space:normal;overflow-wrap:normal}
+ .v2-app--workspace [data-desktop-q-secondary-tools].desktop-inline-group-booking{height:var(--v2-desktop-q-button-height);min-height:var(--v2-desktop-q-button-height);max-height:var(--v2-desktop-q-button-height)}
+ .v2-app--workspace [data-desktop-q-secondary-tools].desktop-inline-group-booking>.list-entry{height:calc(var(--v2-desktop-q-button-height) - 2px);min-height:calc(var(--v2-desktop-q-button-height) - 2px);max-height:calc(var(--v2-desktop-q-button-height) - 2px)}
+ .v2-app--workspace [data-desktop-q-secondary-tools].desktop-inline-group-booking .desktop-inline-capacity input[type="number"]{height:calc(var(--v2-desktop-q-button-height) - 2px);min-height:calc(var(--v2-desktop-q-button-height) - 2px);max-height:calc(var(--v2-desktop-q-button-height) - 2px)}
+}
