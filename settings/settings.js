@@ -109,7 +109,7 @@ export function settingsOverviewMarkup(visible) {
   };
   const card = id => {
     if (['online-booking','integrations','tags','documents'].includes(id)) return '<section class="settings-overview-card settings-overview-card--inline" data-settings-inline="'+id+'" data-settings-section-owner="'+id+'"><div data-settings-embedded></div></section>';
-    if (id === 'notifications') return '<section class="settings-overview-card settings-notification-card" data-settings-section-owner="notifications"><div class="settings-inline-heading settings-notification-card-heading"><button type="button" class="settings-notification-title" data-settings-tile="notifications" aria-expanded="false" aria-controls="settings-panel-notifications">Уведомления</button><div class="settings-notification-card-actions">'+button('Сохранить',{type:'submit',className:'settings-h-action',data:'data-notification-card-save form="settings-notification-delivery-form" hidden'})+compactButton({kind:'info',data:'data-notification-card-info',aria:'О доставке уведомлений'})+'</div></div><div data-notification-delivery-card></div></section>';
+    if (id === 'notifications') return '<section class="settings-overview-card settings-notification-card" data-settings-section-owner="notifications"><div class="settings-inline-heading settings-notification-card-heading"><button type="button" class="settings-notification-title" data-settings-tile="notifications" aria-expanded="false" aria-controls="settings-panel-notifications"><span>Уведомления</span><span class="settings-notification-chevron" aria-hidden="true">⌄</span></button><div class="settings-notification-card-actions">'+button('Сохранить',{type:'submit',className:'settings-h-action',data:'data-notification-card-save form="settings-notification-delivery-form" hidden'})+compactButton({kind:'info',data:'data-notification-card-info',aria:'О доставке уведомлений'})+'</div></div><div data-notification-delivery-card></div></section>';
     const trigger = '<button type="button" class="settings-overview-trigger" data-settings-tile="'+id+'" aria-expanded="false" aria-controls="settings-panel-'+id+'"><strong class="settings-overview-card-title">'+available.get(id)+'</strong><span class="settings-overview-card-summary">'+summaries[id]+'</span><span aria-hidden="true" class="settings-overview-arrow">⌄</span></button>';
     return '<section class="settings-overview-card" data-settings-section-owner="'+id+'">'+trigger+'</section>';
   };
@@ -187,7 +187,7 @@ function renderDesktopSettings(root) {
   if (notificationCard) {
     // The card opens the list; its independent form controls must never toggle it.
     notificationCard.addEventListener('click', event => {
-      if (event.target.closest('button, input, select, textarea, label, [data-notification-delivery-card]')) return;
+      if (event.target.closest('button, input, select, textarea, label, [data-notification-delivery-status]')) return;
       void open('notifications');
     });
     const host = notificationCard.querySelector('[data-notification-delivery-card]');
