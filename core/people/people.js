@@ -1068,7 +1068,7 @@ function desktopPersonOverviewTools(layer, person, options = {}) {
     ? layer.querySelector(':scope > [data-v2-z-header] > [data-v2-z-header-content]')
     : layer.closest('[data-v2-q="true"]')?.querySelector('[data-v2-q-header-content]');
   if (!header) return;
-  const markup = `<div class="people-overview-heading">${fullPage ? compactButton({ kind: 'previous', data: 'data-v2-z-close', aria: 'Вернуться к клиентам' }) : ''}<h2 class="v2-q-title">Клиент</h2></div>
+  const markup = `<div class="people-overview-heading"><h2 class="v2-q-title">Клиент</h2>${fullPage ? compactButton({ kind: 'previous', data: 'data-v2-z-close', aria: 'Вернуться к клиентам' }) : ''}</div>
   <div class="people-overview-toolbar" data-v2-layer-gesture-ignore>
     ${select({ name: 'personOverviewProgram', aria: 'Программы', value: '', options: [
       { value: '', label: 'Программы' },
@@ -1184,7 +1184,7 @@ function openPersonOverview(root, key, options = {}) {
       if (!layer) return null;
       layer.setAttribute('data-desktop-person-overview', '');
       layer.innerHTML = page([workspaceHeaderContext({title:'Клиент'}), emptyState('Клиент', 'Загружаем данные…')]);
-      setV2ZHeaderRows(layer, ['<div class="people-overview-heading">'+compactButton({kind:'previous',data:'data-v2-z-close',aria:'Вернуться к клиентам'})+'<h2>Клиент</h2></div>']);
+      setV2ZHeaderRows(layer, ['<div class="people-overview-heading"><h2>Клиент</h2>'+compactButton({kind:'previous',data:'data-v2-z-close',aria:'Вернуться к клиентам'})+'</div>']);
       void renderPersonOverview(layer, root, key, options).catch(error => {
         if (layer.isConnected) layer.innerHTML = page([workspaceHeaderContext({title:'Клиент'}), emptyState('Клиент', 'Не удалось открыть клиента.')]);
         console.error(error);
