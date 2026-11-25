@@ -1021,5 +1021,26 @@
 .service-consumable-inline-quantity{display:flex;align-items:center;gap:6px;flex:0 0 auto}
 .service-consumable-inline-quantity>.field{width:70px;margin:0}
 .service-consumable-inline-quantity>.field>span:empty{display:none}
-.service-consumable-inline-quantity>.field>input{box-sizing:border-box;min-width:0;width:100%;height:34px;min-height:34px;padding:4px 6px;border-radius:8px}
+.service-consumable-inline-quantity>.field>input{box-sizing:border-box;min-width:0;width:100%;height:34px;min-height:34px;padding:4px 6px;border-radius:0}
 .service-consumable-inline-quantity>span{font-size:12px;min-width:23px}
+
+/* Consumables editor: the shared compact table, one header and one row
+   per norm/position. The Q width is local and retains the global 50% cap. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.service-consumables-q{--v2-desktop-q-width:520px}
+ .v2-app--workspace .service-consumables-q [data-procedure-consumable-items]>.ui-data-table--compact{border-radius:10px;overflow:hidden}
+ .v2-app--workspace .service-consumables-q .ui-data-table--compact table{width:100%;min-width:0;table-layout:fixed;border-collapse:collapse}
+ .v2-app--workspace .service-consumables-q .ui-data-table--compact th{background:var(--button-secondary,#E0D6D6);color:#41484F;font-size:12px;font-weight:750}
+ .v2-app--workspace .service-consumables-q .ui-data-table--compact :is(th,td){box-sizing:border-box;padding:4px 8px;vertical-align:middle;text-align:left}
+ .v2-app--workspace .service-consumables-q .ui-data-table--compact td{height:44px;font-size:13px;color:#41484F}
+ .v2-app--workspace .service-consumables-q .ui-data-table--compact :is(th,td)[data-table-column="quantity"]{width:80px;padding-inline:4px}
+ .v2-app--workspace .service-consumables-q .ui-data-table--compact :is(th,td)[data-table-column="unit"]{width:68px;padding-inline:4px;text-align:center}
+ .v2-app--workspace .service-consumables-q .ui-data-table--compact :is(th,td)[data-table-column="remove"]{width:36px;padding-inline:4px;text-align:center}
+ .v2-app--workspace .service-consumables-q .ui-data-table--compact td[data-table-column="remove"]>.ui-compact-button{margin:auto}
+ .v2-app--workspace .service-consumables-q .service-consumable-title,.v2-app--workspace .service-consumables-q .service-consumable-subtitle{display:block;line-height:1.2;overflow-wrap:anywhere}
+ .v2-app--workspace .service-consumables-q .service-consumable-title{font-weight:600}
+ .v2-app--workspace .service-consumables-q .service-consumable-subtitle{font-size:11px;color:var(--text-secondary);margin-top:2px}
+ .v2-app--workspace .service-consumables-q td[data-table-column="unit"]>.ui-select{width:100%;min-width:0;margin:0}
+ .v2-app--workspace .service-consumables-q td[data-table-column="unit"] .ui-select__control{box-sizing:border-box;min-width:0;width:100%;height:34px;min-height:34px;max-height:34px;padding:0 15px 0 4px;font-size:12px}
+ .v2-app--workspace .service-consumables-q td[data-table-column="unit"] .ui-select__value{min-width:0;white-space:nowrap}
+}

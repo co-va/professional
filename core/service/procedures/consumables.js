@@ -1,6 +1,6 @@
 import {
   actionBlock, button, compactButton, dataTable, emptyState, escapeHtml, field,
-  list, modal, mountModal, openNotice,
+  list, modal, mountModal, openNotice, select,
 } from '../../../ui/ui.js';
 import { setSharedActionVisible } from '../../../ui/page/page.js';
 import { moveDesktopQTool } from '../../../ui/v2/z-layout.js';
@@ -44,6 +44,41 @@ export function procedureConsumableUnit(item = {}) {
   return String(item.consumeUnit || item.unit || '').trim();
 }
 
+// Match the existing Core stock conversion contract, independently of price.
+// A sale/receipt unit is not automatically a consumption unit.
+export function procedureConsumableFactor(item = {}, unit = '') {
+  const stock = String(item.unit || '').trim();
+  const usage = String(unit || '').trim();
+  if (!stock || !usage) return null;
+  if (stock === usage) return 1;
+  const metric = { 'кг>г': 0.001, 'г>кг': 1000, 'л>мл': 0.001, 'мл>л': 1000,
+    'м>см': 0.01, 'см>м': 100 };
+  if (metric[stock + '>' + usage]) return metric[stock + '>' + usage];
+  const rule = (Array.isArray(item.conversionRules) ? item.conversionRules : [])
+    .find(value => String(value?.unit || '').trim() === usage);
+  if (rule) {
+    const factor = number(rule.stockPerUnit);
+    return Number.isFinite(factor) && factor > 0 ? factor : null;
+  }
+  const nominal = number(item.nominalQuantity), pack = number(item.packageQuantity);
+  if (String(item.nominalUnit || '').trim() === usage && nominal > 0 && pack > 0)
+    return pack / nominal;
+  if (usage === 'уп.' || (usage === 'шт.' && ['г','мл'].includes(stock))) {
+    const net = number(item.netPackageWeight);
+    return pack > 0 ? pack : stock === 'г' && net > 0 ? net : null;
+  }
+  return null;
+}
+
+export function procedureConsumableUnits(item = {}) {
+  const candidates = [procedureConsumableUnit(item), item.unit,
+    ...(Array.isArray(item.conversionRules) ? item.conversionRules.map(rule => rule?.unit) : []),
+    item.nominalUnit, item.receiptUnit];
+  // Offer only actual documented options, not every theoretical metric alias.
+  return [...new Set(candidates.map(unit => String(unit || '').trim()).filter(Boolean))]
+    .filter(unit => procedureConsumableFactor(item, unit) != null);
+}
+
 // Value per chosen consumption unit only when its conversion is documented.
 // A supplier's pack price must never be guessed to be a per-gram price.
 export function procedureConsumableCost(item = {}, unit = '') {
@@ -58,13 +93,7 @@ export function procedureConsumableCost(item = {}, unit = '') {
     && String(item.receiptUnit || '').trim() === stock)
     price = number(item.basePrice);
   if (price == null || !(price >= 0)) return null;
-  const metric = { 'кг>г': 0.001, 'г>кг': 1000, 'л>мл': 0.001, 'мл>л': 1000 };
-  let factor = stock === usage ? 1 : metric[stock + '>' + usage] ?? null;
-  if (factor == null) {
-    const rule = (Array.isArray(item.conversionRules) ? item.conversionRules : [])
-      .find(value => value.unit === usage && number(value.stockPerUnit) > 0);
-    factor = rule ? number(rule.stockPerUnit) : null;
-  }
+  const factor = procedureConsumableFactor(item, usage);
   return factor == null ? null : price * factor;
 }
 
@@ -267,6 +296,57 @@ export async function openProcedureConsumables(procedureId, onSaved = () => {}) 
   const render = () => {
     const inventory = new Map(getInventoryItems().map(item => [String(item.itemId), item]));
     const groupMap = new Map(stockGroups.map(group => [String(group.groupId), group]));
+    if (desktop) {
+      const entries = [
+        ...norms.map((row, index) => {
+          const group = groupMap.get(String(row.groupId));
+          return { ...row, index, kind: 'group', title: group?.name || row.name || 'Группа недоступна',
+            subtitle: groupsLoaded && !group ? 'Группа недоступна' : 'Группа' };
+        }),
+        ...rows.map((row, index) => {
+          const item = inventory.get(String(row.itemId));
+          return { ...row, index, kind: 'position', title: item?.name || 'Позиция недоступна',
+            subtitle: item?.manufacturer || '', unit: row.unit || procedureConsumableUnit(item),
+            units: item ? procedureConsumableUnits(item) : [] };
+        }),
+      ];
+      const quantityCell = row => row.kind ? '<div class="desktop-inline-capacity">' +
+        field({ name: 'consumableQuantity-' + row.kind + '-' + row.index, type: 'number',
+          min: '0.000001', step: 'any', inputmode: 'decimal', placeholder: '—',
+          value: row.quantity ?? '', data: (row.kind === 'group'
+            ? 'data-consumable-norm-quantity' : 'data-consumable-quantity') +
+            ' data-consumable-index="' + row.index + '" aria-label="Расход ' + escapeHtml(row.title) + '"' }) +
+        '</div>' : '';
+      const unitCell = row => {
+        if (!row.kind) return '';
+        const units = row.kind === 'position' ? row.units : [];
+        // Retain a historical unit even when the current stock settings changed.
+        // It is never used as a fabricated conversion.
+        if (units.length > 1 || (units.length === 1 && row.unit && !units.includes(row.unit))) {
+          const options = units.includes(row.unit) || !row.unit ? units : [row.unit, ...units];
+          return select({ name: 'consumableUnit-' + row.index, value: row.unit,
+            aria: 'Единица расхода ' + row.title, options,
+            data: 'data-consumable-unit="' + row.index + '"' });
+        }
+        return escapeHtml(row.unit || units[0] || '—');
+      };
+      host.innerHTML = dataTable({ compact: true, caption: 'Расходники',
+        columns: [
+          { key: 'title', label: 'Наименование', sortable: false, render: row =>
+            '<span class="service-consumable-title">' + escapeHtml(row.title) + '</span>' +
+            (row.subtitle ? '<small class="service-consumable-subtitle">' + escapeHtml(row.subtitle) + '</small>' : '') },
+          { key: 'quantity', label: 'Расход', sortable: false, narrow: true, render: quantityCell },
+          { key: 'unit', label: 'Ед.', sortable: false, narrow: true, render: unitCell },
+          { key: 'remove', label: '', sortable: false, narrow: true, render: row => row.kind
+            ? compactButton({ kind: 'remove', aria: 'Убрать ' + row.title,
+              data: (row.kind === 'group' ? 'data-consumable-norm-remove' : 'data-consumable-remove') +
+                '="' + row.index + '"' }) : '' },
+        ],
+        rows: entries.length ? entries : [{ title: 'Расходников пока нет' }],
+      });
+      sync();
+      return;
+    }
     const normMarkup = norms.map((row, index) => {
       const group = groupMap.get(String(row.groupId));
       const title = group?.name || row.name || 'Группа недоступна';
@@ -308,7 +388,8 @@ export async function openProcedureConsumables(procedureId, onSaved = () => {}) 
   };
   host.addEventListener('input', event => {
     if (event.target.matches?.('[data-consumable-norm-quantity]')) {
-      const index = Number(event.target.closest('[data-consumable-norm-row]')?.dataset.consumableNormRow);
+      const index = Number(event.target.dataset.consumableIndex ??
+        event.target.closest('[data-consumable-norm-row]')?.dataset.consumableNormRow);
       if (!norms[index]) return;
       norms[index] = { ...norms[index], quantity: event.target.value };
       if (errorNode) errorNode.textContent = '';
@@ -316,9 +397,24 @@ export async function openProcedureConsumables(procedureId, onSaved = () => {}) 
       return;
     }
     if (!event.target.matches?.('[data-consumable-quantity]')) return;
-    const index = Number(event.target.closest('[data-consumable-row]')?.dataset.consumableRow);
+    const index = Number(event.target.dataset.consumableIndex ??
+      event.target.closest('[data-consumable-row]')?.dataset.consumableRow);
     if (!rows[index]) return;
     rows[index] = { ...rows[index], quantity: event.target.value };
+    if (errorNode) errorNode.textContent = '';
+    sync();
+  });
+  host.addEventListener('change', event => {
+    if (!event.target.matches?.('input[data-consumable-unit]')) return;
+    const index = Number(event.target.dataset.consumableUnit);
+    const row = rows[index];
+    if (!row) return;
+    const item = getInventoryItems().find(item => String(item.itemId) === String(row.itemId));
+    if (!item || !procedureConsumableUnits(item).includes(event.target.value)) {
+      render();
+      return;
+    }
+    rows[index] = { ...row, unit: event.target.value };
     if (errorNode) errorNode.textContent = '';
     sync();
   });
