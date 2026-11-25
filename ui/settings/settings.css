@@ -170,3 +170,17 @@
 .settings-inline-document-editor .form-grid{min-width:0}
 .settings-inline-document-editor textarea{resize:vertical}
 .settings-document-row [data-desktop-document-actions]{color:var(--text);font-size:20px;font-weight:400}
+
+/* Desktop table headings follow the established italic H-list convention. */
+.settings-document-list-heading,.notification-desktop-group h3,.settings-list-heading{font-style:italic}
+.settings-documents-switch{align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.settings-history-tools{display:flex;align-items:center;gap:8px;min-width:0;flex:1 1 180px;max-width:320px;margin-left:auto}
+.settings-history-tools .ui-search-field{padding:0;flex:1;min-width:0}
+.settings-history-tools .field{margin:0;min-width:0}
+.settings-history-tools input[type="search"]{height:36px;min-height:36px;max-height:36px;border-radius:10px;font-size:13px}
+.settings-document-list-heading--history{padding-left:12px}
+.settings-history-heading-main,.settings-document-row--history .list-entry__main.has-leading-icon{display:grid;grid-template-columns:20px minmax(0,0.9fr) minmax(0,1.45fr);gap:10px;align-items:center;min-width:0}
+.settings-document-row--history .list-entry__content{padding-left:12px;padding-right:12px;min-height:44px}
+.settings-document-row--history .list-entry__text{min-width:0;gap:2px}
+.settings-document-row--history .list-entry__text :is(strong,small){white-space:normal;overflow-wrap:anywhere}
+.settings-document-row--history[hidden]{display:none!important}

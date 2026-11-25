@@ -30,6 +30,8 @@ export function v2ListEntry({
   initial = '?',
   leadingSwatch = '',
   leadingIcon = '',
+  identityTitle = '',
+  identitySubtitle = '',
   statusMark = null,
   interactive = true,
   data = '',
@@ -95,7 +97,7 @@ export function v2ListEntry({
   return `<${tag} class="${classes}"${attrs}${style}>
     <span class="list-entry__background" aria-hidden="true">${image ? '' : `<span>${escapeHtml(initial)}</span>`}</span>
     <span class="list-entry__content">
-      ${reorderAction}<span class="list-entry__main${swatch ? ' has-swatch' : ''}${leading ? ' has-leading-icon' : ''}">${swatch}${leading}<span class="list-entry__text">${firstLine}<strong>${escapeHtml(title)}</strong>${subtitleHtml}</span></span>
+      ${reorderAction}<span class="list-entry__main${swatch ? ' has-swatch' : ''}${leading ? ' has-leading-icon' : ''}">${swatch}${leading}${identityTitle || identitySubtitle ? `<span class="list-entry__text list-entry__identity"><strong>${escapeHtml(identityTitle)}</strong><small>${escapeHtml(identitySubtitle)}</small></span>` : ''}<span class="list-entry__text">${firstLine}<strong>${escapeHtml(title)}</strong>${subtitleHtml}</span></span>
       ${right}${mark}${toggleAction}${action}${deleteAction}${selectionAction}
     </span>
   </${tag}>`;

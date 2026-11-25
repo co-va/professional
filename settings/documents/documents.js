@@ -293,7 +293,7 @@ function historyItems() {
   );
 }
 
-function mobileHistorySubject(item, people) {
+function historySubject(item, people) {
   const person = consentPerson(item, people);
   const members = person ? [person, ...people.filter(candidate => candidate !== person && person.uei && candidate.uei === person.uei)] : [];
   const named = members.find(candidate => [candidate.name, candidate.surname].some(value => String(value || '').trim()));
@@ -307,7 +307,7 @@ function mobileHistorySubject(item, people) {
 function historyCard(item, people, index) {
   const snapshot = signedDocumentSnapshot(item);
   const date = shortDateTime(item.eventAt || item.acceptedAt || item.revokedAt || item.createdAt, '');
-  const { name, phone } = mobileHistorySubject(item, people);
+  const { name, phone } = historySubject(item, people);
   const title = signingDocumentTitle(item, snapshot);
   return documentTile({
     title,
@@ -352,8 +352,8 @@ function normalizeHistoryQuery(value) {
   return String(value || '').trim().toLocaleLowerCase('ru').replaceAll('ё', 'е');
 }
 
-function bindMobileHistory(root, tools) {
-  const host = root.querySelector('.mobile-document-history');
+function bindDocumentHistory(root, tools) {
+  const host = root.querySelector('.mobile-document-history, .desktop-document-history');
   if (!host) return;
   const cards = [...host.querySelectorAll('[data-history-person]')];
   const query = tools?.querySelector('[name="documentHistoryQuery"]');
@@ -390,13 +390,24 @@ function desktopDocumentList() {
   const heading=history=>'<div class="settings-document-list-heading"><span>Наименование / Дата</span><span>Версия</span><span>'+(history?'Статус':'')+'</span></div>';
   if(currentView==='history') {
     const items=historyItems();
-    return items.length ? '<div class="settings-document-table">'+heading(true)+v2ListEntries(items.map(item=>v2ListEntry({
-      className:'settings-document-row settings-document-row--history',leadingIcon:'document',title:signedDocumentSnapshot(item)?.title||item.documentId||'Документ',
-      subtitle:shortDateTime(item.eventAt||item.acceptedAt||item.revokedAt||item.createdAt,''),
-      rightTop:String(item.documentVersion||signedDocumentSnapshot(item)?.version||1),
-      statusMark:{symbol:item.status==='revoked'?'×':item.status==='declined'?'—':'✓',label:consentStateText(item.status)},
-      data:'data-signing-event="'+escapeHtml(item.id)+'"'
-    })))+'</div>' : emptyState('Истории подписаний пока нет','Здесь появятся факты подписания, отказа и отзыва.');
+    if (!items.length) return emptyState('Истории подписаний пока нет','Здесь появятся факты подписания, отказа и отзыва.');
+    const people = getAllPeople();
+    const rows = items.map((item,index) => {
+      const snapshot = signedDocumentSnapshot(item);
+      const {name,phone} = historySubject(item,people);
+      const title = signingDocumentTitle(item,snapshot);
+      return v2ListEntry({
+        className:'settings-document-row settings-document-row--history',leadingIcon:'document',
+        identityTitle:name || 'Имя не указано',identitySubtitle:phone || 'Телефон не указан',
+        title,subtitle:[shortDateTime(item.eventAt||item.acceptedAt||item.revokedAt||item.createdAt,''),signingHistoryEventLabel(item)].filter(Boolean).join(' · '),
+        rightTop:String(item.documentVersion||snapshot?.version||1),
+        statusMark:{symbol:item.status==='revoked'?'×':item.status==='declined'?'—':'✓',label:consentStateText(item.status)},
+        data:`data-signing-event="${escapeHtml(item.id)}" data-history-person="${escapeHtml(name)}" data-history-phone="${escapeHtml(phone)}" data-history-order="${index}"`,
+      });
+    });
+    return '<div class="settings-document-table settings-document-table--history"><div class="settings-document-list-heading settings-document-list-heading--history"><span class="settings-history-heading-main"><span aria-hidden="true"></span><span>Имя / Телефон</span><span>Наименование / Дата</span></span><span>Версия</span><span>Статус</span></div>'
+      +'<div class="list-entries desktop-document-history">'+rows.join('')+'</div></div>'
+      +`<div data-history-no-results hidden>${emptyState('Ничего не найдено','Измените имя, фамилию или телефон.')}</div>`;
   }
   const group=(title,items)=>'<section class="settings-document-group"><h3>'+title+'</h3>'+ (items.length?'<div class="settings-document-table">'+heading(false)+v2ListEntries(items.map(item=>v2ListEntry({
     className:'settings-document-row',leadingIcon:'document',title:item.title||'Документ',
@@ -885,7 +896,7 @@ function bindMain(root, headerRows = []) {
   initSegmentControls(root);
   for (const row of headerRows) initSegmentControls(row);
   if(root.hasAttribute('data-settings-embedded')) root.querySelector('.settings-documents-switch')?.addEventListener('click',event=>{
-    if(!event.target.closest('button'))return;
+    if(!event.target.closest('[data-segment-option]'))return;
     const host=root.querySelector('[data-documents-content]');
     if(host?.hidden) setSettingsDetailOpen(host,true);
   });
@@ -914,7 +925,7 @@ function bindMain(root, headerRows = []) {
     });
   });
 
-  if (!root.hasAttribute('data-settings-embedded')) bindMobileHistory(root, headerRows[1] || root);
+  bindDocumentHistory(root, headerRows[1] || root);
   root.querySelectorAll('[data-signing-event]').forEach((control) => {
     control.addEventListener('click', () => {
       const item = getConsents().find((event) => event.id === control.dataset.signingEvent);
@@ -931,7 +942,8 @@ function renderMain(root) {
   if(root.hasAttribute('data-settings-embedded')) {
     const expanded=root.dataset.documentsExpanded==='true';
     const tools=button('Загрузить PDF',{variant:'outline',className:'settings-outline-action',data:'data-settings-document-pdf'})+button('Создать документ',{className:'settings-h-action',data:'data-settings-document-create'});
-    root.innerHTML=`<div class="settings-documents-heading"><button type="button" class="settings-document-toggle" data-settings-document-toggle aria-controls="settings-document-content" aria-expanded="${expanded}">Документы <span aria-hidden="true">⌄</span></button><div class="settings-documents-actions">${tools}</div></div><div class="settings-documents-switch">${segmentControl(VIEWS,{value:currentView,name:'documentsView',aria:'Документы и история подписаний'})}</div>
+    root.innerHTML=`<div class="settings-documents-heading"><button type="button" class="settings-document-toggle" data-settings-document-toggle aria-controls="settings-document-content" aria-expanded="${expanded}">Документы <span aria-hidden="true">⌄</span></button><div class="settings-documents-actions">${tools}</div></div><div class="settings-documents-switch">${segmentControl(VIEWS,{value:currentView,name:'documentsView',aria:'Документы и история подписаний'})}
+      ${currentView==='history'? `<div class="settings-history-tools"><div class="ui-search-field">${field({name:'documentHistoryQuery',type:'search',placeholder:'Поиск',autocomplete:'off',data:'aria-label="Поиск по имени, фамилии или телефону"'})}</div>${select({name:'documentHistorySort',value:'date',options:[{value:'date',label:'По дате'},{value:'name',label:'По имени (А–Я)'}],triggerKind:'sort',pickerTitle:'Сортировка',aria:'Сортировка'})}</div>`:''}</div>
       <section id="settings-document-content" class="settings-document-list" data-documents-content data-settings-detail data-settings-detail-state="documentsExpanded"${expanded?'':' hidden'}>${settingsDetailHeading(currentView==='history'?'История':'Документы','settings-document-content')}${desktopDocumentList()}</section>`;
     bindMain(root);
     window.dispatchEvent(new CustomEvent('va-tools:v2-context-changed'));
