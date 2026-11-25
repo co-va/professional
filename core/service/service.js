@@ -147,8 +147,8 @@ export function renderService(root, navigateBack = () => {}) {
         ]);
         if (version !== renderVersion || !catalog.isConnected) return;
         disposeCatalog = view === 'products'
-          ? module.renderProductCatalog(catalog, { root, onChanged: renderCurrent })
-          : module.renderProcedureCatalog(catalog, { root, onChanged: renderCurrent });
+          ? module.renderProductCatalog(catalog, { root, onChanged: renderCurrent, desktop })
+          : module.renderProcedureCatalog(catalog, { root, onChanged: renderCurrent, desktop });
       }).catch((error) => {
         console.error('Service catalog load failed', error);
       });

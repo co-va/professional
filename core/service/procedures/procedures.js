@@ -47,7 +47,7 @@ function procedureRow(procedure) {
   });
 }
 
-export function renderProcedureCatalog(host, { root = host, onChanged = () => {} } = {}) {
+export function renderProcedureCatalog(host, { root = host, onChanged = () => {}, desktop = false } = {}) {
   const items = getProcedures();
   const grouped = items.length
     ? renderServiceGroupTree(items, 'procedures', procedureRow,
@@ -55,7 +55,7 @@ export function renderProcedureCatalog(host, { root = host, onChanged = () => {}
       error => openNotice({
         title: 'Порядок',
         message: error instanceof Error ? error.message : 'Не удалось сохранить порядок услуг.',
-      }))
+      }), { desktop })
     : null;
   host.innerHTML = items.length
     ? grouped?.html || v2ListEntries(items.map(procedureRow))

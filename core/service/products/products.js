@@ -71,7 +71,7 @@ function productRow(product) {
   });
 }
 
-export function renderProductCatalog(host, { root = host, onChanged = () => {} } = {}) {
+export function renderProductCatalog(host, { root = host, onChanged = () => {}, desktop = false } = {}) {
   const items = getProducts();
   const grouped = items.length
     ? renderServiceGroupTree(items, 'products', productRow,
@@ -79,7 +79,7 @@ export function renderProductCatalog(host, { root = host, onChanged = () => {} }
       error => openNotice({
         title: 'Порядок',
         message: error instanceof Error ? error.message : 'Не удалось сохранить порядок.',
-      }))
+      }), { desktop })
     : null;
   host.innerHTML = items.length
     ? grouped?.html || v2ListEntries(items.map(productRow))

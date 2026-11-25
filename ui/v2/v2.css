@@ -815,3 +815,21 @@
  .v2-app--workspace [data-people-list-host] .ui-compact-check{display:grid;margin:auto}
  .v2-app--workspace [data-people-list-host] .people-table-person__name{white-space:nowrap;overflow-wrap:normal}
 }
+
+/* Service Desktop: one visible catalogue panel, same stationary 44px header
+   and independently scrolling body as the accepted Clients list. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z:has([data-service-desktop-group-list])>[data-v2-z-body]{display:flex;flex-direction:column;overflow:hidden!important;padding-bottom:0;scrollbar-gutter:auto}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z:has([data-service-desktop-group-list]) :is([data-v2-workspace-surface],.ui-page,[data-service-catalog]){display:flex;flex-direction:column;flex:1 1 auto;min-height:0;min-width:0}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-desktop-group-list]{display:flex;flex-direction:column;flex:0 1 auto;min-height:0;min-width:0;border:1px solid var(--border);border-radius:var(--radius-control);overflow:hidden;background:var(--white)}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .service-desktop-group-header{box-sizing:border-box;display:flex;align-items:center;justify-content:space-between;gap:16px;flex:0 0 var(--h-list-row);height:var(--h-list-row);min-height:var(--h-list-row);max-height:var(--h-list-row);padding:0 28px 0 16px;background:#E0D6D6;color:#41484F;border-bottom:1px solid var(--border)}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .service-desktop-group-select{display:flex;min-width:0;max-width:100%;flex:0 1 auto;gap:0}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .service-desktop-group-select .ui-select__control{width:auto;height:36px;min-height:36px;max-height:36px;padding:0 24px 0 0;background:transparent;border:0;border-radius:0;color:#41484F;font-size:13px;font-weight:750}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .service-desktop-group-select :is(.ui-select__selection,.ui-select__text){min-width:0;justify-content:flex-start;text-align:left}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .service-desktop-group-select .ui-select__value{display:block;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;text-align:left}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .service-desktop-group-select .ui-select__chevron{right:4px;color:#41484F}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-group-count]{flex:0 0 auto;color:var(--text);font-size:15px;font-weight:750;font-variant-numeric:tabular-nums;white-space:nowrap}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .service-desktop-group-body[data-service-group-catalog]{display:block;flex:0 1 auto;min-height:0;overflow:auto;overscroll-behavior:none}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-group-branch][hidden]{display:none!important}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-group-branch]>.list-entries:last-child>.list-entry:last-child{border-bottom:0}
+}
