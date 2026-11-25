@@ -37,6 +37,7 @@ import { getProfile } from '../../profile/data.js';
 import { getAllPeople } from '../../people/data.js';
 import { personDisplay } from '../../people/presentation.js';
 import { getCardAppearanceTemplate, saveCardAppearanceTemplate } from '../../card-appearance-templates.js';
+import { flushBusinessPersistence, isBusinessServerReady } from '../../business-persistence.js';
 import { createUEI, getUEI, listUEIs, normalizeUEI, releaseUEI, replaceUEI } from '../../uei.js';
 import { crop, formObject, personOption as contactOption, openLoyaltySettingsMenu } from '../shared.js';
 import { openDepositExcelQ } from './excel.js';
@@ -408,6 +409,7 @@ function openAppearanceQ(root, onSaved = () => {}) {
   const sample = programs[0] || {
     id: '', name: 'Депозит', amount: 30000, termRule: '12 месяцев', benefit: 'Условия программы', status: 'active',
   };
+  const assignedSample = getDepositInstances().find(item => String(item?.programId) === String(sample.id)) || getDepositInstances()[0];
   return openEntityCardAppearanceQ(root, {
     title: 'Вид',
     typeLabel: 'Карта',
@@ -417,17 +419,19 @@ function openAppearanceQ(root, onSaved = () => {}) {
     allowPhoto: true,
     resolve: () => ({
       appearance: depositCardAppearance(),
-      fields: programFields(sample, { editorPreview: true }),
+      fields: assignedSample ? assignedDepositFields(assignedSample) : programFields(sample, { editorPreview: true }),
       photo: depositCardPhoto(),
       photoPosition: depositCardPhotoPosition(),
     }),
     save: async ({ appearance, photo }) => {
+      if (!isBusinessServerReady()) throw new Error('Серверное сохранение недоступно');
       const current = getCardAppearanceTemplate(depositCardScope());
       saveCardAppearanceTemplate(depositCardScope(), {
         appearance,
         photo,
         photoPosition: current?.photoPosition || depositCardPhotoPosition(),
       });
+      await flushBusinessPersistence();
     },
     onSaved,
   });
@@ -1087,16 +1091,14 @@ async function openProgramLayer(root, programId, { person = null, onChanged = ()
   return layer;
 }
 
-function personDepositCard(deposit, { interactive = true, history = false } = {}) {
+function assignedDepositFields(deposit) {
   const terms = deposit?.terms && typeof deposit.terms === 'object' ? deposit.terms : {};
   const nominal = Number(terms.amount);
   const funded = Number(deposit?.fundedAmount);
   const hasNominal = terms.amount !== undefined && terms.amount !== null && nominal > 0;
-  return entityVisualCard({
-    appearance: depositCardAppearance(),
-    fields: depositCardFields({
+  return depositCardFields({
       uei: getUEI('loyalty-deposit-program', deposit?.programId) || '',
-      title: `${String(deposit?.programName || 'Депозит')}: ${money(deposit?.balance)}`,
+      title: String(deposit?.programName || 'Депозит'),
       subtitle: terms.termRule || 'Бессрочно',
       status: deposit?.status === 'active' && depositFundingProgress(deposit).fixed
         ? (depositFundingProgress(deposit).paid ? 'Оплачено' : 'К оплате ' + money(depositFundingProgress(deposit).due))
@@ -1107,7 +1109,13 @@ function personDepositCard(deposit, { interactive = true, history = false } = {}
       spent: depositSpentAmount(deposit),
       balance: deposit?.balance ?? null,
       toFund: hasNominal && Number.isFinite(funded) ? Math.max(0, nominal - funded) : null,
-    }),
+  });
+}
+
+function personDepositCard(deposit, { interactive = true, history = false } = {}) {
+  return entityVisualCard({
+    appearance: depositCardAppearance(),
+    fields: assignedDepositFields(deposit),
     image: depositCardPhoto(),
     imagePosition: depositCardPhotoPosition(),
     interactive,
