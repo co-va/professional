@@ -10,6 +10,7 @@ import {
   setNotificationEnabled,
 } from '../../core/notifications/routing.js';
 import {
+  actionBlock,
   button,
   compactButton,
   emptyState,
@@ -225,7 +226,7 @@ function editorMarkup(event, current) {
         ${textareaField({ label: 'Текст сообщения', name: 'bodyTemplate', value: current.bodyTemplate, rows: 7, required: true })}
         ${notificationVariableMarkup(event)}
         <div class="muted" data-notification-editor-status aria-live="polite"></div>
-        <button type="button" class="v2-workspace-source-hidden" data-v2-primary-action data-v2-primary-label="Сохранить" data-v2-primary-visible="false" aria-label="Сохранить сообщение">Сохранить</button>
+        ${actionBlock(button('Сохранить',{type:'submit',data:'data-notification-mobile-save hidden',aria:'Сохранить сообщение'}),{className:'notification-mobile-save-actions'})}
       </form>
     `)}`;
 }
@@ -237,9 +238,11 @@ function openEditor(root, routing, event) {
 
   const form = layer.querySelector('[data-notification-policy-form]');
   const preview = layer.querySelector('[data-notification-preview]');
-  const primary = layer.querySelector('[data-v2-primary-action]');
+  const save = layer.querySelector('[data-notification-mobile-save]');
+  const actions = save?.closest('.modal-actions');
   const status = layer.querySelector('[data-notification-editor-status]');
   const initial = editorSignature(form);
+  let busy = false;
 
   const redraw = () => {
     if (!form) return;
@@ -253,17 +256,18 @@ function openEditor(root, routing, event) {
         ].filter(Boolean).join('\n\n'),
       }, { viewer: 'profile' });
     }
-    if (primary) primary.dataset.v2PrimaryVisible = editorSignature(form) !== initial ? 'true' : 'false';
-    window.dispatchEvent(new CustomEvent('va-tools:v2-context-changed'));
+    const dirty = editorSignature(form) !== initial;
+    if (actions) actions.hidden = !dirty;
+    if (save) {save.hidden = !dirty; save.disabled = busy;}
   };
 
   form?.addEventListener('input', redraw);
   if(form) bindNotificationVariables(form, redraw);
-  primary?.addEventListener('click', () => form?.requestSubmit());
   form?.addEventListener('submit', async (submitEvent) => {
     submitEvent.preventDefault();
-    if (!form) return;
-    if (primary) primary.disabled = true;
+    if (!form || busy || editorSignature(form) === initial) return;
+    busy = true;
+    redraw();
     if (status) status.textContent = 'Сохраняем…';
     const data = new FormData(form);
     try {
@@ -274,9 +278,9 @@ function openEditor(root, routing, event) {
       layer.v2Close?.();
       await render(root);
     } catch (error) {
-      if (primary) primary.disabled = false;
+      busy = false;
       if (status) status.textContent = error instanceof Error ? error.message : 'Не удалось сохранить сообщение';
-      window.dispatchEvent(new CustomEvent('va-tools:v2-context-changed'));
+      redraw();
     }
   });
   redraw();

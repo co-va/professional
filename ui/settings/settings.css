@@ -150,3 +150,5 @@
 .notification-mobile-master{display:flex;align-items:center;margin-bottom:12px}
 .notification-mobile-master .ui-compact-check__label{font-weight:700}
 .notification-editor-z .notification-variable-chips .ui-button{color:var(--text);background:var(--white);border-color:var(--border)}
+
+.notification-editor-z .notification-mobile-save-actions[hidden],.notification-editor-z [data-notification-mobile-save][hidden]{display:none!important}
