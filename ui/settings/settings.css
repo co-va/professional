@@ -171,7 +171,12 @@
 .settings-inline-document-editor .form-grid{min-width:0}
 .settings-inline-document-editor textarea{resize:vertical}
 .settings-document-row [data-desktop-document-actions]{color:var(--text);font-size:20px;font-weight:400}
-.settings-document-row [data-desktop-document-delete]{color:var(--ui-delete-foreground)}
+.settings-document-row:not(.settings-document-row--history) .list-entry__main{grid-column:1;grid-row:1}
+.settings-document-row:not(.settings-document-row--history) .list-entry__right{grid-column:2;grid-row:1}
+.settings-document-row:not(.settings-document-row--history) :is(.list-entry__action,.list-entry__delete){grid-column:3;grid-row:1;width:var(--ui-compact-size,28px);height:var(--ui-compact-size,28px);justify-self:center}
+.settings-document-row .list-entry__content:has(>.list-entry__delete)>.list-entry__action{justify-self:start}
+.settings-document-row .list-entry__content:has(>.list-entry__action)>.list-entry__delete{justify-self:end}
+.settings-document-row .list-entry__delete{color:var(--ui-delete-foreground)}
 
 /* Desktop table headings follow the established italic H-list convention. */
 .settings-document-list-heading,.notification-desktop-group h3,.settings-list-heading{font-style:italic}

@@ -387,6 +387,10 @@ function bindDocumentHistory(root, tools) {
   });
 }
 
+function canEditDesktopDocument(item) {
+  return isCoreDocument(item) || (!item.system && !isRknGuide(item));
+}
+
 function desktopDocumentList() {
   const heading=history=>'<div class="settings-document-list-heading"><span>Наименование / Дата</span><span>Версия</span><span>'+(history?'Статус':'')+'</span></div>';
   if(currentView==='history') {
@@ -415,9 +419,11 @@ function desktopDocumentList() {
     subtitle:documentMoment(item)?shortDateTime(documentMoment(item),''):'',omitEmptySubtitle:true,
     rightTop:String(visibleDocumentVersion(item)),
     data:'data-profile-document="'+escapeHtml(item.id)+'"',
-    actionData:(isCoreDocument(item)||canDeleteDocument(item))?'data-desktop-document-actions="'+escapeHtml(item.id)+'"'+(isCoreDocument(item)?' aria-expanded="false"':' data-desktop-document-delete'):'',
-    actionIcon:isCoreDocument(item)?'✎':'×',
-    actionAria:isCoreDocument(item)?'Редактировать документ':isRknGuide(item)?'Убрать документ':'Удалить документ'
+    actionData:canEditDesktopDocument(item)?'data-desktop-document-actions="'+escapeHtml(item.id)+'" aria-expanded="false"':'',
+    actionIcon:'✎',
+    actionAria:'Редактировать документ',
+    deleteData:canDeleteDocument(item)?item.id:'',
+    deleteAria:isRknGuide(item)?'Убрать документ':'Удалить документ'
   }))):'<div class="settings-document-empty" role="status">Документов пока нет</div>')+'</div></section>';
   return group('Основные документы',coreDocuments())+group('Другие документы',otherDocuments());
 }
@@ -857,7 +863,7 @@ function openDesktopDocumentEditor(root, control, item) {
   if (same) return;
   const row = control.closest('[data-profile-document]');
   if (!row) return;
-  const template = templates().find(entry => entry.id === item.id) || item;
+  const template = isCoreDocument(item) ? (templates().find(entry => entry.id === item.id) || item) : item;
   row.insertAdjacentHTML('afterend', `<section class="settings-inline-document-editor" data-inline-document-editor="${escapeHtml(item.id)}">
     <div class="settings-inline-heading">
       <strong>Редактирование документа</strong>
@@ -868,7 +874,7 @@ function openDesktopDocumentEditor(root, control, item) {
     </div>
     <form class="form-grid" data-inline-document-form>
       ${field({ label: 'Название', name: 'documentTitle', value: template.title || '', required: true })}
-      ${textareaField({ label: 'Текст документа', name: 'documentText', value: template.text || '', rows: 12, placeholder: 'Текст документа' })}
+      ${template.attachment ? '' : textareaField({ label: 'Текст документа', name: 'documentText', value: template.text || '', rows: 12, placeholder: 'Текст документа' })}
     </form>
   </section>`);
   const editor = root.querySelector('[data-inline-document-editor]');
@@ -877,7 +883,7 @@ function openDesktopDocumentEditor(root, control, item) {
   control.setAttribute('aria-expanded', 'true');
   const draft = () => ({
     title: String(form.querySelector('[name="documentTitle"]')?.value || '').trim(),
-    text: String(form.querySelector('[name="documentText"]')?.value || ''),
+    text: template.attachment ? String(template.text || '') : String(form.querySelector('[name="documentText"]')?.value || ''),
   });
   const sync = () => {
     const next = draft();
@@ -893,7 +899,7 @@ function openDesktopDocumentEditor(root, control, item) {
   save.addEventListener('click', () => {
     if (save.hidden) return;
     const next = draft();
-    saveDocument({ ...template, ...next, documentClass: DOCUMENT_CLASS.CORE_LEGAL, sourceMode: 'CUSTOM' });
+    saveDocument({ ...template, ...next, sourceMode: 'CUSTOM' });
     renderMain(root);
     const updatedControl = [...root.querySelectorAll('[data-desktop-document-actions]')].find(action => action.dataset.desktopDocumentActions === item.id);
     const updatedItem = currentProfileDocuments().find(document => document.id === item.id);
@@ -953,11 +959,21 @@ function bindMain(root, headerRows = []) {
       event.preventDefault();event.stopPropagation();
       const item=currentProfileDocuments().find(doc=>doc.id===control.dataset.desktopDocumentActions);
       if (!item) return;
-      if (isCoreDocument(item)) openDesktopDocumentEditor(root, control, item);
-      else if (canDeleteDocument(item)) confirmDocumentDeletion(root, null, item);
+      if (canEditDesktopDocument(item)) openDesktopDocumentEditor(root, control, item);
     };
     control.addEventListener('click',open);
     control.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' ')open(event);});
+  });
+  root.querySelectorAll('[data-profile-document] [data-delete-action]').forEach(control => {
+    control.setAttribute('role','button');
+    control.setAttribute('tabindex','0');
+    const remove = event => {
+      event.preventDefault(); event.stopPropagation();
+      const item = currentProfileDocuments().find(doc=>doc.id===control.dataset.deleteAction);
+      if (item && canDeleteDocument(item)) confirmDocumentDeletion(root, null, item);
+    };
+    control.addEventListener('click',remove);
+    control.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' ')remove(event);});
   });
   root.querySelectorAll('[data-profile-document]').forEach((control) => {
     control.addEventListener('click', () => {
