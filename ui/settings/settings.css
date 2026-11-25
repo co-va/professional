@@ -173,8 +173,8 @@
 
 /* Desktop table headings follow the established italic H-list convention. */
 .settings-document-list-heading,.notification-desktop-group h3,.settings-list-heading{font-style:italic}
-.settings-documents-switch{align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
-.settings-history-tools{display:flex;align-items:center;gap:8px;min-width:0;flex:1 1 180px;max-width:320px;margin-left:auto}
+.settings-documents-switch{align-items:center;justify-content:flex-start;gap:12px;flex-wrap:wrap}
+.settings-history-tools{display:flex;align-items:center;gap:8px;min-width:0;flex:0 1 260px;max-width:320px}
 .settings-history-tools .ui-search-field{padding:0;flex:1;min-width:0}
 .settings-history-tools .field{margin:0;min-width:0}
 .settings-history-tools input[type="search"]{height:36px;min-height:36px;max-height:36px;border-radius:10px;font-size:13px}
