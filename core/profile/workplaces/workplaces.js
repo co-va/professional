@@ -3,6 +3,8 @@ import { compactCheck } from '../../../ui/selection/check-list.js';
 import { moveDesktopQTool, pinDesktopQDanger } from '../../../ui/v2/z-layout.js';
 import { isV2DesktopWorkspace } from '../../../ui/v2/geometry.js';
 import { getProfile } from '../data.js';
+import { canUseCapability } from '../../access.js';
+import { BOOKING_SLOT_STEPS, getWorkplaceBookingRules, normalizeWorkplaceBookingRules, saveWorkplaceBookingRules } from '../../booking-settings/index.js';
 import { deleteWorkplace as deleteWorkplaceData, getWorkplaceReferenceData, getWorkplaces, upsertWorkplace } from './data.js';
 
 function workplaceDefaults(){
@@ -26,6 +28,7 @@ export function workplaceForm(existing=null){
   const defaults=reference.defaults||{};
   const w=existing||emptyWorkplace();
   const cities=[...new Set([w.city,...(reference.cities||[])].filter(Boolean))];
+  const bookingRules = canUseCapability('online_booking.access') ? getWorkplaceBookingRules(w.key) : null;
   const currencies=(reference.currencies||[]).length
     ? reference.currencies
     : (w.currency?[{value:w.currency,label:w.currency}]:[]);
@@ -73,6 +76,15 @@ export function workplaceForm(existing=null){
         data:'data-workplace-public-booking-visibility',
       })}
     </div>
+    ${bookingRules ? `<div class="form-grid" data-workplace-booking-rules>
+      <strong>Правила онлайн-записи</strong>
+      ${select({label:'Шаг времени записи',name:'workplaceBookingSlotStep',value:String(bookingRules.preferredSlotStep),options:BOOKING_SLOT_STEPS.map(step=>({value:String(step),label:step+' мин'}))})}
+      <input type="hidden" name="workplaceAllowCancellation" value="${bookingRules.allowClientCancellation?'true':'false'}">
+      ${compactCheck({label:'Разрешить отмену записи',checked:bookingRules.allowClientCancellation,data:'data-workplace-booking-cancel'})}
+      <input type="hidden" name="workplaceAllowRescheduling" value="${bookingRules.allowClientRescheduling?'true':'false'}">
+      ${compactCheck({label:'Разрешить перенос записи',checked:bookingRules.allowClientRescheduling,data:'data-workplace-booking-reschedule'})}
+      <small class="muted">Правила сохраняются для этого пространства. Применение в клиентской записи ещё не подключено.</small>
+    </div>` : ''}
     ${links({links:w.links||[],name:'workplace-links',label:'Ссылки',compact:true,addInHeader:true})}
     ${textareaField({label:'О рабочем пространстве',name:'workplaceAbout',value:w.about||'',placeholder:'Коротко о рабочем пространстве'})}
     <div class="form-error" data-workplace-error></div>
@@ -101,8 +113,13 @@ function collectWorkplaceForm(root,existing){
   const profile=getProfile();
   return {
     valid:Boolean(name&&city&&color),
+    bookingRules:form.querySelector('[data-workplace-booking-rules]')?normalizeWorkplaceBookingRules({
+      preferredSlotStep:Number(data.get('workplaceBookingSlotStep')),
+      allowClientCancellation:data.get('workplaceAllowCancellation')==='true',
+      allowClientRescheduling:data.get('workplaceAllowRescheduling')==='true',
+    }):null,
     item:{
-      key:existing?.key||crypto.randomUUID(),
+      key:existing?.key||form.dataset.workplaceDraftKey||(form.dataset.workplaceDraftKey=crypto.randomUUID()),
       profileId:profile.key,
       photo:String(data.get('workplacePhoto')||''),
       photoCropX:Number(data.get('workplacePhotoCropX')||50),
@@ -126,11 +143,13 @@ function collectWorkplaceForm(root,existing){
 }
 
 async function saveWorkplace(root,existing,onDone){
-  const {valid,item}=collectWorkplaceForm(root,existing);
+  const {valid,item,bookingRules}=collectWorkplaceForm(root,existing);
   const error=root.querySelector('[data-workplace-error]');
   if(!valid){if(error)error.textContent='Название, город и цвет обязательны.';return false}
   try{
     const saved=await upsertWorkplace(item);
+    if(!saved)throw Error('Сервер не подтвердил рабочее пространство.');
+    if(bookingRules && (!existing || JSON.stringify(bookingRules)!==JSON.stringify(getWorkplaceBookingRules(item.key)))) await saveWorkplaceBookingRules(item.key,bookingRules);
     if(error)error.textContent='';
     onDone?.(saved);
     return true;
@@ -152,6 +171,10 @@ export function bindWorkplaceForm(root,existing=null,{onSaved=()=>{},onDeleted=(
   form.querySelector('[data-workplace-public-booking-visibility]')?.addEventListener('change',(event)=>{
     setWorkplaceDraft(root,'visibleInPublicBooking',event.currentTarget.checked?'true':'false');
   });
+
+  for(const [selector,name] of [['[data-workplace-booking-cancel]','workplaceAllowCancellation'],['[data-workplace-booking-reschedule]','workplaceAllowRescheduling']]){
+    form.querySelector(selector)?.addEventListener('change',event=>setWorkplaceDraft(root,name,event.currentTarget.checked?'true':'false'));
+  }
 
   const primary=root.querySelector('[data-workplace-primary]');
   const primaryActions=primary?.closest('.modal-actions');

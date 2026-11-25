@@ -7,6 +7,7 @@ import { bindWorkplaceForm, workplaceForm } from './workplaces/workplaces.js';
 import { profileCardAppearance, profileCardFields, workplaceCardAppearance, workplaceCardFields, workplaceCardPhoto } from './card-presentation.js';
 import { getCardAppearanceTemplate, saveCardAppearanceTemplate } from '../../core/card-appearance-templates.js';
 import { loadProfileState } from './runtime.js';
+import { loadOperationalState } from '../runtime/operational-state.js';
 import { isV2DesktopWorkspace } from '../../ui/v2/geometry.js';
 import { moveDesktopQTool } from '../../ui/v2/z-layout.js';
 
@@ -321,7 +322,13 @@ function renderDesktopProfileTools(root,navigateBack,options,workplacesAllowed,t
   row?.querySelector('[data-profile-desktop-add]')?.addEventListener('click',()=>openWorkplace(root,null,navigateBack,options));
 }
 
-function openWorkplaceQ(root,existing,navigateBack,options={}){
+async function openWorkplaceQ(root,existing,navigateBack,options={}){
+  // Do not open a draft with default rules before the server snapshot is loaded.
+  if(canUseCapability('online_booking.access')){
+    try{await loadOperationalState({full:true});}
+    catch(error){showProfileError(root,error?.message||'Не удалось загрузить правила онлайн-записи.');return;}
+    if(!root.isConnected)return;
+  }
   // The F profile owns Header B. Q owns only its canonical in-sheet title.
   const layer=mountModal(root,modal(workplaceForm(existing),{
     title:'Рабочее пространство',
