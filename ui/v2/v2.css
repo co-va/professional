@@ -406,8 +406,6 @@
   }
   .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z:not(.v2-z--layer)>[data-v2-z-header]{grid-template-columns:minmax(0,1fr)!important}
   .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z:not(.v2-z--layer)>[data-v2-z-header]>[data-v2-z-header-content]{grid-column:1!important;padding:0!important}
-  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z:not(.v2-z--layer)>[data-v2-z-header]:has(>[data-v2-z-header-content]:empty){display:none!important}
-  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z--layer>[data-v2-z-header] [data-v2-z-dismiss]{color:var(--white)!important;left:0!important}
   .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z>[data-v2-z-body]{scrollbar-width:auto;scrollbar-gutter:stable}
   .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z>[data-v2-z-body]::-webkit-scrollbar{display:revert}
   .v2-app--workspace[data-v2-desktop-surface="list"] .v2-workspace-surface{min-height:0}
@@ -506,16 +504,6 @@
 /* Contacts: match the approved Admin working area, not the mobile list.
    Exact Admin pearl #E0D6D6 and header ink #41484F, scoped to this screen. */
 @media (min-width:768px) and (min-height:600px){
- .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]){
-   padding:36px 36px 48px;
- }
- .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar])>[data-v2-z-header]{
-   max-width:1240px;width:100%;align-self:center;padding-bottom:24px!important;
- }
- .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar])>[data-v2-z-body]{
-   max-width:1240px;width:100%;align-self:center;
- }
- [data-people-desktop-toolbar] h2{margin:0 0 24px;color:var(--white);font-size:30px;line-height:1.2;font-weight:720;letter-spacing:-.035em}
  .people-desktop-tools{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
  .people-desktop-tools>.field{width:min(300px,100%);min-width:180px}
  .people-desktop-tools>.field input[type="search"]{height:36px;min-height:36px;max-height:36px;border-radius:10px;font-size:13px}
@@ -542,7 +530,6 @@
  .v2-app--workspace>.v2-header:has(.v2-desktop-toolbar-context){border-bottom:1px solid rgba(255,255,255,.14)}
 }
 @media (min-width:768px) and (max-width:1024px) and (min-height:600px){
- .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]){padding:26px 26px 36px}
  .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact td{padding:4px 8px}
 }
 
@@ -654,9 +641,6 @@
 /* Desktop Contacts: counter matches the H title; selection and opening are
    separate native controls. No row-wide click target. */
 @media (min-width:768px) and (min-height:600px){
- .people-desktop-title{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:0 0 24px}
- [data-people-desktop-toolbar] .people-desktop-title h2{margin:0}
- .people-desktop-title>[data-people-count]{color:var(--white);font-size:30px;line-height:1.2;font-weight:720;letter-spacing:-.035em;font-variant-numeric:tabular-nums;white-space:nowrap}
  .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact :is(th,td)[data-table-column="select"]{padding:0 4px;text-align:center}
  .v2-app--workspace [data-people-list-host] .ui-compact-check{position:relative;display:inline-grid;place-items:center;width:36px;height:40px;min-height:40px;touch-action:manipulation}
  .v2-app--workspace [data-people-list-host] .ui-compact-check .ui-check-input{inset:0;width:100%;height:100%;margin:0;pointer-events:auto;cursor:pointer}
@@ -696,23 +680,43 @@
  .v2-app--workspace .people-overview-record{width:auto;height:34px;min-height:34px;padding:0 12px;border-radius:8px;font-size:13px;white-space:nowrap;touch-action:manipulation}
 }
 
-/* Desktop Clients Z2: the same H surface as the list, not a Q. */
+/* Shared Desktop Z: one H header above every workspace body. The breadcrumb
+   in the application Header is independent. Q and Mobile retain their owners. */
+.v2-desktop-z-title{display:none}
 @media (min-width:768px) and (min-height:600px){
- .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.people-desktop-overview-z{padding:36px 36px 48px}
- .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.people-desktop-overview-z>[data-v2-z-header]{max-width:1240px;width:100%;align-self:center;grid-template-columns:minmax(0,1fr)!important;padding-bottom:24px!important}
- .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.people-desktop-overview-z>[data-v2-z-header]>[data-v2-z-header-content]{grid-column:1!important;padding:0!important}
- .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.people-desktop-overview-z>[data-v2-z-header]>[data-v2-z-dismiss]{display:none!important}
- .v2-app--workspace .people-desktop-overview-z>[data-v2-z-body]{max-width:1240px;width:100%;align-self:center}
- .v2-app--workspace .people-desktop-overview-z .people-overview-heading{height:auto;justify-content:space-between;gap:12px;padding:0;margin:0 0 20px}
- .v2-app--workspace .people-desktop-overview-z .people-overview-heading h2{margin:0;color:var(--white);font-size:30px;line-height:1.2;font-weight:720;letter-spacing:-.035em}
- .v2-app--workspace .people-desktop-overview-z .people-overview-heading .ui-compact-button,.v2-app--workspace .people-desktop-overview-z .people-overview-tools .ui-compact-button{color:var(--white)}
- .v2-app--workspace .people-desktop-overview-z .people-overview-toolbar{justify-content:flex-end;flex-wrap:wrap;gap:12px}
+ .v2-app--workspace{--v2-desktop-work-inset:36px;--v2-desktop-work-top:36px;--v2-desktop-work-bottom:48px;--v2-desktop-work-max:1240px;--v2-desktop-title-height:36px;--v2-desktop-title-gap:24px;--v2-desktop-tools-height:36px;--v2-desktop-content-gap:24px}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z{padding:var(--v2-desktop-work-top) var(--v2-desktop-work-inset) var(--v2-desktop-work-bottom)}
+ .v2-app--workspace[data-v2-desktop-surface] .v2-front>.v2-z>[data-v2-z-header]{
+   display:flex!important;flex-direction:column;align-items:stretch;gap:var(--v2-desktop-title-gap);box-sizing:border-box;
+   min-height:0!important;width:100%;max-width:var(--v2-desktop-work-max);align-self:center;
+   margin:0!important;padding:0 0 var(--v2-desktop-content-gap)!important;background:var(--v2-base)!important
+ }
+ .v2-app--workspace[data-v2-desktop-surface] .v2-front>.v2-z>[data-v2-z-header]>[data-v2-z-dismiss]{display:none!important;visibility:hidden!important;pointer-events:none!important}
+ .v2-app--workspace .v2-front>.v2-z>[data-v2-z-header]>.v2-desktop-z-title{
+   display:flex;align-items:center;gap:16px;min-width:0;min-height:var(--v2-desktop-title-height);height:var(--v2-desktop-title-height);flex:none;color:var(--white)
+ }
+ .v2-desktop-z-title>h2{margin:0;min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:30px;line-height:1.2;font-weight:720;letter-spacing:-.035em}
+ [data-v2-desktop-z-accessory]:empty{display:none}
+ [data-v2-desktop-z-accessory]>[data-people-count]{color:var(--white);font-size:30px;line-height:1.2;font-weight:720;letter-spacing:-.035em;font-variant-numeric:tabular-nums;white-space:nowrap}
+ .v2-desktop-z-back{display:none;border:0;background:transparent;color:var(--white);font:inherit;font-size:14px;font-weight:650;min-height:36px;padding:0 0 0 12px;cursor:pointer;touch-action:manipulation}
+ .v2-app--workspace .v2-front>.v2-z--layer[data-v2-dismissible="true"]>.v2-z-header .v2-desktop-z-back,
+ .v2-app--workspace .v2-front>.v2-z--layer[data-v2-dismissible="true"]>[data-v2-z-header] .v2-desktop-z-back{display:block}
+ .v2-app--workspace[data-v2-desktop-surface] .v2-front>.v2-z>[data-v2-z-header]>[data-v2-z-header-content]{
+   box-sizing:border-box;min-height:var(--v2-desktop-tools-height);padding:0!important;justify-content:center;flex:none;margin:0!important
+ }
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z>[data-v2-z-body]{max-width:var(--v2-desktop-work-max);width:100%;align-self:center;scrollbar-gutter:auto}
+ /* Journal keeps the existing edge-attached white body and its own tools.
+    Only its H header joins the common vertical rhythm. */
+ .v2-app--workspace[data-v2-desktop-surface="journal"] .v2-front>.v2-z:not(.v2-z--layer)>[data-v2-z-header]{width:calc(100% - 2 * var(--v2-desktop-work-inset));padding:var(--v2-desktop-work-top) 0 var(--v2-desktop-content-gap)!important}
+ .v2-app--workspace .people-desktop-overview-z .people-overview-toolbar{justify-content:flex-end;flex-wrap:wrap;gap:12px;min-height:var(--v2-desktop-tools-height)}
  .v2-app--workspace .people-desktop-overview-z .people-overview-tools{margin-left:0;flex-wrap:wrap}
- .v2-app--workspace .people-desktop-overview-z .people-overview-record{background:#E0D6D6;color:#41484F;border-color:#E0D6D6}
- .v2-app--workspace .people-desktop-overview-z .people-overview-delete{width:auto;height:34px;min-height:34px;padding:0 12px;border-radius:8px;font-size:13px;white-space:nowrap}
+ .v2-app--workspace .people-desktop-overview-z .people-overview-tools .ui-compact-button{color:var(--white)}
+ .v2-app--workspace .people-desktop-overview-z .people-overview-record{background:#E0D6D6;color:#41484F;border-color:#E0D6D6;height:36px;min-height:36px}
+ .v2-app--workspace .people-desktop-overview-z .people-overview-toolbar .ui-select__control{height:36px;min-height:36px;max-height:36px}
  .v2-app--workspace .people-desktop-overview-z [data-person-card]{width:min(338px,100%);max-width:338px;align-self:flex-start}
+ .v2-app--workspace .v2-front>.v2-z .v2-desktop-danger-footer{left:auto;right:max(var(--v2-desktop-work-inset),calc((100% - var(--v2-desktop-work-max)) / 2));width:max-content;bottom:calc(24px + var(--ui-bottom-safe,env(safe-area-inset-bottom)) + var(--ui-keyboard-inset,0px))}
+ .v2-app--workspace .v2-front>.v2-z .v2-desktop-danger-footer>.ui-button{width:auto;min-width:128px}
 }
-@media (min-width:768px) and (max-width:1023px) and (min-height:600px){
- .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.people-desktop-overview-z{padding:26px 26px 36px}
- .v2-app--workspace .people-desktop-overview-z .people-overview-tools{margin-left:0}
+@media (min-width:768px) and (max-width:1024px) and (min-height:600px){
+ .v2-app--workspace{--v2-desktop-work-inset:26px;--v2-desktop-work-top:26px;--v2-desktop-work-bottom:36px}
 }

@@ -602,7 +602,6 @@ export function renderPeople(root, options = {}) {
   ]);
   const search = field({ name:'peopleSearch', type:'search', placeholder:wide?'Поиск по имени или коду':'Поиск по имени или UEI', autocomplete:'off', data:'data-people-search' });
   const [searchRow] = setV2ZHeaderRows(root, [wide ? `<section data-people-desktop-toolbar>
-    <div class="people-desktop-title"><h2>Клиенты</h2><output data-people-count aria-live="polite">—</output></div>
     <div class="people-desktop-tools">${search}
       <div class="people-desktop-actions">
         ${button('Фильтр',{variant:'secondary',data:'data-people-desktop-filter'})}
@@ -613,9 +612,11 @@ export function renderPeople(root, options = {}) {
         ${button('Вид',{variant:'secondary',data:'data-people-desktop-view'})}
         ${button('<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>',{variant:'secondary',className:'people-desktop-icon people-desktop-add',data:'data-people-desktop-add title="Добавить клиента" aria-haspopup="dialog"',aria:'Добавить клиента'})}
       </div>
-    </div></section>` : `<div class="people-search ui-search-field">${search}</div>`]);
+    </div></section>` : `<div class="people-search ui-search-field">${search}</div>`], {
+    desktopAccessory: wide ? '<output data-people-count aria-live="polite">—</output>' : '',
+  });
   root.peopleSearchInput = searchRow?.querySelector('[data-people-search]') || null;
-  root.peopleCounter = searchRow?.querySelector('[data-people-count]') || null;
+  root.peopleCounter = wide ? root.closest('[data-v2-z]')?.querySelector('[data-people-count]') || null : null;
   root.peopleRefreshPresentation = () => refreshPeopleList(root);
   searchRow?.querySelector('[data-people-desktop-filter]')?.addEventListener('click', event => openFilterSettings(root, event.currentTarget));
   searchRow?.querySelector('[data-people-desktop-excel]')?.addEventListener('click', event => openPeopleExcelMenu(root, {
@@ -1068,7 +1069,7 @@ function desktopPersonOverviewTools(layer, person, options = {}) {
     ? layer.querySelector(':scope > [data-v2-z-header] > [data-v2-z-header-content]')
     : layer.closest('[data-v2-q="true"]')?.querySelector('[data-v2-q-header-content]');
   if (!header) return;
-  const markup = `<div class="people-overview-heading"><h2 class="v2-q-title">Клиент</h2>${fullPage ? compactButton({ kind: 'previous', data: 'data-v2-z-close', aria: 'Вернуться к клиентам' }) : ''}</div>
+  const markup = `${fullPage ? '' : '<div class="people-overview-heading"><h2 class="v2-q-title">Клиент</h2></div>'}
   <div class="people-overview-toolbar" data-v2-layer-gesture-ignore>
     ${select({ name: 'personOverviewProgram', aria: 'Программы', value: '', options: [
       { value: '', label: 'Программы' },
@@ -1078,7 +1079,6 @@ function desktopPersonOverviewTools(layer, person, options = {}) {
       ${compactButton({ kind: 'document', data: 'data-person-overview-documents title="Документы"', aria: 'Документы' })}
       ${compactButton({ kind: 'history', data: 'data-person-overview-history title="История"', aria: 'История' })}
       ${button('Записать', { className: 'people-overview-record', data: 'data-person-overview-record' })}
-      ${fullPage ? button('Удалить', { variant: 'danger', className: 'people-overview-delete', data: 'data-person-overview-delete' }) : ''}
     </div>
   </div>`;
   if (fullPage) setV2ZHeaderRows(layer, [markup]);
@@ -1127,9 +1127,9 @@ async function renderPersonOverview(layer, baseRoot, key, options = {}) {
     desktop ? personQContext(person, fullPage ? { title: 'Клиент' } : {}) : personContext(person),
     overviewCard(person),
     relationships.markup,
-    desktop && !fullPage ? actionBlock(
+    desktop ? actionBlock(
       button('Удалить', { variant: 'danger', data: 'data-person-overview-delete data-ui-keyboard-action="auxiliary"' }),
-      { className: 'people-overview-footer' },
+      { className: fullPage ? 'v2-desktop-danger-footer' : 'people-overview-footer' },
     ) : '',
   ]);
   setV2ZHeaderRows(layer, []);
@@ -1184,7 +1184,8 @@ function openPersonOverview(root, key, options = {}) {
       if (!layer) return null;
       layer.setAttribute('data-desktop-person-overview', '');
       layer.innerHTML = page([workspaceHeaderContext({title:'Клиент'}), emptyState('Клиент', 'Загружаем данные…')]);
-      setV2ZHeaderRows(layer, ['<div class="people-overview-heading"><h2>Клиент</h2>'+compactButton({kind:'previous',data:'data-v2-z-close',aria:'Вернуться к клиентам'})+'</div>']);
+      setV2ZHeaderRows(layer, []);
+      notifyContext();
       void renderPersonOverview(layer, root, key, options).catch(error => {
         if (layer.isConnected) layer.innerHTML = page([workspaceHeaderContext({title:'Клиент'}), emptyState('Клиент', 'Не удалось открыть клиента.')]);
         console.error(error);

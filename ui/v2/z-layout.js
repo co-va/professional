@@ -71,7 +71,8 @@ function surfaceHeader(content = '', { kind = 'z', dismiss = true } = {}) {
   const contentData = kind === 'q' ? 'data-v2-q-header-content' : 'data-v2-z-header-content';
   const contentStyle = visibleWorkAreaStyle(SURFACE_HEADER_CONTENT_STYLE, kind);
   const desktopClose = kind === 'q' && dismiss ? '<button type="button" class="v2-layer__close v2-desktop-q-close" data-v2-q-close aria-label="Закрыть">×</button>' : '';
-  return `<div ${data} style="${SURFACE_HEADER_STYLE}">${dismiss ? v2ZDismissAffordance() : ''}<div ${contentData} style="${contentStyle}">${content}</div>${desktopClose}</div>`;
+  const desktopTitle = kind === 'z' ? '<div class="v2-desktop-z-title"><h2 data-v2-desktop-z-title></h2><div data-v2-desktop-z-accessory></div><button type="button" class="v2-desktop-z-back" data-v2-z-close>Назад</button></div>' : '';
+  return `<div ${data} style="${SURFACE_HEADER_STYLE}">${dismiss ? v2ZDismissAffordance() : ''}${desktopTitle}<div ${contentData} style="${contentStyle}">${content}</div>${desktopClose}</div>`;
 }
 
 function surfaceBody(content = '', { kind = 'z' } = {}) {
@@ -138,11 +139,13 @@ function bindV2ZHeaderOwner(root) {
   Z_HEADER_OWNER_BOUND.add(root);
 }
 
-export function setV2ZHeaderRows(root, rows = []) {
+export function setV2ZHeaderRows(root, rows = [], { desktopAccessory = '' } = {}) {
   const surface = resolveZSurface(root);
   const host = surface?.querySelector?.(':scope > [data-v2-z-header] > [data-v2-z-header-content]');
   if (!host) return [];
   bindV2ZHeaderOwner(root);
+  const accessory = surface.querySelector(':scope > [data-v2-z-header] > .v2-desktop-z-title > [data-v2-desktop-z-accessory]');
+  if (accessory) accessory.innerHTML = desktopAccessory;
   const values = (Array.isArray(rows) ? rows : [rows]).filter((row) => String(row || '').trim());
   host.innerHTML = values.map((row, index) => `<div data-v2-z-header-row="${index}" style="min-width:0">${row}</div>`).join('');
   host.querySelectorAll(':scope > [data-v2-z-header-row] > *').forEach((node) => {
@@ -155,4 +158,12 @@ export function clearV2ZHeaderRows(root) {
   const surface = resolveZSurface(root);
   const host = surface?.querySelector?.(':scope > [data-v2-z-header] > [data-v2-z-header-content]');
   if (host) host.replaceChildren();
+  surface?.querySelector(':scope > [data-v2-z-header] > .v2-desktop-z-title > [data-v2-desktop-z-accessory]')?.replaceChildren();
+}
+
+export function syncV2DesktopZTitle(root, title = '') {
+  const surface = resolveZSurface(root);
+  const node = surface?.querySelector(':scope > [data-v2-z-header] > .v2-desktop-z-title > [data-v2-desktop-z-title]');
+  const next = String(title || '');
+  if (node && node.textContent !== next) node.textContent = next;
 }
