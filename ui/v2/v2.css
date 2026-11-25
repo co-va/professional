@@ -694,7 +694,7 @@
    Keep mobile Z and all Q geometry intact. */
 [data-h-title-row]{display:none}
 @media (min-width:768px) and (min-height:600px){
-.v2-app--workspace{--h-inset:36px;--h-top:36px;--h-bottom:48px;--h-title:36px;--h-gap:24px;--h-tools:36px;--h-content-gap:24px}
+.v2-app--workspace{--h-inset:36px;--h-top:36px;--h-bottom:48px;--h-title:36px;--h-gap:24px;--h-tools:36px;--h-list-tool-row:42px;--h-content-gap:24px}
 .v2-app--workspace [data-v2-z-header]>[data-v2-z-dismiss]{display:none!important;visibility:hidden!important;pointer-events:none!important}
 .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z{padding:var(--h-top) var(--h-inset) var(--h-bottom)}
 .v2-app--workspace[data-v2-desktop-surface] .v2-front>.v2-z>[data-v2-z-header]{display:grid!important;grid-template-columns:minmax(0,1fr)!important;grid-template-rows:var(--h-title) minmax(var(--h-tools),auto);align-items:center;gap:var(--h-gap);width:100%;max-width:none;align-self:stretch;min-height:0!important;margin:0!important;padding:0 0 var(--h-content-gap)!important;background:var(--v2-base)!important}
@@ -782,7 +782,7 @@
 /* Ordinary Desktop H tool row: same approved geometry/palette as Clients.
    Only explicit opt-in rows use this; Mobile and Journal do not. */
 @media (min-width:768px) and (min-height:600px){
- .v2-app--workspace[data-v2-desktop-surface="list"] .v2-desktop-tool-row{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;min-width:0;min-height:var(--h-tools);gap:12px}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-desktop-tool-row{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;min-width:0;min-height:var(--h-list-tool-row);gap:12px}
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-desktop-tool-context{display:flex;align-items:center;gap:8px;min-width:0}
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-desktop-tool-context>.ui-compact-button{color:var(--white);background:transparent;border:1px solid var(--white);border-radius:6px}
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-desktop-tool-context>.ui-compact-button:focus-visible{outline-color:var(--white)}
