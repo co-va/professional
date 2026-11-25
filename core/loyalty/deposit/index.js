@@ -14,8 +14,6 @@ import {
   field,
   formValidationMessage,
   initDatePickers,
-  miniCard,
-  miniCardRail,
   modal,
   mountModal,
   mountV2ZLayer,
@@ -193,31 +191,6 @@ function card(fields, { data = '', aria = '', interactive = true } = {}) {
   });
 }
 
-function depositInfo(deposit = {}) {
-  const terms = deposit?.terms && typeof deposit.terms === 'object' ? deposit.terms : {};
-  const benefitBalance = Math.max(0, Number(deposit?.benefitBalance || 0));
-  const refundableAmount = Math.max(0, Number(deposit?.refundableAmount ?? deposit?.principalBalance ?? 0));
-  const payment = depositFundingProgress(deposit);
-  const rows = [
-    { label: 'UEI', value: depositUei(deposit) },
-    { label: 'Контакт', value: contactLabel(depositPerson(deposit)) },
-    { label: 'Дата оформления', value: shortDateTime(deposit?.fundedAt, '—') },
-    ...(payment.fixed ? [{ label: 'Номинал', value: money(payment.nominal) }] : []),
-    { label: 'Внесено', value: money(payment.funded) },
-    ...(payment.fixed ? [{ label: payment.paid ? 'Платёж' : 'К оплате', value: payment.paid ? 'Оплачено' : money(payment.due) }] : []),
-    { label: 'Срок', value: terms?.termRule || 'Бессрочно' },
-    { label: 'Условие выгоды', value: terms?.benefit || 'Без дополнительной выгоды' },
-  ];
-  if (String(deposit?.benefitMode || 'none') === 'accrual' || benefitBalance > 0.009) {
-    rows.push({ label: 'Выгода в остатке', value: money(benefitBalance) });
-  }
-  if (deposit?.canRefund || refundableAmount > 0.009) {
-    rows.push({ label: 'К возврату', value: money(refundableAmount) });
-  }
-  rows.push({ label: 'Состояние', value: depositStatusLabel(deposit?.status) });
-  return details(rows);
-}
-
 function historyKindLabel(kind) {
   if (kind === 'deposit-funding') return 'Внесение';
   if (kind === 'deposit-benefit') return 'Выгода';
@@ -252,8 +225,7 @@ function depositHistoryNewest(deposit = {}) {
   return depositHistoryWithBalance(deposit).slice().reverse();
 }
 
-function historyListMarkup(deposit = {}) {
-  const items = depositHistoryNewest(deposit);
+function historyListMarkup(deposit = {}, items = depositHistoryNewest(deposit)) {
   if (!items.length) return emptyState('Истории пока нет', 'Движения депозита появятся здесь.');
   return v2ListEntries(items.map((item, index) => v2ListEntry({
     title: historyKindLabel(item?.kind),
@@ -265,17 +237,6 @@ function historyListMarkup(deposit = {}) {
     data: `data-deposit-history-entry="${index}"`,
     aria: `Открыть ${historyKindLabel(item?.kind).toLowerCase()}`,
   })));
-}
-
-function depositBalanceMiniCard(deposit = {}) {
-  return miniCardRail([miniCard({
-    title: 'Остаток',
-    value: money(deposit?.balance),
-    subtitle: depositStatusLabel(deposit?.status),
-    interactive: true,
-    data: 'data-deposit-history',
-    aria: 'Открыть историю депозита',
-  })]);
 }
 
 function historyOperationId(item = {}) {
@@ -346,21 +307,13 @@ async function openDepositHistoryEventS(root, item) {
   }));
 }
 
-function openDepositHistoryQ(root, deposit) {
-  const items = depositHistoryNewest(deposit);
-  const layer = mountModal(root, modal(historyListMarkup(deposit), {
-    variant: 'q',
-    surface: 'app',
-    title: 'История',
-  }));
-  if (!layer) return null;
-  layer.querySelectorAll('[data-deposit-history-entry]').forEach((node) => {
+function bindDepositHistory(root, items) {
+  root.querySelectorAll('[data-deposit-history-entry]').forEach((node) => {
     node.addEventListener('click', () => {
       const item = items[Number(node.dataset.depositHistoryEntry)];
-      if (item) void openDepositHistoryEventS(layer, item);
+      if (item) void openDepositHistoryEventS(root, item);
     });
   });
-  return layer;
 }
 
 function fundingEntries(deposit = {}) {
@@ -945,10 +898,11 @@ function depositInstanceSettings(root, layer, deposit, effectiveVisible, render,
 }
 
 function openDepositSettings(root, layer, deposit, effectiveVisible, render, onChanged) {
-  return openDepositSettingsMenu(depositInstanceSettings(root, layer, deposit, effectiveVisible, render, onChanged));
+  const settings = depositInstanceSettings(root, layer, deposit, effectiveVisible, render, onChanged);
+  return openDepositSettingsMenu({ ...settings, actions: settings.actions.filter(item => item.id !== 'delete') });
 }
 
-function bindDesktopDepositTools(layer, host, settings) {
+function bindDesktopDepositTools(layer, settings) {
   const header = layer.querySelector('[data-v2-q-header-content]');
   if (!header) return;
   header.innerHTML = `<div class="desktop-q-heading"><h2 class="v2-q-title">${escapeHtml(settings.title)}</h2></div>
@@ -989,7 +943,10 @@ function bindDesktopDepositTools(layer, host, settings) {
       });
     });
   });
-  host.querySelector('[data-deposit-desktop-delete]')?.addEventListener('click', () => {
+}
+
+function bindDepositDelete(layer, host, settings) {
+  host.querySelector('[data-deposit-instance-delete]')?.addEventListener('click', () => {
     const action = settings.actions.find(item => item.id === 'delete');
     if (!action) return;
     const confirmation = mountModal(layer, modal(`<div class="modal-title"><h2>Удалить карту?</h2><p>${escapeHtml(settings.title)}</p></div>
@@ -1047,23 +1004,26 @@ async function openDepositQ(root, depositId, onChanged = () => {}) {
     const desktop = isV2DesktopWorkspace(layer.closest('[data-v2-app]'));
     const header = layer.querySelector('[data-v2-q-header-content]');
     if (!desktop && header?.querySelector('.desktop-q-toolbar')) header.innerHTML = `<h2 class="v2-q-title">${escapeHtml(deposit.programName || 'Депозит')}</h2>`;
+    const items = depositHistoryNewest(deposit);
+    const settings = depositInstanceSettings(root, layer, deposit, effectiveVisible, render, onChanged);
     host.innerHTML = page([
       depositHeaderContext({
         title: deposit.programName || 'Депозит',
         settingsData: desktop ? '' : 'data-deposit-instance-settings',
         settingsAria: 'Настройки депозита',
       }),
-      ...(desktop
-        ? [depositBalanceMiniCard(deposit), depositInfo(deposit), actionBlock(button('Удалить карту', {
-            variant: 'danger', data: 'data-deposit-desktop-delete data-ui-keyboard-action="auxiliary"',
-          }))]
-        : [depositInfo(deposit), depositBalanceMiniCard(deposit)]),
+      personDepositCard(deposit, { interactive: false }),
+      v2Section('История', historyListMarkup(deposit, items)),
+      actionBlock(button('Удалить карту', {
+        variant: 'danger', data: 'data-deposit-instance-delete data-ui-keyboard-action="auxiliary"',
+      })),
     ]);
-    if (desktop) bindDesktopDepositTools(layer, host, depositInstanceSettings(root, layer, deposit, effectiveVisible, render, onChanged));
+    if (desktop) bindDesktopDepositTools(layer, settings);
     else host.querySelector('[data-deposit-instance-settings]')?.addEventListener('click', () => {
       openDepositSettings(root, layer, deposit, effectiveVisible, render, onChanged);
     });
-    host.querySelector('[data-deposit-history]')?.addEventListener('click', () => openDepositHistoryQ(root, deposit));
+    bindDepositHistory(host, items);
+    bindDepositDelete(layer, host, settings);
     notifyContext();
   };
 
@@ -1112,7 +1072,7 @@ async function openProgramLayer(root, programId, { person = null, onChanged = ()
   return layer;
 }
 
-function personDepositCard(deposit) {
+function personDepositCard(deposit, { interactive = true } = {}) {
   const terms = deposit?.terms && typeof deposit.terms === 'object' ? deposit.terms : {};
   const nominal = Number(terms.amount);
   const funded = Number(deposit?.fundedAmount);
@@ -1135,9 +1095,9 @@ function personDepositCard(deposit) {
     }),
     image: depositCardPhoto(),
     imagePosition: depositCardPhotoPosition(),
-    interactive: true,
-    data: `data-person-program="deposit:${escapeHtml(deposit?.depositId || deposit?.id || '')}"`,
-    aria: `Открыть депозит ${deposit?.programName || ''}`,
+    interactive,
+    data: interactive ? `data-person-program="deposit:${escapeHtml(deposit?.depositId || deposit?.id || '')}"` : '',
+    aria: interactive ? `Открыть депозит ${deposit?.programName || ''}` : String(deposit?.programName || 'Депозит'),
   });
 }
 
