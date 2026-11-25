@@ -538,3 +538,23 @@
  .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact th:nth-child(n+5)>span{display:block;white-space:nowrap}
  .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact td:nth-child(n+5){font-variant-numeric:tabular-nums;white-space:nowrap}
 }
+
+/* Contacts Desktop: approved compact action card, using the existing X portal.
+   Mobile and all other X presentations retain their original geometry. */
+@media (min-width:768px) and (min-height:600px){
+ .people-desktop-actions .people-desktop-icon{display:grid;place-items:center;width:36px;min-width:36px;padding:0}
+ .people-desktop-actions .people-desktop-add{background:var(--white);border-color:var(--white)}
+ .v2-app--workspace>.v2-layer-portal.is-anchored>.v2-layer-backdrop>.v2-layer--bottom.people-action-popup{
+   border-radius:14px;background:var(--white);padding:8px;overflow:auto;
+ }
+ .people-action-menu{display:grid;gap:0}
+ .people-action-menu>.ui-button{
+   display:flex;align-items:center;gap:12px;width:100%;min-height:42px;height:auto;padding:10px 12px;
+   border:0;border-radius:0;background:transparent;color:#41484F;text-align:left;
+   font-size:14px;font-weight:550;white-space:normal;
+ }
+ .people-action-menu>.ui-button+.ui-button{border-top:1px solid #E0D6D6}
+ .people-action-menu>.ui-button svg{flex:0 0 20px}
+ .people-action-menu>.ui-button:hover,.people-action-menu>.ui-button:focus-visible{background:var(--surface-soft);outline-offset:-2px}
+ .people-action-popup>[data-add-choice-error]:empty{display:none}
+}

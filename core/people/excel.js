@@ -147,12 +147,19 @@ export function openPeopleExcelMenu(root, { getRows = () => [], onLoaded = () =>
     { id: 'import', label: 'Загрузка', run: () => chooseAndLoad(root, onLoaded) },
     { id: 'template', label: 'Шаблон', run: () => getWorkbook([], true) },
   ];
-  const markup = '<div class="modal-actions">'
-    + actions.map(action => button(action.label, {
+  const desktopMenu = Boolean(anchor?.matches?.('[data-people-desktop-excel]'));
+  const desktopLabels = {
+    export: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V3m-5 5 5-5 5 5M4 16v4h16v-4"/></svg><span>Выгрузить</span>',
+    import: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v13m-5-5 5 5 5-5M4 16v4h16v-4"/></svg><span>Загрузить</span>',
+    template: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H5v18h14V8l-5-5Zm0 0v5h5M8 12h8m-8 4h8m-4-4v4"/></svg><span>Скачать шаблон</span>',
+  };
+  const markup = '<div class="' + (desktopMenu ? 'people-action-menu' : 'modal-actions') + '">'
+    + actions.map(action => button(desktopMenu ? desktopLabels[action.id] : action.label, {
       type: 'button', variant: 'secondary', data: 'data-people-excel-' + action.id,
     })).join('') + '</div>';
   const layer = mountModal(anchor || root, modal(markup, {
     title: 'Excel', variant: 'x', surface: 'app', xRole: 'action',
+    className: desktopMenu ? 'people-action-popup' : '',
   }));
   if (!layer) return null;
   for (const action of actions) {

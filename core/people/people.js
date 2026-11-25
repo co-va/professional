@@ -586,10 +586,10 @@ export function renderPeople(root, options = {}) {
         ${button('Сортировка',{variant:'secondary',data:'data-people-desktop-sort'})}
       </div>
       <div class="people-desktop-actions people-desktop-actions--right">
-        ${button('Excel',{variant:'secondary',data:'data-people-desktop-excel'})}
+        ${button('<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3v18m-4-4 4 4 4-4M17 21V3m-4 4 4-4 4 4"/></svg>',{variant:'secondary',className:'people-desktop-icon',data:'data-people-desktop-excel title="Обмен данными" aria-haspopup="dialog"',aria:'Обмен данными'})}
         ${button('Загрузки',{variant:'secondary',data:'data-people-desktop-uploads'})}
         ${button('Вид',{variant:'secondary',data:'data-people-desktop-view'})}
-        ${button('+',{variant:'secondary',data:'data-people-desktop-add',aria:'Добавить клиента'})}
+        ${button('<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>',{variant:'secondary',className:'people-desktop-icon people-desktop-add',data:'data-people-desktop-add title="Добавить клиента" aria-haspopup="dialog"',aria:'Добавить клиента'})}
       </div>
     </div></section>` : `<div class="people-search ui-search-field">${search}</div>`]);
   root.peopleSearchInput = searchRow?.querySelector('[data-people-search]') || null;
@@ -914,13 +914,15 @@ function openPeopleAppearanceQ(root, options = {}) {
 
 function openAddMenu(root, options = {}, anchor = null) {
   const allowReal = canUseRealPersonalData();
-  const layer = mountModal(anchor || root, modal(`<div class="modal-actions">
-    ${button('Из контакта', { variant: 'secondary', data: 'data-add-from-contacts' })}
-    ${button('Внести вручную', { variant: 'secondary', data: 'data-add-manual' })}
+  const desktopMenu = Boolean(anchor && isV2DesktopWorkspace(root.closest('[data-v2-app]')));
+  const layer = mountModal(anchor || root, modal(`<div class="${desktopMenu ? 'people-action-menu' : 'modal-actions'}">
+    ${button(desktopMenu ? '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2"/><circle cx="12" cy="9" r="2.5"/><path d="M8 16c0-3 8-3 8 0M2 7h2m-2 5h2m-2 5h2"/></svg><span>Из контактов</span>' : 'Из контакта', { variant: 'secondary', data: 'data-add-from-contacts' })}
+    ${button(desktopMenu ? '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="7" r="3"/><path d="M3 20v-2a6 6 0 0 1 12 0v2m4-12v6m-3-3h6"/></svg><span>Внести вручную</span>' : 'Внести вручную', { variant: 'secondary', data: 'data-add-manual' })}
   </div><div class="form-error" data-add-choice-error></div>`, {
     title: 'Добавить клиента',
     variant: 'x',
     surface: 'app',
+    className: desktopMenu ? 'people-action-popup' : '',
   }));
   if (!layer) return null;
 
