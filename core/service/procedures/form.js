@@ -1,11 +1,10 @@
 import { createServiceSaveController } from '../editor-actions.js';
-import { isV2DesktopWorkspace } from '../../../ui/v2/geometry.js';
 import { collectCost, validateCostDefinition, costField, durationPicker, field, initCostFields, initDurationPickers, setSharedProfilePrimary, textareaField } from '../../../ui/ui.js';
 import { getProcedures, commitProcedure, commitProcedureWorkplace } from './data.js';
 import { procedureEditorSignature, rebaseWorkplaceAssignmentSignature } from '../editor-signature.js';
 import { bindServiceWorkplaceAssignments, serviceWorkplaceAssignmentList } from '../workplace-selection.js';
 import { compactCheck } from '../../../ui/selection/check-list.js';
-import { procedureGroupBookingFields, bindProcedureGroupBooking } from './group-booking-ui.js';
+import { procedureGroupBookingFields, bindProcedureGroupBooking, adaptDesktopGroupBooking } from './group-booking-ui.js';
 import { serviceGroupFields, readServiceGroupFields, bindServiceGroupFields } from '../catalog-grouping.js';
 
 export function initialProcedure(existing = null, defaultWorkplace = null) {
@@ -63,28 +62,12 @@ export function bindProcedureEditor(root, {
   const primary = root.querySelector('[data-procedure-editor-primary]');
   if (!form || !primary) return { save: async () => null };
 
-  // Desktop prioritizes booking parameters above the main data. Relocate
-  // original form nodes before binding, so Tab order and FormData agree.
-  if (root.closest('[data-v2-q="true"]') && isV2DesktopWorkspace(root.closest('[data-v2-app]'))) {
-    const group = form.querySelector(':scope > .list-entries:has([data-procedure-group-toggle])');
-    const capacity = form.querySelector(':scope > [data-procedure-group-capacity]');
-    const online = form.querySelector('[data-procedure-online-check]')?.closest('.ui-compact-check');
-    if (group?.parentElement === form && capacity?.parentElement === form && online?.parentElement === form) {
-      const content = group.querySelector('.list-entry__content');
-      const input = capacity.querySelector('[name="procedureGroupCapacity"]');
-      if (content && input) {
-        // Keep the original numeric input and conditional visibility owner.
-        // The number sits to the right of the existing toggle in one row.
-        capacity.classList.add('desktop-inline-capacity');
-        input.setAttribute('aria-label', 'Максимум людей');
-        input.title = 'Максимум людей';
-        content.append(capacity);
-        group.classList.add('desktop-inline-group-booking');
-        form.prepend(group, online);
-      } else {
-        form.prepend(group, online, capacity);
-      }
-    }
+  if (root.closest('[data-v2-q="true"]')) {
+    adaptDesktopGroupBooking(form, {
+      toggleSelector: '[data-procedure-group-toggle]',
+      capacitySelector: '[data-procedure-group-capacity]',
+      onlineSelector: '[data-procedure-online-check]',
+    });
   }
 
   initCostFields(root);

@@ -868,13 +868,13 @@
 @media (min-width:768px) and (min-height:600px){
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-catalog]>.list-entries{border:1px solid var(--border);border-radius:var(--radius-control);background:var(--white);overflow:hidden}
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-catalog]>.list-entries>.list-entry:last-child{border-bottom:0}
- .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard:is(.service-procedure-editor-layer,.service-product-editor-layer) [data-v2-q-body] .list-entries:has(>[class~="list-entry"] [data-procedure-group-toggle]){gap:0;border:1px solid var(--border);border-radius:var(--radius-control);overflow:hidden;background:var(--white)}
- .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard:is(.service-procedure-editor-layer,.service-product-editor-layer) .list-entry:has([data-procedure-group-toggle]){height:var(--h-list-row);min-height:var(--h-list-row);max-height:var(--h-list-row);box-shadow:none;transform:none}
- .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard:is(.service-procedure-editor-layer,.service-product-editor-layer) .list-entry:has([data-procedure-group-toggle]) .list-entry__content{height:100%;min-height:0;padding:4px 12px;background:var(--white)}
- .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard:is(.service-procedure-editor-layer,.service-product-editor-layer) .list-entry:has([data-procedure-group-toggle]) .list-entry__text{gap:2px;min-width:0}
- .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard:is(.service-procedure-editor-layer,.service-product-editor-layer) .list-entry:has([data-procedure-group-toggle]) .list-entry__main strong{font-size:14px;line-height:16px}
- .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard:is(.service-procedure-editor-layer,.service-product-editor-layer) .list-entry:has([data-procedure-group-toggle]) .list-entry__main small{font-size:12px;line-height:14px;white-space:nowrap;text-overflow:ellipsis;overflow:hidden}
- .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard:is(.service-procedure-editor-layer,.service-product-editor-layer) .list-entry:has([data-procedure-group-toggle]) .list-entry__toggle{height:var(--ui-compact-size)}
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard:is(.service-procedure-editor-layer,.service-product-editor-layer) [data-v2-q-body] .list-entries:not(.desktop-inline-group-booking):has(>[class~="list-entry"] [data-procedure-group-toggle]){gap:0;border:1px solid var(--border);border-radius:var(--radius-control);overflow:hidden;background:var(--white)}
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard:is(.service-procedure-editor-layer,.service-product-editor-layer) .list-entry:has([data-procedure-group-toggle]):not(.desktop-inline-group-booking>.list-entry){height:var(--h-list-row);min-height:var(--h-list-row);max-height:var(--h-list-row);box-shadow:none;transform:none}
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard:is(.service-procedure-editor-layer,.service-product-editor-layer) .list-entry:has([data-procedure-group-toggle]):not(.desktop-inline-group-booking>.list-entry) .list-entry__content{height:100%;min-height:0;padding:4px 12px;background:var(--white)}
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard:is(.service-procedure-editor-layer,.service-product-editor-layer) .list-entry:has([data-procedure-group-toggle]):not(.desktop-inline-group-booking>.list-entry) .list-entry__text{gap:2px;min-width:0}
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard:is(.service-procedure-editor-layer,.service-product-editor-layer) .list-entry:has([data-procedure-group-toggle]):not(.desktop-inline-group-booking>.list-entry) .list-entry__main strong{font-size:14px;line-height:16px}
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard:is(.service-procedure-editor-layer,.service-product-editor-layer) .list-entry:has([data-procedure-group-toggle]):not(.desktop-inline-group-booking>.list-entry) .list-entry__main small{font-size:12px;line-height:14px;white-space:nowrap;text-overflow:ellipsis;overflow:hidden}
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard:is(.service-procedure-editor-layer,.service-product-editor-layer) .list-entry:has([data-procedure-group-toggle]):not(.desktop-inline-group-booking>.list-entry) .list-entry__toggle{height:var(--ui-compact-size)}
  .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard:is(.service-procedure-editor-layer,.service-product-editor-layer) [data-service-workplace-prices]>.ui-list{border-radius:var(--radius-control)}
  .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard:is(.service-procedure-editor-layer,.service-product-editor-layer) [data-service-workplace-prices]>.ui-list:empty{display:none}
  .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard:is(.service-procedure-editor-layer,.service-product-editor-layer) [data-service-workplace-prices] .ui-list__item{height:var(--h-list-row);min-height:var(--h-list-row);max-height:var(--h-list-row);padding:4px 12px}
@@ -888,22 +888,38 @@
  .v2-app--workspace>.v2-layer-portal.is-anchored>.v2-layer-backdrop[data-v2-x-role="picker"]>.v2-layer--bottom.service-workplace-picker .ui-list__item:is(:hover,:focus-visible){background:var(--surface-soft);border-radius:8px}
 }
 
-/* A single fixed-height setting row. The existing toggle remains in its
-   original slot; the optional capacity uses the reserved right-hand slot. */
+/* Desktop group booking is one line of form fields, not a mobile card.
+   The right-hand column matches the existing cost/duration half-field grid. */
 @media (min-width:768px) and (min-height:600px){
- .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard .desktop-inline-group-booking .list-entry__content{box-sizing:border-box;grid-template-columns:minmax(0,1fr) 48px 48px;gap:6px;padding:4px 8px}
- .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard .desktop-inline-group-booking .list-entry__toggle{width:48px}
- .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard .desktop-inline-group-booking .list-entry__main small{font-size:11px;line-height:13px;white-space:normal;overflow-wrap:normal}
- .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard .desktop-inline-capacity{min-width:0;width:48px;align-self:center}
- .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard .desktop-inline-capacity[hidden]{display:block!important;visibility:hidden;pointer-events:none}
- .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard .desktop-inline-capacity>.field{display:block;margin:0}
- .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard .desktop-inline-capacity>.field>span{display:none}
- .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard .desktop-inline-capacity input[type="number"]{box-sizing:border-box;width:48px;height:32px;min-height:32px;max-height:32px;padding:0 4px;text-align:center;font-size:16px}
+ .v2-app--workspace :is(.desktop-inline-group-booking, .desktop-workplace-editor .desktop-inline-group-booking){display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:center;gap:8px;border:0;background:transparent;box-shadow:none;overflow:visible;border-radius:0}
+ .v2-app--workspace .desktop-inline-group-booking>.list-entry{height:var(--ui-field-height);min-height:var(--ui-field-height);max-height:var(--ui-field-height);box-shadow:none;transform:none;background:transparent;overflow:visible}
+ .v2-app--workspace .desktop-inline-group-booking .list-entry__background{display:none}
+ .v2-app--workspace .desktop-inline-group-booking .list-entry__content{box-sizing:border-box;height:var(--ui-field-height);min-height:var(--ui-field-height);max-height:var(--ui-field-height);grid-template-columns:minmax(0,1fr) 42px;gap:4px;padding:0;background:transparent}
+ .v2-app--workspace .desktop-inline-group-booking .list-entry__text{display:block}
+ .v2-app--workspace .desktop-inline-group-booking .list-entry__main strong{font-size:13px;line-height:16px;white-space:normal;overflow-wrap:normal}
+ .v2-app--workspace .desktop-inline-group-booking .list-entry__main small{display:none}
+ .v2-app--workspace .desktop-inline-group-booking .list-entry__toggle{width:42px;height:var(--ui-compact-size);justify-self:end}
+ .v2-app--workspace .desktop-inline-capacity{min-width:0;width:100%;align-self:center}
+ .v2-app--workspace .desktop-inline-capacity>.field{display:block;margin:0}
+ .v2-app--workspace .desktop-inline-capacity>.field>span{display:none}
+ .v2-app--workspace .desktop-inline-capacity input[type="number"]{box-sizing:border-box;width:100%;height:var(--ui-field-height);min-height:var(--ui-field-height);max-height:var(--ui-field-height);padding:10px 12px;text-align:left;border-radius:0;font-size:16px}
 }
-
 /* Desktop Q destructive action follows the accepted Clients Z footer:
    isolated, fixed bottom right, never in the action toolbar. */
 @media (min-width:768px) and (min-height:600px){
  .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard>[data-v2-q-body]>.v2-desktop-danger-footer{left:auto;right:var(--v2-desktop-q-inset);width:max-content;margin:0;background:var(--v2-inner-surface)}
  .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard>[data-v2-q-body]>.v2-desktop-danger-footer>.ui-button{box-sizing:border-box;width:160px;min-width:160px;max-width:160px;height:var(--v2-desktop-q-button-height);min-height:var(--v2-desktop-q-button-height);max-height:var(--v2-desktop-q-button-height);margin:0;padding:0 12px;border-width:1px;border-radius:10px;font-size:13px;line-height:1}
+}
+
+/* Local Service X editor: the same form density, explicit Desktop close,
+   ordinary actions above the data and the destructive action below. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace .desktop-workplace-editor{padding:0;gap:12px}
+ .v2-app--workspace .desktop-workplace-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:36px}
+ .v2-app--workspace .desktop-workplace-heading>.service-workplace-price-editor__title{min-width:0;flex:1}
+ .v2-app--workspace .desktop-workplace-heading>.desktop-workplace-close{position:static;flex:0 0 var(--ui-compact-size);width:var(--ui-compact-size);height:var(--ui-compact-size);padding:0;border-radius:8px;line-height:1;cursor:pointer}
+ .v2-app--workspace .desktop-workplace-tools{display:flex;justify-content:flex-end;align-items:center;gap:6px;min-height:42px;height:42px;max-height:42px}
+ .v2-app--workspace .desktop-workplace-tools :is(.ui-button){box-sizing:border-box;width:112px;min-width:112px;max-width:112px;height:36px;min-height:36px;max-height:36px;margin:0;padding:0 4px;border-radius:10px;font-size:12px}
+ .v2-app--workspace .desktop-workplace-editor>.desktop-workplace-danger-footer{display:flex;justify-content:flex-end;align-items:center;margin-top:8px}
+ .v2-app--workspace .desktop-workplace-editor>.desktop-workplace-danger-footer>.ui-button{box-sizing:border-box;width:160px;min-width:160px;max-width:160px;height:36px;min-height:36px;max-height:36px;margin:0;padding:0 12px;border-radius:10px;font-size:13px}
 }

@@ -7,7 +7,7 @@ import { durationPicker, durationText, initDurationPickers } from '../../ui/dura
 import { textareaField } from '../../ui/inputs/index.js';
 import { compactCheck } from '../../ui/selection/check-list.js';
 import { list as sharedList } from '../../ui/lists/list.js';
-import { procedureGroupBookingFields, bindProcedureGroupBooking } from './procedures/group-booking-ui.js';
+import { procedureGroupBookingFields, bindProcedureGroupBooking, adaptDesktopGroupBooking } from './procedures/group-booking-ui.js';
 import { costSnapshot } from './editor-signature.js';
 import { getWorkplaces } from '../profile/workplaces/data.js';
 
@@ -152,6 +152,39 @@ export function bindServiceWorkplaceAssignments(root, {
     </div>`;
     const layer = mountModal(document.body, modal(content, { variant: 'x', xRole: 'editor', title: space.name }));
     if (!layer) return;
+    if (desktopTool) {
+      const editor = layer.querySelector('[data-service-workplace-editor]');
+      const title = editor?.querySelector('.service-workplace-price-editor__title');
+      const footer = editor?.querySelector('.modal-actions');
+      if (editor && title && footer) {
+        const header = editor.ownerDocument.createElement('div');
+        header.className = 'desktop-workplace-heading';
+        title.replaceWith(header);
+        header.append(title);
+        const close = editor.ownerDocument.createElement('button');
+        close.type = 'button';
+        close.className = 'v2-layer__close desktop-workplace-close';
+        close.setAttribute('aria-label', 'Закрыть');
+        close.setAttribute('data-modal-close', '');
+        close.textContent = '×';
+        header.append(close);
+        const tools = editor.ownerDocument.createElement('div');
+        tools.className = 'desktop-workplace-tools';
+        for (const action of footer.querySelectorAll('[data-service-workplace-apply-host], [data-service-workplace-cancel-price]')) tools.append(action);
+        header.after(tools);
+        footer.classList.add('desktop-workplace-danger-footer');
+        if (!footer.children.length) footer.hidden = true;
+        editor.classList.add('desktop-workplace-editor');
+        if (isProcedure) {
+          const extra = editor.querySelector('.service-workplace-extra');
+          if (adaptDesktopGroupBooking(extra, {
+            toggleSelector: '[data-local-group-toggle]',
+            capacitySelector: '[data-local-group-count]',
+            onlineSelector: '[data-local-online]',
+          })) tools.after(extra);
+        }
+      }
+    }
     initCostFields(layer);
     if (isProcedure) initDurationPickers(layer);
     let saving = false;
@@ -164,7 +197,13 @@ export function bindServiceWorkplaceAssignments(root, {
         breakDuration: isProcedure ? Number(layer.querySelector('[name="localBreak"]')?.value || 0) : 0,
         description: layer.querySelector('[name="localDescription"]')?.value || '',
         visibleInPublicBooking: !isProcedure || Boolean(layer.querySelector('[data-local-online]')?.checked),
-        groupBooking: { enabled: groupEnabled, capacity: Number(layer.querySelector('[name="localCapacity"]')?.value || 2) },
+        groupBooking: {
+          enabled: groupEnabled,
+          capacity: Number((() => {
+            const field = layer.querySelector('[name="localCapacity"]');
+            return field?.disabled && field.dataset.enabledCapacity !== undefined ? field.dataset.enabledCapacity : field?.value;
+          })() || 2),
+        },
       };
     };
     const actions = layer.querySelector('[data-service-workplace-apply]');
