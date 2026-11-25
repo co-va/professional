@@ -6,7 +6,7 @@ if(!target) throw Error('Preview URL required');
 const local=process.argv.includes('--local');
 const browser=await chromium.launch({headless:true,args:local?['--host-resolver-rules=MAP professional-volokovykh.msk1.amvera.tech 127.0.0.1','--no-proxy-server']:[]});
 try {
-  const page=await browser.newPage({serviceWorkers:'block'});
+  const page=await browser.newPage({serviceWorkers:'block',viewport:{width:1280,height:900}});
   const errors=[];
   const isApi=url=>new URL(url).pathname.startsWith('/api/')||new URL(url).hostname==='api.va-tools.ru';
   page.on('requestfailed',r=>{if(!isApi(r.url()))errors.push(r.url()+' '+r.failure()?.errorText);});
@@ -17,7 +17,7 @@ try {
     const url=new URL(r.request().url());
     if(isApi(url.href)) {
       const body=url.pathname.endsWith('/auth/me')?{account:{id:'preview-smoke',email:'preview@example.invalid'},tenantId:'preview-smoke'}:
-        url.pathname.endsWith('/saas-access/me')?{tenantId:'preview-smoke',status:'ACTIVE',commercialMode:'LIVE',capabilities:[{key:'profile.access',valueType:'BOOLEAN',enabled:true}]}:{};
+        url.pathname.endsWith('/saas-access/me')?{tenantId:'preview-smoke',status:'ACTIVE',commercialMode:'LIVE',capabilities:['profile.access','journal.day.access'].map(key=>({key,valueType:'BOOLEAN',enabled:true}))}:{};
       return r.fulfill({status:200,contentType:'application/json',body:JSON.stringify(body)});
     }
     if(url.origin!==new URL(target).origin) return r.abort();
@@ -31,6 +31,22 @@ try {
   await page.locator('[data-v2-app].v2-app--workspace').waitFor({timeout:30000});
   await page.locator('[data-v2-workspace-surface]').waitFor({state:'attached',timeout:10000});
   assert.equal(await page.locator('[data-workspace-load-error]').count(),0);
+  const shell=page.locator('.v2-app--workspace');
+  const surface=page.locator('[data-v2-front]>[data-v2-z]');
+  const geometry=()=>surface.evaluate(node=>({background:getComputedStyle(node).backgroundColor,radius:getComputedStyle(node).borderTopLeftRadius}));
+  await shell.locator('[data-v2-root-item="journal"]').waitFor({state:'attached'});
+  assert.equal(await shell.getAttribute('data-v2-desktop-surface'),'journal');
+  assert.equal((await geometry()).radius,'34px','Journal retains full Z');
+  await page.evaluate(()=>{location.hash='profile';});
+  await page.waitForFunction(()=>document.querySelector('.v2-app--workspace')?.dataset.v2DesktopSurface==='list');
+  assert.deepEqual(await geometry(),{background:'rgb(47, 51, 56)',radius:'0px'},'Desktop profile is on H, not white Z');
+  await page.setViewportSize({width:390,height:844});
+  assert.equal((await geometry()).radius,'34px','Phone keeps original Z');
+  await page.setViewportSize({width:1280,height:900});
+  await page.evaluate(()=>{location.hash='journal';});
+  await page.waitForFunction(()=>document.querySelector('.v2-app--workspace')?.dataset.v2DesktopSurface==='journal');
+  assert.equal((await geometry()).radius,'34px','Return to Journal restores Z');
+  console.log('PASS: Journal-only Desktop Z; non-Journal H; Mobile Z preserved');
   const assets=await page.evaluate(()=>performance.getEntriesByType('resource').map(r=>new URL(r.name).pathname));
   assert.ok(assets.some(p=>p.startsWith('/assets/')&&p.endsWith('.js')));
   assert.ok(!assets.some(p=>p==='/professional.js'||p==='/professional/workspace.js'||p.startsWith('/core/')));

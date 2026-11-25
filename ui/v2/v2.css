@@ -361,3 +361,40 @@
  .v2-app--workspace .v2-desktop-list-actions{display:flex;align-items:center;gap:8px}
  .v2-app--workspace .v2-desktop-list-actions .ui-button{width:auto}
 }
+
+/* Approved wide layout: Journal alone is edge-attached Z. Other sections
+   use the admin-style H workspace with independent, content-height lists.
+   Keep existing Z header/body owners and Mobile geometry intact. */
+@media (min-width:768px) and (min-height:600px){
+  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front{background:var(--v2-base)}
+  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z{
+    width:100%;height:100%;min-height:0;margin:0;padding:0 36px 36px;
+    border-radius:0;background:var(--v2-base);box-shadow:none;color:var(--white);
+  }
+  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z--layer{
+    inset:0;width:100%;transform:none;animation:none;transition:none;
+  }
+  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z.is-v2-obscured{visibility:hidden}
+  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z>[data-v2-z-header]{
+    background:var(--v2-base)!important;margin:0!important;padding:0 0 16px!important;
+    min-height:0!important;grid-template-columns:24px minmax(0,1fr)!important;
+  }
+  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z:not(.v2-z--layer)>[data-v2-z-header]{grid-template-columns:minmax(0,1fr)!important}
+  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z:not(.v2-z--layer)>[data-v2-z-header]>[data-v2-z-header-content]{grid-column:1!important;padding:0!important}
+  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z:not(.v2-z--layer)>[data-v2-z-header]:has(>[data-v2-z-header-content]:empty){display:none!important}
+  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z--layer>[data-v2-z-header] [data-v2-z-dismiss]{color:var(--white)!important;left:0!important}
+  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z>[data-v2-z-body]{scrollbar-width:auto;scrollbar-gutter:stable}
+  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z>[data-v2-z-body]::-webkit-scrollbar{display:revert}
+  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-workspace-surface{min-height:0}
+  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z :is(.v2-section__title,.ui-state-view__separator,.ui-state-view__title,.v2-profile-empty){color:var(--white)}
+  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z :is(.ui-list,.ui-folder-list,.ui-data-table,.entity-details,.agreements-summary,.empty-state,.ui-state-view__rows,.ui-state-view__empty){color:var(--text)}
+  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .field :is(input,textarea,select){color:var(--text)}
+  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .form-grid:not(.form-grid .form-grid){background:var(--white);color:var(--text);padding:16px;border-radius:var(--radius-control)}
+  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .v2-section:has(>.v2-section__content>.form-grid) .v2-section__title{color:var(--white)}
+  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .ui-state-view__row{min-height:42px;padding:8px 12px}
+  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .ui-folder-list__item{min-height:44px}
+  .v2-app--workspace[data-v2-desktop-surface="journal"] .v2-front>[data-v2-z]{background:var(--v2-inner-surface);border-radius:var(--v2-z-radius) 0 0 0}
+}
+@media (min-width:768px) and (max-width:1024px) and (min-height:600px){
+  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z{padding:0 18px 24px}
+}

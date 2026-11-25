@@ -17,3 +17,8 @@
  .ui-data-table--compact th button{padding:0}
  .ui-data-table--compact tbody tr:last-child td{border-bottom:0}
 }
+
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .ui-data-table--compact{border-radius:var(--radius-control)}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .ui-data-table--compact th{background:var(--surface-soft)}
+}

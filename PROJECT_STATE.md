@@ -1,5 +1,9 @@
 # PROJECT_STATE
 
+## Desktop — correction of section layout 25.11.2026
+
+Owner rejected the expanded Mobile Z used for all wide sections. On Desktop/iPad only Journal is a continuous edge-attached Z; all other root sections and their nested Z list pages are on H, with content-height compact lists as in Admin. The canonical Z DOM hooks remain for existing controllers; the presentation is selected by the active section, not separate business logic. Existing Q remains the right-side modal, real entity/mini cards, palette and Mobile remain untouched. Existing row components are denser on H; individual instruments that still contain mobile-specific cards/forms require addressed review, not automatic destructive conversion. Added wide/phone geometry assertions to the synthetic browser preview test. Actual customer acceptance and complete per-tool audit are pending. Main/Core/User untouched.
+
 ## Desktop Professional — таблицы и действия, кандидат 25.11.2026
 
 Контакты на широком экране используют существующий dataTable с утверждёнными колонками: выбор, код, имя фамилия в одной ячейке, телефон, первое и последнее посещение, Compact-редактор. Метаданные посещений берутся из прежнего Person/Record projection, одиночная запись оставляет только последнее посещение. Фильтр у кнопки, Excel использует существующий export; галочки выбирают строки, не запускают новую массовую операцию. Депозитные программы и оформленные депозиты показываются как таблицы только в wide, оригинальные карты и конструктор сохраняются внутри действующих сценариев. V использует существующий Compact settings в wide, прежний V на телефоне; запись сохраняет MiniCard и меню. Тёмный переключатель календаря использует существующие токены. Существующие X roles сохранены на телефоне.

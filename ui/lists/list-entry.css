@@ -19,3 +19,15 @@
 .list-entry__content:has(.list-entry__reorder-handle){grid-template-columns:36px minmax(0,1fr) auto auto auto}
 .list-entry--columns .list-entry__content:has(.list-entry__reorder-handle){grid-template-columns:36px minmax(0,1fr) auto auto}
 .list-entry--columns .list-entry__columns{grid-column:auto}
+
+/* Same row markup/actions: desktop H lists are continuous, not a stack of
+   floating Mobile cards. True entity/mini cards are deliberately excluded. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .list-entries:not(.is-reordering){gap:0}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .list-entry:not(.is-reordering){min-height:44px;border-bottom:1px solid var(--border);box-shadow:none;transform:none}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .list-entry__content{min-height:44px;padding:7px 12px}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .list-entry__text{gap:2px}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .list-entry__main strong{font-size:14px}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .list-entry__main small{font-size:12px}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .list-entry__action,.v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .list-entry__delete{height:var(--ui-compact-size);width:var(--ui-compact-size);flex-basis:var(--ui-compact-size)}
+}

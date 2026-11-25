@@ -589,6 +589,10 @@ function renderWorkspace() {
 
   state.navigationEnterZ = false;
 
+  // Preserve the shared Z DOM contract for Mobile and existing controllers.
+  // On wide screens only Journal manifests as a full Z surface; all other
+  // section roots are the ordinary H workspace, not a white page/modal.
+  if (shell) shell.dataset.v2DesktopSurface = state.activeSection === 'journal' ? 'journal' : 'list';
   const surface = shell?.querySelector('[data-v2-workspace-surface]');
   const disposers = [];
   let moduleDispose = () => {};
