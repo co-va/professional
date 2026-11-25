@@ -224,3 +224,7 @@ button.document-tile,.document-tile__open,.document-tile__toggle{cursor:pointer}
 .account-consent-navigation[hidden]{display:none}
 .document-tiles--rail.account-consent-rail{position:relative;min-width:0;max-width:100%;touch-action:pan-x;overscroll-behavior-x:contain;scroll-snap-type:none;scroll-behavior:auto;overflow-anchor:none}
 .account-consent-rail>.document-tile{scroll-snap-align:none;touch-action:pan-x}
+
+/* Mobile signing history only: existing document tile with explicit signer. */
+.mobile-document-history .document-tile__person{font-size:14px;line-height:1.2;font-weight:700;overflow-wrap:anywhere}
+.mobile-document-history .document-tile[hidden],.mobile-document-history-empty[hidden]{display:none}

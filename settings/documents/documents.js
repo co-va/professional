@@ -1,4 +1,4 @@
-import { settingsSectionHeader, settingsDetailHeading, setSettingsDetailOpen } from '../settings.js';
+import { settingsDetailHeading, setSettingsDetailOpen } from '../settings.js';
 import {
   actionBlock,
   button,
@@ -14,6 +14,7 @@ import {
   openNotice,
   page,
   segmentControl,
+  select,
   selectFile,
   shortDateTime,
   shortDateTimeParts,
@@ -262,24 +263,74 @@ function historyItems() {
   );
 }
 
-function historyCard(item) {
+function mobileHistorySubject(item, people) {
+  const person = consentPerson(item, people);
+  const name = person ? [person.name, person.surname].filter(Boolean).join(' ').trim() : '';
+  return name || person?.phones?.[0] || person?.emails?.[0] || item.contactValue || 'Подписавший не определён';
+}
+
+function historyCard(item, people, index) {
   const snapshot = signedDocumentSnapshot(item);
   const date = shortDateTime(item.eventAt || item.acceptedAt || item.revokedAt || item.createdAt, '');
+  const subject = mobileHistorySubject(item, people);
   return documentTile({
     title: snapshot?.title || item.documentId || 'Документ',
     version: item.documentVersion || snapshot?.version || 1,
+    subject,
     meta: date,
     status: consentStateText(item.status),
     statusState: consentStateKind(item.status),
-    data: `data-signing-event="${String(item.id || '')}"`,
-    aria: `Открыть факт подписания ${snapshot?.title || item.documentId || 'документа'}`,
+    data: `data-signing-event="${escapeHtml(String(item.id || ''))}" data-history-person="${escapeHtml(subject)}" data-history-order="${index}"`,
+    aria: `Открыть факт подписания ${snapshot?.title || item.documentId || 'документа'}: ${subject}`,
   });
 }
 
 function historyMarkup() {
   const items = historyItems();
   if (!items.length) return emptyState('Истории подписаний пока нет', 'Здесь появятся факты подписания, отказа и отзыва.');
-  return documentTiles(items.map(historyCard));
+  const people = getAllPeople();
+  return `
+    <div class="form-grid" data-mobile-document-history-tools>
+      ${field({ label: 'Поиск по клиенту', name: 'documentHistoryQuery', type: 'search', placeholder: 'Имя или фамилия', autocomplete: 'off' })}
+      ${select({ label: 'Сортировка', name: 'documentHistorySort', value: 'date', options: [
+        { value: 'date', label: 'По дате' },
+        { value: 'name', label: 'По имени (А–Я)' },
+      ] })}
+    </div>
+    ${documentTiles(items.map((item, index) => historyCard(item, people, index)), { className: 'mobile-document-history' })}
+    <div class="mobile-document-history-empty" data-history-no-results hidden>${emptyState('Ничего не найдено', 'Измените имя или фамилию.')}</div>
+  `;
+}
+
+function normalizeHistoryQuery(value) {
+  return String(value || '').trim().toLocaleLowerCase('ru').replaceAll('ё', 'е');
+}
+
+function bindMobileHistory(root) {
+  const host = root.querySelector('.mobile-document-history');
+  if (!host) return;
+  const cards = [...host.querySelectorAll('[data-history-person]')];
+  const query = root.querySelector('[name="documentHistoryQuery"]');
+  const sort = root.querySelector('[name="documentHistorySort"]');
+  const empty = root.querySelector('[data-history-no-results]');
+  const order = () => {
+    const byName = sort?.value === 'name';
+    cards.sort((a, b) => (byName ? a.dataset.historyPerson.localeCompare(b.dataset.historyPerson, 'ru', { sensitivity: 'base' }) : 0)
+      || Number(a.dataset.historyOrder) - Number(b.dataset.historyOrder));
+    for (const card of cards) host.append(card);
+  };
+  const filter = () => {
+    const tokens = normalizeHistoryQuery(query?.value).split(/\s+/).filter(Boolean);
+    let count = 0;
+    for (const card of cards) {
+      const subject = normalizeHistoryQuery(card.dataset.historyPerson);
+      card.hidden = !tokens.every(token => subject.includes(token));
+      if (!card.hidden) count++;
+    }
+    if (empty) empty.hidden = count !== 0;
+  };
+  query?.addEventListener('input', filter);
+  sort?.addEventListener('change', order);
 }
 
 function desktopDocumentList() {
@@ -651,7 +702,7 @@ function openAddDocumentMenu(root) {
   const layer = mountModal(document.body, modal(
     `<div class="compact-form">
       ${button('Создать документ', { data: 'data-create-text-document', variant: 'outline' })}
-      ${button('Загрузить PDF', { data: 'data-upload-pdf-document' })}
+      ${button(root.hasAttribute('data-settings-embedded') ? 'Загрузить PDF' : 'Загрузить документ', { data: 'data-upload-pdf-document' })}
     </div>`,
     {
       title: 'Добавить документ',
@@ -756,6 +807,7 @@ function bindMain(root) {
     });
   });
 
+  if (!root.hasAttribute('data-settings-embedded')) bindMobileHistory(root);
   root.querySelectorAll('[data-signing-event]').forEach((control) => {
     control.addEventListener('click', () => {
       const item = getConsents().find((event) => event.id === control.dataset.signingEvent);
@@ -781,15 +833,17 @@ function renderMain(root) {
     return;
   }
   root.innerHTML = page([
-    root.hasAttribute('data-settings-embedded')
-      ? settingsSectionHeader(root,{title:'Документы'},[{label:'Шаблоны',data:'data-settings-document-templates'},{label:'+ Документ',data:'data-settings-document-add'}])
-      : headerContext('Документы'),
+    workspaceHeaderContext({
+      title: 'Документы',
+      c: currentView === 'documents' ? { label: '+', data: 'data-settings-document-add', aria: 'Добавить документ' } : null,
+    }),
     segmentControl(VIEWS, {
       value: currentView,
       name: 'documentsView',
       aria: 'Документы и история подписаний',
     }),
     `<section class="documents-content" data-documents-content>${contentMarkup()}</section>`,
+    currentView === 'documents' ? actionBlock(button('Шаблоны', { variant: 'outline', data: 'data-settings-document-templates' })) : '',
   ]);
   bindMain(root);
   window.dispatchEvent(new CustomEvent('va-tools:v2-context-changed'));
