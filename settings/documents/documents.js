@@ -409,7 +409,7 @@ function desktopDocumentList() {
       +'<div class="list-entries desktop-document-history">'+rows.join('')+'</div></div>'
       +`<div data-history-no-results hidden>${emptyState('Ничего не найдено','Измените имя, фамилию или телефон.')}</div>`;
   }
-  const group=(title,items)=>'<section class="settings-document-group"><h3>'+title+'</h3>'+ (items.length?'<div class="settings-document-table">'+heading(false)+v2ListEntries(items.map(item=>v2ListEntry({
+  const group=(title,items)=>'<section class="settings-document-group"><h3>'+title+'</h3><div class="settings-document-table">'+heading(false)+(items.length?v2ListEntries(items.map(item=>v2ListEntry({
     className:'settings-document-row',leadingIcon:'document',title:item.title||'Документ',
     subtitle:documentMoment(item)?shortDateTime(documentMoment(item),''):'',omitEmptySubtitle:true,
     rightTop:String(visibleDocumentVersion(item)),
@@ -417,7 +417,7 @@ function desktopDocumentList() {
     actionData:(isCoreDocument(item)||canDeleteDocument(item))?'data-desktop-document-actions="'+escapeHtml(item.id)+'"'+(isCoreDocument(item)?' aria-expanded="false"':' data-desktop-document-delete'):'',
     actionIcon:isCoreDocument(item)?'✎':'×',
     actionAria:isCoreDocument(item)?'Редактировать документ':isRknGuide(item)?'Убрать документ':'Удалить документ'
-  })))+'</div>':emptyState('Документов пока нет',''))+'</section>';
+  }))):'<div class="settings-document-empty" role="status">Документов пока нет</div>')+'</div></section>';
   return group('Основные документы',coreDocuments())+group('Другие документы',otherDocuments());
 }
 

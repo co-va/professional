@@ -100,6 +100,7 @@
 .settings-documents-switch .segment-control button.is-active{background:var(--surface-dark,#2F3338);color:var(--white)}
 .settings-document-table{overflow:hidden;border-radius:12px;border:1px solid var(--border)}
 .settings-document-table .list-entries{border-radius:0}
+.settings-document-empty{box-sizing:border-box;display:grid;place-items:center;min-height:var(--h-list-row,44px);padding:8px 12px;background:var(--white);color:var(--text-secondary);font-size:13px;text-align:center}
 .settings-document-list-heading{display:grid;grid-template-columns:minmax(0,1fr) 74px 60px;gap:10px;align-items:center;background:#E0D6D6;color:#41484F;padding:9px 12px 9px 42px;font-size:12px;font-weight:650}
 .settings-document-list-heading>span:not(:first-child){text-align:center}
 .settings-document-row .list-entry__content{grid-template-columns:minmax(0,1fr) 74px 60px}
