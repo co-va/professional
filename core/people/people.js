@@ -137,12 +137,33 @@ function personDocumentTile(person, documentItem) {
   });
 }
 
-function openPersonDocuments(root, person) {
+function desktopPersonDocumentsList(person, documents) {
+  const people = getAllPeople();
+  return dataTable({
+    compact: true, caption: 'Документы / согласия',
+    columns: [
+      { key: 'icon', label: '', sortable: false, narrow: true, render: () => '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M8 13h8M8 17h8"/></svg>' },
+      { key: 'title', label: 'Документ', sortable: false },
+      { key: 'date', label: 'Дата', sortable: false, narrow: true },
+      { key: 'status', label: '', sortable: false, narrow: true, render: row => row.signed ? '<span class="document-tile__status-mark" aria-label="Подписано" title="Подписано">✓</span>' : '' },
+    ],
+    rows: documents.map(item => {
+      const state = getPersonConsentState(person, item, people);
+      return { title: item.title || 'Документ', date: state.active ? consentSignedMoment(state.fact) : '', signed: state.active };
+    }),
+  });
+}
+
+function openPersonDocuments(root, person, anchor = null) {
+  const desktop = isV2DesktopWorkspace(root.closest('[data-v2-app]'));
   const documents = personDocuments(person);
   const body = documents.length
-    ? documentTiles(documents.map((item) => personDocumentTile(person, item)), { layout: 'rail' })
+    ? (desktop ? desktopPersonDocumentsList(person, documents) : documentTiles(documents.map((item) => personDocumentTile(person, item)), { layout: 'rail' }))
     : emptyState('Документов пока нет', 'Документы и согласия этого человека появятся здесь.');
-  return mountModal(root, modal(body, { title: 'Документы / согласия', variant: 'x', surface: 'app' }));
+  return mountModal(desktop && anchor ? anchor : root, modal(body, {
+    title: 'Документы / согласия', variant: 'x', surface: 'app',
+    className: desktop ? 'people-documents-popup' : '',
+  }));
 }
 
 function historyItems(items = [], query = '') {
@@ -1084,14 +1105,14 @@ function desktopPersonOverviewTools(layer, person, options = {}) {
       ...personProgramActionTypes().map(item => ({ value: item.id, label: item.label })),
     ] })}
     <div class="people-overview-tools">
-      ${compactButton({ kind: 'document', data: 'data-person-overview-documents title="Документы"', aria: 'Документы' })}
+      ${compactButton({ kind: 'document', data: 'data-person-overview-documents data-v2-anchor-width="520" title="Документы"', aria: 'Документы' })}
       ${compactButton({ kind: 'history', data: 'data-person-overview-history title="История"', aria: 'История' })}
       ${button('Записать', { className: 'people-overview-record', data: 'data-person-overview-record' })}
     </div>
   </div>`;
   if (fullPage) setV2ZHeaderRows(layer, [markup], { desktopTitle: 'Клиент' });
   else header.innerHTML = markup;
-  header.querySelector('[data-person-overview-documents]')?.addEventListener('click', () => openPersonDocuments(layer, person));
+  header.querySelector('[data-person-overview-documents]')?.addEventListener('click', (event) => openPersonDocuments(layer, person, event.currentTarget));
   header.querySelector('[data-person-overview-history]')?.addEventListener('click', () => void openPersonHistoryQ(layer, person, options));
   const programInput = header.querySelector('[name="personOverviewProgram"]');
   programInput?.addEventListener('change', () => {
