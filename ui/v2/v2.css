@@ -681,3 +681,15 @@
  .people-card-field-selector .ui-selector__option-label{min-width:0}
  .people-card-field-selector .ui-selector__option-main small{flex:0 0 auto;font-size:14px;white-space:nowrap}
 }
+
+/* Desktop Person overview: direct V actions in the common Q header/footer. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace .people-overview-toolbar{display:flex;align-items:center;gap:8px;min-width:0}
+ .v2-app--workspace .people-overview-toolbar>.v2-q-title{flex:1 1 auto;width:auto;font-size:20px;white-space:nowrap}
+ .v2-app--workspace .people-overview-toolbar>.ui-select{flex:0 1 116px;min-width:90px}
+ .v2-app--workspace .people-overview-toolbar .ui-select__control{height:34px;min-height:34px;max-height:34px;border-radius:8px;font-size:13px;padding:0 18px 0 6px}
+ .v2-app--workspace .people-overview-toolbar .ui-select__value{font-size:13px;white-space:nowrap}
+ .v2-app--workspace .people-overview-toolbar .ui-compact-button{color:var(--text);border-radius:8px}
+ .v2-app--workspace .people-overview-toolbar .ui-compact-button:hover{background:var(--surface-soft)}
+ .v2-app--workspace [data-desktop-person-overview] .people-overview-footer{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;left:var(--v2-desktop-q-inset);right:var(--v2-desktop-q-inset)}
+}

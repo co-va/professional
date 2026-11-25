@@ -20,12 +20,13 @@ async function loadPersonProgramWorkflow(kind, person) {
   return { module, settings };
 }
 
-export function openPersonProgramActions(root, person, { onChanged = () => {} } = {}) {
+export function openPersonProgramActions(root, person, { onChanged = () => {}, initialKind = '' } = {}) {
   if (!person?.key) return null;
   const kinds = personProgramActionTypes();
+  const initial = kinds.some(item => item.id === initialKind) ? initialKind : '';
   const layer = mountModal(root, modal(`<div class="form-grid">
     ${kinds.length ? select({
-      label: 'Программа', name: 'personProgramKind', value: '',
+      label: 'Программа', name: 'personProgramKind', value: initial,
       options: [{ value: '', label: 'Выберите программу' }, ...kinds.map((item) => ({
         value: item.id, label: item.label,
       }))],
@@ -141,5 +142,6 @@ export function openPersonProgramActions(root, person, { onChanged = () => {} } 
     }
   });
   updateAction();
+  if (initial) layer.querySelector('[name="personProgramKind"]')?.dispatchEvent(new Event('change', { bubbles: true }));
   return layer;
 }

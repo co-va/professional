@@ -1,6 +1,7 @@
 import {
   actionBlock,
   button,
+  compactButton,
   dataTable,
   collectLinks,
   details,
@@ -65,7 +66,7 @@ import { loadFinanceState } from '../runtime/auxiliary-state.js';
 import { saveCardAppearanceTemplate } from '../card-appearance-templates.js';
 import { getPeopleFilters, getPeopleSortMode, setPeopleFilters, setPeopleSortMode } from './view-state.js';
 import { buildPersonRelationshipSections } from './programs.js';
-import { openPersonProgramActions } from '../loyalty/person-program-actions.js';
+import { openPersonProgramActions, personProgramActionTypes } from '../loyalty/person-program-actions.js';
 import { listPersonDeposits } from '../loyalty/deposit/data.js';
 import { peopleHasAssignedDiscount, peopleAssignedPrograms, peopleProgramOptions, refreshPeopleLoyaltyData } from './loyalty-filter.js';
 import { openPersonRecordCreation } from './record-creation.js';
@@ -1053,6 +1054,33 @@ function overviewCard(person) {
   });
 }
 
+function desktopPersonOverviewTools(layer, person, options = {}) {
+  const header = layer.closest('[data-v2-q="true"]')?.querySelector('[data-v2-q-header-content]');
+  if (!header) return;
+  header.innerHTML = `<div class="people-overview-toolbar">
+    <h2 class="v2-q-title">Клиент</h2>
+    ${compactButton({ kind: 'document', data: 'data-person-overview-documents title="Документы"', aria: 'Документы' })}
+    ${compactButton({ kind: 'history', data: 'data-person-overview-history title="История"', aria: 'История' })}
+    ${select({ name: 'personOverviewProgram', aria: 'Программы', value: '', options: [
+      { value: '', label: 'Программы' },
+      ...personProgramActionTypes().map(item => ({ value: item.id, label: item.label })),
+    ] })}
+  </div>`;
+  header.querySelector('[data-person-overview-documents]')?.addEventListener('click', () => openPersonDocuments(layer, person));
+  header.querySelector('[data-person-overview-history]')?.addEventListener('click', () => void openPersonHistoryQ(layer, person, options));
+  const programInput = header.querySelector('[name="personOverviewProgram"]');
+  programInput?.addEventListener('change', () => {
+    const kind = programInput.value;
+    if (!kind) return;
+    programInput.value = '';
+    const value = header.querySelector('.ui-select__value');
+    if (value) value.textContent = 'Программы';
+    openPersonProgramActions(layer, person, { onChanged: options.onProgramChanged, initialKind: kind });
+  });
+  layer.querySelector('[data-person-overview-record]')?.addEventListener('click', () => void openPersonRecordCreation({ person }));
+  layer.querySelector('[data-person-overview-delete]')?.addEventListener('click', () => confirmDelete(layer, person, options.onDeleted));
+}
+
 async function renderPersonOverview(layer, baseRoot, key, options = {}) {
   const person = getAllPeople().find((item) => item.key === key);
   if (!person) {
@@ -1064,20 +1092,28 @@ async function renderPersonOverview(layer, baseRoot, key, options = {}) {
   if (!layer.isConnected) return;
   // Z2 Header stays empty (apart from its shared dismiss control).
   // The contact card and its programs belong to the same scrollable Z2 Body.
-  layer.innerHTML = page([
-    personContext(person),
-    overviewCard(person),
-    relationships.markup,
-  ]);
-  setV2ZHeaderRows(layer, []);
-  bindPersonContext(layer, person, {
+  const desktop = layer.hasAttribute('data-desktop-person-overview');
+  const contextOptions = {
     ...options,
     onProgramChanged: () => void renderPersonOverview(layer, baseRoot, person.key, options),
     onDeleted: () => {
       layer.v2Close?.();
       renderPeople(baseRoot, options);
     },
-  });
+  };
+  layer.innerHTML = page([
+    desktop ? personQContext(person) : personContext(person),
+    overviewCard(person),
+    relationships.markup,
+    desktop ? actionBlock(
+      button('Записать', { data: 'data-person-overview-record data-ui-keyboard-action="auxiliary"' })
+      + button('Удалить', { variant: 'delete-outline', data: 'data-person-overview-delete data-ui-keyboard-action="auxiliary"' }),
+      { className: 'people-overview-footer' },
+    ) : '',
+  ]);
+  setV2ZHeaderRows(layer, []);
+  bindPersonContext(layer, person, contextOptions);
+  if (desktop) desktopPersonOverviewTools(layer, person, contextOptions);
   relationships.bind(layer, (detail) => openPersonRelationshipQ(baseRoot, person, detail, {
     ...options,
     onNativeChanged: () => renderPersonOverview(layer, baseRoot, person.key, options),
