@@ -1,8 +1,10 @@
 import { dataTable } from '../../../ui/page/page.js';
 import { isV2DesktopWorkspace } from '../../../ui/v2/geometry.js';
+import { compactCheck } from '../../../ui/selection/check-list.js';
 import {
   actionBlock,
   button,
+  compactButton,
   datePicker,
   details,
   emptyState,
@@ -900,8 +902,8 @@ function openProgramSettings(root, program, { person = null, rerender = async ()
   });
 }
 
-function openDepositSettings(root, layer, deposit, effectiveVisible, render, onChanged) {
-  return openDepositSettingsMenu({
+function depositInstanceSettings(root, layer, deposit, effectiveVisible, render, onChanged) {
+  return {
     title: deposit.programName || 'Депозит',
     checked: effectiveVisible,
     onToggle: async (checked) => {
@@ -939,6 +941,76 @@ function openDepositSettings(root, layer, deposit, effectiveVisible, render, onC
         },
       },
     ],
+  };
+}
+
+function openDepositSettings(root, layer, deposit, effectiveVisible, render, onChanged) {
+  return openDepositSettingsMenu(depositInstanceSettings(root, layer, deposit, effectiveVisible, render, onChanged));
+}
+
+function bindDesktopDepositTools(layer, host, settings) {
+  const header = layer.querySelector('[data-v2-q-header-content]');
+  if (!header) return;
+  header.innerHTML = `<div class="desktop-q-heading"><h2 class="v2-q-title">${escapeHtml(settings.title)}</h2></div>
+    <div class="desktop-q-toolbar" data-v2-layer-gesture-ignore>
+      ${compactCheck({ label: 'Показать', checked: settings.checked, data: 'data-deposit-desktop-visible', aria: 'Показать карту клиенту' })}
+      <div class="desktop-q-tools">
+        ${compactButton({ kind: 'payment', data: 'data-deposit-desktop-payment title="Платёж / Возврат"', aria: 'Платёж / Возврат' })}
+      </div>
+    </div>`;
+  const visible = header.querySelector('[data-deposit-desktop-visible]');
+  visible?.addEventListener('change', async () => {
+    const requested = Boolean(visible.checked);
+    visible.disabled = true;
+    try {
+      const resolved = await settings.onToggle(requested);
+      if (typeof resolved === 'boolean' && visible.isConnected) visible.checked = resolved;
+    } catch (error) {
+      if (visible.isConnected) visible.checked = !requested;
+      openNotice({ title: 'Настройки карты', message: error instanceof Error ? error.message : 'Не удалось сохранить видимость карты.' });
+    } finally {
+      if (visible.isConnected) visible.disabled = false;
+    }
+  });
+  header.querySelector('[data-deposit-desktop-payment]')?.addEventListener('click', (event) => {
+    const actions = settings.actions.filter(item => item.id === 'payment' || item.id === 'refund');
+    const menu = mountModal(event.currentTarget, modal(`<div class="desktop-q-action-menu">${actions.map(item => button(escapeHtml(item.label), {
+      variant: 'secondary', data: `data-deposit-desktop-operation="${escapeHtml(item.id)}"`,
+    })).join('')}</div>`, {
+      title: 'Платёж / Возврат', variant: 'x', surface: 'app', className: 'desktop-q-action-popup', xRole: 'action',
+    }));
+    if (!menu) return;
+    menu.querySelectorAll('[data-deposit-desktop-operation]').forEach(control => {
+      control.addEventListener('click', () => {
+        const action = actions.find(item => item.id === control.dataset.depositDesktopOperation);
+        if (!action) return;
+        menu.v2Close?.();
+        void action.onSelect();
+      });
+    });
+  });
+  host.querySelector('[data-deposit-desktop-delete]')?.addEventListener('click', () => {
+    const action = settings.actions.find(item => item.id === 'delete');
+    if (!action) return;
+    const confirmation = mountModal(layer, modal(`<div class="modal-title"><h2>Удалить карту?</h2><p>${escapeHtml(settings.title)}</p></div>
+      <div class="modal-actions">
+        ${button('Удалить карту', { variant: 'danger', data: 'data-confirm-deposit-delete' })}
+        ${button('Отмена', { variant: 'secondary', data: 'data-cancel-deposit-delete' })}
+      </div>`, { title: 'Удалить карту', variant: 'x', surface: 'app' }));
+    if (!confirmation) return;
+    confirmation.querySelector('[data-cancel-deposit-delete]')?.addEventListener('click', () => confirmation.v2Close?.());
+    confirmation.querySelector('[data-confirm-deposit-delete]')?.addEventListener('click', async (event) => {
+      const control = event.currentTarget;
+      control.disabled = true;
+      try {
+        await action.onSelect();
+        confirmation.v2Close?.();
+      } catch (error) {
+        openNotice({ title: 'Удалить карту', message: error instanceof Error ? error.message : 'Не удалось удалить карту.' });
+      } finally {
+        if (control.isConnected) control.disabled = false;
+      }
+    });
   });
 }
 
@@ -972,16 +1044,23 @@ async function openDepositQ(root, depositId, onChanged = () => {}) {
       : inheritedVisible;
     const host = layer.querySelector('[data-deposit-instance-q-host]');
     if (!host) return;
+    const desktop = isV2DesktopWorkspace(layer.closest('[data-v2-app]'));
+    const header = layer.querySelector('[data-v2-q-header-content]');
+    if (!desktop && header?.querySelector('.desktop-q-toolbar')) header.innerHTML = `<h2 class="v2-q-title">${escapeHtml(deposit.programName || 'Депозит')}</h2>`;
     host.innerHTML = page([
       depositHeaderContext({
         title: deposit.programName || 'Депозит',
-        settingsData: 'data-deposit-instance-settings',
+        settingsData: desktop ? '' : 'data-deposit-instance-settings',
         settingsAria: 'Настройки депозита',
       }),
-      depositInfo(deposit),
-      depositBalanceMiniCard(deposit),
+      ...(desktop
+        ? [depositBalanceMiniCard(deposit), depositInfo(deposit), actionBlock(button('Удалить карту', {
+            variant: 'danger', data: 'data-deposit-desktop-delete data-ui-keyboard-action="auxiliary"',
+          }))]
+        : [depositInfo(deposit), depositBalanceMiniCard(deposit)]),
     ]);
-    host.querySelector('[data-deposit-instance-settings]')?.addEventListener('click', () => {
+    if (desktop) bindDesktopDepositTools(layer, host, depositInstanceSettings(root, layer, deposit, effectiveVisible, render, onChanged));
+    else host.querySelector('[data-deposit-instance-settings]')?.addEventListener('click', () => {
       openDepositSettings(root, layer, deposit, effectiveVisible, render, onChanged);
     });
     host.querySelector('[data-deposit-history]')?.addEventListener('click', () => openDepositHistoryQ(root, deposit));
