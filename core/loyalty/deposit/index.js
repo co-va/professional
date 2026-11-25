@@ -899,7 +899,7 @@ function depositInstanceSettings(root, layer, deposit, effectiveVisible, render,
 
 function openDepositSettings(root, layer, deposit, effectiveVisible, render, onChanged) {
   const settings = depositInstanceSettings(root, layer, deposit, effectiveVisible, render, onChanged);
-  return openDepositSettingsMenu({ ...settings, actions: settings.actions.filter(item => item.id !== 'delete') });
+  return openDepositSettingsMenu(settings);
 }
 
 function bindDesktopDepositTools(layer, settings) {
@@ -1014,16 +1014,16 @@ async function openDepositQ(root, depositId, onChanged = () => {}) {
       }),
       personDepositCard(deposit, { interactive: false }),
       v2Section('История', historyListMarkup(deposit, items)),
-      actionBlock(button('Удалить карту', {
+      desktop ? actionBlock(button('Удалить карту', {
         variant: 'danger', data: 'data-deposit-instance-delete data-ui-keyboard-action="auxiliary"',
-      })),
+      })) : '',
     ]);
     if (desktop) bindDesktopDepositTools(layer, settings);
     else host.querySelector('[data-deposit-instance-settings]')?.addEventListener('click', () => {
       openDepositSettings(root, layer, deposit, effectiveVisible, render, onChanged);
     });
     bindDepositHistory(host, items);
-    bindDepositDelete(layer, host, settings);
+    if (desktop) bindDepositDelete(layer, host, settings);
     notifyContext();
   };
 
