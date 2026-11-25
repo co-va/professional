@@ -27,7 +27,6 @@ import {
   workspaceHeaderContext,
 } from '../../ui/ui.js';
 import { readOnlyReceipt } from '../../ui/receipt/index.js';
-import { compactCheck } from '../../ui/selection/check-list.js';
 import { escapeHtml } from '../../ui/utils/escape-html.js';
 import { formatPhone, phonesMatch } from '../../core/phone/index.js';
 import { getAllPeople } from '../../core/people/data.js';
@@ -693,10 +692,14 @@ function renderNewDocumentEditor(layer, root, draft = {}) {
     data: 'data-new-document-save' + (desktop ? ' hidden' : ''),
     aria: 'Сохранить документ',
   });
-  const toolbar = desktop ? `<div class="v2-desktop-tool-row documents-new-toolbar"><div class="v2-desktop-tool-actions">
-    ${compactCheck({label:'Для подписания',checked:signable,data:'data-document-signable',aria:'Разрешить использовать документ для подписания'})}
-    ${saveButton}
-  </div></div>` : '';
+  const toolbar = desktop ? `<div class="v2-desktop-tool-row documents-new-toolbar">
+    <div class="v2-desktop-tool-context">
+      <button type="button" class="app-setting-toggle documents-new-signable${signable?' is-on':''}" data-document-signable aria-pressed="${signable}" aria-label="Подписание клиентом">
+        <span class="app-setting-toggle__switch${signable?' is-on':''}" aria-hidden="true"><span></span></span><span>Подписание клиентом</span>
+      </button>
+    </div>
+    <div class="v2-desktop-tool-actions">${saveButton}</div>
+  </div>` : '';
   layer.innerHTML = page([
     desktop ? workspaceHeaderContext({title:'Новый документ'}) : headerContext('Новый документ'),
     attachment ? documentTiles([
@@ -732,8 +735,7 @@ function renderNewDocumentEditor(layer, root, draft = {}) {
     else setPrimaryVisible(primary, valid);
   };
 
-  if (desktop) toggle?.addEventListener('change', () => { signable = toggle.checked; });
-  else toggle?.addEventListener('click', () => {
+  toggle?.addEventListener('click', () => {
     signable = !signable;
     toggle.setAttribute('aria-pressed', signable ? 'true' : 'false');
     toggle.classList.toggle('is-on', signable);

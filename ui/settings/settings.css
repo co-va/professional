@@ -204,5 +204,11 @@
 }
 
 /* New document: use the canonical H toolbar; form contains only document content. */
-.documents-new-toolbar .ui-compact-check__label{color:var(--white)}
+.documents-new-toolbar{box-sizing:border-box;display:flex;align-items:center;justify-content:space-between;min-height:var(--h-list-tool-row,42px);gap:12px}
+.documents-new-toolbar .v2-desktop-tool-context{flex:0 0 auto;min-width:0}
+.documents-new-toolbar .v2-desktop-tool-actions{flex:0 0 auto;min-height:var(--h-tools,36px);margin-left:auto}
+.documents-new-toolbar .documents-new-signable.app-setting-toggle{display:flex;align-items:center;gap:8px;width:auto;min-height:var(--h-tools,36px);height:var(--h-tools,36px);padding:0;border:0;background:transparent;color:var(--white);font-size:13px;font-weight:650;white-space:nowrap}
+.documents-new-toolbar .documents-new-signable .app-setting-toggle__switch{flex:0 0 42px}
+.documents-new-toolbar .documents-new-signable.is-on .app-setting-toggle__switch{background:#E0D6D6}
+.documents-new-toolbar .documents-new-signable:focus-visible{outline:2px solid var(--white);outline-offset:2px}
 .documents-new-toolbar [data-new-document-save][hidden]{display:none!important}
