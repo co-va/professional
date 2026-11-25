@@ -510,7 +510,7 @@
 /* Contacts: match the approved Admin working area, not the mobile list.
    Exact Admin pearl #E0D6D6 and header ink #41484F, scoped to this screen. */
 @media (min-width:768px) and (min-height:600px){
- .people-desktop-tools{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+ .people-desktop-tools{display:flex;align-items:center;gap:12px}
  .people-desktop-tools>.field{width:min(300px,100%);min-width:180px}
  .people-desktop-tools>.field input[type="search"]{height:36px;min-height:36px;max-height:36px;border-radius:10px;font-size:13px}
  .people-desktop-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
@@ -782,7 +782,7 @@
 /* Ordinary Desktop H tool row: same approved geometry/palette as Clients.
    Only explicit opt-in rows use this; Mobile and Journal do not. */
 @media (min-width:768px) and (min-height:600px){
- .v2-app--workspace[data-v2-desktop-surface="list"] .v2-desktop-tool-row{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;min-width:0;min-height:var(--h-list-tool-row);gap:12px}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-desktop-tool-row{display:flex;align-items:center;justify-content:space-between;min-width:0;gap:12px}
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-desktop-tool-context{display:flex;align-items:center;gap:8px;min-width:0}
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-desktop-tool-context>.ui-compact-button{color:var(--white);background:transparent;border:1px solid var(--white);border-radius:6px}
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-desktop-tool-context>.ui-compact-button:focus-visible{outline-color:var(--white)}
@@ -792,4 +792,21 @@
  .v2-app--workspace[data-v2-desktop-surface="list"] :is(.v2-desktop-tool-context,.v2-desktop-tool-actions)>.segment-control{box-sizing:border-box;width:auto;min-width:0;height:var(--h-tools);min-height:var(--h-tools);margin:0}
  .v2-app--workspace[data-v2-desktop-surface="list"] :is(.v2-desktop-tool-context,.v2-desktop-tool-actions)>.segment-control>button{flex:1 0 auto}
  .v2-app--workspace[data-v2-desktop-surface="list"] :is(.v2-desktop-tool-context,.v2-desktop-tool-actions) :is(.ui-button,.segment-control>button):focus-visible{outline:2px solid var(--white);outline-offset:-3px}
+}
+
+/* Canonical single-line Desktop list toolbar. Preserve the accepted Clients
+   baseline (42px), but make it explicit, never an intrinsic field height.
+   Other legacy surfaces opt in as they are adapted; Journal/Mobile untouched. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z>[data-v2-z-header]:has(>[data-v2-z-header-content]>[data-v2-z-header-row]>:is([data-people-desktop-toolbar],.v2-desktop-tool-row)){
+   grid-template-rows:var(--h-title) var(--h-list-tool-row);
+ }
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z :is(.people-desktop-tools,.v2-desktop-tool-row){
+   box-sizing:border-box;height:var(--h-list-tool-row);min-height:var(--h-list-tool-row);max-height:var(--h-list-tool-row);
+   flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;
+ }
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z :is(.people-desktop-tools,.v2-desktop-tool-row)::-webkit-scrollbar{display:none}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .people-desktop-tools>.field:has(>input[type="search"]){gap:0}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .people-desktop-tools>.field:has(>input[type="search"])>span:empty{display:none}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z :is(.people-desktop-actions,.v2-desktop-tool-context,.v2-desktop-tool-actions){flex:0 0 auto;flex-wrap:nowrap}
 }
