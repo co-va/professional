@@ -502,7 +502,7 @@
  }
  .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact th{
    height:44px;box-sizing:border-box;padding:4px 12px;background:#E0D6D6;color:#41484F;
-   font-size:15px;font-weight:750;line-height:1.2;letter-spacing:.05em;text-transform:uppercase;white-space:normal;
+   font-size:12px;font-weight:750;line-height:1.2;letter-spacing:0;text-transform:uppercase;white-space:normal;
    border-bottom:1px solid #E0D6D6;
  }
  .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact td{
@@ -519,7 +519,6 @@
 }
 @media (min-width:768px) and (max-width:1024px) and (min-height:600px){
  .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]){padding:26px 26px 36px}
- .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact th{font-size:11px}
  .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact td{padding:4px 8px}
 }
 
@@ -531,9 +530,6 @@
  .people-desktop-actions .ui-button{background:#E0D6D6;color:#41484F;border-color:#E0D6D6}
  .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact :is(th,td):is([data-table-column="firstVisit"],[data-table-column="lastVisit"]){
    box-sizing:border-box;width:110px;min-width:110px;max-width:110px;text-align:center;padding:4px 6px;
- }
- .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact th:is([data-table-column="firstVisit"],[data-table-column="lastVisit"]){
-   font-size:11px;line-height:1.2;letter-spacing:0;
  }
  .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact th:is([data-table-column="firstVisit"],[data-table-column="lastVisit"])>span{display:block;white-space:nowrap}
  .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact td:is([data-table-column="firstVisit"],[data-table-column="lastVisit"]){font-variant-numeric:tabular-nums;white-space:nowrap}
@@ -610,6 +606,18 @@
  .v2-app--workspace [data-people-list-host]>.ui-data-table--compact [data-table-column="name"]{min-width:155px}
  .v2-app--workspace [data-people-list-host]>.ui-data-table--compact [data-table-column="visitCount"]{width:96px;min-width:96px;text-align:center;font-variant-numeric:tabular-nums}
  .v2-app--workspace [data-people-list-host]>.ui-data-table--compact :is([data-table-column="paidTotal"],[data-table-column="debt"]){width:112px;min-width:112px;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
- .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact th:is([data-table-column="visitCount"],[data-table-column="paidTotal"],[data-table-column="debt"]){font-size:11px;line-height:1.2;letter-spacing:0;padding:4px 6px}
+ .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact th:is([data-table-column="visitCount"],[data-table-column="paidTotal"],[data-table-column="debt"]){padding:4px 6px}
  .v2-app--workspace [data-people-list-host]>.ui-data-table--compact th[data-table-column="visitCount"]>span{display:block;white-space:nowrap}
+}
+
+/* Desktop Contacts: three logical groups, without extra data columns.
+   Add 16px leading whitespace at each new group, retaining the existing
+   110px date content area and equal date alignment. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact :is(th,td)[data-table-column="visitCount"]{
+   width:112px;min-width:112px;padding-left:22px;padding-right:6px;
+ }
+ .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact :is(th,td)[data-table-column="firstVisit"]{
+   width:126px;min-width:126px;max-width:126px;padding-left:22px;padding-right:6px;
+ }
 }

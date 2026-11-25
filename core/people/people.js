@@ -493,11 +493,11 @@ function desktopPeopleTable(root, items, visitIndex) {
     { key: 'select', label: '', narrow: true, sortable: false, header: () => check('data-people-select-all', 'Выбрать все видимые контакты', allSelected), render: row => check(`data-people-select="${escapeHtml(row.key)}"`, `Выбрать ${row.name}`, selected.has(row.key)) },
     { key: 'code', label: 'Код', sortable:false },
     { key: 'name', label: 'Клиент', sortable:false, render: row => `<button type="button" class="people-table-person" data-person="${escapeHtml(row.key)}"><span class="people-table-person__name">${escapeHtml(row.name)}</span>${row.phone ? `<span class="people-table-person__phone">${escapeHtml(row.phone)}</span>` : ''}</button>` },
-    { key: 'firstVisit', label: 'Первое посещение', sortable: false, header: () => '<span>Первое</span><span>посещение</span>', render: row => escapeHtml(row.firstVisit ? formatPersonVisitDate(row.firstVisit) : '') },
-    { key: 'lastVisit', label: 'Последнее посещение', sortable:false, header: () => '<span>Последнее</span><span>посещение</span>', render: row => escapeHtml(row.lastVisit ? formatPersonVisitDate(row.lastVisit) : '') },
     { key:'visitCount', label:'Количество посещений', sortable:false, header:()=>'<span>Количество</span><span>посещений</span>' },
     { key:'paidTotal', label:'Оплачено', sortable:false, render:row=>row.paidTotal == null ? '—' : escapeHtml(money(row.paidTotal)) },
     { key:'debt', label:'Задолженность', sortable:false, render:row=>row.debt == null ? '—' : row.debt > 0.009 ? escapeHtml(money(row.debt)) : '' },
+    { key: 'firstVisit', label: 'Первое посещение', sortable: false, header: () => '<span>Первое</span><span>посещение</span>', render: row => escapeHtml(row.firstVisit ? formatPersonVisitDate(row.firstVisit) : '') },
+    { key: 'lastVisit', label: 'Последнее посещение', sortable:false, header: () => '<span>Последнее</span><span>посещение</span>', render: row => escapeHtml(row.lastVisit ? formatPersonVisitDate(row.lastVisit) : '') },
   ];
   const rows = items.map(person => {
     const display = personDisplay(person);
