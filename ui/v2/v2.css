@@ -542,7 +542,6 @@
  .people-desktop-query-tools .ui-compact-button{color:var(--white);background:transparent;border:1px solid var(--white);border-radius:6px}
  .people-desktop-query-tools .ui-compact-button[aria-pressed="true"]{background:transparent;color:#E0D6D6;border-color:#E0D6D6}
  .people-desktop-query-tools .ui-compact-button:focus-visible{outline-color:var(--white)}
- .people-desktop-actions .ui-button[data-people-desktop-view]{background:transparent;color:var(--white);border-color:var(--white)}
  .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact :is(th,td):is([data-table-column="firstVisit"],[data-table-column="lastVisit"]){
    box-sizing:border-box;width:110px;min-width:110px;max-width:110px;text-align:center;padding:4px 6px;
  }
