@@ -477,3 +477,48 @@
     flex:1 1 auto;height:auto;min-height:0;
   }
 }
+
+/* Contacts: match the approved Admin working area, not the mobile list.
+   Exact Admin pearl #E0D6D6 and header ink #41484F, scoped to this screen. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]){
+   padding:36px 36px 48px;
+ }
+ .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar])>[data-v2-z-header]{
+   max-width:1240px;width:100%;align-self:center;padding-bottom:24px!important;
+ }
+ .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar])>[data-v2-z-body]{
+   max-width:1240px;width:100%;align-self:center;
+ }
+ [data-people-desktop-toolbar] h2{margin:0 0 24px;color:var(--white);font-size:30px;line-height:1.2;font-weight:720;letter-spacing:-.035em}
+ .people-desktop-tools{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+ .people-desktop-tools>.field{width:min(300px,100%);min-width:180px}
+ .people-desktop-tools>.field input[type="search"]{height:36px;min-height:36px;max-height:36px;border-radius:10px;font-size:13px}
+ .people-desktop-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+ .people-desktop-actions .ui-button{width:auto;height:36px;min-height:36px;padding:0 12px;border-radius:10px;font-size:13px}
+ .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) [data-people-list-host]{min-height:0}
+ .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact{
+   border-radius:14px;background:var(--white);border-color:var(--border);
+ }
+ .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact th{
+   height:44px;box-sizing:border-box;padding:4px 12px;background:#E0D6D6;color:#41484F;
+   font-size:15px;font-weight:750;line-height:1.2;letter-spacing:.05em;text-transform:uppercase;white-space:normal;
+   border-bottom:1px solid #E0D6D6;
+ }
+ .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact td{
+   height:44px;box-sizing:border-box;padding:4px 12px;font-size:13px;color:var(--text);border-bottom:1px solid #E0D6D6;
+ }
+ .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact td>button{font-weight:650}
+ .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact tbody tr{cursor:pointer}
+ .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact tbody tr:hover{background:var(--surface-soft)}
+ .v2-app--workspace>.v2-header>.v2-desktop-toolbar-context,
+ .v2-app--workspace>.v2-header>.v2-desktop-toolbar-user,
+ .v2-app--workspace>.v2-header .v2-desktop-toolbar-divider,
+ .v2-app--workspace>.v2-header .v2-desktop-toolbar-user>button:not([data-desktop-profile]){color:#E0D6D6}
+ .v2-app--workspace>.v2-header:has(.v2-desktop-toolbar-context){border-bottom:1px solid rgba(255,255,255,.14)}
+}
+@media (min-width:768px) and (max-width:1024px) and (min-height:600px){
+ .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]){padding:26px 26px 36px}
+ .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact th{font-size:11px}
+ .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact td{padding:4px 8px}
+}

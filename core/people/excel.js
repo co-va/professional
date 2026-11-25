@@ -141,7 +141,7 @@ async function chooseAndLoad(root, onLoaded) {
   openContactImportUpload(root, file, { onLoaded });
 }
 
-export function openPeopleExcelMenu(root, { getRows = () => [], onLoaded = () => {} } = {}) {
+export function openPeopleExcelMenu(root, { getRows = () => [], onLoaded = () => {}, anchor = null } = {}) {
   const actions = [
     { id: 'export', label: 'Выгрузка', run: () => openPeopleExport(root, getRows) },
     { id: 'import', label: 'Загрузка', run: () => chooseAndLoad(root, onLoaded) },
@@ -151,7 +151,7 @@ export function openPeopleExcelMenu(root, { getRows = () => [], onLoaded = () =>
     + actions.map(action => button(action.label, {
       type: 'button', variant: 'secondary', data: 'data-people-excel-' + action.id,
     })).join('') + '</div>';
-  const layer = mountModal(root, modal(markup, {
+  const layer = mountModal(anchor || root, modal(markup, {
     title: 'Excel', variant: 'x', surface: 'app', xRole: 'action',
   }));
   if (!layer) return null;

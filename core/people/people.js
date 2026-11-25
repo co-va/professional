@@ -1,9 +1,7 @@
 import {
   actionBlock,
   button,
-  compactButton,
   dataTable,
-  bindDataTable,
   collectLinks,
   details,
   collectRepeatedEntries,
@@ -492,21 +490,18 @@ function desktopPeopleTable(root, items, visitIndex) {
   const check = (data, aria, checked) => `<label class="ui-compact-check">${checkControl({ data, aria, checked })}</label>`;
   const columns = [
     { key: 'select', label: '', narrow: true, sortable: false, header: () => check('data-people-select-all', 'Выбрать все видимые контакты', allSelected), render: row => check(`data-people-select="${escapeHtml(row.key)}"`, `Выбрать ${row.name}`, selected.has(row.key)) },
-    { key: 'code', label: 'Код' },
-    { key: 'name', label: 'Имя Фамилия', render: row => `<button type="button" data-person="${escapeHtml(row.key)}">${escapeHtml(row.name)}</button>` },
+    { key: 'code', label: 'Код', sortable:false },
+    { key: 'name', label: 'Имя Фамилия', sortable:false, render: row => `<button type="button" data-person="${escapeHtml(row.key)}">${escapeHtml(row.name)}</button>` },
     { key: 'phone', label: 'Телефон', sortable: false },
     { key: 'firstVisit', label: 'Первое посещение', sortable: false, render: row => escapeHtml(row.firstVisit ? formatPersonVisitDate(row.firstVisit) : '') },
-    { key: 'lastVisit', label: 'Последнее посещение', render: row => escapeHtml(row.lastVisit ? formatPersonVisitDate(row.lastVisit) : '') },
-    { key: 'edit', label: '', narrow: true, sortable: false, render: row => compactButton({ kind: 'settings', data: `data-people-edit="${escapeHtml(row.key)}"`, aria: `Редактировать ${row.name}` }) },
+    { key: 'lastVisit', label: 'Последнее посещение', sortable:false, render: row => escapeHtml(row.lastVisit ? formatPersonVisitDate(row.lastVisit) : '') },
   ];
-  const mode = getPeopleSortMode();
-  const sortKey = mode.startsWith('name') ? 'name' : mode.startsWith('uei') ? 'code' : 'lastVisit';
   const rows = items.map(person => {
     const display = personDisplay(person);
     const metadata = visitIndex.get(String(person.key)) || {};
     return { key: person.key, code: display.uei, name: display.name, phone: display.phone, firstVisit: metadata.firstVisit || '', lastVisit: metadata.lastVisit || '' };
   });
-  return dataTable({ columns, rows, caption: 'Клиенты', compact: true, sortKey, descending: mode.endsWith('Desc') });
+  return dataTable({ columns, rows, caption: 'Клиенты', compact: true });
 }
 
 function bindDesktopPeopleTable(root, host, items) {
@@ -530,15 +525,9 @@ function bindDesktopPeopleTable(root, host, items) {
     sync();
   });
   sync();
-  bindDataTable(host, key => {
-    const prefix = { name: 'name', code: 'uei', lastVisit: 'last' }[key];
-    if (!prefix) return;
-    const previous = getPeopleSortMode();
-    setPeopleSortMode(prefix + (previous === prefix + 'Asc' ? 'Desc' : 'Asc'));
-    refreshPeopleList(root);
-  });
-  host.querySelectorAll('[data-people-edit]').forEach(node => node.addEventListener('click', () => {
-    openPersonEdit(root, node.dataset.peopleEdit, { onSaved: () => refreshPeopleList(root) });
+  host.querySelectorAll('tbody tr').forEach(row => row.addEventListener('click', event => {
+    if (event.target.closest('button,input,label')) return;
+    row.querySelector('[data-person]')?.click();
   }));
 }
 
@@ -578,26 +567,44 @@ function listContext() {
 
 export function renderPeople(root, options = {}) {
   root.peopleOptions = options;
+  const wide = isV2DesktopWorkspace(root.closest('[data-v2-app]'));
   root.innerHTML = page([
-    listContext(),
+    wide ? workspaceHeaderContext({title:'Клиенты'}) : listContext(),
     `<section><div data-people-list-host></div></section>`,
-    button('+', {
+    wide ? '' : button('+', {
       className: 'v2-primary-source-only',
       data: 'data-add data-v2-primary-action data-v2-primary-label="+"',
       aria: 'Добавить клиента',
     }),
   ]);
-  const [searchRow] = setV2ZHeaderRows(root, [`<div class="people-search ui-search-field">
-    ${field({ name: 'peopleSearch', type: 'search', placeholder: 'Поиск по имени или UEI', autocomplete: 'off', data: 'data-people-search' })}
-    <div class="v2-desktop-list-actions">
-      ${button('Фильтр', { variant: 'secondary', data: 'data-people-desktop-filter' })}
-      ${button('Excel', { variant: 'secondary', data: 'data-people-desktop-excel' })}
-    </div>
-  </div>`]);
+  const search = field({ name:'peopleSearch', type:'search', placeholder:wide?'Поиск по имени или коду':'Поиск по имени или UEI', autocomplete:'off', data:'data-people-search' });
+  const [searchRow] = setV2ZHeaderRows(root, [wide ? `<section data-people-desktop-toolbar>
+    <h2>Клиенты</h2>
+    <div class="people-desktop-tools">${search}
+      <div class="people-desktop-actions">
+        ${button('Фильтр',{variant:'secondary',data:'data-people-desktop-filter'})}
+        ${button('Сортировка',{variant:'secondary',data:'data-people-desktop-sort'})}
+        ${button('Excel',{variant:'secondary',data:'data-people-desktop-excel'})}
+        ${button('Загрузки',{variant:'secondary',data:'data-people-desktop-uploads'})}
+        ${button('Вид',{variant:'secondary',data:'data-people-desktop-view'})}
+        ${button('+',{variant:'secondary',data:'data-people-desktop-add',aria:'Добавить клиента'})}
+      </div>
+    </div></section>` : `<div class="people-search ui-search-field">${search}</div>`]);
   root.peopleSearchInput = searchRow?.querySelector('[data-people-search]') || null;
   root.peopleRefreshPresentation = () => refreshPeopleList(root);
   searchRow?.querySelector('[data-people-desktop-filter]')?.addEventListener('click', event => openFilterSettings(root, event.currentTarget));
-  searchRow?.querySelector('[data-people-desktop-excel]')?.addEventListener('click', () => openPeopleExcelMenu(root, { getRows: () => visiblePeople(root), onLoaded: () => renderPeople(root, options) }));
+  searchRow?.querySelector('[data-people-desktop-excel]')?.addEventListener('click', event => openPeopleExcelMenu(root, {
+    anchor:event.currentTarget,
+    getRows: () => {
+      if (currentPeopleFilters().loyaltyMode && (root.peopleLoyaltyLoading || root.peopleLoyaltyError)) throw new Error('Список ещё загружается. Повторите выгрузку после обновления.');
+      return visiblePeople(root);
+    },
+    onLoaded: () => renderPeople(root, options)
+  }));
+  searchRow?.querySelector('[data-people-desktop-sort]')?.addEventListener('click', event => openSortSettings(root,event.currentTarget));
+  searchRow?.querySelector('[data-people-desktop-uploads]')?.addEventListener('click', () => openContactImportBatches(root,{onLoaded:()=>renderPeople(root,options)}));
+  searchRow?.querySelector('[data-people-desktop-view]')?.addEventListener('click', () => openPeopleAppearanceQ(root,options));
+  searchRow?.querySelector('[data-people-desktop-add]')?.addEventListener('click', event => openAddMenu(root,options,event.currentTarget));
   root.peopleLoyaltyLoading=Boolean(currentPeopleFilters().loyaltyMode);
   root.peopleLoyaltyError='';
   refreshPeopleList(root);
@@ -618,8 +625,8 @@ export function renderPeople(root, options = {}) {
   root.querySelector('[data-add]')?.addEventListener('click', () => openAddMenu(root, options));
 }
 
-function openSortSettings(root) {
-  const layer = mountModal(root, modal(`<div class="form-grid">${select({
+function openSortSettings(root, anchor = null) {
+  const layer = mountModal(anchor || root, modal(`<div class="form-grid">${select({
     label: 'Сортировка',
     value: getPeopleSortMode(),
     options: sortOptions(),
@@ -903,9 +910,9 @@ function openPeopleAppearanceQ(root, options = {}) {
 }
 
 
-function openAddMenu(root, options = {}) {
+function openAddMenu(root, options = {}, anchor = null) {
   const allowReal = canUseRealPersonalData();
-  const layer = mountModal(root, modal(`<div class="modal-actions">
+  const layer = mountModal(anchor || root, modal(`<div class="modal-actions">
     ${button('Из контакта', { variant: 'secondary', data: 'data-add-from-contacts' })}
     ${button('Внести вручную', { variant: 'secondary', data: 'data-add-manual' })}
   </div><div class="form-error" data-add-choice-error></div>`, {
@@ -994,6 +1001,7 @@ async function renderPersonOverview(layer, baseRoot, key, options = {}) {
     return;
   }
   const relationships = await buildPersonRelationshipSections(person);
+  if (!layer.isConnected) return;
   // Z2 Header stays empty (apart from its shared dismiss control).
   // The contact card and its programs belong to the same scrollable Z2 Body.
   layer.innerHTML = page([
@@ -1048,6 +1056,19 @@ async function openPersonRelationshipQ(root, person, detail, options = {}) {
 
 function openPersonOverview(root, key, options = {}) {
   if (!key) return null;
+  if (isV2DesktopWorkspace(root.closest?.('[data-v2-app]') || document.querySelector('.v2-app--workspace'))) {
+    const layer = mountModal(root, modal('<div data-desktop-person-overview></div>', { title:'Клиент', variant:'q', surface:'app' }));
+    const host = layer?.querySelector('[data-desktop-person-overview]');
+    if (!host) return layer;
+    const close = layer.v2Close?.bind(layer);
+    host.v2Close = () => layer.v2Close?.();
+    if (close && options.onClose) layer.v2Close = () => { if (layer.isConnected) { close(); options.onClose(); } };
+    void renderPersonOverview(host, root, key, options).catch(error => {
+      if (host.isConnected) host.textContent = 'Не удалось открыть клиента.';
+      console.error(error);
+    });
+    return layer;
+  }
   const layer = mountV2ZLayer(root, v2ZLayer('', { className: 'people-overview-layer' }), {
     stack: true,
     onClose: options.onClose || null,
