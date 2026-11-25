@@ -47,15 +47,16 @@ function procedureRow(procedure) {
   });
 }
 
-export function renderProcedureCatalog(host, { root = host, onChanged = () => {}, desktop = false } = {}) {
+export function renderProcedureCatalog(host, { root = host, onChanged = () => {}, desktop = false, onCount = () => {} } = {}) {
   const items = getProcedures();
+  if (desktop) onCount(items.length);
   const grouped = items.length
     ? renderServiceGroupTree(items, 'procedures', procedureRow,
       ids => commitReorderProcedures(ids),
       error => openNotice({
         title: 'Порядок',
         message: error instanceof Error ? error.message : 'Не удалось сохранить порядок услуг.',
-      }), { desktop })
+      }), { desktop, onCount })
     : null;
   host.innerHTML = items.length
     ? grouped?.html || v2ListEntries(items.map(procedureRow))

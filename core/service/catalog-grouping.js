@@ -136,9 +136,9 @@ export function bindServiceGroupFields(root) {
 // Existing Stock disclosure and V2 items, but a named group must fold even if
 // it has NO values. With values: "Инструменты" → "Брашинг" → V2 positions.
 // Multiple chosen groups are nested in the configured order, never implicit.
-export function renderServiceGroupTree(items = [], kind = 'procedures', renderRow = () => '', onReorder = () => {}, onError = () => {}, { desktop = false } = {}) {
+export function renderServiceGroupTree(items = [], kind = 'procedures', renderRow = () => '', onReorder = () => {}, onError = () => {}, { desktop = false, onCount = () => {} } = {}) {
   const levels = getServiceGroupLevels(kind);
-  if (!levels.length) return null;
+  if (!levels.length && !desktop) return null;
   const criteria = levels.flatMap(group => [
     { id: '__service_group_' + group.id, values: [{ id: 'selected', name: group.name }] },
     { id: group.id, values: group.values || [] },
@@ -168,16 +168,17 @@ export function renderServiceGroupTree(items = [], kind = 'procedures', renderRo
     key: node.key, label: node.value, count: node.items.length, content: walk(node),
   })) : [];
   if (desktop && tree.direct.length) branches.push({
-    key: '', label: 'Без группы', count: tree.direct.length, content: directRows(tree.direct),
+    key: '', label: levels.length ? 'Без группы' : (kind === 'products' ? 'Товары' : 'Услуги'), count: tree.direct.length, content: directRows(tree.direct),
   });
   const initial = branches[0];
   const html = desktop && initial
     ? '<section data-service-desktop-group-list>' +
       '<div class="service-desktop-group-header">' +
-      select({ name: 'serviceCatalogGroup', value: initial.key,
+      (levels.length ? select({ name: 'serviceCatalogGroup', value: initial.key,
         options: branches.map(branch => ({ value: branch.key, label: branch.label })),
-        aria: 'Группа каталога', className: 'service-desktop-group-select' }) +
-      '<output data-service-group-count aria-live="polite">' + initial.count + ' поз.</output></div>' +
+        aria: 'Группа каталога', className: 'service-desktop-group-select' }) :
+        '<span class="service-desktop-group-title">' + escapeHtml(initial.label) + '</span>') +
+      '<span class="service-desktop-price-title">Цена</span></div>' +
       '<div class="service-desktop-group-body" data-service-group-catalog>' +
       branches.map((branch, index) => '<div data-service-group-branch="' + index + '"' +
         (index === 0 ? '' : ' hidden') + '>' + branch.content + '</div>').join('') +
@@ -185,7 +186,7 @@ export function renderServiceGroupTree(items = [], kind = 'procedures', renderRo
     : '<div data-service-group-catalog>' + walk(tree) + '</div>';
   const attach = host => {
     const selector = host.querySelector('input[name="serviceCatalogGroup"]');
-    const counter = host.querySelector('[data-service-group-count]');
+    if (desktop && initial) onCount(initial.count);
     const views = [...host.querySelectorAll('[data-service-group-branch]')];
     // Open the selected list's nested groups initially as well. They remain
     // normal native disclosures, with the original subgroup reorder scopes.
@@ -196,7 +197,7 @@ export function renderServiceGroupTree(items = [], kind = 'procedures', renderRo
       const index = branches.findIndex(branch => branch.key === selector?.value);
       if (index < 0) return;
       views.forEach((view, i) => { view.hidden = i !== index; });
-      if (counter) counter.textContent = branches[index].count + ' поз.';
+      if (desktop) onCount(branches[index].count);
       const body = host.querySelector('.service-desktop-group-body');
       if (body) body.scrollTop = 0;
     };

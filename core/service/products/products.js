@@ -71,15 +71,16 @@ function productRow(product) {
   });
 }
 
-export function renderProductCatalog(host, { root = host, onChanged = () => {}, desktop = false } = {}) {
+export function renderProductCatalog(host, { root = host, onChanged = () => {}, desktop = false, onCount = () => {} } = {}) {
   const items = getProducts();
+  if (desktop) onCount(items.length);
   const grouped = items.length
     ? renderServiceGroupTree(items, 'products', productRow,
       ids => commitReorderProducts(ids),
       error => openNotice({
         title: 'Порядок',
         message: error instanceof Error ? error.message : 'Не удалось сохранить порядок.',
-      }), { desktop })
+      }), { desktop, onCount })
     : null;
   host.innerHTML = items.length
     ? grouped?.html || v2ListEntries(items.map(productRow))
