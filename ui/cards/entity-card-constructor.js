@@ -330,12 +330,13 @@ export function mountEntityCardConstructor(root,{appearance={},fields=[],photo='
       rerenderWorkspace();
     }));
 
-    root.querySelector('[data-card-text-color]')?.addEventListener('click',()=>{
+    root.querySelector('[data-card-text-color]')?.addEventListener('click',(event)=>{
       // Bind the color selection to the cell that opened the shared palette.
       const rowIndex=state.line;
       const column=state.column;
       openColorPickerAction({
         title:'Цвет текста',
+        anchor:event.currentTarget,
         value:state.appearance.lines[rowIndex].cells[column].color,
         onSelect:(selected)=>{
           state.appearance.lines[rowIndex].cells[column].color=textColor(selected);
