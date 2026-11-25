@@ -94,25 +94,69 @@ function openPushInfo() {
   }));
 }
 
+function deliveryFields(policy = {}) {
+  const channels = externalChannelValues(policy);
+  return `<div class="field-inline-label"><span>Push — всегда</span>${smallActionButton({
+    icon: 'info', data: 'data-notification-push-info', aria: 'О Push',
+  })}</div>
+    ${select({label:'Порядок отправки',name:'mode',value:policy?.mode === 'fallback'?'fallback':'always',options:ROUTING_MODE_OPTIONS})}
+    ${select({label:'Канал 1',name:'channel1',value:channels[0],options:EXTERNAL_CHANNEL_OPTIONS})}
+    ${select({label:'Канал 2',name:'channel2',value:channels[1],options:EXTERNAL_CHANNEL_OPTIONS})}`;
+}
+
+function deliveryDraft(form) {
+  const data = new FormData(form);
+  return {mode:data.get('mode') === 'fallback'?'fallback':'always',channels:['PUSH',...selectedExternalChannels(form)]};
+}
+
+export async function renderDeliveryCard(host) {
+  const save = host.closest('.settings-notification-card')?.querySelector('[data-notification-card-save]');
+  if (!save) return;
+  save.hidden = true;
+  const policy = await getNotificationDeliveryRouting();
+  if (!host.isConnected) return;
+  const draw = current => {
+    host.innerHTML = `<form id="settings-notification-delivery-form" class="form-grid settings-notification-delivery-form" data-notification-delivery-form>
+      ${deliveryFields(current)}
+      <div class="muted" data-notification-delivery-status aria-live="polite"></div>
+    </form>`;
+    const form = host.querySelector('form');
+    const status = form.querySelector('[data-notification-delivery-status]');
+    const baseline = JSON.stringify(deliveryDraft(form));
+    let busy = false;
+    const sync = () => {
+      save.hidden = JSON.stringify(deliveryDraft(form)) === baseline;
+      save.disabled = busy;
+      form.querySelectorAll('button').forEach(control=>{control.disabled=busy;});
+    };
+    form.querySelector('[data-notification-push-info]')?.addEventListener('click',openPushInfo);
+    form.addEventListener('input',sync);
+    form.addEventListener('change',sync);
+    form.addEventListener('submit',async event=>{
+      event.preventDefault();
+      const draft=deliveryDraft(form);
+      if(busy || JSON.stringify(draft)===baseline)return;
+      busy=true;sync();status.textContent='Сохраняем…';
+      try {
+        const saved=await saveNotificationDeliveryRouting(draft);
+        if(host.isConnected)draw(saved);
+      } catch(error) {
+        status.textContent=error?.message||'Не удалось сохранить настройки доставки';
+      } finally {
+        busy=false;
+        if(form.isConnected)sync();
+      }
+    });
+    sync();
+  };
+  draw(policy);
+}
+
 export async function openDeliverySettings() {
   const policy = await getNotificationDeliveryRouting();
-  const channels = externalChannelValues(policy);
-  const pushInfo = `<div class="field-inline-label"><span>Push — всегда</span>${smallActionButton({
-    icon: 'info',
-    data: 'data-notification-push-info',
-    aria: 'О Push',
-  })}</div>`;
   const body = `<div data-notification-delivery-settings>
     <form class="form-grid" data-notification-delivery-form>
-      ${pushInfo}
-      ${select({
-        label: 'Порядок отправки',
-        name: 'mode',
-        value: policy?.mode === 'fallback' ? 'fallback' : 'always',
-        options: ROUTING_MODE_OPTIONS,
-      })}
-      ${select({ label: 'Канал 1', name: 'channel1', value: channels[0], options: EXTERNAL_CHANNEL_OPTIONS })}
-      ${select({ label: 'Канал 2', name: 'channel2', value: channels[1], options: EXTERNAL_CHANNEL_OPTIONS })}
+      ${deliveryFields(policy)}
       <div class="muted" data-notification-delivery-status aria-live="polite"></div>
       ${button('Сохранить', { type: 'submit' })}
     </form>
@@ -133,11 +177,7 @@ export async function openDeliverySettings() {
     if (submit) submit.disabled = true;
     if (status) status.textContent = 'Сохраняем…';
     try {
-      const data = new FormData(form);
-      await saveNotificationDeliveryRouting({
-        mode: String(data.get('mode') || 'always'),
-        channels: ['PUSH', ...selectedExternalChannels(form)],
-      });
+      await saveNotificationDeliveryRouting(deliveryDraft(form));
       layer.v2Close?.();
     } catch (error) {
       if (submit) submit.disabled = false;

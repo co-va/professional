@@ -110,7 +110,13 @@
 .settings-document-row .list-entry__leading-icon{color:var(--text-secondary)}
 
 /* Desktop notifications: summary action on H, canonical list entries, inline editor. */
-.settings-notification-card-heading{width:100%;margin-bottom:0}
+.settings-notification-card-heading{width:100%;margin-bottom:0;min-height:36px;flex-wrap:nowrap}
+.settings-notification-card{cursor:pointer}
+.settings-notification-title{font:inherit;font-size:20px;font-weight:730;line-height:1.2;color:var(--text);background:transparent;border:0;padding:0;text-align:left;cursor:pointer}
+.settings-notification-card [data-notification-delivery-card]{width:100%;min-width:0;cursor:default}
+.settings-notification-delivery-form{gap:8px;min-width:0}
+.settings-notification-delivery-form .field-inline-label{justify-content:flex-start;gap:8px}
+.settings-notification-delivery-form [data-notification-delivery-status]:empty{display:none}
 .notification-desktop-master{display:flex;align-items:center;margin-bottom:12px}
 .notification-desktop-master .ui-compact-check__label{font-size:20px;font-weight:730}
 .notification-desktop-master .ui-check-input:indeterminate+.ui-compact-check__mark::after{content:'−';font-size:19px;font-weight:800;color:var(--text)}

@@ -109,7 +109,7 @@ export function settingsOverviewMarkup(visible) {
   };
   const card = id => {
     if (['online-booking','integrations','tags','documents'].includes(id)) return '<section class="settings-overview-card settings-overview-card--inline" data-settings-inline="'+id+'" data-settings-section-owner="'+id+'"><div data-settings-embedded></div></section>';
-    if (id === 'notifications') return '<section class="settings-overview-card" data-settings-section-owner="notifications"><div class="settings-inline-heading settings-notification-card-heading"><strong>Уведомления</strong>'+button('Доставка',{className:'settings-h-action',data:'data-settings-notification-delivery',aria:'Настройки доставки уведомлений'})+'</div><button type="button" class="settings-overview-trigger" data-settings-tile="notifications" aria-expanded="false" aria-controls="settings-panel-notifications"><span class="settings-overview-card-summary">События и способы доставки</span><span aria-hidden="true" class="settings-overview-arrow">⌄</span></button></section>';
+    if (id === 'notifications') return '<section class="settings-overview-card settings-notification-card" data-settings-section-owner="notifications"><div class="settings-inline-heading settings-notification-card-heading"><button type="button" class="settings-notification-title" data-settings-tile="notifications" aria-expanded="false" aria-controls="settings-panel-notifications">Уведомления</button>'+button('Сохранить',{type:'submit',className:'settings-h-action',data:'data-notification-card-save form="settings-notification-delivery-form" hidden'})+'</div><div data-notification-delivery-card></div></section>';
     const trigger = '<button type="button" class="settings-overview-trigger" data-settings-tile="'+id+'" aria-expanded="false" aria-controls="settings-panel-'+id+'"><strong class="settings-overview-card-title">'+available.get(id)+'</strong><span class="settings-overview-card-summary">'+summaries[id]+'</span><span aria-hidden="true" class="settings-overview-arrow">⌄</span></button>';
     return '<section class="settings-overview-card" data-settings-section-owner="'+id+'">'+trigger+'</section>';
   };
@@ -183,22 +183,29 @@ function renderDesktopSettings(root) {
     }
   };
   for (const card of cards) card.addEventListener('click', () => void open(card.dataset.settingsTile));
-  overview.querySelector('[data-settings-notification-delivery]')?.addEventListener('click', async event => {
-    const control = event.currentTarget;
+  const notificationCard = overview.querySelector('.settings-notification-card');
+  if (notificationCard) {
+    // The card opens the list; its independent form controls must never toggle it.
+    notificationCard.addEventListener('click', event => {
+      if (event.target.closest('button, input, select, textarea, label, [data-notification-delivery-card]')) return;
+      void open('notifications');
+    });
+    const host = notificationCard.querySelector('[data-notification-delivery-card]');
     const folder = visible.find(item => item[0] === 'notifications');
-    if (!folder || control.disabled) return;
-    panels.filter(panel => panel.dataset.settingsPanel === 'notifications').forEach(panel => setSettingsDetailOpen(panel,false));
-    control.disabled = true;
-    try {
-      const module = await folder[3]();
-      if (control.isConnected) await module.openDeliverySettings();
-    } catch (error) {
-      if (control.isConnected) {
-        const module = await import('../ui/ui.js');
-        module.openNotice({title:'Доставка',message:error?.message || 'Не удалось загрузить настройки доставки.'});
+    const loadDelivery = async () => {
+      host.innerHTML = emptyState('Загрузка', 'Загружаем настройки доставки.');
+      try {
+        const module = await folder[3]();
+        if (host.isConnected) await module.renderDeliveryCard(host);
+      } catch (error) {
+        if (!host.isConnected) return;
+        host.innerHTML = emptyState('Доставка недоступна',error?.message||'Повторите попытку.')+
+          button('Повторить',{data:'data-delivery-retry'});
+        host.querySelector('[data-delivery-retry]')?.addEventListener('click',()=>void loadDelivery());
       }
-    } finally { control.disabled = false; }
-  });
+    };
+    void loadDelivery();
+  }
   for (const inline of overview.querySelectorAll('[data-settings-inline]')) {
     const id = inline.dataset.settingsInline;
     const folder = visible.find(item => item[0] === id);
