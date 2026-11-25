@@ -46,7 +46,8 @@ export function initV2WorkspaceInteraction(root, {
 
   const fCards = [...(fDeck?.querySelectorAll?.('[data-v2-card-item]') || [])];
   const eCards = [...(eDeck?.querySelectorAll?.('[data-v2-card-item]') || [])];
-  let fActiveIndex = Math.max(0, fCards.findIndex((card) => String(card.getAttribute('data-v2-card-item') || '') === String(activeId || '')));
+  const rootIndex = () => fCards.findIndex((card) => String(card.getAttribute('data-v2-card-item') || '') === String(activeId || ''));
+  let fActiveIndex = isV2DesktopWorkspace(app) ? rootIndex() : Math.max(0, rootIndex());
   let eActiveIndex = Math.max(0, eCards.findIndex((card) => String(card.getAttribute('data-v2-card-item') || '') === String(eActiveId || '')));
   let open = Boolean(deckOpen);
   let secondaryOpen = Boolean(open && eOpen && eCards.length);
@@ -480,7 +481,7 @@ export function initV2WorkspaceInteraction(root, {
     if (!desktop()) return;
     clearZGesture();
     eCancel();
-    fActiveIndex = Math.max(0, fCards.findIndex(card => cardId(card) === String(activeId)));
+    fActiveIndex = rootIndex();
     eActiveIndex = Math.max(0, eCards.findIndex(card => cardId(card) === String(eActiveId)));
     setActiveCard(fCards, fActiveIndex);
     setActiveCard(eCards, eActiveIndex);

@@ -163,7 +163,7 @@ function rootDisplayLabel(section) {
 }
 
 function allowedRootItems(wide = false) {
-  const sections = wide ? ROOT_SECTIONS.map(item => item.id === 'profile' ? { id:'workplaces' } : item) : ROOT_SECTIONS;
+  const sections = wide ? ROOT_SECTIONS.filter(item => item.id !== 'profile') : ROOT_SECTIONS;
   return sections
     .filter((item) => sectionAllowed(item.id))
     .map(({ id }) => {
@@ -364,6 +364,8 @@ function syncWorkspaceHeader(surface) {
     desktopContextRedundant: false,
     desktopToolbar: true,
     desktopProfileAllowed: sectionAllowed('profile'),
+    desktopWorkplacesAllowed: sectionAllowed('workplaces'),
+    desktopWorkplacesActive: root === 'workplaces' && state.activeSection !== 'chat',
     desktopContext: state.activeSection === 'chat' ? 'Чат' : (root === 'workplaces' ? 'Рабочие пространства' : rootDisplayLabel(root)) + (root !== 'journal' && title && title !== rootDisplayLabel(root) ? ' / ' + title : ''),
     b: subtitle ? { label: title, subtitle } : title,
     c: cVisible ? {
@@ -399,6 +401,8 @@ function syncWorkspaceHeader(surface) {
 function bindDesktopHeader(surface) {
   const profile = app.querySelector('[data-desktop-profile]');
   if (profile) profile.onclick = () => openDesktopProfileQ(surface, { accountEmail: authenticatedAccount?.account?.email || '', onSaved: () => syncWorkspaceHeader(surface) });
+  const workplaces = app.querySelector('[data-desktop-workplaces]');
+  if (workplaces) workplaces.onclick = () => navigate('workplaces', { navigationOpen: false });
   const notice = app.querySelector('[data-desktop-notices]');
   if (notice) notice.onclick = () => openAccountControlsModal();
   const exit = app.querySelector('[data-desktop-logout]');
@@ -607,6 +611,8 @@ function renderWorkspace() {
     desktopContextRedundant: false,
     desktopToolbar: true,
     desktopProfileAllowed: sectionAllowed('profile'),
+    desktopWorkplacesAllowed: sectionAllowed('workplaces'),
+    desktopWorkplacesActive: root === 'workplaces' && state.activeSection !== 'chat',
     desktopContext: state.activeSection === 'chat' ? 'Чат' : rootDisplayLabel(root),
     b: state.activeSection === 'chat' ? 'Чат' : rootDisplayLabel(root),
     d: sectionAllowed('chat') ? { kind: 'chat', data: 'data-v2-workspace-chat', aria: 'Чат' } : null,
