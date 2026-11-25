@@ -279,7 +279,7 @@ export function openServiceGroupingQ({ onSaved = () => {}, desktop = false } = {
     const q = mountModal(document.body, modal(
       '<div data-desktop-group-content></div>' +
       '<div class="form-error" role="alert" data-desktop-group-error></div>' +
-      actionBlock(button('+ Группа', { variant: 'secondary', data: 'data-desktop-group-add' })) +
+      actionBlock(button('+ Добавить группу', { variant: 'secondary', data: 'data-desktop-group-add' })) +
       actionBlock(button('Отмена', { variant: 'secondary', data: 'data-desktop-group-cancel' })) +
       actionBlock(button('Сохранить', { data: 'data-desktop-group-save' })) +
       actionBlock(button('Удалить группу', { variant: 'danger', data: 'data-desktop-group-delete' })),
@@ -292,7 +292,7 @@ export function openServiceGroupingQ({ onSaved = () => {}, desktop = false } = {
     const cancel = q.querySelector('[data-desktop-group-cancel]');
     const saveButton = q.querySelector('[data-desktop-group-save]');
     const remove = q.querySelector('[data-desktop-group-delete]');
-    for (const control of [add, cancel, saveButton]) moveDesktopQTool(control);
+    for (const control of [cancel, saveButton, add]) moveDesktopQTool(control);
     pinDesktopQDanger(remove);
     const title = q.querySelector('.v2-q-title');
     const visible = (control, yes) => { control.closest('.modal-actions').hidden = !yes; };
@@ -304,6 +304,12 @@ export function openServiceGroupingQ({ onSaved = () => {}, desktop = false } = {
     let busy = false;
     let dispose = () => {};
     const current = () => key ? groupByKey(key) : null;
+    const valueCountText = group => {
+      const count = Array.isArray(group.values) ? group.values.length : 0;
+      const mod10 = count % 10, mod100 = count % 100;
+      return count + ' ' + (mod10 === 1 && mod100 !== 11 ? 'значение'
+        : mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14) ? 'значения' : 'значений');
+    };
     const edited = () => valueEdit && !valueEdit.isNew
       ? current()?.values?.find(value => value.id === valueEdit.id) : null;
     const nameChanged = () => Boolean(nameDraft.trim()) &&
@@ -314,7 +320,7 @@ export function openServiceGroupingQ({ onSaved = () => {}, desktop = false } = {
       (!valueEdit || valueEdit.name.trim()) && (nameChanged() || valueChanged()));
     const sync = () => {
       const active = current();
-      add.textContent = active ? '+ Значение' : '+ Группа';
+      add.textContent = active ? '+ Добавить значение' : '+ Добавить группу';
       visible(add, !creating && !valueEdit);
       visible(cancel, creating || Boolean(valueEdit));
       visible(saveButton, canSave());
@@ -366,14 +372,14 @@ export function openServiceGroupingQ({ onSaved = () => {}, desktop = false } = {
       dispose(); dispose = () => {};
       const active = current();
       if (key && !active) reset();
-      if (title) title.textContent = creating ? 'Новая группа' : active?.name || 'Группы';
+      if (title) title.textContent = creating ? 'Новая группа' : active ? 'Группа' : 'Группы';
       error.textContent = '';
       if (!creating && !active) {
         const entries = getServiceGroupEntries();
         content.innerHTML = entries.length ? list({
           className: 'ui-list--dense list-entries',
           items: entries.map(group => ({
-            title: group.name, secondary: kindLabel(group.kind), interactive: true, reorderHandle: true,
+            title: group.name, secondary: kindLabel(group.kind), right: valueCountText(group), interactive: true, reorderHandle: true,
             data: 'data-desktop-group-key="' + escapeHtml(group.key) + '" data-reorder-id="' + escapeHtml(group.key) + '"',
             aria: 'Открыть группу ' + group.name,
           })),
@@ -392,7 +398,7 @@ export function openServiceGroupingQ({ onSaved = () => {}, desktop = false } = {
       content.innerHTML = '<form class="compact-form" data-desktop-group-form>' +
         (creating ? select({ label: 'Раздел', name: 'groupKind', value: kindDraft,
           options: [{ value: 'procedures', label: 'Услуги' }, { value: 'products', label: 'Товары' }] })
-          : '<div class="inventory-editor-label">' + kindLabel(active.kind) + '</div>') +
+          : '') +
         field({ label: 'Наименование группы', name: 'name', value: nameDraft, required: true, maxlength: 80 }) +
         (valueEdit ? field({ label: 'Наименование значения', name: 'valueName', value: valueEdit.name,
           required: true, maxlength: 80 }) : '') +
@@ -420,7 +426,10 @@ export function openServiceGroupingQ({ onSaved = () => {}, desktop = false } = {
             data: 'data-desktop-group-value="' + escapeHtml(value.id) + '" data-reorder-id="' + escapeHtml(value.id) + '"',
             aria: 'Изменить значение ' + value.name,
           })),
-        }) : emptyState('Значений пока нет');
+        }) : list({
+          className: 'ui-list--dense list-entries',
+          items: [{ title: 'Значений пока нет', className: 'desktop-group-empty-row' }],
+        });
         listHost.querySelectorAll('[data-desktop-group-value]').forEach(node => node.addEventListener('click', event => {
           if (busy || event.target.closest?.('[data-reorder-handle]')) return;
           if (valueEdit) return;

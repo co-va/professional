@@ -953,4 +953,6 @@
  .v2-app--workspace .desktop-service-groups-q [data-desktop-group-content] .ui-list__title{font-size:14px;line-height:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
  .v2-app--workspace .desktop-service-groups-q [data-desktop-group-content] .ui-list__secondary{font-size:12px;line-height:14px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
  .v2-app--workspace .desktop-service-groups-q [data-desktop-group-content] .ui-list__item>.list-entry__reorder-handle{height:var(--ui-compact-size);width:var(--ui-compact-size);flex-basis:var(--ui-compact-size)}
+ .v2-app--workspace .desktop-service-groups-q [data-desktop-group-content] .ui-list__right-secondary{font-size:13px;line-height:16px;font-variant-numeric:tabular-nums;white-space:nowrap}
+ .v2-app--workspace .desktop-service-groups-q [data-service-group-value-list] .desktop-group-empty-row .ui-list__title{color:var(--text-secondary);font-weight:400}
 }
