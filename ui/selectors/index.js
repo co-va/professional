@@ -1,4 +1,5 @@
 import { escapeHtml } from '../utils/escape-html.js';
+import { compactButton } from '../buttons/index.js';
 import { modal, mountModal } from '../modals/index.js';
 
 let selectorEventsReady = false;
@@ -137,7 +138,7 @@ function openSelector(trigger) {
   const desktopContactSelector = Boolean(trigger.closest('.people-filter-popup, .people-card-appearance-q, .people-overview-toolbar'));
   const desktopCardField = Boolean(trigger.matches('[data-card-line-field]') && trigger.closest('.people-card-appearance-q'));
   const popupClass = desktopContactSelector ? 'people-action-popup people-filter-selector' + (desktopCardField ? ' people-card-field-selector' : '') : '';
-  const modalRoot = mountModal(trigger, modal(content, { variant: 'x', title: 'Выбор', xRole: 'picker', className:popupClass }));
+  const modalRoot = mountModal(trigger, modal(content, { variant: 'x', title: trigger.dataset.pickerTitle || 'Выбор', xRole: 'picker', className:popupClass }));
   const surface = modalRoot?.querySelector('[data-ui-selector]');
   if (!surface) return;
   surface.uiSourceInput = input;
@@ -178,7 +179,7 @@ export function selectionTrigger({ value = 'Выбрать', meta = '', aria = '
   return `<div class="field ui-select${className ? ` ${escapeHtml(className)}` : ''}">${selectorControl({ value, meta, attributes })}</div>`;
 }
 
-export function select({ name = '', label = '', value = '', options = [], aria = '', className = '', data = '', searchable = false, allowCustom = false, placeholder = '' } = {}) {
+export function select({ name = '', label = '', value = '', options = [], aria = '', className = '', data = '', searchable = false, allowCustom = false, placeholder = '', triggerKind = '', pickerTitle = '' } = {}) {
   ensureSelectorEvents();
 
   const normalized = normalizeOptions(options);
@@ -188,6 +189,11 @@ export function select({ name = '', label = '', value = '', options = [], aria =
   const current = normalized.find((option) => option.value === stringValue) || (!stringValue && placeholder ? { value: '', label: placeholder, meta: '', indicatorColor: '' } : normalized[0]) || { value: '', label: placeholder || 'Выбрать', meta: '', indicatorColor: '' };
   const optionData = escapeHtml(JSON.stringify(normalized));
   const dataAttrs = data ? ` ${data}` : '';
+  const triggerAttributes = `data-ui-select-trigger data-input-id="${inputId}" data-options="${optionData}" data-searchable="${searchable ? 'true' : 'false'}" data-allow-custom="${allowCustom ? 'true' : 'false'}" data-placeholder="${escapeHtml(placeholder)}"${pickerTitle ? ` data-picker-title="${escapeHtml(pickerTitle)}"` : ''}${dataAttrs}`;
+  if (triggerKind) return `<div class="ui-select ${escapeHtml(className)}">
+    <input id="${inputId}" type="hidden" name="${escapeHtml(name)}" value="${escapeHtml(stringValue)}"${dataAttrs}>
+    ${compactButton({ kind: triggerKind, data: triggerAttributes + ' aria-haspopup="dialog"', aria: aria || label })}
+  </div>`;
 
   return `<label class="field ui-select ${escapeHtml(className)}">
     ${label ? `<span>${escapeHtml(label)}</span>` : ''}
@@ -196,7 +202,7 @@ export function select({ name = '', label = '', value = '', options = [], aria =
       value: current.label,
       meta: current.meta || '',
       indicatorColor: current.indicatorColor,
-      attributes: `data-ui-select-trigger data-input-id="${inputId}" data-options="${optionData}" data-searchable="${searchable ? 'true' : 'false'}" data-allow-custom="${allowCustom ? 'true' : 'false'}" data-placeholder="${escapeHtml(placeholder)}"${aria ? ` aria-label="${escapeHtml(aria)}"` : ''}${dataAttrs}`,
+      attributes: triggerAttributes + (aria ? ` aria-label="${escapeHtml(aria)}"` : ''),
     })}
   </label>`;
 }

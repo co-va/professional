@@ -2,7 +2,6 @@ import { settingsDetailHeading, setSettingsDetailOpen } from '../settings.js';
 import {
   actionBlock,
   button,
-  compactButton,
   documentTile,
   documentTiles,
   emptyState,
@@ -15,6 +14,7 @@ import {
   openNotice,
   page,
   segmentControl,
+  select,
   selectFile,
   setV2ZHeaderRows,
   shortDateTime,
@@ -310,7 +310,9 @@ function mobileDocumentsHeaderRows() {
   })];
   if (currentView === 'history') rows.push(`<div class="mobile-document-history-tools" data-v2-layer-gesture-ignore>
     <div class="ui-search-field">${field({ name: 'documentHistoryQuery', type: 'search', placeholder: 'Поиск', autocomplete: 'off', data: 'aria-label="Поиск по имени, фамилии или телефону"' })}</div>
-    ${compactButton({ kind: 'sort', data: 'data-mobile-history-sort aria-haspopup="dialog"', aria: 'Сортировка' })}
+    ${select({ name: 'documentHistorySort', value: 'date', options: [
+      { value: 'date', label: 'По дате' }, { value: 'name', label: 'По имени (А–Я)' },
+    ], triggerKind: 'sort', pickerTitle: 'Сортировка', aria: 'Сортировка' })}
   </div>`);
   return rows;
 }
@@ -324,7 +326,7 @@ function bindMobileHistory(root, tools) {
   if (!host) return;
   const cards = [...host.querySelectorAll('[data-history-person]')];
   const query = tools?.querySelector('[name="documentHistoryQuery"]');
-  const sort = tools?.querySelector('[data-mobile-history-sort]');
+  const sort = tools?.querySelector('[name="documentHistorySort"]');
   const empty = root.querySelector('[data-history-no-results]');
   let mode = 'date';
   const order = () => {
@@ -347,17 +349,9 @@ function bindMobileHistory(root, tools) {
     if (empty) empty.hidden = count !== 0;
   };
   query?.addEventListener('input', filter);
-  sort?.addEventListener('click', () => {
-    const options = [{ value: 'date', label: 'По дате' }, { value: 'name', label: 'По имени (А–Я)' }];
-    const layer = mountModal(sort, modal(`<div class="compact-form">${options.map(option => button(option.label, {
-      variant: option.value === mode ? 'primary' : 'outline',
-      data: `data-history-sort-choice="${option.value}" aria-pressed="${option.value === mode}"`,
-    })).join('')}</div>`, { title: 'Сортировка', variant: 'x', surface: 'app', xRole: 'action', className: 'modal--form-sheet' }));
-    layer?.querySelectorAll('[data-history-sort-choice]').forEach(control => control.addEventListener('click', () => {
-      mode = control.dataset.historySortChoice === 'name' ? 'name' : 'date';
-      order();
-      layer.v2Close?.();
-    }));
+  sort?.addEventListener('change', () => {
+    mode = sort.value === 'name' ? 'name' : 'date';
+    order();
   });
 }
 
