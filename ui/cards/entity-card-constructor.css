@@ -95,7 +95,7 @@
 .entity-card-editor__tool-captions{display:grid;grid-template-columns:3fr 4fr;gap:calc(10px + var(--entity-card-control-gap) * 2);color:var(--text-secondary);font-size:12px}
 .entity-card-editor__tool-captions span{min-width:0}
 .entity-card-editor__line-picker button{border:1px solid var(--border);background:#fff;color:#111;font:inherit;font-size:12px}
-.entity-card-editor__line-picker button.is-active{border-color:#41484F;background:#41484F;color:#fff}
+.entity-card-editor__line-picker button.is-active{border-color:var(--surface-dark);background:var(--surface-dark);color:#fff}
 
 .entity-card-editor__data{margin:0;min-width:0}
 .entity-card-editor__control-label{margin:0;font-size:12px;color:var(--text-secondary)}
@@ -115,7 +115,7 @@
   border-radius:0;
   padding:0;
 }
-.entity-card-editor__tool.is-active{border-color:#41484F;background:#41484F;color:#fff}
+.entity-card-editor__tool.is-active{border-color:var(--surface-dark);background:var(--surface-dark);color:#fff}
 .entity-card-editor__tool[aria-label="Курсив"]{font-style:italic}
 .entity-card-editor__tool[aria-label="Подчёркнутый"]{text-decoration:underline}
 .entity-card-editor__text-color{display:flex;align-items:center;justify-content:center}
