@@ -65,13 +65,14 @@ export function settingsSectionHeader(root, context, actions = []) {
 
 export function settingsOverviewMarkup(visible) {
   const available = new Map(visible.map(folder => [folder[0], folder[1]]));
-  const top = ['online-booking','integrations','tags'].filter(id => available.has(id));
-  const other = ['notifications','documents','data-transfer'].filter(id => available.has(id));
+  const top = ['online-booking','integrations','data-transfer'].filter(id => available.has(id));
+  const middle = ['notifications','tags'].filter(id => available.has(id));
   const card = id => '<button type="button" class="settings-overview-card" data-settings-tile="'+id+'" aria-expanded="false" aria-controls="settings-panel-'+id+'"><span>'+available.get(id)+'</span><span aria-hidden="true" class="settings-overview-arrow">⌄</span></button>';
   const panel = id => '<section id="settings-panel-'+id+'" class="settings-overview-panel" data-settings-panel="'+id+'" hidden><div data-settings-embedded></div></section>';
   return workspaceHeaderContext({title:'Настройки'})+'<div class="settings-overview">'+
-    (top.length ? columnLayout(top.map(card),{columns:top.length,ariaLabel:'Основные настройки'})+top.map(panel).join('') : '')+
-    other.map(id => '<div class="settings-overview-section">'+card(id)+panel(id)+'</div>').join('')+
+    (top.length ? '<div class="settings-overview-section">'+columnLayout(top.map(card),{columns:top.length,ariaLabel:'Онлайн-запись, интеграции и перенос данных'})+top.map(panel).join('')+'</div>' : '')+
+    (middle.length ? '<div class="settings-overview-section">'+columnLayout(middle.map(card),{columns:middle.length,ariaLabel:'Уведомления и ярлыки'})+middle.map(panel).join('')+'</div>' : '')+
+    (available.has('documents') ? '<div class="settings-overview-section">'+card('documents')+panel('documents')+'</div>' : '')+
     '</div>';
 }
 
