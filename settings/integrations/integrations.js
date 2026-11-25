@@ -1,3 +1,4 @@
+import { settingsSectionHeader } from '../settings.js';
 import {
   beginEmailConnection,
   disconnectEmail,
@@ -302,7 +303,7 @@ function renderIntegrationCards(root, telegramState = {}, emailState = {}) {
 }
 
 async function renderIntegrations(root) {
-  root.innerHTML = page([workspaceHeaderContext({ title: 'Интеграции' }), '<div data-integrations-list></div>']);
+  root.innerHTML = page([settingsSectionHeader(root,{ title: 'Интеграции' }), '<div data-integrations-list></div>']);
   const host = root.querySelector('[data-integrations-list]');
   if (host) host.innerHTML = emptyState('Загрузка', 'Проверяем интеграции.');
   const [telegramResult, emailResult] = await Promise.allSettled([getTelegramBotConnection(), getEmailConnection()]);

@@ -1,3 +1,4 @@
+import { settingsSectionHeader } from '../settings.js';
 import { compactCheck } from '../../ui/selection/check-list.js';
 import {
   getNotificationCatalog,
@@ -348,13 +349,13 @@ function bindCatalog(root, host, catalog, routing) {
 
 export async function render(root) {
   root.innerHTML = page([
-    workspaceHeaderContext({
+    settingsSectionHeader(root,{
       title: 'Уведомления',
       v: {
         data: 'data-notification-delivery-settings-open',
         aria: 'Настройки доставки уведомлений',
       },
-    }),
+    },[{label:'Доставка',data:'data-notification-delivery-settings-open',aria:'Настройки доставки уведомлений'}]),
     '<div data-notification-routing></div>',
   ]);
   root.querySelector('[data-notification-delivery-settings-open]')?.addEventListener('click', () => void openDeliverySettings());

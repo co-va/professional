@@ -1,3 +1,4 @@
+import { settingsSectionHeader } from '../settings.js';
 import {
   actionBlock,
   button,
@@ -677,6 +678,8 @@ function openSettingsMenu(root) {
 
 function bindMain(root) {
   bindSettings(root, root);
+  root.querySelector('[data-settings-document-templates]')?.addEventListener('click', () => openTemplatesLayer(root));
+  root.querySelector('[data-settings-document-add]')?.addEventListener('click', () => openAddDocumentMenu(root));
 
   initSegmentControls(root);
   root.querySelector('[name="documentsView"]')?.addEventListener('change', (event) => {
@@ -701,7 +704,9 @@ function bindMain(root) {
 
 function renderMain(root) {
   root.innerHTML = page([
-    headerContext('Документы'),
+    root.hasAttribute('data-settings-embedded')
+      ? settingsSectionHeader(root,{title:'Документы'},[{label:'Шаблоны',data:'data-settings-document-templates'},{label:'+ Документ',data:'data-settings-document-add'}])
+      : headerContext('Документы'),
     segmentControl(VIEWS, {
       value: currentView,
       name: 'documentsView',

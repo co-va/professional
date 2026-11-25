@@ -1,3 +1,4 @@
+import { settingsSectionHeader } from '../settings.js';
 import { buildBookingLink } from '../../core/booking-link/index.js';
 import { apiRequest, getCurrentAccount } from '../../core/auth.js';
 import { loadOperationalState } from '../../core/runtime/operational-state.js';
@@ -143,14 +144,15 @@ function openOnlineBookingSettings(root) {
 }
 
 function mountScreen(root, body) {
-  root.innerHTML = `${workspaceHeaderContext({
+  const embedded = root.hasAttribute('data-settings-embedded');
+  root.innerHTML = `${settingsSectionHeader(root,{
     title: 'Онлайн-запись',
     v: {
       data: 'data-online-booking-settings',
       aria: 'Настройки онлайн-записи',
     },
-  })}<div class="form-grid form-grid--relaxed">${body}</div>`;
-  root.querySelector('[data-online-booking-settings]')?.addEventListener('click', () => openOnlineBookingSettings(root));
+  },[{label:'Приветствие',data:'data-online-booking-settings'}])}<div class="form-grid form-grid--relaxed">${body}</div>`;
+  root.querySelector('[data-online-booking-settings]')?.addEventListener('click', () => embedded ? openWelcomeQ(root) : openOnlineBookingSettings(root));
 }
 
 // These settings are intentionally saved as preferences, not active permissions.
@@ -231,7 +233,7 @@ function renderUnavailable(root, title, message) {
 }
 
 export function render(root) {
-  root.innerHTML = `${workspaceHeaderContext({ title: 'Онлайн-запись' })}${emptyState('Загрузка', 'Формируем ссылки онлайн-записи.')}`;
+  root.innerHTML = `${settingsSectionHeader(root,{ title: 'Онлайн-запись' })}${emptyState('Загрузка', 'Формируем ссылки онлайн-записи.')}`;
 
   void Promise.all([loadOperationalState({ full: true }), getCurrentAccount(), loadOwnerPublicRoute()])
     .then(([, account, publicRoute]) => {

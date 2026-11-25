@@ -158,6 +158,7 @@ function rootDisplayLabel(section) {
   if (section === 'workplaces') return 'Рабочие пространства';
   const definition = rootDefinition(section);
   if (!definition) return '';
+  if (section === 'settings' && window.matchMedia?.(V2_DESKTOP_MEDIA).matches) return definition.label;
   const children = secondaryItems(section);
   return children.length === 1 ? children[0].label : definition.label;
 }
@@ -171,7 +172,7 @@ function allowedRootItems(wide = false) {
       return {
         id,
         label: rootDisplayLabel(id),
-        childrenCount: children.length > 1 ? children.length : 0,
+        childrenCount: wide && id === 'settings' ? 0 : children.length > 1 ? children.length : 0,
       };
     });
 }
@@ -599,7 +600,7 @@ function renderWorkspace() {
   const root = activeRootSection();
   const wide = window.matchMedia?.(V2_DESKTOP_MEDIA).matches;
   const rootItems = allowedRootItems(wide);
-  const childItems = secondaryItems(root);
+  const childItems = wide && root === 'settings' ? [] : secondaryItems(root);
   const childActive = ensureSecondary(root);
   const rootDeck = v2CardDeck(rootItems, {
     axis: 'x',

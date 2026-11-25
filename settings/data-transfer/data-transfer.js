@@ -1,3 +1,4 @@
+import { settingsSectionHeader } from '../settings.js';
 import { apiRequest } from '../../core/auth.js';
 import { actionBlock, button, select, page, details, workspaceHeaderContext, selectFile, openNotice, dataTable, bindDataTable } from '../../ui/ui.js';
 import { settingToggle } from '../../ui/settings/index.js';
@@ -18,7 +19,7 @@ export function render(root){
   function draw(){
     const next=state.step==='mapping'?'Проверить':state.step==='checked'?'Перенести':'Загрузить файл';
     root.innerHTML=page([
-      workspaceHeaderContext({title:'Перенос данных'}),
+      settingsSectionHeader(root,{title:'Перенос данных'}),
       details([{label:'Шаг',value:state.step==='mapping'?'Проверить колонки':state.step==='checked'?'Проверка':state.step==='result'?'Результат':'Загрузить'}]),
       state.step==='upload'?`<ol><li>Скачайте шаблон.</li><li>Перенесите старые данные в подходящие колонки — по смыслу, а не по старому названию.</li><li>Заполняйте только то, что известно. В одном файле можно указать разные виды данных.</li><li>Загрузите файл. Система распределит понятные данные по разделам.</li><li>Ошибки можно скачать, исправить и загрузить повторно.</li></ol>${button('Скачать шаблон',{variant:'secondary',data:'data-transfer-template'})}`:'',
       state.step==='mapping'?mapping():'',state.result?results():'',history(),'<p class="form-error" role="status" data-transfer-error></p>',

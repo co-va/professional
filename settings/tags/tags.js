@@ -1,3 +1,4 @@
+import { settingsSectionHeader } from '../settings.js';
 import {
   actionBlock,
   button,
@@ -191,10 +192,10 @@ function renderList(root) {
   const tags = getTags();
   const sources = currentSources();
   root.innerHTML = page([
-    workspaceHeaderContext({
+    settingsSectionHeader(root,{
       title: 'Ярлыки',
       c: { label: '+', data: 'data-tag-add', aria: 'Добавить ярлык' },
-    }),
+    },[{label:'+ Ярлык',data:'data-tag-add'}]),
     tags.length
       ? `<div class="settings-tags-v2">${v2ListEntries(tags.map((tag) =>
           tagRow(tag, tagAssignments(tag, sources).length)))}</div>`
@@ -275,7 +276,7 @@ export async function renderTags(root) {
   // Settings normally loads only the tag catalog. Read all existing owners
   // before showing counts; unloaded entities must never silently count as 0.
   root.innerHTML = page([
-    workspaceHeaderContext({ title: 'Ярлыки' }),
+    settingsSectionHeader(root,{ title: 'Ярлыки' }),
     emptyState('Загрузка', 'Загружаем назначения ярлыков.'),
   ]);
   const loadingView = root.firstElementChild;
@@ -290,7 +291,7 @@ export async function renderTags(root) {
   } catch (error) {
     if (root.firstElementChild !== loadingView) return;
     root.innerHTML = page([
-      workspaceHeaderContext({ title: 'Ярлыки' }),
+      settingsSectionHeader(root,{ title: 'Ярлыки' }),
       emptyState('Не удалось загрузить назначения', String(error?.message || 'Повторите попытку.')),
       button('Повторить', { data: 'data-tags-retry' }),
     ]);
