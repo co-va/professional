@@ -987,16 +987,12 @@
    start on the same line, aligned at the H origin. The statistics column
    wraps independently; it never pushes the main card or centres the rail. */
 @media (min-width:768px) and (min-height:600px){
- .v2-app--workspace .service-desktop-overview-cards{display:flex;flex-direction:column;align-items:stretch;gap:16px;width:100%;min-width:0}
+ .v2-app--workspace .service-desktop-overview-cards{display:flex;flex-direction:column;align-items:stretch;gap:var(--h-content-gap);width:100%;min-width:0}
  .v2-app--workspace .service-desktop-overview-cards>.entity-visual-card{align-self:flex-start;flex:0 0 auto;width:min(338px,100%);max-width:338px;margin:0}
  .v2-app--workspace .service-desktop-workplace-cards{display:flex;flex:0 0 auto;width:100%;max-width:100%;min-width:0;flex-wrap:nowrap;gap:12px;align-items:flex-start;justify-content:flex-start;overflow-x:auto;overflow-y:hidden;padding:0;scroll-padding-inline:0;scroll-snap-type:none;touch-action:pan-x;user-select:none;-webkit-user-select:none}
  .v2-app--workspace .service-desktop-workplace-cards>.mini-card{flex:0 0 min(var(--mini-card-width),100%);width:min(var(--mini-card-width),100%);margin:0;box-shadow:none;color:#111;scroll-snap-align:none;touch-action:pan-x}
  .v2-app--workspace .service-desktop-workplace-cards>.mini-card>.mini-card__record-center{overflow:visible;overscroll-behavior:auto;touch-action:pan-x}
  .v2-app--workspace .service-desktop-workplace-cards :is(.mini-card__row-label,.mini-card__row-value){color:#111}
- /* A lone workplace shares the top line with the main card whenever it fits.
-    Multiple workplaces retain the accepted full-width horizontal rail. */
- .v2-app--workspace .service-desktop-overview-cards:has(>.service-desktop-workplace-cards>.mini-card:only-child){flex-direction:row;flex-wrap:wrap;align-items:flex-start;justify-content:flex-start}
- .v2-app--workspace .service-desktop-overview-cards:has(>.service-desktop-workplace-cards>.mini-card:only-child)>.service-desktop-workplace-cards{flex:0 0 min(var(--mini-card-width,290px),100%);width:min(var(--mini-card-width,290px),100%)}
 }
 
 /* Desktop consumables use the same compact List frame for populated and
