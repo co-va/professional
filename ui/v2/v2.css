@@ -764,3 +764,11 @@
 @media (min-width:768px) and (min-height:600px){
  .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) [data-people-list-host]>.empty-state{border-radius:var(--radius-control,14px);overflow:hidden}
 }
+
+/* Shared Desktop form actions: reuse the approved H-tool dimensions without
+   changing the Mobile button contract or inline/menu/paired controls. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace :is(.form-grid>.ui-button[type="submit"],.profile-actions>.ui-button:only-child):not(.v2-confirmation-safe,.v2-confirmation-destructive){
+   box-sizing:border-box;width:160px;min-width:0;max-width:100%;height:var(--h-tools,36px);min-height:var(--h-tools,36px);max-height:var(--h-tools,36px);margin-inline:auto 0;justify-self:end;padding:0 12px;border-width:1px;border-radius:10px;font-size:13px;line-height:1;
+ }
+}
