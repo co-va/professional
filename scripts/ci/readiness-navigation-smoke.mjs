@@ -131,3 +131,27 @@ assert.match(personalAccountSource, /export async function openPersonalAccountFo
 assert.doesNotMatch(personalAccountSource, /export async function getPersonProgramChoices\(/,
   'Automatic Personal Account must not export a manual assignment workflow');
 console.log('Person assignment: automatic Personal Account excluded, Loyalty remains accessible PASS');
+
+
+// Desktop F/E navigation discards previous Z layers without Back callbacks.
+const stackSource = readFileSync('ui/v2/z-stack.js', 'utf8');
+const disposeStackSource = stackSource.match(/export function disposeV2ZStack\(app\) \{[\s\S]*?\n\}/)?.[0];
+assert.ok(disposeStackSource);
+const disposalOrder = [];
+let remainingLayers = [];
+const layer1 = { v2Dispose() { disposalOrder.push('Z2'); remainingLayers = remainingLayers.filter(layer => layer !== this); }, v2Close() { assert.fail('Back callback must not run'); } };
+const layer2 = { v2Dispose() { disposalOrder.push('Z3'); remainingLayers = remainingLayers.filter(layer => layer !== this); }, v2Close() { assert.fail('Back callback must not run'); } };
+remainingLayers = [layer1, layer2];
+const front = { querySelectorAll: () => remainingLayers };
+const mockApp = { querySelector: () => front, classList: { toggle: (name, active) => { assert.equal(name, 'has-z-layer'); assert.equal(active, false); } } };
+let syncedStack = false;
+const disposeStack = runInNewContext(disposeStackSource.replace('export ', '') + '\ndisposeV2ZStack', { syncV2ZStackInteraction: (app, host) => { assert.equal(app, mockApp); assert.equal(host, front); assert.equal(remainingLayers.length, 0); syncedStack = true; } });
+disposeStack(mockApp);
+assert.deepEqual(disposalOrder, ['Z3', 'Z2']);
+assert.ok(syncedStack);
+const desktopReset = source.match(/function resetDesktopNavigationStack\(\) \{[\s\S]*?\n\}/)?.[0];
+assert.ok(desktopReset);
+assert.match(desktopReset, /if \(!isV2DesktopWorkspace\(shell\)\) return;/);
+assert.match(source, /if \(!sectionAllowed\(next\)\) return;\s*resetDesktopNavigationStack\(\);/);
+assert.match(source, /function selectSecondary\(id\)[\s\S]*?resetDesktopNavigationStack\(\);\s*renderWorkspace\(\);/);
+console.log('Desktop F/E navigation stack disposal PASS');

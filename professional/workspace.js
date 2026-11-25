@@ -32,6 +32,7 @@ import { setThemeColor } from '../ui/viewport/index.js';
 import { isV2DesktopWorkspace, V2_DESKTOP_MEDIA } from '../ui/v2/geometry.js';
 import { syncV2YPlacement } from '../ui/v2/y.js';
 import { syncV2DesktopZTitle } from '../ui/v2/z-layout.js';
+import { disposeV2ZStack } from '../ui/v2/z-stack.js';
 
 configureWorkplaceSource(getWorkplaceEntities);
 configureTimeUsageSource(getJournalTimeUsages);
@@ -214,10 +215,18 @@ function setNavigationOpen(open) {
   setV2DeckOpen(app, state.navigationOpen);
 }
 
+function resetDesktopNavigationStack() {
+  const shell = app.querySelector(':scope > [data-v2-app].v2-app--workspace');
+  if (!isV2DesktopWorkspace(shell)) return;
+  disposeV2ZStack(shell);
+  state.navigationEnterZ = false;
+}
+
 function navigate(section, { navigationOpen = state.navigationOpen, updateHash = true, chatPersonKey = '' } = {}) {
   if (!workspaceReady) return;
   const next = normalizeRequestedSection(section);
   if (!sectionAllowed(next)) return;
+  resetDesktopNavigationStack();
   if (next === 'chat') {
     if (state.activeSection !== 'chat') state.lastRootSection = activeRootSection();
     state.activeSection = 'chat';
@@ -244,6 +253,7 @@ function selectSecondary(id) {
   state.navigationOpen = false;
   state.navigationLevel = 'f';
   state.navigationEnterZ = true;
+  resetDesktopNavigationStack();
   renderWorkspace();
   history.replaceState({}, '', `#${section}`);
 }
