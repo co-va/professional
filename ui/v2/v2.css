@@ -529,14 +529,14 @@
  .people-desktop-tools>.field{flex:1 1 180px;max-width:300px;width:auto;min-width:140px}
  .people-desktop-actions--right{margin-left:auto}
  .people-desktop-actions .ui-button{background:#E0D6D6;color:#41484F;border-color:#E0D6D6}
- .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact :is(th,td):nth-child(n+5){
+ .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact :is(th,td)::is(:nth-child(3),:nth-child(4)){
    box-sizing:border-box;width:110px;min-width:110px;max-width:110px;text-align:center;padding:4px 6px;
  }
- .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact th:nth-child(n+5){
+ .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact th::is(:nth-child(3),:nth-child(4)){
    font-size:11px;line-height:1.2;letter-spacing:0;
  }
- .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact th:nth-child(n+5)>span{display:block;white-space:nowrap}
- .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact td:nth-child(n+5){font-variant-numeric:tabular-nums;white-space:nowrap}
+ .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact th::is(:nth-child(3),:nth-child(4))>span{display:block;white-space:nowrap}
+ .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact td::is(:nth-child(3),:nth-child(4)){font-variant-numeric:tabular-nums;white-space:nowrap}
 }
 
 /* Contacts Desktop: approved compact action card, using the existing X portal.
@@ -578,4 +578,27 @@
  .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) [data-people-list-host]>.ui-data-table--compact thead th{
    position:sticky;top:0;z-index:2;background:#E0D6D6;
  }
+}
+
+/* One contact cell, two unchanged visit columns, compact rounded Contacts X. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .people-table-person{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;width:100%;min-width:0;line-height:1.15}
+ .people-table-person__name{font-size:13px;font-weight:650;overflow-wrap:anywhere}
+ .people-table-person__code{font-weight:500;color:#41484F}
+ .people-table-person__phone{font-size:12px;font-weight:400;color:var(--text-secondary);white-space:nowrap;font-variant-numeric:tabular-nums}
+ .people-sort-popup .people-action-menu>.ui-button[aria-pressed="true"]{font-weight:750;background:var(--surface-soft);border-radius:8px}
+ .v2-app--workspace>.v2-layer-portal.is-anchored>.v2-layer-backdrop>.v2-layer--bottom.people-filter-popup{padding:16px}
+ .people-filter-popup [data-people-filter-fields]>.form-grid{gap:8px}
+ .people-filter-popup [data-people-filter-fields] .field.ui-select:has(>span){display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);align-items:center;gap:10px}
+ .people-filter-popup [data-people-filter-fields] .field>span{font-size:13px;color:#41484F;line-height:1.2}
+ .people-filter-popup .ui-select__control{height:34px;min-height:34px;max-height:34px;border-radius:8px;font-size:13px;padding:0 23px 0 9px}
+ .people-filter-popup .ui-select__selection,.people-filter-popup .ui-select__text,.people-filter-popup .ui-select__value{justify-content:flex-start;text-align:left;font-size:13px}
+ .people-filter-popup [data-people-filter-actions]:not([hidden]){margin-top:12px}
+ .people-filter-popup [data-people-filter-action]{height:36px;min-height:36px;border-radius:10px;font-size:13px}
+ .people-filter-popup [hidden]{display:none!important}
+ .people-filter-selector .ui-selector__wheel{border:0;border-radius:10px}
+ .people-filter-selector .ui-selector__viewport{padding:0 4px}
+ .people-filter-selector .ui-selector__option{height:auto;min-height:36px;max-height:none;justify-content:flex-start;font-size:13px;text-align:left;padding:8px}
+ .people-filter-selector .ui-selector__option-main{text-align:left}
+ .people-filter-selector .ui-selector__option.is-current{background:var(--surface-soft);border-radius:8px}
 }

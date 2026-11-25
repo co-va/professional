@@ -62,7 +62,8 @@ function mountV2ModalPortal(host, app = null, kind = 'standard', anchor = null) 
     portal.classList.toggle('is-anchored', anchored);
     if (anchored) {
       const gap = 6;
-      const width = Math.min(Math.max(anchorRect.width, 240), 380, Math.max(0, appRect.width - 16));
+      const preferredWidth = anchor.matches('[data-people-desktop-filter]') ? 360 : 240;
+      const width = Math.min(Math.max(anchorRect.width, preferredWidth), 380, Math.max(0, appRect.width - 16));
       const left = Math.max(8, Math.min(anchorRect.left - appRect.left, appRect.width - width - 8));
       const below = Math.max(0, appRect.bottom - anchorRect.bottom - gap - 8);
       const above = Math.max(0, anchorRect.top - appRect.top - gap - 8);

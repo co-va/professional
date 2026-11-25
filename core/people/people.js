@@ -490,9 +490,7 @@ function desktopPeopleTable(root, items, visitIndex) {
   const check = (data, aria, checked) => `<label class="ui-compact-check">${checkControl({ data, aria, checked })}</label>`;
   const columns = [
     { key: 'select', label: '', narrow: true, sortable: false, header: () => check('data-people-select-all', 'Выбрать все видимые контакты', allSelected), render: row => check(`data-people-select="${escapeHtml(row.key)}"`, `Выбрать ${row.name}`, selected.has(row.key)) },
-    { key: 'code', label: 'Код', sortable:false },
-    { key: 'name', label: 'Имя Фамилия', sortable:false, render: row => `<button type="button" data-person="${escapeHtml(row.key)}">${escapeHtml(row.name)}</button>` },
-    { key: 'phone', label: 'Телефон', sortable: false },
+    { key: 'name', label: 'Клиент', sortable:false, render: row => `<button type="button" class="people-table-person" data-person="${escapeHtml(row.key)}"><span class="people-table-person__name">${row.code ? `<span class="people-table-person__code">${escapeHtml(row.code)}</span> ` : ''}${escapeHtml(row.name)}</span>${row.phone ? `<span class="people-table-person__phone">${escapeHtml(row.phone)}</span>` : ''}</button>` },
     { key: 'firstVisit', label: 'Первое посещение', sortable: false, header: () => '<span>Первое</span><span>посещение</span>', render: row => escapeHtml(row.firstVisit ? formatPersonVisitDate(row.firstVisit) : '') },
     { key: 'lastVisit', label: 'Последнее посещение', sortable:false, header: () => '<span>Последнее</span><span>посещение</span>', render: row => escapeHtml(row.lastVisit ? formatPersonVisitDate(row.lastVisit) : '') },
   ];
@@ -628,6 +626,19 @@ export function renderPeople(root, options = {}) {
 }
 
 function openSortSettings(root, anchor = null) {
+  if (anchor && isV2DesktopWorkspace(root.closest('[data-v2-app]'))) {
+    const labels = {nameAsc:'Имя — А–Я',nameDesc:'Имя — Я–А',ueiAsc:'Код — по возрастанию',ueiDesc:'Код — по убыванию',lastAsc:'Посещение — сначала ранние',lastDesc:'Посещение — сначала недавние'};
+    const markup = '<div class="people-action-menu">' + sortOptions().map(option =>
+      button(escapeHtml(labels[option.value] || option.label), {variant:'secondary',data:`data-people-sort-choice="${escapeHtml(option.value)}" aria-pressed="${option.value === getPeopleSortMode()}"`})
+    ).join('') + '</div>';
+    const layer = mountModal(anchor,modal(markup,{title:'Сортировка',variant:'x',surface:'app',xRole:'action',className:'people-action-popup people-sort-popup'}));
+    layer?.querySelectorAll('[data-people-sort-choice]').forEach(node=>node.addEventListener('click',()=>{
+      setPeopleSortMode(node.dataset.peopleSortChoice);
+      layer.v2Close?.();
+      refreshPeopleList(root);
+    }));
+    return layer;
+  }
   const layer = mountModal(anchor || root, modal(`<div class="form-grid">${select({
     label: 'Сортировка',
     value: getPeopleSortMode(),
@@ -696,6 +707,7 @@ function peopleFilterFields(filters = {}) {
 }
 
 function openFilterSettings(root, anchor = null) {
+  const desktopMenu = Boolean(anchor && isV2DesktopWorkspace(root.closest('[data-v2-app]')));
   let applied = currentPeopleFilters();
   let draft = { ...applied };
   const hasFilters = (filters) => Object.values(filters).some(Boolean);
@@ -704,7 +716,7 @@ function openFilterSettings(root, anchor = null) {
     <div data-people-filter-fields>${peopleFilterFields(draft)}</div>
     <div class="modal-actions" data-people-filter-actions hidden>
       ${button('Применить', { data: 'data-people-filter-action' })}
-    </div>`, { title: 'Фильтр', variant: 'x', surface: 'app' }));
+    </div>`, { title: 'Фильтр', variant: 'x', surface: 'app', className: desktopMenu ? 'people-action-popup people-filter-popup' : '' }));
   if (!layer) return null;
   initDatePickers(layer);
   const action = layer.querySelector('[data-people-filter-action]');
