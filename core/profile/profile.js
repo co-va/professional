@@ -7,6 +7,7 @@ import { bindWorkplaceForm, workplaceForm } from './workplaces/workplaces.js';
 import { profileCardAppearance, profileCardFields, workplaceCardAppearance, workplaceCardFields, workplaceCardPhoto } from './card-presentation.js';
 import { getCardAppearanceTemplate, saveCardAppearanceTemplate } from '../../core/card-appearance-templates.js';
 import { loadProfileState } from './runtime.js';
+import { isV2DesktopWorkspace } from '../../ui/v2/geometry.js';
 
 const EXPERIENCES=['Без опыта','До 1 года','1–3 года','3–5 лет','5–10 лет','10–15 лет','15–20 лет','Более 20 лет'];
 const fullName=p=>[p.name,p.surname].filter(Boolean).join(' ')||'Ваш профиль';
@@ -295,9 +296,10 @@ function renderProfile(root,navigateBack,options={}){
   const workplacesAllowed=canUseCapability('workplaces.access');
   const workplaceOnly=options.desktopPart==='workplaces';
   const profileOnly=options.desktopPart==='profile';
+  const desktopOverview=isV2DesktopWorkspace(root.closest('[data-v2-app]'))&&!profileOnly&&!workplaceOnly;
   root.innerHTML=page([
-    workplaceOnly?workspaceHeaderContext({title:'Рабочие пространства',v:{data:'data-profile-settings',aria:'Настройки'}}):profileContext(p,profileOnly?'Профиль':fullName(p)),
-    workplaceOnly?'':profileCard(p),
+    workplaceOnly?workspaceHeaderContext({title:'Рабочие пространства',v:{data:'data-profile-settings',aria:'Настройки'}}):profileContext(p,desktopOverview||profileOnly?'Профиль':fullName(p)),
+    workplaceOnly?'':desktopOverview?v2Section('Профиль',profileCard(p)):profileCard(p),
     workplacesAllowed&&!profileOnly?(workplaceOnly?workplaceRail():v2Section('Рабочие пространства',workplaceRail())):'',
     workplacesAllowed&&!profileOnly?rootAddSource():''
   ]);
