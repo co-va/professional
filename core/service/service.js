@@ -1,5 +1,6 @@
 import {
   button,
+  compactButton,
   emptyState,
   initViewNavigation,
   openSharedProfileSettingsMenu,
@@ -106,9 +107,12 @@ export function renderService(root, navigateBack = () => {}) {
     // surface geometry or introduce a second header inside the Z body.
     const navMarkup = viewNavigation({ views, activeView: view, ariaLabel: 'Сервис' });
     const toolbar = desktop ? `<div class="v2-desktop-tool-row" data-service-desktop-toolbar>
-      <div class="v2-desktop-tool-actions">
+      <div class="v2-desktop-tool-context">
         ${navMarkup}
-        ${actions.map(action => button(action.label, { variant: 'secondary', data: `data-service-tool="${action.id}"` })).join('')}
+        ${compactButton({ kind: 'group', data: 'data-service-tool="grouping" title="Группы"', aria: 'Группы' })}
+      </div>
+      <div class="v2-desktop-tool-actions">
+        ${actions.filter(action => action.id !== 'grouping').map(action => button(action.label, { variant: 'secondary', data: `data-service-tool="${action.id}"` })).join('')}
         ${button('<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>', { variant: 'secondary', className: 'v2-desktop-tool-primary', data: 'data-service-add', aria: addAria })}
       </div>
     </div>` : navMarkup;
