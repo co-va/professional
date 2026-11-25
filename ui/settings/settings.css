@@ -197,3 +197,7 @@
  .v2-app--workspace .modal--form-sheet>form:is([data-telegram-integration-form],[data-email-integration-form])>.muted:empty{display:none}
  .v2-app--workspace .modal--form-sheet>form:is([data-telegram-integration-form],[data-email-integration-form])>.ui-button[type="submit"]{order:2;align-self:flex-end;flex:none;margin-top:auto}
 }
+
+/* New document: use the canonical H toolbar; form contains only document content. */
+.documents-new-toolbar .ui-compact-check__label{color:var(--white)}
+.documents-new-toolbar [data-new-document-save][hidden]{display:none!important}

@@ -27,6 +27,7 @@ import {
   workspaceHeaderContext,
 } from '../../ui/ui.js';
 import { readOnlyReceipt } from '../../ui/receipt/index.js';
+import { compactCheck } from '../../ui/selection/check-list.js';
 import { escapeHtml } from '../../ui/utils/escape-html.js';
 import { formatPhone, phonesMatch } from '../../core/phone/index.js';
 import { getAllPeople } from '../../core/people/data.js';
@@ -680,8 +681,18 @@ function signableSetting(checked = false) {
 function renderNewDocumentEditor(layer, root, draft = {}) {
   let signable = Boolean(draft.signable);
   const attachment = draft.attachment || null;
+  const desktop = root.hasAttribute('data-settings-embedded');
+  const saveButton = button('Сохранить', {
+    className: desktop ? 'v2-desktop-tool-accent' : '',
+    data: 'data-new-document-save' + (desktop ? ' hidden' : ''),
+    aria: 'Сохранить документ',
+  });
+  const toolbar = desktop ? `<div class="v2-desktop-tool-row documents-new-toolbar"><div class="v2-desktop-tool-actions">
+    ${compactCheck({label:'Для подписания',checked:signable,data:'data-document-signable',aria:'Разрешить использовать документ для подписания'})}
+    ${saveButton}
+  </div></div>` : '';
   layer.innerHTML = page([
-    headerContext('Новый документ'),
+    desktop ? workspaceHeaderContext({title:'Новый документ'}) : headerContext('Новый документ'),
     attachment ? documentTiles([
       documentTile({
         title: draft.title || attachment.fileName || 'PDF',
@@ -693,25 +704,30 @@ function renderNewDocumentEditor(layer, root, draft = {}) {
     `<form class="form-grid" data-new-document-form>
       ${field({ label: 'Название', name: 'documentTitle', value: draft.title || '', required: true, placeholder: 'Название документа' })}
       ${attachment ? '' : textareaField({ label: 'Текст документа', name: 'documentText', value: draft.text || '', rows: 16, placeholder: 'Текст документа' })}
-      ${signableSetting(signable)}
+      ${desktop ? '' : signableSetting(signable)}
     </form>`,
-    actionBlock(button('Сохранить', {
-      data: 'data-new-document-save',
-      aria: 'Сохранить документ',
-    })),
+    desktop ? '' : actionBlock(saveButton),
   ]);
-
   const form = layer.querySelector('[data-new-document-form]');
-  const primary = layer.querySelector('[data-new-document-save]');
-  const toggle = layer.querySelector('[data-document-signable]');
+  let tools = layer;
+  if (desktop) {
+    const [row] = setV2ZHeaderRows(layer,[toolbar],{desktopTitle:'Новый документ'});
+    if (row) tools = row;
+    else form?.insertAdjacentHTML('beforebegin',toolbar);
+  }
+  const primary = tools.querySelector('[data-new-document-save]');
+  const toggle = tools.querySelector('[data-document-signable]');
 
   const sync = () => {
     const title = String(form?.querySelector('[name="documentTitle"]')?.value || '').trim();
     const body = String(form?.querySelector('[name="documentText"]')?.value || '').trim();
-    setPrimaryVisible(primary, Boolean(title && (attachment || body)));
+    const valid = Boolean(title && (attachment || body));
+    if (desktop && primary) primary.hidden = !valid;
+    else setPrimaryVisible(primary, valid);
   };
 
-  toggle?.addEventListener('click', () => {
+  if (desktop) toggle?.addEventListener('change', () => { signable = toggle.checked; });
+  else toggle?.addEventListener('click', () => {
     signable = !signable;
     toggle.setAttribute('aria-pressed', signable ? 'true' : 'false');
     toggle.classList.toggle('is-on', signable);
@@ -736,7 +752,7 @@ function renderNewDocumentEditor(layer, root, draft = {}) {
     renderMain(root);
   });
 
-  bindSettings(layer, root);
+  if (!desktop) bindSettings(layer, root);
   sync();
 }
 
