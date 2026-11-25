@@ -57,12 +57,12 @@ function actionControl(slot = {}, role = '') {
   return `<div class="v2-header__slot v2-header__slot--${role}"><button type="button" class="v2-header__control v2-header__control--${kind}${variantClass}"${dataAttributes(slot.data)} aria-label="${aria}"${slot.disabled ? ' disabled' : ''}>${body}${badge}</button></div>`;
 }
 
-export function v2Header({ a = null, b = '', c = null, d = null, desktopAccount = '', desktopContextRedundant = false } = {}) {
+export function v2Header({ a = null, b = '', c = null, d = null, desktopAccount = '', desktopContextRedundant = false, desktopToolbar = false, desktopContext = '', desktopProfileAllowed = false } = {}) {
   const title = titleControl(b);
   const headerClasses = ['v2-header', c && !c.hidden ? 'has-c' : '', d && !d.hidden ? 'has-d' : ''].filter(Boolean).join(' ');
   return `<header class="${headerClasses}" data-v2-header${desktopContextRedundant ? ' data-v2-desktop-context-redundant' : ''}>
     ${avatarControl(a)}
-    ${desktopAccount ? `<span class="v2-header__desktop-account">${text(desktopAccount)}</span>` : ''}
+    ${desktopToolbar ? `<div class="v2-desktop-toolbar-context"><span>Кабинет</span><span class="v2-desktop-toolbar-divider">/</span><span>${text(desktopContext)}</span></div><div class="v2-desktop-toolbar-user">${desktopProfileAllowed ? `<button type="button" data-desktop-profile>${text(desktopAccount)}</button>` : `<span>${text(desktopAccount)}</span>`}<button type="button" data-desktop-notices aria-label="Уведомления"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18s-3-2-3-9"></path><path d="M10 21h4"></path></svg></button><button type="button" data-desktop-logout aria-label="Выйти из аккаунта"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><path d="m16 17 5-5-5-5"></path><path d="M21 12H9"></path></svg></button></div>` : desktopAccount ? `<span class="v2-header__desktop-account">${text(desktopAccount)}</span>` : ''}
     ${title}
     ${actionControl(c, 'c')}
     ${actionControl(d, 'd')}

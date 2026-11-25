@@ -9,7 +9,9 @@ import { getWorkplaceContext, setWorkplaceContext } from '../core/workplace-cont
 import { getWorkplaces } from '../core/workplace-time.js';
 import { localDateKey } from '../core/time/index.js';
 import { settingsNavigationItems, renderSettingsSection } from '../settings/settings.js';
-import { render as renderProfile } from '../core/profile/profile.js';
+import { render as renderProfile, openDesktopProfileQ } from '../core/profile/profile.js';
+import { logout } from '../core/auth.js';
+import { openAccountControlsModal } from '../core/profile/account-controls.js';
 import { getProfile } from '../core/profile/data.js';
 import { renderChat } from '../chat/chat.js';
 import { getWorkplaces as getWorkplaceEntities } from '../core/profile/workplaces/data.js';
@@ -116,7 +118,7 @@ function ensureServerSync() {
   startProfessionalServerSync({ initialRefresh: false, getActiveScopes: () => {
     if (state.activeSection === 'journal') return ['business'];
     if (state.activeSection === 'people') return ['business', 'documents'];
-    if (state.activeSection === 'profile') return ['profile'];
+    if (state.activeSection === 'profile' || state.activeSection === 'workplaces') return ['profile'];
     if (state.activeSection === 'finance') return ['finance'];
     if (state.activeSection === 'settings') return ['documents'];
     if (state.activeSection === 'loyalty') return ['business'];
@@ -137,6 +139,7 @@ function sectionAllowed(section) {
       .some((key) => canUseCapability(key));
   }
   if (section === 'profile') return canUseCapability('profile.access');
+  if (section === 'workplaces') return canUseCapability('workplaces.access');
   if (section === 'finance' || section === 'inventory' || section === 'loyalty' || section === 'settings') {
     return secondaryItems(section).length > 0;
   }
@@ -149,14 +152,16 @@ function allowedSections() {
 }
 
 function rootDisplayLabel(section) {
+  if (section === 'workplaces') return 'Рабочие пространства';
   const definition = rootDefinition(section);
   if (!definition) return '';
   const children = secondaryItems(section);
   return children.length === 1 ? children[0].label : definition.label;
 }
 
-function allowedRootItems() {
-  return ROOT_SECTIONS
+function allowedRootItems(wide = false) {
+  const sections = wide ? ROOT_SECTIONS.map(item => item.id === 'profile' ? { id:'workplaces' } : item) : ROOT_SECTIONS;
+  return sections
     .filter((item) => sectionAllowed(item.id))
     .map(({ id }) => {
       const children = secondaryItems(id);
@@ -174,7 +179,11 @@ function defaultSection() {
 }
 
 function normalizeRequestedSection(section) {
-  return String(section || '').trim();
+  const id = String(section || '').trim();
+  const wide = window.matchMedia?.(V2_DESKTOP_MEDIA).matches;
+  if (wide && id === 'profile' && sectionAllowed('workplaces')) return 'workplaces';
+  if (!wide && id === 'workplaces') return 'profile';
+  return id;
 }
 function activeRootSection() {
   return state.activeSection === 'chat' ? state.lastRootSection : state.activeSection;
@@ -336,10 +345,13 @@ function syncWorkspaceHeader(surface) {
     : workspaceProfileASlot();
 
   const accountSlot = workspaceProfileASlot();
-  header.outerHTML = v2Header({
+  const markup = v2Header({
     a: isV2DesktopWorkspace(header.closest('[data-v2-app]')) ? accountSlot : aSlot,
     desktopAccount: accountSlot.label,
-    desktopContextRedundant: state.activeSection === 'journal' && contextRoot === surface && !subtitle && title === rootDisplayLabel(root),
+    desktopContextRedundant: false,
+    desktopToolbar: true,
+    desktopProfileAllowed: sectionAllowed('profile'),
+    desktopContext: state.activeSection === 'chat' ? 'Чат' : (root === 'workplaces' ? 'Рабочие пространства' : rootDisplayLabel(root)) + (root !== 'journal' && title && title !== rootDisplayLabel(root) ? ' / ' + title : ''),
     b: subtitle ? { label: title, subtitle } : title,
     c: cVisible ? {
       kind: 'text',
@@ -355,21 +367,35 @@ function syncWorkspaceHeader(surface) {
     } : null,
   });
 
-  app.querySelector('[data-v2-workspace-primary]')?.addEventListener('click', () => cSource?.click());
-  app.querySelector('[data-v2-workspace-chat]')?.addEventListener('click', () => {
+  // Keep the persistent header stable when context observers report the same state.
+  if (header.outerHTML !== markup) header.outerHTML = markup;
+  bindDesktopHeader(surface);
+  const primary = app.querySelector('[data-v2-workspace-primary]');
+  if (primary) primary.onclick = () => cSource?.click();
+  const chat = app.querySelector('[data-v2-workspace-chat]');
+  if (chat) chat.onclick = () => {
     if (dSource) {
       dSource.click();
       return;
     }
     if (state.activeSection === 'chat') navigate(state.lastRootSection, { navigationOpen: false });
     else navigate('chat', { navigationOpen: false });
-  });
+  };
+}
+
+function bindDesktopHeader(surface) {
+  const profile = app.querySelector('[data-desktop-profile]');
+  if (profile) profile.onclick = () => openDesktopProfileQ(surface, { accountEmail: authenticatedAccount?.account?.email || '', onSaved: () => syncWorkspaceHeader(surface) });
+  const notice = app.querySelector('[data-desktop-notices]');
+  if (notice) notice.onclick = () => openAccountControlsModal();
+  const exit = app.querySelector('[data-desktop-logout]');
+  if (exit) exit.onclick = () => logout();
 }
 
 async function ensureWorkspaceState(section) {
   const secondary = section === 'finance' || section === 'settings' ? ensureSecondary(section) : '';
   const tasks = [];
-  if (section === 'journal' || section === 'profile' || section === 'people' || section === 'service' || section === 'settings') tasks.push(loadProfileState());
+  if (section === 'journal' || section === 'profile' || section === 'workplaces' || section === 'people' || section === 'service' || section === 'settings') tasks.push(loadProfileState());
   if (section === 'journal' || section === 'people' || section === 'loyalty') tasks.push(loadBusinessState());
   if (section === 'journal') tasks.push(loadOperationalState());
   if (section === 'service') tasks.push(loadOperationalState({ full: true }));
@@ -479,7 +505,9 @@ function bindDesktopCalendar(shell) {
 
 async function renderActiveWorkspaceSurface(surface, calendarSync = () => {}) {
   const section = state.activeSection;
+  const version = workspaceRenderVersion;
   await ensureWorkspaceState(section);
+  if (version !== workspaceRenderVersion || !surface.isConnected) return null;
   ensureServerSync();
   const openNavigation = () => setNavigationOpen(true);
   if (section === 'people') return renderPeople(surface, {
@@ -495,17 +523,20 @@ async function renderActiveWorkspaceSurface(surface, calendarSync = () => {}) {
       initialView: state.journalView || 'day',
       onCalendarContextChange: (context) => {
         const previous = state.desktopCalendarContext;
+        const dateChanged = !previous || localDateKey(previous.date) !== localDateKey(context.date);
+        const workplaceChanged = !previous || previous.workplaceId !== context.workplaceId;
         state.desktopCalendarContext = context;
-        if (!previous || localDateKey(previous.date) !== localDateKey(context.date)) state.desktopCalendarMonth = context.date;
-        calendarSync();
+        if (dateChanged) state.desktopCalendarMonth = context.date;
+        if (dateChanged || workplaceChanged) calendarSync();
       },
       onViewChange: (view) => {
         state.journalView = view;
       },
     });
   }
-  if (section === 'profile') return renderProfile(surface, openNavigation, {
+  if (section === 'profile' || section === 'workplaces') return renderProfile(surface, openNavigation, {
     accountEmail: authenticatedAccount?.account?.email || '',
+    desktopPart: section === 'workplaces' ? 'workplaces' : '',
   });
   if (section === 'service') {
     const { renderService } = await import('../core/service/service.js');
@@ -533,11 +564,12 @@ function renderWorkspace() {
     return;
   }
   const requested = normalizeRequestedSection(state.activeSection);
-  if (!sectionAllowed(requested)) state.activeSection = defaultSection();
+  state.activeSection = sectionAllowed(requested) ? requested : defaultSection();
   if (state.activeSection !== 'chat') state.lastRootSection = state.activeSection;
 
   const root = activeRootSection();
-  const rootItems = allowedRootItems();
+  const wide = window.matchMedia?.(V2_DESKTOP_MEDIA).matches;
+  const rootItems = allowedRootItems(wide);
   const childItems = secondaryItems(root);
   const childActive = ensureSecondary(root);
   const rootDeck = v2CardDeck(rootItems, {
@@ -559,7 +591,10 @@ function renderWorkspace() {
   const headerMarkup = v2Header({
     a: accountSlot,
     desktopAccount: accountSlot.label,
-    desktopContextRedundant: state.activeSection === 'journal',
+    desktopContextRedundant: false,
+    desktopToolbar: true,
+    desktopProfileAllowed: sectionAllowed('profile'),
+    desktopContext: state.activeSection === 'chat' ? 'Чат' : rootDisplayLabel(root),
     b: state.activeSection === 'chat' ? 'Чат' : rootDisplayLabel(root),
     d: sectionAllowed('chat') ? { kind: 'chat', data: 'data-v2-workspace-chat', aria: 'Чат' } : null,
   });
@@ -620,6 +655,7 @@ function renderWorkspace() {
   let disposed = false;
   const renderVersion = ++workspaceRenderVersion;
 
+  bindDesktopHeader(surface);
   app.querySelector('[data-v2-workspace-chat]')?.addEventListener('click', () => navigate('chat', { navigationOpen: false }));
 
   if (shell) disposers.push(initV2WorkspaceInteraction(shell, {
@@ -646,10 +682,7 @@ function renderWorkspace() {
 
   const onV2ContextChanged = () => syncWorkspaceHeader(surface);
   const wideMedia = typeof window.matchMedia === 'function' ? window.matchMedia(V2_DESKTOP_MEDIA) : null;
-  const onPresentationChange = () => {
-    onV2ContextChanged();
-    if (state.activeSection === 'people') surface?.peopleRefreshPresentation?.();
-  };
+  const onPresentationChange = () => renderWorkspace();
   wideMedia?.addEventListener?.('change', onPresentationChange);
   disposers.push(() => wideMedia?.removeEventListener?.('change', onPresentationChange));
   window.addEventListener('va-tools:v2-context-changed', onV2ContextChanged);

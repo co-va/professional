@@ -290,16 +290,30 @@ function rootAddSource(){
 }
 
 function renderProfile(root,navigateBack,options={}){
+  if(!root?.isConnected)return;
   const p=getProfile();
   const workplacesAllowed=canUseCapability('workplaces.access');
+  const workplaceOnly=options.desktopPart==='workplaces';
+  const profileOnly=options.desktopPart==='profile';
   root.innerHTML=page([
-    profileContext(p),
-    profileCard(p),
-    workplacesAllowed?v2Section('Рабочие пространства',workplaceRail()):'',
-    workplacesAllowed?rootAddSource():''
+    workplaceOnly?workspaceHeaderContext({title:'Рабочие пространства',v:{data:'data-profile-settings',aria:'Настройки'}}):profileContext(p,profileOnly?'Профиль':fullName(p)),
+    workplaceOnly?'':profileCard(p),
+    workplacesAllowed&&!profileOnly?(workplaceOnly?workplaceRail():v2Section('Рабочие пространства',workplaceRail())):'',
+    workplacesAllowed&&!profileOnly?rootAddSource():''
   ]);
   root.querySelector('[data-profile-settings]')?.addEventListener('click',()=>openProfileSettings(root,navigateBack,options));
   root.querySelector('[data-profile-card]')?.addEventListener('click',()=>openProfileData(root,navigateBack,options));
   root.querySelector('[data-add-workplace]')?.addEventListener('click',()=>openWorkplace(root,null,navigateBack,options));
   root.querySelectorAll('[data-workplace]').forEach(el=>el.addEventListener('click',()=>openWorkplace(root,getWorkplaces().find(w=>w.key===el.dataset.workplace)||null,navigateBack,options)));
+}
+
+// Desktop account entry uses the existing profile data/card/settings in Q.
+export function openDesktopProfileQ(root,options={}){
+  if(!canUseCapability('profile.access'))return null;
+  const layer=mountModal(root,modal('<div data-desktop-profile-content></div>',{title:'Профиль',variant:'q',surface:'app'}));
+  const host=layer?.querySelector('[data-desktop-profile-content]');
+  if(!host)return layer;
+  const refresh=()=>{if(host.isConnected)renderProfile(host,refresh,{...options,desktopPart:'profile'});options.onSaved?.();};
+  refresh();
+  return layer;
 }

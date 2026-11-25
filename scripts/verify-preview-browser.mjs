@@ -12,12 +12,13 @@ try {
   page.on('requestfailed',r=>{if(!isApi(r.url()))errors.push(r.url()+' '+r.failure()?.errorText);});
   page.on('response',r=>{if(r.status()>=400&&!isApi(r.url()))errors.push(r.status()+' '+r.url());});
   page.on('pageerror',e=>errors.push(e.message));
+  page.on('console',message=>{if(message.type()==='error')console.log('BROWSER ERROR:',message.text());});
   // All account calls are synthetic. Never send a real token or mutate Core.
   await page.route('**/*',r=>{
     const url=new URL(r.request().url());
     if(isApi(url.href)) {
       const body=url.pathname.endsWith('/auth/me')?{account:{id:'preview-smoke',email:'preview@example.invalid'},tenantId:'preview-smoke'}:
-        url.pathname.endsWith('/saas-access/me')?{tenantId:'preview-smoke',status:'ACTIVE',commercialMode:'LIVE',capabilities:['profile.access','journal.day.access'].map(key=>({key,valueType:'BOOLEAN',enabled:true}))}:{};
+        url.pathname.endsWith('/saas-access/me')?{tenantId:'preview-smoke',status:'ACTIVE',commercialMode:'LIVE',capabilities:['profile.access','workplaces.access','journal.day.access'].map(key=>({key,valueType:'BOOLEAN',enabled:true}))}:{};
       return r.fulfill({status:200,contentType:'application/json',body:JSON.stringify(body)});
     }
     if(url.origin!==new URL(target).origin) return r.abort();
@@ -39,7 +40,10 @@ try {
   const journalBody=surface.locator(':scope > [data-v2-z-body]');
   assert.equal(await journalBody.evaluate(node=>getComputedStyle(node).borderTopLeftRadius),'34px','Journal retains full Z body');
   assert.equal((await geometry()).background,'rgb(47, 51, 56)','Journal controls on H');
-  await page.evaluate(()=>{location.hash='profile';});
+  assert.equal(await shell.locator('[data-v2-root-item="profile"]').count(),0,'Desktop F excludes Profile');
+  assert.equal(await shell.locator('[data-v2-root-item="workplaces"]').count(),1,'Desktop F includes workplaces');
+  assert.equal(await shell.locator('[data-desktop-profile]').isVisible(),true,'Profile in right toolbar');
+  await page.evaluate(()=>{location.hash='workplaces';});
   await page.waitForFunction(()=>document.querySelector('.v2-app--workspace')?.dataset.v2DesktopSurface==='list');
   assert.deepEqual(await geometry(),{background:'rgb(47, 51, 56)',radius:'0px'},'Desktop profile is on H, not white Z');
   await page.setViewportSize({width:390,height:844});

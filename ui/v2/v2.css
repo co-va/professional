@@ -440,3 +440,26 @@
  .v2-app--workspace[data-v2-desktop-surface="list"]>.v2-header .v2-header__title{padding-left:10px}
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z{padding-top:20px}
 }
+
+/* Admin toolbar geometry and session controls; desktop only. Keep A at left temporarily. */
+.v2-desktop-toolbar-context,.v2-desktop-toolbar-user{display:none}
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace>.v2-header{height:68px;min-height:68px;flex:0 0 68px;padding:0 32px 0 16px;grid-template-columns:48px calc(var(--v2-desktop-sidebar-width) - 96px) minmax(0,1fr) auto auto auto;gap:10px}
+ .v2-app--workspace>.v2-header>.v2-header__title{display:none!important}
+ .v2-app--workspace>.v2-header>.v2-desktop-toolbar-context{display:flex;grid-column:3;grid-row:1;align-items:center;gap:9px;color:#D1D4D6;font-size:13px;white-space:nowrap;min-width:0;overflow:hidden}
+ .v2-desktop-toolbar-context>span:last-child{color:var(--white);font-weight:650;overflow:hidden;text-overflow:ellipsis}
+ .v2-desktop-toolbar-divider{color:var(--text-muted)}
+ .v2-app--workspace>.v2-header>.v2-desktop-toolbar-user{display:flex;grid-column:6;grid-row:1;align-items:center;gap:10px;color:#D1D4D6;font-size:12px;min-width:0}
+ .v2-desktop-toolbar-user>button{border:0;background:transparent;color:inherit;cursor:pointer;font:inherit}
+ .v2-desktop-toolbar-user>button[data-desktop-profile]{padding:0;white-space:nowrap;max-width:180px;overflow:hidden;text-overflow:ellipsis}
+ .v2-desktop-toolbar-user>button:not([data-desktop-profile]){box-sizing:border-box;display:grid;place-items:center;flex:0 0 36px;width:36px;height:36px;padding:0;border-radius:10px;color:var(--white)}
+ .v2-desktop-toolbar-user>button svg{display:block;width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+ .v2-desktop-toolbar-user>button:hover{background:rgba(255,255,255,.09)}
+ .v2-app--workspace>.v2-header>.v2-header__slot--c{grid-column:4;grid-row:1}
+ .v2-app--workspace>.v2-header>.v2-header__slot--d{grid-column:5;grid-row:1}
+}
+@media (min-width:768px) and (max-width:1024px) and (min-height:600px){
+ .v2-app--workspace>.v2-header{padding-right:12px;gap:6px;grid-template-columns:48px calc(var(--v2-desktop-sidebar-width) - 82px) minmax(0,1fr) auto auto auto}
+ .v2-desktop-toolbar-user>button[data-desktop-profile]{max-width:120px}
+ .v2-app--workspace>.v2-header>.v2-desktop-toolbar-user{gap:4px}
+}
