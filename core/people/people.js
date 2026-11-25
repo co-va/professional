@@ -56,7 +56,7 @@ import { openPeopleExcelMenu } from './excel.js';
 import { openContactImportBatches } from './contact-import-review.js';
 import { personCardAppearance, personCardFields } from './card-presentation.js';
 import { getCurrentPersonHistory, getPersonHistory } from './history.js';
-import { getPersonMetadata, formatPersonVisitDate } from './metadata.js';
+import { getPersonMetadata, formatPersonVisitDate, buildPersonVisitIndex } from './metadata.js';
 import { checkControl } from '../../ui/selection/check-list.js';
 import { isV2DesktopWorkspace } from '../../ui/v2/geometry.js';
 import { getRecord, getRecords } from '../record/index.js';
@@ -81,7 +81,8 @@ function notifyContext() {
   window.dispatchEvent(new CustomEvent('va-tools:v2-context-changed'));
 }
 
-function sortItems(items, mode) {
+function sortItems(items, mode, visitIndex = null) {
+  const visits = mode.startsWith('last') ? (visitIndex || buildPersonVisitIndex()) : null;
   return [...items].sort((a, b) => {
     if (mode.startsWith('name')) {
       const compared = name(a).localeCompare(name(b), 'ru');
@@ -91,8 +92,8 @@ function sortItems(items, mode) {
       const compared = String(personDisplay(a).uei || '').localeCompare(String(personDisplay(b).uei || ''), 'ru', { numeric: true });
       return mode === 'ueiDesc' ? -compared : compared;
     }
-    const av = getPersonMetadata(a.key).lastVisit ? Date.parse(getPersonMetadata(a.key).lastVisit) : 0;
-    const bv = getPersonMetadata(b.key).lastVisit ? Date.parse(getPersonMetadata(b.key).lastVisit) : 0;
+    const av = Date.parse(visits?.get(String(a.key))?.lastVisit || '') || 0;
+    const bv = Date.parse(visits?.get(String(b.key))?.lastVisit || '') || 0;
     return mode === 'lastDesc' ? bv - av : av - bv;
   });
 }
@@ -484,7 +485,7 @@ function listMarkup(items, query = '') {
   }));
 }
 
-function desktopPeopleTable(root, items) {
+function desktopPeopleTable(root, items, visitIndex) {
   if (!items.length) return listMarkup(items, root.peopleSearchInput?.value || '');
   const selected = root.peopleSelectedKeys ||= new Set();
   const allSelected = items.every(person => selected.has(person.key));
@@ -494,16 +495,16 @@ function desktopPeopleTable(root, items) {
     { key: 'code', label: 'Код' },
     { key: 'name', label: 'Имя Фамилия', render: row => `<button type="button" data-person="${escapeHtml(row.key)}">${escapeHtml(row.name)}</button>` },
     { key: 'phone', label: 'Телефон', sortable: false },
-    { key: 'firstVisit', label: 'Первое посещение', sortable: false, render: row => escapeHtml(formatPersonVisitDate(row.firstVisit)) },
-    { key: 'lastVisit', label: 'Последнее посещение', render: row => escapeHtml(formatPersonVisitDate(row.lastVisit)) },
+    { key: 'firstVisit', label: 'Первое посещение', sortable: false, render: row => escapeHtml(row.firstVisit ? formatPersonVisitDate(row.firstVisit) : '') },
+    { key: 'lastVisit', label: 'Последнее посещение', render: row => escapeHtml(row.lastVisit ? formatPersonVisitDate(row.lastVisit) : '') },
     { key: 'edit', label: '', narrow: true, sortable: false, render: row => compactButton({ kind: 'settings', data: `data-people-edit="${escapeHtml(row.key)}"`, aria: `Редактировать ${row.name}` }) },
   ];
   const mode = getPeopleSortMode();
   const sortKey = mode.startsWith('name') ? 'name' : mode.startsWith('uei') ? 'code' : 'lastVisit';
   const rows = items.map(person => {
     const display = personDisplay(person);
-    const metadata = getPersonMetadata(person.key);
-    return { key: person.key, code: display.uei, name: display.name, phone: display.phone, firstVisit: metadata.firstVisit, lastVisit: metadata.lastVisit };
+    const metadata = visitIndex.get(String(person.key)) || {};
+    return { key: person.key, code: display.uei, name: display.name, phone: display.phone, firstVisit: metadata.firstVisit || '', lastVisit: metadata.lastVisit || '' };
   });
   return dataTable({ columns, rows, caption: 'Клиенты', compact: true, sortKey, descending: mode.endsWith('Desc') });
 }
@@ -541,9 +542,9 @@ function bindDesktopPeopleTable(root, host, items) {
   }));
 }
 
-function visiblePeople(root) {
+function visiblePeople(root, visitIndex = null) {
   const query = root.peopleSearchInput?.value || '';
-  return filterPeople(applyPeopleFilters(sortItems(getPeople(), getPeopleSortMode())), query);
+  return filterPeople(applyPeopleFilters(sortItems(getPeople(), getPeopleSortMode(), visitIndex)), query);
 }
 
 function refreshPeopleList(root) {
@@ -558,9 +559,10 @@ function refreshPeopleList(root) {
     return;
   }
   const query = root.peopleSearchInput?.value || '';
-  const items = visiblePeople(root);
   const desktop = isV2DesktopWorkspace(root.closest('[data-v2-app]'));
-  host.innerHTML = desktop ? desktopPeopleTable(root, items) : listMarkup(items, query);
+  const visitIndex = desktop ? buildPersonVisitIndex() : null;
+  const items = visiblePeople(root, visitIndex);
+  host.innerHTML = desktop ? desktopPeopleTable(root, items, visitIndex) : listMarkup(items, query);
   if (desktop) bindDesktopPeopleTable(root, host, items);
   host.querySelectorAll('[data-person]').forEach((node) => {
     node.addEventListener('click', () => openPersonOverview(root, node.dataset.person, root.peopleOptions || {}));

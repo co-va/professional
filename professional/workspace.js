@@ -339,7 +339,7 @@ function syncWorkspaceHeader(surface) {
   header.outerHTML = v2Header({
     a: isV2DesktopWorkspace(header.closest('[data-v2-app]')) ? accountSlot : aSlot,
     desktopAccount: accountSlot.label,
-    desktopContextRedundant: contextRoot === surface && !subtitle && title === rootDisplayLabel(root),
+    desktopContextRedundant: state.activeSection === 'journal' && contextRoot === surface && !subtitle && title === rootDisplayLabel(root),
     b: subtitle ? { label: title, subtitle } : title,
     c: cVisible ? {
       kind: 'text',
@@ -559,7 +559,7 @@ function renderWorkspace() {
   const headerMarkup = v2Header({
     a: accountSlot,
     desktopAccount: accountSlot.label,
-    desktopContextRedundant: state.activeSection !== 'chat',
+    desktopContextRedundant: state.activeSection === 'journal',
     b: state.activeSection === 'chat' ? 'Чат' : rootDisplayLabel(root),
     d: sectionAllowed('chat') ? { kind: 'chat', data: 'data-v2-workspace-chat', aria: 'Чат' } : null,
   });
@@ -684,6 +684,11 @@ function renderWorkspace() {
     syncWorkspaceHeader(surface);
   }).catch((error) => {
     console.error('Workspace UI render failed', error);
+    if (disposed || renderVersion !== workspaceRenderVersion || !surface?.isConnected) return;
+    if (isV2DesktopWorkspace(shell)) {
+      surface.innerHTML = '<div class="empty-state" data-workspace-load-error><strong>Не удалось открыть раздел</strong><span>Повторите попытку.</span><button type="button" class="ui-button" data-workspace-retry>Повторить</button></div>';
+      surface.querySelector('[data-workspace-retry]')?.addEventListener('click', () => renderWorkspace());
+    }
   });
   syncWorkspaceHeader(surface);
 
