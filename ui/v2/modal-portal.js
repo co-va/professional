@@ -411,6 +411,14 @@ export function mountV2Layer(html, { root = null } = {}) {
     onDismiss: () => node.v2Close?.(),
   });
   node.addEventListener('click', (event) => {
+    // Technical is mounted on document.body, outside the application portal.
+    // Only its own veil may dismiss it; clicks in the document must stay inside.
+    if (technical && event.target === node) {
+      event.preventDefault();
+      event.stopPropagation();
+      node.v2Close?.();
+      return;
+    }
     if (event.target.closest('[data-v2-layer-close]')) node.v2Close?.();
     if (qLayer && event.target.closest('[data-v2-z-dismiss], [data-v2-q-close]') && !requestBack()) node.v2Close?.();
   });
