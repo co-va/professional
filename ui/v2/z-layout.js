@@ -1,4 +1,5 @@
 import { v2ZDismissAffordance } from './z-affordance.js';
+import { isV2DesktopWorkspace } from './geometry.js';
 
 const Z_VIEWPORT_OVERSCAN = 'var(--v2-z-viewport-overscan)';
 // One geometry and one 12px spacing token for Z and Q.
@@ -167,4 +168,33 @@ export function syncV2DesktopZTitle(root, title = '') {
   const node = surface?.querySelector(':scope > [data-v2-z-header] > [data-h-title-row] > [data-h-title]');
   const next = String(title || '');
   if (node && node.textContent !== next) node.textContent = next;
+}
+
+/** Move an existing auxiliary form action into the fixed Desktop Q toolbar.
+ * Preserve the original node/listeners. Mobile and non-Q surfaces are no-ops.
+ * Primary save actions and contextual field controls stay with their owners.
+ */
+export function moveDesktopQTool(control) {
+  const sheet = control?.closest?.('.v2-layer--standard');
+  const body = control?.closest?.('[data-v2-q-body]');
+  if (!sheet || !body || !sheet.closest('[data-v2-q="true"]')
+      || !isV2DesktopWorkspace(sheet.closest('[data-v2-app]'))) return false;
+  const header = sheet.querySelector(':scope > [data-v2-q-header] > [data-v2-q-header-content]');
+  if (!header) return false;
+  let row = header.querySelector(':scope > .desktop-q-toolbar');
+  if (!row) {
+    const heading = header.querySelector(':scope > .v2-q-title');
+    if (!heading) return false;
+    const wrapper = header.ownerDocument.createElement('div');
+    wrapper.className = 'desktop-q-heading';
+    heading.replaceWith(wrapper);
+    wrapper.append(heading);
+    row = header.ownerDocument.createElement('div');
+    row.className = 'desktop-q-toolbar';
+    row.setAttribute('data-v2-layer-gesture-ignore', '');
+    header.append(row);
+    sheet.classList.add('desktop-q-fixed-tools');
+  }
+  row.append(control);
+  return true;
 }

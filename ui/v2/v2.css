@@ -839,3 +839,14 @@
 @media (min-width:768px) and (min-height:600px){
  .v2-app--workspace>.v2-layer-portal.is-anchored>.v2-layer-backdrop[data-v2-x-role="picker"]:has(>.v2-layer--bottom:is(.modal--time-picker-sheet,.modal--duration-picker-popover)){background:transparent}
 }
+
+/* Shared Desktop Q: auxiliary form actions belong to a fixed toolbar, not
+   the scrolling form or primary save footer. Opt in through moveDesktopQTool. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-q-fixed-tools>[data-v2-q-header]>[data-v2-q-header-content]{padding-right:0!important;gap:0!important}
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-q-fixed-tools .desktop-q-heading{flex:0 0 68px;min-height:68px;max-height:68px}
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-q-fixed-tools .desktop-q-toolbar{box-sizing:border-box;height:var(--h-list-tool-row,42px);min-height:var(--h-list-tool-row,42px);max-height:var(--h-list-tool-row,42px);flex:0 0 var(--h-list-tool-row,42px);justify-content:flex-end;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;scrollbar-width:none}
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-q-fixed-tools .desktop-q-toolbar::-webkit-scrollbar{display:none}
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-q-fixed-tools .desktop-q-toolbar>.ui-button{box-sizing:border-box;flex:0 0 auto;width:auto;height:var(--h-tools,36px);min-height:var(--h-tools,36px);max-height:var(--h-tools,36px);padding:0 12px;margin:0;border-width:1px;border-radius:10px;font-size:13px;line-height:1;white-space:nowrap}
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-q-fixed-tools>[data-v2-q-body]{padding-top:max(12px,calc(var(--v2-desktop-q-content-start) - var(--v2-desktop-q-header-height) - var(--h-list-tool-row,42px)))}
+}

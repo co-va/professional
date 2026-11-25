@@ -1,4 +1,5 @@
 import { modal, mountModal } from '../../ui/modals/index.js';
+import { moveDesktopQTool } from '../../ui/v2/z-layout.js';
 import { escapeHtml } from '../../ui/utils/escape-html.js';
 import { button } from '../../ui/buttons/index.js';
 import { collectCost, costField, initCostFields, validateCostDefinition, costListParts } from '../../ui/cost/index.js';
@@ -55,6 +56,9 @@ export function bindServiceWorkplaceAssignments(root, {
   const list = root.querySelector('[data-service-workplace-prices]');
   const addButton = root.querySelector('[data-service-workplace-add]');
   if (!list || !addButton) return { read: () => [] };
+  const addPanel = addButton.closest('.service-workplace-add-panel');
+  const desktopTool = moveDesktopQTool(addButton);
+  if (desktopTool && addPanel && !addPanel.children.length) addPanel.remove();
   const isProcedure = kind === 'procedure';
   // Preserve legacy assignments even if a workplace was archived or is
   // temporarily missing from the current list. Never erase them on Q Save.
@@ -246,7 +250,7 @@ export function bindServiceWorkplaceAssignments(root, {
   addButton.addEventListener('click', () => {
     const available = catalog.filter((space) => !assignments.has(space.id));
     if (!available.length) {
-      const layer = mountModal(document.body, modal('<div class="muted">Все рабочие пространства уже добавлены.</div>',
+      const layer = mountModal(desktopTool ? addButton : document.body, modal('<div class="muted">Все рабочие пространства уже добавлены.</div>',
         { variant: 'x', xRole: 'picker' }));
       return layer;
     }
@@ -256,7 +260,7 @@ export function bindServiceWorkplaceAssignments(root, {
       data: `data-service-workplace-choose="${escapeHtml(space.id)}"`,
       aria: `Выбрать ${space.name}`,
     })) });
-    const picker = mountModal(document.body, modal(content, { variant: 'x', xRole: 'picker', title: 'Рабочее пространство' }));
+    const picker = mountModal(desktopTool ? addButton : document.body, modal(content, { variant: 'x', xRole: 'picker', title: 'Рабочее пространство' }));
     picker?.querySelectorAll('[data-service-workplace-choose]').forEach((choice) => {
       choice.addEventListener('click', () => {
         const id = choice.dataset.serviceWorkplaceChoose;
