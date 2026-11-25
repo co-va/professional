@@ -31,3 +31,18 @@
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .list-entry__main small{font-size:12px}
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .list-entry__action,.v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .list-entry__delete{height:var(--ui-compact-size);width:var(--ui-compact-size);flex-basis:var(--ui-compact-size)}
 }
+
+/* Fixed list-row geometry for standardized Desktop H surfaces. The 44px
+   token belongs to H; the row's text, handle and actions fit inside it. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z:has([data-v2-z-header-row]>.v2-desktop-tool-row,[data-people-desktop-toolbar]) .list-entry{box-sizing:border-box;height:var(--h-list-row);min-height:var(--h-list-row);max-height:var(--h-list-row)}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z:has([data-v2-z-header-row]>.v2-desktop-tool-row,[data-people-desktop-toolbar]) .list-entry__content{box-sizing:border-box;height:100%;min-height:0;max-height:100%;padding:4px 12px}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z:has([data-v2-z-header-row]>.v2-desktop-tool-row,[data-people-desktop-toolbar]) .list-entry__reorder-handle{height:var(--ui-compact-size)}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z:has([data-v2-z-header-row]>.v2-desktop-tool-row,[data-people-desktop-toolbar]) .list-entry__toggle{height:var(--ui-compact-size)}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z:has([data-v2-z-header-row]>.v2-desktop-tool-row,[data-people-desktop-toolbar]) .list-entry__text{min-height:0;gap:2px}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z:has([data-v2-z-header-row]>.v2-desktop-tool-row,[data-people-desktop-toolbar]) .list-entry__main :is(strong,small){white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z:has([data-v2-z-header-row]>.v2-desktop-tool-row,[data-people-desktop-toolbar]) .list-entry__right{min-height:0;gap:2px;align-content:center}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z:has([data-v2-z-header-row]>.v2-desktop-tool-row,[data-people-desktop-toolbar]) .list-entry__right :is(strong,small){max-width:100%;overflow:hidden;text-overflow:ellipsis}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z:has([data-v2-z-header-row]>.v2-desktop-tool-row,[data-people-desktop-toolbar]) .list-entry--columns .list-entry__content{padding-block:2px}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z:has([data-v2-z-header-row]>.v2-desktop-tool-row,[data-people-desktop-toolbar]) .list-entry__column{grid-template-rows:repeat(3,12px);gap:1px;line-height:12px}
+}
