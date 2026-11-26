@@ -1087,7 +1087,9 @@
  .v2-app--workspace .desktop-q-toolbar>.desktop-q-online-booking .ui-compact-check__label{min-width:0;font-size:12px;line-height:1.15;font-weight:700;white-space:normal;overflow-wrap:normal}
  .v2-app--workspace .desktop-q-toolbar>.desktop-q-leading-icon.ui-compact-button--settings{order:-1;background:transparent;border:0;color:var(--v2-base)}
  .v2-app--workspace .desktop-q-toolbar>.desktop-q-h-action.ui-button{background:var(--v2-base);border-color:var(--v2-base);color:var(--white)}
- .v2-app--workspace [data-personal-account-desktop-tools]+[data-desktop-q-secondary-tools]{justify-content:flex-start}
+ .v2-app--workspace [data-personal-account-desktop-tools]+[data-personal-account-secondary-tools]{justify-content:space-between}
+ .v2-app--workspace [data-personal-account-secondary-tools]>.ui-compact-check{order:0}
+ .v2-app--workspace [data-personal-account-secondary-tools]>.ui-compact-button--info{flex:0 0 var(--ui-compact-size);height:var(--ui-compact-size);min-height:var(--ui-compact-size);max-height:var(--ui-compact-size)}
  .v2-app--workspace .desktop-q-toolbar[data-desktop-q-secondary-tools]::before{display:none}
 }
 
@@ -1126,5 +1128,4 @@
  .v2-app--workspace .deposit-program-code-x [data-deposit-code-error]:empty{display:none}
 }
 
-.personal-account-limit-field{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:8px;min-width:0}
-.personal-account-limit-field>.ui-compact-button{align-self:end;margin-bottom:9px}
+[data-personal-account-mobile-info]{display:flex;justify-content:flex-start}

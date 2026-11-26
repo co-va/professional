@@ -218,17 +218,11 @@ function accountInfo(person = {}, account = {}) {
 
 function openSettingsX(root, person, account, onSaved, { desktop = false } = {}) {
   const layer = mountModal(root, modal(`<form class="form-grid" data-personal-account-settings-form>
-    <div class="personal-account-limit-field">
-      ${field({ label: 'Лимит оплаты, %', name: 'spendLimitPercent', type: 'number', min: '0', max: '100', step: '1', inputmode: 'decimal', value: account?.spendLimitPercent ?? 100, required: true })}
-      ${compactButton({ kind: 'info', data: 'data-personal-account-limit-info', aria: 'Как работает лимит оплаты' })}
-    </div>
+    ${field({ label: 'Лимит оплаты, %', name: 'spendLimitPercent', type: 'number', min: '0', max: '100', step: '1', inputmode: 'decimal', value: account?.spendLimitPercent ?? 100, required: true })}
     ${button('Сохранить', { type: 'submit' })}
     <div class="form-error" data-personal-account-settings-error></div>
   </form>`, { title: desktop ? 'Лимит оплаты' : 'Настройки Личного счёта', variant: 'x', surface: 'app' }));
   const form = layer?.querySelector?.('[data-personal-account-settings-form]');
-  form?.querySelector('[data-personal-account-limit-info]')?.addEventListener('click', () => {
-    openNotice({ title: 'Лимит оплаты', message: 'Максимальная доля стоимости услуги или покупки, которую клиент может оплатить с Личного счёта. Например, при лимите 50% и стоимости 4 000 ₽ со счёта можно оплатить не более 2 000 ₽ при достаточном остатке. Остальное оплачивается другим доступным способом. Если остаток оплаты не внесён и оформлен как задолженность, он учитывается как долг за обслуживание. Лимит не является скидкой и сам по себе не создаёт долг.' });
-  });
   form?.addEventListener('submit', async (event) => {
     event.preventDefault();
     const errorNode = layer.querySelector('[data-personal-account-settings-error]');
@@ -364,6 +358,23 @@ function bindAccountVisibility(control, person, onSaved = () => {}) {
   });
 }
 
+function personalAccountInfoButton() {
+  return compactButton({ kind: 'info', data: 'data-personal-account-info', aria: 'Как работает Личный счёт' });
+}
+
+function openPersonalAccountInfo(root) {
+  const sections = [
+    ['Личный счёт', 'Создаётся автоматически для каждого клиента. Это не депозитная программа: на счёте хранятся деньги, внесённые клиентом авансом.'],
+    ['Пополнение и оплата', 'Пополнение увеличивает остаток. При оплате услуги или покупки деньги списываются с этого остатка.'],
+    ['Лимит оплаты', 'Максимальная доля стоимости, которую можно оплатить со счёта при достаточном остатке. Например, при лимите 50% и стоимости 4 000 ₽ со счёта можно оплатить не более 2 000 ₽. Остальное оплачивается другим доступным способом. Это не скидка.'],
+    ['Долг за обслуживание', 'Если неоплаченная сумма оформлена как задолженность, она появляется отдельно от денежного остатка. Пополнение само по себе не погашает долг; лимит не создаёт долг автоматически.'],
+    ['Возврат и история', 'Можно вернуть внесённые, но не использованные деньги в пределах остатка. Движения счёта отображаются в истории.'],
+  ];
+  return mountModal(root, modal(page(sections.map(([title, description]) =>
+    `<div><strong>${escapeHtml(title)}</strong><p>${escapeHtml(description)}</p></div>`
+  )), { variant: 's', surface: 'app', title: 'Как работает Личный счёт' }));
+}
+
 function bindDesktopAccountTools(layer, person, account, refresh) {
   const header = layer.querySelector('[data-v2-q-header-content]');
   if (!header) return;
@@ -373,9 +384,11 @@ function bindDesktopAccountTools(layer, person, account, refresh) {
       ${compactButton({ kind: 'settings', className: 'desktop-q-action-slot desktop-q-leading-icon', data: 'data-personal-account-limit title="Лимит оплаты"', aria: 'Лимит оплаты' })}
       ${button('Пополнить', { className: 'desktop-q-action-slot desktop-q-h-action', data: 'data-personal-account-fund' })}
     </div>
-    <div class="desktop-q-toolbar" data-desktop-q-secondary-tools data-v2-layer-gesture-ignore>
+    <div class="desktop-q-toolbar" data-desktop-q-secondary-tools data-personal-account-secondary-tools data-v2-layer-gesture-ignore>
+      ${personalAccountInfoButton()}
       ${compactCheck({ label: 'Показать', checked: account?.visibleToEndUser !== false, data: 'data-personal-account-q-visible', aria: 'Показать карту клиенту' })}
     </div>`;
+  header.querySelector('[data-personal-account-info]')?.addEventListener('click', () => openPersonalAccountInfo(layer));
   bindAccountVisibility(header.querySelector('[data-personal-account-q-visible]'), person, refresh);
   header.querySelector('[data-personal-account-fund]')?.addEventListener('click', () => openMoneyX(layer, person, account, 'fund', refresh, { desktop: true }));
   header.querySelector('[data-personal-account-limit]')?.addEventListener('click', () => openSettingsX(layer, person, account, refresh, { desktop: true }));
@@ -392,6 +405,7 @@ function renderDetail(layer, root, person, account, onChanged = () => {}) {
   const debts = outstandingDebts(account);
   host.innerHTML = page([
     loyaltyHeader(personLabel(person), { settings: !desktop, settingsData: 'data-personal-account-actions' }),
+    desktop ? '' : `<div data-personal-account-mobile-info>${personalAccountInfoButton()}</div>`,
     personalAccountVisualCard({
       person, balance: account?.balance, debt: account?.debtTotal,
       data: 'data-personal-account-summary', aria: 'Информация о личном счёте',
@@ -407,6 +421,7 @@ function renderDetail(layer, root, person, account, onChanged = () => {}) {
     renderDetail(layer, root, person, next || {}, onChanged);
     await onChanged();
   };
+  host.querySelector('[data-personal-account-info]')?.addEventListener('click', () => openPersonalAccountInfo(layer));
   host.querySelector('[data-personal-account-summary]')?.addEventListener('click', () => {
     mountModal(layer, modal(accountInfo(person, account), { variant: 's', surface: 'app', title: 'Личный счёт' }));
   });
