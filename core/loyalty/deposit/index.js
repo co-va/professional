@@ -68,6 +68,7 @@ import {
   depositCardScope,
   depositCardStatusLabel,
   depositFundingProgress,
+  depositFundingListStatus,
   depositSpentAmount,
 } from './card-presentation.js';
 
@@ -398,16 +399,17 @@ function issuedList(items = [], desktop = false, program = {}) {
       { key: 'code', label: 'Код', sortable: false },
       { key: 'name', label: 'Клиент', sortable: false, render: row => `<button type="button" data-deposit-instance="${escapeHtml(row.id)}">${escapeHtml(row.name)}</button>` },
       { key: 'nominal', label: 'Номинал', sortable: false }, { key: 'funded', label: 'Внесено', sortable: false },
-      { key: 'balance', label: 'Остаток', sortable: false }, { key: 'status', label: 'Состояние', sortable: false },
+      { key: 'balance', label: 'Остаток', sortable: false }, { key: 'status', label: 'Состояние', sortable: false, render: row => `<div class="deposit-list-status"><span>${escapeHtml(row.status)}</span>${row.statusAmount != null ? `<span class="deposit-list-status__amount">${escapeHtml(money(row.statusAmount))}</span>` : ''}</div>` },
       { key: 'visible', label: 'Показать', sortable: false, narrow: true, render: row => compactCheck({
         checked: row.visible, data: `data-deposit-row-visible="${escapeHtml(row.id)}"`, aria: `Показать карту клиенту ${row.name}`,
       }) },
     ],
     rows: items.map(deposit => {
       const payment = depositFundingProgress(deposit);
+      const fundingState = depositFundingListStatus(deposit);
       return { id: deposit.depositId, code: depositUei(deposit), name: contactLabel(depositPerson(deposit)), visible: effectiveDepositVisibility(deposit, program),
         nominal: payment.fixed ? money(payment.nominal) : 'Свободная сумма', funded: money(payment.funded), balance: money(deposit.balance),
-        status: deposit.status === 'active' && payment.fixed ? (payment.paid ? 'Оплачено' : 'К оплате ' + money(payment.due)) : depositStatusLabel(deposit.status) };
+        status: fundingState?.label ?? depositStatusLabel(deposit.status), statusAmount: fundingState?.amount ?? null };
     }),
   });
   return v2ListEntries(items.map((deposit) => v2ListEntry({

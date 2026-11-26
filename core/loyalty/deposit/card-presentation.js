@@ -39,6 +39,20 @@ export function depositFundingProgress(deposit = {}) {
   return { fixed, nominal: fixed ? nominal : null, funded, due, paid: fixed && due <= 0.009 };
 }
 
+// Funding state is a presentation of the immutable assigned terms; it never
+// changes the deposit lifecycle, recorded payments or canonical amounts.
+export function depositFundingListStatus(deposit = {}, at = new Date()) {
+  const progress = depositFundingProgress(deposit);
+  if (deposit.status !== 'active' || !progress.fixed) return null;
+  if (progress.paid) return { label: 'Оплачено', amount: null };
+  const day = `${at.getFullYear()}-${String(at.getMonth() + 1).padStart(2, '0')}-${String(at.getDate()).padStart(2, '0')}`;
+  const terms = deposit.terms || {};
+  const start = ['dated', 'fixed'].includes(String(terms.termMode || '').toLowerCase())
+    ? String(terms.termStartDate || '').slice(0, 10) : '';
+  const future = /^\d{4}-\d{2}-\d{2}$/.test(start) && start > day;
+  return { label: future ? 'К оплате' : 'Задолженность', amount: progress.due };
+}
+
 export function depositCardScope() {
   return SCOPE;
 }
