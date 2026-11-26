@@ -502,10 +502,10 @@
 @media (min-width:768px) and (min-height:600px){
  .v2-app--workspace>.v2-header{height:68px;min-height:68px;flex:0 0 68px;padding:0 32px 0 16px;grid-template-columns:48px calc(var(--v2-desktop-sidebar-width) - 96px) minmax(0,1fr) auto auto auto;gap:10px}
  .v2-app--workspace>.v2-header>.v2-header__title{display:none!important}
- .v2-app--workspace>.v2-header>.v2-desktop-toolbar-context{display:flex;grid-column:3;grid-row:1;align-items:center;gap:9px;color:#D1D4D6;font-size:13px;white-space:nowrap;min-width:0;overflow:hidden}
+ .v2-app--workspace>.v2-header>.v2-desktop-toolbar-context{display:flex;grid-column:3;grid-row:1;align-items:center;gap:9px;color:var(--desktop-h-secondary-ink);font-size:13px;white-space:nowrap;min-width:0;overflow:hidden}
  .v2-desktop-toolbar-context>span:last-child{color:var(--white);font-weight:650;overflow:hidden;text-overflow:ellipsis}
  .v2-desktop-toolbar-divider{color:var(--text-muted)}
- .v2-app--workspace>.v2-header>.v2-desktop-toolbar-user{display:flex;grid-column:6;grid-row:1;align-items:center;gap:10px;color:#D1D4D6;font-size:12px;min-width:0}
+ .v2-app--workspace>.v2-header>.v2-desktop-toolbar-user{display:flex;grid-column:6;grid-row:1;align-items:center;gap:10px;color:var(--desktop-h-secondary-ink);font-size:12px;min-width:0}
  .v2-desktop-toolbar-user>button{border:0;background:transparent;color:inherit;cursor:pointer;font:inherit}
  .v2-desktop-toolbar-user>button[data-desktop-profile]{padding:0;white-space:nowrap;max-width:180px;overflow:hidden;text-overflow:ellipsis}
  .v2-desktop-toolbar-user>button:not([data-desktop-profile]){box-sizing:border-box;display:grid;place-items:center;flex:0 0 36px;width:36px;height:36px;padding:0;border-radius:10px;color:var(--white)}
@@ -1101,10 +1101,12 @@
 
 /* Canonical Desktop table/group header (Clients, Service and every shared table). */
 @media (min-width:768px) and (min-height:600px){
- .v2-app--workspace{--desktop-table-header-bg:#E0D6D6;--desktop-table-header-ink:#41484F}
+ .v2-app--workspace{--desktop-table-header-bg:#E0D6D6;--desktop-table-header-ink:#41484F;--desktop-h-secondary-ink:#D1D4D6}
  .v2-app--workspace :is(.ui-data-table th,.service-desktop-group-header){background:var(--desktop-table-header-bg);color:var(--desktop-table-header-ink);font-size:12px;font-weight:750;font-style:normal;line-height:1.2;letter-spacing:0;text-transform:uppercase}
  .v2-app--workspace .ui-data-table th button{font-style:inherit;font-weight:inherit;text-transform:inherit}
  .v2-app--workspace .loyalty-deposit-program-z .ui-data-table--compact :is(th,td){box-sizing:border-box;height:var(--h-list-row);padding-block:4px}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.loyalty-deposit-program-z .v2-section__title{color:var(--desktop-h-secondary-ink)}
+ .v2-app--workspace .loyalty-deposit-program-z [data-deposit-open-row]>td:not([data-table-column="visible"]){cursor:pointer}
  .v2-app--workspace .loyalty-deposit-program-z [data-table-column="visible"]{text-align:center}
  .v2-app--workspace .loyalty-deposit-program-z [data-table-column="visible"] .ui-compact-check{display:grid;margin:auto}
  .v2-app--workspace[data-v2-desktop-surface="list"] [data-deposit-program-toolbar] .v2-desktop-tool-actions>.ui-button--danger{background:var(--ui-delete-background);color:var(--ui-delete-foreground);border-color:var(--ui-delete-foreground)}

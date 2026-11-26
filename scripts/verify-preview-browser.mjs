@@ -23,6 +23,7 @@ try {
       const body=url.pathname.endsWith('/auth/me')?{account:{id:'preview-smoke',email:'preview@example.invalid'},tenantId:'preview-smoke'}:
         url.pathname.endsWith('/saas-access/me')?{tenantId:'preview-smoke',status:'ACTIVE',commercialMode:'LIVE',capabilities:['profile.access','workplaces.access','journal.day.access','journal.month.access','timetable.access','loyalty.deposit.access','loyalty.personal_account.access'].map(key=>({key,valueType:'BOOLEAN',enabled:true}))}:
         url.pathname.endsWith('/auxiliary-state/loyalty')?{wallets:[],depositPrograms:Array.from({length:4},(_,i)=>({id:'smoke-program-'+i,name:'Тестовый депозит '+(i+1),amount:10000,amountMode:'fixed',status:'active',termMode:'indefinite'}))}:
+        url.pathname.endsWith('/loyalty/deposits')?[{depositId:'smoke-issued-1',programId:'smoke-program-0',programName:'Тестовый депозит 1',person:{key:'smoke-person',name:'Тестовый клиент',uei:'T001'},status:'active',balance:10000,nominal:10000,terms:{amount:10000,amountMode:'fixed',termMode:'indefinite'},history:[{id:'smoke-funding',kind:'funding',direction:'in',amount:10000,occurredAt:'2026-01-01T10:00:00Z'}]}]:
         url.pathname.endsWith('/loyalty/personal-accounts')?[{personKey:'smoke-person',hasActivity:true,balance:0,debtTotal:0,movements:[{id:'smoke-event',kind:'funding',amount:100,occurredAt:'2026-01-01T10:00:00Z'}],debts:[]}]:
         url.pathname.endsWith('/business-state/operational')?{procedures:[],days:[]}:
         url.pathname.endsWith('/auth/email-verification/status')?{email:'preview@example.invalid',verified:true}:{};
@@ -158,12 +159,18 @@ try {
   assert.equal(await programDetail.locator('[data-deposit-program-visible]').count(),0,'Visibility is per issued card, not a Desktop toolbar switch');
   assert.equal(await programDetail.locator('[data-deposit-program-action="delete"] svg').count(),1,'Delete uses trash icon');
   assert.equal(await programDetail.locator('[data-deposit-program-action="delete"]').getAttribute('aria-label'),'Удалить программу');
+  assert.equal(await programDetail.locator('.v2-section__title').evaluate(node=>getComputedStyle(node).color),await shell.locator('.v2-desktop-toolbar-context>span').first().evaluate(node=>getComputedStyle(node).color),'Section caption uses H secondary ink');
   const issuedHeaders=programDetail.locator('.ui-data-table th');
-  if(await issuedHeaders.count()){
-    assert.equal(await issuedHeaders.first().evaluate(node=>getComputedStyle(node).backgroundColor),'rgb(224, 214, 214)');
-    assert.equal(await issuedHeaders.first().evaluate(node=>getComputedStyle(node).textTransform),'uppercase');
-    assert.equal(await programDetail.locator('[data-deposit-row-visible]').count(),await programDetail.locator('.ui-data-table tbody tr').count());
-  }
+  assert.ok(await issuedHeaders.count(),'Synthetic issued deposit table exists');
+  assert.equal(await issuedHeaders.first().evaluate(node=>getComputedStyle(node).backgroundColor),'rgb(224, 214, 214)');
+  assert.equal(await issuedHeaders.first().evaluate(node=>getComputedStyle(node).textTransform),'uppercase');
+  assert.equal(await programDetail.locator('[data-deposit-row-visible]').count(),await programDetail.locator('.ui-data-table tbody tr').count());
+  await programDetail.locator('[data-deposit-open-row="smoke-issued-1"] [data-table-column="balance"]').click();
+  const issuedQ=page.locator('.loyalty-deposit-instance-q');
+  await issuedQ.locator('.entity-visual-card').waitFor({timeout:15000});
+  await issuedQ.locator('[data-deposit-history-entry]').first().waitFor({timeout:10000});
+  assert.equal(await issuedQ.locator('.v2-section__title').filter({hasText:'История'}).count(),1);
+  await issuedQ.locator('[data-v2-q-close]').click();
   await programDetail.locator('[data-deposit-program-action="copy"]').click();
   const copyForm=page.locator('[data-deposit-program-form]');
   await copyForm.waitFor({timeout:10000});

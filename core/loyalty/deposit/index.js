@@ -1205,11 +1205,35 @@ async function openProgramLayer(root, programId, { person = null, onChanged = ()
         onChanged,
       }));
     }
+    let openingDeposit = false;
     layer.querySelectorAll('[data-deposit-instance]').forEach((node) => {
-      node.addEventListener('click', () => openDepositQ(layer, node.dataset.depositInstance, async () => {
-        await render();
-        await onChanged?.();
-      }));
+      const open = async () => {
+        if (openingDeposit) return;
+        openingDeposit = true;
+        try {
+          const detail = await openDepositQ(layer, node.dataset.depositInstance, async () => {
+            await render();
+            await onChanged?.();
+          });
+          if (!detail) openNotice({ title: 'Депозит', message: 'Не удалось открыть оформленную карту.' });
+        } catch (error) {
+          openNotice({ title: 'Депозит', message: error instanceof Error ? error.message : 'Не удалось открыть оформленную карту.' });
+        } finally {
+          openingDeposit = false;
+        }
+      };
+      if (desktop) {
+        const row = node.closest('tr');
+        if (row) {
+          row.dataset.depositOpenRow = node.dataset.depositInstance;
+          // The native client button remains keyboard-accessible. The whole
+          // row delegates to the same Q, except the independent visibility cell.
+          row.addEventListener('click', event => {
+            if (event.target.closest('[data-table-column="visible"]')) return;
+            void open();
+          });
+        } else node.addEventListener('click', open);
+      } else node.addEventListener('click', open);
     });
     notifyContext();
   };
