@@ -48,6 +48,7 @@ import {
   text,
   uid,
 } from '../shared.js';
+import { renderDesktopProgramSection } from '../shared.js';
 
 let programs = [
   {
@@ -454,8 +455,14 @@ export function getPersonLoyaltyCards(person = {}) {
 }
 export async function renderReferral(root) {
   const render = async () => {
-    const cards = programs.length ? entityCardStack(programs.map((program) => loyaltyVisualCard('referral', programCardFields(program), { data: `data-referral-program="${program.id}"`, aria: `Открыть ${program.name}` }))) : emptyState('Реферальных программ пока нет', 'Создайте первую программу кнопкой «+».');
-    root.innerHTML = page([loyaltyHeader('Реферальная программа', { settings: true, c: { label: '+', data: 'data-referral-create', aria: 'Создать реферальную программу' } }), cards]);
+    const items = programs.map((program) => loyaltyVisualCard('referral', programCardFields(program), { data: `data-referral-program="${program.id}"`, aria: `Открыть ${program.name}` }));
+    const empty = emptyState('Реферальных программ пока нет', 'Создайте первую программу кнопкой «+».');
+    if (root.hasAttribute('data-loyalty-program-section')) {
+      renderDesktopProgramSection(root, items, empty, { addData: 'data-referral-create', addAria: 'Создать реферальную программу' });
+    } else {
+      const cards = items.length ? entityCardStack(items) : empty;
+      root.innerHTML = page([loyaltyHeader('Реферальная программа', { settings: true, c: { label: '+', data: 'data-referral-create', aria: 'Создать реферальную программу' } }), cards]);
+    }
     bindViewSettings(root, 'Реферальная программа', { type: 'referral', fields: () => programCardFields(programs[0] || { name: 'Реферальная программа', qualifyingEvent: 'first-paid', assignment: 'all', levels: 1, status: 'active' }), onSaved: render });
     root.querySelector('[data-referral-create]')?.addEventListener('click', () => openCreateProgramQ(root, render));
     root.querySelectorAll('[data-referral-program]').forEach((node) => node.addEventListener('click', () => openProgramLayer(root, text(node.dataset.referralProgram), render)));

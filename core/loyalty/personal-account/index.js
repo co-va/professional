@@ -1,5 +1,7 @@
 import {
   button,
+  dataTable,
+  setV2ZHeaderRows,
   datePicker,
   details,
   emptyState,
@@ -19,6 +21,9 @@ import {
   v2ListEntry,
   v2Section,
 } from '../../../ui/ui.js';
+import { isV2DesktopWorkspace } from '../../../ui/v2/geometry.js';
+import { personDisplay } from '../../people/presentation.js';
+import { openLoyaltyAppearanceQ } from '../shared.js';
 import { getWallets } from '../../finance/index.js';
 import {
   availablePeople,
@@ -324,7 +329,7 @@ function openDebtSettleX(root, debt, onSaved) {
   return layer;
 }
 
-function renderDetail(layer, root, person, account) {
+function renderDetail(layer, root, person, account, onChanged = () => {}) {
   const host = layer.querySelector('[data-personal-account-q-host]') || layer;
   host.innerHTML = page([
     loyaltyHeader(personLabel(person), { settings: true, settingsData: 'data-personal-account-actions' }),
@@ -334,7 +339,8 @@ function renderDetail(layer, root, person, account) {
   ]);
   const refresh = async (saved = null) => {
     const next = saved?.personKey ? saved : await loadPersonalAccount(personKey(person));
-    renderDetail(layer, root, person, next || {});
+    renderDetail(layer, root, person, next || {}, onChanged);
+    await onChanged();
   };
   host.querySelector('[data-personal-account-actions]')?.addEventListener('click', () => {
     const actions = [
@@ -372,7 +378,7 @@ function renderDetail(layer, root, person, account) {
   notifyLoyaltyContext();
 }
 
-export async function openPersonalAccountForPerson(root, person = {}, snapshot = null) {
+export async function openPersonalAccountForPerson(root, person = {}, snapshot = null, onChanged = () => {}) {
   const layer = mountModal(root, modal('<div data-personal-account-q-host></div>', {
     variant: 'q',
     surface: 'app',
@@ -381,7 +387,7 @@ export async function openPersonalAccountForPerson(root, person = {}, snapshot =
   }));
   if (!layer) return null;
   const account = snapshot || await loadPersonalAccount(personKey(person));
-  renderDetail(layer, root, person, account || {});
+  if (layer.isConnected) renderDetail(layer, root, person, account || {}, onChanged);
   return layer;
 }
 
@@ -419,9 +425,40 @@ export async function renderPersonalAccount(root) {
     return;
   }
 
+  if (!root.isConnected) return;
+  const desktop = isV2DesktopWorkspace(root.closest('[data-v2-app]'));
   const values = accounts
-    .filter((account) => Number(account?.balance || 0) > 0.009 || Number(account?.debtTotal || 0) > 0.009)
+    .filter(account => desktop
+      ? account.hasActivity === true || Boolean(account.movements?.length || account.debts?.length) || Number(account.balance || 0) > 0.009 || Number(account.debtTotal || 0) > 0.009
+      : Number(account?.balance || 0) > 0.009 || Number(account?.debtTotal || 0) > 0.009)
     .map((account) => ({ account, person: accountPerson(account, people) }));
+  if (desktop) {
+    const rows = values.map(({ account, person }) => {
+      const display = personDisplay(person);
+      return { id: personKey(person), code: display.uei, name: display.name, phone: display.phone, balance: money(account.balance), debt: money(account.debtTotal) };
+    }).sort((a,b) => String(a.name || '').localeCompare(String(b.name || ''), 'ru'));
+    const table = rows.length ? dataTable({
+      compact: true, caption: 'Личные счета',
+      columns: [
+        { key: 'code', label: 'Код', sortable: false },
+        { key: 'name', label: 'Клиент', sortable: false, render: row => '<button type="button" data-personal-account-person="' + escapeHtml(row.id) + '"><span class="people-table-person"><span class="people-table-person__name">' + escapeHtml(row.name) + '</span>' + (row.phone ? '<span class="people-table-person__phone">' + escapeHtml(row.phone) + '</span>' : '') + '</span></button>' },
+        { key: 'balance', label: 'Остаток', sortable: false },
+        { key: 'debt', label: 'Задолженность', sortable: false },
+      ], rows,
+    }) : emptyState('Личных счетов с движениями пока нет', 'Здесь появятся клиенты после операций по личному счёту.');
+    root.innerHTML = page([loyaltyHeader('Личный счёт'), table]);
+    const [toolbar] = setV2ZHeaderRows(root, ['<div class="v2-desktop-tool-row"><div class="v2-desktop-tool-actions">' + button('Вид', { variant: 'secondary', data: 'data-personal-account-view' }) + '</div></div>'], { desktopTitle: 'Личный счёт' });
+    toolbar?.querySelector('[data-personal-account-view]')?.addEventListener('click', () => {
+      const first = values[0];
+      openLoyaltyAppearanceQ(root, { type: 'personal-account', fields: () => personalAccountCardFields({ person: first?.person || people[0] || {}, balance: first?.account?.balance || 0, debt: first?.account?.debtTotal || 0 }), onSaved: () => renderPersonalAccount(root) });
+    });
+    root.querySelectorAll('[data-personal-account-person]').forEach(node => node.addEventListener('click', () => {
+      const item = values.find(({ person }) => personKey(person) === node.dataset.personalAccountPerson);
+      if (item) void openPersonalAccountForPerson(root, item.person, item.account, () => renderPersonalAccount(root));
+    }));
+    notifyLoyaltyContext();
+    return;
+  }
   const cards = values.length
     ? entityCardStack(values.map(({ account, person }) => personalAccountVisualCard({
         person,

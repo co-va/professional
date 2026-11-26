@@ -52,6 +52,7 @@ import {
   text,
   uid,
 } from '../shared.js';
+import { renderDesktopProgramSection } from '../shared.js';
 
 let programs = [
   {
@@ -585,20 +586,23 @@ export function getPersonLoyaltyCards(person = {}) {
 }
 export async function renderBonus(root) {
   const render = async () => {
-    const cards = programs.length
-      ? entityCardStack(programs.map((program) => loyaltyVisualCard('bonus', programCardFields(program), {
+    const items = programs.map((program) => loyaltyVisualCard('bonus', programCardFields(program), {
           data: `data-bonus-program="${program.id}"`,
           aria: `Открыть ${program.name}`,
-        })))
-      : emptyState('Бонусных программ пока нет', 'Создайте первую программу кнопкой «+».');
-
-    root.innerHTML = page([
+        }));
+    const empty = emptyState('Бонусных программ пока нет', 'Создайте первую программу кнопкой «+».');
+    if (root.hasAttribute('data-loyalty-program-section')) {
+      renderDesktopProgramSection(root, items, empty, { addData: 'data-bonus-create', addAria: 'Создать бонусную программу' });
+    } else {
+      const cards = items.length ? entityCardStack(items) : empty;
+      root.innerHTML = page([
       loyaltyHeader('Бонусная программа', {
         settings: true,
         c: { label: '+', data: 'data-bonus-create', aria: 'Создать бонусную программу' },
       }),
       cards,
     ]);
+    }
     bindViewSettings(root, 'Бонусная программа', {
       type: 'bonus',
       fields: () => programCardFields(programs[0] || { name: 'Бонусная программа', condition: 'each-paid', assignment: 'all', rewardType: 'percent', rewardValue: 5, status: 'active' }),

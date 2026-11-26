@@ -11,6 +11,7 @@ import {
   details,
   emptyState,
   entityCardStack,
+  entityCardRail,
   entityVisualCard,
   escapeHtml,
   field,
@@ -43,7 +44,7 @@ import { personDisplay } from '../../people/presentation.js';
 import { getCardAppearanceTemplate, saveCardAppearanceTemplate } from '../../card-appearance-templates.js';
 import { flushBusinessPersistence, isBusinessServerReady } from '../../business-persistence.js';
 import { createUEI, getUEI, listUEIs, normalizeUEI, releaseUEI, replaceUEI } from '../../uei.js';
-import { crop, formObject, personOption as contactOption, openLoyaltySettingsMenu } from '../shared.js';
+import { crop, formObject, personOption as contactOption, openLoyaltySettingsMenu, renderDesktopProgramSection } from '../shared.js';
 import { openDepositExcelQ } from './excel.js';
 import {
   correctDepositFunding,
@@ -1267,6 +1268,17 @@ export async function renderDeposit(root) {
     aria: `Открыть депозитную программу ${program.name || ''}`,
   }));
   const rerender = () => renderDeposit(root);
+  if (root.hasAttribute('data-loyalty-program-section')) {
+    renderDesktopProgramSection(root, cards, emptyState('Депозитных программ пока нет', 'Создайте первую программу кнопкой «+».'), {
+      addData: 'data-deposit-program-add', addAria: 'Создать депозитную программу', excel: true, viewData: 'data-deposit-desktop-view',
+    });
+    root.querySelector('[data-deposit-desktop-view]')?.addEventListener('click', () => openAppearanceQ(root, rerender));
+    root.querySelector('[data-deposit-desktop-excel]')?.addEventListener('click', event => openDepositExcelQ(root, rerender, { anchor: event.currentTarget }));
+    root.querySelector('[data-deposit-program-add]')?.addEventListener('click', () => openCreateProgramQ(root, rerender));
+    root.querySelectorAll('[data-deposit-program]').forEach(node => node.addEventListener('click', () => openProgramLayer(root, node.dataset.depositProgram, { onChanged: rerender })));
+    notifyContext();
+    return;
+  }
   root.innerHTML = page([
     depositHeaderContext({
       title: 'Депозит',
@@ -1275,7 +1287,7 @@ export async function renderDeposit(root) {
       c: desktop ? null : { label: '+', data: 'data-deposit-program-add', aria: 'Создать депозитную программу' },
     }),
     '<div data-deposit-program-cards>' + (cards.length
-      ? entityCardStack(cards, { layout: desktop ? 'grid' : 'stack' })
+      ? (desktop ? entityCardRail(cards) : entityCardStack(cards))
       : emptyState('Депозитных программ пока нет', 'Создайте первую программу кнопкой «+».')) + '</div>',
   ]);
   let tools = root;

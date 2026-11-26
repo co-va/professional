@@ -53,6 +53,7 @@ import {
   text,
   uid,
 } from '../shared.js';
+import { renderDesktopProgramSection } from '../shared.js';
 
 const fallbackPeople = [];
 
@@ -623,18 +624,23 @@ export function getPersonLoyaltyCards(person = {}) {
 }
 export async function renderSubscription(root) {
   const render = async () => {
-    const cards = programs.length ? entityCardStack(programs.map((program) => loyaltyVisualCard('subscription', programCardFields(program), {
+    const items = programs.map((program) => loyaltyVisualCard('subscription', programCardFields(program), {
       data: `data-subscription-program="${program.id}"`,
       aria: `Открыть ${program.name}`,
-    }))) : emptyState('Абонементов пока нет', 'Создайте первую программу кнопкой «+».');
-
-    root.innerHTML = page([
+    }));
+    const empty = emptyState('Абонементов пока нет', 'Создайте первую программу кнопкой «+».');
+    if (root.hasAttribute('data-loyalty-program-section')) {
+      renderDesktopProgramSection(root, items, empty, { addData: 'data-subscription-create', addAria: 'Создать программу абонемента' });
+    } else {
+      const cards = items.length ? entityCardStack(items) : empty;
+      root.innerHTML = page([
       loyaltyHeader('Абонемент', {
         settings: true,
         c: { label: '+', data: 'data-subscription-create', aria: 'Создать программу абонемента' },
       }),
       cards,
     ]);
+    }
     bindViewSettings(root, 'Абонемент', {
       type: 'subscription',
       fields: () => programCardFields(programs[0] || { name: 'Абонемент', price: 30000, compositionMode: 'common-limit', commonLimit: 10, termType: 'duration', termCount: 12, termUnit: 'months', termValue: '12 мес.', status: 'active' }),

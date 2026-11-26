@@ -1,7 +1,7 @@
 import { renderPeople } from '../core/people/people.js';
 import { financeNavigationItems, renderFinanceSection } from '../core/finance/index.js';
 import { inventoryNavigationItems, renderInventorySection } from '../core/inventory/index.js';
-import { loyaltyNavigationItems, renderLoyaltySection } from '../core/loyalty/index.js';
+import { loyaltyWorkspaceNavigationItems, renderLoyaltySection } from '../core/loyalty/index.js';
 import { renderJournal } from '../journal/journal.js';
 import { mountJournalMonthCalendar } from '../journal/месяц.js';
 import { renderJournalGraphMode } from '../journal/график.js';
@@ -158,7 +158,7 @@ function rootDisplayLabel(section) {
   if (section === 'workplaces') return 'Рабочие пространства';
   const definition = rootDefinition(section);
   if (!definition) return '';
-  if (section === 'settings' && window.matchMedia?.(V2_DESKTOP_MEDIA).matches) return definition.label;
+  if ((section === 'settings' || section === 'loyalty') && window.matchMedia?.(V2_DESKTOP_MEDIA).matches) return definition.label;
   const children = secondaryItems(section);
   return children.length === 1 ? children[0].label : definition.label;
 }
@@ -195,7 +195,7 @@ function activeRootSection() {
 function secondaryItems(section = activeRootSection()) {
   if (section === 'finance') return financeNavigationItems();
   if (section === 'inventory') return inventoryNavigationItems();
-  if (section === 'loyalty') return loyaltyNavigationItems();
+  if (section === 'loyalty') return loyaltyWorkspaceNavigationItems(Boolean(window.matchMedia?.(V2_DESKTOP_MEDIA).matches));
   if (section === 'settings') return settingsNavigationItems();
   return [];
 }
