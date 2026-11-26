@@ -1083,8 +1083,12 @@
 
 /* Service booking options use the shared Q tool rows, not the form. */
 @media (min-width:768px) and (min-height:600px){
- .v2-app--workspace :is(.desktop-q-toolbar>.desktop-q-online-booking,[data-personal-account-desktop-tools]>.ui-compact-check){order:-1;flex:0 1 auto;min-width:0;height:var(--v2-desktop-q-button-height);max-height:var(--v2-desktop-q-button-height);gap:5px}
+ .v2-app--workspace :is(.desktop-q-toolbar>.desktop-q-online-booking,.desktop-q-toolbar[data-desktop-q-secondary-tools]>.ui-compact-check){order:-1;flex:0 1 auto;min-width:0;height:var(--v2-desktop-q-button-height);max-height:var(--v2-desktop-q-button-height);gap:5px}
  .v2-app--workspace .desktop-q-toolbar>.desktop-q-online-booking .ui-compact-check__label{min-width:0;font-size:12px;line-height:1.15;font-weight:700;white-space:normal;overflow-wrap:normal}
+ .v2-app--workspace .desktop-q-toolbar>.desktop-q-leading-icon.ui-compact-button--settings{order:-1;background:transparent;border:0;color:var(--v2-base)}
+ .v2-app--workspace .desktop-q-toolbar>.desktop-q-h-action.ui-button{background:var(--v2-base);border-color:var(--v2-base);color:var(--white)}
+ .v2-app--workspace [data-personal-account-desktop-tools]+[data-desktop-q-secondary-tools]{justify-content:flex-start}
+ .v2-app--workspace .desktop-q-toolbar[data-desktop-q-secondary-tools]::before{display:none}
 }
 
 /* One Desktop veil for Q/X/S and technical layers; preserve Mobile geometry. */
@@ -1121,3 +1125,6 @@
  .v2-app--workspace .deposit-program-code-x [data-deposit-code-form]{display:grid;gap:24px}
  .v2-app--workspace .deposit-program-code-x [data-deposit-code-error]:empty{display:none}
 }
+
+.personal-account-limit-field{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:8px;min-width:0}
+.personal-account-limit-field>.ui-compact-button{align-self:end;margin-bottom:9px}

@@ -239,7 +239,10 @@ try {
   const personalQ=page.locator('.loyalty-personal-account-q');
   const personalTools=personalQ.locator('[data-personal-account-desktop-tools]');
   await personalTools.waitFor({timeout:10000});
-  for(const selector of ['[data-personal-account-fund]','[data-personal-account-limit]','[data-personal-account-q-visible]']) assert.equal(await personalTools.locator(selector).count(),1);
+  for(const selector of ['[data-personal-account-fund]','[data-personal-account-limit]']) assert.equal(await personalTools.locator(selector).count(),1);
+  assert.equal(await personalQ.locator('[data-desktop-q-secondary-tools] [data-personal-account-q-visible]').count(),1,'Visibility on second row');
+  assert.equal(await personalTools.locator('[data-personal-account-limit]').evaluate(node=>getComputedStyle(node).borderTopWidth),'0px','Unframed shared settings icon');
+  assert.ok(await personalTools.locator('[data-personal-account-limit]').evaluate(node=>node.getBoundingClientRect().left<node.parentElement.querySelector('[data-personal-account-fund]').getBoundingClientRect().left));
   assert.equal(await personalTools.locator('[data-personal-account-withdraw]').count(),0,'Refund never in header');
   assert.equal(await personalQ.locator('[data-personal-account-withdraw]').count(),0,'Zero balance has no refund action');
   assert.equal(await personalQ.locator('[data-personal-account-summary]').count(),1,'Saved visual card in account Q');
@@ -251,6 +254,7 @@ try {
   assert.equal(await personalQ.locator('[data-personal-account-actions]').count(),0,'Desktop Q has no V');
   await personalTools.locator('[data-personal-account-limit]').click();
   await page.locator('[data-personal-account-settings-form]').waitFor({timeout:10000});
+  assert.equal(await page.locator('[data-personal-account-limit-info]').count(),1,'Limit explanation available');
   await page.locator('[data-personal-account-settings-form]').evaluate(node=>node.closest('[data-v2-layer]')?.v2Close?.());
   await personalTools.locator('[data-personal-account-fund]').click();
   await page.locator('[data-personal-account-money-form]').waitFor({timeout:10000});

@@ -194,7 +194,7 @@ function debtList(items = []) {
   return v2ListEntries(items.map((item) => {
     const outstanding = Math.max(0, Number(item?.outstandingAmount || 0));
     return v2ListEntry({
-      title: outstanding > 0.009 ? 'Задолженность' : 'Погашено',
+      title: item?.sourceType === 'record' ? 'За услугу' : item?.sourceType === 'sale' ? 'За покупку' : item?.sourceType === 'order' ? 'За заказ' : 'За обслуживание',
       subtitle: shortDateTime(item?.occurredAt, '—'),
       rightTop: money(outstanding),
       rightBottom: outstanding > 0.009 ? 'Открыта' : 'Закрыта',
@@ -209,19 +209,26 @@ function accountInfo(person = {}, account = {}) {
   return readOnlyReceipt({ groups: [[
     { label: 'Контакт', value: personLabel(person) },
     { label: 'Денежный остаток', value: money(account?.balance) },
-    { label: 'Задолженность', value: money(account?.debtTotal) },
     { label: 'Лимит оплаты', value: `${Math.max(0, Math.min(100, Number(account?.spendLimitPercent ?? 100) || 0))}%` },
     { label: 'Показать', value: account?.visibleToEndUser === false ? 'Нет' : 'Да' },
+  ], [
+    { label: 'Долг за обслуживание', value: money(account?.debtTotal) },
   ]] });
 }
 
 function openSettingsX(root, person, account, onSaved, { desktop = false } = {}) {
   const layer = mountModal(root, modal(`<form class="form-grid" data-personal-account-settings-form>
-    ${field({ label: 'Лимит оплаты, %', name: 'spendLimitPercent', type: 'number', min: '0', max: '100', step: '1', inputmode: 'decimal', value: account?.spendLimitPercent ?? 100, required: true })}
+    <div class="personal-account-limit-field">
+      ${field({ label: 'Лимит оплаты, %', name: 'spendLimitPercent', type: 'number', min: '0', max: '100', step: '1', inputmode: 'decimal', value: account?.spendLimitPercent ?? 100, required: true })}
+      ${compactButton({ kind: 'info', data: 'data-personal-account-limit-info', aria: 'Как работает лимит оплаты' })}
+    </div>
     ${button('Сохранить', { type: 'submit' })}
     <div class="form-error" data-personal-account-settings-error></div>
   </form>`, { title: desktop ? 'Лимит оплаты' : 'Настройки Личного счёта', variant: 'x', surface: 'app' }));
   const form = layer?.querySelector?.('[data-personal-account-settings-form]');
+  form?.querySelector('[data-personal-account-limit-info]')?.addEventListener('click', () => {
+    openNotice({ title: 'Лимит оплаты', message: 'Максимальная доля стоимости услуги или покупки, которую клиент может оплатить с Личного счёта. Например, при лимите 50% и стоимости 4 000 ₽ со счёта можно оплатить не более 2 000 ₽ при достаточном остатке. Остальное оплачивается другим доступным способом. Если остаток оплаты не внесён и оформлен как задолженность, он учитывается как долг за обслуживание. Лимит не является скидкой и сам по себе не создаёт долг.' });
+  });
   form?.addEventListener('submit', async (event) => {
     event.preventDefault();
     const errorNode = layer.querySelector('[data-personal-account-settings-error]');
@@ -363,9 +370,11 @@ function bindDesktopAccountTools(layer, person, account, refresh) {
   header.closest('.v2-layer--standard')?.classList.add('desktop-q-fixed-tools');
   header.innerHTML = `<div class="desktop-q-heading"><h2 class="v2-q-title">${escapeHtml(personLabel(person))}</h2></div>
     <div class="desktop-q-toolbar" data-personal-account-desktop-tools data-v2-layer-gesture-ignore>
+      ${compactButton({ kind: 'settings', className: 'desktop-q-action-slot desktop-q-leading-icon', data: 'data-personal-account-limit title="Лимит оплаты"', aria: 'Лимит оплаты' })}
+      ${button('Пополнить', { className: 'desktop-q-action-slot desktop-q-h-action', data: 'data-personal-account-fund' })}
+    </div>
+    <div class="desktop-q-toolbar" data-desktop-q-secondary-tools data-v2-layer-gesture-ignore>
       ${compactCheck({ label: 'Показать', checked: account?.visibleToEndUser !== false, data: 'data-personal-account-q-visible', aria: 'Показать карту клиенту' })}
-      ${compactButton({ kind: 'settings', className: 'desktop-q-action-slot', data: 'data-personal-account-limit title="Лимит оплаты"', aria: 'Лимит оплаты' })}
-      ${button('Пополнить', { className: 'desktop-q-action-slot', data: 'data-personal-account-fund' })}
     </div>`;
   bindAccountVisibility(header.querySelector('[data-personal-account-q-visible]'), person, refresh);
   header.querySelector('[data-personal-account-fund]')?.addEventListener('click', () => openMoneyX(layer, person, account, 'fund', refresh, { desktop: true }));
