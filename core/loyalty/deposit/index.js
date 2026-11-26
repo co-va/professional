@@ -298,10 +298,13 @@ function historyEventMarkup(item = {}, operation = null, { desktop = false } = {
   if (item?.kind === 'deposit-funding' && item?.walletResolution === 'unknown') {
     rows.push({ label: 'Кошелёк', value: 'Не определён' });
   }
-  if (item?.reconciliationStatus === 'unmatched') {
-    rows.push({ label: 'Связь с Журналом', value: 'Не сопоставлена' });
-  } else if (item?.recordId) {
-    rows.push({ label: 'Связь с Журналом', value: 'Сопоставлена' });
+  // Reconciliation metadata belongs to the technical layer, not Desktop receipts.
+  if (!desktop) {
+    if (item?.reconciliationStatus === 'unmatched') {
+      rows.push({ label: 'Связь с Журналом', value: 'Не сопоставлена' });
+    } else if (item?.recordId) {
+      rows.push({ label: 'Связь с Журналом', value: 'Сопоставлена' });
+    }
   }
   rows.push({ label: 'Остаток', value: money(item?.balanceAfter) });
   if (item?.dueToFund != null) rows.push({ label: 'К оплате', value: money(item?.dueToFund) });
