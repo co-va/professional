@@ -547,8 +547,8 @@
    border-radius:14px;background:var(--white);border-color:var(--border);
  }
  .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact th{
-   height:var(--h-list-row);box-sizing:border-box;padding:4px 12px;background:#E0D6D6;color:#41484F;
-   font-size:12px;font-weight:750;line-height:1.2;letter-spacing:0;text-transform:uppercase;white-space:normal;
+   height:var(--h-list-row);box-sizing:border-box;padding:4px 12px;
+   white-space:normal;
    border-bottom:1px solid #E0D6D6;
  }
  .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact td{
@@ -620,7 +620,7 @@
    border-collapse:separate;border-spacing:0;
  }
  .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) [data-people-list-host]>.ui-data-table--compact thead th{
-   position:sticky;top:0;z-index:2;background:#E0D6D6;
+   position:sticky;top:0;z-index:2;background:var(--desktop-table-header-bg);
  }
 }
 
@@ -759,7 +759,7 @@
  .v2-app--workspace :is(.people-documents-popup,.desktop-table-popup) .ui-data-table--compact{border-radius:10px;overflow:hidden}
  .v2-app--workspace :is(.people-documents-popup,.desktop-table-popup) .ui-data-table--compact table{width:100%;table-layout:fixed;border-collapse:collapse}
  /* Q uses the exact existing documents popup header, not the H-list header. */
- .v2-app--workspace :is(.people-documents-popup,.desktop-table-popup,.service-consumables-q) .ui-data-table--compact th{background:#E0D6D6;color:#41484F;font-size:12px;font-weight:750;box-sizing:border-box;padding:8px 10px;vertical-align:middle;text-align:left}
+ .v2-app--workspace :is(.people-documents-popup,.desktop-table-popup,.service-consumables-q) .ui-data-table--compact th{box-sizing:border-box;padding:8px 10px;vertical-align:middle;text-align:left}
  .v2-app--workspace :is(.people-documents-popup,.desktop-table-popup) .ui-data-table--compact td{box-sizing:border-box;padding:8px 10px;vertical-align:middle;text-align:left}
  .v2-app--workspace :is(.people-documents-popup,.desktop-table-popup) .ui-data-table--compact td{height:44px;font-size:13px;color:#41484F}
  .v2-app--workspace :is(.people-documents-popup,.desktop-table-popup) .ui-data-table--compact :is(th,td)[data-table-column="icon"]{width:38px;text-align:center;padding:4px}
@@ -855,7 +855,7 @@
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z:has([data-service-desktop-group-list])>[data-v2-z-body]{display:flex;flex-direction:column;overflow:hidden!important;padding-bottom:0;scrollbar-gutter:auto}
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z:has([data-service-desktop-group-list]) :is([data-v2-workspace-surface],.ui-page,[data-service-catalog]){display:flex;flex-direction:column;flex:1 1 auto;min-height:0;min-width:0}
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-desktop-group-list]{display:flex;flex-direction:column;flex:0 1 auto;min-height:0;min-width:0;border:1px solid var(--border);border-radius:var(--radius-control);overflow:hidden;background:var(--white)}
- .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .service-desktop-group-header{box-sizing:border-box;display:flex;align-items:center;justify-content:space-between;gap:16px;flex:0 0 var(--h-list-row);height:var(--h-list-row);min-height:var(--h-list-row);max-height:var(--h-list-row);padding:0 12px 0 16px;background:#E0D6D6;color:#41484F;border-bottom:1px solid var(--border);font-size:12px;font-weight:750;font-style:italic;line-height:1.2;text-transform:uppercase}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .service-desktop-group-header{box-sizing:border-box;display:flex;align-items:center;justify-content:space-between;gap:16px;flex:0 0 var(--h-list-row);height:var(--h-list-row);min-height:var(--h-list-row);max-height:var(--h-list-row);padding:0 12px 0 16px;border-bottom:1px solid var(--border)}
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .service-desktop-group-select{display:flex;min-width:0;max-width:100%;flex:0 1 auto;gap:0}
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .service-desktop-group-select .ui-select__control{width:auto;height:36px;min-height:36px;max-height:36px;padding:0 24px 0 0;background:transparent;border:0;border-radius:0;color:#41484F;font-size:inherit;font-weight:inherit;font-style:inherit;text-transform:inherit}
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .service-desktop-group-select :is(.ui-select__selection,.ui-select__text){min-width:0;justify-content:flex-start;text-align:left}
@@ -863,7 +863,7 @@
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .service-desktop-group-select .ui-select__chevron{right:4px;color:#41484F}
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .service-desktop-price-title{flex:0 0 auto;text-align:right;white-space:nowrap}
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .service-desktop-group-title{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
- .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .service-desktop-group-header .service-desktop-group-select .ui-select__value{font-style:italic;text-transform:inherit}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .service-desktop-group-header .service-desktop-group-select .ui-select__value{font-style:inherit;text-transform:inherit}
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-desktop-group-list] :is([data-procedure],[data-product])>.list-entry__content{grid-template-columns:36px minmax(0,1fr) auto}
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-desktop-group-list] :is([data-procedure],[data-product]) .list-entry__right{grid-column:3;justify-self:end}
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .service-desktop-group-body[data-service-group-catalog]{display:block;flex:0 1 auto;min-height:0;overflow:auto;overscroll-behavior:none}
@@ -1097,4 +1097,18 @@
  body:has(.v2-app--workspace)>.v2-layer-backdrop--technical>.v2-layer--technical .document-page__version{line-height:16px}
  body:has(.v2-app--workspace)>.v2-layer-backdrop--technical>.v2-layer--technical .document-page h1{padding-right:40px}
  body:has(.v2-app--workspace)>.v2-layer-backdrop--technical>.v2-layer--technical:has(.document-viewer__pdf)>.v2-layer__close{top:calc(env(safe-area-inset-top) + 12px)}
+}
+
+/* Canonical Desktop table/group header (Clients, Service and every shared table). */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace{--desktop-table-header-bg:#E0D6D6;--desktop-table-header-ink:#41484F}
+ .v2-app--workspace :is(.ui-data-table th,.service-desktop-group-header){background:var(--desktop-table-header-bg);color:var(--desktop-table-header-ink);font-size:12px;font-weight:750;font-style:normal;line-height:1.2;letter-spacing:0;text-transform:uppercase}
+ .v2-app--workspace .ui-data-table th button{font-style:inherit;font-weight:inherit;text-transform:inherit}
+ .v2-app--workspace .loyalty-deposit-program-z .ui-data-table--compact :is(th,td){box-sizing:border-box;height:var(--h-list-row);padding-block:4px}
+ .v2-app--workspace .loyalty-deposit-program-z [data-table-column="visible"]{text-align:center}
+ .v2-app--workspace .loyalty-deposit-program-z [data-table-column="visible"] .ui-compact-check{display:grid;margin:auto}
+ .v2-app--workspace [data-deposit-program-toolbar] [data-deposit-program-visible]~.ui-compact-check__label{color:var(--white)}
+ .v2-app--workspace[data-v2-desktop-surface="list"] [data-deposit-program-toolbar] .v2-desktop-tool-actions>.ui-button--danger{background:var(--ui-delete-background);color:var(--ui-delete-foreground);border-color:var(--ui-delete-foreground)}
+ .v2-app--workspace .deposit-program-code-x [data-deposit-code-form]{display:grid;gap:24px}
+ .v2-app--workspace .deposit-program-code-x [data-deposit-code-error]:empty{display:none}
 }

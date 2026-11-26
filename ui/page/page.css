@@ -20,7 +20,7 @@
 
 @media (min-width:768px) and (min-height:600px){
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .ui-data-table--compact{border-radius:var(--radius-control)}
- .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .ui-data-table--compact th{background:var(--surface-soft)}
+ /* Desktop header appearance belongs to the shared rule in v2.css. */
 }
 
 /* Same H row token as the approved Clients table, for standardized Desktop

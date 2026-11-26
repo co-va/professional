@@ -146,6 +146,19 @@ try {
   assert.match(await create.textContent(),/Код/);
   assert.doesNotMatch(await create.textContent(),/UEI/);
   await page.locator('.v2-layer--standard:has([data-deposit-program-form]) [data-v2-q-close]').click();
+  await programs.locator('[data-deposit-program]').first().click();
+  const programDetail=page.locator('.loyalty-deposit-program-z');
+  await programDetail.locator('[data-deposit-program-toolbar]').waitFor({timeout:15000});
+  assert.equal(await programDetail.locator('[data-deposit-program-settings]').count(),0,'Desktop program has no V source');
+  for(const action of ['code','copy','fund','delete']) assert.equal(await programDetail.locator(`[data-deposit-program-action="${action}"]`).count(),1);
+  assert.equal(await programDetail.locator('[data-deposit-program-visible]').count(),1);
+  const issuedHeaders=programDetail.locator('.ui-data-table th');
+  if(await issuedHeaders.count()){
+    assert.equal(await issuedHeaders.first().evaluate(node=>getComputedStyle(node).backgroundColor),'rgb(224, 214, 214)');
+    assert.equal(await issuedHeaders.first().evaluate(node=>getComputedStyle(node).textTransform),'uppercase');
+    assert.equal(await programDetail.locator('[data-deposit-row-visible]').count(),await programDetail.locator('.ui-data-table tbody tr').count());
+  }
+  await programDetail.locator('[data-h-back]').click();
   const rail=programs.locator('[data-entity-card-rail]');
   await page.waitForFunction(()=>document.querySelector('[data-loyalty-program-section="deposit"] [data-loyalty-rail-next]')?.disabled===false);
   assert.equal(await rail.evaluate(node=>node.scrollWidth>node.clientWidth),true,'Deposit cards overflow horizontally');

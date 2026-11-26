@@ -339,7 +339,13 @@ function fundingEntries(deposit = {}) {
     .sort((a, b) => String(b?.occurredAt || '').localeCompare(String(a?.occurredAt || '')));
 }
 
-function issuedList(items = [], desktop = false) {
+function effectiveDepositVisibility(deposit, program) {
+  return typeof deposit.visibleToPersonOverride === 'boolean'
+    ? deposit.visibleToPersonOverride
+    : program?.showToAll !== false;
+}
+
+function issuedList(items = [], desktop = false, program = {}) {
   if (!items.length) return emptyState('Депозитов пока нет', 'Оформленные депозиты этой программы появятся здесь.');
   if (desktop) return dataTable({
     compact: true, caption: 'Оформленные депозиты',
@@ -348,10 +354,13 @@ function issuedList(items = [], desktop = false) {
       { key: 'name', label: 'Клиент', sortable: false, render: row => `<button type="button" data-deposit-instance="${escapeHtml(row.id)}">${escapeHtml(row.name)}</button>` },
       { key: 'nominal', label: 'Номинал', sortable: false }, { key: 'funded', label: 'Внесено', sortable: false },
       { key: 'balance', label: 'Остаток', sortable: false }, { key: 'status', label: 'Состояние', sortable: false },
+      { key: 'visible', label: 'Показать', sortable: false, narrow: true, render: row => compactCheck({
+        checked: row.visible, data: `data-deposit-row-visible="${escapeHtml(row.id)}"`, aria: `Показать карту клиенту ${row.name}`,
+      }) },
     ],
     rows: items.map(deposit => {
       const payment = depositFundingProgress(deposit);
-      return { id: deposit.depositId, code: depositUei(deposit), name: contactLabel(depositPerson(deposit)),
+      return { id: deposit.depositId, code: depositUei(deposit), name: contactLabel(depositPerson(deposit)), visible: effectiveDepositVisibility(deposit, program),
         nominal: payment.fixed ? money(payment.nominal) : 'Свободная сумма', funded: money(payment.funded), balance: money(deposit.balance),
         status: deposit.status === 'active' && payment.fixed ? (payment.paid ? 'Оплачено' : 'К оплате ' + money(payment.due)) : depositStatusLabel(deposit.status) };
     }),
@@ -384,13 +393,13 @@ async function deleteProgram(programId) {
   releaseUEI({ entityType: PROGRAM_UEI_TYPE, entityId: id });
 }
 
-function openProgramCodeX(program, onSaved = () => {}) {
+function openProgramCodeX(program, onSaved = () => {}, { desktop = false } = {}) {
   const current = programUei(program);
   const layer = mountModal(document.body, modal(`<form class="form-grid" data-deposit-code-form>
     ${ueiField({ value: current, required: true })}
     ${button('Сохранить', { type: 'submit' })}
     <div class="form-error" data-deposit-code-error></div>
-  </form>`, { title: 'UEI программы', variant: 'x', surface: 'app' }));
+  </form>`, { title: desktop ? 'Код программы' : 'UEI программы', variant: 'x', surface: 'app', className: desktop ? 'deposit-program-code-x' : '' }));
   if (!layer) return null;
   bindUeiInput(layer);
   const form = layer.querySelector('[data-deposit-code-form]');
@@ -876,8 +885,8 @@ function openDepositSettingsMenu(options = {}) {
   return openLoyaltySettingsMenu(options);
 }
 
-function openProgramSettings(root, program, { person = null, rerender = async () => {}, onChanged = () => {} } = {}) {
-  return openDepositSettingsMenu({
+function programSettings(root, program, { person = null, rerender = async () => {}, onChanged = () => {}, desktop = false } = {}) {
+  return {
     title: program.name || 'Депозит',
     checked: program?.showToAll !== false,
     onToggle: async (checked) => {
@@ -890,7 +899,7 @@ function openProgramSettings(root, program, { person = null, rerender = async ()
       { id: 'code', label: `UEI · ${programUei(program) || 'не задан'}`, onSelect: () => openProgramCodeX(program, async () => {
         await rerender();
         await onChanged?.();
-      }) },
+      }, { desktop }) },
       { id: 'copy', label: 'Создать копию', onSelect: () => openCreateProgramQ(root, async () => {
         await rerender();
         await onChanged?.();
@@ -914,6 +923,69 @@ function openProgramSettings(root, program, { person = null, rerender = async ()
         },
       },
     ],
+  };
+}
+
+function openProgramSettings(root, program, options) {
+  return openDepositSettingsMenu(programSettings(root, program, options));
+}
+
+function bindProgramVisibility(control, save, title) {
+  control?.addEventListener('change', async () => {
+    const requested = Boolean(control.checked);
+    control.disabled = true;
+    try {
+      const resolved = await save(requested);
+      if (control.isConnected && typeof resolved === 'boolean') control.checked = resolved;
+    } catch (error) {
+      if (control.isConnected) control.checked = !requested;
+      openNotice({ title, message: error instanceof Error ? error.message : 'Не удалось сохранить видимость карты.' });
+    } finally {
+      if (control.isConnected) control.disabled = false;
+    }
+  });
+}
+
+function bindDesktopProgramTools(layer, program, settings) {
+  const toolsMarkup = `<div class="v2-desktop-tool-row" data-deposit-program-toolbar>
+    <div class="v2-desktop-tool-context">${compactCheck({ label: 'Показать всем', checked: settings.checked, data: 'data-deposit-program-visible', aria: 'Показывать карты программы по умолчанию' })}</div>
+    <div class="v2-desktop-tool-actions">
+      ${button('Код · ' + escapeHtml(programUei(program) || '—'), { variant: 'secondary', data: 'data-deposit-program-action="code"', aria: 'Изменить код программы' })}
+      ${button('Создать копию', { variant: 'secondary', data: 'data-deposit-program-action="copy"' })}
+      ${button('Удалить программу', { variant: 'danger', data: 'data-deposit-program-action="delete"' })}
+      ${button('+', { variant: 'secondary', className: 'v2-desktop-tool-primary', data: 'data-deposit-program-action="fund" title="Оформить карту"', aria: 'Оформить карту' })}
+    </div>
+  </div>`;
+  const [tools] = setV2ZHeaderRows(layer, [toolsMarkup], { desktopTitle: settings.title });
+  if (!tools) return;
+  bindProgramVisibility(tools.querySelector('[data-deposit-program-visible]'), settings.onToggle, 'Настройки программы');
+  tools.querySelectorAll('[data-deposit-program-action]').forEach(control => {
+    control.addEventListener('click', () => {
+      const action = settings.actions.find(item => item.id === control.dataset.depositProgramAction);
+      if (!action) return;
+      if (action.id !== 'delete') {
+        void action.onSelect();
+        return;
+      }
+      const confirmation = mountModal(layer, modal(`<div class="modal-title"><h2>Удалить программу?</h2><p>${escapeHtml(settings.title)}. Будут удалены данные этой программы в соответствии с действующим механизмом удаления.</p></div>
+        <div class="modal-actions">
+          ${button('Удалить', { variant: 'danger', data: 'data-confirm-program-delete' })}
+          ${button('Отмена', { variant: 'secondary', data: 'data-cancel-program-delete' })}
+        </div>`, { title: 'Удалить программу', variant: 'x', surface: 'app' }));
+      confirmation?.querySelector('[data-cancel-program-delete]')?.addEventListener('click', () => confirmation.v2Close?.());
+      confirmation?.querySelector('[data-confirm-program-delete]')?.addEventListener('click', async event => {
+        const confirm = event.currentTarget;
+        confirm.disabled = true;
+        try {
+          await action.onSelect();
+          confirmation.v2Close?.();
+        } catch (error) {
+          openNotice({ title: 'Удалить программу', message: error instanceof Error ? error.message : 'Не удалось удалить программу.' });
+        } finally {
+          if (confirm.isConnected) confirm.disabled = false;
+        }
+      });
+    });
   });
 }
 
@@ -1057,10 +1129,7 @@ async function openDepositQ(root, depositId, onChanged = () => {}) {
       releaseUEI({ entityType: ASSIGNED_DEPOSIT_UEI_TYPE, entityId: deposit.depositId });
     }
     const program = getDepositPrograms().find((item) => String(item?.id) === String(deposit.programId)) || {};
-    const inheritedVisible = program?.showToAll !== false;
-    const effectiveVisible = typeof deposit.visibleToPersonOverride === 'boolean'
-      ? deposit.visibleToPersonOverride
-      : inheritedVisible;
+    const effectiveVisible = effectiveDepositVisibility(deposit, program);
     const host = layer.querySelector('[data-deposit-instance-q-host]');
     if (!host) return;
     const desktop = isV2DesktopWorkspace(layer.closest('[data-v2-app]'));
@@ -1113,19 +1182,31 @@ async function openProgramLayer(root, programId, { person = null, onChanged = ()
     for (const deposit of issued) {
       if (getUEI(ASSIGNED_DEPOSIT_UEI_TYPE, deposit.depositId)) releaseUEI({ entityType: ASSIGNED_DEPOSIT_UEI_TYPE, entityId: deposit.depositId });
     }
+    const desktop = isV2DesktopWorkspace(layer.closest('[data-v2-app]'));
     layer.innerHTML = page([
       depositHeaderContext({
         title: program.name || 'Депозит',
-        settingsData: 'data-deposit-program-settings',
+        settingsData: desktop ? '' : 'data-deposit-program-settings',
         settingsAria: 'Настройки депозитной программы',
       }),
-      v2Section('Оформленные депозиты', issuedList(issued, isV2DesktopWorkspace(layer.closest('[data-v2-app]')))),
+      v2Section('Оформленные депозиты', issuedList(issued, desktop, program)),
     ]);
-    layer.querySelector('[data-deposit-program-settings]')?.addEventListener('click', () => openProgramSettings(root, program, {
-      person,
-      rerender: render,
-      onChanged,
-    }));
+    if (desktop) {
+      bindDesktopProgramTools(layer, program, programSettings(layer, program, { person, rerender: render, onChanged, desktop: true }));
+      layer.querySelectorAll('[data-deposit-row-visible]').forEach(control => {
+        bindProgramVisibility(control, async checked => {
+          const saved = await updateDepositSettings(control.dataset.depositRowVisible, { visibleToPerson: checked });
+          return saved ? effectiveDepositVisibility(saved, program) : checked;
+        }, 'Настройки карты');
+      });
+    } else {
+      setV2ZHeaderRows(layer, []);
+      layer.querySelector('[data-deposit-program-settings]')?.addEventListener('click', () => openProgramSettings(root, program, {
+        person,
+        rerender: render,
+        onChanged,
+      }));
+    }
     layer.querySelectorAll('[data-deposit-instance]').forEach((node) => {
       node.addEventListener('click', () => openDepositQ(layer, node.dataset.depositInstance, async () => {
         await render();
