@@ -626,7 +626,7 @@
 
 /* One contact cell, two unchanged visit columns, compact rounded Contacts X. */
 @media (min-width:768px) and (min-height:600px){
- .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .people-table-person{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;width:100%;min-width:0;line-height:1.15}
+ .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar],[data-personal-account-list-host]) .people-table-person{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;width:100%;min-width:0;line-height:1.15}
  .people-table-person__name{font-size:13px;font-weight:650;overflow-wrap:anywhere}
   .people-table-person__phone{font-size:12px;font-weight:400;color:var(--text-secondary);white-space:nowrap;font-variant-numeric:tabular-nums}
  .people-sort-popup :is(.people-action-menu,.desktop-q-action-menu)>.ui-button[aria-pressed="true"]{font-weight:750;background:var(--surface-soft);border-radius:8px}
@@ -649,9 +649,11 @@
 /* Desktop Clients: preserve the approved 110px date columns, make Code visible,
    and reserve independent metric columns. Horizontal overflow stays in the table. */
 @media (min-width:768px) and (min-height:600px){
- .v2-app--workspace [data-people-list-host]>.ui-data-table--compact [data-table-column="code"]{width:72px;min-width:72px;text-align:left;font-variant-numeric:tabular-nums}
- .v2-app--workspace [data-people-list-host]>.ui-data-table--compact td[data-table-column="code"]{font-size:14px;font-weight:750;color:#111}
- .v2-app--workspace [data-people-list-host]>.ui-data-table--compact [data-table-column="name"]{min-width:155px}
+ .v2-app--workspace :is([data-people-list-host],[data-personal-account-list-host])>.ui-data-table--compact [data-table-column="code"]{width:72px;min-width:72px;text-align:left;font-variant-numeric:tabular-nums}
+ .v2-app--workspace :is([data-people-list-host],[data-personal-account-list-host])>.ui-data-table--compact td[data-table-column="code"]{font-size:14px;font-weight:750;color:#111}
+ .v2-app--workspace :is([data-people-list-host],[data-personal-account-list-host])>.ui-data-table--compact [data-table-column="name"]{min-width:155px}
+  .v2-app--workspace [data-personal-account-list-host]>.ui-data-table--compact [data-table-column="code"]{max-width:72px}
+  .v2-app--workspace [data-personal-account-list-host]>.ui-data-table--compact td[data-table-column="name"]>button{display:block;width:100%;min-width:0}
  .v2-app--workspace [data-people-list-host]>.ui-data-table--compact [data-table-column="visitCount"]{width:96px;min-width:96px;text-align:center;font-variant-numeric:tabular-nums}
  .v2-app--workspace [data-people-list-host]>.ui-data-table--compact :is([data-table-column="paidTotal"],[data-table-column="debt"]){width:112px;min-width:112px;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
  .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact th:is([data-table-column="visitCount"],[data-table-column="paidTotal"],[data-table-column="debt"]){padding:4px 6px}
@@ -848,7 +850,7 @@
 
 @media (min-width:768px) and (min-height:600px){
  .v2-app--workspace [data-people-list-host] .ui-compact-check{display:grid;margin:auto}
- .v2-app--workspace [data-people-list-host] .people-table-person__name{white-space:nowrap;overflow-wrap:normal}
+ .v2-app--workspace :is([data-people-list-host],[data-personal-account-list-host]) .people-table-person__name{white-space:nowrap;overflow-wrap:normal}
 }
 
 /* Service Desktop: one visible catalogue panel, same stationary 44px header
