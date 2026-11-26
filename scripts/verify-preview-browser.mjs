@@ -112,6 +112,21 @@ try {
   assert.deepEqual(await geometryOf(typeSelector),{height:36,border:'1px'});
   for(const control of [targetSelector,fieldSelector,line,format])assert.deepEqual(await geometryOf(control),await geometryOf(typeSelector));
   assert.equal(await fieldSelector.locator('.ui-select__text').evaluate(node=>getComputedStyle(node).display),'flex');
+  const sectionGaps = await appearance.evaluate(node => {
+    const rect = selector => node.querySelector(selector).getBoundingClientRect();
+    const gap = (above, below) => Math.round(rect(below).top - rect(above).bottom);
+    return {
+      header: gap('.entity-card-appearance-q__selectors', '.entity-card-editor__preview'),
+      preview: gap('.entity-card-editor__preview', '.entity-card-editor__tabs'),
+      tabs: gap('.entity-card-editor__tabs', '.entity-card-editor__section--placement'),
+      placement: gap('.entity-card-editor__section--placement', '.entity-card-editor__section--data'),
+      field: gap('.entity-card-editor__section--data', '.entity-card-editor__section--format'),
+    };
+  });
+  assert.ok(sectionGaps.header >= 24, JSON.stringify(sectionGaps));
+  for (const key of ['preview','tabs','placement','field']) {
+    assert.equal(sectionGaps[key],24, key + ' must use the common View section gap');
+  }
   assert.equal(await appearance.locator('[data-card-q-save]').isVisible(),false);
   await format.click();
   assert.equal(await appearance.locator('[data-v2-q-header] [data-card-q-save]').isVisible(),true);
