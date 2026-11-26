@@ -60,19 +60,27 @@ async function renderDesktopPrograms(root) {
   const visible = loyaltyNavigationItems().filter(item => item.assignableToPerson);
   root.innerHTML = page([
     loyaltyHeader('Лояльность'),
-    ...visible.map(item => '<div data-loyalty-program-section="' + item.id + '"></div>'),
+    ...visible.map(item => '<div data-loyalty-program-section="' + item.id + '">' + emptyState(LOYALTY_NAVIGATION.find(entry => entry.id === item.id)?.overviewLabel || item.label, 'Загрузка…') + '</div>'),
   ]);
   setV2ZHeaderRows(root, [], { desktopTitle: 'Лояльность' });
   const sections = visible.map(async item => {
     const host = root.querySelector('[data-loyalty-program-section="' + item.id + '"]');
     if (!host) return;
     host.dataset.loyaltyOverviewTitle = LOYALTY_NAVIGATION.find(entry => entry.id === item.id)?.overviewLabel || item.label;
-    try {
-      const owner = await loadLoyaltyModule(item.id);
-      if (host.isConnected) await owner.render(host);
-    } catch (error) {
-      if (host.isConnected) host.innerHTML = emptyState(host.dataset.loyaltyOverviewTitle, String(error?.message || 'Не удалось загрузить программы'));
-    }
+    const render = async () => {
+      try {
+        const owner = await loadLoyaltyModule(item.id);
+        if (host.isConnected) await owner.render(host);
+      } catch (error) {
+        if (!host.isConnected) return;
+        host.innerHTML = emptyState(host.dataset.loyaltyOverviewTitle, String(error?.message || 'Не удалось загрузить программы')) + '<button type="button" class="ui-button ui-button--secondary" data-loyalty-program-retry>Повторить</button>';
+        host.querySelector('[data-loyalty-program-retry]')?.addEventListener('click', () => {
+          host.innerHTML = emptyState(host.dataset.loyaltyOverviewTitle, 'Загрузка…');
+          void render();
+        });
+      }
+    };
+    await render();
   });
   await Promise.all(sections);
 }

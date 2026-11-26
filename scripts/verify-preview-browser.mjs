@@ -21,7 +21,9 @@ try {
     const url=new URL(r.request().url());
     if(isApi(url.href)) {
       const body=url.pathname.endsWith('/auth/me')?{account:{id:'preview-smoke',email:'preview@example.invalid'},tenantId:'preview-smoke'}:
-        url.pathname.endsWith('/saas-access/me')?{tenantId:'preview-smoke',status:'ACTIVE',commercialMode:'LIVE',capabilities:['profile.access','workplaces.access','journal.day.access','journal.month.access','timetable.access'].map(key=>({key,valueType:'BOOLEAN',enabled:true}))}:
+        url.pathname.endsWith('/saas-access/me')?{tenantId:'preview-smoke',status:'ACTIVE',commercialMode:'LIVE',capabilities:['profile.access','workplaces.access','journal.day.access','journal.month.access','timetable.access','loyalty.deposit.access','loyalty.personal_account.access'].map(key=>({key,valueType:'BOOLEAN',enabled:true}))}:
+        url.pathname.endsWith('/auxiliary-state/loyalty')?{wallets:[],depositPrograms:Array.from({length:4},(_,i)=>({id:'smoke-program-'+i,name:'Тестовый депозит '+(i+1),amount:10000,amountMode:'fixed',status:'active',termMode:'indefinite'}))}:
+        url.pathname.endsWith('/loyalty/personal-accounts')?[{personKey:'smoke-person',hasActivity:true,balance:0,debtTotal:0,movements:[{id:'smoke-event',kind:'funding',amount:100,occurredAt:'2026-01-01T10:00:00Z'}],debts:[]}]:
         url.pathname.endsWith('/business-state/operational')?{procedures:[],days:[]}:
         url.pathname.endsWith('/auth/email-verification/status')?{email:'preview@example.invalid',verified:true}:{};
       if (url.pathname.endsWith('/business-state/operational')) await operationalReady;
@@ -86,6 +88,24 @@ try {
   await page.waitForFunction(()=>document.querySelector('.v2-app--workspace')?.dataset.v2DesktopSurface==='journal');
   assert.equal(await journalBody.evaluate(node=>getComputedStyle(node).borderTopLeftRadius),'34px','Return to Journal restores Z body');
   console.log('PASS: Journal-only Desktop Z; non-Journal H; Mobile Z preserved');
+  await page.setViewportSize({width:1024,height:768});
+  await shell.locator('[data-v2-root-item="loyalty"]').click({timeout:15000});
+  const programs=surface.locator('[data-loyalty-program-section="deposit"]');
+  await programs.locator('[data-deposit-program]').first().waitFor({timeout:20000});
+  assert.equal(await programs.locator('[data-deposit-program]').count(),4,'All synthetic deposit programs rendered');
+  assert.equal(await shell.locator('[data-v2-secondary-item="programs"]').count(),1);
+  const rail=programs.locator('[data-entity-card-rail]');
+  await page.waitForFunction(()=>document.querySelector('[data-loyalty-program-section="deposit"] [data-loyalty-rail-next]')?.disabled===false);
+  assert.equal(await rail.evaluate(node=>node.scrollWidth>node.clientWidth),true,'Deposit cards overflow horizontally');
+  await programs.locator('[data-loyalty-rail-next]').click({timeout:10000});
+  await page.waitForFunction(()=>document.querySelector('[data-loyalty-program-section="deposit"] [data-entity-card-rail]')?.scrollLeft>0);
+  // Actual click out of the formerly hanging section, not a forced DOM event.
+  await shell.locator('[data-v2-secondary-item="personal-account"]').click({timeout:10000});
+  await surface.locator('[data-personal-account-person]').first().waitFor({timeout:15000});
+  assert.equal(await surface.locator('[data-personal-account-person]').count(),1,'Paid-off account with history remains visible');
+  await shell.locator('[data-v2-root-item="journal"]').click({timeout:10000});
+  await page.waitForFunction(()=>document.querySelector('.v2-app--workspace')?.dataset.v2DesktopSurface==='journal');
+  console.log('PASS: tablet-sized loyalty cards render, overflow controls work, personal-account table and navigation remain responsive');
   const assets=await page.evaluate(()=>performance.getEntriesByType('resource').map(r=>new URL(r.name).pathname));
   assert.ok(assets.some(p=>p.startsWith('/assets/')&&p.endsWith('.js')));
   assert.ok(!assets.some(p=>p==='/professional.js'||p==='/professional/workspace.js'||p.startsWith('/core/')));

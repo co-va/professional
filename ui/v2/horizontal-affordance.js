@@ -47,7 +47,7 @@ function syncSection(section) {
   const rails = [...section.querySelectorAll(V2_HORIZONTAL_RAIL_SELECTOR)];
   rails.forEach(positionCurrentRailItem);
   const hasMore = rails.some(isHorizontallyScrollable);
-  section.classList.toggle('has-v2-horizontal-rail', hasMore);
+  if (section.classList.contains('has-v2-horizontal-rail') !== hasMore) section.classList.toggle('has-v2-horizontal-rail', hasMore);
   rails.forEach(rail => rail.dispatchEvent(new Event('v2:rail-layout')));
 }
 
@@ -57,23 +57,28 @@ export function syncV2HorizontalAffordances(root = document) {
 
 export function bindV2HorizontalAffordances(root) {
   if (!root?.querySelectorAll || typeof MutationObserver !== 'function') return () => {};
-  let queued = false;
+  // Never re-enter the header/rail MutationObserver chain within the same
+  // microtask checkpoint. Safari can otherwise starve painting and input.
+  let frame = 0;
   const sync = () => {
-    queued = false;
+    frame = 0;
     if (!root.isConnected) return;
     syncV2HorizontalAffordances(root);
   };
   const queue = () => {
-    if (queued) return;
-    queued = true;
-    queueMicrotask(sync);
+    if (frame) return;
+    frame = requestAnimationFrame(sync);
   };
 
   syncV2HorizontalAffordances(root);
   const observer = new MutationObserver(queue);
   observer.observe(root, { childList: true, subtree: true });
   window.addEventListener('resize', queue);
-  return () => { observer.disconnect(); window.removeEventListener('resize', queue); };
+  return () => {
+    observer.disconnect();
+    window.removeEventListener('resize', queue);
+    if (frame) cancelAnimationFrame(frame);
+  };
 }
 
 /** Existing Desktop rail navigation, independent of card owner. */
@@ -90,9 +95,12 @@ export function bindDesktopRailControls(rail, { prefix = 'rail', label = 'кар
   const next = nav.querySelector('[data-' + prefix + '-next]');
   const sync = () => {
     const max = Math.max(0, rail.scrollWidth - rail.clientWidth);
-    nav.hidden = max <= 1;
-    prev.disabled = rail.scrollLeft <= 1;
-    next.disabled = rail.scrollLeft >= max - 1;
+    const hidden = max <= 1;
+    const atStart = rail.scrollLeft <= 1;
+    const atEnd = rail.scrollLeft >= max - 1;
+    if (nav.hidden !== hidden) nav.hidden = hidden;
+    if (prev.disabled !== atStart) prev.disabled = atStart;
+    if (next.disabled !== atEnd) next.disabled = atEnd;
   };
   const step = direction => {
     const max = Math.max(0, rail.scrollWidth - rail.clientWidth);
