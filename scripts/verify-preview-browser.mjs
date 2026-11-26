@@ -171,6 +171,21 @@ try {
   await issuedQ.locator('[data-deposit-history-entry]').first().waitFor({timeout:10000});
   assert.equal(await issuedQ.locator('.v2-section__title').filter({hasText:'История'}).count(),1);
   await issuedQ.locator('[data-v2-q-close]').click();
+  // Open the same issued deposit through the Mobile rendering path.
+  await programDetail.locator('[data-h-back]').click();
+  await page.setViewportSize({width:390,height:844});
+  await programs.locator('[data-deposit-program]').first().click();
+  await programDetail.locator('[data-deposit-instance]').first().click();
+  await issuedQ.locator('.entity-visual-card').waitFor({timeout:15000});
+  await issuedQ.locator('[data-deposit-history-entry]').first().waitFor({timeout:10000});
+  assert.equal(await issuedQ.locator('[data-deposit-card-history]').count(),0,'No second Mobile history Q');
+  assert.equal(await issuedQ.locator('[data-deposit-instance-settings]').count(),1,'Mobile V is preserved');
+  assert.equal(await page.locator('[data-v2-q="true"]').count(),1,'One Mobile Q for card and history');
+  await page.evaluate(()=>document.querySelector('.loyalty-deposit-instance-q')?.closest('[data-v2-layer]')?.v2Close?.());
+  await page.evaluate(()=>document.querySelector('.loyalty-deposit-program-z')?.v2Close?.());
+  await page.setViewportSize({width:1024,height:768});
+  await programs.locator('[data-deposit-program]').first().click();
+  await programDetail.locator('[data-deposit-program-toolbar]').waitFor({timeout:15000});
   await programDetail.locator('[data-deposit-program-action="copy"]').click();
   const copyForm=page.locator('[data-deposit-program-form]');
   await copyForm.waitFor({timeout:10000});

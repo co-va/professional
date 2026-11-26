@@ -322,17 +322,6 @@ function bindDepositHistory(root, items) {
   });
 }
 
-function openDepositHistoryQ(root, deposit) {
-  const items = depositHistoryNewest(deposit);
-  const layer = mountModal(root, modal(historyListMarkup(deposit, items), {
-    variant: 'q',
-    surface: 'app',
-    title: 'История',
-  }));
-  if (layer) bindDepositHistory(layer, items);
-  return layer;
-}
-
 function fundingEntries(deposit = {}) {
   return (Array.isArray(deposit?.history) ? deposit.history : [])
     .filter((item) => item?.kind === 'deposit-funding' && String(item?.operationId || ''))
@@ -1141,8 +1130,8 @@ async function openDepositQ(root, depositId, onChanged = () => {}) {
         settingsData: desktop ? '' : 'data-deposit-instance-settings',
         settingsAria: 'Настройки депозита',
       }),
-      personDepositCard(deposit, { interactive: !desktop, history: !desktop }),
-      desktop ? v2Section('История', historyListMarkup(deposit, items)) : '',
+      personDepositCard(deposit, { interactive: false }),
+      v2Section('История', historyListMarkup(deposit, items)),
       desktop ? actionBlock(button('Удалить карту', {
         variant: 'danger', data: 'data-deposit-instance-delete data-ui-keyboard-action="auxiliary"',
       })) : '',
@@ -1151,12 +1140,8 @@ async function openDepositQ(root, depositId, onChanged = () => {}) {
     else host.querySelector('[data-deposit-instance-settings]')?.addEventListener('click', () => {
       openDepositSettings(root, layer, deposit, effectiveVisible, render, onChanged);
     });
-    if (desktop) {
-      bindDepositHistory(host, items);
-      bindDepositDelete(layer, host, settings);
-    } else {
-      host.querySelector('[data-deposit-card-history]')?.addEventListener('click', () => openDepositHistoryQ(layer, deposit));
-    }
+    bindDepositHistory(host, items);
+    if (desktop) bindDepositDelete(layer, host, settings);
     notifyContext();
   };
 
@@ -1262,7 +1247,7 @@ function assignedDepositFields(deposit) {
   });
 }
 
-function personDepositCard(deposit, { interactive = true, history = false } = {}) {
+function personDepositCard(deposit, { interactive = true } = {}) {
   const program = getDepositPrograms().find(item => String(item.id) === String(deposit?.programId)) || {};
   return entityVisualCard({
     appearance: depositCardAppearance(program),
@@ -1270,8 +1255,8 @@ function personDepositCard(deposit, { interactive = true, history = false } = {}
     image: depositCardPhoto(program),
     imagePosition: depositCardPhotoPosition(program),
     interactive,
-    data: interactive ? (history ? 'data-deposit-card-history' : `data-person-program="deposit:${escapeHtml(deposit?.depositId || deposit?.id || '')}"`) : '',
-    aria: history && interactive ? 'Открыть историю депозита' : interactive ? `Открыть депозит ${deposit?.programName || ''}` : String(deposit?.programName || 'Депозит'),
+    data: interactive ? `data-person-program="deposit:${escapeHtml(deposit?.depositId || deposit?.id || '')}"` : '',
+    aria: interactive ? `Открыть депозит ${deposit?.programName || ''}` : String(deposit?.programName || 'Депозит'),
   });
 }
 
