@@ -23,6 +23,7 @@ try {
       const body=url.pathname.endsWith('/auth/me')?{account:{id:'preview-smoke',email:'preview@example.invalid'},tenantId:'preview-smoke'}:
         url.pathname.endsWith('/saas-access/me')?{tenantId:'preview-smoke',status:'ACTIVE',commercialMode:'LIVE',capabilities:['profile.access','workplaces.access','journal.day.access','journal.month.access','timetable.access','loyalty.deposit.access','loyalty.personal_account.access'].map(key=>({key,valueType:'BOOLEAN',enabled:true}))}:
         url.pathname.endsWith('/auxiliary-state/loyalty')?{wallets:[],depositPrograms:Array.from({length:4},(_,i)=>({id:'smoke-program-'+i,name:'Тестовый депозит '+(i+1),amount:10000,amountMode:'fixed',status:'active',termMode:'indefinite'}))}:
+        url.pathname.endsWith('/loyalty/deposits/smoke-issued-1/settings')?{depositId:'smoke-issued-1',visibleToPersonOverride:r.request().postDataJSON()?.visibleToPerson}:
         url.pathname.endsWith('/loyalty/deposits')?[{depositId:'smoke-issued-1',programId:'smoke-program-0',programName:'Тестовый депозит 1',person:{key:'smoke-person',name:'Тестовый клиент',uei:'T001'},status:'active',balance:10000,fundedAmount:10000,cardSequence:1,fundedAt:'2026-01-01T10:00:00Z',terms:{amount:10000,amountMode:'fixed',termMode:'indefinite'},history:[{operationId:'smoke-funding',kind:'deposit-funding',direction:'in',amount:10000,occurredAt:'2026-01-01T10:00:00Z',recordedAt:'2026-01-02T10:00:00Z',origin:'application',walletName:'Наличные',recordId:'smoke-record'}]},{depositId:'smoke-issued-debt',programId:'smoke-program-0',programName:'Тестовый депозит 1',person:{key:'smoke-debt-person',name:'Долг'},status:'active',balance:20000,fundedAmount:20000,cardSequence:2,fundedAt:'2025-01-01T10:00:00Z',terms:{amount:50000,amountMode:'fixed',termMode:'dated',termStartDate:'2025-01-01',termEndDate:'2099-12-31'},history:[]},{depositId:'smoke-issued-future',programId:'smoke-program-0',programName:'Тестовый депозит 1',person:{key:'smoke-future-person',name:'Будущая карта'},status:'active',balance:20000,fundedAmount:20000,cardSequence:3,fundedAt:'2025-01-01T10:00:00Z',terms:{amount:50000,amountMode:'fixed',termMode:'dated',termStartDate:'2099-01-01',termEndDate:'2099-12-31'},history:[]}]:
         url.pathname.endsWith('/loyalty/personal-accounts')?[{personKey:'smoke-person',hasActivity:true,balance:0,debtTotal:0,movements:[{id:'smoke-event',kind:'funding',amount:100,occurredAt:'2026-01-01T10:00:00Z'}],debts:[]}]:
         url.pathname.endsWith('/business-state/operational')?{procedures:[],days:[]}:
@@ -165,6 +166,14 @@ try {
   assert.equal(await issuedHeaders.first().evaluate(node=>getComputedStyle(node).backgroundColor),'rgb(224, 214, 214)');
   assert.equal(await issuedHeaders.first().evaluate(node=>getComputedStyle(node).textTransform),'uppercase');
   assert.equal(await programDetail.locator('[data-deposit-row-visible]').count(),await programDetail.locator('.ui-data-table tbody tr').count());
+  const depositCount=programDetail.locator('[data-deposit-count]');
+  assert.equal(await depositCount.textContent(),'3 / 3','Issued / visible count');
+  const firstVisibility=programDetail.locator('[data-deposit-row-visible="smoke-issued-1"]');
+  await firstVisibility.uncheck();
+  await page.waitForFunction(()=>document.querySelector('[data-deposit-count]')?.textContent==='3 / 2');
+  await firstVisibility.check();
+  await page.waitForFunction(()=>document.querySelector('[data-deposit-count]')?.textContent==='3 / 3');
+  assert.equal(await page.locator('[data-v2-q="true"]').count(),0,'Visibility does not open a Q');
   const debtStatus=programDetail.locator('[data-deposit-open-row="smoke-issued-debt"] .deposit-list-status');
   const futureStatus=programDetail.locator('[data-deposit-open-row="smoke-issued-future"] .deposit-list-status');
   assert.equal(await debtStatus.locator('span').first().textContent(),'Задолженность');

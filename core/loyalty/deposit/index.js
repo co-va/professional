@@ -1228,20 +1228,36 @@ async function openProgramLayer(root, programId, { person = null, onChanged = ()
       if (getUEI(ASSIGNED_DEPOSIT_UEI_TYPE, deposit.depositId)) releaseUEI({ entityType: ASSIGNED_DEPOSIT_UEI_TYPE, entityId: deposit.depositId });
     }
     const desktop = isV2DesktopWorkspace(layer.closest('[data-v2-app]'));
+    const visibility = new Map(issued.map(deposit => [String(deposit.depositId), effectiveDepositVisibility(deposit, program)]));
     layer.innerHTML = page([
       depositHeaderContext({
         title: program.name || 'Депозит',
         settingsData: desktop ? '' : 'data-deposit-program-settings',
         settingsAria: 'Настройки депозитной программы',
       }),
-      v2Section('Оформленные депозиты', issuedList(issued, desktop, program)),
+      v2Section('Оформленные депозиты', issuedList(issued, desktop, program), {
+        accessory: desktop ? '<output data-deposit-count aria-live="polite"></output>' : '',
+      }),
     ]);
     if (desktop) {
+      const counter = layer.querySelector('[data-deposit-count]');
+      const updateCount = () => {
+        if (!counter?.isConnected) return;
+        const total = issued.length;
+        const shown = [...visibility.values()].filter(Boolean).length;
+        counter.textContent = `${total} / ${shown}`;
+        counter.setAttribute('aria-label', `Оформлено депозитов: ${total}. Показано клиентам: ${shown}`);
+      };
+      updateCount();
       bindDesktopProgramTools(layer, program, programSettings(layer, program, { person, rerender: render, onChanged, desktop: true }));
       layer.querySelectorAll('[data-deposit-row-visible]').forEach(control => {
         bindProgramVisibility(control, async checked => {
-          const saved = await updateDepositSettings(control.dataset.depositRowVisible, { visibleToPerson: checked });
-          return saved ? effectiveDepositVisibility(saved, program) : checked;
+          const id = control.dataset.depositRowVisible;
+          const saved = await updateDepositSettings(id, { visibleToPerson: checked });
+          const resolved = saved ? effectiveDepositVisibility(saved, program) : checked;
+          visibility.set(id, resolved);
+          updateCount();
+          return resolved;
         }, 'Настройки карты');
       });
     } else {
