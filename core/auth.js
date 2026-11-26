@@ -35,6 +35,28 @@ function defaultReadTimeout(path) {
   return DEFAULT_READ_TIMEOUT_MS;
 }
 
+// Staging Preview can intermittently return an upstream 5xx. Keep the
+// saved session and retry only the two affected idempotent GET requests,
+// under the original request deadline. Never retry financial mutations.
+function shouldRetryPreviewRead(path, method) {
+  return typeof location !== 'undefined'
+    && location.hostname === 'professional-volokovykh.msk1.amvera.tech'
+    && API_BASE === '/api'
+    && method === 'GET'
+    && (path === '/auth/me' || path === '/loyalty/personal-accounts');
+}
+
+async function fetchPreviewRead(url, options) {
+  const retryable = new Set([500, 502, 503, 504]);
+  for (let attempt = 0; ; attempt += 1) {
+    const response = await fetch(url, { ...options, cache: 'no-store' });
+    if (attempt >= 2 || !retryable.has(response.status) || options.signal?.aborted) return response;
+    if (response.body) void response.body.cancel().catch(() => {});
+    await new Promise(resolve => setTimeout(resolve, 250 * (attempt + 1)));
+    if (options.signal?.aborted) throw options.signal.reason || new DOMException('Aborted', 'AbortError');
+  }
+}
+
 export async function apiRequest(path, options = {}) {
   const token = getAuthToken();
   const { timeoutMs, ...requestOptions } = options;
@@ -44,16 +66,19 @@ export async function apiRequest(path, options = {}) {
   if (requestOptions.body != null && !multipart && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
 
   const url = `${API_BASE}${path}`;
-  if (requestOptions.signal) return fetch(url, { ...requestOptions, headers });
-
   const method = String(requestOptions.method || 'GET').toUpperCase();
+  const request = (opts) => shouldRetryPreviewRead(path, method)
+    ? fetchPreviewRead(url, opts)
+    : fetch(url, opts);
+  if (requestOptions.signal) return request({ ...requestOptions, headers });
+
   const shouldBound = timeoutMs != null || method === 'GET' || method === 'HEAD';
-  if (!shouldBound) return fetch(url, { ...requestOptions, headers });
+  if (!shouldBound) return request({ ...requestOptions, headers });
 
   const controller = new AbortController();
   const timer = globalThis.setTimeout(() => controller.abort(), timeoutValue(timeoutMs, defaultReadTimeout(path)));
   try {
-    return await fetch(url, { ...requestOptions, headers, signal: controller.signal });
+    return await request({ ...requestOptions, headers, signal: controller.signal });
   } finally {
     globalThis.clearTimeout(timer);
   }
@@ -131,7 +156,7 @@ export async function getCurrentAccount() {
   }
 
   if (!response.ok) {
-    throw new Error('Не удалось проверить вход');
+    throw new Error(`Не удалось проверить вход (HTTP ${response.status})`);
   }
 
   return response.json();
