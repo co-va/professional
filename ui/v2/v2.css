@@ -1107,7 +1107,6 @@
  .v2-app--workspace .loyalty-deposit-program-z .ui-data-table--compact :is(th,td){box-sizing:border-box;height:var(--h-list-row);padding-block:4px}
  .v2-app--workspace .loyalty-deposit-program-z [data-table-column="visible"]{text-align:center}
  .v2-app--workspace .loyalty-deposit-program-z [data-table-column="visible"] .ui-compact-check{display:grid;margin:auto}
- .v2-app--workspace [data-deposit-program-toolbar] [data-deposit-program-visible]~.ui-compact-check__label{color:var(--white)}
  .v2-app--workspace[data-v2-desktop-surface="list"] [data-deposit-program-toolbar] .v2-desktop-tool-actions>.ui-button--danger{background:var(--ui-delete-background);color:var(--ui-delete-foreground);border-color:var(--ui-delete-foreground)}
  .v2-app--workspace .deposit-program-code-x [data-deposit-code-form]{display:grid;gap:24px}
  .v2-app--workspace .deposit-program-code-x [data-deposit-code-error]:empty{display:none}

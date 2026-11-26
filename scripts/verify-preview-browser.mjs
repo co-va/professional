@@ -151,7 +151,9 @@ try {
   await programDetail.locator('[data-deposit-program-toolbar]').waitFor({timeout:15000});
   assert.equal(await programDetail.locator('[data-deposit-program-settings]').count(),0,'Desktop program has no V source');
   for(const action of ['code','copy','fund','delete']) assert.equal(await programDetail.locator(`[data-deposit-program-action="${action}"]`).count(),1);
-  assert.equal(await programDetail.locator('[data-deposit-program-visible]').count(),1);
+  assert.equal(await programDetail.locator('[data-deposit-program-visible]').count(),0,'Visibility is per issued card, not a Desktop toolbar switch');
+  assert.equal(await programDetail.locator('[data-deposit-program-action="delete"] svg').count(),1,'Delete uses trash icon');
+  assert.equal(await programDetail.locator('[data-deposit-program-action="delete"]').getAttribute('aria-label'),'Удалить программу');
   const issuedHeaders=programDetail.locator('.ui-data-table th');
   if(await issuedHeaders.count()){
     assert.equal(await issuedHeaders.first().evaluate(node=>getComputedStyle(node).backgroundColor),'rgb(224, 214, 214)');

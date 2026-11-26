@@ -1,5 +1,5 @@
 import { dataTable, setSharedActionVisible } from '../../../ui/page/page.js';
-import { DATA_EXCHANGE_ICON } from '../../../ui/buttons/index.js';
+import { DATA_EXCHANGE_ICON, TRASH_ICON } from '../../../ui/buttons/index.js';
 import { moveDesktopQTool } from '../../../ui/v2/z-layout.js';
 import { isV2DesktopWorkspace } from '../../../ui/v2/geometry.js';
 import { compactCheck } from '../../../ui/selection/check-list.js';
@@ -948,17 +948,15 @@ function bindProgramVisibility(control, save, title) {
 
 function bindDesktopProgramTools(layer, program, settings) {
   const toolsMarkup = `<div class="v2-desktop-tool-row" data-deposit-program-toolbar>
-    <div class="v2-desktop-tool-context">${compactCheck({ label: 'Показать всем', checked: settings.checked, data: 'data-deposit-program-visible', aria: 'Показывать карты программы по умолчанию' })}</div>
     <div class="v2-desktop-tool-actions">
-      ${button('Код · ' + escapeHtml(programUei(program) || '—'), { variant: 'secondary', data: 'data-deposit-program-action="code"', aria: 'Изменить код программы' })}
+      ${button('Код · ' + escapeHtml(programUei(program) || '----'), { variant: 'secondary', data: 'data-deposit-program-action="code"', aria: 'Изменить код программы' })}
       ${button('Создать копию', { variant: 'secondary', data: 'data-deposit-program-action="copy"' })}
-      ${button('Удалить программу', { variant: 'danger', data: 'data-deposit-program-action="delete"' })}
+      ${button(TRASH_ICON, { variant: 'danger', className: 'v2-desktop-tool-icon', data: 'data-deposit-program-action="delete" title="Удалить программу"', aria: 'Удалить программу' })}
       ${button('+', { variant: 'secondary', className: 'v2-desktop-tool-primary', data: 'data-deposit-program-action="fund" title="Оформить карту"', aria: 'Оформить карту' })}
     </div>
   </div>`;
   const [tools] = setV2ZHeaderRows(layer, [toolsMarkup], { desktopTitle: settings.title });
   if (!tools) return;
-  bindProgramVisibility(tools.querySelector('[data-deposit-program-visible]'), settings.onToggle, 'Настройки программы');
   tools.querySelectorAll('[data-deposit-program-action]').forEach(control => {
     control.addEventListener('click', () => {
       const action = settings.actions.find(item => item.id === control.dataset.depositProgramAction);
