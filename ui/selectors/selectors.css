@@ -61,3 +61,8 @@
  .v2-app--workspace>.v2-layer-portal.is-anchored>.v2-layer-backdrop[data-v2-x-role="picker"]>.v2-layer--bottom:has(>[data-ui-selector]):not(.people-filter-selector) .ui-selector__search-wrap{background:transparent;padding:4px 4px 8px}
  .v2-app--workspace>.v2-layer-portal.is-anchored>.v2-layer-backdrop[data-v2-x-role="picker"]>.v2-layer--bottom:has(>[data-ui-selector]):not(.people-filter-selector) .ui-selector__search{border-radius:var(--desktop-selector-radius,8px)}
 }
+
+/* Card field and its grid coordinates are one line for every card type. */
+.ui-selector__option[data-field-state] .ui-selector__option-main{display:flex;flex-wrap:nowrap;align-items:center;justify-content:center;gap:8px;min-width:0}
+.ui-selector__option[data-field-state] .ui-selector__option-label{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ui-selector__option[data-field-state] .ui-selector__option-main small{flex:0 0 auto;white-space:nowrap}

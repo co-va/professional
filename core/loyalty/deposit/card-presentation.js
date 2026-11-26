@@ -88,7 +88,7 @@ export function depositCardFields({
   toFund = null,
 } = {}) {
   return [
-    { value: 'uei', label: 'UEI программы', text: String(uei || '') },
+    { value: 'uei', label: 'Код программы', text: String(uei || '') },
     { value: 'title', label: 'Название программы', text: String(title || 'Депозит') },
     { value: 'subtitle', label: 'Срок действия', text: String(subtitle || 'Депозит') },
     { value: 'status', label: 'Статус', text: String(status || '') },

@@ -136,8 +136,8 @@ function openSelector(trigger) {
   </div>`;
 
   const desktopContactSelector = Boolean(trigger.closest('.people-filter-popup, .people-card-appearance-q, .people-overview-toolbar'));
-  const desktopCardField = Boolean(trigger.matches('[data-card-line-field]') && trigger.closest('.people-card-appearance-q'));
-  const popupClass = desktopContactSelector ? 'people-action-popup people-filter-selector' + (desktopCardField ? ' people-card-field-selector' : '') : '';
+  const desktopCardField = Boolean(trigger.matches('[data-card-line-field]') && trigger.closest('.desktop-appearance-q, .people-card-appearance-q'));
+  const popupClass = (desktopContactSelector || desktopCardField) ? 'people-action-popup people-filter-selector' + (desktopCardField ? ' people-card-field-selector' : '') : '';
   const modalRoot = mountModal(trigger, modal(content, { variant: 'x', title: trigger.dataset.pickerTitle || 'Выбор', xRole: 'picker', className:popupClass }));
   const surface = modalRoot?.querySelector('[data-ui-selector]');
   if (!surface) return;

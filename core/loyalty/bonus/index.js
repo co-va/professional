@@ -52,7 +52,7 @@ import {
   text,
   uid,
 } from '../shared.js';
-import { renderDesktopProgramSection } from '../shared.js';
+import { renderDesktopProgramSection, loyaltyAppearanceOptions } from '../shared.js';
 
 let programs = [
   {
@@ -286,7 +286,7 @@ function initBonusConstructor(layer, editingProgram = null) {
   syncCondition(); syncReward(); syncExpiry(); syncRecurrence(); renderTiers(); renderPositionRules();
 }
 
-async function openCreateProgramQ(root, rerender, editingProgram = null) {
+export async function openCreateProgramQ(root, rerender, editingProgram = null) {
   const editing = Boolean(editingProgram?.id);
   const title = editing ? 'Корректировать бонусную программу' : 'Новая бонусная программа';
   const serviceItems = services();
@@ -584,6 +584,12 @@ export function getPersonLoyaltyCards(person = {}) {
     }),
   };
 }
+const programAppearanceFields = () => programCardFields(programs[0] || { name: 'Бонусная программа', condition: 'each-paid', assignment: 'all', rewardType: 'percent', rewardValue: 5, status: 'active' });
+
+export function programAppearanceOptions(onSaved = () => {}) {
+  return loyaltyAppearanceOptions({ type: 'bonus', fields: programAppearanceFields, onSaved });
+}
+
 export async function renderBonus(root) {
   const render = async () => {
     const items = programs.map((program) => loyaltyVisualCard('bonus', programCardFields(program), {
@@ -592,7 +598,7 @@ export async function renderBonus(root) {
         }));
     const empty = emptyState('Бонусных программ пока нет', 'Создайте первую программу кнопкой «+».');
     if (root.hasAttribute('data-loyalty-program-section')) {
-      renderDesktopProgramSection(root, items, empty, { addData: 'data-bonus-create', addAria: 'Создать бонусную программу' });
+      renderDesktopProgramSection(root, items, empty);
     } else {
       const cards = items.length ? entityCardStack(items) : empty;
       root.innerHTML = page([
@@ -605,7 +611,7 @@ export async function renderBonus(root) {
     }
     bindViewSettings(root, 'Бонусная программа', {
       type: 'bonus',
-      fields: () => programCardFields(programs[0] || { name: 'Бонусная программа', condition: 'each-paid', assignment: 'all', rewardType: 'percent', rewardValue: 5, status: 'active' }),
+      fields: programAppearanceFields,
       onSaved: render,
     });
     root.querySelector('[data-bonus-create]')?.addEventListener('click', () => openCreateProgramQ(root, render));

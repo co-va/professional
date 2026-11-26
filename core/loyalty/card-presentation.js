@@ -61,7 +61,7 @@ export function loyaltyCardFields({
   metaRight = '',
 } = {}) {
   return [
-    { value: 'uei', label: 'UEI', text: String(uei || '') },
+    { value: 'uei', label: 'Код', text: String(uei || '') },
     { value: 'title', label: 'Название', text: String(title || '') },
     { value: 'subtitle', label: 'Подпись', text: String(subtitle || '') },
     { value: 'status', label: 'Статус', text: String(status || '') },

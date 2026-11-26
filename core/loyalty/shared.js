@@ -1,5 +1,4 @@
 import {
-  button,
   datePicker,
   entityCardRail,
   v2Section,
@@ -20,7 +19,6 @@ import {
   v2ListEntry,
   workspaceHeaderContext,
 } from '../../ui/ui.js';
-import { DATA_EXCHANGE_ICON } from '../../ui/buttons/index.js';
 import { bindDesktopRailControls } from '../../ui/v2/horizontal-affordance.js';
 import { compactCheck } from '../../ui/selection/check-list.js';
 import { settingsPanel } from '../../ui/settings/index.js';
@@ -101,7 +99,7 @@ export function loyaltyVisualCard(type, fields, { data = '', aria = '', interact
   });
 }
 
-export function openLoyaltyAppearanceQ(root, {
+export function loyaltyAppearanceOptions({
   type,
   fields = loyaltyCardFields({ title: loyaltyCardLabel(type), subtitle: loyaltyCardLabel(type), status: 'Активна' }),
   onSaved = () => {},
@@ -109,7 +107,7 @@ export function openLoyaltyAppearanceQ(root, {
   const scope = loyaltyCardScope(type);
   const label = loyaltyCardLabel(type);
   const resolveFields = typeof fields === 'function' ? fields : () => fields;
-  return openEntityCardAppearanceQ(root, {
+  return {
     title: 'Вид',
     typeLabel: 'Тип карты',
     typeOptions: [{ value: scope, label }],
@@ -132,26 +130,20 @@ export function openLoyaltyAppearanceQ(root, {
       await flushBusinessPersistence();
     },
     onSaved,
-  });
+  };
 }
 
-export function renderDesktopProgramSection(root, cards, empty, { addData = '', addAria = '', excel = false, viewData = 'data-loyalty-e-settings' } = {}) {
+export function openLoyaltyAppearanceQ(root, options = {}) {
+  return openEntityCardAppearanceQ(root, loyaltyAppearanceOptions(options));
+}
+
+export function renderDesktopProgramSection(root, cards, empty) {
   root.innerHTML = v2Section(root.dataset.loyaltyOverviewTitle, cards.length ? entityCardRail(cards) : empty, { className: 'loyalty-program-section' });
-  const section = root.firstElementChild;
-  const heading = section.querySelector('.v2-section__title');
-  heading.insertAdjacentHTML('beforeend', '<span class="v2-desktop-tool-actions">' +
-    (excel ? button(DATA_EXCHANGE_ICON, { variant: 'secondary', className: 'v2-desktop-tool-icon', data: 'data-deposit-desktop-excel title="Обмен данными"', aria: 'Обмен данными' }) : '') +
-    button('Вид', { variant: 'secondary', data: viewData }) +
-    (addData ? button('+', { variant: 'secondary', className: 'v2-desktop-tool-primary', data: addData, aria: addAria }) : '') +
-    '</span>');
-  bindDesktopRailControls(section.querySelector('[data-entity-card-rail]'), { prefix: 'loyalty-rail', label: root.dataset.loyaltyOverviewTitle });
+  bindDesktopRailControls(root.querySelector('[data-entity-card-rail]'), { prefix: 'loyalty-rail', label: root.dataset.loyaltyOverviewTitle });
 }
 
 export function bindViewSettings(root, title, { type, fields, onSaved = () => {} } = {}) {
-  if (root?.hasAttribute('data-loyalty-program-section')) {
-    root.querySelector('[data-loyalty-e-settings]')?.addEventListener('click', () => openLoyaltyAppearanceQ(root, { type, fields, onSaved }));
-    return;
-  }
+  if (root?.hasAttribute('data-loyalty-program-section')) return;
   root?.querySelector?.('[data-loyalty-e-settings]')?.addEventListener('click', () => {
     openSharedProfileSettingsMenu({
       title,
@@ -256,7 +248,7 @@ export function normalizeOptionalUei(value = '') {
 
 export function optionalUeiField({ name = 'uei', value = '' } = {}) {
   return field({
-    label: 'UEI',
+    label: 'Код',
     name,
     value: normalizeOptionalUei(value),
     maxlength: 4,

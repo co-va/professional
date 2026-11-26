@@ -1,4 +1,5 @@
-import { emptyState, page, setV2ZHeaderRows } from '../../ui/ui.js';
+import { button, emptyState, escapeHtml, modal, mountModal, openEntityCardAppearanceQ, page, setV2ZHeaderRows } from '../../ui/ui.js';
+import { DATA_EXCHANGE_ICON } from '../../ui/buttons/index.js';
 import { isV2DesktopWorkspace } from '../../ui/v2/geometry.js';
 import { loyaltyHeader } from './shared.js';
 import { canUseCapability } from '../access.js';
@@ -59,10 +60,64 @@ export function loyaltyWorkspaceNavigationItems(desktop = false) {
 async function renderDesktopPrograms(root) {
   const visible = loyaltyNavigationItems().filter(item => item.assignableToPerson);
   root.innerHTML = page([
-    loyaltyHeader('Лояльность'),
+    loyaltyHeader('Программы'),
     ...visible.map(item => '<div data-loyalty-program-section="' + item.id + '">' + emptyState(LOYALTY_NAVIGATION.find(entry => entry.id === item.id)?.overviewLabel || item.label, 'Загрузка…') + '</div>'),
   ]);
-  setV2ZHeaderRows(root, [], { desktopTitle: 'Лояльность' });
+  const owners = new Map();
+  const toolbar = '<div class="v2-desktop-tool-row"><div class="v2-desktop-tool-actions">' +
+    button(DATA_EXCHANGE_ICON, { variant: 'secondary', className: 'v2-desktop-tool-icon', data: 'data-program-excel title="Обмен данными"', aria: 'Обмен данными', disabled: true }) +
+    button('Вид', { variant: 'secondary', data: 'data-program-view', disabled: true }) +
+    button('+', { variant: 'secondary', className: 'v2-desktop-tool-primary', data: 'data-program-add aria-haspopup="dialog"', aria: 'Добавить программу', disabled: true }) +
+    '</div></div>';
+  const [tools] = setV2ZHeaderRows(root, [toolbar], { desktopTitle: 'Программы' });
+  const add = tools?.querySelector('[data-program-add]');
+  const view = tools?.querySelector('[data-program-view]');
+  const excel = tools?.querySelector('[data-program-excel]');
+  const availableOwners = () => visible.map(item => owners.get(item.id)).filter(item => item?.host.isConnected);
+  const syncTools = () => {
+    if (!tools?.isConnected) return;
+    const available = availableOwners();
+    if (add) add.disabled = !available.some(item => typeof item.owner.openCreateProgramQ === 'function');
+    if (view) view.disabled = !available.some(item => typeof item.owner.programAppearanceOptions === 'function');
+    if (excel) {
+      const supported = visible.some(item => item.id === 'deposit') || available.some(item => typeof item.owner.openProgramExcel === 'function');
+      excel.hidden = !supported;
+      excel.disabled = !available.some(item => typeof item.owner.openProgramExcel === 'function');
+    }
+  };
+  const choose = (anchor, entries, action) => {
+    if (!entries.length) return;
+    const markup = '<div class="desktop-q-action-menu">' + entries.map(item => button(escapeHtml(item.label), {
+      variant: 'secondary', data: 'data-program-choice="' + escapeHtml(item.id) + '"',
+    })).join('') + '</div>';
+    const layer = mountModal(anchor, modal(markup, { variant: 'x', xRole: 'picker', className: 'desktop-q-action-popup' }));
+    layer?.querySelectorAll('[data-program-choice]').forEach(control => control.addEventListener('click', () => {
+      const item = entries.find(entry => entry.id === control.dataset.programChoice);
+      layer.v2Close?.();
+      if (item?.host.isConnected) void action(item);
+    }));
+  };
+  add?.addEventListener('click', () => choose(add, availableOwners().filter(item => typeof item.owner.openCreateProgramQ === 'function'), item => item.owner.openCreateProgramQ(item.host, item.render)));
+  view?.addEventListener('click', () => {
+    const entries = availableOwners().filter(item => typeof item.owner.programAppearanceOptions === 'function');
+    if (!entries.length) return;
+    const configs = new Map(entries.map(item => [item.id, item.owner.programAppearanceOptions(item.render)]));
+    const config = id => configs.get(id);
+    openEntityCardAppearanceQ(root, {
+      title: 'Вид', typeLabel: 'Тип карты', showTypeSelector: true,
+      typeOptions: entries.map(item => ({ value: item.id, label: item.label })),
+      initialType: entries[0].id,
+      resolve: id => config(id).resolve(),
+      save: ({ type, ...values }) => config(type).save(values),
+      onSaved: ({ type }) => config(type).onSaved?.(),
+    });
+  });
+  excel?.addEventListener('click', () => {
+    const entries = availableOwners().filter(item => typeof item.owner.openProgramExcel === 'function');
+    if (entries.length === 1) return entries[0].owner.openProgramExcel(entries[0].host, entries[0].render, { anchor: excel });
+    choose(excel, entries, item => item.owner.openProgramExcel(item.host, item.render, { anchor: excel }));
+  });
+  syncTools();
   const sections = visible.map(async item => {
     const host = root.querySelector('[data-loyalty-program-section="' + item.id + '"]');
     if (!host) return;
@@ -70,7 +125,12 @@ async function renderDesktopPrograms(root) {
     const render = async () => {
       try {
         const owner = await loadLoyaltyModule(item.id);
-        if (host.isConnected) await owner.render(host);
+        if (!host.isConnected) return;
+        await owner.render(host);
+        if (host.isConnected) {
+          owners.set(item.id, { ...item, owner, host, render });
+          syncTools();
+        }
       } catch (error) {
         if (!host.isConnected) return;
         host.innerHTML = emptyState(host.dataset.loyaltyOverviewTitle, String(error?.message || 'Не удалось загрузить программы')) + '<button type="button" class="ui-button ui-button--secondary" data-loyalty-program-retry>Повторить</button>';

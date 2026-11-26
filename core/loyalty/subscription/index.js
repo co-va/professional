@@ -53,7 +53,7 @@ import {
   text,
   uid,
 } from '../shared.js';
-import { renderDesktopProgramSection } from '../shared.js';
+import { renderDesktopProgramSection, loyaltyAppearanceOptions } from '../shared.js';
 
 const fallbackPeople = [];
 
@@ -309,7 +309,7 @@ function instanceDates(program = {}, issuedAt = '') {
   return { startsAt, expiresAt: startsAt ? addPeriod(startsAt, program.termCount, program.termUnit) : '' };
 }
 
-async function openCreateProgramQ(root, rerender, editingProgram = null) {
+export async function openCreateProgramQ(root, rerender, editingProgram = null) {
   const editing = Boolean(editingProgram?.id);
   const title = editing ? 'Корректировать абонемент' : 'Новый абонемент';
   const layer = mountModal(root, modal(`${loyaltyHeader(title)}
@@ -622,6 +622,12 @@ export function getPersonLoyaltyCards(person = {}) {
     }),
   };
 }
+const programAppearanceFields = () => programCardFields(programs[0] || { name: 'Абонемент', price: 30000, compositionMode: 'common-limit', commonLimit: 10, termType: 'duration', termCount: 12, termUnit: 'months', termValue: '12 мес.', status: 'active' });
+
+export function programAppearanceOptions(onSaved = () => {}) {
+  return loyaltyAppearanceOptions({ type: 'subscription', fields: programAppearanceFields, onSaved });
+}
+
 export async function renderSubscription(root) {
   const render = async () => {
     const items = programs.map((program) => loyaltyVisualCard('subscription', programCardFields(program), {
@@ -630,7 +636,7 @@ export async function renderSubscription(root) {
     }));
     const empty = emptyState('Абонементов пока нет', 'Создайте первую программу кнопкой «+».');
     if (root.hasAttribute('data-loyalty-program-section')) {
-      renderDesktopProgramSection(root, items, empty, { addData: 'data-subscription-create', addAria: 'Создать программу абонемента' });
+      renderDesktopProgramSection(root, items, empty);
     } else {
       const cards = items.length ? entityCardStack(items) : empty;
       root.innerHTML = page([
@@ -643,7 +649,7 @@ export async function renderSubscription(root) {
     }
     bindViewSettings(root, 'Абонемент', {
       type: 'subscription',
-      fields: () => programCardFields(programs[0] || { name: 'Абонемент', price: 30000, compositionMode: 'common-limit', commonLimit: 10, termType: 'duration', termCount: 12, termUnit: 'months', termValue: '12 мес.', status: 'active' }),
+      fields: programAppearanceFields,
       onSaved: render,
     });
     root.querySelector('[data-subscription-create]')?.addEventListener('click', () => openCreateProgramQ(root, render));

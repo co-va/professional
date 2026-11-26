@@ -130,14 +130,14 @@ function depositUei(deposit = {}) {
 
 function normalizeRequiredUei(value) {
   const normalized = normalizeUEI(value);
-  if (!normalized || normalized === '0000') throw new Error('Сформируйте UEI');
+  if (!normalized || normalized === '0000') throw new Error('Укажите код');
   return normalized;
 }
 
 function ensureUeiAvailable(value, current = '') {
   const normalized = normalizeRequiredUei(value);
   if (normalized === current) return normalized;
-  if (listUEIs().some((item) => String(item?.uei || '') === normalized)) throw new Error('Этот UEI уже используется');
+  if (listUEIs().some((item) => String(item?.uei || '') === normalized)) throw new Error('Этот код уже используется');
   return normalized;
 }
 
@@ -154,7 +154,7 @@ function bindUeiInput(root, name = 'uei') {
 
 function ueiField({ name = 'uei', value = '', readonly = false, required = true } = {}) {
   return field({
-    label: 'UEI',
+    label: 'Код',
     name,
     value,
     maxlength: 4,
@@ -409,13 +409,13 @@ function openProgramCodeX(program, onSaved = () => {}) {
   return layer;
 }
 
-function openAppearanceQ(root, onSaved = () => {}) {
+export function programAppearanceOptions(onSaved = () => {}) {
   const programs = getDepositPrograms();
   const sample = programs[0] || {
     id: '', name: 'Депозит', amount: 30000, termRule: '12 месяцев', benefit: 'Условия программы', status: 'active',
   };
   const assignedSample = getDepositInstances().find(item => String(item?.programId) === String(sample.id)) || getDepositInstances()[0];
-  return openEntityCardAppearanceQ(root, {
+  return {
     title: 'Вид',
     typeLabel: 'Карта',
     typeOptions: [{ value: depositCardScope(), label: 'Депозит' }],
@@ -439,7 +439,11 @@ function openAppearanceQ(root, onSaved = () => {}) {
       await flushBusinessPersistence();
     },
     onSaved,
-  });
+  };
+}
+
+function openAppearanceQ(root, onSaved = () => {}) {
+  return openEntityCardAppearanceQ(root, programAppearanceOptions(onSaved));
 }
 
 function initDepositProgramConstructor(layer) {
@@ -471,7 +475,7 @@ function depositBenefit(values = {}) {
   return '';
 }
 
-async function openCreateProgramQ(root, onSaved = () => {}, sourceProgram = null) {
+export async function openCreateProgramQ(root, onSaved = () => {}, sourceProgram = null) {
   const copying = Boolean(sourceProgram?.id);
   const title = copying ? 'Создать копию' : 'Новая депозитная программа';
   const layer = mountModal(root, modal(`${depositHeaderContext({ title })}
@@ -1269,12 +1273,7 @@ export async function renderDeposit(root) {
   }));
   const rerender = () => renderDeposit(root);
   if (root.hasAttribute('data-loyalty-program-section')) {
-    renderDesktopProgramSection(root, cards, emptyState('Депозитных программ пока нет', 'Создайте первую программу кнопкой «+».'), {
-      addData: 'data-deposit-program-add', addAria: 'Создать депозитную программу', excel: true, viewData: 'data-deposit-desktop-view',
-    });
-    root.querySelector('[data-deposit-desktop-view]')?.addEventListener('click', () => openAppearanceQ(root, rerender));
-    root.querySelector('[data-deposit-desktop-excel]')?.addEventListener('click', event => openDepositExcelQ(root, rerender, { anchor: event.currentTarget }));
-    root.querySelector('[data-deposit-program-add]')?.addEventListener('click', () => openCreateProgramQ(root, rerender));
+    renderDesktopProgramSection(root, cards, emptyState('Депозитных программ пока нет', 'Создайте первую программу кнопкой «+».'));
     root.querySelectorAll('[data-deposit-program]').forEach(node => node.addEventListener('click', () => openProgramLayer(root, node.dataset.depositProgram, { onChanged: rerender })));
     notifyContext();
     return;
@@ -1314,4 +1313,4 @@ export async function renderDeposit(root) {
   notifyContext();
 }
 
-export { renderDeposit as render };
+export { renderDeposit as render, openDepositExcelQ as openProgramExcel };

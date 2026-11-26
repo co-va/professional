@@ -55,7 +55,7 @@ import {
   text,
   uid,
 } from '../shared.js';
-import { renderDesktopProgramSection } from '../shared.js';
+import { renderDesktopProgramSection, loyaltyAppearanceOptions } from '../shared.js';
 
 const fallbackPeople = [];
 
@@ -223,7 +223,7 @@ function expiryFromProgram(program = {}, issuedDate = '') {
   return date.toISOString().slice(0, 10);
 }
 
-async function openCreateProgramQ(root, rerender, editingProgram = null) {
+export async function openCreateProgramQ(root, rerender, editingProgram = null) {
   const editing = Boolean(editingProgram?.id);
   const title = editing ? 'Корректировать сертификат' : 'Новый сертификат';
   const selectedIds = Array.isArray(editingProgram?.serviceIds) ? editingProgram.serviceIds : [];
@@ -505,6 +505,12 @@ export function getPersonLoyaltyCards(person = {}) {
     }),
   };
 }
+const programAppearanceFields = () => programCardFields(programs[0] || { name: 'Сертификат', type: 'amount', amount: 10000, term: '12 мес.', status: 'active' });
+
+export function programAppearanceOptions(onSaved = () => {}) {
+  return loyaltyAppearanceOptions({ type: 'certificate', fields: programAppearanceFields, onSaved });
+}
+
 export async function renderCertificate(root) {
   const render = async () => {
     const items = programs.map((program) => loyaltyVisualCard('certificate', programCardFields(program), {
@@ -513,7 +519,7 @@ export async function renderCertificate(root) {
     }));
     const empty = emptyState('Сертификатов пока нет', 'Создайте первый вид сертификата кнопкой «+».');
     if (root.hasAttribute('data-loyalty-program-section')) {
-      renderDesktopProgramSection(root, items, empty, { addData: 'data-certificate-create', addAria: 'Создать вид сертификата' });
+      renderDesktopProgramSection(root, items, empty);
     } else {
       const cards = items.length ? entityCardStack(items) : empty;
       root.innerHTML = page([
@@ -526,7 +532,7 @@ export async function renderCertificate(root) {
     }
     bindViewSettings(root, 'Сертификат', {
       type: 'certificate',
-      fields: () => programCardFields(programs[0] || { name: 'Сертификат', type: 'amount', amount: 10000, term: '12 мес.', status: 'active' }),
+      fields: programAppearanceFields,
       onSaved: render,
     });
     root.querySelector('[data-certificate-create]')?.addEventListener('click', () => openCreateProgramQ(root, render));

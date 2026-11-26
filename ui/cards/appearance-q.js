@@ -16,6 +16,7 @@ export function openEntityCardAppearanceQ(root, {
   className = '',
   typeLabel = 'Тип карты',
   typeOptions = [],
+  showTypeSelector = false,
   initialType = '',
   targetLabel = 'Карта',
   initialTarget = 'all',
@@ -50,7 +51,7 @@ export function openEntityCardAppearanceQ(root, {
     target = targets.length ? optionValue(targets, target) : '';
     const editor = resolve(type, target) || {};
     const canEditPhoto = typeof allowPhoto === 'function' ? Boolean(allowPhoto(type, target)) : Boolean(allowPhoto);
-    const typeSelector = types.length > 1 ? select({
+    const typeSelector = (showTypeSelector || types.length > 1) ? select({
       name: 'entityCardAppearanceType',
       label: '',
       aria: typeLabel,
