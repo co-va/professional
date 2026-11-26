@@ -23,7 +23,7 @@ try {
       const body=url.pathname.endsWith('/auth/me')?{account:{id:'preview-smoke',email:'preview@example.invalid'},tenantId:'preview-smoke'}:
         url.pathname.endsWith('/saas-access/me')?{tenantId:'preview-smoke',status:'ACTIVE',commercialMode:'LIVE',capabilities:['profile.access','workplaces.access','journal.day.access','journal.month.access','timetable.access','loyalty.deposit.access','loyalty.personal_account.access'].map(key=>({key,valueType:'BOOLEAN',enabled:true}))}:
         url.pathname.endsWith('/auxiliary-state/loyalty')?{wallets:[],depositPrograms:Array.from({length:4},(_,i)=>({id:'smoke-program-'+i,name:'Тестовый депозит '+(i+1),amount:10000,amountMode:'fixed',status:'active',termMode:'indefinite'}))}:
-        url.pathname.endsWith('/loyalty/deposits')?[{depositId:'smoke-issued-1',programId:'smoke-program-0',programName:'Тестовый депозит 1',person:{key:'smoke-person',name:'Тестовый клиент',uei:'T001'},status:'active',balance:10000,nominal:10000,terms:{amount:10000,amountMode:'fixed',termMode:'indefinite'},history:[{id:'smoke-funding',kind:'funding',direction:'in',amount:10000,occurredAt:'2026-01-01T10:00:00Z'}]}]:
+        url.pathname.endsWith('/loyalty/deposits')?[{depositId:'smoke-issued-1',programId:'smoke-program-0',programName:'Тестовый депозит 1',person:{key:'smoke-person',name:'Тестовый клиент',uei:'T001'},status:'active',balance:10000,fundedAmount:10000,cardSequence:1,fundedAt:'2026-01-01T10:00:00Z',terms:{amount:10000,amountMode:'fixed',termMode:'indefinite'},history:[{operationId:'smoke-funding',kind:'deposit-funding',direction:'in',amount:10000,occurredAt:'2026-01-01T10:00:00Z',recordedAt:'2026-01-02T10:00:00Z',origin:'application',walletName:'Наличные',recordId:'smoke-record'}]}]:
         url.pathname.endsWith('/loyalty/personal-accounts')?[{personKey:'smoke-person',hasActivity:true,balance:0,debtTotal:0,movements:[{id:'smoke-event',kind:'funding',amount:100,occurredAt:'2026-01-01T10:00:00Z'}],debts:[]}]:
         url.pathname.endsWith('/business-state/operational')?{procedures:[],days:[]}:
         url.pathname.endsWith('/auth/email-verification/status')?{email:'preview@example.invalid',verified:true}:{};
@@ -181,6 +181,20 @@ try {
   assert.equal(await issuedQ.locator('[data-deposit-card-history]').count(),0,'No second Mobile history Q');
   assert.equal(await issuedQ.locator('[data-deposit-instance-settings]').count(),1,'Mobile V is preserved');
   assert.equal(await page.locator('[data-v2-q="true"]').count(),1,'One Mobile Q for card and history');
+  await issuedQ.locator('[data-deposit-summary]').click();
+  const summaryS=page.getByRole('dialog',{name:'Оформление депозита',exact:true});
+  await summaryS.locator('[data-read-only-sheet]').waitFor({timeout:10000});
+  assert.match(await summaryS.textContent(),/Тестовый клиент/);
+  assert.equal(await page.locator('[data-v2-q="true"]').count(),1,'Card receipt does not create another Q');
+  await summaryS.evaluate(node=>node.closest('[data-v2-layer]')?.v2Close?.());
+  await issuedQ.locator('[data-deposit-history-entry]').first().click();
+  const historyS=page.getByRole('dialog',{name:'Внесение',exact:true});
+  await historyS.locator('[data-read-only-sheet]').waitFor({timeout:10000});
+  assert.match(await historyS.textContent(),/Кошелёк/);
+  assert.doesNotMatch(await historyS.textContent(),/Связь с Журналом/);
+  assert.equal(await historyS.locator('[data-deposit-history-correct]').count(),1,'Same funding correction action on Mobile');
+  assert.equal(await page.locator('[data-v2-q="true"]').count(),1,'Operation receipt does not create another Q');
+  await historyS.evaluate(node=>node.closest('[data-v2-layer]')?.v2Close?.());
   await page.evaluate(()=>document.querySelector('.loyalty-deposit-instance-q')?.closest('[data-v2-layer]')?.v2Close?.());
   await page.evaluate(()=>document.querySelector('.loyalty-deposit-program-z')?.v2Close?.());
   await page.setViewportSize({width:1024,height:768});

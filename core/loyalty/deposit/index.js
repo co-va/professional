@@ -8,7 +8,6 @@ import {
   button,
   compactButton,
   datePicker,
-  details,
   emptyState,
   entityCardStack,
   entityCardRail,
@@ -184,9 +183,7 @@ function programFields(program = {}, { editorPreview = false } = {}) {
       toFund: 'Пример: к внесению',
     } : {}),
   });
-  if (isV2DesktopWorkspace(document.querySelector('[data-v2-app]'))) {
-    fields.push({ value: 'personName', label: 'Имя клиента', text: editorPreview ? 'Пример: имя клиента' : '' });
-  }
+  fields.push({ value: 'personName', label: 'Имя клиента', text: editorPreview ? 'Пример: имя клиента' : '' });
   return fields;
 }
 
@@ -277,7 +274,7 @@ function settlementRows(operation = null) {
   }));
 }
 
-function historyEventMarkup(item = {}, operation = null, { desktop = false } = {}) {
+function historyEventMarkup(item = {}, operation = null) {
   const incoming = String(item?.direction || '').toUpperCase() === 'IN';
   const rows = [
     { label: 'Дата', value: shortDateTime(item?.occurredAt, '—') },
@@ -298,18 +295,11 @@ function historyEventMarkup(item = {}, operation = null, { desktop = false } = {
   if (item?.kind === 'deposit-funding' && item?.walletResolution === 'unknown') {
     rows.push({ label: 'Кошелёк', value: 'Не определён' });
   }
-  // Reconciliation metadata belongs to the technical layer, not Desktop receipts.
-  if (!desktop) {
-    if (item?.reconciliationStatus === 'unmatched') {
-      rows.push({ label: 'Связь с Журналом', value: 'Не сопоставлена' });
-    } else if (item?.recordId) {
-      rows.push({ label: 'Связь с Журналом', value: 'Сопоставлена' });
-    }
-  }
+  // Reconciliation metadata belongs to the technical layer, not user receipts.
   rows.push({ label: 'Остаток', value: money(item?.balanceAfter) });
   if (item?.dueToFund != null) rows.push({ label: 'К оплате', value: money(item?.dueToFund) });
   rows.push({ label: 'Дата формирования', value: shortDateTime(item?.recordedAt || operation?.recordedAt || item?.occurredAt, '—') });
-  return desktop ? readOnlyReceipt({ groups: [rows] }) : details(rows);
+  return readOnlyReceipt({ groups: [rows] });
 }
 
 function openDepositSummaryS(root, deposit) {
@@ -334,15 +324,15 @@ function openDepositSummaryS(root, deposit) {
   }));
 }
 
-async function openDepositHistoryEventS(root, item, { desktop = false, deposit = null, onSaved = () => {} } = {}) {
+async function openDepositHistoryEventS(root, item, { deposit = null, onSaved = () => {} } = {}) {
   const operation = await resolveHistoryOperation(item);
-  const funding = desktop && deposit && item?.kind === 'deposit-funding' && String(item?.operationId || '');
+  const funding = deposit && item?.kind === 'deposit-funding' && String(item?.operationId || '');
   const allowDelete = funding && fundingEntries(deposit).length > 1;
   const actions = funding ? actionBlock([
     button('Корректировать', { variant: 'secondary', data: 'data-deposit-history-correct' }),
     ...(allowDelete ? [button('Удалить платёж', { variant: 'danger', data: 'data-deposit-history-delete' })] : []),
   ].join('')) : '';
-  const layer = mountModal(root, modal(historyEventMarkup(item, operation, { desktop }) + actions, {
+  const layer = mountModal(root, modal(historyEventMarkup(item, operation) + actions, {
     variant: 's',
     surface: 'app',
     title: historyKindLabel(item?.kind),
@@ -1196,7 +1186,7 @@ async function openDepositQ(root, depositId, onChanged = () => {}) {
         settingsData: desktop ? '' : 'data-deposit-instance-settings',
         settingsAria: 'Настройки депозита',
       }),
-      personDepositCard(deposit, { interactive: desktop, summary: desktop }),
+      personDepositCard(deposit, { interactive: true, summary: true }),
       v2Section('История', historyListMarkup(deposit, items)),
       desktop ? actionBlock(button('Удалить карту', {
         variant: 'danger', data: 'data-deposit-instance-delete data-ui-keyboard-action="auxiliary"',
@@ -1206,14 +1196,12 @@ async function openDepositQ(root, depositId, onChanged = () => {}) {
     else host.querySelector('[data-deposit-instance-settings]')?.addEventListener('click', () => {
       openDepositSettings(root, layer, deposit, effectiveVisible, render, onChanged);
     });
-    bindDepositHistory(host, items, { desktop, deposit, onSaved: async () => {
+    bindDepositHistory(host, items, { deposit, onSaved: async () => {
       await render();
       await onChanged?.();
     } });
-    if (desktop) {
-      host.querySelector('[data-deposit-summary]')?.addEventListener('click', () => openDepositSummaryS(layer, deposit));
-      bindDepositDelete(layer, host, settings);
-    }
+    host.querySelector('[data-deposit-summary]')?.addEventListener('click', () => openDepositSummaryS(layer, deposit));
+    if (desktop) bindDepositDelete(layer, host, settings);
     notifyContext();
   };
 
@@ -1303,9 +1291,8 @@ function assignedDepositFields(deposit) {
   const nominal = Number(terms.amount);
   const funded = Number(deposit?.fundedAmount);
   const hasNominal = terms.amount !== undefined && terms.amount !== null && nominal > 0;
-  const desktop = isV2DesktopWorkspace(document.querySelector('[data-v2-app]'));
   const fields = depositCardFields({
-      uei: desktop ? depositUei(deposit) : (getUEI('loyalty-deposit-program', deposit?.programId) || ''),
+      uei: depositUei(deposit),
       title: String(deposit?.programName || 'Депозит'),
       subtitle: terms.termRule || 'Бессрочно',
       status: deposit?.status === 'active' && depositFundingProgress(deposit).fixed
@@ -1318,10 +1305,8 @@ function assignedDepositFields(deposit) {
       balance: deposit?.balance ?? null,
       toFund: hasNominal && Number.isFinite(funded) ? Math.max(0, nominal - funded) : null,
   });
-  if (desktop) {
-    const owner = depositPerson(deposit);
-    fields.push({ value: 'personName', label: 'Имя клиента', text: [owner?.name, owner?.surname].filter(Boolean).join(' ') });
-  }
+  const owner = depositPerson(deposit);
+  fields.push({ value: 'personName', label: 'Имя клиента', text: [owner?.name, owner?.surname].filter(Boolean).join(' ') });
   return fields;
 }
 
