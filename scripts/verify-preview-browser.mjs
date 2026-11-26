@@ -13,14 +13,18 @@ try {
   page.on('response',r=>{if(r.status()>=400&&!isApi(r.url()))errors.push(r.status()+' '+r.url());});
   page.on('pageerror',e=>errors.push(e.message));
   page.on('console',message=>{if(message.type()==='error')console.log('BROWSER ERROR:',message.text());});
+  // Hold the operational response to exercise the initial Desktop render.
+  let releaseOperational;
+  const operationalReady = new Promise(resolve => { releaseOperational = resolve; });
   // All account calls are synthetic. Never send a real token or mutate Core.
-  await page.route('**/*',r=>{
+  await page.route('**/*',async r=>{
     const url=new URL(r.request().url());
     if(isApi(url.href)) {
       const body=url.pathname.endsWith('/auth/me')?{account:{id:'preview-smoke',email:'preview@example.invalid'},tenantId:'preview-smoke'}:
-        url.pathname.endsWith('/saas-access/me')?{tenantId:'preview-smoke',status:'ACTIVE',commercialMode:'LIVE',capabilities:['profile.access','workplaces.access','journal.day.access'].map(key=>({key,valueType:'BOOLEAN',enabled:true}))}:
+        url.pathname.endsWith('/saas-access/me')?{tenantId:'preview-smoke',status:'ACTIVE',commercialMode:'LIVE',capabilities:['profile.access','workplaces.access','journal.day.access','journal.month.access','timetable.access'].map(key=>({key,valueType:'BOOLEAN',enabled:true}))}:
         url.pathname.endsWith('/business-state/operational')?{procedures:[],days:[]}:
         url.pathname.endsWith('/auth/email-verification/status')?{email:'preview@example.invalid',verified:true}:{};
+      if (url.pathname.endsWith('/business-state/operational')) await operationalReady;
       return r.fulfill({status:200,contentType:'application/json',body:JSON.stringify(body)});
     }
     if(url.origin!==new URL(target).origin) return r.abort();
@@ -35,6 +39,29 @@ try {
   await page.locator('[data-v2-workspace-surface]').waitFor({state:'attached',timeout:10000});
   assert.equal(await page.locator('[data-workspace-load-error]').count(),0);
   const shell=page.locator('.v2-app--workspace');
+  const sidebar=shell.locator('[data-v2-desktop-calendar]');
+  const navigation=shell.locator('[data-v2-fe]');
+  await sidebar.locator('.calendar__grid').waitFor({state:'visible'});
+  assert.equal(await sidebar.getAttribute('aria-busy'),'true','Dates exist before server response');
+  assert.equal(await sidebar.evaluate(node=>node.inert),true,'Loading dates do not accept actions');
+  assert.equal(await navigation.isVisible(),false,'F must not appear at an incorrect initial position');
+  const separator=await shell.locator('[data-v2-header]').evaluate(node=>({
+    start:parseFloat(getComputedStyle(node,'::after').insetInlineStart),
+    width:parseFloat(getComputedStyle(node.closest('[data-v2-app]')).getPropertyValue('--v2-desktop-sidebar-width')),
+    background:getComputedStyle(node).borderBottomColor,
+    end:parseFloat(getComputedStyle(node,'::after').insetInlineEnd),
+  }));
+  assert.equal(separator.start,separator.width,'Separator starts at F boundary');
+  assert.equal(separator.end,0);
+  assert.equal(separator.background,'rgba(0, 0, 0, 0)','No full-width header border');
+  releaseOperational();
+  await navigation.waitFor({state:'visible'});
+  assert.equal(await sidebar.getAttribute('aria-busy'),null);
+  assert.equal(await sidebar.evaluate(node=>node.inert),false);
+  const sidebarBounds=await sidebar.boundingBox();
+  const navBounds=await navigation.boundingBox();
+  assert.ok(navBounds.y>=sidebarBounds.y+sidebarBounds.height-1,'F follows the fully rendered calendar');
+  console.log('PASS: Desktop dates before hydration, stable first F reveal and H-only divider');
   const surface=page.locator('[data-v2-front]>[data-v2-z]');
   const geometry=()=>surface.evaluate(node=>({background:getComputedStyle(node).backgroundColor,radius:getComputedStyle(node).borderTopLeftRadius}));
   await shell.locator('[data-v2-root-item="journal"]').waitFor({state:'attached'});
