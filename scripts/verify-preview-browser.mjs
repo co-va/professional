@@ -145,6 +145,10 @@ try {
   await create.waitFor({timeout:10000});
   assert.match(await create.textContent(),/Код/);
   assert.doesNotMatch(await create.textContent(),/UEI/);
+  assert.equal(await create.locator('input[name="name"]').evaluate(node=>node.getBoundingClientRect().height),46,'Text input retains 46px');
+  for(const selector of await create.locator('.ui-select__control:visible').all()){
+    assert.equal(await selector.evaluate(node=>node.getBoundingClientRect().height),36,'Shared Desktop form selector is 36px');
+  }
   await page.locator('.v2-layer--standard:has([data-deposit-program-form]) [data-v2-q-close]').click();
   await programs.locator('[data-deposit-program]').first().click();
   const programDetail=page.locator('.loyalty-deposit-program-z');
@@ -160,6 +164,14 @@ try {
     assert.equal(await issuedHeaders.first().evaluate(node=>getComputedStyle(node).textTransform),'uppercase');
     assert.equal(await programDetail.locator('[data-deposit-row-visible]').count(),await programDetail.locator('.ui-data-table tbody tr').count());
   }
+  await programDetail.locator('[data-deposit-program-action="copy"]').click();
+  const copyForm=page.locator('[data-deposit-program-form]');
+  await copyForm.waitFor({timeout:10000});
+  assert.equal(await copyForm.locator('input[name="name"]').evaluate(node=>node.getBoundingClientRect().height),46);
+  for(const selector of await copyForm.locator('.ui-select__control:visible').all()){
+    assert.equal(await selector.evaluate(node=>node.getBoundingClientRect().height),36,'Copy uses the shared selector height');
+  }
+  await page.locator('.v2-layer--standard:has([data-deposit-program-form]) [data-v2-q-close]').click();
   await programDetail.locator('[data-h-back]').click();
   const rail=programs.locator('[data-entity-card-rail]');
   await page.waitForFunction(()=>document.querySelector('[data-loyalty-program-section="deposit"] [data-loyalty-rail-next]')?.disabled===false);

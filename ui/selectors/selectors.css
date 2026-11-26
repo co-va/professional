@@ -41,11 +41,12 @@
 .ui-selector--center .ui-selector__option{justify-content:center;text-align:center}
 .ui-selector--center .ui-selector__option-main{flex:0 1 auto;text-align:center}
 
-/* Desktop selectors are rounded, unlike text fields. Preserve the existing
-   shared selector height and special header variants; Mobile is untouched. */
+/* Desktop controls use the H tool height, not the 46px text input height.
+   Scope the rule to the closed control; picker rows and Mobile stay unchanged.
+   Specialized compact/header variants retain their explicit geometry. */
 @media (min-width:768px) and (min-height:600px){
- .v2-app--workspace{--desktop-selector-radius:8px}
- .v2-app--workspace :is(.ui-select__control,.duration-picker__button,.time-picker__button,.color-picker__trigger){border-radius:var(--desktop-selector-radius)}
+ .v2-app--workspace{--desktop-selector-radius:8px;--desktop-selector-height:var(--h-tools,36px)}
+ .v2-app--workspace :is(.ui-select__control,.duration-picker__button,.time-picker__button,.color-picker__trigger){box-sizing:border-box;height:var(--desktop-selector-height);min-height:var(--desktop-selector-height);max-height:var(--desktop-selector-height);padding-block:0;border-radius:var(--desktop-selector-radius)}
 }
 
 /* Generalize the accepted Contacts picker presentation to the ordinary
