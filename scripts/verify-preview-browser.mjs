@@ -239,7 +239,15 @@ try {
   const personalQ=page.locator('.loyalty-personal-account-q');
   const personalTools=personalQ.locator('[data-personal-account-desktop-tools]');
   await personalTools.waitFor({timeout:10000});
-  for(const selector of ['[data-personal-account-fund]','[data-personal-account-withdraw]','[data-personal-account-limit]','[data-personal-account-q-visible]']) assert.equal(await personalTools.locator(selector).count(),1);
+  for(const selector of ['[data-personal-account-fund]','[data-personal-account-limit]','[data-personal-account-q-visible]']) assert.equal(await personalTools.locator(selector).count(),1);
+  assert.equal(await personalTools.locator('[data-personal-account-withdraw]').count(),0,'Refund never in header');
+  assert.equal(await personalQ.locator('[data-personal-account-withdraw]').count(),0,'Zero balance has no refund action');
+  assert.equal(await personalQ.locator('[data-personal-account-summary]').count(),1,'Saved visual card in account Q');
+  assert.equal(await personalQ.locator('.v2-section__title').filter({hasText:'Задолженности'}).count(),0,'No empty debt section');
+  await personalQ.locator('[data-personal-account-summary]').click();
+  const accountSummary=page.getByRole('dialog',{name:'Личный счёт',exact:true});
+  await accountSummary.locator('.read-only-sheet').waitFor({timeout:10000});
+  await accountSummary.evaluate(node=>node.closest('[data-v2-layer]')?.v2Close?.());
   assert.equal(await personalQ.locator('[data-personal-account-actions]').count(),0,'Desktop Q has no V');
   await personalTools.locator('[data-personal-account-limit]').click();
   await page.locator('[data-personal-account-settings-form]').waitFor({timeout:10000});

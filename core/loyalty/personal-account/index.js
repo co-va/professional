@@ -1,9 +1,10 @@
 import {
+  actionBlock,
   button,
+  compactButton,
   dataTable,
   setV2ZHeaderRows,
   datePicker,
-  details,
   emptyState,
   entityCardStack,
   escapeHtml,
@@ -24,6 +25,7 @@ import {
 } from '../../../ui/ui.js';
 import { isV2DesktopWorkspace } from '../../../ui/v2/geometry.js';
 import { compactCheck } from '../../../ui/selection/check-list.js';
+import { readOnlyReceipt } from '../../../ui/receipt/index.js';
 import { personDisplay } from '../../people/presentation.js';
 import { openLoyaltyAppearanceQ } from '../shared.js';
 import { getWallets } from '../../finance/index.js';
@@ -173,7 +175,7 @@ function movementEventMarkup(item = {}) {
   }
   rows.push({ label: 'Остаток', value: money(item?.balanceAfter) });
   rows.push({ label: 'Дата формирования', value: shortDateTime(item?.recordedAt || item?.createdAt || item?.occurredAt, '—') });
-  return details(rows);
+  return readOnlyReceipt({ groups: [rows] });
 }
 
 function openMovementEventS(root, item = {}) {
@@ -184,9 +186,11 @@ function openMovementEventS(root, item = {}) {
   }));
 }
 
-function debtList(account = {}) {
-  const items = Array.isArray(account?.debts) ? account.debts : [];
-  if (!items.length) return emptyState('Задолженностей нет', 'Неоплаченные остатки появятся здесь отдельно от денег Личного счёта.');
+function outstandingDebts(account = {}) {
+  return (Array.isArray(account?.debts) ? account.debts : []).filter(item => Number(item?.outstandingAmount || 0) > 0.009);
+}
+
+function debtList(items = []) {
   return v2ListEntries(items.map((item) => {
     const outstanding = Math.max(0, Number(item?.outstandingAmount || 0));
     return v2ListEntry({
@@ -202,13 +206,13 @@ function debtList(account = {}) {
 }
 
 function accountInfo(person = {}, account = {}) {
-  return details([
+  return readOnlyReceipt({ groups: [[
     { label: 'Контакт', value: personLabel(person) },
     { label: 'Денежный остаток', value: money(account?.balance) },
     { label: 'Задолженность', value: money(account?.debtTotal) },
-    { label: 'Можно оплатить со счёта', value: `${Math.max(0, Math.min(100, Number(account?.spendLimitPercent ?? 100) || 0))}%` },
-    { label: 'Виден конечному пользователю', value: account?.visibleToEndUser === false ? 'Нет' : 'Да' },
-  ]);
+    { label: 'Лимит оплаты', value: `${Math.max(0, Math.min(100, Number(account?.spendLimitPercent ?? 100) || 0))}%` },
+    { label: 'Показать', value: account?.visibleToEndUser === false ? 'Нет' : 'Да' },
+  ]] });
 }
 
 function openSettingsX(root, person, account, onSaved, { desktop = false } = {}) {
@@ -356,37 +360,51 @@ function bindAccountVisibility(control, person, onSaved = () => {}) {
 function bindDesktopAccountTools(layer, person, account, refresh) {
   const header = layer.querySelector('[data-v2-q-header-content]');
   if (!header) return;
+  header.closest('.v2-layer--standard')?.classList.add('desktop-q-fixed-tools');
   header.innerHTML = `<div class="desktop-q-heading"><h2 class="v2-q-title">${escapeHtml(personLabel(person))}</h2></div>
     <div class="desktop-q-toolbar" data-personal-account-desktop-tools data-v2-layer-gesture-ignore>
       ${compactCheck({ label: 'Показать', checked: account?.visibleToEndUser !== false, data: 'data-personal-account-q-visible', aria: 'Показать карту клиенту' })}
-      <div class="desktop-q-tools">
-        ${button('Пополнить', { variant: 'secondary', data: 'data-personal-account-fund' })}
-        ${button('Возврат', { variant: 'secondary', data: 'data-personal-account-withdraw', disabled: Number(account?.balance || 0) <= 0.009 })}
-        ${button('Лимит ' + escapeHtml(String(account?.spendLimitPercent ?? 100)) + '%', { variant: 'secondary', data: 'data-personal-account-limit title="Лимит оплаты"', aria: 'Лимит оплаты' })}
-      </div>
+      ${compactButton({ kind: 'settings', className: 'desktop-q-action-slot', data: 'data-personal-account-limit title="Лимит оплаты"', aria: 'Лимит оплаты' })}
+      ${button('Пополнить', { className: 'desktop-q-action-slot', data: 'data-personal-account-fund' })}
     </div>`;
   bindAccountVisibility(header.querySelector('[data-personal-account-q-visible]'), person, refresh);
   header.querySelector('[data-personal-account-fund]')?.addEventListener('click', () => openMoneyX(layer, person, account, 'fund', refresh, { desktop: true }));
-  header.querySelector('[data-personal-account-withdraw]')?.addEventListener('click', () => openMoneyX(layer, person, account, 'withdraw', refresh, { desktop: true }));
   header.querySelector('[data-personal-account-limit]')?.addEventListener('click', () => openSettingsX(layer, person, account, refresh, { desktop: true }));
 }
 
 function renderDetail(layer, root, person, account, onChanged = () => {}) {
   const host = layer.querySelector('[data-personal-account-q-host]') || layer;
   const desktop = isV2DesktopWorkspace(layer.closest('[data-v2-app]'));
+  const header = layer.querySelector('[data-v2-q-header-content]');
+  if (!desktop && header?.querySelector('.desktop-q-toolbar')) {
+    header.innerHTML = `<h2 class="v2-q-title">${escapeHtml(personLabel(person))}</h2>`;
+    header.closest('.v2-layer--standard')?.classList.remove('desktop-q-fixed-tools');
+  }
+  const debts = outstandingDebts(account);
   host.innerHTML = page([
     loyaltyHeader(personLabel(person), { settings: !desktop, settingsData: 'data-personal-account-actions' }),
-    `<section class="v2-section">${accountInfo(person, account || {})}</section>`,
-    v2Section('Задолженности', debtList(account || {})),
+    personalAccountVisualCard({
+      person, balance: account?.balance, debt: account?.debtTotal,
+      data: 'data-personal-account-summary', aria: 'Информация о личном счёте',
+    }),
+    debts.length ? v2Section('Задолженности', debtList(debts)) : '',
     v2Section('История', historyRail(account || {})),
+    desktop && Number(account?.balance || 0) > 0.009 ? actionBlock(button('Возврат', {
+      variant: 'danger', data: 'data-personal-account-withdraw data-ui-keyboard-action="auxiliary"',
+    })) : '',
   ]);
   const refresh = async (saved = null) => {
     const next = saved?.personKey ? saved : await loadPersonalAccount(personKey(person));
     renderDetail(layer, root, person, next || {}, onChanged);
     await onChanged();
   };
-  if (desktop) bindDesktopAccountTools(layer, person, account, refresh);
-  else host.querySelector('[data-personal-account-actions]')?.addEventListener('click', () => {
+  host.querySelector('[data-personal-account-summary]')?.addEventListener('click', () => {
+    mountModal(layer, modal(accountInfo(person, account), { variant: 's', surface: 'app', title: 'Личный счёт' }));
+  });
+  if (desktop) {
+    bindDesktopAccountTools(layer, person, account, refresh);
+    host.querySelector('[data-personal-account-withdraw]')?.addEventListener('click', () => openMoneyX(layer, person, account, 'withdraw', refresh, { desktop: true }));
+  } else host.querySelector('[data-personal-account-actions]')?.addEventListener('click', () => {
     const actions = [
       { id: 'fund', label: 'Пополнить', onSelect: () => openMoneyX(root, person, account, 'fund', refresh) },
       { id: 'withdraw', label: 'Вернуть деньги', onSelect: () => openMoneyX(root, person, account, 'withdraw', refresh) },

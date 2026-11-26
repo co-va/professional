@@ -220,6 +220,7 @@
 .v2-app--workspace .v2-z .app-view-shell{min-height:100%;background:transparent}
 
 .v2-section{display:grid;gap:10px;margin-bottom:24px}
+[data-personal-account-q-host]>.ui-page>.v2-section{margin-bottom:0}
 .v2-section__title{margin:0;color:var(--v2-muted);font-size:14px;line-height:1.2;font-weight:650}
 .v2-section__content{min-width:0}
 .v2-rail{display:flex;gap:10px;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:none;padding:4px 0 12px}
@@ -1082,7 +1083,7 @@
 
 /* Service booking options use the shared Q tool rows, not the form. */
 @media (min-width:768px) and (min-height:600px){
- .v2-app--workspace .desktop-q-toolbar>.desktop-q-online-booking{order:-1;flex:0 1 auto;min-width:0;height:var(--v2-desktop-q-button-height);max-height:var(--v2-desktop-q-button-height);gap:5px}
+ .v2-app--workspace :is(.desktop-q-toolbar>.desktop-q-online-booking,[data-personal-account-desktop-tools]>.ui-compact-check){order:-1;flex:0 1 auto;min-width:0;height:var(--v2-desktop-q-button-height);max-height:var(--v2-desktop-q-button-height);gap:5px}
  .v2-app--workspace .desktop-q-toolbar>.desktop-q-online-booking .ui-compact-check__label{min-width:0;font-size:12px;line-height:1.15;font-weight:700;white-space:normal;overflow-wrap:normal}
 }
 
@@ -1116,10 +1117,6 @@
  .v2-app--workspace :is(.loyalty-deposit-program-z,[data-personal-account-list-host]) [data-table-column="visible"]{text-align:center}
  .v2-app--workspace :is(.loyalty-deposit-program-z,[data-personal-account-list-host]) [data-table-column="visible"] .ui-compact-check{display:grid;margin:auto}
  .v2-app--workspace [data-personal-account-open-row]>td:not([data-table-column="visible"]){cursor:pointer}
- .v2-app--workspace [data-personal-account-desktop-tools]{gap:8px;flex-wrap:nowrap}
- .v2-app--workspace [data-personal-account-desktop-tools] .desktop-q-tools{gap:6px;flex:1 1 auto;min-width:0}
- .v2-app--workspace [data-personal-account-desktop-tools] .ui-button{width:auto;min-width:0;padding:0 6px;white-space:nowrap;font-size:12px;border-width:1px}
- .v2-app--workspace [data-personal-account-desktop-tools] .ui-compact-check{flex:0 0 auto}
  .v2-app--workspace[data-v2-desktop-surface="list"] [data-deposit-program-toolbar] .v2-desktop-tool-actions>.ui-button--danger{background:var(--ui-delete-background);color:var(--ui-delete-foreground);border-color:var(--ui-delete-foreground)}
  .v2-app--workspace .deposit-program-code-x [data-deposit-code-form]{display:grid;gap:24px}
  .v2-app--workspace .deposit-program-code-x [data-deposit-code-error]:empty{display:none}
