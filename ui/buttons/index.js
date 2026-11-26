@@ -1,5 +1,8 @@
 import { escapeHtml } from '../utils/escape-html.js';
 
+// Desktop Excel entry uses the same symbol in every business module.
+export const DATA_EXCHANGE_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3v18m-4-4 4 4 4-4M17 21V3m-4 4 4-4 4 4"/></svg>';
+
 const BUTTON_VARIANTS = {
   primary: '',
   'delete-outline': 'ui-button--delete-outline',

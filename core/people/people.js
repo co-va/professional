@@ -41,6 +41,7 @@ import {
   workspaceHeaderContext,
   openEntityCardAppearanceQ,
 } from '../../ui/ui.js';
+import { DATA_EXCHANGE_ICON } from '../../ui/buttons/index.js';
 import { applyUEI, detachUEI, getMembers, getOptions, getUEI } from '../uei.js';
 import { getTags } from '../../settings/tags/data.js';
 import { openTagEditor } from '../../settings/tags/tags.js';
@@ -641,7 +642,7 @@ export function renderPeople(root, options = {}) {
         ${compactButton({kind:'sort',data:'data-people-desktop-sort title="Сортировка" aria-haspopup="dialog" aria-pressed="false"'})}
       </div>
       <div class="people-desktop-actions people-desktop-actions--right">
-        ${button('<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3v18m-4-4 4 4 4-4M17 21V3m-4 4 4-4 4 4"/></svg>',{variant:'secondary',className:'people-desktop-icon',data:'data-people-desktop-excel title="Обмен данными" aria-haspopup="dialog"',aria:'Обмен данными'})}
+        ${button(DATA_EXCHANGE_ICON,{variant:'secondary',className:'people-desktop-icon',data:'data-people-desktop-excel title="Обмен данными" aria-haspopup="dialog"',aria:'Обмен данными'})}
         ${button('Вид',{variant:'secondary',data:'data-people-desktop-view'})}
         ${button('<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>',{variant:'secondary',className:'people-desktop-icon people-desktop-add',data:'data-people-desktop-add title="Добавить клиента" aria-haspopup="dialog"',aria:'Добавить клиента'})}
       </div>

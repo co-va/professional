@@ -1,4 +1,6 @@
-import { dataTable } from '../../../ui/page/page.js';
+import { dataTable, setSharedActionVisible } from '../../../ui/page/page.js';
+import { DATA_EXCHANGE_ICON } from '../../../ui/buttons/index.js';
+import { moveDesktopQTool } from '../../../ui/v2/z-layout.js';
 import { isV2DesktopWorkspace } from '../../../ui/v2/geometry.js';
 import { compactCheck } from '../../../ui/selection/check-list.js';
 import {
@@ -22,6 +24,8 @@ import {
   openSharedProfileSettingsMenu,
   page,
   select,
+  setSharedProfilePrimary,
+  setV2ZHeaderRows,
   shortDateTime,
   textareaField,
   twoColumnLayout,
@@ -501,7 +505,26 @@ async function openCreateProgramQ(root, onSaved = () => {}, sourceProgram = null
   bindUeiInput(layer, 'programUei');
   initDepositProgramConstructor(layer);
   const form = layer.querySelector('[data-deposit-program-form]');
-  layer.querySelector('[data-deposit-program-save]')?.addEventListener('click', async () => {
+  const primary = layer.querySelector('[data-deposit-program-save]');
+  const actions = primary?.closest('.modal-actions');
+  const desktop = moveDesktopQTool(primary);
+  const signature = () => JSON.stringify(formObject(form));
+  const baseline = signature();
+  let saving = false;
+  const syncDirty = () => {
+    const changed = signature() !== baseline;
+    if (desktop) {
+      setSharedActionVisible(actions, changed);
+      setSharedProfilePrimary(primary, { visible: changed, label: 'Сохранить', disabled: saving });
+    } else if (primary) primary.disabled = saving;
+    return changed;
+  };
+  if (desktop) {
+    form.addEventListener('input', syncDirty);
+    form.addEventListener('change', syncDirty);
+  }
+  primary?.addEventListener('click', async () => {
+    if (saving || (desktop && !syncDirty())) return;
     const errorNode = layer.querySelector('[data-deposit-program-error]');
     const validationError = formValidationMessage(form);
     if (validationError) {
@@ -542,6 +565,8 @@ async function openCreateProgramQ(root, onSaved = () => {}, sourceProgram = null
       return;
     }
     const id = uid();
+    saving = true;
+    syncDirty();
     try {
       const code = ensureUeiAvailable(values.programUei);
       const now = new Date().toISOString();
@@ -571,8 +596,12 @@ async function openCreateProgramQ(root, onSaved = () => {}, sourceProgram = null
       await onSaved?.();
     } catch (error) {
       if (errorNode) errorNode.textContent = error instanceof Error ? error.message : 'Не удалось сохранить программу';
+    } finally {
+      saving = false;
+      if (layer.isConnected) syncDirty();
     }
   });
+  syncDirty();
   notifyContext();
   return layer;
 }
@@ -1230,26 +1259,45 @@ export async function openPersonProgramChoice(root, person, programId, onChanged
 
 export async function renderDeposit(root) {
   await loadDepositPrograms();
+  if (!root.isConnected) return;
+  const desktop = isV2DesktopWorkspace(root.closest('[data-v2-app]'));
   const programs = getDepositPrograms().filter((item) => !item?.archivedAt);
+  const cards = programs.map((program) => card(programFields(program), {
+    data: `data-deposit-program="${escapeHtml(program.id)}"`,
+    aria: `Открыть депозитную программу ${program.name || ''}`,
+  }));
+  const rerender = () => renderDeposit(root);
   root.innerHTML = page([
     depositHeaderContext({
       title: 'Депозит',
-      settingsData: 'data-deposit-settings',
+      settingsData: desktop ? '' : 'data-deposit-settings',
       settingsAria: 'Настройки депозита',
-      c: { label: '+', data: 'data-deposit-program-add', aria: 'Создать депозитную программу' },
+      c: desktop ? null : { label: '+', data: 'data-deposit-program-add', aria: 'Создать депозитную программу' },
     }),
-    programs.length ? (isV2DesktopWorkspace(root.closest('[data-v2-app]')) ? dataTable({
-      compact: true, caption: 'Депозитные программы',
-      columns: [{ key: 'code', label: 'Код', sortable: false }, { key: 'name', label: 'Программа', sortable: false, render: row => `<button type="button" data-deposit-program="${escapeHtml(row.id)}">${escapeHtml(row.name)}</button>` }, { key: 'nominal', label: 'Номинал', sortable: false }, { key: 'term', label: 'Срок', sortable: false }, { key: 'benefit', label: 'Условие', sortable: false }],
-      rows: programs.map(program => ({ id: program.id, code: programUei(program), name: program.name || 'Депозит', nominal: Number(program.amount) > 0 ? money(program.amount) : 'Свободная сумма', term: program.termRule || 'Бессрочно', benefit: program.benefit || 'Без дополнительной выгоды' })),
-    }) : entityCardStack(programs.map((program) => card(programFields(program), {
-      data: `data-deposit-program="${escapeHtml(program.id)}"`,
-      aria: `Открыть депозитную программу ${program.name || ''}`,
-    })))) : emptyState('Депозитных программ пока нет', 'Создайте первую программу кнопкой «+».')
+    '<div data-deposit-program-cards>' + (cards.length
+      ? entityCardStack(cards, { layout: desktop ? 'grid' : 'stack' })
+      : emptyState('Депозитных программ пока нет', 'Создайте первую программу кнопкой «+».')) + '</div>',
   ]);
-  const rerender = () => renderDeposit(root);
+  let tools = root;
+  if (desktop) {
+    const toolbar = `<div class="v2-desktop-tool-row" data-deposit-desktop-toolbar>
+      <div class="v2-desktop-tool-actions">
+        ${button(DATA_EXCHANGE_ICON, { variant: 'secondary', className: 'v2-desktop-tool-icon', data: 'data-deposit-desktop-excel title="Обмен данными" aria-haspopup="dialog"', aria: 'Обмен данными' })}
+        ${button('Вид', { variant: 'secondary', data: 'data-deposit-desktop-view' })}
+        ${button('<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>', { variant: 'secondary', className: 'v2-desktop-tool-primary', data: 'data-deposit-program-add title="Создать депозитную программу" aria-haspopup="dialog"', aria: 'Создать депозитную программу' })}
+      </div>
+    </div>`;
+    const [row] = setV2ZHeaderRows(root, [toolbar], {
+      desktopTitle: 'Депозит',
+      desktopAccessory: `<output aria-label="Количество депозитных программ">${programs.length}</output>`,
+    });
+    if (!row) root.querySelector('[data-deposit-program-cards]')?.insertAdjacentHTML('beforebegin', toolbar);
+    tools = row || root;
+    tools.querySelector('[data-deposit-desktop-view]')?.addEventListener('click', () => openAppearanceQ(root, rerender));
+    tools.querySelector('[data-deposit-desktop-excel]')?.addEventListener('click', event => openDepositExcelQ(root, rerender, { anchor: event.currentTarget }));
+  }
   root.querySelector('[data-deposit-settings]')?.addEventListener('click', () => openRootSettings(root, rerender));
-  root.querySelector('[data-deposit-program-add]')?.addEventListener('click', () => openCreateProgramQ(root, rerender));
+  tools.querySelector('[data-deposit-program-add]')?.addEventListener('click', () => openCreateProgramQ(root, rerender));
   root.querySelectorAll('[data-deposit-program]').forEach((node) => node.addEventListener('click', () => openProgramLayer(root, node.dataset.depositProgram, { onChanged: rerender })));
   notifyContext();
 }

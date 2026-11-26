@@ -200,19 +200,23 @@ async function openImport(root, rerender) {
   openImportPreview(root, selected, rerender);
 }
 
-export function openDepositExcelQ(root, rerender = async () => {}) {
+export function openDepositExcelQ(root, rerender = async () => {}, { anchor = null } = {}) {
   // The same X action menu pattern is used by Inventory Excel.
   const actions = [
     { id: 'export', label: 'Выгрузка', run: () => openExport(root) },
     { id: 'import', label: 'Загрузка', run: () => openImport(root, rerender) },
     { id: 'template', label: 'Шаблон', run: () => download('/template', 'deposits-template.xlsx') },
   ];
-  const markup = actionBlock(actions.map((item) => button(item.label, {
+  const desktop = Boolean(anchor);
+  const labels = { export: 'Выгрузить', import: 'Загрузить', template: 'Скачать шаблон' };
+  const buttons = actions.map((item) => button(desktop ? labels[item.id] : item.label, {
     type: 'button', variant: 'secondary',
     data: 'data-deposit-excel-action="' + item.id + '"',
-  })).join(''));
-  const menu = mountModal(root, modal(markup, {
+  })).join('');
+  const markup = desktop ? '<div class="people-action-menu">' + buttons + '</div>' : actionBlock(buttons);
+  const menu = mountModal(anchor || root, modal(markup, {
     title: 'Excel', variant: 'x', surface: 'app', xRole: 'action',
+    className: desktop ? 'people-action-popup' : '',
   }));
   if (!menu) return null;
   actions.forEach((item) => {
