@@ -104,12 +104,15 @@ async function renderDesktopPrograms(root) {
     const configs = new Map(entries.map(item => [item.id, item.owner.programAppearanceOptions(item.render)]));
     const config = id => configs.get(id);
     openEntityCardAppearanceQ(root, {
-      title: 'Вид', typeLabel: 'Тип карты', showTypeSelector: true,
+      title: 'Вид', typeLabel: 'Тип программы', showTypeSelector: true,
+      targetLabel: 'Название программы', showTargetSelector: true,
       typeOptions: entries.map(item => ({ value: item.id, label: item.label })),
       initialType: entries[0].id,
-      resolve: id => config(id).resolve(),
+      targetOptions: id => config(id).targetOptions?.() || [],
+      defaultTarget: id => config(id).targetOptions?.()[0]?.value || '',
+      resolve: (id, target) => config(id).resolve(id, target),
       save: ({ type, ...values }) => config(type).save(values),
-      onSaved: ({ type }) => config(type).onSaved?.(),
+      onSaved: ({ type, target }) => config(type).onSaved?.({ type, target }),
     });
   });
   excel?.addEventListener('click', () => {

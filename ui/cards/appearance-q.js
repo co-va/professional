@@ -19,6 +19,7 @@ export function openEntityCardAppearanceQ(root, {
   showTypeSelector = false,
   initialType = '',
   targetLabel = 'Карта',
+  showTargetSelector = false,
   initialTarget = 'all',
   defaultTarget = () => 'all',
   targetOptions = () => [],
@@ -47,7 +48,8 @@ export function openEntityCardAppearanceQ(root, {
   if (desktop) sheet.classList.add('desktop-q-fixed-tools', 'desktop-appearance-q');
 
   const render = () => {
-    const targets = Array.isArray(targetOptions(type)) ? targetOptions(type).filter(Boolean) : [];
+    const options = targetOptions(type);
+    const targets = Array.isArray(options) ? options.filter(Boolean) : [];
     target = targets.length ? optionValue(targets, target) : '';
     const editor = resolve(type, target) || {};
     const canEditPhoto = typeof allowPhoto === 'function' ? Boolean(allowPhoto(type, target)) : Boolean(allowPhoto);
@@ -60,7 +62,7 @@ export function openEntityCardAppearanceQ(root, {
       options: types,
       data: 'data-entity-card-appearance-type',
     }) : '';
-    const targetSelector = targets.length > 1 ? select({
+    const targetSelector = (targets.length > 1 || (showTargetSelector && targets.length)) ? select({
       name: 'entityCardAppearanceTarget',
       label: '',
       aria: targetLabel,

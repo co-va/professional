@@ -585,6 +585,7 @@ function personSubscriptionCard({ instance, program }) {
     metaLeft: instance?.expiresAt || program?.termValue || 'Бессрочно',
     metaRight: unlimited ? 'Безлимит' : `Осталось ${Math.max(0, Number(instance?.remaining || 0))}`,
   }), {
+    programId: program?.id,
     data: `data-person-program="subscription:${escapeHtml(instance?.id || '')}"`,
     aria: `Открыть абонемент ${program?.name || ''}`,
   });
@@ -622,15 +623,15 @@ export function getPersonLoyaltyCards(person = {}) {
     }),
   };
 }
-const programAppearanceFields = () => programCardFields(programs[0] || { name: 'Абонемент', price: 30000, compositionMode: 'common-limit', commonLimit: 10, termType: 'duration', termCount: 12, termUnit: 'months', termValue: '12 мес.', status: 'active' });
+const programAppearanceFields = program => programCardFields(program || programs[0] || { name: 'Абонемент', price: 30000, compositionMode: 'common-limit', commonLimit: 10, termType: 'duration', termCount: 12, termUnit: 'months', termValue: '12 мес.', status: 'active' });
 
 export function programAppearanceOptions(onSaved = () => {}) {
-  return loyaltyAppearanceOptions({ type: 'subscription', fields: programAppearanceFields, onSaved });
+  return loyaltyAppearanceOptions({ type: 'subscription', fields: programAppearanceFields, programs: () => programs, onSaved });
 }
 
 export async function renderSubscription(root) {
   const render = async () => {
-    const items = programs.map((program) => loyaltyVisualCard('subscription', programCardFields(program), {
+    const items = programs.map((program) => loyaltyVisualCard('subscription', programCardFields(program), { programId: program.id,
       data: `data-subscription-program="${program.id}"`,
       aria: `Открыть ${program.name}`,
     }));

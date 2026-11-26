@@ -43,7 +43,8 @@ export function depositCardScope() {
   return SCOPE;
 }
 
-export function depositCardAppearance() {
+export function depositCardAppearance(program = {}) {
+  if (hasConfiguredEntityCardAppearance(program.cardAppearance)) return remapEntityCardAppearanceFields(program.cardAppearance, {metaLeft:'benefit',metaRight:'nominal'});
   const template = getCardAppearanceTemplate(SCOPE);
   if (hasConfiguredEntityCardAppearance(template?.appearance)) return remapEntityCardAppearanceFields(template.appearance, {metaLeft:'benefit',metaRight:'nominal'});
   return normalizeEntityCardAppearance({
@@ -58,12 +59,12 @@ export function depositCardAppearance() {
   });
 }
 
-export function depositCardPhoto() {
-  return String(getCardAppearanceTemplate(SCOPE)?.photo || '');
+export function depositCardPhoto(program = {}) {
+  return String(program.photo ?? getCardAppearanceTemplate(SCOPE)?.photo ?? '');
 }
 
-export function depositCardPhotoPosition() {
-  return String(getCardAppearanceTemplate(SCOPE)?.photoPosition || '50% 50%');
+export function depositCardPhotoPosition(program = {}) {
+  return String(program.photoPosition || getCardAppearanceTemplate(SCOPE)?.photoPosition || '50% 50%');
 }
 
 // One status label for the Deposit program and its assigned Person card.

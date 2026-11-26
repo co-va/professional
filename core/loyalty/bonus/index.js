@@ -549,6 +549,7 @@ function personBonusCard({ program, participant = null }) {
     metaLeft: program?.term || 'Бессрочно',
     metaRight: participant ? `${Math.max(0, Number(participant.available || 0))} бонусов` : `${Math.max(0, Number(program?.rewardValue || 0))}${program?.rewardType === 'percent' ? '%' : ''}`,
   }), {
+    programId: program?.id,
     data: `data-person-program="bonus:${escapeHtml(program?.id || '')}"`,
     aria: `Открыть бонусную программу ${program?.name || ''}`,
   });
@@ -584,15 +585,15 @@ export function getPersonLoyaltyCards(person = {}) {
     }),
   };
 }
-const programAppearanceFields = () => programCardFields(programs[0] || { name: 'Бонусная программа', condition: 'each-paid', assignment: 'all', rewardType: 'percent', rewardValue: 5, status: 'active' });
+const programAppearanceFields = program => programCardFields(program || programs[0] || { name: 'Бонусная программа', condition: 'each-paid', assignment: 'all', rewardType: 'percent', rewardValue: 5, status: 'active' });
 
 export function programAppearanceOptions(onSaved = () => {}) {
-  return loyaltyAppearanceOptions({ type: 'bonus', fields: programAppearanceFields, onSaved });
+  return loyaltyAppearanceOptions({ type: 'bonus', fields: programAppearanceFields, programs: () => programs, onSaved });
 }
 
 export async function renderBonus(root) {
   const render = async () => {
-    const items = programs.map((program) => loyaltyVisualCard('bonus', programCardFields(program), {
+    const items = programs.map((program) => loyaltyVisualCard('bonus', programCardFields(program), { programId: program.id,
           data: `data-bonus-program="${program.id}"`,
           aria: `Открыть ${program.name}`,
         }));

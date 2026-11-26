@@ -144,3 +144,9 @@
 /* The iOS file picker is opened by its own native control, not JS input.click(). */
 .entity-card-editor__photo-select{position:relative;display:grid;place-items:center;cursor:pointer;overflow:hidden}
 .entity-card-editor__photo-select [data-card-photo-input]{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
+
+/* The chosen field and the coordinates use the same single line as its picker. */
+.entity-card-editor button[data-card-line-field] .ui-select__text{display:flex;flex-wrap:nowrap;align-items:center;justify-content:center;gap:8px;max-width:100%;min-width:0}
+.entity-card-editor button[data-card-line-field] .ui-select__value{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-height:none}
+.entity-card-editor button[data-card-line-field] .ui-select__meta{flex:0 0 auto;white-space:nowrap}
+.entity-card-editor button[data-card-line-field] .ui-select__meta[hidden]{display:none}

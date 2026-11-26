@@ -185,12 +185,12 @@ function programFields(program = {}, { editorPreview = false } = {}) {
   });
 }
 
-function card(fields, { data = '', aria = '', interactive = true } = {}) {
+function card(fields, { data = '', aria = '', interactive = true, program = {} } = {}) {
   return entityVisualCard({
-    appearance: depositCardAppearance(),
+    appearance: depositCardAppearance(program),
     fields,
-    image: depositCardPhoto(),
-    imagePosition: depositCardPhotoPosition(),
+    image: depositCardPhoto(program),
+    imagePosition: depositCardPhotoPosition(program),
     interactive,
     data,
     aria,
@@ -410,33 +410,46 @@ function openProgramCodeX(program, onSaved = () => {}) {
 }
 
 export function programAppearanceOptions(onSaved = () => {}) {
-  const programs = getDepositPrograms();
-  const sample = programs[0] || {
-    id: '', name: 'Депозит', amount: 30000, termRule: '12 месяцев', benefit: 'Условия программы', status: 'active',
-  };
-  const assignedSample = getDepositInstances().find(item => String(item?.programId) === String(sample.id)) || getDepositInstances()[0];
+  const programs = () => getDepositPrograms().filter(item => !item?.archivedAt);
+  const targets = () => programs().length
+    ? programs().map(item => ({ value: String(item.id), label: item.name || 'Депозит' }))
+    : [{ value: 'all', label: 'Общий вид' }];
+  const sample = target => programs().find(item => String(item.id) === target) || {};
   return {
     title: 'Вид',
-    typeLabel: 'Карта',
+    typeLabel: 'Тип программы',
     typeOptions: [{ value: depositCardScope(), label: 'Депозит' }],
     initialType: depositCardScope(),
-    targetOptions: () => [],
+    showTypeSelector: true,
+    targetLabel: 'Название программы',
+    showTargetSelector: true,
+    targetOptions: targets,
+    defaultTarget: () => targets()[0]?.value,
     allowPhoto: true,
-    resolve: () => ({
-      appearance: depositCardAppearance(),
-      fields: assignedSample ? assignedDepositFields(assignedSample) : programFields(sample, { editorPreview: true }),
-      photo: depositCardPhoto(),
-      photoPosition: depositCardPhotoPosition(),
-    }),
-    save: async ({ appearance, photo }) => {
+    resolve: (_type, target) => {
+      const program = sample(target);
+      const assigned = getDepositInstances().find(item => String(item?.programId) === String(program.id));
+      return {
+        appearance: depositCardAppearance(program),
+        fields: assigned ? assignedDepositFields(assigned) : programFields(program, { editorPreview: true }),
+        photo: depositCardPhoto(program),
+        photoPosition: depositCardPhotoPosition(program),
+      };
+    },
+    save: async ({ target, appearance, photo, editor }) => {
       if (!isBusinessServerReady()) throw new Error('Серверное сохранение недоступно');
-      const current = getCardAppearanceTemplate(depositCardScope());
-      saveCardAppearanceTemplate(depositCardScope(), {
-        appearance,
-        photo,
-        photoPosition: current?.photoPosition || depositCardPhotoPosition(),
-      });
-      await flushBusinessPersistence();
+      if (target === 'all') {
+        saveCardAppearanceTemplate(depositCardScope(), { appearance, photo, photoPosition: editor?.photoPosition || depositCardPhotoPosition() });
+        await flushBusinessPersistence();
+        return;
+      }
+      // Appearance belongs to the program. Reload authoritative values first;
+      // never change other programs or the immutable issued deposit terms.
+      const values = await loadDepositPrograms();
+      if (!values.some(item => String(item.id) === target && !item.archivedAt)) throw new Error('Программа недоступна');
+      await saveDepositPrograms(values.map(item => String(item.id) === target
+        ? { ...item, cardAppearance: appearance, photo, photoPosition: editor?.photoPosition || depositCardPhotoPosition(item) }
+        : item));
     },
     onSaved,
   };
@@ -1147,11 +1160,12 @@ function assignedDepositFields(deposit) {
 }
 
 function personDepositCard(deposit, { interactive = true, history = false } = {}) {
+  const program = getDepositPrograms().find(item => String(item.id) === String(deposit?.programId)) || {};
   return entityVisualCard({
-    appearance: depositCardAppearance(),
+    appearance: depositCardAppearance(program),
     fields: assignedDepositFields(deposit),
-    image: depositCardPhoto(),
-    imagePosition: depositCardPhotoPosition(),
+    image: depositCardPhoto(program),
+    imagePosition: depositCardPhotoPosition(program),
     interactive,
     data: interactive ? (history ? 'data-deposit-card-history' : `data-person-program="deposit:${escapeHtml(deposit?.depositId || deposit?.id || '')}"`) : '',
     aria: history && interactive ? 'Открыть историю депозита' : interactive ? `Открыть депозит ${deposit?.programName || ''}` : String(deposit?.programName || 'Депозит'),
@@ -1189,6 +1203,7 @@ export async function openDepositForPerson(root, person = null) {
     const programs = getDepositPrograms().filter((item) => !item?.archivedAt);
     const cards = programs.length
       ? entityCardStack(programs.map((program) => card(programFields(program), {
+          program,
           data: `data-deposit-program="${escapeHtml(program.id)}"`,
           aria: `Открыть депозитную программу ${program.name || ''}`,
         })))
@@ -1268,6 +1283,7 @@ export async function renderDeposit(root) {
   const desktop = isV2DesktopWorkspace(root.closest('[data-v2-app]'));
   const programs = getDepositPrograms().filter((item) => !item?.archivedAt);
   const cards = programs.map((program) => card(programFields(program), {
+          program,
     data: `data-deposit-program="${escapeHtml(program.id)}"`,
     aria: `Открыть депозитную программу ${program.name || ''}`,
   }));

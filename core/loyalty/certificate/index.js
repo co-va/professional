@@ -470,6 +470,7 @@ function personCertificateCard({ instance, program }) {
     metaLeft: instance?.expiresAt || program?.term || 'Бессрочно',
     metaRight: program?.type === 'amount' ? money(instance?.balance) : (instance?.status === 'used' ? 'Использован' : 'Активен'),
   }), {
+    programId: program?.id,
     data: `data-person-program="certificate:${escapeHtml(instance?.id || '')}"`,
     aria: `Открыть сертификат ${program?.name || ''}`,
   });
@@ -505,15 +506,15 @@ export function getPersonLoyaltyCards(person = {}) {
     }),
   };
 }
-const programAppearanceFields = () => programCardFields(programs[0] || { name: 'Сертификат', type: 'amount', amount: 10000, term: '12 мес.', status: 'active' });
+const programAppearanceFields = program => programCardFields(program || programs[0] || { name: 'Сертификат', type: 'amount', amount: 10000, term: '12 мес.', status: 'active' });
 
 export function programAppearanceOptions(onSaved = () => {}) {
-  return loyaltyAppearanceOptions({ type: 'certificate', fields: programAppearanceFields, onSaved });
+  return loyaltyAppearanceOptions({ type: 'certificate', fields: programAppearanceFields, programs: () => programs, onSaved });
 }
 
 export async function renderCertificate(root) {
   const render = async () => {
-    const items = programs.map((program) => loyaltyVisualCard('certificate', programCardFields(program), {
+    const items = programs.map((program) => loyaltyVisualCard('certificate', programCardFields(program), { programId: program.id,
       data: `data-certificate-program="${program.id}"`,
       aria: `Открыть ${program.name}`,
     }));

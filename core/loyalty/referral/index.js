@@ -417,6 +417,7 @@ function personReferralCard({ program }) {
     metaLeft: program?.term || 'Бессрочно',
     metaRight: `${Math.max(1, Number(program?.levels || 1))} ур.`,
   }), {
+    programId: program?.id,
     data: `data-person-program="referral:${escapeHtml(program?.id || '')}"`,
     aria: `Открыть реферальную программу ${program?.name || ''}`,
   });
@@ -453,15 +454,15 @@ export function getPersonLoyaltyCards(person = {}) {
     }),
   };
 }
-const programAppearanceFields = () => programCardFields(programs[0] || { name: 'Реферальная программа', qualifyingEvent: 'first-paid', assignment: 'all', levels: 1, status: 'active' });
+const programAppearanceFields = program => programCardFields(program || programs[0] || { name: 'Реферальная программа', qualifyingEvent: 'first-paid', assignment: 'all', levels: 1, status: 'active' });
 
 export function programAppearanceOptions(onSaved = () => {}) {
-  return loyaltyAppearanceOptions({ type: 'referral', fields: programAppearanceFields, onSaved });
+  return loyaltyAppearanceOptions({ type: 'referral', fields: programAppearanceFields, programs: () => programs, onSaved });
 }
 
 export async function renderReferral(root) {
   const render = async () => {
-    const items = programs.map((program) => loyaltyVisualCard('referral', programCardFields(program), { data: `data-referral-program="${program.id}"`, aria: `Открыть ${program.name}` }));
+    const items = programs.map((program) => loyaltyVisualCard('referral', programCardFields(program), { programId: program.id, data: `data-referral-program="${program.id}"`, aria: `Открыть ${program.name}` }));
     const empty = emptyState('Реферальных программ пока нет', 'Создайте первую программу кнопкой «+».');
     if (root.hasAttribute('data-loyalty-program-section')) {
       renderDesktopProgramSection(root, items, empty);
