@@ -34,7 +34,8 @@ import { DATA_EXCHANGE_ICON, FINANCE_OPERATIONS_ICON, GROUP_ICON, TRASH_ICON } f
 import { financeOperationGroups, openFinanceOperations } from '../operations/index.js';
 import { canUseCapability } from '../../access.js';
 import { getAllPeople } from '../../people/data.js';
-import { getFinanceOperation } from '../data.js';
+import { getFinanceOperation, getFinanceArticles } from '../data.js';
+import { desktopDocumentArticles, desktopOperationDirection } from './classification.js';
 import { getWallets } from '../cash/data.js';
 import { financeLocalDateValue, financeOccurredAtForDate } from '../date.js';
 import { cancelFinanceOperation, correctFinanceOperation, hardDeleteFinanceOperation } from '../service.js';
@@ -570,16 +571,18 @@ function renderDDS(root) {
   const groupedOperations = operationGroupsFromLedger(movements);
   const people = financeDesktop(root) ? getAllPeople() : [];
   const desktop = financeDesktop(root);
+  const catalog=desktop?getFinanceArticles():[];
   const rows = desktop ? groupedOperations.map(entries => {
     const first = entries[0];
     const transfer = first.operationKind === 'transfer';
     const wallets = [...new Set(entries.map(walletText).filter(Boolean))];
-    const articles = [...new Set(entries.map(item => String(item.articleName || '')).filter(Boolean))];
+    const articles = desktopDocumentArticles(entries,catalog);
     const directions = new Set(entries.map(item=>item.direction).filter(Boolean));
     const direction = transfer ? 'transfer' : directions.size===1&&directions.has('OUT') ? 'out' : directions.size===1&&directions.has('IN') ? 'in' : 'mixed';
     const contact=financeTableContact(first,people);
+    const title=desktopOperationDirection(direction);
     return { id:String(first.operationId), date:operationMoment(first), occurredAt:String(first.occurredAt||first.refundedAt||first.paidAt||''),
-      localDate:localDate(first.occurredAt||first.refundedAt||first.paidAt||''), title:operationName(first), ...contact,
+      localDate:localDate(first.occurredAt||first.refundedAt||first.paidAt||''), title, displayTitle:first.operationStatus==='cancelled'?title+' · Отменена':title, operationLabel:operationName(first), ...contact,
       personFilter:[contact.code,contact.person].filter(Boolean).join(' · '), workplace:String(first.workplace||''),
       wallets, wallet:transfer?operationListSubtitle(entries):wallets.join(' + '), articles, article:articles.join(', '),
       direction, status:first.operationStatus==='cancelled'?'Отменена':'Активна',

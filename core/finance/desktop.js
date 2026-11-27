@@ -81,7 +81,7 @@ export function financeHistoryTable(rows, caption, columns) {
     ...(column.key === 'workplace' ? { header: () => twoLineHeading('Рабочее', 'пространство') } : {}),
     ...(column.key === 'title' ? {
       ...(column.secondaryKey ? { header: () => twoLineHeading(column.label, column.secondaryLabel) } : {}),
-      render: row => '<button type="button" data-finance-history-row="' + escapeHtml(row.id) + '" aria-label="' + escapeHtml(row.title) + '">' + (column.secondaryKey ? twoLineCell(row.title, row[column.secondaryKey]) : escapeHtml(row.title)) + '</button>',
+      render: row => '<button type="button" data-finance-history-row="' + escapeHtml(row.id) + '" aria-label="' + escapeHtml(row.title) + '">' + (column.secondaryKey ? twoLineCell(row.displayTitle || row.title, row[column.secondaryKey]) : escapeHtml(row.displayTitle || row.title)) + '</button>',
     } : {}),
   })), rows });
 }

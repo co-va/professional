@@ -12,7 +12,9 @@ import {
   openNotice,
   select,
 } from '../../../ui/ui.js';
-import { openFinanceDeleteConfirmation } from '../desktop.js';
+import { openFinanceDeleteConfirmation, financeDesktop } from '../desktop.js';
+import { canUseCapability } from '../../access.js';
+import { desktopAvailableArticles } from './classification.js';
 import { moveDesktopQTool } from '../../../ui/v2/z-layout.js';
 import { getFinanceArticles } from '../data.js';
 import { archiveFinanceArticle, createFinanceArticle, updateFinanceArticle } from '../service.js';
@@ -94,9 +96,9 @@ function row(item) {
   };
 }
 
-function openArticleX(existing = null, onSaved = () => {}) {
+function openArticleX(existing = null, onSaved = () => {}, getArticles = getFinanceArticles) {
   if(existing?.systemKey)return null;
-  const items = getFinanceArticles();
+  const items = getArticles();
   const isSystem = Boolean(existing?.systemKey);
   const title = existing ? 'Редактирование статьи' : 'Новая статья';
   const direction = existing?.direction || 'OUT';
@@ -221,6 +223,8 @@ function openArticleSort(anchor,state,refresh){
 // and compact X editor are used on desktop and mobile; persisted Core article
 // IDs and mutation rules are unchanged until the classification contract changes.
 export function openFinanceArticlesQ(root, {onSaved=()=>{}}={}) {
+  const desktop=financeDesktop(root);
+  const getArticles=()=>desktop?desktopAvailableArticles(getFinanceArticles(),canUseCapability):getFinanceArticles();
   const state={query:'',filters:articleFilters(),sort:'tree'};
   const layer=mountModal(root,modal(
     '<div class="form-grid">'
@@ -243,22 +247,22 @@ export function openFinanceArticlesQ(root, {onSaved=()=>{}}={}) {
   const add=layer.querySelector('[data-add-finance-article]');
   moveDesktopQTool(add);
   const refresh=()=>{
-    const items=getFinanceArticles();
+    const items=getArticles();
     const rows=visibleArticles(items,state);
     count.textContent=String(rows.length);
     filter?.setAttribute('aria-pressed',String(Object.values(state.filters).some(Boolean)));
     sort?.setAttribute('aria-pressed',String(state.sort!=='tree'));
     host.innerHTML=rows.length?list({items:rows.map(row)}):emptyState(items.length?'Статьи не найдены':'Статей пока нет');
     host.querySelectorAll('[data-finance-article]').forEach(control=>control.addEventListener('click',()=>{
-      const item=getFinanceArticles().find(candidate=>candidate.articleId===control.dataset.financeArticle);
-      if(item)openArticleX(item,changed);
+      const item=getArticles().find(candidate=>candidate.articleId===control.dataset.financeArticle);
+      if(item)openArticleX(item,changed,getArticles);
     }));
   };
   const changed=()=>{refresh();onSaved();};
   search?.addEventListener('input',()=>{state.query=search.value;refresh();});
-  filter?.addEventListener('click',()=>openArticleFilters(filter,getFinanceArticles(),state,refresh));
+  filter?.addEventListener('click',()=>openArticleFilters(filter,getArticles(),state,refresh));
   sort?.addEventListener('click',()=>openArticleSort(sort,state,refresh));
-  add?.addEventListener('click',()=>openArticleX(null,changed));
+  add?.addEventListener('click',()=>openArticleX(null,changed,getArticles));
   refresh();
   return layer;
 }

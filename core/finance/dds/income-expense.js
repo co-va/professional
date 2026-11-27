@@ -14,14 +14,19 @@ import {
   workspaceHeaderContext,
 } from '../../../ui/ui.js';
 import { financeQSubmit, financeZSave } from '../desktop.js';
+import { canUseCapability } from '../../access.js';
+import { desktopAvailableArticles } from './classification.js';
 import { getFinanceArticles } from '../data.js';
 import { getWallets } from '../cash/data.js';
 import { financeLocalDateValue, financeOccurredAtForDate } from '../date.js';
 import { getLedgerEntries } from '../read.js';
 import { correctFinanceOperation, recordManualFinanceOperation } from '../service.js';
 
-function articleOptions(direction) {
-  return getFinanceArticles()
+function articleOptions(direction,desktopArticles=false,preserveId='') {
+  const all=getFinanceArticles();
+  const visible=desktopArticles?desktopAvailableArticles(all,canUseCapability):all;
+  if(preserveId&&!visible.some(item=>item.articleId===preserveId)){const prior=all.find(item=>item.articleId===preserveId);if(prior)visible.push(prior);}
+  return visible
     .filter((item) => item.direction === direction && item.economicType !== 'GROUP')
     .map((item) => ({ value: item.articleId, label: item.name }));
 }
@@ -162,15 +167,16 @@ export function openIncomeExpenseQ(root, direction, { onSaved = null, operation 
   }));
   if (!layer) return null;
   const rendered = renderIncomeExpenseOperation(layer, direction, {
-    operation, onSaved: () => { layer.v2Close?.(); onSaved?.(); },
+    operation, desktopArticles:true, onSaved: () => { layer.v2Close?.(); onSaved?.(); },
   });
   if (!rendered) { layer.v2Close?.(); return null; }
   return layer;
 }
 
-export function renderIncomeExpenseOperation(root, direction, { onSaved = null, operation = null } = {}) {
+export function renderIncomeExpenseOperation(root, direction, { onSaved = null, operation = null, desktopArticles = false } = {}) {
   const isIncome = direction === 'IN';
-  const articles = articleOptions(direction);
+  const original=operation?.data||{};
+  const articles=articleOptions(direction,desktopArticles,String(original.articleId||original.lines?.[0]?.articleId||''));
   const wallets = walletOptions();
   if (!articles.length) {
     openNotice({ message: 'Сначала добавьте конечную статью для этого типа операции.' });
