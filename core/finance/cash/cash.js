@@ -258,25 +258,29 @@ function canCreateCashEntity() {
     || canCreateInvestment();
 }
 
-function openCashCreateMenu(root) {
+function openCashCreateMenu(root, { anchor = null } = {}) {
   const actions = [
     canUseCapability('finance.cash.access')
-      ? button('+ Добавить кошелек', { variant: 'secondary', data: 'data-cash-create-wallet' })
+      ? button(anchor ? 'Кошелёк' : '+ Добавить кошелек', { variant: 'secondary', data: 'data-cash-create-wallet' })
       : '',
     canCreateInvestment()
-      ? button('+ Добавить инвестицию', { variant: 'secondary', data: 'data-cash-create-investment' })
+      ? button(anchor ? 'Инвестиция' : '+ Добавить инвестицию', { variant: 'secondary', data: 'data-cash-create-investment' })
       : '',
     canUseCapability('finance.special.access')
-      ? button('+ Добавить займ', { variant: 'secondary', data: 'data-cash-create-loan' })
+      ? button(anchor ? 'Займ' : '+ Добавить займ', { variant: 'secondary', data: 'data-cash-create-loan' })
       : '',
   ].filter(Boolean);
   if (!actions.length) return null;
-  const content = actionBlock(actions.join(''));
-  const layer = mountModal(document.body, modal(content, {
-    title: 'Добавить',
-    variant: 'x',
-    surface: 'app',
-  }));
+  const content = anchor
+    ? '<div class="desktop-q-action-menu">' + actions.join('') + '</div>'
+    : actionBlock(actions.join(''));
+  const layer = anchor
+    ? mountModal(anchor, modal(content, { variant: 'x', xRole: 'picker', className: 'desktop-q-action-popup' }))
+    : mountModal(document.body, modal(content, {
+        title: 'Добавить',
+        variant: 'x',
+        surface: 'app',
+      }));
   if (!layer) return null;
 
   layer.querySelector('[data-cash-create-wallet]')?.addEventListener('click', () => {
@@ -451,7 +455,8 @@ function renderDesktopCashTools(root) {
   const [row] = setV2ZHeaderRows(root, tools.length ? ['<div class="v2-desktop-tool-row"><div class="v2-desktop-tool-actions" data-cash-desktop-tools>' + tools.join('') + '</div></div>'] : [], { desktopTitle: 'Касса' });
   row?.querySelector('[data-cash-desktop-view]')?.addEventListener('click', () => openCashAppearanceQ(root));
   row?.querySelector('[data-cash-desktop-operations]')?.addEventListener('click', () => openFinanceOperations(root, { groups, onSaved: () => renderList(root) }));
-  row?.querySelector('[data-cash-desktop-add]')?.addEventListener('click', () => openCashCreateMenu(root));
+  const add = row?.querySelector('[data-cash-desktop-add]');
+  add?.addEventListener('click', () => openCashCreateMenu(root, { anchor: add }));
 }
 
 function renderList(root) {

@@ -137,8 +137,9 @@ try {
   await cashOperations.locator('[data-finance-operation-action="manual-income"]').waitFor();
   await cashOperations.evaluate(node=>node.closest('[data-v2-layer]')?.v2Close?.());
   await cashAdd.click();
-  const cashCreate=page.locator('[data-cash-create-wallet]');
+  const cashCreate=page.locator('.desktop-q-action-popup .desktop-q-action-menu [data-cash-create-wallet]');
   await cashCreate.waitFor({state:'visible'});
+  assert.equal(await cashCreate.textContent(),'Кошелёк','Desktop uses short picker labels');
   await cashCreate.evaluate(node=>node.closest('[data-v2-layer]')?.v2Close?.());
   console.log('PASS: Desktop Cash H toolbar opens existing appearance, operations and create menu');
   await shell.locator('[data-v2-root-item="loyalty"]').click({timeout:15000});
