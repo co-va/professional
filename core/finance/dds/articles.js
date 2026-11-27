@@ -310,10 +310,11 @@ function renderDesktopArticleTable(host,rows,collapsed,onOpen){
   const columns=[
     {key:'name',label:'Наименование',sortable:false,render:a=>{
       const name=escapeHtml(a.name);
-      const content=a.systemKey&&a.direction==='TRANSFER'?name:button(name,{variant:'secondary',className:'desktop-group-table-name',data:'data-finance-article="'+escapeHtml(a.articleId)+'"',aria:'Открыть статью '+a.name});
-      return '<div style="padding-inline-start:'+Math.min(a.depth,5)*12+'px" data-article-row="'+escapeHtml(a.articleId)+'">'+content+'</div>';
+      const attrs=' data-article-row="'+escapeHtml(a.articleId)+'" style="--article-indent:'+Math.min(a.depth,5)*12+'px"';
+      return a.systemKey&&a.direction==='TRANSFER'
+        ? '<span class="desktop-group-table-name"'+attrs+'>'+name+'</span>'
+        : '<button type="button" class="desktop-group-table-name"'+attrs+' data-finance-article="'+escapeHtml(a.articleId)+'" aria-label="'+escapeHtml('Открыть статью '+a.name)+'">'+name+'</button>';
     }},
-    {key:'type',label:'Тип',sortable:false,render:a=>a.systemKey?'Системная':'Пользовательская'},
     {key:'values',label:'Значения',sortable:false,render:a=>String(a.childCount)},
   ];
   host.innerHTML='<div class="desktop-table-popup">'+dataTable({columns,rows,caption:'Статьи',compact:true})+'</div>';
