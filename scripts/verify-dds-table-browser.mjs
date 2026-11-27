@@ -13,7 +13,7 @@ const rows=Array.from({length:24},(_,i)=>({select:'',date:'27.11.2026',title:i?'
 const browser=await chromium.launch({headless:true});
 try{
  const page=await browser.newPage({viewport:{width:1280,height:900}});
- await page.setContent('<style>'+css+'\n.fixture{position:relative;width:var(--fixture-width);height:300px;overflow:hidden}.fixture [data-dds-history]{width:100%;height:100%}.fixture [data-wallet-history-host]{width:100%;height:230px}.fixture .ui-data-table--compact{max-height:200px}</style><div class="v2-app--workspace" data-v2-desktop-surface="list"><div class="v2-front"><div class="v2-z fixture" style="--fixture-width:670px"><div data-dds-history><div data-wallet-history-host></div></div></div></div></div>');
+ await page.setContent('<style>'+css+'\n.fixture{position:relative;width:var(--fixture-width)!important;height:300px;overflow:hidden}.fixture [data-dds-history]{width:100%;height:100%}.fixture [data-wallet-history-host]{width:100%;height:230px}.fixture .ui-data-table--compact{max-height:200px}</style><div class="v2-app--workspace" data-v2-desktop-surface="list"><div class="v2-front"><div class="v2-z fixture" style="--fixture-width:670px"><div data-dds-history><div data-wallet-history-host></div></div></div></div></div>');
  const host=page.locator('[data-wallet-history-host]');
  const measure=()=>host.locator('thead th').evaluateAll(nodes=>Object.fromEntries(nodes.map(n=>[n.dataset.tableColumn,Math.round(n.getBoundingClientRect().width)])));
  const mount=async keys=>host.evaluate((node,html)=>{node.innerHTML=html;},dataTable({columns:columns(keys),rows,caption:'ДДС',compact:true}));
@@ -27,13 +27,16 @@ try{
    for(const key of keys)assert.ok(Math.abs(sizes[key]-g.table*expected[key]/minimum)<=1,key+' unexpected proportion');
    return sizes;
  };
- await mount(order);const narrow=await check(order);
+ await mount(order);
+ assert.ok((await geometry()).available<752,'Narrow fixture must actually be narrower than the DDS minimum');
+ const narrow=await check(order);
  assert.equal(Math.round((await table.boundingBox()).width),752);
  await host.locator('tbody').evaluate(body=>{const group=body.insertRow(0);group.dataset.tableGroupLevel='group';const td=group.insertCell();td.colSpan=8;td.textContent='Длинная системная группа';for(const row of [...body.rows].slice(1))row.hidden=true;});
  assert.deepEqual(await check(order),narrow,'Collapse must not redistribute columns');
  await host.locator('tbody').evaluate(body=>{for(const row of [...body.rows].slice(1))row.hidden=false;});
  assert.deepEqual(await check(order),narrow);
  await page.locator('.fixture').evaluate(node=>node.style.setProperty('--fixture-width','1000px'));
+ assert.ok((await geometry()).available>882,'Wide fixture must actually exceed both DDS minimum widths');
  const wide=await check(order);
  assert.equal(await viewport.evaluate(node=>node.scrollWidth<=node.clientWidth+1),true,'No redundant horizontal scrolling');
  await host.locator('tbody').evaluate(body=>{for(const row of [...body.rows].slice(1))row.hidden=true;});
