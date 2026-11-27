@@ -69,3 +69,22 @@ assert.match(itemEditor,/patch\.criteriaValues = Object\.fromEntries/);
 assert.match(registry,/deleteData:isFixedManufacturerCriterion\(group\) \? '' : group.id/);
 assert.match(registry,/if \(isFixedManufacturerCriterion\(group\)\) return;/);
 console.log('Inventory grouping: recursive grouping, 30-item mix, skipped levels, root locking PASS');
+
+// Service catalogue reuses the inventory grouping tree without changing assignments.
+{
+ const {serviceTree,serviceTableColumns,serviceUsageText}=await import('../../core/service/catalog-view.js');
+ const levels=[{id:'g1',name:'Группа 1',values:[{id:'v1',name:'Значение'}]},{id:'g2',name:'Группа 2',values:[{id:'v2',name:'Значение'}]}];
+const items=[{id:'1',groupValues:{g1:'v1',g2:'v2'}},{id:'2',groupValues:{g1:'v1'}},{id:'3',groupValues:{}},{id:'4',groupValues:{g2:'__service_group_only__'}}];
+for(const groupGroups of [false,true])for(const groupValues of [false,true]){
+ const {tree,criteria}=serviceTree(items,levels,{groupGroups,groupValues});
+ const leaves=node=>[...node.direct,...[...node.children.values()].flatMap(leaves)];
+ assert.deepEqual(leaves(tree).map(i=>i.id).sort(),['1','2','3','4']);
+ assert.equal(criteria.length,(Number(groupGroups)+Number(groupValues))*2);
+ if(!groupGroups&&!groupValues)assert.equal(tree.children.size,0);
+ if(!groupGroups&&groupValues)assert.deepEqual([...tree.children.values()].map(n=>n.value),['Группа 1 · Значение']);
+}
+assert.deepEqual(serviceTableColumns('procedures').map(x=>x[0]),['name','price','duration','usage','minutes','revenue']);
+assert.deepEqual(serviceTableColumns('products').map(x=>x[0]),['name','price','usage','revenue']);
+assert.equal(serviceUsageText(4,10),'4 / 10');assert.equal(serviceUsageText(3,undefined),'3 / —');
+ console.log('PASS Service grouping switches and combined count');
+}

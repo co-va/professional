@@ -1,9 +1,11 @@
 // Desktop projects one active section of the existing Service catalogue.
 // Keep V2 rows, catalogue disclosure, price format and reorder owner.
 import {button,compactButton,field,select,modal,mountModal,emptyState,v2ListEntry,v2ListEntries,initV2ListReorder,openNotice,costListParts,durationText,escapeHtml} from '../../ui/ui.js';
-import {checkControl} from '../../ui/selection/check-list.js';
+import {checkControl,compactCheck} from '../../ui/selection/check-list.js';
+import {serviceTree,serviceTableColumns,serviceUsageText,SERVICE_GROUP_PREFIX as prefix} from './catalog-view.js';
+import {getProfile} from '../profile/data.js';
 import {catalogDisclosure} from '../inventory/catalog-ui.js';
-import {stockGroupTree,sortedStockChildren} from '../inventory/grouping.js';
+import {sortedStockChildren} from '../inventory/grouping.js';
 import {getProcedures,commitReorderProcedures} from './procedures/data.js';
 import {getProducts,commitReorderProducts,getServiceGroupLevels,getServiceGroupEntries} from './products/data.js';
 import {getWorkplaces} from '../profile/workplaces/data.js';
@@ -25,8 +27,7 @@ const priceNumber=item=>{
   if(cost.free)return 0;
   return numberOrMissing(cost.mode==='from'||cost.mode==='from-to'?(cost.from!==''&&cost.from!=null?cost.from:cost.amount):(cost.amount!==''&&cost.amount!=null?cost.amount:cost.from));
 };
-const prefix='__service_group_';
-const labels={name:'Наименование',price:'Цена',duration:'Время',workplaces:'Рабочие пространства',count:'Количество',minutes:'Затрачено времени',revenue:'Доход'};
+const labels={name:'Наименование',price:'Цена',duration:'Время работы',workplaces:'Число рабочих пространств',count:'Количество выполненных услуг',minutes:'Затрачено времени',revenue:'Доход'};
 const rangeKeys=['price','duration','count','minutes','revenue'];
 const hasRange=range=>Boolean(range&&(key(range.min)!==''||key(range.max)!==''));
 const filtersActive=state=>Boolean(state.group||state.value||state.workplace||rangeKeys.some(k=>hasRange(state.ranges?.[k])));
@@ -44,19 +45,17 @@ export function mergeServiceOrder(all,changed){
   if(set.size!==changed.length||changed.some(id=>!all.includes(id)))throw Error('Список изменился.');
   let offset=0;return all.map(id=>set.has(id)?changed[offset++]:id);
 }
-function serviceTree(items,levels){
-  const criteria=levels.flatMap(g=>[{id:prefix+g.id,values:[{id:'selected',name:g.name}]},{id:g.id,values:g.values||[]}]);
-  const decorated=items.map(item=>{
-    const criteriaValues={};
-    for(const g of levels){
-      const value=key(item.groupValues?.[g.id]);
-      if(!value)continue;
-      criteriaValues[prefix+g.id]='selected';
-      if(g.values?.some(v=>v.id===value))criteriaValues[g.id]=value;
-    }
-    return {...item,criteriaValues};
-  });
-  return {tree:stockGroupTree(decorated,criteria),criteria};
+function groupingKey(kind){
+ const p=getProfile(),id=p.platformAccountId||p.id;
+ return id?'professional.service.grouping.v1:'+id+':'+kind:'';
+}
+function readGrouping(kind){
+ try{const id=groupingKey(kind),v=id?JSON.parse(localStorage.getItem(id)||'null'):null;
+ if(v&&typeof v.groupGroups==='boolean'&&typeof v.groupValues==='boolean')return v;}catch{}
+ return {groupGroups:true,groupValues:true};
+}
+function saveGrouping(kind,st){
+ try{const id=groupingKey(kind);if(id)localStorage.setItem(id,JSON.stringify({groupGroups:st.groupGroups,groupValues:st.groupValues}));}catch{}
 }
 export function renderDesktopServiceCatalog(host,{root,toolbar,onChanged,state,kind:activeKind,onCount,loadProceduresModule,loadProductsModule}){
   let disposed=false,statistics=null,serial=0;
@@ -64,17 +63,24 @@ export function renderDesktopServiceCatalog(host,{root,toolbar,onChanged,state,k
   const fail=error=>openNotice({title:'Сервис',message:error?.message||'Не удалось сохранить.'});
   const kinds=[activeKind==='products'?'products':'procedures'];
   const check=(data,aria,checked=false)=>'<label class="ui-compact-check service-table-check">'+checkControl({data,aria,checked})+'</label>';
-  const columns=Object.entries(labels).filter(([id])=>kinds[0]==='procedures'||!['duration','minutes'].includes(id));
-  const activeRangeKeys=rangeKeys.filter(id=>columns.some(([column])=>column===id));
-  const header=columns.map(([,label])=>label);
-  host.innerHTML='<section data-service-desktop-group-list data-service-table-kind="combined" data-service-table-mode="'+kinds[0]+'"><div class="service-desktop-table-track"><div class="service-desktop-group-header">'+'<span aria-hidden="true"></span>'+check('data-service-select-all','Выбрать все позиции')+header.map(v=>'<span>'+v+'</span>').join('')+'<span aria-hidden="true"></span>'+'</div><div class="service-desktop-group-body" data-service-group-catalog>'+kinds.map(kind=>'<section data-service-desktop-section="'+kind+'"><div data-service-table-host></div></section>').join('')+'</div></div></section>';
+  const isServiceKind=kinds[0]==='procedures';
+  const sortColumns=Object.entries({...labels,count:isServiceKind?'Количество выполненных услуг':'Количество визитов с товаром'}).filter(([id])=>isServiceKind||!['duration','minutes'].includes(id));
+  const columns=serviceTableColumns(kinds[0]);
+  const activeRangeKeys=rangeKeys.filter(id=>sortColumns.some(([column])=>column===id));
+  const header=columns.map(([id,label])=>{
+    const lines=id==='usage'?['Пространства','/ Количество']:id==='duration'?['Время','работы']:id==='minutes'?['Затрачено','времени']:[label];
+    const title=id==='usage'?(isServiceKind?'Рабочие пространства / количество выполненных услуг':'Рабочие пространства / количество визитов с товаром'):label;
+    return '<span data-service-column="'+id+'" title="'+escapeHtml(title)+'">'+lines.map(line=>'<span>'+escapeHtml(line)+'</span>').join('')+'</span>';
+  });
+  host.innerHTML='<section data-service-desktop-group-list data-service-table-kind="combined" data-service-table-mode="'+kinds[0]+'"><div class="service-desktop-table-track"><div class="service-desktop-group-header">'+'<span aria-hidden="true"></span>'+check('data-service-select-all','Выбрать все позиции')+header.join('')+'<span aria-hidden="true"></span>'+'</div><div class="service-desktop-group-body" data-service-group-catalog>'+kinds.map(kind=>'<section data-service-desktop-section="'+kind+'"><div data-service-table-host></div></section>').join('')+'</div></div></section>';
   const sections=[...host.querySelectorAll('[data-service-desktop-section]')];
   const st=state;
+  if(typeof st.groupGroups!=='boolean'||typeof st.groupValues!=='boolean')Object.assign(st,readGrouping(kinds[0]));
   st.selected ||= new Set();
   st.ranges ||= {};
   for(const id of Object.keys(st.ranges))if(!activeRangeKeys.includes(id))delete st.ranges[id];
   if(!activeRangeKeys.includes(st.rangeMetric))st.rangeMetric='';
-  if(st.sort!=='manual'&&!columns.some(([id])=>id===st.sort.split(':')[0]))st.sort='manual';
+  if(st.sort!=='manual'&&!sortColumns.some(([id])=>id===st.sort.split(':')[0]))st.sort='manual';
   st.groupCollapsed ||= new Set();
   let selectable=[];
   const selectionKey=(kind,id)=>JSON.stringify([kind,key(id)]);
@@ -106,12 +112,12 @@ export function renderDesktopServiceCatalog(host,{root,toolbar,onChanged,state,k
       }
       const manual=st.sort==='manual'&&!st.query&&!filtersActive(st);
       selectable.push(...rows.map(item=>selectionKey(kind,item.id)));
-      const {tree,criteria}=serviceTree(rows,levels);
+      const {tree,criteria}=serviceTree(rows,levels,st);
       const scopes=[];
       const row=(item,scope)=>{
         const stats=stat(item),price=costListParts(item.cost);
-        const cells={duration:isService?durationText(item.duration):'',workplaces:String(ids(item).length),count:stats?String(stats.count):'—',minutes:isService?(stats?serviceSpentText(stats.minutes):'—'):'',revenue:stats?money(stats.revenue):'—'};
-        const values='<span class="list-entry__right service-desktop-price">'+[price.rightTop,price.rightBottom].filter(Boolean).map((v,i)=>'<'+(i?'small':'strong')+'>'+escapeHtml(v)+'</'+(i?'small':'strong')+'>').join('')+'</span>'+columns.filter(([id])=>Object.hasOwn(cells,id)).map(([id])=>'<span class="service-desktop-value" data-service-column="'+id+'">'+escapeHtml(cells[id])+'</span>').join('');
+        const cells={duration:isService?durationText(item.duration):'',usage:serviceUsageText(ids(item).length,stats?.count),minutes:isService?(stats?serviceSpentText(stats.minutes):'—'):'',revenue:stats?money(stats.revenue):'—'};
+        const values='<span class="list-entry__right service-desktop-price" data-service-column="price">'+[price.rightTop,price.rightBottom].filter(Boolean).map((v,i)=>'<'+(i?'small':'strong')+'>'+escapeHtml(v)+'</'+(i?'small':'strong')+'>').join('')+'</span>'+columns.filter(([id])=>Object.hasOwn(cells,id)).map(([id])=>'<span class="service-desktop-value" data-service-column="'+id+'">'+escapeHtml(cells[id])+'</span>').join('');
         let html=v2ListEntry({title:item.name||'',subtitle:'',omitEmptySubtitle:true,image:isService?procedureCardPhoto(item):productCardPhoto(item),initial:(item.name||'?').slice(0,1).toUpperCase(),interactive:true,reorderHandle:manual,reorderAria:'Изменить порядок',data:'data-service-position="'+escapeHtml(item.id)+'" data-reorder-id="'+escapeHtml(item.id)+'" data-service-reorder-scope="'+scope+'"',aria:'Открыть '+item.name});
         // The shared checkbox is a real input, not a nested control in a button.
         const selectedId=selectionKey(kind,item.id);
@@ -187,7 +193,7 @@ export function renderDesktopServiceCatalog(host,{root,toolbar,onChanged,state,k
   toolbar.querySelector('[data-service-filter]')?.addEventListener('click',e=>{
     const anchor=e.currentTarget;anchor.dataset.v2AnchorWidth='360';
     const none={value:'',label:'Без фильтра'};
-    const rangeLabels={price:'Цена, ₽',duration:'Время, мин',count:'Количество',minutes:'Затраченное время, мин',revenue:'Доход, ₽'};
+    const rangeLabels={price:'Цена, ₽',duration:'Время работы, мин',count:isServiceKind?'Количество выполненных услуг':'Количество визитов с товаром',minutes:'Затраченное время, мин',revenue:'Доход, ₽'};
     const rangeFields=()=>{
       const k=st.rangeMetric||'';
       const range=st.ranges[k]||{};
@@ -237,13 +243,19 @@ export function renderDesktopServiceCatalog(host,{root,toolbar,onChanged,state,k
   });
   toolbar.querySelector('[data-service-sort]')?.addEventListener('click',e=>{
     const anchor=e.currentTarget;
-    const options=[['manual','Ручной порядок'],...columns.flatMap(([id,label])=>[
+    const options=[['manual','Ручной порядок'],...sortColumns.flatMap(([id,label])=>[
       [id+':asc',label+' — '+(id==='name'?'от А до Я':'по возрастанию')],
       [id+':desc',label+' — '+(id==='name'?'от Я до А':'по убыванию')]
     ])];
-    const markup='<div class="people-action-menu">'+options.map(([value,label])=>
+    const grouping=compactCheck({label:'По группам',checked:st.groupGroups,data:'data-service-group-groups',aria:'Группировать по группам'})+
+      compactCheck({label:'По значениям',checked:st.groupValues,data:'data-service-group-values',aria:'Группировать по значениям'});
+    const markup='<div class="people-action-menu">'+grouping+options.map(([value,label])=>
       button(escapeHtml(label),{variant:'secondary',data:'data-service-sort-choice="'+escapeHtml(value)+'" aria-pressed="'+(value===st.sort)+'"'})).join('')+'</div>';
     const layer=mountModal(anchor,modal(markup,{title:'Сортировка',variant:'x',surface:'app',xRole:'action',className:'people-action-popup people-sort-popup'}));
+    for(const [selector,key] of [['[data-service-group-groups]','groupGroups'],['[data-service-group-values]','groupValues']]){
+      const control=layer?.querySelector(selector);
+      control?.addEventListener('change',()=>{st[key]=control.checked;saveGrouping(kinds[0],st);refresh();});
+    }
     layer?.querySelectorAll('[data-service-sort-choice]').forEach(control=>control.addEventListener('click',()=>{
       const next=control.dataset.serviceSortChoice;
       if(!options.some(([value])=>value===next))return;

@@ -1187,11 +1187,11 @@
 .v2-app--workspace [data-table-group-level="group"]{--table-level-bg:var(--desktop-table-group-bg);--table-level-ink:var(--desktop-table-group-ink)}
 .v2-app--workspace [data-table-group-level="value"]{--table-level-bg:var(--desktop-table-value-bg);--table-level-ink:var(--desktop-table-value-ink)}
 .v2-app--workspace [data-table-group-level]:is(tr)>td{background:var(--table-level-bg);color:var(--table-level-ink);font-weight:750}
-.v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-table-kind="combined"]{--service-columns:36px 28px minmax(155px,1fr) minmax(85px,.65fr) minmax(65px,.45fr) minmax(100px,.65fr) minmax(72px,.45fr) minmax(95px,.65fr) minmax(105px,.75fr) 28px;display:block;overflow:auto;flex:0 1 auto;min-height:0;max-height:100%;overscroll-behavior:none}
+.v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-table-kind="combined"]{--service-columns:36px 28px minmax(155px,1fr) minmax(85px,.65fr) minmax(80px,.45fr) minmax(130px,.85fr) minmax(100px,.65fr) minmax(105px,.75fr) 28px;display:block;overflow:auto;flex:0 1 auto;min-height:0;max-height:100%;overscroll-behavior:none}
 .v2-app--workspace [data-service-table-kind="combined"] .service-desktop-table-track{min-width:886px}
 .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-table-kind] .service-desktop-group-header,.v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-table-kind] [data-service-position]>.list-entry__content{display:grid;grid-template-columns:var(--service-columns);gap:10px;padding-inline:12px;align-items:center}
 .v2-app--workspace [data-service-table-kind="combined"] .service-desktop-group-header{position:sticky;top:0;z-index:10}
-.v2-app--workspace [data-service-table-kind] .service-desktop-group-header>span{white-space:normal;overflow-wrap:normal;text-align:right}.v2-app--workspace [data-service-table-kind] .service-desktop-group-header>span:nth-child(3){text-align:left}
+.v2-app--workspace [data-service-table-kind]  .service-desktop-group-header>span{min-width:0;white-space:normal;overflow-wrap:normal;text-align:right}.v2-app--workspace [data-service-table-kind] .service-desktop-group-header>span:nth-child(3){text-align:left}
 .v2-app--workspace [data-service-table-kind] [data-service-position] .list-entry__main{grid-column:3}.v2-app--workspace [data-service-table-kind] [data-service-position] .list-entry__right{grid-column:4}
 .v2-app--workspace [data-service-table-kind] .service-desktop-value{text-align:right;font-size:13px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-table-kind] .service-desktop-group-body[data-service-group-catalog]{display:block;overflow:visible}
@@ -1214,7 +1214,7 @@
 
 @media (min-width:768px) and (min-height:600px){
 /* Drag first, selection second, editable action last. System headings are not draggable. */
-.v2-app--workspace [data-service-table-kind] [data-service-position] .service-table-edit{grid-column:10;justify-self:center;align-self:center;box-sizing:border-box;width:var(--ui-compact-size);height:var(--ui-compact-size);min-height:var(--ui-compact-size);padding:0;border:0;background:transparent;color:var(--text);font-size:20px;font-weight:400;line-height:1}
+.v2-app--workspace [data-service-table-kind] [data-service-position] .service-table-edit{grid-column:9;justify-self:center;align-self:center;box-sizing:border-box;width:var(--ui-compact-size);height:var(--ui-compact-size);min-height:var(--ui-compact-size);padding:0;border:0;background:transparent;color:var(--text);font-size:20px;font-weight:400;line-height:1}
 .v2-app--workspace [data-service-table-kind] [data-service-collapse-key]{position:relative}
 
 .v2-app--workspace .ui-data-table--compact tr[data-table-group-level] .dds-table-disclosure>summary{display:flex;align-items:center;padding-inline:12px 40px;color:inherit;background:transparent;white-space:normal;font:inherit}
@@ -1233,10 +1233,17 @@
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-table-kind] [data-service-position]>.list-entry__content{grid-template-rows:minmax(0,1fr);grid-auto-rows:0;align-items:center}
  .v2-app--workspace [data-service-table-kind] [data-service-position]>.list-entry__content>*{grid-row:1;min-width:0}
  .v2-app--workspace [data-service-table-kind] [data-service-position] [data-service-column="duration"]{grid-column:5}
- .v2-app--workspace [data-service-table-kind] [data-service-position] [data-service-column="workplaces"]{grid-column:6}
- .v2-app--workspace [data-service-table-kind] [data-service-position] [data-service-column="count"]{grid-column:7}
- .v2-app--workspace [data-service-table-kind] [data-service-position] [data-service-column="minutes"]{grid-column:8}
- .v2-app--workspace [data-service-table-kind] [data-service-position] [data-service-column="revenue"]{grid-column:9}
+ .v2-app--workspace [data-service-table-kind] [data-service-column="usage"]{grid-column:6}
+ .v2-app--workspace [data-service-table-kind] [data-service-column="minutes"]{grid-column:7}
+ .v2-app--workspace [data-service-table-kind] [data-service-column="revenue"]{grid-column:8}
+ .v2-app--workspace [data-service-table-kind] .service-desktop-group-header>[data-service-column]{display:grid;align-content:center;line-height:1.2}
+ .v2-app--workspace [data-service-table-kind] .service-desktop-group-header>[data-service-column="name"]{grid-column:3;text-align:left}
+ .v2-app--workspace [data-service-table-kind] [data-service-column="price"]{grid-column:4}
+ .v2-app--workspace [data-service-table-kind] .service-desktop-group-header>[data-service-column="duration"]{grid-column:5}
+ .v2-app--workspace [data-service-table-kind] [data-service-column]:is([data-service-column="duration"],[data-service-column="usage"],[data-service-column="minutes"]){text-align:center}
+ .v2-app--workspace [data-service-table-kind] [data-service-position] .service-desktop-price{width:100%;max-width:none;justify-self:stretch}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-table-kind] :is(.service-desktop-group-header,[data-service-position]>.list-entry__content){box-sizing:border-box;width:100%;justify-content:normal;padding-inline:12px}
+ .v2-app--workspace [data-service-table-kind] .service-desktop-group-header>span:last-child:not([data-service-column]){grid-column:9}
  .v2-app--workspace [data-service-table-kind] [data-service-position] .list-entry__reorder-handle{height:var(--ui-compact-size);margin:0;justify-self:center}
  .v2-app--workspace [data-service-table-kind] [data-service-desktop-section]{position:relative}
 }
@@ -1249,12 +1256,12 @@
 
 /* Products have no duration columns: compact the actual grid, not just its cells. */
 @media (min-width:768px) and (min-height:600px){
- .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-table-kind][data-service-table-mode="products"]{--service-columns:36px 28px minmax(155px,1fr) minmax(85px,.65fr) minmax(100px,.65fr) minmax(72px,.45fr) minmax(105px,.75fr) 28px}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-table-kind][data-service-table-mode="products"]{--service-columns:36px 28px minmax(155px,1fr) minmax(85px,.65fr) minmax(130px,.85fr) minmax(105px,.75fr) 28px}
  .v2-app--workspace [data-service-table-kind][data-service-table-mode="products"] .service-desktop-table-track{min-width:704px}
- .v2-app--workspace [data-service-table-kind][data-service-table-mode="products"] [data-service-position] [data-service-column="workplaces"]{grid-column:5}
- .v2-app--workspace [data-service-table-kind][data-service-table-mode="products"] [data-service-position] [data-service-column="count"]{grid-column:6}
- .v2-app--workspace [data-service-table-kind][data-service-table-mode="products"] [data-service-position] [data-service-column="revenue"]{grid-column:7}
- .v2-app--workspace [data-service-table-kind][data-service-table-mode="products"] [data-service-position] .service-table-edit{grid-column:8}
+ .v2-app--workspace [data-service-table-kind][data-service-table-mode="products"] [data-service-column="usage"]{grid-column:5}
+ .v2-app--workspace [data-service-table-kind][data-service-table-mode="products"] [data-service-column="revenue"]{grid-column:6}
+ .v2-app--workspace [data-service-table-kind][data-service-table-mode="products"] [data-service-position] .service-table-edit{grid-column:7}
+ .v2-app--workspace [data-service-table-kind][data-service-table-mode="products"] .service-desktop-group-header>span:last-child:not([data-service-column]){grid-column:7}
 }
 
 /* Q group directory uses the existing compact data table and shared reorder handle. */
