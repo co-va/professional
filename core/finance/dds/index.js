@@ -480,9 +480,8 @@ function openOperationCorrection(root, operationLayer, entries) {
     openNotice({ message: 'Операция не найдена.' });
     return;
   }
-  const desktop = financeDesktop(root);
-  if (desktop) operationLayer.v2Close?.();
-  const layer = mountV2ZLayer(desktop ? root : operationLayer, v2ZLayer('', { className: 'finance-dds-correction-z' }), { stack: true });
+  operationLayer.v2Close?.();
+  const layer = mountV2ZLayer(root, v2ZLayer('', { className: 'finance-dds-correction-z' }), { stack: true });
   if (!layer) return;
   const onSaved = () => reopenCorrectedOperation(root, operationLayer, layer, operation.operationId);
   let rendered = false;
@@ -503,33 +502,7 @@ function openOperationCorrection(root, operationLayer, entries) {
   }
 }
 
-function openOperationSettings(root, operationLayer, entries) {
-  const first = entries[0] || {};
-  const active = first?.operationStatus !== 'cancelled';
-  return openSharedProfileSettingsMenu({
-    title: 'Настройки операции',
-    actions: [
-      active ? {
-        id: 'correct-operation',
-        label: 'Корректировка',
-        variant: 'outline',
-        onSelect: () => openOperationCorrection(root, operationLayer, entries),
-      } : null,
-      active ? {
-        id: 'cancel-operation',
-        label: 'Отменить операцию',
-        variant: 'danger',
-        onSelect: () => openCancelOperation(root, operationLayer, entries),
-      } : null,
-      {
-        id: 'delete-operation',
-        label: 'Удалить операцию',
-        variant: 'critical',
-        onSelect: () => openDeleteOperation(root, operationLayer, entries),
-      },
-    ].filter(Boolean),
-  });
-}
+
 
 function openFinanceOperation(root, movements, operationId) {
   const id = String(operationId || '');
@@ -553,21 +526,12 @@ function openFinanceOperation(root, movements, operationId) {
       strong: true,
     }],
   });
-  if (financeDesktop(root)) {
-    const active = first?.operationStatus !== 'cancelled';
-    return openFinanceReceiptQ(root, operationName(first), receipt, [
-      active ? { label: 'Корректировка', run: layer => openOperationCorrection(root, layer, entries) } : null,
-      active ? { label: 'Отменить операцию', variant: 'danger', run: layer => openCancelOperation(root, layer, entries) } : null,
-      { label: 'Удалить операцию', variant: 'critical', run: layer => openDeleteOperation(root, layer, entries) },
-    ]);
-  }
-  const layer = mountV2ZLayer(root, v2ZLayer('', { className: 'finance-dds-receipt-z' }), { stack: true });
-  if (!layer) return;
-  layer.innerHTML = `${workspaceHeaderContext({ title: operationName(first), v: { kind: 'settings', data: 'data-finance-operation-settings', aria: 'Настройки операции' } })}${receipt}`;
-
-  layer.querySelector('[data-finance-operation-settings]')?.addEventListener('click', () => {
-    openOperationSettings(root, layer, entries);
-  });
+  const active = first?.operationStatus !== 'cancelled';
+  return openFinanceReceiptQ(root, operationName(first), receipt, [
+    active ? { label: 'Корректировка', run: layer => openOperationCorrection(root, layer, entries) } : null,
+    active ? { label: 'Отменить операцию', variant: 'danger', run: layer => openCancelOperation(root, layer, entries) } : null,
+    { label: 'Удалить операцию', variant: 'critical', run: layer => openDeleteOperation(root, layer, entries) },
+  ]);
 }
 
 function openArticles(root) {

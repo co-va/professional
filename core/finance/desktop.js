@@ -63,6 +63,7 @@ export function bindFinanceHistoryTable(root, open) {
   });
 }
 
+// The financial document is Q in both Mobile and Desktop, not another Z.
 export function openFinanceReceiptQ(root, title, receipt, actions = []) {
   const available = actions.filter(Boolean);
   const tools = available.map((item, index) => button(item.label, {

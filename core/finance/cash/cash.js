@@ -183,16 +183,7 @@ function walletContext(wallet, title = wallet?.name || 'Касса', desktop = f
   });
 }
 
-function operationContext(operation, desktop = false) {
-  return workspaceHeaderContext({
-    title: operationName(operation),
-    v: desktop ? null : {
-      kind: 'settings',
-      data: 'data-wallet-operation-settings',
-      aria: 'Настройки операции',
-    },
-  });
-}
+
 
 function renderWalletCard(wallet) {
   const balance = getWalletBalance(wallet.id);
@@ -1399,32 +1390,19 @@ function openInvestmentEvent(root, entityLayer, entity, eventId) {
   const event = (Array.isArray(entity?.investmentEvents) ? entity.investmentEvents : [])
     .find((item) => String(item?.id || '') === String(eventId || '') && !item?.deletedAt);
   if (!event) return null;
-  const layer = mountV2ZLayer(entityLayer, v2ZLayer(page([
-    workspaceHeaderContext({
-      title: investmentEventTitle(event),
-      v: financeDesktop(root) ? null : {
-        kind: 'settings',
-        data: 'data-investment-event-settings',
-        aria: 'Настройки события инвестиции',
-      },
-    }),
-    readOnlyReceipt({
-      title: investmentEventTitle(event),
-      date: shortDate(event.occurredDate || event.occurredAt || '', '—'),
-      time: '',
-      items: event.note ? [{ label: String(event.note), value: '' }] : [],
-      totals: [{ label: '', value: formatMoney(event.amount), strong: true }],
-    }),
-  ])), { stack: true });
-  if (!layer) return null;
-
-  const openSettings = () => {
-    openSharedProfileSettingsMenu({
-      title: investmentEventTitle(event),
+  const title = investmentEventTitle(event);
+  return openFinanceReceiptQ(entityLayer, title, readOnlyReceipt({
+    title,
+    date: shortDate(event.occurredDate || event.occurredAt || '', '—'),
+    time: '',
+    items: event.note ? [{ label: String(event.note), value: '' }] : [],
+    totals: [{ label: '', value: formatMoney(event.amount), strong: true }],
+  }), [{
+    label: 'Удалить событие', variant: 'danger',
+    run: receipt => openSharedProfileSettingsMenu({
+      title,
       actions: [{
-        id: 'delete-event',
-        label: 'Удалить событие',
-        variant: 'danger',
+        id: 'delete-event', label: 'Удалить событие', variant: 'danger',
         onSelect: () => {
           const current = financeEntityById('investment', entity.id) || entity;
           saveInvestmentEntity({
@@ -1433,42 +1411,31 @@ function openInvestmentEvent(root, entityLayer, entity, eventId) {
               .filter((item) => String(item?.id || '') !== String(event.id || '')),
             updatedAt: new Date().toISOString(),
           });
-          layer.v2Close?.();
+          receipt.v2Close?.();
           renderFinanceEntityLayer(root, entityLayer, 'investment', entity.id);
           renderList(root);
         },
       }],
-    });
-  };
-  if (financeDesktop(layer)) financeZActions(layer, investmentEventTitle(event), [{ label: 'Удалить', run: openSettings }]);
-  else layer.querySelector('[data-investment-event-settings]')?.addEventListener('click', openSettings);
-  return layer;
+    }),
+  }]);
 }
 
 function openFinanceEntityOperation(root, entityLayer, type, entity, operationId) {
   const operation = financeEntityOperations(type, entity.id)
     .find((item) => String(item?.operationId || '') === String(operationId || ''));
   if (!operation) return null;
-  if (financeDesktop(root)) return openFinanceReceiptQ(entityLayer, operationName(operation), operationReceipt(operation), [{ label: 'Удалить операцию', variant: 'danger', run: receipt => openSharedProfileSettingsMenu({ title: operationName(operation), actions: [{ id: 'delete-operation', label: 'Удалить операцию', variant: 'danger', onSelect: async () => { try { await cancelFinanceOperation(operation.operationId, { reason: 'incorrect-entry', occurredAt: new Date() }); receipt.v2Close?.(); renderFinanceEntityLayer(root, entityLayer, type, entity.id); renderList(root); } catch (error) { openNotice({ message: String(error?.message || 'Не удалось удалить операцию') }); } } }] }) }]);
-  const layer = mountV2ZLayer(entityLayer, v2ZLayer(page([
-    operationContext(operation, financeDesktop(root)),
-    operationReceipt(operation),
-  ])), { stack: true });
-  if (!layer) return null;
-  const openSettings = () => {
-    openSharedProfileSettingsMenu({
+  return openFinanceReceiptQ(entityLayer, operationName(operation), operationReceipt(operation), [{
+    label: 'Удалить операцию', variant: 'danger',
+    run: receipt => openSharedProfileSettingsMenu({
       title: operationName(operation),
       actions: [{
-        id: 'delete-operation',
-        label: 'Удалить операцию',
-        variant: 'danger',
+        id: 'delete-operation', label: 'Удалить операцию', variant: 'danger',
         onSelect: async () => {
           try {
             await cancelFinanceOperation(operation.operationId, {
-              reason: 'incorrect-entry',
-              occurredAt: new Date(),
+              reason: 'incorrect-entry', occurredAt: new Date(),
             });
-            layer.v2Close?.();
+            receipt.v2Close?.();
             renderFinanceEntityLayer(root, entityLayer, type, entity.id);
             renderList(root);
           } catch (error) {
@@ -1476,11 +1443,8 @@ function openFinanceEntityOperation(root, entityLayer, type, entity, operationId
           }
         },
       }],
-    });
-  };
-  if (financeDesktop(layer)) financeZActions(layer, operationName(operation), [{ label: 'Удалить', run: openSettings }]);
-  else layer.querySelector('[data-wallet-operation-settings]')?.addEventListener('click', openSettings);
-  return layer;
+    }),
+  }]);
 }
 
 function renderWalletLayer(root, layer, walletId) {
@@ -1611,19 +1575,11 @@ function operationReceipt(operation) {
 function openWalletOperation(root, walletLayer, wallet, operationId) {
   const operation = walletOperations(wallet.id)
     .find((item) => String(item.operationId) === String(operationId));
-  if (!operation) return;
-  if (financeDesktop(root)) return openFinanceReceiptQ(walletLayer, operationName(operation), operationReceipt(operation), [{ label: 'Удалить операцию', variant: 'danger', run: receipt => openOperationSettings(root, walletLayer, receipt, wallet, operation) }]);
-  const layer = mountV2ZLayer(walletLayer, v2ZLayer(page([
-    operationContext(operation, financeDesktop(root)),
-    operationReceipt(operation),
-  ])), { stack: true });
-  if (!layer) return;
-  if (financeDesktop(layer)) financeZActions(layer, operationName(operation), [{
-    label: 'Удалить', run: () => openOperationSettings(root, walletLayer, layer, wallet, operation),
+  if (!operation) return null;
+  return openFinanceReceiptQ(walletLayer, operationName(operation), operationReceipt(operation), [{
+    label: 'Удалить операцию', variant: 'danger',
+    run: receipt => openOperationSettings(root, walletLayer, receipt, wallet, operation),
   }]);
-  else layer.querySelector('[data-wallet-operation-settings]')?.addEventListener('click', () => {
-    openOperationSettings(root, walletLayer, layer, wallet, operation);
-  });
 }
 
 function openOperationSettings(root, walletLayer, operationLayer, wallet, operation) {
