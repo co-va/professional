@@ -64,12 +64,17 @@ export function renderDesktopServiceCatalog(host,{root,toolbar,onChanged,state,k
   const fail=error=>openNotice({title:'Сервис',message:error?.message||'Не удалось сохранить.'});
   const kinds=[activeKind==='products'?'products':'procedures'];
   const check=(data,aria,checked=false)=>'<label class="ui-compact-check service-table-check">'+checkControl({data,aria,checked})+'</label>';
-  const header=Object.values(labels);
-  host.innerHTML='<section data-service-desktop-group-list data-service-table-kind="combined"><div class="service-desktop-table-track"><div class="service-desktop-group-header">'+'<span aria-hidden="true"></span>'+check('data-service-select-all','Выбрать все позиции')+header.map(v=>'<span>'+v+'</span>').join('')+'<span aria-hidden="true"></span>'+'</div><div class="service-desktop-group-body" data-service-group-catalog>'+kinds.map(kind=>'<section data-service-desktop-section="'+kind+'"><div data-service-table-host></div></section>').join('')+'</div></div></section>';
+  const columns=Object.entries(labels).filter(([id])=>kinds[0]==='procedures'||!['duration','minutes'].includes(id));
+  const activeRangeKeys=rangeKeys.filter(id=>columns.some(([column])=>column===id));
+  const header=columns.map(([,label])=>label);
+  host.innerHTML='<section data-service-desktop-group-list data-service-table-kind="combined" data-service-table-mode="'+kinds[0]+'"><div class="service-desktop-table-track"><div class="service-desktop-group-header">'+'<span aria-hidden="true"></span>'+check('data-service-select-all','Выбрать все позиции')+header.map(v=>'<span>'+v+'</span>').join('')+'<span aria-hidden="true"></span>'+'</div><div class="service-desktop-group-body" data-service-group-catalog>'+kinds.map(kind=>'<section data-service-desktop-section="'+kind+'"><div data-service-table-host></div></section>').join('')+'</div></div></section>';
   const sections=[...host.querySelectorAll('[data-service-desktop-section]')];
   const st=state;
   st.selected ||= new Set();
   st.ranges ||= {};
+  for(const id of Object.keys(st.ranges))if(!activeRangeKeys.includes(id))delete st.ranges[id];
+  if(!activeRangeKeys.includes(st.rangeMetric))st.rangeMetric='';
+  if(st.sort!=='manual'&&!columns.some(([id])=>id===st.sort.split(':')[0]))st.sort='manual';
   st.groupCollapsed ||= new Set();
   let selectable=[];
   const selectionKey=(kind,id)=>JSON.stringify([kind,key(id)]);
@@ -105,8 +110,8 @@ export function renderDesktopServiceCatalog(host,{root,toolbar,onChanged,state,k
       const scopes=[];
       const row=(item,scope)=>{
         const stats=stat(item),price=costListParts(item.cost);
-        const cells=[isService?durationText(item.duration):'—',String(ids(item).length),stats?String(stats.count):'—',isService?(stats?serviceSpentText(stats.minutes):'—'):'—',stats?money(stats.revenue):'—'];
-        const values='<span class="list-entry__right service-desktop-price">'+[price.rightTop,price.rightBottom].filter(Boolean).map((v,i)=>'<'+(i?'small':'strong')+'>'+escapeHtml(v)+'</'+(i?'small':'strong')+'>').join('')+'</span>'+cells.map((v,i)=>'<span class="service-desktop-value" data-service-column="'+['duration','workplaces','count','minutes','revenue'][i]+'">'+escapeHtml(v)+'</span>').join('');
+        const cells={duration:isService?durationText(item.duration):'',workplaces:String(ids(item).length),count:stats?String(stats.count):'—',minutes:isService?(stats?serviceSpentText(stats.minutes):'—'):'',revenue:stats?money(stats.revenue):'—'};
+        const values='<span class="list-entry__right service-desktop-price">'+[price.rightTop,price.rightBottom].filter(Boolean).map((v,i)=>'<'+(i?'small':'strong')+'>'+escapeHtml(v)+'</'+(i?'small':'strong')+'>').join('')+'</span>'+columns.filter(([id])=>Object.hasOwn(cells,id)).map(([id])=>'<span class="service-desktop-value" data-service-column="'+id+'">'+escapeHtml(cells[id])+'</span>').join('');
         let html=v2ListEntry({title:item.name||'',subtitle:'',omitEmptySubtitle:true,image:isService?procedureCardPhoto(item):productCardPhoto(item),initial:(item.name||'?').slice(0,1).toUpperCase(),interactive:true,reorderHandle:manual,reorderAria:'Изменить порядок',data:'data-service-position="'+escapeHtml(item.id)+'" data-reorder-id="'+escapeHtml(item.id)+'" data-service-reorder-scope="'+scope+'"',aria:'Открыть '+item.name});
         // The shared checkbox is a real input, not a nested control in a button.
         const selectedId=selectionKey(kind,item.id);
@@ -222,7 +227,7 @@ export function renderDesktopServiceCatalog(host,{root,toolbar,onChanged,state,k
       const range=st.ranges[k]||{};
       const integer=k==='count'||k==='duration'||k==='minutes';
       const bound=(side,label)=>field({name:'range_'+side,type:'number',inputmode:integer?'numeric':'decimal',placeholder:label,value:key(range[side]),disabled:!k,step:integer?'1':'0.01',min:k==='revenue'?'':'0',data:'data-service-range="'+escapeHtml(k)+'" data-service-bound="'+side+'" aria-label="'+escapeHtml((rangeLabels[k]||'Показатель')+' '+label.toLowerCase())+'"'});
-      return select({name:'rangeMetric',value:k,options:[{value:'',label:'Выбрать показатель'},...rangeKeys.map(value=>({value,label:rangeLabels[value]}))]})+
+      return select({name:'rangeMetric',value:k,options:[{value:'',label:'Выбрать показатель'},...activeRangeKeys.map(value=>({value,label:rangeLabels[value]}))]})+
         '<div class="service-filter-range">'+bound('min','От')+bound('max','До')+'</div>';
     };
     const selectors=()=>{
@@ -240,7 +245,7 @@ export function renderDesktopServiceCatalog(host,{root,toolbar,onChanged,state,k
     layer.addEventListener('change',ev=>{
       if(ev.target.name==='rangeMetric'){
         const metric=ev.target.value;
-        if(!rangeKeys.includes(metric)&&metric!=='')return;
+        if(!activeRangeKeys.includes(metric)&&metric!=='')return;
         if(metric!==st.rangeMetric){st.rangeMetric=metric;st.ranges={};}
         layer.querySelector('[data-service-range-fields]').innerHTML=rangeFields();
         apply();return;
@@ -254,7 +259,7 @@ export function renderDesktopServiceCatalog(host,{root,toolbar,onChanged,state,k
     layer.addEventListener('input',ev=>{
       const input=ev.target;
       const k=input.dataset.serviceRange,side=input.dataset.serviceBound;
-      if(!rangeKeys.includes(k)||!['min','max'].includes(side)||!input.validity.valid)return;
+      if(!activeRangeKeys.includes(k)||!['min','max'].includes(side)||!input.validity.valid)return;
       const next={...(st.ranges[k]||{}),[side]:input.value};
       st.ranges[k]=next;
       apply();
@@ -269,13 +274,14 @@ export function renderDesktopServiceCatalog(host,{root,toolbar,onChanged,state,k
     const current=()=>st.sort==='manual'?['manual','asc']:st.sort.split(':');
     const fields=()=>{
       const [column,dir]=current();
-      return '<div class="form-grid">'+select({label:'Порядок',name:'sortColumn',value:column,options:[{value:'manual',label:'Ручной порядок'},...Object.entries(labels).map(([value,label])=>({value,label}))]})+
+      return '<div class="form-grid">'+select({label:'Порядок',name:'sortColumn',value:column,options:[{value:'manual',label:'Ручной порядок'},...columns.map(([value,label])=>({value,label}))]})+
       (column==='manual'?'':select({label:'Направление',name:'sortDirection',value:dir,options:[{value:'asc',label:column==='name'?'От А до Я':'По возрастанию'},{value:'desc',label:column==='name'?'От Я до А':'По убыванию'}]}))+'</div>';
     };
     const layer=mountModal(anchor,modal('<div data-people-filter-fields>'+fields()+'</div>',{title:'Сортировка',variant:'x',surface:'app',className:'people-action-popup people-filter-popup people-sort-popup'}));
     layer?.addEventListener('change',event=>{
       const [column,dir]=current();
       if(event.target.name==='sortColumn'){
+        if(event.target.value!=='manual'&&!columns.some(([id])=>id===event.target.value))return;
         st.sort=event.target.value==='manual'?'manual':event.target.value+':'+dir;
         layer.querySelector('[data-people-filter-fields]').innerHTML=fields();
       }else if(event.target.name==='sortDirection'&&column!=='manual')st.sort=column+':'+event.target.value;

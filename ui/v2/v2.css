@@ -1234,3 +1234,13 @@
  .v2-app--workspace [data-service-table-kind] [data-service-collapse-key]>[data-reorder-handle]{box-sizing:border-box;height:var(--service-disclosure-row);min-height:0;max-height:var(--service-disclosure-row)}
  .v2-app--workspace [data-service-table-kind] [data-service-collapse-key]>[data-reorder-handle]::before{inset:0 -5px}
 }
+
+/* Products have no duration columns: compact the actual grid, not just its cells. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-table-kind][data-service-table-mode="products"]{--service-columns:36px 28px minmax(155px,1fr) minmax(85px,.65fr) minmax(100px,.65fr) minmax(72px,.45fr) minmax(105px,.75fr) 28px}
+ .v2-app--workspace [data-service-table-kind][data-service-table-mode="products"] .service-desktop-table-track{min-width:704px}
+ .v2-app--workspace [data-service-table-kind][data-service-table-mode="products"] [data-service-position] [data-service-column="workplaces"]{grid-column:5}
+ .v2-app--workspace [data-service-table-kind][data-service-table-mode="products"] [data-service-position] [data-service-column="count"]{grid-column:6}
+ .v2-app--workspace [data-service-table-kind][data-service-table-mode="products"] [data-service-position] [data-service-column="revenue"]{grid-column:7}
+ .v2-app--workspace [data-service-table-kind][data-service-table-mode="products"] [data-service-position] .service-table-edit{grid-column:8}
+}
