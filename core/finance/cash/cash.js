@@ -33,6 +33,7 @@ import {
 import { financeDesktop, financeZActions, financeZSave, financeQSubmit, financeHistoryTable, financeTableContact, bindFinanceHistoryTable, openFinanceReceiptX, openFinanceDeleteConfirmation } from '../desktop.js';
 import { readOnlyReceipt } from '../../../ui/receipt/index.js';
 import { financeReceipt } from '../receipt.js';
+import { walletHistoryRows, walletHistoryBody, bindWalletHistory } from './wallet-history.js';
 import { isV2DesktopWorkspace } from '../../../ui/v2/geometry.js';
 import { bindDesktopRailControls } from '../../../ui/v2/horizontal-affordance.js';
 import { canUseCapability } from '../../access.js';
@@ -1446,23 +1447,25 @@ function renderWalletLayer(root, layer, walletId) {
     return;
   }
   const operations = walletOperations(wallet.id);
-  const people = financeDesktop(layer) ? getAllPeople() : [];
+  const desktop = financeDesktop(layer);
   layer.innerHTML = page([
-    walletContext(wallet, wallet.name, financeDesktop(layer)),
-    operations.length
-      ? (financeDesktop(layer) ? financeHistoryTable(operations.map(item => ({ id: item.operationId, date: operationMoment(item), title: operationName(item), ...financeTableContact(item, people), workplace: String(item.workplace || ''), amount: formatMoney(item.total) })), 'Операции кошелька', [{ key: 'date', label: 'Дата', narrow: true }, { key: 'title', label: 'Операция' }, { key: 'code', label: 'Код', narrow: true }, { key: 'person', label: 'Клиент / контрагент' }, { key: 'workplace', label: 'Рабочее пространство' }, { key: 'amount', label: 'Сумма', narrow: true }]) : v2ListEntries(operations.map(renderOperationRow)))
+    walletContext(wallet, wallet.name, desktop),
+    desktop ? walletHistoryBody() : operations.length
+      ? v2ListEntries(operations.map(renderOperationRow))
       : emptyState('Операций пока нет', 'Движения по этой кассе появятся здесь.'),
   ]);
-  if (financeDesktop(layer)) financeZActions(layer, wallet.name, wallet.system ? [] : [{
-    label: 'Удалить', aria: 'Удалить кассу', run: () => void openWalletSettings(root, layer, wallet),
-  }]);
-  else layer.querySelector('[data-wallet-settings]')?.addEventListener('click', () => {
-    void openWalletSettings(root, layer, wallet);
-  });
-  if (financeDesktop(layer)) bindFinanceHistoryTable(layer, id => openWalletOperation(root, layer, wallet, id));
-  layer.querySelectorAll('[data-wallet-operation]').forEach((element) => {
-    element.addEventListener('click', () => openWalletOperation(root, layer, wallet, element.dataset.walletOperation));
-  });
+  if (desktop) {
+    bindWalletHistory(layer, wallet, walletHistoryRows(operations, getAllPeople(), { operationName, operationMoment }), {
+      balance: getWalletBalance(wallet.id),
+      open: id => openWalletOperation(root, layer, wallet, id),
+      settings: wallet.system ? null : () => void openWalletSettings(root, layer, wallet),
+    });
+  } else {
+    layer.querySelector('[data-wallet-settings]')?.addEventListener('click', () => void openWalletSettings(root, layer, wallet));
+    layer.querySelectorAll('[data-wallet-operation]').forEach(element => {
+      element.addEventListener('click', () => openWalletOperation(root, layer, wallet, element.dataset.walletOperation));
+    });
+  }
 }
 
 function openWalletZ2(root, walletId) {
