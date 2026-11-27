@@ -64,7 +64,8 @@ export function financeTableContact(item = {}, people = []) {
 }
 
 function twoLineCell(top, bottom = '', { contact = false } = {}) {
-  return '<div><div class="people-table-person__name">' + escapeHtml(top || '—') + '</div><div class="people-table-person__phone">' + escapeHtml(bottom || (contact ? '' : '—')) + '</div></div>';
+  const primary=escapeHtml(top||'—'),secondary=escapeHtml(bottom||(contact?'':'—'));
+  return '<div><div class="people-table-person__name" title="'+primary+'">'+primary+'</div><div class="people-table-person__phone" title="'+secondary+'">'+secondary+'</div></div>';
 }
 
 function twoLineHeading(top, bottom) {
