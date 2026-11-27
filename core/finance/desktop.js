@@ -114,7 +114,7 @@ export function openFinanceReceiptX(root, title, receipt, actions = [], { action
 
 // Reuse the canonical X deletion-confirmation contract. The document remains
 // open until an explicit, successful confirmation; dismissing X is harmless.
-export function openFinanceDeleteConfirmation(receipt, { message, onConfirm, onSuccess }) {
+export function openFinanceDeleteConfirmation(receipt, { message, onConfirm, onSuccess, closeOwner = true }) {
   const title = 'Удалить?';
   const content = `<div class="modal-title"><h2>${title}</h2><p>${escapeHtml(message)}</p></div>
     <div class="modal-actions">
@@ -136,7 +136,7 @@ export function openFinanceDeleteConfirmation(receipt, { message, onConfirm, onS
       const result = await onConfirm();
       if (result === false || result === null) throw new Error('Не удалось удалить');
       confirmation.v2Close?.();
-      receipt.v2Close?.();
+      if (closeOwner) receipt.v2Close?.();
       onSuccess?.();
     } catch (error) {
       openNotice({ message: String(error?.message || 'Не удалось удалить') });
