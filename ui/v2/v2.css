@@ -1194,3 +1194,10 @@
 .v2-app--workspace [data-service-table-host]{min-width:0}
 .v2-app--workspace [data-dds-history] .ui-data-table--compact tbody tr[data-table-group-level]>td{background:var(--table-level-bg);color:var(--table-level-ink);font-weight:750;text-align:left;padding-inline:12px;white-space:normal}
 }
+
+/* Service numeric filter: same anchored X and shared input geometry. */
+.people-filter-popup .service-filter-range{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);align-items:center;gap:10px}
+.people-filter-popup .service-filter-range>span{font-size:13px;line-height:1.2;color:#41484F}
+.people-filter-popup .service-filter-range>div{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;min-width:0}
+.people-filter-popup .service-filter-range .field{min-width:0;gap:0}.people-filter-popup .service-filter-range .field>span:empty{display:none}
+.people-filter-popup .service-filter-range input{box-sizing:border-box;width:100%;min-width:0;height:34px;min-height:34px;max-height:34px;border-radius:8px;font-size:13px;padding:0 6px}
