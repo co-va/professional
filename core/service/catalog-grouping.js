@@ -317,12 +317,14 @@ export function openServiceGroupingQ({ onSaved = () => {}, desktop = false } = {
   // Desktop Q is a directory only. Creation and editing use X.
   if (desktop) {
     const q=mountModal(document.body,modal(
+      '<output data-service-group-count aria-label="Количество групп" aria-live="polite"></output>'+
       '<div data-desktop-group-content></div>'+
       compactButton({kind:'add',className:'v2-desktop-tool-primary',data:'data-desktop-group-add title="Добавить группу"',aria:'Добавить группу'}),
       {title:'Группы',variant:'q',surface:'app',className:'desktop-service-groups-q'}
     ));
     if(!q)return null;
     const content=q.querySelector('[data-desktop-group-content]');
+    const count=q.querySelector('[data-service-group-count]');
     const add=q.querySelector('[data-desktop-group-add]');
     moveDesktopQTool(add);
     let busy=false,dispose=()=>{};
@@ -455,8 +457,10 @@ export function openServiceGroupingQ({ onSaved = () => {}, desktop = false } = {
     };
     function render(){
       dispose();dispose=()=>{};
+      const rows=getServiceGroupEntries();
+      count.textContent=String(rows.length);
       dispose=renderGroupDirectory(content,{
-        rows:getServiceGroupEntries(),sections:[['procedures','УСЛУГИ'],['products','ТОВАРЫ']],collapsed,showEmpty:true,
+        rows,sections:[['procedures','УСЛУГИ'],['products','ТОВАРЫ']],collapsed,showEmpty:true,
         getId:group=>group.key,getSection:group=>group.kind,nameData:()=> 'data-desktop-group-open',
         busy:()=>busy,onOpen:key=>{const fresh=groupByKey(key);if(fresh)openEditor(fresh);},
         onDelete:key=>{

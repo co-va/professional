@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {sortArticleDirectory,mergeArticleSectionOrder,orderDDSArticleRows} from '../core/finance/dds/article-order.js';
 import { ddsRegistryParts } from '../core/finance/dds/registry-parts.js';
 import { registeredRoute, availableArticleDirectory, mechanismValueParents } from '../core/finance/dds/article-view.js';
 const canonical=[
@@ -56,3 +57,11 @@ assert.deepEqual(mechanismValueParents({...servicesMechanism,values:[{routes:['D
 assert.deepEqual(mechanismValueParents({...servicesMechanism,values:[{routes:['SERVICE_REVENUE']}]},rawParents.map(a=>({...a,archivedAt:'2026-11-28'}))),[]);
 assert.deepEqual(mechanismValueParents({systemKey:'MECHANISM_TRANSFER',capability:'finance.special.access',values:[],routes:['TRANSFER']},rawParents),[]);
 console.log('PASS custom mechanism values use existing writable route owners');
+
+const orderCatalog=[{articleId:'services',systemKey:'s'},{articleId:'products',systemKey:'p'},{articleId:'rent',systemKey:''},{articleId:'tax',systemKey:''}];
+assert.deepEqual(sortArticleDirectory(orderCatalog,['tax','products','services','rent']).map(a=>a.articleId),['products','services','tax','rent']);
+const savedOrder=mergeArticleSectionOrder(orderCatalog,['services','products','rent','tax','hidden'],'system',['products','services']);
+assert.deepEqual(savedOrder,['products','services','rent','tax','hidden']);
+assert.throws(()=>mergeArticleSectionOrder(orderCatalog,[],'system',['rent','services']));
+assert.deepEqual(orderDDSArticleRows([{id:'s1',articleId:'services'},{id:'r',articleId:'rent'},{id:'p',articleId:'products'},{id:'s2',articleId:'services'},{id:'x',articleId:''}],orderCatalog,savedOrder).map(r=>r.id),['p','s1','s2','r','x']);
+console.log('PASS article display order and section boundaries');

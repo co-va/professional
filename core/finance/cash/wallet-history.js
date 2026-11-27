@@ -9,6 +9,7 @@ import { getFinanceOperation, getFinanceArticles, getFinanceArticleCatalog } fro
 import { desktopDocumentArticles, desktopOperationDirection } from '../dds/classification.js';
 import { registeredArticle } from '../dds/article-view.js';
 import { articleCellText } from '../dds/article-view.js';
+import {readArticleOrder,orderDDSArticleRows} from '../dds/article-order.js';
 import { exportScopedWorkbook, reportExcelError } from '../../excel/scoped.js';
 
 const SORTS = [
@@ -21,7 +22,7 @@ const SORTS = [
 ];
 const emptyFilters = () => ({ title:'', workplace:'', person:'', direction:'', article:'', from:'', to:'' });
 const ddsFilters = () => ({ ...emptyFilters(), wallet:'', status:'' });
-const DDS_SORTS = [...SORTS.filter(([key])=>!key.startsWith('title')), ['walletAsc','Кошелёк — от А до Я'], ['walletDesc','Кошелёк — от Я до А'], ['bonusDesc','Бонусы — по убыванию'],['bonusAsc','Бонусы — по возрастанию']];
+const DDS_SORTS = [['articleOrder','По статьям'],...SORTS.filter(([key])=>!key.startsWith('title')&&!key.startsWith('article')), ['walletAsc','Кошелёк — от А до Я'], ['walletDesc','Кошелёк — от Я до А'], ['bonusDesc','Бонусы — по убыванию'],['bonusAsc','Бонусы — по возрастанию']];
 const money = value => new Intl.NumberFormat('ru-RU',{maximumFractionDigits:2}).format(value) + ' ₽';
 const clean = value => String(value ?? '').toLocaleLowerCase('ru').replace(/ё/g,'е').replace(/\s+/g,' ').trim();
 const numeric = value => String(value ?? '').replace(/[^0-9]/g,'');
@@ -209,10 +210,10 @@ function applyDDSHierarchy(host,rows,collapsed){
 
 export function bindWalletHistory(layer,wallet,rows,{open,settings,dds=false,actions=[]}) {
   const stateKey=dds?'ddsHistoryState':'walletHistoryState';
-  const state=layer[stateKey] ||= {query:'',filters:dds?ddsFilters():emptyFilters(),sort:dds?'articleAsc':'dateDesc',selected:new Set()};
+  const state=layer[stateKey] ||= {query:'',filters:dds?ddsFilters():emptyFilters(),sort:dds?'articleOrder':'dateDesc',selected:new Set()};
   const tools=actions.filter(Boolean);
   if(!dds){state.filters={...emptyFilters(),...state.filters,title:''};if(!SORTS.some(([key])=>key===state.sort))state.sort='dateDesc';}
-  if(dds){state.collapsed ||= new Set();if(!DDS_SORTS.some(([key])=>key===state.sort))state.sort='articleAsc';state.filters.title='';if(state.filters.direction==='mixed')state.filters.direction='transfer';}
+  if(dds){state.collapsed ||= new Set();if(!DDS_SORTS.some(([key])=>key===state.sort))state.sort='articleOrder';state.filters.title='';if(state.filters.direction==='mixed')state.filters.direction='transfer';}
   const [toolbar]=setV2ZHeaderRows(layer,[
     '<section data-people-desktop-toolbar><div class="people-desktop-tools">'
     +field({name:'walletSearch',type:'search',placeholder:'Поиск',autocomplete:'off',value:state.query,data:'data-wallet-search'})
@@ -244,9 +245,10 @@ export function bindWalletHistory(layer,wallet,rows,{open,settings,dds=false,act
   const refresh=()=>{
     const previousViewport=dds?host.querySelector('.ui-data-table--compact'):null;
     if(previousViewport){state.scrollLeft=previousViewport.scrollLeft;state.scrollTop=previousViewport.scrollTop;}
-    const grouped=dds&&['articleAsc','articleDesc'].includes(state.sort);
+    const grouped=dds&&state.sort==='articleOrder';
     const canonical=rows.some(row=>row.canonicalArticle);
-    visible=visibleWalletRows(rows,state.query,state.filters,state.sort);
+    visible=visibleWalletRows(rows,state.query,state.filters,grouped?'dateDesc':state.sort);
+    if(grouped)visible=orderDDSArticleRows(visible,getFinanceArticleCatalog(),readArticleOrder());
     // Selection always refers to the current visible table, never hidden rows.
     const ids=new Set(visible.map(row=>row.id));
     for(const id of state.selected)if(!ids.has(id))state.selected.delete(id);

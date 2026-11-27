@@ -22,6 +22,7 @@ import { desktopAvailableArticles, desktopArticleGroups, desktopArticleValues } 
 import { moveDesktopQTool } from '../../../ui/v2/z-layout.js';
 import { getFinanceArticles, getFinanceArticleCatalog } from '../data.js';
 import { availableArticleDirectory, mechanismValueParents } from './article-view.js';
+import {readArticleOrder,sortArticleDirectory,saveArticleSectionOrder} from './article-order.js';
 import { archiveFinanceArticle, createFinanceArticle, updateFinanceArticle } from '../service.js';
 
 const ECONOMIC_OPTIONS = [
@@ -310,18 +311,19 @@ function desktopArticleRows(items,state){
   }).map(a=>({...a,childCount:desktopArticleValues(articles,a.articleId).length}));
 }
 const articleRemovalMessage=item=>'Статья «'+item.name+'» и все её значения будут удалены из доступного справочника. Проведённые операции останутся в истории.';
-function renderDesktopArticleTable(host,rows,collapsed,onOpen,onDelete,canonical=false){
+function renderDesktopArticleTable(host,rows,collapsed,onOpen,onDelete,canonical=false,reorder={}){
   return renderGroupDirectory(host,{
     rows,sections:canonical?[['system','СИСТЕМНЫЕ'],['custom','ПОЛЬЗОВАТЕЛЬСКИЕ']]:[['IN','ПРИХОД'],['OUT','РАСХОД'],['TRANSFER','ТРАНЗАКЦИЯ']],collapsed,caption:'Статьи',
     getId:a=>a.articleId,getSection:a=>canonical?(a.systemKey?'system':'custom'):a.direction,getCount:a=>a.childCount,getDepth:a=>a.depth,
     canOpen:a=>canonical||!a.systemKey||a.direction!=='TRANSFER',canDelete:a=>!a.systemKey,
     nameData:a=>'data-article-row="'+escapeHtml(a.articleId)+'"'+(canonical||!a.systemKey||a.direction!=='TRANSFER'?' data-finance-article="'+escapeHtml(a.articleId)+'"':''),
-    deleteData:'data-article-row-delete',deleteLabel:'Удалить статью',openLabel:'Открыть статью',onOpen,onDelete,
+    deleteData:'data-article-row-delete',deleteLabel:'Удалить статью',openLabel:'Открыть статью',onOpen,onDelete,...reorder,
   });
 }
-function canonicalDirectoryRows(items,state){
+function canonicalDirectoryRows(items,state,desktop=false){
   const words=normalized(state.query).split(/\s+/).filter(Boolean);
   const rows=items.filter(a=>(!state.filters.system||state.filters.system===(a.systemKey?'system':'custom'))&&words.every(word=>normalized([a.name,...a.values.map(v=>v.name)].join(' ')).includes(word))).map(a=>({...a,depth:0,childCount:a.values.length}));
+  if(desktop)return sortArticleDirectory(rows,readArticleOrder());
   if(state.sort!=='tree')rows.sort((a,b)=>{const key=state.sort.startsWith('system')?'systemKey':'name';return String(a[key]||'').localeCompare(String(b[key]||''),'ru',{numeric:true})*(state.sort.endsWith('Desc')?-1:1);});
   return rows;
 }
@@ -401,16 +403,15 @@ export function openFinanceArticlesQ(root, {onSaved=()=>{}}={}) {
   const state={query:'',filters:articleFilters(),sort:'tree'};
   const collapsed=new Set();
   const layer=mountModal(root,modal(
-    '<div class="form-grid">'
-    +'<div style="display:flex;align-items:center;gap:8px">'
+    (desktop?'':'<div class="form-grid"><div style="display:flex;align-items:center;gap:8px">'
     +field({name:'articleSearch',type:'search',placeholder:'Поиск',autocomplete:'off',value:'',data:'data-article-search'})
     +compactButton({kind:'filter',data:'data-article-filter title="Фильтр" aria-haspopup="dialog" aria-pressed="false"'})
     +compactButton({kind:'sort',data:'data-article-sort title="Сортировка" aria-haspopup="dialog" aria-pressed="false"'})
-    +'</div>'
+    +'</div>')
     +'<output data-article-count aria-label="Количество статей" aria-live="polite"></output>'
-    +'<div data-finance-article-list></div></div>'
+    +'<div data-finance-article-list></div>'+(desktop?'':'</div>')
     +compactButton({kind:'add',className:'v2-desktop-tool-primary',data:'data-add-finance-article title="Добавить статью"',aria:'Добавить статью'}),
-    {title:'Статьи',variant:'q',surface:'app'}
+    {title:'Статьи',variant:'q',surface:'app',...(desktop?{className:'desktop-service-groups-q'}:{})}
   ));
   if(!layer)return null;
   const host=layer.querySelector('[data-finance-article-list]');
@@ -420,7 +421,7 @@ export function openFinanceArticlesQ(root, {onSaved=()=>{}}={}) {
   const sort=layer.querySelector('[data-article-sort]');
   const add=layer.querySelector('[data-add-finance-article]');
   moveDesktopQTool(add);
-  let busy=false;
+  let busy=false,dispose=()=>{};
   const syncDirectory=()=>{if(add)add.disabled=busy;host.querySelectorAll('[data-article-row-delete]').forEach(control=>control.disabled=busy);};
   const deleteFromDirectory=id=>{
     const item=getArticles().find(a=>a.articleId===id);
@@ -436,11 +437,21 @@ export function openFinanceArticlesQ(root, {onSaved=()=>{}}={}) {
   const refresh=()=>{
     const directory=getDirectory(),canonical=Array.isArray(directory);
     const items=getArticles();
-    const rows=canonical?canonicalDirectoryRows(directory,state):desktopArticleRows(items,state);
+    dispose();dispose=()=>{};
+    const rows=canonical?canonicalDirectoryRows(directory,state,desktop):desktopArticleRows(items,state);
     count.textContent=String(rows.length);
     filter?.setAttribute('aria-pressed',String(Object.values(state.filters).some(Boolean)));
     sort?.setAttribute('aria-pressed',String(state.sort!=='tree'));
-    if(desktop&&rows.length){renderDesktopArticleTable(host,rows,collapsed,openRow,deleteFromDirectory,canonical);syncDirectory();return;}
+    if(desktop&&rows.length){
+      dispose=renderDesktopArticleTable(host,rows,collapsed,openRow,deleteFromDirectory,canonical,canonical?{
+        busy:()=>busy,onReorder:async(section,ids)=>{
+          if(busy)throw new Error('Дождитесь завершения сохранения.');
+          busy=true;syncDirectory();
+          try{saveArticleSectionOrder(getDirectory()||[],section,ids);onSaved();}finally{busy=false;syncDirectory();}
+        },onError:cause=>openNotice({title:'Порядок статей',message:cause?.message||'Не удалось сохранить порядок.'}),
+      }:{});
+      syncDirectory();return;
+    }
     host.innerHTML=rows.length?list({items:rows.map(a=>canonical?{title:a.name,secondary:a.values.map(v=>v.name).join(' · '),interactive:true,data:'data-finance-article="'+escapeHtml(a.articleId)+'"',aria:'Открыть статью '+a.name}:({...row(a),interactive:a.direction!=='TRANSFER'||!a.systemKey,data:a.direction==='TRANSFER'&&a.systemKey?'':'data-finance-article="'+escapeHtml(a.articleId)+'"'}))}):emptyState(items.length?'Статьи не найдены':'Статей пока нет');
     host.querySelectorAll('[data-finance-article]').forEach(control=>control.addEventListener('click',()=>{
       openRow(control.dataset.financeArticle);
@@ -451,6 +462,8 @@ export function openFinanceArticlesQ(root, {onSaved=()=>{}}={}) {
   filter?.addEventListener('click',()=>{const directory=getDirectory();openArticleFilters(filter,directory|| (desktop?getArticles().filter(a=>!['INCOME_ROOT','EXPENSE_ROOT'].includes(a.systemKey)).map(a=>({...a,parentArticleId:['system-income','system-expense'].includes(a.parentArticleId)?'':a.parentArticleId})):getArticles()),state,refresh,desktop||Boolean(directory),Boolean(directory));});
   sort?.addEventListener('click',()=>openArticleSort(sort,state,refresh,desktop||Boolean(getDirectory())));
   add?.addEventListener('click',()=>{if(!busy)openArticleX(null,changed,getArticles,true);});
+  const close=layer.v2Close?.bind(layer);
+  if(close)layer.v2Close=()=>{if(!busy){dispose();close();}};
   refresh();
   return layer;
 }
