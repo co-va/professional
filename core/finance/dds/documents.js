@@ -64,14 +64,14 @@ export function desktopDocuments(operations,ledger){
  for(const entry of ledger){if(!entry.operationId||entry.operationKind==='cancel')continue;if(!groups.has(entry.operationId))groups.set(entry.operationId,[]);groups.get(entry.operationId).push(entry);}
  const byId=new Map(operations.map(o=>[o.operationId,o]));
  const result=[];
- for(const [id,entries] of groups){const operation=byId.get(id);const first=entries[0];if(operation?.data?.personKey&&!first.person)result.push({id,entries,first:{...first,person:{key:operation.data.personKey}},facts:loyaltyDocumentFacts(operation,entries)});else result.push({id,entries,first,facts:operation?loyaltyDocumentFacts(operation,entries):null});}
+ for(const [id,entries] of groups){const operation=byId.get(id);const first=entries[0];if(operation?.data?.personKey&&!first.person)result.push({id,entries,operation,first:{...first,person:{key:operation.data.personKey}},facts:loyaltyDocumentFacts(operation,entries)});else result.push({id,entries,operation,first,facts:operation?loyaltyDocumentFacts(operation,entries):null});}
  for(const operation of operations){
   const id=operation.operationId;if(!id||groups.has(id)||operation.kind==='cancel')continue;
   const facts=loyaltyDocumentFacts(operation,[]);if(!facts)continue;
   const data=operation.data||{};
   // Header facts for a document without wallet movements; not a ledger entry.
   const first={operationId:id,operationKind:operation.kind,operationStatus:operation.status,occurredAt:operation.occurredAt,recordedAt:operation.recordedAt,source:operation.source,person:data.person||{key:data.personKey},workplace:data.workplace||'',operationTotal:facts.amount,settlementItems:arr(data.settlement?.items),sourceDetails:arr(data.settlement?.items).map(i=>i.name).filter(Boolean).join(', ')};
-  result.push({id,entries:[],first,facts});
+  result.push({id,entries:[],operation,first,facts});
  }
  return result;
 }

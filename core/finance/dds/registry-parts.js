@@ -1,7 +1,7 @@
 // DDS Desktop: actual article movements, linked to one original financial document.
 // Read-only projection. Never invent allocations or add ledger entries.
 import { desktopArticleName } from './classification.js';
-import { registeredRoute, registeredLedgerArticle } from './article-view.js';
+import { registeredRoute, registeredLedgerArticle, registeredArticle } from './article-view.js';
 const cents=v=>Math.round(Number(v||0)*100);
 const unique=values=>[...new Set(values.map(v=>String(v||'').trim()).filter(Boolean))];
 const sum=(a,b)=>a===null||b===null?null:a+b;
@@ -63,13 +63,14 @@ function legacyRegistryParts(document,catalog=[]){
  // The catalogue is supplied by Core; unresolved history remains visible.
  export function ddsRegistryParts(document,catalog=[],canonical=null,{walletOnly=false}={}){
   if(!Array.isArray(canonical))return legacyRegistryParts(document,catalog);
-  const {id,entries=[],first={},facts:f}=document;
+  const {id,entries=[],first={},facts:f,operation}=document;
+  const movements=Array.isArray(operation?.data?.positionMovements)?operation.data.positionMovements:[];
   const rows=new Map();
-  const add=({classification=null,missing='',direction='mixed',sourceKey='',sources=[],money=0,bonus=undefined,meta={}})=>{
-   const key=JSON.stringify([classification?.articleId||'missing:'+missing,classification?.valueId||'',direction,sourceKey]);
+  const add=({classification=null,missing='',direction='mixed',sourceKey='',sources=[],money=0,bonus=undefined,meta={},movementId='',position='',positionId=''})=>{
+   const key=JSON.stringify([classification?.articleId||'missing:'+missing,classification?.valueId||'',direction,sourceKey,movementId]);
    let p=rows.get(key);
    if(!p){
-    p={articleId:classification?.articleId||'',article:classification?.articleName||'',articleValueId:classification?.valueId||'',articleValue:classification?.valueName||'',direction,partKey:key,sources:[],money:0,bonus:undefined,meta:{}};
+    p={articleId:classification?.articleId||'',article:classification?.articleName||'',articleValueId:classification?.valueId||'',articleValue:classification?.valueName||'',direction,partKey:key,sources:[],money:0,bonus:undefined,meta:{},position,positionId,movementId};
     rows.set(key,p);
    }
    p.money=sum(p.money,money);
@@ -87,9 +88,22 @@ function legacyRegistryParts(document,catalog=[]){
    const out=entries.find(e=>e.direction==='OUT'),incoming=entries.find(e=>e.direction==='IN');
    add({classification:route('TRANSFER'),missing:'TRANSFER',direction:'transfer',sourceKey:'transfer',sources:[wallet(out||{}),wallet(incoming||{})],money:Math.max(cents(first.operationTotal),...entries.map(e=>cents(e.amount)),0),meta:{cashIn:entries.filter(e=>e.direction==='IN').reduce((n,e)=>n+cents(e.amount),0),cashOut:entries.filter(e=>e.direction==='OUT').reduce((n,e)=>n+cents(e.amount),0)}});
   }else{
-   for(const e of entries){
-    const out=e.direction==='OUT';
-    add({classification:registeredLedgerArticle(e,canonical),missing:e.articleId||e.economicType||e.entryId||'ledger',direction:isTransfer?'transfer':directionFor(e),sourceKey:walletKey(e),sources:[wallet(e)],money:(out?-1:1)*cents(e.amount),meta:{cashIn:out?0:cents(e.amount),cashOut:out?cents(e.amount):0}});
+   for(const [entryIndex,e] of entries.entries()){
+    const out=e.direction==='OUT',amount=cents(e.amount);
+    const slices=walletOnly?[]:movements.filter(p=>p.sourceKind==='wallet'&&p.entryId===e.entryId&&p.sourceId===e.walletId);
+    // Core's registered position links must reconcile to this exact wallet
+    // entry. Never multiply a payment by the count of invoice positions.
+    if(slices.length&&slices.every(p=>p.id&&cents(p.amount)>0)&&slices.reduce((n,p)=>n+cents(p.amount),0)===amount){
+     for(const p of slices){
+      const n=cents(p.amount);
+      add({classification:registeredArticle(canonical,p.articleClass),missing:e.entryId,direction:directionFor(e),sourceKey:walletKey(e),sources:[wallet(e)],movementId:p.id,position:p.positionName||'',positionId:p.positionId||'',money:(out?-1:1)*n,meta:{cashIn:out?0:n,cashOut:out?n:0}});
+     }
+    }else{
+     // Purchasing/manual lines already have their own ledger entry; do not
+     // collapse multiple items of the same article into one row.
+     const cashKind=Object.hasOwn(cashKeys,first.operationKind);
+     add({classification:registeredLedgerArticle(e,canonical),missing:e.articleId||e.economicType||e.entryId||'ledger',direction:isTransfer?'transfer':directionFor(e),sourceKey:walletKey(e),sources:[wallet(e)],movementId:cashKind?'':String(e.entryId||entryIndex),position:String(e.lineName||''),money:(out?-1:1)*amount,meta:{cashIn:out?0:amount,cashOut:out?amount:0}});
+    }
    }
   }
   if(f&&!walletOnly){
@@ -112,7 +126,22 @@ function legacyRegistryParts(document,catalog=[]){
     const ac=a.accounting;
     const principal=a.principal===null?null:cents(a.principalMovement??sign*a.principal);
     const bonus=a.bonus===null?null:cents(a.bonusMovement??sign*a.bonus);
-    add({classification:depositClass,missing:depositKey,sourceKey:'deposit:'+String(a.depositId||''),sources:[String(a.name||'').split(' · остаток ')[0]],money:principal,bonus,meta:{depositPrincipal:principal,depositNet:sign*cents(a.amount),grossAmount:ac?cents(ac.grossAmount):null,benefitGranted:ac?cents(ac.benefitGranted):0,benefitReversed:ac?cents(ac.benefitReversed):0,bonusUsed:ac?cents(ac.benefitUsed):(!refund&&a.bonus!=null?cents(a.bonus):null),bonusRestored:ac?cents(ac.benefitRestored):(refund&&a.bonus!=null?cents(a.bonus):null)}});
+    const slices=movements.filter(p=>p.sourceKind==='deposit'&&p.sourceId===String(a.depositId||''));
+    const matches=slices.length&&slices.reduce((n,p)=>n+cents(p.amount),0)===cents(a.amount);
+    const base={classification:depositClass,missing:depositKey,sourceKey:'deposit:'+String(a.depositId||''),sources:[String(a.name||'').split(' · остаток ')[0]]};
+    const metadata={depositPrincipal:principal,depositNet:sign*cents(a.amount),grossAmount:ac?cents(ac.grossAmount):null,benefitGranted:ac?cents(ac.benefitGranted):0,benefitReversed:ac?cents(ac.benefitReversed):0,bonusUsed:ac?cents(ac.benefitUsed):(!refund&&a.bonus!=null?cents(a.bonus):null),bonusRestored:ac?cents(ac.benefitRestored):(refund&&a.bonus!=null?cents(a.bonus):null)};
+    // Core may additionally provide exact real/benefit components for each
+    // position. Without them preserve the actual source-level amounts.
+    const detailed=matches&&slices.every(p=>p.depositComponents&&Number.isFinite(p.depositComponents.money)&&Number.isFinite(p.depositComponents.bonus))&&principal!==null&&bonus!==null&&slices.reduce((n,p)=>n+cents(p.depositComponents.money),0)===principal&&slices.reduce((n,p)=>n+cents(p.depositComponents.bonus),0)===bonus;
+    if(detailed){
+     for(const p of slices){
+      const c=p.depositComponents;
+      add({...base,movementId:p.id,position:p.positionName||'',positionId:p.positionId||'',money:cents(c.money),bonus:cents(c.bonus),meta:{depositPrincipal:cents(c.money),depositNet:sign*cents(p.amount),grossAmount:c.grossAmount==null?null:cents(c.grossAmount),benefitGranted:cents(c.benefitGranted),benefitReversed:cents(c.benefitReversed),bonusUsed:cents(c.bonusUsed),bonusRestored:cents(c.bonusRestored)}});
+     }
+    }else if(matches&&slices.length===1){
+     const p=slices[0];add({...base,movementId:p.id,position:p.positionName||'',positionId:p.positionId||'',money:principal,bonus,meta:metadata});
+    }else add({...base,money:principal,bonus,meta:metadata});
+
    }
    if((f.kind==='payment'||refund)&&(f.discount||f.discountUnknown)){
     const credited=(f.allocations||[]).reduce((n,a)=>n+cents(a.accounting?.[refund?'benefitReversed':'benefitGranted']),0);
@@ -123,12 +152,17 @@ function legacyRegistryParts(document,catalog=[]){
      const allocated=(f.allocations||[]).find(a=>a.depositId===depositId);
      // A conditional bonus on the same deposit merges into its payment/refund row.
      const meta=refund?{benefitReversed:external}:{benefitGranted:external};
-     add({classification:depositClass,missing:depositKey,sourceKey:'deposit:'+depositId,sources:[allocated?String(allocated.name||'').split(' · остаток ')[0]:f.priceDepositName],bonus:external===null?null:(refund?-external:external),meta});
+     const same=[...rows.values()].filter(p=>p.articleId===depositClass?.articleId&&p.articleValueId===depositClass?.valueId&&p.direction==='mixed'&&JSON.parse(p.partKey)[3]==='deposit:'+depositId);
+     if(same.length===1){const p=same[0],delta=external===null?null:(refund?-external:external);p.bonus=p.bonus===undefined?delta:sum(p.bonus,delta);for(const [k,v] of Object.entries(meta))p.meta[k]=Object.hasOwn(p.meta,k)?sum(p.meta[k],v):v;}
+     else add({classification:depositClass,missing:depositKey,sourceKey:'deposit:'+depositId,sources:[allocated?String(allocated.name||'').split(' · остаток ')[0]:f.priceDepositName],bonus:external===null?null:(refund?-external:external),meta});
     }
    }
    if(f.personal){
     const key=refund?'PERSONAL_ACCOUNT_PAYMENT_REFUND':'PERSONAL_ACCOUNT_SPEND';
-    add({classification:route(key),missing:key,sourceKey:'personal-account',sources:['Личный счёт'],money:cents(f.personal),meta:{personal:cents(f.personal)}});
+    const slices=movements.filter(p=>p.sourceKind==='personal');
+    if(slices.length&&slices.reduce((n,p)=>n+cents(p.amount),0)===Math.abs(cents(f.personal))){
+     for(const p of slices){const n=sign*cents(p.amount);add({classification:route(key),missing:key,sourceKey:'personal-account',sources:['Личный счёт'],movementId:p.id,position:p.positionName||'',positionId:p.positionId||'',money:n,meta:{personal:n}});}
+    }else add({classification:route(key),missing:key,sourceKey:'personal-account',sources:['Личный счёт'],money:cents(f.personal),meta:{personal:cents(f.personal)}});
    }
   }
   if(!rows.size)add({classification:registeredLedgerArticle(first,canonical),missing:first.operationKind||'document',money:null});

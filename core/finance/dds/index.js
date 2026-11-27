@@ -613,9 +613,9 @@ function renderDDS(root) {
     return ddsRegistryParts(document,catalog,canonical).map(part=>{
       const title=desktopOperationDirection(part.direction);
       const bonus=part.bonus==null?'':part.bonus===0?(Array.isArray(canonical)?'0':''):(part.bonus>0?'+':'−')+new Intl.NumberFormat('ru-RU',{maximumFractionDigits:2}).format(Math.abs(part.bonus));
-      return {...base,id:part.id,documentId:part.documentId,articleId:part.articleId,article:part.article,articleValue:part.articleValue||'',articleValueId:part.articleValueId||'',articles:part.article?[part.article]:[],canonicalArticle:Array.isArray(canonical),part,
+      return {...base,id:part.id,documentId:part.documentId,articleId:part.articleId,article:part.article,articleValue:part.articleValue||'',articleValueId:part.articleValueId||'',position:part.position||'',positionId:part.positionId||'',articles:part.article?[part.article]:[],canonicalArticle:Array.isArray(canonical),part,
         direction:part.direction,title,displayTitle:base.status==='Отменена'?title+' · Отменена':title,
-        wallet:part.direction==='transfer'?part.sources.join(' → '):part.sources.join(' + '),wallets:part.sources,
+        wallet:part.direction==='transfer'?part.sources.join(' → '):part.sources.join(' + '),wallets:part.sources,sourcePosition:[part.direction==='transfer'?part.sources.join(' → '):part.sources.join(' + '),part.position].filter(Boolean).join(' · '),
         amount:part.money==null||part.money===0?'':formatMoney(part.money,{signed:part.direction!=='transfer'}),
         value:part.money??0,bonus,bonusValue:part.bonus??0};
     });
@@ -624,12 +624,12 @@ function renderDDS(root) {
   const registryRows=Array.isArray(canonical)?desktopRows.map(row=>{
     const part=row.part,doc=byId.get(row.documentId);
     const first=!exportedDocuments.has(row.documentId);exportedDocuments.add(row.documentId);
-    return {...row,id:row.documentId,article:articleCellText(row.article,row.articleValue),...part.meta,bonus:part.bonus??null,documentAmount:first?operationTotal(doc.entries.length?doc.entries:[doc.first]):null,uncertainty:[...(!row.articleId?['Статья не установлена']:[]),...(part.money===null?['Денежная часть не определена']:[]),...(part.bonus===null?['Бонусная часть не определена']:[])].join('; ')};
+    return {...row,registryRowId:row.id,id:row.documentId,article:articleCellText(row.article,row.articleValue),...part.meta,bonus:part.bonus??null,documentAmount:first?operationTotal(doc.entries.length?doc.entries:[doc.first]):null,uncertainty:[...(!row.articleId?['Статья не установлена']:[]),...(part.money===null?['Денежная часть не определена']:[]),...(part.bonus===null?['Бонусная часть не определена']:[])].join('; ')};
   }):legacyRegistryRows;
   const desktopRowById=new Map(desktopRows.map(row=>[row.id,row]));
   const mobileRows=[...(Array.isArray(canonical)?desktopRows:rows)].sort((a,b)=>String(b.occurredAt).localeCompare(String(a.occurredAt))||a.id.localeCompare(b.id));
   const operations = desktop ? '<div data-dds-history>'+walletHistoryBody(true)+'</div>'
-    : mobileRows.length ? v2ListEntries(mobileRows.map(row=>v2ListEntry({title:row.article||row.displayTitle,subtitle:[row.articleValue,row.displayTitle,row.person,row.wallet].filter(Boolean).join(' · '),rightTop:row.amount,rightBottom:[row.date,row.bonus&&row.bonus!=='—'?'Бонусы: '+row.bonus:''].filter(Boolean).join(' · '),interactive:true,initial:'',data:'data-finance-operation="'+(row.documentId||row.id)+'"',aria:'Открыть финансовый документ'}))) : emptyState('Все операции','Финансовых операций пока нет.');
+    : mobileRows.length ? v2ListEntries(mobileRows.map(row=>v2ListEntry({title:row.article||row.displayTitle,subtitle:[row.articleValue,row.displayTitle,row.person,row.wallet,row.position].filter(Boolean).join(' · '),rightTop:row.amount,rightBottom:[row.date,row.bonus&&row.bonus!=='—'?'Бонусы: '+row.bonus:''].filter(Boolean).join(' · '),interactive:true,initial:'',data:'data-finance-operation="'+(row.documentId||row.id)+'"',aria:'Открыть финансовый документ'}))) : emptyState('Все операции','Финансовых операций пока нет.');
   const settingsItems = availableDDSSettings();
   const operationGroups = ['income-expense', 'transfer'];
   const headerContext = workspaceHeaderContext({
@@ -646,7 +646,8 @@ function renderDDS(root) {
     dds:true, open:id=>{const documentId=desktopRowById.get(id)?.documentId;if(documentId)openFinanceOperation(root,movements,documentId,byId.get(documentId));}, actions:[
     { label: DATA_EXCHANGE_ICON, className: 'people-desktop-icon', aria: 'Обмен данными', run: (anchor, selectedRows) => {
       const ids=new Set(selectedRows.map(row=>row.documentId||row.id));
-      openDDSExcel(root, movements, { anchor, exportMovements:movements.filter(item=>ids.has(String(item.operationId))), registryRows:registryRows.filter(row=>ids.has(row.id)), onImported: () => renderDDS(root) });
+      const selected=new Set(selectedRows.map(row=>row.id));
+      openDDSExcel(root, movements, { anchor, exportMovements:movements.filter(item=>ids.has(String(item.operationId))), registryRows:registryRows.filter(row=>Array.isArray(canonical)?selected.has(row.registryRowId):ids.has(row.id)), onImported: () => renderDDS(root) });
     } },
     canUseCapability('finance.articles.access') ? { label: GROUP_ICON, className: 'people-desktop-icon', aria: 'Статьи', run: () => openArticles(root) } : null,
     financeOperationGroups({ groups: operationGroups }).length ? {

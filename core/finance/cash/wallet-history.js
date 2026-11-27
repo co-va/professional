@@ -7,7 +7,7 @@ import { DATA_EXPORT_ICON } from '../../../ui/buttons/index.js';
 import { financeHistoryTable, financeTableContact } from '../desktop.js';
 import { getFinanceOperation, getFinanceArticles, getFinanceArticleCatalog } from '../data.js';
 import { desktopDocumentArticles, desktopOperationDirection } from '../dds/classification.js';
-import { ddsRegistryParts } from '../dds/registry-parts.js';
+import { registeredArticle } from '../dds/article-view.js';
 import { articleCellText } from '../dds/article-view.js';
 import { exportScopedWorkbook, reportExcelError } from '../../excel/scoped.js';
 
@@ -34,23 +34,35 @@ export function localDate(value) {
 }
 
 // Cash shares DDS classification, but only includes this wallet's actual ledger entries.
-export function walletOperationClassification(item, catalog = getFinanceArticles()) {
+export function walletOperationClassification(item, catalog = getFinanceArticles(), canonical = getFinanceArticleCatalog(), operation = getFinanceOperation(item.operationId)) {
   const entries = Array.isArray(item.entries) && item.entries.length ? item.entries : [item];
   const directions = new Set(entries.map(entry=>entry.direction).filter(Boolean));
   const transfer = item.operationKind==='transfer' || entries.some(entry=>entry.economicType==='TRANSFER');
   const direction = transfer ? 'transfer' : directions.size>1 ? 'mixed' : directions.has('OUT') ? 'out' : directions.has('IN') ? 'in' : Number(item.total)<0 ? 'out' : 'in';
-  const articles = desktopDocumentArticles(entries,catalog);
-  return { direction, title:desktopOperationDirection(direction), articles, article:articles.join(', ') };
+  const settlement=operation?.data?.settlement;
+  const positions=(Array.isArray(settlement?.items)?settlement.items:item.settlementItems||[]).map(p=>String(p.name||'')).filter(Boolean);
+  if(!Array.isArray(canonical)){
+   const articles=desktopDocumentArticles(entries,catalog);
+   return {direction,title:desktopOperationDirection(direction),articles,article:articles.join(', '),positions,positionList:positions.join(' · ')};
+  }
+  // Cash is one real payment per wallet, not one row per DDS position.
+  // Article labels are only its registered composition, not a new article.
+  const entryIds=new Set(entries.map(e=>e.entryId));
+  const parts=(operation?.data?.positionMovements||[]).filter(p=>p.sourceKind==='wallet'&&entryIds.has(p.entryId));
+  const classes=(parts.length?parts.map(p=>registeredArticle(canonical,p.articleClass)):entries.map(e=>registeredArticle(canonical,e.articleClass))).filter(Boolean);
+  const articles=[...new Set(classes.map(a=>a.articleName))];
+  const values=[...new Set(classes.map(a=>a.valueName).filter(Boolean))];
+  const tips=entries.filter(e=>e.component==='tips'||e.economicType==='TIPS'||e.economicType==='TIPS_REFUND').reduce((n,e)=>n+Math.round(Number(e.amount||0)*100),0)/100;
+  return {direction,title:desktopOperationDirection(direction),articles,article:articles.join(' · '),articleValue:articles.length===1&&values.length===1?values[0]:'',positions,positionList:positions.join(' · '),tips,canonicalArticle:true};
 }
 
-export function walletHistoryRows(operations, people, { operationName, operationMoment, catalog = getFinanceArticles(), canonical = getFinanceArticleCatalog() }) {
-  return operations.flatMap(item => {
+export function walletHistoryRows(operations, people, { operationName, operationMoment, catalog = getFinanceArticles(), canonical = getFinanceArticleCatalog(), lookup=getFinanceOperation }) {
+  return operations.map(item => {
     const value = Number(item.total)||0;
     const occurredAt = String(item.occurredAt||'');
     const contact=financeTableContact(item,people);
-    const base={ id:String(item.operationId), documentId:String(item.operationId), date:operationMoment(item), occurredAt, localDate:localDate(occurredAt), operationLabel:operationName(item), ...contact, personFilter:[contact.code,contact.person].filter(Boolean).join(' · '),workplace:String(item.workplace||''),item };
-    if(!Array.isArray(canonical))return [{...base,...walletOperationClassification(item,catalog),amount:money(value),value}];
-    return ddsRegistryParts({id:base.id,entries:item.entries?.length?item.entries:[item],first:item},catalog,canonical,{walletOnly:true}).map(part=>({...base,id:part.id,articleId:part.articleId,article:part.article,articleValue:part.articleValue,articles:part.article?[part.article]:[],canonicalArticle:true,direction:part.direction,title:desktopOperationDirection(part.direction),amount:part.money===null?'':money(part.money),value:part.money??0}));
+    const classification=walletOperationClassification(item,catalog,canonical,lookup(item.operationId));
+    return {id:String(item.operationId),documentId:String(item.operationId),date:operationMoment(item),occurredAt,localDate:localDate(occurredAt),operationLabel:operationName(item),...contact,personFilter:[contact.code,contact.person].filter(Boolean).join(' · '),workplace:String(item.workplace||''),item,...classification,amount:money(value),value};
   });
 }
 
@@ -61,7 +73,7 @@ export function visibleWalletRows(rows, query='', filters=emptyFilters(), sort='
   const items = rows.filter(row => {
     const fullDate = row.localDate ? row.localDate.split('-').reverse().join('.') : '';
     const haystack=clean([row.date,row.localDate,fullDate,row.title,row.code,row.person,row.contact,row.workplace,row.amount,
-      row.operationLabel,row.item?.sourceDetails,row.item?.articleName,row.item?.note,row.id,row.documentId,row.wallet,row.article,row.articleValue,row.status,row.bonus].join(' '));
+      row.operationLabel,row.item?.sourceDetails,row.item?.articleName,row.item?.note,row.id,row.documentId,row.wallet,row.position,row.positionList,row.article,row.articleValue,row.status,row.bonus].join(' '));
     if (!words.every(word=>haystack.includes(word) || (/^[+\d().-]+$/.test(word)&&numeric(word)&&
       [row.contact,row.date,fullDate,row.amount].map(numeric).some(value=>value.includes(numeric(word)))))) return false;
     return (!filters.title||row.title===filters.title)&&(!filters.workplace||row.workplace===filters.workplace)
@@ -103,9 +115,9 @@ export function walletExportRows(rows, wallet, lookup=getFinanceOperation) {
       invoiceTime:String(quote.invoiceTime||row.date.split(' ')[1]||''),
       participantCode:row.code, participant:row.person, phone:row.contact,
       documentNumber:String(quote.documentNumber||data.documentNumber||row.documentId||row.id),
-      purpose:row.canonicalArticle?articleCellText(row.article,row.articleValue):row.operationLabel||row.article||row.title, subject:String(quote.subject||data.subject||item.sourceDetails||item.articleName||data.financeEntityName||''),
+      purpose:row.canonicalArticle?articleCellText(row.article,row.articleValue):row.operationLabel||row.article||row.title, subject:String(quote.subject||data.subject||row.positionList||item.sourceDetails||item.articleName||data.financeEntityName||''),
       direction:row.value<0?'Расход':'Приход', price:quote.price==null?'':Number(quote.price), discount,
-      quotedTotal:quote.quotedTotal==null?'':Number(quote.quotedTotal),
+      quotedTotal:quote.quotedTotal==null?(data.settlement?.planTotal==null?'':Number(data.settlement.planTotal)):Number(quote.quotedTotal),
       amount:Math.abs(row.value), paymentDate:date, wallet:String(wallet.name||''),
       note:String(data.note||item.note||''), integrationSource:String(quote.integrationSource||data.integrationSource||'Приложение'),
       status:'Активна',
@@ -242,7 +254,7 @@ export function bindWalletHistory(layer,wallet,rows,{open,settings,dds=false,act
     toolbar.querySelector('[data-wallet-sort]')?.setAttribute('aria-pressed',String(state.sort!=='dateDesc'));
     host.innerHTML=visible.length?financeHistoryTable(visible,dds?'Все операции':'Операции кошелька',[
       {key:'select',label:'',narrow:true,header:()=>check('data-wallet-select-all','Выбрать все видимые операции',visible.every(row=>state.selected.has(row.id))),render:row=>check('data-wallet-select="'+escapeHtml(row.id)+'"','Выбрать операцию '+row.title,state.selected.has(row.id))},
-      {key:'date',label:'Дата',narrow:true},{key:'title',label:'Операция',...(dds?{secondaryKey:'wallet',secondaryLabel:'Источник'}:{})},{key:'code',label:'Код',narrow:true},
+      {key:'date',label:'Дата',narrow:true},{key:'title',label:'Операция',...(dds?{secondaryKey:canonical?'sourcePosition':'wallet',secondaryLabel:canonical?'Источник · позиция':'Источник'}:{})},{key:'code',label:'Код',narrow:true},
       {key:'person',label:'Клиент / контрагент'},{key:'workplace',label:'Рабочее пространство'},...(!grouped||canonical?[{key:'article',label:'Статья',articleValue:canonical}]:[]),{key:'amount',label:'Сумма',narrow:true},...(dds?[{key:'bonus',label:'Бонусы',narrow:true}]:[]),
     ]):emptyState(rows.length?'Операции не найдены':'Операций пока нет',rows.length?'Измените условия поиска или фильтрации.':(dds?'Финансовые операции появятся здесь.':'Движения по этой кассе появятся здесь.'));
     if(grouped&&visible.length)applyDDSHierarchy(host,visible,state.collapsed);

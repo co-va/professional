@@ -74,7 +74,7 @@ function operationReceiptItems(entries = []) {
   return { items, lineCount: lines.length };
 }
 
-function paymentGroups(rows, data, { walletOnly = false, facts = null } = {}) {
+function paymentGroups(rows, data, { walletOnly = false, walletEntries = [], facts = null } = {}) {
   const first = rows[0] || {};
   const person = first.person || data.person || {};
   const when = shortDateTimeParts(first.occurredAt || '');
@@ -83,7 +83,7 @@ function paymentGroups(rows, data, { walletOnly = false, facts = null } = {}) {
   const items = Array.isArray(settlement.items) && settlement.items.length ? settlement.items : (first.settlementItems || []);
   const identity = [
     { label: 'Рабочее пространство', value: first.workplace || data.workplaceName || data.workplace || '' },
-    { label: 'Дата и время оплаты', value: [when.date, when.time].filter(Boolean).join(' · ') },
+    { label: first.operationKind==='refund'?'Дата и время возврата':'Дата и время оплаты', value: [when.date, when.time].filter(Boolean).join(' · ') },
     { label: 'Код', value: person.uei || '' },
     { label: 'Клиент', value: [person.name, person.surname].filter(Boolean).join(' ') },
   ].filter(row => row.value);
@@ -99,7 +99,10 @@ function paymentGroups(rows, data, { walletOnly = false, facts = null } = {}) {
     breakdown.push({ label: facts?.discount||facts?.discountUnknown?'Выгода по депозиту':'Скидка', value: formatMoney(Number(settlement.serviceTotal) - Number(settlement.planTotal)) });
   }
   if (settlement.planTotal != null) breakdown.push({ label: 'К оплате', value: formatMoney(settlement.planTotal), strong: true });
-  if (walletOnly) return [identity, breakdown].filter(group => group.length);
+  if(walletOnly){
+    const tips=walletEntries.filter(e=>e.component==='tips'||e.economicType==='TIPS'||e.economicType==='TIPS_REFUND').reduce((n,e)=>n+Math.round(Number(e.amount||0)*100),0)/100;
+    return [identity,breakdown,...(tips?[[{label:'Чаевые',value:formatMoney(tips)}]]:[])].filter(group=>group.length);
+  }
   const tips = data.tips != null ? Math.max(0, Number(data.tips) || 0) : rows.filter(item => item.economicType === 'TIPS').reduce((sum,item) => sum + Math.max(0, Number(item.amount)||0),0);
   const payment = [{ label: 'Оплата', value: formatMoney(data.total ?? operationTotal(rows)), strong: true }];
   if(facts?.discount){payment.unshift({label:'Стоимость до выгоды',value:formatMoney(facts.discount.grossAmount)},{label:'Выгода по депозиту',value:formatMoney(-Number(facts.discount.benefitAmount),{signed:true})});}
@@ -196,8 +199,9 @@ export function financeReceipt(operationId, title, { entries = [], wallet = null
   const receiptRows=rows.length?rows:[first];
   const when = shortDateTimeParts(first.occurredAt || '');
   if((desktop||document)&&isDepositCashDocument(first))return readOnlyReceipt({groups:depositCashGroups(receiptRows,data,facts)});
-  if(facts&&first.operationKind!=='payment')return readOnlyReceipt({groups:loyaltyOtherGroups(first,data,facts)});
-  const groups = first.operationKind === 'payment' ? paymentGroups(receiptRows,data,{ walletOnly: Boolean(wallet),facts }) : [];
+  if(facts&&first.operationKind!=='payment'&&!(wallet&&first.operationKind==='refund'))return readOnlyReceipt({groups:loyaltyOtherGroups(first,data,facts)});
+  const walletEntries=wallet?(wallet.id?receiptRows.filter(e=>e.walletId===wallet.id):entries):[];
+  const groups = first.operationKind === 'payment'||(wallet&&first.operationKind==='refund') ? paymentGroups(receiptRows,data,{ walletOnly: Boolean(wallet),walletEntries,facts }) : [];
   const walletTotal = wallet ? [{ label: 'Движение по кошельку · ' + wallet.name, value: formatMoney(wallet.total), strong: true }] : [];
   if (groups.length) {
     const movement = Number(wallet?.total) || 0;

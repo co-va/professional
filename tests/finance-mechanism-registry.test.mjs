@@ -28,4 +28,17 @@ const directory=[{articleId:'services',capability:'journal',systemKey:'MECHANISM
 const available=availableArticleDirectory(directory,[],key=>key==='loyalty.deposit.access');
 assert.deepEqual(available.map(a=>a.articleId),['deposit','custom']);assert.deepEqual(available[0].values.map(v=>v.name),['Оплата']);
 assert.equal(availableArticleDirectory(null,[],()=>true),null);
-console.log('PASS mechanism registry and capability-gated directory');
+const paidEntry={...entry('SERVICE_REVENUE',10000),entryId:'wallet1'};
+const paidTip={...entry('TIPS',2000),entryId:'wallet2'};
+const secondEntry={...entry('SERVICE_REVENUE',8000),walletId:'bank',walletName:'Сбербанк',entryId:'wallet3'};
+const productArticle={articleId:'products',name:'Продажа товаров',values:[{valueId:'product-payment',name:'Оплата товаров',routes:['PRODUCT_REVENUE']}],routes:[]};
+const fullCatalog=[...canonical,productArticle];
+const position=(id,entryId,sourceId,positionName,amount,route)=>({id,entryId,sourceKind:'wallet',sourceId,positionName,amount,articleClass:registeredRoute(fullCatalog,route)});
+const moves=[position('p1','wallet1','cash','Стрижка',4000,'SERVICE_REVENUE'),position('p2','wallet1','cash','Окрашивание',6000,'SERVICE_REVENUE'),position('p3','wallet2','cash','',2000,'TIPS'),position('p4','wallet3','bank','Окрашивание',2000,'SERVICE_REVENUE'),position('p5','wallet3','bank','Товар',6000,'PRODUCT_REVENUE')];
+const itemized=ddsRegistryParts({id:'pay',entries:[paidEntry,paidTip,secondEntry],first:{operationKind:'payment'},operation:{data:{positionMovements:moves}}},[],fullCatalog);
+assert.deepEqual(itemized.map(p=>[p.position,p.money,p.article]),[['Стрижка',4000,'Оказание услуг'],['Окрашивание',6000,'Оказание услуг'],['',2000,'Оказание услуг'],['Окрашивание',2000,'Оказание услуг'],['Товар',6000,'Продажа товаров']]);
+assert.equal(itemized.reduce((n,p)=>n+p.money,0),20000);
+const purchases=ddsRegistryParts({id:'buy',first:{operationKind:'manual-expense'},entries:[{...entry('MATERIALS_REFUND',1200),entryId:'a',lineName:'Краситель'},{...entry('MATERIALS_REFUND',700),entryId:'b',lineName:'Шампунь'}]},[],canonical);
+assert.equal(purchases.length,2);
+assert.deepEqual(purchases.map(p=>p.position),['Краситель','Шампунь']);
+console.log('PASS mechanism registry and position movement rows');

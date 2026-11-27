@@ -143,7 +143,7 @@ function renderOperationRow(operation, articleRow=null) {
   const workplace = String(operation?.workplace || '').trim();
   const classification = articleRow || walletOperationClassification(operation);
   const label = classification.article || classification.title;
-  const source = [classification.articleValue,classification.article ? classification.title : '', name || counterparty, workplace].filter(Boolean).join(' · ');
+  const source = [classification.articleValue,classification.article ? classification.title : '', classification.positionList, name || counterparty, workplace].filter(Boolean).join(' · ');
   return v2ListEntry({
     overline: String(operation?.person?.uei || ''),
     title: label,
@@ -1553,7 +1553,7 @@ async function openWalletSettings(root, walletLayer, wallet) {
 }
 
 function operationReceipt(operation, wallet = null, desktop = false) {
-  return financeReceipt(operation.operationId, operationName(operation), { entries: operation.entries || [operation], wallet: wallet ? { name: wallet.name, total: operation.total } : null, desktop });
+  return financeReceipt(operation.operationId, operationName(operation), { entries: operation.entries || [operation], wallet: wallet ? { id:wallet.id,name: wallet.name, total: operation.total } : null, desktop });
 }
 
 function openWalletOperation(root, walletLayer, wallet, operationId) {
