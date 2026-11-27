@@ -270,24 +270,19 @@ export function renderDesktopServiceCatalog(host,{root,toolbar,onChanged,state,k
     });
   });
   toolbar.querySelector('[data-service-sort]')?.addEventListener('click',e=>{
-    const anchor=e.currentTarget;anchor.dataset.v2AnchorWidth='360';
-    const current=()=>st.sort==='manual'?['manual','asc']:st.sort.split(':');
-    const fields=()=>{
-      const [column,dir]=current();
-      return '<div class="form-grid">'+select({label:'Порядок',name:'sortColumn',value:column,options:[{value:'manual',label:'Ручной порядок'},...columns.map(([value,label])=>({value,label}))]})+
-      (column==='manual'?'':select({label:'Направление',name:'sortDirection',value:dir,options:[{value:'asc',label:column==='name'?'От А до Я':'По возрастанию'},{value:'desc',label:column==='name'?'От Я до А':'По убыванию'}]}))+'</div>';
-    };
-    const layer=mountModal(anchor,modal('<div data-people-filter-fields>'+fields()+'</div>',{title:'Сортировка',variant:'x',surface:'app',className:'people-action-popup people-filter-popup people-sort-popup'}));
-    layer?.addEventListener('change',event=>{
-      const [column,dir]=current();
-      if(event.target.name==='sortColumn'){
-        if(event.target.value!=='manual'&&!columns.some(([id])=>id===event.target.value))return;
-        st.sort=event.target.value==='manual'?'manual':event.target.value+':'+dir;
-        layer.querySelector('[data-people-filter-fields]').innerHTML=fields();
-      }else if(event.target.name==='sortDirection'&&column!=='manual')st.sort=column+':'+event.target.value;
-      else return;
-      refresh();
-    });
+    const anchor=e.currentTarget;
+    const options=[['manual','Ручной порядок'],...columns.flatMap(([id,label])=>[
+      [id+':asc',label+' — '+(id==='name'?'от А до Я':'по возрастанию')],
+      [id+':desc',label+' — '+(id==='name'?'от Я до А':'по убыванию')]
+    ])];
+    const markup='<div class="people-action-menu">'+options.map(([value,label])=>
+      button(escapeHtml(label),{variant:'secondary',data:'data-service-sort-choice="'+escapeHtml(value)+'" aria-pressed="'+(value===st.sort)+'"'})).join('')+'</div>';
+    const layer=mountModal(anchor,modal(markup,{title:'Сортировка',variant:'x',surface:'app',xRole:'action',className:'people-action-popup people-sort-popup'}));
+    layer?.querySelectorAll('[data-service-sort-choice]').forEach(control=>control.addEventListener('click',()=>{
+      const next=control.dataset.serviceSortChoice;
+      if(!options.some(([value])=>value===next))return;
+      st.sort=next;layer.v2Close?.();refresh();
+    }));
   });
   refresh();
   void Promise.all([loadInventory(),loadAuxiliaryState('service')]).then(()=>{if(!disposed)refresh();return loadServiceStatistics()}).then(()=>{if(disposed)return;statistics=serviceCatalogStatistics(getProcedures(),getProducts());refresh()}).catch(e=>{if(!disposed)console.error('Service statistics unavailable',e)});
