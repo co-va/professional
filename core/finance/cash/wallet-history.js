@@ -215,13 +215,37 @@ export function bindWalletHistory(layer,wallet,rows,{open,settings}) {
   });
   toolbar.querySelector('[data-wallet-sort]')?.addEventListener('click',event=>openSort(event.currentTarget,state,refresh));
   toolbar.querySelector('[data-wallet-settings]')?.addEventListener('click',()=>settings?.());
-  exportControl?.addEventListener('click',async()=>{
+  exportControl?.addEventListener('click',()=>{
     if(busy)return;const result=walletSelection(visible,state.selected);
     if(!result.exportRows.length)return;
-    busy=true;sync();
-    try{await exportScopedWorkbook('finance',walletExportRows(result.exportRows,wallet));}
-    catch(error){reportExcelError(error);}
-    finally{busy=false;sync();}
+    openWalletExportConfirmation(layer,wallet,result.exportRows,{
+      onBusy:value=>{busy=value;sync();},
+    });
   });
   refresh();
+}
+
+export function openWalletExportConfirmation(root,wallet,rows,{onBusy=()=>{},exportWorkbook=exportScopedWorkbook}={}) {
+  if(!rows.length)return null;
+  const payload=walletExportRows(rows,wallet);
+  const title='Выгрузка';
+  const markup='<div class="modal-title"><h2>'+title+'</h2><p>Количество операций: '+rows.length+' · '+escapeHtml(money(sum(rows)))+'</p><p>Выгрузить в Excel?</p></div>'
+    +'<div class="modal-actions">'
+    +button('Выгрузить',{variant:'secondary',data:'data-wallet-export-confirm'})
+    +button('Отмена',{variant:'secondary',data:'data-wallet-export-cancel data-modal-autofocus',className:'v2-confirmation-safe'})
+    +'</div>';
+  const popup=mountModal(root,modal(markup,{title,variant:'x',surface:'app',className:'desktop-export-confirmation'}));
+  if(!popup)return null;
+  const confirm=popup.querySelector('[data-wallet-export-confirm]');
+  const cancel=popup.querySelector('[data-wallet-export-cancel]');
+  let pending=false;
+  cancel?.addEventListener('click',()=>{if(!pending)popup.v2Close?.();});
+  confirm?.addEventListener('click',async()=>{
+    if(pending)return;
+    pending=true;confirm.disabled=true;if(cancel)cancel.disabled=true;onBusy(true);
+    try{await exportWorkbook('finance',payload);popup.v2Close?.();}
+    catch(error){reportExcelError(error);}
+    finally{pending=false;confirm.disabled=false;if(cancel)cancel.disabled=false;onBusy(false);}
+  });
+  return popup;
 }
