@@ -21,7 +21,7 @@ try {
     const url=new URL(r.request().url());
     if(isApi(url.href)) {
       const body=url.pathname.endsWith('/auth/me')?{account:{id:'preview-smoke',email:'preview@example.invalid'},tenantId:'preview-smoke'}:
-        url.pathname.endsWith('/saas-access/me')?{tenantId:'preview-smoke',status:'ACTIVE',commercialMode:'LIVE',capabilities:['profile.access','workplaces.access','journal.day.access','journal.month.access','timetable.access','loyalty.deposit.access','loyalty.personal_account.access'].map(key=>({key,valueType:'BOOLEAN',enabled:true}))}:
+        url.pathname.endsWith('/saas-access/me')?{tenantId:'preview-smoke',status:'ACTIVE',commercialMode:'LIVE',capabilities:['profile.access','workplaces.access','journal.day.access','journal.month.access','timetable.access','loyalty.deposit.access','loyalty.personal_account.access','finance.cash.access','finance.income_expense.access'].map(key=>({key,valueType:'BOOLEAN',enabled:true}))}:
         url.pathname.endsWith('/auxiliary-state/loyalty')?{wallets:[],depositPrograms:Array.from({length:4},(_,i)=>({id:'smoke-program-'+i,name:'Тестовый депозит '+(i+1),amount:10000,amountMode:'fixed',status:'active',termMode:'indefinite'}))}:
         url.pathname.endsWith('/loyalty/deposits/smoke-issued-1/settings')?{depositId:'smoke-issued-1',visibleToPersonOverride:r.request().postDataJSON()?.visibleToPerson}:
         url.pathname.endsWith('/loyalty/deposits')?[{depositId:'smoke-issued-1',programId:'smoke-program-0',programName:'Тестовый депозит 1',person:{key:'smoke-person',name:'Тестовый клиент',uei:'T001'},status:'active',balance:10000,fundedAmount:10000,cardSequence:1,fundedAt:'2026-01-01T10:00:00Z',terms:{amount:10000,amountMode:'fixed',termMode:'indefinite'},history:[{operationId:'smoke-funding',kind:'deposit-funding',direction:'in',amount:10000,occurredAt:'2026-01-01T10:00:00Z',recordedAt:'2026-01-02T10:00:00Z',origin:'application',walletName:'Наличные',recordId:'smoke-record'}]},{depositId:'smoke-issued-debt',programId:'smoke-program-0',programName:'Тестовый депозит 1',person:{key:'smoke-debt-person',name:'Долг'},status:'active',balance:20000,fundedAmount:20000,cardSequence:2,fundedAt:'2025-01-01T10:00:00Z',terms:{amount:50000,amountMode:'fixed',termMode:'dated',termStartDate:'2025-01-01',termEndDate:'2099-12-31'},history:[]},{depositId:'smoke-issued-future',programId:'smoke-program-0',programName:'Тестовый депозит 1',person:{key:'smoke-future-person',name:'Будущая карта'},status:'active',balance:20000,fundedAmount:20000,cardSequence:3,fundedAt:'2025-01-01T10:00:00Z',terms:{amount:50000,amountMode:'fixed',termMode:'dated',termStartDate:'2099-01-01',termEndDate:'2099-12-31'},history:[]}]:
@@ -91,6 +91,23 @@ try {
   assert.equal(await journalBody.evaluate(node=>getComputedStyle(node).borderTopLeftRadius),'34px','Return to Journal restores Z body');
   console.log('PASS: Journal-only Desktop Z; non-Journal H; Mobile Z preserved');
   await page.setViewportSize({width:1024,height:768});
+  await shell.locator('[data-v2-root-item="finance"]').click({timeout:15000});
+  const cashTools=surface.locator('[data-v2-z-header] [data-cash-desktop-tools]');
+  await cashTools.waitFor({timeout:20000});
+  assert.equal(await surface.locator('[data-cash-settings]').count(),0,'Desktop Cash has no legacy V');
+  assert.equal(await cashTools.locator('button').count(),2,'Exactly two Cash tools');
+  const cashGeometry=await cashTools.locator('button').evaluateAll(nodes=>nodes.map(node=>{const r=node.getBoundingClientRect();const icon=node.querySelector('svg').getBoundingClientRect();return {width:r.width,height:r.height,y:r.top+r.height/2,iconX:icon.left+icon.width/2-(r.left+r.width/2),iconY:icon.top+icon.height/2-(r.top+r.height/2),text:node.textContent.trim()};}));
+  for(const g of cashGeometry){assert.equal(g.width,36);assert.equal(g.height,36);assert.equal(g.text,'');assert.ok(Math.abs(g.iconX)<1&&Math.abs(g.iconY)<1,'Centered H icon');}
+  assert.ok(Math.abs(cashGeometry[0].y-cashGeometry[1].y)<0.5,'Shared H axis');
+  await cashTools.locator('[data-cash-desktop-view]').click();
+  const cashAppearance=page.getByRole('dialog',{name:'Вид',exact:true});
+  await cashAppearance.locator('[name="entityCardAppearanceType"]').waitFor({state:'attached'});
+  await cashAppearance.locator('[data-v2-q-close]').click();
+  await cashTools.locator('[data-cash-desktop-operations]').click();
+  const cashOperations=page.getByRole('dialog',{name:'Финансовые операции',exact:true});
+  await cashOperations.locator('[data-finance-operation-action="manual-income"]').waitFor();
+  await cashOperations.evaluate(node=>node.closest('[data-v2-layer]')?.v2Close?.());
+  console.log('PASS: Desktop Cash icon toolbar opens existing appearance and finance operations');
   await shell.locator('[data-v2-root-item="loyalty"]').click({timeout:15000});
   const programs=surface.locator('[data-loyalty-program-section="deposit"]');
   await programs.locator('[data-deposit-program]').first().waitFor({timeout:20000});

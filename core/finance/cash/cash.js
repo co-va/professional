@@ -22,6 +22,8 @@ import {
   shortDate,
   shortDateTime,
   shortDateTimeParts,
+  setV2ZHeaderRows,
+  clearV2ZHeaderRows,
   v2ListEntries,
   v2ListEntry,
   v2Section,
@@ -29,6 +31,7 @@ import {
   workspaceHeaderContext,
 } from '../../../ui/ui.js';
 import { readOnlyReceipt } from '../../../ui/receipt/index.js';
+import { isV2DesktopWorkspace } from '../../../ui/v2/geometry.js';
 import { canUseCapability } from '../../access.js';
 import { findPersonByAccountId, getPeople } from '../../people/data.js';
 import {
@@ -147,14 +150,14 @@ function renderOperationRow(operation) {
   });
 }
 
-function cashContext() {
+function cashContext({ desktop = false } = {}) {
   // Cash is one E-card whose three independently gated parts are wallets,
   // loans and investments. Never rename the E based on which part is visible.
   const hasSettings = cashAppearanceTypeOptions().length > 0
     || financeOperationGroups({ groups: ['income-expense', 'transfer'] }).length > 0;
   return workspaceHeaderContext({
     title: 'Касса',
-    v: hasSettings ? {
+    v: !desktop && hasSettings ? {
       kind: 'settings',
       data: 'data-cash-settings',
       aria: 'Настройки кассы',
@@ -436,7 +439,21 @@ function openCashSettings(root) {
   });
 }
 
+function renderDesktopCashTools(root) {
+  const groups = ['income-expense', 'transfer'];
+  const cardIcon = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M6.5 9h11M6.5 13h7"/></svg>';
+  const operationsIcon = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8h18m-4-4 4 4-4 4M21 16H3m4-4-4 4 4 4"/></svg>';
+  const tools = [
+    cashAppearanceTypeOptions().length ? button(cardIcon, { variant: 'secondary', className: 'v2-desktop-tool-icon', data: 'data-cash-desktop-view title="Вид"', aria: 'Вид' }) : '',
+    financeOperationGroups({ groups }).length ? button(operationsIcon, { variant: 'secondary', className: 'v2-desktop-tool-icon', data: 'data-cash-desktop-operations title="Финансовые операции"', aria: 'Финансовые операции' }) : '',
+  ].filter(Boolean);
+  const [row] = setV2ZHeaderRows(root, tools.length ? ['<div class="v2-desktop-tool-row"><div class="v2-desktop-tool-actions" data-cash-desktop-tools>' + tools.join('') + '</div></div>'] : [], { desktopTitle: 'Касса' });
+  row?.querySelector('[data-cash-desktop-view]')?.addEventListener('click', () => openCashAppearanceQ(root));
+  row?.querySelector('[data-cash-desktop-operations]')?.addEventListener('click', () => openFinanceOperations(root, { groups, onSaved: () => renderList(root) }));
+}
+
 function renderList(root) {
+  const desktop = isV2DesktopWorkspace(root.closest('[data-v2-app]'));
   const wallets = getWallets();
   const investments = getInvestmentEntities();
   const loans = getLoanEntities();
@@ -444,13 +461,17 @@ function renderList(root) {
   const canUseInvestments = allowedInvestmentRoles().length > 0;
   const canUseLoans = canUseCapability('finance.special.access');
   root.innerHTML = page([
-    cashContext(),
+    cashContext({ desktop }),
     canUseWallets ? v2Section('Кошельки', horizontalCards(wallets.map(renderWalletCard))) : '',
     canUseInvestments ? v2Section('Инвестиции', horizontalCards(investments.map((item) => renderCashEntityCard(item, 'investment')))) : '',
     canUseLoans ? v2Section('Займ', horizontalCards(loans.map((item) => renderCashEntityCard(item, 'loan')))) : '',
   ]);
 
-  root.querySelector('[data-cash-settings]')?.addEventListener('click', () => openCashSettings(root));
+  if (desktop) renderDesktopCashTools(root);
+  else {
+    clearV2ZHeaderRows(root);
+    root.querySelector('[data-cash-settings]')?.addEventListener('click', () => openCashSettings(root));
+  }
   root.querySelector('[data-cash-create]')?.addEventListener('click', () => openCashCreateMenu(root));
   root.querySelectorAll('[data-wallet]').forEach((element) => {
     element.addEventListener('click', () => openWalletZ2(root, element.dataset.wallet));
