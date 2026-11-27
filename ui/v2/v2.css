@@ -463,6 +463,7 @@
  .v2-app--workspace .v2-journal-desktop-toolbar .segment-control button.is-active{background:var(--text-secondary)}
  .v2-app--workspace .v2-journal-desktop-actions{display:flex;align-items:center;gap:8px;margin-left:auto}
  .v2-app--workspace .v2-journal-desktop-actions .ui-button{width:auto;height:32px;min-height:32px;border-radius:var(--radius-control);font-size:13px;padding:0 12px}
+ .v2-app--workspace .v2-journal-desktop-actions .v2-journal-excel-icon{display:grid;place-items:center;width:32px;min-width:32px;padding:0}
  .v2-app--workspace .v2-journal-desktop-toolbar [data-journal-period-navigation]{color:var(--white)}
  .v2-app--workspace .v2-journal-desktop-toolbar [data-journal-period-navigation] .ui-compact-button{color:var(--white);border-color:var(--text-secondary)}
  .v2-app--workspace .journal-list-viewport{height:auto;min-height:0;overflow:visible}

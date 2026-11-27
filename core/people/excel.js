@@ -1,5 +1,5 @@
 import { downloadBlob } from '../excel/scoped.js';
-import { DATA_EXPORT_ICON } from '../../ui/buttons/index.js';
+import { desktopExcelActionLabel } from '../../ui/buttons/index.js';
 import {
   button, modal, mountModal, openNotice, selectFile,
   segmentControl, initSegmentControls,
@@ -150,14 +150,9 @@ export function openPeopleExcelMenu(root, { getRows = () => [], onLoaded = () =>
   ];
   const desktopMenu = Boolean(anchor?.matches?.('[data-people-desktop-excel]'));
   if (desktopMenu) actions.push({id:'history',label:'История загрузок',run:()=>openContactImportBatches(root,{onLoaded})});
-  const desktopLabels = {
-    history: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9h8M8 13h8M8 17h5"/></svg><span>История загрузок</span>',
-    export: DATA_EXPORT_ICON + '<span>Выгрузить</span>',
-    import: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v13m-5-5 5 5 5-5M4 16v4h16v-4"/></svg><span>Загрузить</span>',
-    template: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H5v18h14V8l-5-5Zm0 0v5h5M8 12h8m-8 4h8m-4-4v4"/></svg><span>Скачать шаблон</span>',
-  };
+
   const markup = '<div class="' + (desktopMenu ? 'people-action-menu' : 'modal-actions') + '">'
-    + actions.map(action => button(desktopMenu ? desktopLabels[action.id] : action.label, {
+    + actions.map(action => button(desktopMenu ? desktopExcelActionLabel(action.id, action.label) : action.label, {
       type: 'button', variant: 'secondary', data: 'data-people-excel-' + action.id,
     })).join('') + '</div>';
   const layer = mountModal(anchor || root, modal(markup, {

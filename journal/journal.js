@@ -1,3 +1,4 @@
+import { DATA_EXCHANGE_ICON } from '../ui/buttons/index.js';
 import { formatReportRubles as formatRubles, formatReportNumber as formatNumber } from '../ui/utils/values.js';
 import { recordDurationHours } from '../core/time/index.js';
 import { viewNavigation, initViewNavigation, ALL_WORKPLACES_ID, modal, mountModal, openDayWorkplaceControl, openSharedProfileSettingsMenu, workspaceHeaderContext, button } from '../ui/ui.js';
@@ -572,14 +573,14 @@ export function renderJournal(root, options = {}) {
     const secondaryNavigation = activeView === 'list'
       ? viewNavigation({ views: listModes, activeView: listMode, ariaLabel: 'Режим списка' })
       : '<div data-journal-period-navigation></div>';
-    const toolbar = wide ? `<div class="v2-journal-desktop-toolbar"><div data-journal-primary-navigation>${primaryNavigation}</div><div data-journal-secondary-navigation>${secondaryNavigation}</div><div class="v2-journal-desktop-actions">${activeView === 'day' ? button('Сегодня',{variant:'secondary',data:'data-journal-today'}) + button('Z-отчёт',{variant:'secondary',data:'data-journal-day-report'}) : ''}${activeView === 'list' ? button('Excel',{variant:'secondary',data:'data-journal-direct-excel'}) : ''}</div></div>` : '';
+    const toolbar = wide ? `<div class="v2-journal-desktop-toolbar"><div data-journal-primary-navigation>${primaryNavigation}</div><div data-journal-secondary-navigation>${secondaryNavigation}</div><div class="v2-journal-desktop-actions">${activeView === 'day' ? button('Сегодня',{variant:'secondary',data:'data-journal-today'}) + button('Z-отчёт',{variant:'secondary',data:'data-journal-day-report'}) : ''}${activeView === 'list' ? button(DATA_EXCHANGE_ICON,{variant:'secondary',className:'v2-journal-excel-icon',data:'data-journal-direct-excel title="Обмен данными" aria-haspopup="dialog"',aria:'Обмен данными'}) : ''}</div></div>` : '';
     const headerRows = setV2ZHeaderRows(root, wide ? [toolbar] : [primaryNavigation, secondaryNavigation]);
     const primaryNavigationRoot = wide ? headerRows[0]?.querySelector('[data-journal-primary-navigation]') : headerRows[0] || null;
     const secondaryNavigationRoot = wide ? headerRows[0]?.querySelector('[data-journal-secondary-navigation]') : headerRows[1] || null;
     if (wide) {
       headerRows[0]?.querySelector('[data-journal-today]')?.addEventListener('click', () => { selectedDate = new Date(); persistProfessionalContext(); renderView(); });
       headerRows[0]?.querySelector('[data-journal-day-report]')?.addEventListener('click', () => openJournalZReport());
-      headerRows[0]?.querySelector('[data-journal-direct-excel]')?.addEventListener('click', () => openJournalExcel(document.body,{onImported:()=>renderView()}));
+      headerRows[0]?.querySelector('[data-journal-direct-excel]')?.addEventListener('click', event => openJournalExcel(document.body,{anchor:event.currentTarget,onImported:()=>renderView()}));
     }
     const periodNavigationRoot = secondaryNavigationRoot?.querySelector('[data-journal-period-navigation]') || null;
     const viewClass = activeView === 'list' ? ' class="journal-list-viewport"' : '';

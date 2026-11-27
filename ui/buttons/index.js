@@ -6,6 +6,17 @@ export const DATA_EXCHANGE_ICON = '<svg viewBox="0 0 24 24" width="20" height="2
 // Existing Excel export symbol shared by the export menu and direct export.
 export const DATA_EXPORT_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V3m-5 5 5-5 5 5M4 16v4h16v-4"/></svg>';
 
+// Canonical Desktop Excel action labels, taken unchanged from Contacts.
+const DESKTOP_EXCEL_ACTION_LABELS = {
+  history: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9h8M8 13h8M8 17h5"/></svg><span>История загрузок</span>',
+  export: DATA_EXPORT_ICON + '<span>Выгрузить</span>',
+  import: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v13m-5-5 5 5 5-5M4 16v4h16v-4"/></svg><span>Загрузить</span>',
+  template: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H5v18h14V8l-5-5Zm0 0v5h5M8 12h8m-8 4h8m-4-4v4"/></svg><span>Скачать шаблон</span>',
+};
+export function desktopExcelActionLabel(key, fallback = '') {
+  return DESKTOP_EXCEL_ACTION_LABELS[key] || escapeHtml(fallback);
+}
+
 // Financial operations (income/expense), identical in Cash and DDS.
 export const FINANCE_OPERATIONS_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="2"/><path d="M7.5 9v6M4.5 12h6M14 12h5"/></svg>';
 

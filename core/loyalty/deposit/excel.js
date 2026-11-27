@@ -1,3 +1,4 @@
+import { desktopExcelActionLabel } from '../../../ui/buttons/index.js';
 import {
   actionBlock, button, datePicker, escapeHtml, initDatePickers, modal, mountModal,
   openNotice, selectFile, twoColumnLayout, v2ListEntries, v2ListEntry, v2Section,
@@ -208,8 +209,7 @@ export function openDepositExcelQ(root, rerender = async () => {}, { anchor = nu
     { id: 'template', label: 'Шаблон', run: () => download('/template', 'deposits-template.xlsx') },
   ];
   const desktop = Boolean(anchor);
-  const labels = { export: 'Выгрузить', import: 'Загрузить', template: 'Скачать шаблон' };
-  const buttons = actions.map((item) => button(desktop ? labels[item.id] : item.label, {
+  const buttons = actions.map((item) => button(desktop ? desktopExcelActionLabel(item.id, item.label) : item.label, {
     type: 'button', variant: 'secondary',
     data: 'data-deposit-excel-action="' + item.id + '"',
   })).join('');

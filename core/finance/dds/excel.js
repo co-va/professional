@@ -1,3 +1,4 @@
+import { desktopExcelActionLabel } from '../../../ui/buttons/index.js';
 import {
   button,datePicker,initDatePickers,initSegmentControls,modal,mountModal,
   segmentControl,select,twoColumnLayout,
@@ -152,9 +153,9 @@ export function openDDSExcel(root,movements,{onImported=()=>{},anchor=null,expor
     })},
     {key:'template',label:'Шаблон',run:()=>exportScopedWorkbook('finance',[],{template:true})},
   ];
-  const buttons=actions.map(item=>button(item.label,{variant:'secondary',data:'data-dds-excel-'+item.key})).join('');
+  const buttons=actions.map(item=>button(anchor?desktopExcelActionLabel(item.key,item.label):item.label,{variant:'secondary',data:'data-dds-excel-'+item.key})).join('');
   const layer=anchor
-    ? mountModal(anchor,modal('<div class="desktop-q-action-menu">'+buttons+'</div>',{variant:'x',xRole:'picker',className:'desktop-q-action-popup'}))
+    ? mountModal(anchor,modal('<div class="people-action-menu">'+buttons+'</div>',{title:'Excel',variant:'x',surface:'app',xRole:'action',className:'people-action-popup'}))
     : mountModal(root,modal('<div class="modal-actions">'+buttons+'</div>',{title:'Excel',variant:'x',surface:'app',xRole:'action'}));
   if(!layer)return;
   actions.forEach(item=>layer.querySelector('[data-dds-excel-'+item.key+']')?.addEventListener('click',()=>{

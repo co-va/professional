@@ -1,3 +1,5 @@
+import { desktopExcelActionLabel } from '../../ui/buttons/index.js';
+import { isV2DesktopWorkspace } from '../../ui/v2/geometry.js';
 import {
   button,
   field,
@@ -53,12 +55,13 @@ async function downloadWorkbook(path, { method = 'GET', body = null, fallback = 
 }
 
 function excelAction(trigger, actions = [], title = 'Excel') {
-  const content = actions.map((action) => button(action.label, {
+  const desktop = isV2DesktopWorkspace(trigger.closest('[data-v2-app]'));
+  const content = actions.map((action) => button(desktop ? desktopExcelActionLabel(action.id, action.label) : action.label, {
     type: 'button',
     variant: 'secondary',
     data: `data-inventory-excel-action="${escapeHtml(action.id)}"`,
   })).join('');
-  const modalRoot = mountModal(trigger, modal(content, { title, variant: 'x' }));
+  const modalRoot = mountModal(trigger, modal(desktop ? '<div class="people-action-menu">'+content+'</div>' : content, { title, variant: 'x', ...(desktop ? {surface:'app',xRole:'action',className:'people-action-popup'} : {}) }));
   actions.forEach((action) => {
     modalRoot?.querySelector(`[data-inventory-excel-action="${CSS.escape(action.id)}"]`)?.addEventListener('click', async () => {
       modalRoot.v2Close?.();
