@@ -135,18 +135,20 @@ function openArticleX(existing = null, onSaved = () => {}, getArticles = getFina
   let valueEdit=null;
   const currentValues=()=>desktopArticleValues(getArticles(),existing?.articleId);
   const valueName=()=>String(draftHost?.querySelector('[name="valueName"]')?.value||'').trim();
-  if(isSystem)for(const name of ['direction','economicType']){
+  // A saved Desktop article must keep its direction for historical corrections.
+  const directionLocked=desktop&&Boolean(existing);
+  if(isSystem||directionLocked)for(const name of ['direction','economicType']){
     const trigger=form.querySelector('input[name="'+name+'"]')?.closest('.ui-select')?.querySelector('[data-ui-select-trigger]');
     if(trigger)trigger.disabled=true;
   }
   const read=()=>{
     if(isSystem)return {name:existing.name,parentArticleId:existingParent,direction,economicType};
     const data=new FormData(form);
-    const nextDirection=String(data.get('direction')||'');
+    const nextDirection=directionLocked?direction:String(data.get('direction')||'');
     let parentArticleId=String(data.get('parentArticleId')||'');
     if(desktop)parentArticleId=existing&&nextDirection===direction?existingParent:(items.find(a=>roots.has(a.articleId)&&a.direction===nextDirection)?.articleId||'');
     if(desktop&&existing&&nextDirection===direction&&!String(data.get('parentArticleId')||'')&&!existingParent)parentArticleId='';
-    const nextEconomic=desktop?(existing&&nextDirection===direction?economicType:({IN:'OPERATING_REVENUE',OUT:'OPERATING_EXPENSE',TRANSFER:'TRANSFER'})[nextDirection]):String(data.get('economicType')||'');
+    const nextEconomic=desktop?(directionLocked?economicType:({IN:'OPERATING_REVENUE',OUT:'OPERATING_EXPENSE',TRANSFER:'TRANSFER'})[nextDirection]):String(data.get('economicType')||'');
     return {name:String(data.get('articleName')||'').trim(),parentArticleId,direction:nextDirection,economicType:nextEconomic};
   };
   const initial=JSON.stringify(read());
