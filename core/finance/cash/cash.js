@@ -1456,7 +1456,6 @@ function renderWalletLayer(root, layer, walletId) {
   ]);
   if (desktop) {
     bindWalletHistory(layer, wallet, walletHistoryRows(operations, getAllPeople(), { operationName, operationMoment }), {
-      balance: getWalletBalance(wallet.id),
       open: id => openWalletOperation(root, layer, wallet, id),
       settings: wallet.system ? null : () => void openWalletSettings(root, layer, wallet),
     });

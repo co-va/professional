@@ -3,6 +3,7 @@ import {
   initDatePickers, modal, mountModal, select, setV2ZHeaderRows,
 } from '../../../ui/ui.js';
 import { checkControl } from '../../../ui/selection/check-list.js';
+import { DATA_EXPORT_ICON } from '../../../ui/buttons/index.js';
 import { financeHistoryTable, financeTableContact } from '../desktop.js';
 import { getFinanceOperation } from '../data.js';
 import { exportScopedWorkbook, reportExcelError } from '../../excel/scoped.js';
@@ -147,11 +148,11 @@ function openSort(anchor,state,refresh) {
 const check=(data,aria,checked)=>'<label class="ui-compact-check">'+checkControl({data,aria,checked})+'</label>';
 export function walletHistoryBody() {
   // Regular text, not the 30px H title/accessory counter.
-  return '<section><div class="v2-desktop-tool-row"><div class="v2-desktop-tool-context"><span>Операции: <output data-wallet-count aria-live="polite"></output></span></div>'
-    +'<div class="v2-desktop-tool-actions"><span>Сумма операций: <output data-wallet-sum aria-live="polite"></output></span></div></div>'
+  return '<section><div class="v2-desktop-tool-row"><div class="v2-desktop-tool-context"><span><output data-wallet-count aria-label="Количество операций" aria-live="polite"></output></span></div>'
+    +'<div class="v2-desktop-tool-actions"><span><output data-wallet-sum aria-label="Сумма операций" aria-live="polite"></output></span></div></div>'
     +'<div data-wallet-history-host></div></section>';
 }
-export function bindWalletHistory(layer,wallet,rows,{balance,open,settings}) {
+export function bindWalletHistory(layer,wallet,rows,{open,settings}) {
   const state=layer.walletHistoryState ||= {query:'',filters:emptyFilters(),sort:'dateDesc',selected:new Set()};
   const [toolbar]=setV2ZHeaderRows(layer,[
     '<section data-people-desktop-toolbar><div class="people-desktop-tools">'
@@ -160,8 +161,7 @@ export function bindWalletHistory(layer,wallet,rows,{balance,open,settings}) {
     +compactButton({kind:'filter',data:'data-wallet-filter title="Фильтр" aria-haspopup="dialog" aria-pressed="false"'})
     +compactButton({kind:'sort',data:'data-wallet-sort title="Сортировка" aria-haspopup="dialog" aria-pressed="false"'})
     +'</div><div class="people-desktop-actions people-desktop-actions--right">'
-    +'<span>В наличии: <strong data-wallet-balance>'+escapeHtml(money(balance))+'</strong></span>'
-    +button('Выгрузить',{variant:'secondary',data:'data-wallet-export title="Выгрузить в Excel"',aria:'Выгрузить в Excel'})
+    +button(DATA_EXPORT_ICON,{variant:'secondary',className:'people-desktop-icon',data:'data-wallet-export title="Выгрузить в Excel"',aria:'Выгрузить в Excel'})
     +(settings?button('Удалить',{variant:'secondary',data:'data-wallet-settings',aria:'Удалить кассу'}):'')
     +'</div></div></section>',
   ],{desktopTitle:wallet.name});
