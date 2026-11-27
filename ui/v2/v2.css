@@ -1127,4 +1127,4 @@
  .v2-app--workspace .deposit-program-code-x [data-deposit-code-error]:empty{display:none}
 }
 
-[data-personal-account-mobile-info]{display:flex;justify-content:flex-start}
+[data-personal-account-help-row]{display:flex;justify-content:flex-start}
