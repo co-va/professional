@@ -18,7 +18,11 @@ export function desktopExcelActionLabel(key, fallback = '') {
 }
 
 // Financial operations (income/expense), identical in Cash and DDS.
-export const FINANCE_OPERATIONS_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="2"/><path d="M7.5 9v6M4.5 12h6M14 12h5"/></svg>';
+export const FINANCE_OPERATIONS_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 5.5v13M1 12h11M16 12h7"/></svg>';
+
+// Shared desktop toolbar symbols; retain the existing button geometry.
+export const VIEW_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>';
+export const FINANCE_ARTICLES_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 3v13a2 2 0 0 0 2 2h3M4 8h5M12 8h9M12 18h9"/><rect x="9" y="6.5" width="3" height="3" rx=".5" fill="currentColor" stroke="none"/><rect x="9" y="16.5" width="3" height="3" rx=".5" fill="currentColor" stroke="none"/></svg>';
 
 // Full-size destructive tool icon; keep Compact remove (×) unchanged.
 export const TRASH_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></svg>';

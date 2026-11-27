@@ -33,7 +33,7 @@ import {
 import { financeDesktop, financeZActions, financeZSave, financeQSubmit, financeHistoryTable, financeTableContact, bindFinanceHistoryTable, openFinanceReceiptX, openFinanceDeleteConfirmation } from '../desktop.js';
 import { readOnlyReceipt } from '../../../ui/receipt/index.js';
 import { financeReceipt } from '../receipt.js';
-import { FINANCE_OPERATIONS_ICON } from '../../../ui/buttons/index.js';
+import { FINANCE_OPERATIONS_ICON, VIEW_ICON } from '../../../ui/buttons/index.js';
 import { walletHistoryRows, walletHistoryBody, bindWalletHistory } from './wallet-history.js';
 import { isV2DesktopWorkspace } from '../../../ui/v2/geometry.js';
 import { bindDesktopRailControls } from '../../../ui/v2/horizontal-affordance.js';
@@ -446,7 +446,7 @@ function renderDesktopCashTools(root) {
   const groups = ['income-expense', 'transfer'];
   const operationsIcon = FINANCE_OPERATIONS_ICON;
   const tools = [
-    cashAppearanceTypeOptions().length ? button('Вид', { variant: 'secondary', data: 'data-cash-desktop-view', aria: 'Вид' }) : '',
+    cashAppearanceTypeOptions().length ? button(VIEW_ICON, { variant: 'secondary', className: 'v2-desktop-tool-icon', data: 'data-cash-desktop-view title="Вид"', aria: 'Вид' }) : '',
     financeOperationGroups({ groups }).length ? button(operationsIcon, { variant: 'secondary', className: 'v2-desktop-tool-icon', data: 'data-cash-desktop-operations title="Финансовые операции"', aria: 'Финансовые операции' }) : '',
     canCreateCashEntity() ? button('+', { variant: 'secondary', className: 'v2-desktop-tool-primary', data: 'data-cash-desktop-add aria-haspopup="dialog"', aria: 'Добавить' }) : '',
   ].filter(Boolean);

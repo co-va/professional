@@ -1,3 +1,4 @@
+import { VIEW_ICON } from '../../ui/buttons/index.js';
 import { button, compactButton, setV2ZHeaderRows, collectRepeatedField, entityVisualCard, escapeHtml, field, modal, mountModal, openEntityCardAppearanceQ, openSharedProfileDataEditor, openSharedProfileSettingsMenu, openSharedPasswordAction, page, repeatedField, searchableSelect, select, textareaField, v2HorizontalRail, v2Section, workspaceHeaderContext, workplaceAddButton } from '../../ui/ui.js';
 import { canUseCapability, getAccess, getLimit, loadAccess, requestLiveMode } from '../../core/access.js';
 import { changePassword, logout } from '../../core/auth.js';
@@ -287,7 +288,7 @@ function renderDesktopProfileTools(root,navigateBack,options,workplacesAllowed,t
     variant:'secondary',className:'v2-desktop-tool-primary',data:'data-profile-desktop-add',aria:'Добавить рабочее пространство',
   }):'';
   const markup='<div class="v2-desktop-tool-row" data-profile-desktop-toolbar><div class="v2-desktop-tool-actions">'+
-    actions.map(action=>button(action.label,{variant:'secondary',className:'v2-desktop-tool-accent',data:'data-profile-desktop-action="'+action.id+'"',aria:action.aria||action.label,disabled:Boolean(action.disabled)})).join('')+add+'</div></div>';
+    actions.map(action=>button(action.id==='appearance'?VIEW_ICON:action.label,{variant:'secondary',className:'v2-desktop-tool-accent'+(action.id==='appearance'?' v2-desktop-tool-icon':''),data:'data-profile-desktop-action="'+action.id+'"'+(action.id==='appearance'?' title="Вид"':''),aria:action.aria||action.label,disabled:Boolean(action.disabled)})).join('')+add+'</div></div>';
   const [row]=setV2ZHeaderRows(root,[markup],{desktopTitle:title});
   row?.querySelectorAll('[data-profile-desktop-action]').forEach(control=>{
     const action=actions.find(item=>item.id===control.dataset.profileDesktopAction);

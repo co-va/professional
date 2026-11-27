@@ -30,7 +30,7 @@ import { financeDesktop, financeZActions, financeZSave, financeHistoryTable, fin
 import { financeReceipt } from '../receipt.js';
 import { paymentMethods, initPaymentMethods } from '../../../ui/payment/index.js';
 import { readOnlyReceipt } from '../../../ui/receipt/index.js';
-import { DATA_EXCHANGE_ICON, FINANCE_OPERATIONS_ICON, TRASH_ICON } from '../../../ui/buttons/index.js';
+import { DATA_EXCHANGE_ICON, FINANCE_OPERATIONS_ICON, FINANCE_ARTICLES_ICON, TRASH_ICON } from '../../../ui/buttons/index.js';
 import { financeOperationGroups, openFinanceOperations } from '../operations/index.js';
 import { canUseCapability } from '../../access.js';
 import { getAllPeople } from '../../people/data.js';
@@ -607,9 +607,9 @@ function renderDDS(root) {
       const ids=new Set(selectedRows.map(row=>row.id));
       openDDSExcel(root, movements, { anchor, exportMovements:movements.filter(item=>ids.has(String(item.operationId))), onImported: () => renderDDS(root) });
     } },
-    canUseCapability('finance.articles.access') ? { label: 'Статьи', run: () => openArticles(root) } : null,
+    canUseCapability('finance.articles.access') ? { label: FINANCE_ARTICLES_ICON, className: 'people-desktop-icon', aria: 'Статьи', run: () => openArticles(root) } : null,
     financeOperationGroups({ groups: operationGroups }).length ? {
-      label: FINANCE_OPERATIONS_ICON, className: 'v2-desktop-tool-icon', aria: 'Финансовые операции',
+      label: FINANCE_OPERATIONS_ICON, className: 'people-desktop-icon', aria: 'Финансовые операции',
       run: anchor => openFinanceOperations(root, { groups: operationGroups, anchor, onSaved: () => renderDDS(root) }),
     } : null,
   ]});

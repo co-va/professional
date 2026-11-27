@@ -1,5 +1,5 @@
 import { dataTable, setSharedActionVisible } from '../../../ui/page/page.js';
-import { DATA_EXCHANGE_ICON, TRASH_ICON } from '../../../ui/buttons/index.js';
+import { DATA_EXCHANGE_ICON, TRASH_ICON, VIEW_ICON } from '../../../ui/buttons/index.js';
 import { moveDesktopQTool } from '../../../ui/v2/z-layout.js';
 import { isV2DesktopWorkspace } from '../../../ui/v2/geometry.js';
 import { compactCheck } from '../../../ui/selection/check-list.js';
@@ -1479,7 +1479,7 @@ export async function renderDeposit(root) {
     const toolbar = `<div class="v2-desktop-tool-row" data-deposit-desktop-toolbar>
       <div class="v2-desktop-tool-actions">
         ${button(DATA_EXCHANGE_ICON, { variant: 'secondary', className: 'v2-desktop-tool-icon', data: 'data-deposit-desktop-excel title="Обмен данными" aria-haspopup="dialog"', aria: 'Обмен данными' })}
-        ${button('Вид', { variant: 'secondary', data: 'data-deposit-desktop-view' })}
+        ${button(VIEW_ICON, { variant: 'secondary', className: 'v2-desktop-tool-icon', data: 'data-deposit-desktop-view title="Вид"', aria: 'Вид' })}
         ${button('<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>', { variant: 'secondary', className: 'v2-desktop-tool-primary', data: 'data-deposit-program-add title="Создать депозитную программу" aria-haspopup="dialog"', aria: 'Создать депозитную программу' })}
       </div>
     </div>`;

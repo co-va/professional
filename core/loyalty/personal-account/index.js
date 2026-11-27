@@ -1,3 +1,4 @@
+import { VIEW_ICON } from '../../../ui/buttons/index.js';
 import {
   actionBlock,
   button,
@@ -536,7 +537,7 @@ export async function renderPersonalAccount(root) {
       ], rows,
     }) : emptyState('Личных счетов с движениями пока нет', 'Здесь появятся клиенты после операций по личному счёту.');
     root.innerHTML = page([loyaltyHeader('Личный счёт'), `<div data-personal-account-list-host>${table}</div>`]);
-    const [toolbar] = setV2ZHeaderRows(root, ['<div class="v2-desktop-tool-row"><div class="v2-desktop-tool-actions">' + button('Вид', { variant: 'secondary', data: 'data-personal-account-view' }) + '</div></div>'], { desktopTitle: 'Личный счёт' });
+    const [toolbar] = setV2ZHeaderRows(root, ['<div class="v2-desktop-tool-row"><div class="v2-desktop-tool-actions">' + button(VIEW_ICON, { variant: 'secondary', className: 'v2-desktop-tool-icon', data: 'data-personal-account-view title="Вид"', aria: 'Вид' }) + '</div></div>'], { desktopTitle: 'Личный счёт' });
     toolbar?.querySelector('[data-personal-account-view]')?.addEventListener('click', () => {
       const first = values[0];
       openLoyaltyAppearanceQ(root, { type: 'personal-account', fields: () => personalAccountCardFields({ person: first?.person || people[0] || {}, balance: first?.account?.balance || 0, debt: first?.account?.debtTotal || 0 }), onSaved: () => renderPersonalAccount(root) });
