@@ -1233,10 +1233,3 @@
  .v2-app--workspace [data-service-table-kind] [data-service-system-disclosure][open]>summary.service-table-system-heading::before{content:'▾'}
  .v2-app--workspace [data-service-table-kind] [data-service-section-count]{font-style:normal;font-variant-numeric:tabular-nums;text-transform:none;white-space:nowrap;color:inherit}
 }
-
-/* Left H tools are outlined, not filled. Keep the two Service segments transparent. */
-@media (min-width:768px) and (min-height:600px){
- .v2-app--workspace [data-service-desktop-toolbar] [data-service-view-switch]>.segment-control{background:transparent;border-color:#E0D6D6}
- .v2-app--workspace [data-service-desktop-toolbar] [data-service-view-switch]>.segment-control>button{box-sizing:border-box;flex:1 0 auto;min-width:52px;padding-inline:5px;font-size:12px;background:transparent;color:#E0D6D6;border:1px solid transparent}
- .v2-app--workspace [data-service-desktop-toolbar] [data-service-view-switch]>.segment-control>button.is-active{background:transparent;color:#E0D6D6;border-color:#E0D6D6;font-weight:750}
-}
