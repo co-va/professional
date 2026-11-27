@@ -176,7 +176,7 @@ export function openIncomeExpenseQ(root, direction, { onSaved = null, operation 
   return layer;
 }
 
-export function renderIncomeExpenseOperation(root, direction, { onSaved = null, operation = null, desktopArticles = false } = {}) {
+export function renderIncomeExpenseOperation(root, direction, { onSaved = null, operation = null, desktopArticles = true } = {}) {
   const isIncome = direction === 'IN';
   const original=operation?.data||{};
   const articles=articleOptions(direction,desktopArticles,String(original.articleId||original.lines?.[0]?.articleId||''));

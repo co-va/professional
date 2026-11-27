@@ -20,7 +20,14 @@ function summaryList(report) {
       { title: 'Приход', right: money(report.totals.incoming), interactive: false },
       { title: 'Расход', right: money(report.totals.outgoing), interactive: false },
       { title: 'Чистое движение', right: money(report.totals.netCash, true), interactive: false },
-      { title: 'Выручка услуг', right: money(report.totals.serviceRevenue), interactive: false },
+      { title: 'Выручка услуг по кошелькам', right: money(report.totals.serviceRevenue), interactive: false },
+      { title: 'Выручка из ранее внесённых средств', right: money(report.loyalty.advanceRevenue), interactive: false },
+      { title: 'Возврат ранее признанной выручки', right: money(report.loyalty.advanceRefunds), interactive: false },
+      { title: 'Начислено бонусов', right: String(report.loyalty.bonusAccrued), interactive: false },
+      { title: 'Использовано бонусов', right: String(report.loyalty.bonusSpent), interactive: false },
+      { title: 'Возвращено бонусов', right: String(report.loyalty.bonusRestored), interactive: false },
+      { title: 'Списано бонусов при закрытии', right: String(report.loyalty.bonusWrittenOff), interactive: false },
+      ...(report.loyalty.unresolved?[{title:'Операции с неуточнёнными частями',right:String(report.loyalty.unresolved),interactive:false}]:[]),
       { title: 'Операционные доходы', right: money(report.totals.operatingRevenue), interactive: false },
       { title: 'Продажа товаров', right: money(report.totals.productRevenue), interactive: false },
       { title: 'Операционные расходы', right: money(report.totals.operatingExpense), interactive: false },
@@ -54,7 +61,7 @@ function renderReport(root, from, to) {
     return renderZReport(root);
   }
   const report = getZReport(range);
-  const content = report.entries.length
+  const content = report.entries.length || report.loyalty.count
     ? `${summaryList(report)}${breakdown('По кошелькам', report.byWallet)}${breakdown('По статьям', report.byArticle)}${breakdown('По экономическому смыслу', report.byEconomicType)}`
     : emptyState('Нет движений', 'За выбранный период в ДДС нет операций.');
 

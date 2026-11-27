@@ -33,7 +33,7 @@ export function loyaltyDocumentFacts(operation={},entries=[]){
   }else{bonus=null;bonusUnknown=true;}
  }
  // A withdrawal closes the deposit. Do not invent the prior bonus remainder.
- if(kind==='deposit-withdrawal'){bonus=null;bonusUnknown=true;}
+ if(kind==='deposit-withdrawal'){bonus=data.benefitWrittenOff==null?null:-money(data.benefitWrittenOff);bonusUnknown=bonus===null;}
  const cash=entries.reduce((s,e)=>s+(e.direction==='OUT'?-1:1)*cents(e.amount),0)/100;
  const sources=[...new Set([...allocations.map(a=>a.name.split(' · остаток ')[0]),...(personal>0?['Личный счёт']:[]),...(knownKind&&kind.startsWith('deposit-')?[String(data.programName||'Депозит')]:[]),...(knownKind&&kind.startsWith('personal-account-')?['Личный счёт']:[])])];
  const cashUnknown=knownKind&&['deposit-funding','deposit-withdrawal','personal-account-funding','personal-account-withdrawal','personal-account-debt-settlement'].includes(kind)&&!entries.length&&money(data.amount??data.total)>0;
@@ -55,4 +55,26 @@ export function desktopDocuments(operations,ledger){
   result.push({id,entries:[],first,facts});
  }
  return result;
+}
+
+// Recognize the actual principal once, at settlement, not when money was advanced.
+// A mixed payment may have both a physical wallet component and an advance component.
+export function loyaltyReportTotals(operations,fromMs=-Infinity,toMs=Infinity){
+ const totals={advanceRevenue:0,advanceRefunds:0,bonusAccrued:0,bonusSpent:0,bonusRestored:0,bonusWrittenOff:0,unresolved:0,count:0};
+ for(const op of operations){
+  const time=Date.parse(op.occurredAt||'');
+  if(op.status==='cancelled'||op.kind==='cancel'||!Number.isFinite(time)||time<fromMs||time>toMs)continue;
+  const f=loyaltyDocumentFacts(op,[]);
+  if(!f)continue;
+  totals.count++;
+  if(f.principal===null||f.bonus===null)totals.unresolved++;
+  if(op.kind==='payment')totals.advanceRevenue+=cents(Math.max(0,-(f.principal??0)))+cents(Math.max(0,-f.personal));
+  if(op.kind==='refund')totals.advanceRefunds+=cents(Math.max(0,f.principal??0))+cents(Math.max(0,f.personal));
+  if(op.kind==='deposit-funding'&&f.bonus>0)totals.bonusAccrued+=cents(f.bonus);
+  if(['payment','deposit-import-spend'].includes(op.kind)&&f.bonus<0)totals.bonusSpent+=cents(-f.bonus);
+  if(op.kind==='refund'&&f.bonus>0)totals.bonusRestored+=cents(f.bonus);
+  if(op.kind==='deposit-withdrawal'&&f.bonus<0)totals.bonusWrittenOff+=cents(-f.bonus);
+ }
+ for(const key of Object.keys(totals))if(!['count','unresolved'].includes(key))totals[key]/=100;
+ return totals;
 }

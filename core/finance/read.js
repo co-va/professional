@@ -1,3 +1,4 @@
+import { loyaltyReportTotals } from './dds/documents.js';
 import { readFinanceState } from './data.js';
 import { financialNumber } from './rules.js';
 
@@ -280,6 +281,7 @@ export function getZReport({ from = null, to = null } = {}) {
     }
   }
 
+  const loyalty=loyaltyReportTotals(readFinanceState().operations,fromMs,toMs);
   totals.incoming = Math.round(totals.incoming * 100) / 100;
   totals.outgoing = Math.round(totals.outgoing * 100) / 100;
   totals.netCash = Math.round((totals.incoming - totals.outgoing) * 100) / 100;
@@ -298,6 +300,7 @@ export function getZReport({ from = null, to = null } = {}) {
     to: Number.isFinite(toMs) ? new Date(toMs).toISOString() : '',
     entries,
     totals,
+    loyalty,
     byWallet: normalizeRows(walletMap),
     byArticle: normalizeRows(articleMap),
     byEconomicType: normalizeRows(economicMap),
