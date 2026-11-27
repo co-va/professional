@@ -12,7 +12,7 @@ export function desktopAvailableArticles(articles,can){
  return articles.filter(a=>!hidden.has(a.articleId)).map(a=>({...a,name:desktopArticleName(a)}));
 }
 export const desktopOperationDirection=d=>({in:'Приход',out:'Расход',transfer:'Транзакция',mixed:'Транзакция'})[d]||'—';
-export const depositArticleLabel=entry=>({DEPOSIT_RECEIVED:'Оплата депозита',DEPOSIT_RETURN:'Возврат депозита'})[entry?.economicType]||({'deposit-funding':'Оплата депозита','deposit-withdrawal':'Возврат депозита'})[entry?.operationKind]||'';
+export const depositArticleLabel=entry=>({DEPOSIT_RECEIVED:'Внесение на депозит',DEPOSIT_RETURN:'Возврат депозита'})[entry?.economicType]||({'deposit-funding':'Внесение на депозит','deposit-withdrawal':'Возврат депозита'})[entry?.operationKind]||'';
 export const isDepositCashDocument=entry=>['deposit-funding','deposit-withdrawal'].includes(entry?.operationKind);
 // Existing historical economic types are authoritative when articleId is absent.
 // Never allocate a combined document's money to inferred individual items.

@@ -119,12 +119,12 @@ function depositCashGroups(rows,data){
   const first=rows[0]||{},person=data.person||first.person||{};
   const when=shortDateTimeParts(first.occurredAt||'');
   const identity=[
-    {label:'Дата и время оплаты',value:[when.date,when.time].filter(Boolean).join(' · ')},
+    {label:'Дата и время',value:[when.date,when.time].filter(Boolean).join(' · ')},
     {label:'Код',value:person.uei||''},
     {label:'Клиент',value:[person.name,person.surname].filter(Boolean).join(' ')},
   ].filter(row=>row.value);
   const subject=[{label:'Статья',value:depositArticleLabel(first)},{label:'Депозит',value:String(data.programName||first.lineName||'Не указано')}];
-  const movement=[{label:'Кошелёк',value:String(data.walletName||first.walletName||'Не определён')},{label:first.operationKind==='deposit-withdrawal'?'Возвращено':'Оплачено',value:formatMoney(operationTotal(rows)),strong:true}];
+  const movement=[{label:'Кошелёк',value:String(data.walletName||first.walletName||'Не определён')},{label:first.operationKind==='deposit-withdrawal'?'Возвращено':'Внесено',value:formatMoney(operationTotal(rows)),strong:true}];
   if(first.operationKind==='deposit-withdrawal'&&data.reason)movement.push({label:'Причина',value:String(data.reason)});
   return [identity,subject,movement].filter(group=>group.length);
 }
