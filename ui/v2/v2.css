@@ -1273,3 +1273,12 @@
 
 /* Desktop group editor: use the existing H surface token for primary Save. */
 .v2-app--workspace .desktop-service-group-editor-x [data-desktop-group-save]:not(:disabled){background:var(--v2-base);border-color:var(--v2-base);color:var(--white)}
+
+/* Match the approved Desktop action dimensions, including when both buttons exist. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace .desktop-service-group-editor-x .desktop-group-editor-actions{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+ .v2-app--workspace .desktop-service-group-editor-x .desktop-group-editor-actions>.ui-button{box-sizing:border-box;width:160px;min-width:0;max-width:100%;height:var(--h-tools,36px);min-height:var(--h-tools,36px);max-height:var(--h-tools,36px);margin:0;padding:0 12px;border-width:1px;border-radius:10px;font-size:13px;line-height:1}
+ .v2-app--workspace .desktop-service-group-editor-x .desktop-group-editor-actions>[data-desktop-group-save]{margin-inline-start:auto}
+ .v2-app--workspace .desktop-service-group-editor-x [data-desktop-group-value] .ui-list__main{cursor:pointer;touch-action:manipulation}
+ .v2-app--workspace .desktop-service-group-editor-x [data-desktop-value-row-delete]{flex:0 0 var(--ui-compact-size);margin:0;color:#ff1111;touch-action:manipulation}
+}

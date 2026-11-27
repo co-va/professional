@@ -372,7 +372,7 @@ export function openServiceGroupingQ({ onSaved = () => {}, desktop = false } = {
         (previous?'<div class="desktop-group-values"><div class="stock-position-group-heading"><span>Значения</span>'+compactAddButton({data:'data-desktop-group-value-add',aria:'Добавить значение'})+'</div><div data-desktop-group-value-draft></div><div data-service-group-value-list></div></div>':'')+
         '<div class="form-error" role="alert" data-desktop-group-error></div>'+
         actionBlock((previous?button('Удалить группу',{variant:'danger',data:'data-desktop-group-delete'}):'')+
-          button('Сохранить',{type:'submit',data:'data-desktop-group-save',disabled:!previous}))+
+          button('Сохранить',{type:'submit',data:'data-desktop-group-save',disabled:!previous}),{className:'desktop-group-editor-actions'})+
         '</form>',
         {title:previous?'Группа':'Добавить группу',variant:'x',xRole:'editor',surface:'app',className:'desktop-service-group-editor-x'}
       ));
@@ -391,26 +391,59 @@ export function openServiceGroupingQ({ onSaved = () => {}, desktop = false } = {
       const valueName=()=>String(draftHost?.querySelector('[name="valueName"]')?.value||'').trim();
       const canSave=()=>Boolean(name()&&['procedures','products'].includes(kind())&&(!valueEdit||valueName())&&(!group||name()!==group.name||kind()!==group.kind||(valueEdit&&(valueEdit.isNew||valueName()!==valueEdit.name))));
       const syncEditor=()=>{
-        save.style.display=!previous||canSave()?'':'none';
+        save.style.display=!previous||valueEdit||canSave()?'':'none';
         save.disabled=pending||!canSave();
         if(remove){remove.disabled=pending;remove.hidden=Boolean(valueEdit);}
         if(plus)plus.disabled=pending||Boolean(valueEdit);
-        draftHost?.querySelectorAll('button').forEach(button=>button.disabled=pending);
+        listHost?.querySelectorAll('[data-desktop-value-row-delete]').forEach(control=>control.disabled=pending);
       };
       const drawValues=()=>{
         if(!listHost)return;
         disposeValues();disposeValues=()=>{};
         const values=current()?.values||[];
         listHost.innerHTML=values.length?list({className:'ui-list--dense list-entries',items:values.map(value=>({
-          title:value.name,interactive:true,reorderHandle:!valueEdit,selected:valueEdit?.id===value.id,
+          title:value.name,interactive:false,reorderHandle:!valueEdit,selected:valueEdit?.id===value.id,
           data:'data-desktop-group-value="'+escapeHtml(value.id)+'" data-reorder-id="'+escapeHtml(value.id)+'"',
           aria:'Изменить значение '+value.name,
         }))}):emptyState('Значений пока нет');
-        listHost.querySelectorAll('[data-desktop-group-value]').forEach(node=>node.addEventListener('click',event=>{
-          if(pending||valueEdit||event.target.closest?.('[data-reorder-handle]'))return;
-          const value=current()?.values?.find(item=>item.id===node.dataset.desktopGroupValue);
-          if(value){valueEdit={...value,isNew:false};drawDraft();drawValues();}
-        }));
+        listHost.querySelectorAll('[data-desktop-group-value]').forEach(node=>{
+          const valueId=node.dataset.desktopGroupValue;
+          const value=values.find(item=>item.id===valueId);
+          const editTarget=node.querySelector('.ui-list__main');
+          const startEdit=()=>{
+            if(pending||valueEdit||!value)return;
+            valueEdit={...value,isNew:false};drawDraft();drawValues();
+            draftHost.querySelector('input')?.focus();
+          };
+          if(editTarget){
+            editTarget.tabIndex=0;
+            editTarget.setAttribute('role','button');
+            editTarget.setAttribute('aria-label','Изменить значение '+value.name);
+            editTarget.addEventListener('keydown',event=>{
+              if(event.key==='Enter'||event.key===' '){event.preventDefault();startEdit();}
+            });
+          }
+          node.addEventListener('click',event=>{
+            if(event.target.closest?.('[data-reorder-handle],[data-desktop-value-row-delete]'))return;
+            startEdit();
+          });
+          node.insertAdjacentHTML('beforeend',compactRemoveButton({data:'data-desktop-value-row-delete title="Удалить значение"',aria:'Удалить значение '+value.name}));
+          node.querySelector('[data-desktop-value-row-delete]').addEventListener('click',event=>{
+            event.stopPropagation();
+            if(pending)return;
+            confirmRemove('Удалить значение?',async()=>{
+              const fresh=current();
+              if(pending||!fresh||!fresh.values?.some(item=>item.id===valueId))throw new Error('Значение недоступно.');
+              pending=true;syncEditor();
+              try{
+                await commitServiceGroupLevels(fresh.kind,getServiceGroupLevels(fresh.kind).map(item=>item.id===fresh.id?{...item,values:(item.values||[]).filter(entry=>entry.id!==valueId)}:item));
+                group=current();
+                if(valueEdit?.id===valueId){valueEdit=null;drawDraft();}
+                onSaved();render();drawValues();
+              }finally{pending=false;syncEditor();}
+            },'Значение «'+value.name+'» будет удалено. Остальные значения, группа, услуги и товары останутся на месте.');
+          });
+        });
         if(!valueEdit)disposeValues=initV2ListReorder(listHost,{
           onReorder:async ids=>{
             const fresh=current();
@@ -428,23 +461,7 @@ export function openServiceGroupingQ({ onSaved = () => {}, desktop = false } = {
       };
       const drawDraft=()=>{
         if(!draftHost)return;
-        draftHost.innerHTML=valueEdit?field({label:'Наименование значения',name:'valueName',value:valueEdit.name,required:true,maxlength:80})+
-          actionBlock((valueEdit.isNew?'':button('Удалить значение',{variant:'danger',data:'data-desktop-value-delete'}))+
-          button('Отмена',{variant:'secondary',data:'data-desktop-value-cancel'})):'';
-        draftHost.querySelector('[data-desktop-value-cancel]')?.addEventListener('click',()=>{valueEdit=null;drawDraft();drawValues();});
-        draftHost.querySelector('[data-desktop-value-delete]')?.addEventListener('click',()=>{
-          const valueId=valueEdit?.id;
-          if(pending||!valueId)return;
-          confirmRemove('Удалить значение?',async()=>{
-            const fresh=current();
-            if(!fresh)throw new Error('Группа больше не существует.');
-            pending=true;syncEditor();
-            try{
-              await commitServiceGroupLevels(fresh.kind,getServiceGroupLevels(fresh.kind).map(item=>item.id===fresh.id?{...item,values:(item.values||[]).filter(value=>value.id!==valueId)}:item));
-              group=current();valueEdit=null;onSaved();render();drawDraft();drawValues();
-            }finally{pending=false;syncEditor();}
-          });
-        });
+        draftHost.innerHTML=valueEdit?field({label:'Наименование значения',name:'valueName',value:valueEdit.name,required:true,maxlength:80}):'';
         syncEditor();
       };
       plus?.addEventListener('click',()=>{if(!pending&&!valueEdit){valueEdit={id:null,name:'',isNew:true};drawDraft();drawValues();draftHost.querySelector('input')?.focus();}});
