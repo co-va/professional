@@ -547,7 +547,7 @@ function availableDDSSettings() {
   return items;
 }
 
-function openDDSSettings(root, movements, partialRegistry=false) {
+function openDDSSettings(root, movements, registryRows=null) {
   const items = availableDDSSettings();
   if (!items.length) return;
   const content = actionBlock(items.map((item) => button(item.label, {
@@ -564,7 +564,7 @@ function openDDSSettings(root, movements, partialRegistry=false) {
     element.addEventListener('click', () => {
       const id = String(element.dataset.financeDdsTool || '');
       settings.v2Close?.();
-      if (id === 'excel') openDDSExcel(root, movements, {partialRegistry,onImported:()=>renderDDS(root)});
+      if (id === 'excel') openDDSExcel(root, movements, {registryRows,onImported:()=>renderDDS(root)});
       else if (id === 'articles') openArticles(root);
     });
   });
@@ -599,6 +599,11 @@ function renderDDS(root) {
       direction, status:first.operationStatus==='cancelled'?'Отменена':'Активна',
       value:facts?(facts.cash||facts.principal||facts.personal||0):(direction==='out'?-operationTotal(entries):operationTotal(entries)), amount, bonus, bonusValue:facts?.bonus??0, item:first };
   });
+  const registryRows=rows.map(row=>{
+    const doc=byId.get(row.id),f=doc.facts;
+    const sum=direction=>doc.entries.filter(e=>e.direction===direction).reduce((n,e)=>n+Math.round(Number(e.amount||0)*100),0)/100;
+    return {...row,cashIn:f?.cashUnknown?null:sum('IN'),cashOut:f?.cashUnknown?null:sum('OUT'),depositPrincipal:f?.principal??null,personal:f?.personal??null,bonus:f?.bonus??null,documentAmount:operationTotal(doc.entries.length?doc.entries:[doc.first]),uncertainty:[...(f?.cashUnknown?['Кошелёк не определён']:[]),...(f?.principal===null?['Денежная часть не определена']:[]),...(f?.bonus===null?['Бонусная часть не определена']:[])].join('; ')};
+  });
   const mobileRows=[...rows].sort((a,b)=>String(b.occurredAt).localeCompare(String(a.occurredAt))||a.id.localeCompare(b.id));
   const operations = desktop ? '<div data-dds-history>'+walletHistoryBody(true)+'</div>'
     : mobileRows.length ? v2ListEntries(mobileRows.map(row=>v2ListEntry({title:row.article||row.displayTitle,subtitle:[row.displayTitle,row.person,row.wallet].filter(Boolean).join(' · '),rightTop:row.amount,rightBottom:[row.date,row.bonus&&row.bonus!=='—'?'Бонусы: '+row.bonus:''].filter(Boolean).join(' · '),interactive:true,initial:'',data:'data-finance-operation="'+row.id+'"',aria:'Открыть финансовый документ'}))) : emptyState('Все операции','Финансовых операций пока нет.');
@@ -618,8 +623,7 @@ function renderDDS(root) {
     dds:true, open:id=>openFinanceOperation(root,movements,id,byId.get(id)), actions:[
     { label: DATA_EXCHANGE_ICON, className: 'people-desktop-icon', aria: 'Обмен данными', run: (anchor, selectedRows) => {
       const ids=new Set(selectedRows.map(row=>row.id));
-      const incomplete=selectedRows.some(row=>byId.get(row.id)?.facts);
-      openDDSExcel(root, movements, { anchor, exportMovements:movements.filter(item=>ids.has(String(item.operationId))), partialRegistry:incomplete, onImported: () => renderDDS(root) });
+      openDDSExcel(root, movements, { anchor, exportMovements:movements.filter(item=>ids.has(String(item.operationId))), registryRows:registryRows.filter(row=>ids.has(row.id)), onImported: () => renderDDS(root) });
     } },
     canUseCapability('finance.articles.access') ? { label: GROUP_ICON, className: 'people-desktop-icon', aria: 'Статьи', run: () => openArticles(root) } : null,
     financeOperationGroups({ groups: operationGroups }).length ? {
@@ -627,7 +631,7 @@ function renderDDS(root) {
       run: anchor => openFinanceOperations(root, { groups: operationGroups, anchor, onSaved: () => renderDDS(root) }),
     } : null,
   ]});
-  else root.querySelector('[data-finance-dds-settings]')?.addEventListener('click', () => openDDSSettings(root, movements, documents.some(d=>d.facts)));
+  else root.querySelector('[data-finance-dds-settings]')?.addEventListener('click', () => openDDSSettings(root, movements, registryRows));
   root.querySelectorAll('[data-finance-operation]').forEach((element) => {
     element.addEventListener('click', () => openFinanceOperation(root, movements, element.dataset.financeOperation, byId.get(element.dataset.financeOperation)));
   });

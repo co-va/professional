@@ -9,7 +9,7 @@ import { getRecord } from '../../record/index.js';
 import { getWallets } from '../cash/data.js';
 import { getWorkplaces } from '../../workplace-time.js';
 import { refreshFinanceState } from '../service.js';
-import { chooseScopedImport,exportScopedCsv,exportScopedWorkbook,reportExcelError } from '../../excel/scoped.js';
+import { chooseScopedImport,exportScopedCsv,exportScopedWorkbook,reportExcelError,exportFinanceRegistryWorkbook,exportFinanceRegistryCsv } from '../../excel/scoped.js';
 
 const NAMES={
   'manual-income':'Доход','manual-expense':'Расход',transfer:'Перевод',
@@ -104,17 +104,18 @@ function filteredRows(movements,form){
     &&(!kind||kindGroup(row)===kind)
     &&(!wallet||row.wallet===wallet));
 }
-function exportQ(root,movements,partialRegistry=false){
-  const wallets=getWallets().map(wallet=>({value:String(wallet.name||''),label:String(wallet.name||'')}));
+function exportQ(root,movements,registryRows=null){
+  const registry=Array.isArray(registryRows);
+  const wallets=registry?[...new Set(registryRows.flatMap(row=>row.wallets||[]).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ru')).map(value=>({value,label:value})):getWallets().map(wallet=>({value:String(wallet.name||''),label:String(wallet.name||'')}));
   const form='<form class="form-grid" data-dds-excel-export>'
-    +(partialRegistry?'<p>Текущий формат выгрузки не включает все операции депозитов, личного счёта и бонусов. Выгружаются только поддерживаемые денежные операции.</p>':'')
+    +(registry?'<p>Реестр документов. Для загрузки используйте отдельный шаблон Финансов.</p>':'')
     +twoColumnLayout(datePicker({label:'С',name:'from',showYear:true}),
       datePicker({label:'По',name:'to',showYear:true}),{ariaLabel:'Период'})
     +select({label:'Операции',name:'kind',value:'',options:[
-      {value:'',label:'Все'},...[
+      {value:'',label:'Все'},...(registry?[['in','Приход'],['out','Расход'],['transfer','Транзакция']]:[
         ['income','Доходы'],['expense','Расходы'],['loan','Займы'],
         ['investment','Инвестиции'],['transfer','Переводы'],
-      ].map(([value,label])=>({value,label})),
+      ]).map(([value,label])=>({value,label})),
     ]})
     +select({label:'Кошелёк',name:'wallet',value:'',options:[{value:'',label:'Все'},...wallets]})
     +select({label:'Статус',name:'status',value:'',options:[
@@ -137,18 +138,25 @@ function exportQ(root,movements,partialRegistry=false){
     busy=true;
     if(submit)submit.disabled=true;
     try{
-      const rows=filteredRows(movements,node);
-      const fmt=String(new FormData(node).get('format')||'xlsx');
-      if(fmt==='csv')exportScopedCsv('finance',rows);
-      else await exportScopedWorkbook('finance',rows);
+      const formData=new FormData(node);
+      const fmt=String(formData.get('format')||'xlsx');
+      if(registry){
+        const from=String(formData.get('from')||''),to=String(formData.get('to')||''),kind=String(formData.get('kind')||''),wallet=String(formData.get('wallet')||''),status=String(formData.get('status')||'');
+        if(from&&to&&from>to)throw new Error('Дата «С» не может быть позже «По»');
+        const rows=registryRows.filter(row=>(!from||row.localDate>=from)&&(!to||row.localDate<=to)&&(!kind||row.direction===kind||(kind==='transfer'&&row.direction==='mixed'))&&(!wallet||row.wallets.includes(wallet))&&(!status||row.status===status));
+        if(fmt==='csv')exportFinanceRegistryCsv(rows);else await exportFinanceRegistryWorkbook(rows);
+      }else{
+        const rows=filteredRows(movements,node);
+        if(fmt==='csv')exportScopedCsv('finance',rows);else await exportScopedWorkbook('finance',rows);
+      }
       layer.v2Close?.();
     }catch(error){reportExcelError(error);}
     finally{busy=false;if(submit)submit.disabled=false;}
   });
 }
-export function openDDSExcel(root,movements,{onImported=()=>{},anchor=null,exportMovements=movements,partialRegistry=false}={}){
+export function openDDSExcel(root,movements,{onImported=()=>{},anchor=null,exportMovements=movements,registryRows=null}={}){
   const actions=[
-    {key:'export',label:'Выгрузка',run:()=>exportQ(root,exportMovements,partialRegistry)},
+    {key:'export',label:'Выгрузка',run:()=>exportQ(root,exportMovements,registryRows)},
     {key:'import',label:'Загрузка',run:()=>chooseScopedImport(root,'finance',{
       onImported:async()=>{await refreshFinanceState();await onImported();},
     })},

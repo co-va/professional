@@ -150,3 +150,20 @@ export function downloadBlob(blob, filename) {
   link.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+
+
+const REGISTRY_COLUMNS=[
+ ['workplace','Рабочее пространство'],['occurredAt','Дата и время операции'],['code','Код'],['person','Клиент / контрагент'],['contact','Телефон'],
+ ['id','Номер документа'],['title','Операция'],['article','Статья'],['status','Статус'],['wallet','Источник'],
+ ['cashIn','Приход в кошельки'],['cashOut','Расход из кошельков'],['depositPrincipal','Денежная часть депозита'],['personal','Движение личного счёта'],
+ ['bonus','Бонусы'],['documentAmount','Сумма документа'],['uncertainty','Неуточнённые данные'],
+];
+const registryPayload=rows=>rows.map(row=>Object.fromEntries(REGISTRY_COLUMNS.map(([key])=>[key,row[key]??null])));
+export async function exportFinanceRegistryWorkbook(rows){
+ const response=await post('finance-registry',{rows:registryPayload(rows)});
+ downloadBlob(await response.blob(),'Реестр ДДС.xlsx');
+}
+export function exportFinanceRegistryCsv(rows){
+ const lines=[REGISTRY_COLUMNS.map(([,label])=>csvCell(label)).join(';'),...registryPayload(rows).map(row=>REGISTRY_COLUMNS.map(([key])=>typeof row[key]==='number'&&Number.isFinite(row[key])?String(row[key]).replace('.',','):csvCell(row[key])).join(';'))];
+ downloadBlob(new Blob(['\uFEFF'+lines.join('\r\n')],{type:'text/csv;charset=utf-8'}),'Реестр ДДС.csv');
+}
