@@ -162,6 +162,39 @@ export function walletHistoryBody(dds=false) {
     +(dds?'':'<div class="v2-desktop-tool-actions"><span><output data-wallet-sum aria-label="Сумма операций" aria-live="polite"></output></span></div>')+'</div>'
     +'<div data-wallet-history-host></div></section>';
 }
+// Group the existing DDS rows, never split or relabel a financial operation.
+// Mixed/transfer movements retain their own factual direction.
+function applyDDSHierarchy(host,rows){
+  const body=host.querySelector('tbody');
+  if(!body)return;
+  const byId=new Map([...body.querySelectorAll('[data-finance-history-row]')].map(control=>[control.dataset.financeHistoryRow,control.closest('tr')]));
+  const directions=[['out','Расходы'],['in','Доходы'],['transfer','Переводы'],['mixed','Смешанные операции']];
+  const width=host.querySelector('thead tr')?.cells.length||body.rows[0]?.cells.length||1;
+  const fragment=body.ownerDocument.createDocumentFragment();
+  const heading=(level,title)=>{
+    const tr=body.ownerDocument.createElement('tr');tr.dataset.tableGroupLevel=level;
+    const td=body.ownerDocument.createElement('td');td.colSpan=width;td.textContent=title;tr.append(td);fragment.append(tr);
+  };
+  for(const [direction,title] of directions){
+    const members=rows.filter(row=>row.direction===direction);
+    if(!members.length)continue;
+    heading('system',title);
+    const articles=new Map();
+    for(const row of members){
+      const name=String(row.article||'').trim();
+      if(!articles.has(name))articles.set(name,[]);
+      articles.get(name).push(row);
+    }
+    for(const [name,entries] of articles){
+      if(name)heading('group',name);
+      for(const row of entries){const tr=byId.get(row.id);if(tr)fragment.append(tr);}
+    }
+  }
+  // Unknown directions must never hide an actual financial row.
+  for(const row of rows.filter(row=>!directions.some(([d])=>d===row.direction))){const tr=byId.get(row.id);if(tr)fragment.append(tr);}
+  body.append(fragment);
+}
+
 export function bindWalletHistory(layer,wallet,rows,{open,settings,dds=false,actions=[]}) {
   const stateKey=dds?'ddsHistoryState':'walletHistoryState';
   const state=layer[stateKey] ||= {query:'',filters:dds?ddsFilters():emptyFilters(),sort:'dateDesc',selected:new Set()};
@@ -206,6 +239,7 @@ export function bindWalletHistory(layer,wallet,rows,{open,settings,dds=false,act
       {key:'date',label:'Дата',narrow:true},{key:'title',label:'Операция',...(dds?{secondaryKey:'wallet',secondaryLabel:'Кошелёк'}:{})},{key:'code',label:'Код',narrow:true},
       {key:'person',label:'Клиент / контрагент'},{key:'workplace',label:'Рабочее пространство'},...(dds?[{key:'article',label:'Статья'}]:[]),{key:'amount',label:'Сумма',narrow:true},
     ]):emptyState(rows.length?'Операции не найдены':'Операций пока нет',rows.length?'Измените условия поиска или фильтрации.':(dds?'Финансовые операции появятся здесь.':'Движения по этой кассе появятся здесь.'));
+    if(dds&&visible.length)applyDDSHierarchy(host,visible);
     host.querySelectorAll('[data-wallet-select]').forEach(control=>control.addEventListener('change',()=>{
       if(control.checked)state.selected.add(control.dataset.walletSelect);else state.selected.delete(control.dataset.walletSelect);sync();
     }));

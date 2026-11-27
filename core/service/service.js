@@ -3,6 +3,7 @@ import {
   button,
   compactButton,
   emptyState,
+  field,
   initViewNavigation,
   openSharedProfileSettingsMenu,
   openNotice,
@@ -79,7 +80,7 @@ export function renderService(root, navigateBack = () => {}) {
   let disposeCatalog = () => {};
   let renderVersion = 0;
   let disposed = false;
-  const desktopState={procedures:{query:'',sort:'manual',group:'',workplace:''},products:{query:'',sort:'manual',group:'',workplace:''}};
+  const desktopState={query:'',sort:'manual',kind:'',group:'',workplace:''};
 
   const renderCurrent = () => {
     if (disposed) return;
@@ -109,14 +110,17 @@ export function renderService(root, navigateBack = () => {}) {
     // Use the same stationary Z header slot as Inventory; do not alter Shared
     // surface geometry or introduce a second header inside the Z body.
     const navMarkup = viewNavigation({ views, activeView: view, ariaLabel: 'Сервис' });
-    const toolbar = desktop ? `<div class="v2-desktop-tool-row" data-service-desktop-toolbar>
-      <div class="v2-desktop-tool-context">
+    const toolbar = desktop ? `<section data-people-desktop-toolbar data-service-desktop-toolbar><div class="people-desktop-tools">
+      ${field({name:'serviceSearch',type:'search',placeholder:'Поиск',autocomplete:'off',value:desktopState.query,data:'data-service-search'})}
+      <div class="people-desktop-actions people-desktop-query-tools">
+        ${compactButton({kind:'filter',data:'data-service-filter title="Фильтр" aria-haspopup="dialog" aria-pressed="false"'})}
+        ${compactButton({kind:'sort',data:'data-service-sort title="Сортировка" aria-haspopup="dialog" aria-pressed="false"'})}
       </div>
-      <div class="v2-desktop-tool-actions">
-        ${button(GROUP_ICON, { variant: 'secondary', className: 'v2-desktop-tool-icon', data: 'data-service-tool="grouping" title="Группы"', aria: 'Группы' })}
-        ${actions.filter(action => action.id !== 'grouping').map(action => button(action.id === 'appearance' ? VIEW_ICON : action.label, { variant: 'secondary', className: action.id === 'appearance' ? 'v2-desktop-tool-icon' : '', data: `data-service-tool="${action.id}"${action.id === 'appearance' ? ' title="Вид"' : ''}`, aria: action.label })).join('')}
-      </div>
-    </div>` : navMarkup;
+      <div class="people-desktop-actions people-desktop-actions--right">
+        ${button(GROUP_ICON,{variant:'secondary',className:'people-desktop-icon',data:'data-service-tool="grouping" title="Группы"',aria:'Группы'})}
+        ${button(VIEW_ICON,{variant:'secondary',className:'people-desktop-icon',data:'data-service-tool="appearance" title="Вид"',aria:'Вид'})}
+        ${button('+',{variant:'secondary',className:'people-desktop-icon people-desktop-add',data:'data-service-add-position title="Добавить"',aria:'Добавить'})}
+      </div></div></section>` : navMarkup;
     const headerRows = setV2ZHeaderRows(root, [toolbar], {
       desktopTitle: desktop ? 'Сервис' : null,
       desktopAccessory: desktop ? '<output data-service-count aria-live="polite">—</output>' : '',
@@ -150,7 +154,7 @@ export function renderService(root, navigateBack = () => {}) {
 
     const catalog = root.querySelector('[data-service-catalog]');
     if(catalog && desktop) {
-      disposeCatalog=renderDesktopServiceCatalog(catalog,{root,onChanged:renderCurrent,state:desktopState,onCount,loadProceduresModule,loadProductsModule});
+      disposeCatalog=renderDesktopServiceCatalog(catalog,{root,toolbar:navigationRoot,onChanged:renderCurrent,state:desktopState,onCount,loadProceduresModule,loadProductsModule});
     } else if (catalog) {
       const modulePromise = view === 'products' ? loadProductsModule() : loadProceduresModule();
       void modulePromise.then(async (module) => {
