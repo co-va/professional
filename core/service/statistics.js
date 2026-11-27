@@ -1,5 +1,6 @@
 // Read-only Service projection: one Record scan and one canonical Finance scan per opened card.
 import { getRecordRows, getRecordRowsForProcedure, getRecordEventRows } from '../record/data.js';
+import { recordVisitState } from '../record/state.js';
 import { getActiveDDSMovements } from '../finance/read.js';
 import { calculateSettlementItemTotals } from '../finance/rules.js';
 const key = value => String(value ?? '');
@@ -9,13 +10,14 @@ export function serviceItemStatistics(type, entity = {}) {
   const sourceId = key(entity.id);
   if (!sourceId) return { ...blank(), byWorkplace: new Map() };
   const candidates = sourceType === 'procedure' ? getRecordRowsForProcedure(sourceId) : getRecordRows();
-  const cancelled = new Set(getRecordEventRows().filter(e => e?.type === 'cancelled').map(e => key(e.recordId)));
+  const eventsByRecord = new Map();
+  for(const event of getRecordEventRows()){const id=key(event.recordId);if(!eventsByRecord.has(id))eventsByRecord.set(id,[]);eventsByRecord.get(id).push(event);}
   const byWorkplace = new Map();
   const workplaceByRecord = new Map();
   let count = 0, minutes = 0;
   for (const record of candidates) {
     const recordId = key(record?.id);
-    if (!recordId || cancelled.has(recordId)) continue;
+    if (!recordId || recordVisitState(record,eventsByRecord.get(recordId)||[]) !== 'arrived') continue;
     const entries = sourceType === 'product' ? record?.products : record?.procedures;
     const item = (Array.isArray(entries) ? entries : []).find(entry => key(entry?.id) === sourceId);
     if (!item) continue;
@@ -66,4 +68,20 @@ export function scheduleServiceStatistics(layer, type, id, onReady) {
   }).catch((error) => {
     if (layer.isConnected) console.error('Service statistics unavailable', error);
   });
+}
+
+// Bulk desktop projection uses the same canonical visit state and settlement allocation.
+export function serviceCatalogStatistics(procedures=[],products=[]){
+  const result={procedures:new Map(),products:new Map()};
+  const events=new Map();for(const e of getRecordEventRows()){const id=key(e.recordId);if(!events.has(id))events.set(id,[]);events.get(id).push(e);}
+  for(const [kind,items] of [['procedures',procedures],['products',products]])for(const item of items)result[kind].set(key(item.id),{...blank(),entity:item});
+  for(const record of getRecordRows()){
+    if(recordVisitState(record,events.get(key(record.id))||[])!=='arrived')continue;
+    for(const kind of ['procedures','products']){
+      const seen=new Set();for(const item of (record[kind]||[])){const id=key(item.id),row=result[kind].get(id);if(!row||seen.has(id))continue;seen.add(id);row.count++;if(kind==='procedures')row.minutes+=Math.max(0,Number(item.duration??row.entity.duration??0)||0);}
+    }
+  }
+  const movements=getActiveDDSMovements();
+  for(const [kind,map] of Object.entries(result))for(const [id,row] of map){row.revenue=calculateSettlementItemTotals(movements,kind==='procedures'?'procedure':'product',id).factTotal;delete row.entity;}
+  return result;
 }

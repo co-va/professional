@@ -14,6 +14,7 @@ import {
 import { loadOperationalState } from '../runtime/operational-state.js';
 import { loadAuxiliaryState } from '../runtime/auxiliary-state.js';
 import { openServiceGroupingQ } from './catalog-grouping.js';
+import { renderDesktopServiceCatalog } from './desktop-catalog.js';
 import { hasCurrentProceduresSnapshot } from './procedures/data.js';
 import { loadInventory } from '../inventory/service.js';
 import { serviceHeaderContext, notifyServiceContext } from './context.js';
@@ -78,6 +79,7 @@ export function renderService(root, navigateBack = () => {}) {
   let disposeCatalog = () => {};
   let renderVersion = 0;
   let disposed = false;
+  const desktopState={procedures:{query:'',sort:'manual',group:'',workplace:''},products:{query:'',sort:'manual',group:'',workplace:''}};
 
   const renderCurrent = () => {
     if (disposed) return;
@@ -109,12 +111,10 @@ export function renderService(root, navigateBack = () => {}) {
     const navMarkup = viewNavigation({ views, activeView: view, ariaLabel: 'Сервис' });
     const toolbar = desktop ? `<div class="v2-desktop-tool-row" data-service-desktop-toolbar>
       <div class="v2-desktop-tool-context">
-        ${navMarkup}
       </div>
       <div class="v2-desktop-tool-actions">
         ${button(GROUP_ICON, { variant: 'secondary', className: 'v2-desktop-tool-icon', data: 'data-service-tool="grouping" title="Группы"', aria: 'Группы' })}
         ${actions.filter(action => action.id !== 'grouping').map(action => button(action.id === 'appearance' ? VIEW_ICON : action.label, { variant: 'secondary', className: action.id === 'appearance' ? 'v2-desktop-tool-icon' : '', data: `data-service-tool="${action.id}"${action.id === 'appearance' ? ' title="Вид"' : ''}`, aria: action.label })).join('')}
-        ${button('<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>', { variant: 'secondary', className: 'v2-desktop-tool-primary', data: 'data-service-add', aria: addAria })}
       </div>
     </div>` : navMarkup;
     const headerRows = setV2ZHeaderRows(root, [toolbar], {
@@ -139,7 +139,7 @@ export function renderService(root, navigateBack = () => {}) {
       if (action) control.addEventListener('click', action.onSelect);
     });
 
-    initViewNavigation(navigationRoot, {
+    if(!desktop) initViewNavigation(navigationRoot, {
       views,
       activeView: view,
       onChange: (next) => {
@@ -149,7 +149,9 @@ export function renderService(root, navigateBack = () => {}) {
     });
 
     const catalog = root.querySelector('[data-service-catalog]');
-    if (catalog) {
+    if(catalog && desktop) {
+      disposeCatalog=renderDesktopServiceCatalog(catalog,{root,onChanged:renderCurrent,state:desktopState,onCount,loadProceduresModule,loadProductsModule});
+    } else if (catalog) {
       const modulePromise = view === 'products' ? loadProductsModule() : loadProceduresModule();
       void modulePromise.then(async (module) => {
         if (view === 'products') await Promise.all([
@@ -220,7 +222,7 @@ export function renderService(root, navigateBack = () => {}) {
     disposeCatalog?.();
     const header = root?.closest?.('[data-v2-z],[data-v2-z-layer]')
       ?.querySelector?.(':scope > [data-v2-z-header] > [data-v2-z-header-content]');
-    if (header?.querySelector('[data-view-navigation]')) clearV2ZHeaderRows(root);
+    if (header?.querySelector('[data-view-navigation],[data-service-desktop-toolbar]')) clearV2ZHeaderRows(root);
   };
 }
 

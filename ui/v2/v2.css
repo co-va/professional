@@ -886,8 +886,8 @@
 /* Service Desktop: one visible catalogue panel, same stationary 44px header
    and independently scrolling body as the accepted Clients list. */
 @media (min-width:768px) and (min-height:600px){
- .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z:has([data-service-desktop-group-list])>[data-v2-z-body]{display:flex;flex-direction:column;overflow:hidden!important;padding-bottom:0;scrollbar-gutter:auto}
- .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z:has([data-service-desktop-group-list]) :is([data-v2-workspace-surface],.ui-page,[data-service-catalog]){display:flex;flex-direction:column;flex:1 1 auto;min-height:0;min-width:0}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z:has([data-service-desktop-section])>[data-v2-z-body]{display:block;overflow:auto!important;scrollbar-gutter:auto}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z:has([data-service-desktop-section]) [data-service-catalog]{display:grid;gap:24px;min-width:0}
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-desktop-group-list]{display:flex;flex-direction:column;flex:0 1 auto;min-height:0;min-width:0;border:1px solid var(--border);border-radius:var(--radius-control);overflow:hidden;background:var(--white)}
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .service-desktop-group-header{box-sizing:border-box;display:flex;align-items:center;justify-content:space-between;gap:16px;flex:0 0 var(--h-list-row);height:var(--h-list-row);min-height:var(--h-list-row);max-height:var(--h-list-row);padding:0 12px 0 16px;border-bottom:1px solid var(--border)}
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .service-desktop-group-select{display:flex;min-width:0;max-width:100%;flex:0 1 auto;gap:0}
@@ -1166,3 +1166,19 @@
 /* Q add controls share the existing compact glyph and H surface, never the H toolbar beige. */
 .v2-app--workspace [data-v2-q-body] .ui-compact-button--add.v2-desktop-tool-primary{background:var(--v2-base);color:var(--white);border:1px solid var(--v2-base);border-radius:10px;width:var(--h-tools);min-width:var(--h-tools);max-width:var(--h-tools);height:var(--h-tools);min-height:var(--h-tools);max-height:var(--h-tools);flex-basis:var(--h-tools);font-size:24px;margin-left:auto}
 .v2-app--workspace [data-v2-q-body] .ui-compact-button--add.v2-desktop-tool-primary[hidden]{display:none!important}
+
+@media (min-width:768px) and (min-height:600px){
+.v2-app--workspace [data-service-desktop-section]{display:grid;gap:8px;min-width:0}
+.v2-app--workspace .service-desktop-section-tools{color:var(--white);flex-wrap:wrap}
+.v2-app--workspace .service-desktop-section-tools .v2-desktop-tool-context{display:flex;align-items:center;gap:12px}
+.v2-app--workspace .service-desktop-section-tools .people-desktop-tools{flex:1 1 auto;justify-content:flex-end;min-width:0}
+.v2-app--workspace [data-service-table-kind="procedures"]{--service-columns:36px minmax(155px,1fr) minmax(85px,.65fr) minmax(65px,.45fr) minmax(100px,.65fr) minmax(72px,.45fr) minmax(95px,.65fr) minmax(105px,.75fr)}
+.v2-app--workspace [data-service-table-kind="products"]{--service-columns:36px minmax(160px,1fr) minmax(90px,.65fr) minmax(110px,.65fr) minmax(75px,.45fr) minmax(110px,.75fr)}
+.v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-table-kind] .service-desktop-group-header,.v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-table-kind] [data-service-position]>.list-entry__content{display:grid;grid-template-columns:var(--service-columns);gap:10px;padding-inline:12px;align-items:center}
+.v2-app--workspace [data-service-table-kind] .service-desktop-group-header>span{white-space:normal;overflow-wrap:normal;text-align:right}.v2-app--workspace [data-service-table-kind] .service-desktop-group-header>span:nth-child(2){text-align:left}
+.v2-app--workspace [data-service-table-kind] [data-service-position] .list-entry__main{grid-column:2}.v2-app--workspace [data-service-table-kind] [data-service-position] .list-entry__right{grid-column:3}
+.v2-app--workspace [data-service-table-kind] .service-desktop-value{text-align:right;font-size:13px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.v2-app--workspace [data-service-table-kind] .inventory-editor-panel__body{padding:0!important}.v2-app--workspace [data-service-table-kind] .inventory-editor-panel{margin:0;border-radius:0;box-shadow:none}.v2-app--workspace [data-service-table-kind] .service-desktop-branch{gap:0}
+.v2-app--workspace [data-service-table-kind] .inventory-stock-category.is-reordering{position:relative;z-index:4;transform:translateY(var(--list-entry-drag-y,0px));pointer-events:none}.v2-app--workspace [data-service-table-kind] .inventory-stock-category.is-reorder-target-before{border-top:2px solid var(--text)}.v2-app--workspace [data-service-table-kind] .inventory-stock-category.is-reorder-target-after{border-bottom:2px solid var(--text)}
+.v2-app--workspace [data-service-table-host]{overflow-x:auto;min-width:0}.v2-app--workspace [data-service-table-kind="procedures"]{min-width:810px!important}.v2-app--workspace [data-service-table-kind="products"]{min-width:620px!important}
+}
