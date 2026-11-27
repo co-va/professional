@@ -32,6 +32,7 @@ import {
 } from '../../../ui/ui.js';
 import { financeDesktop, financeZActions, financeZSave, financeQSubmit, financeHistoryTable, bindFinanceHistoryTable, openFinanceReceiptQ } from '../desktop.js';
 import { readOnlyReceipt } from '../../../ui/receipt/index.js';
+import { financeReceipt } from '../receipt.js';
 import { isV2DesktopWorkspace } from '../../../ui/v2/geometry.js';
 import { bindDesktopRailControls } from '../../../ui/v2/horizontal-affordance.js';
 import { canUseCapability } from '../../access.js';
@@ -1551,32 +1552,15 @@ async function openWalletSettings(root, walletLayer, wallet) {
   });
 }
 
-function operationReceipt(operation) {
-  const when = shortDateTimeParts(operation?.occurredAt || '');
-  const fullName = [operation?.person?.name, operation?.person?.surname]
-    .map((part) => String(part || '').trim())
-    .filter(Boolean)
-    .join(' ');
-  return readOnlyReceipt({
-    title: operationName(operation),
-    date: when.date || '—',
-    time: when.time || '—',
-    items: [
-      { label: String(operation?.workplace || '').trim(), value: '' },
-      { label: String(operation?.person?.uei || '').trim(), value: '' },
-      { label: fullName, value: '' },
-    ].filter((item) => item.label || item.value),
-    totals: [
-      { label: '', value: formatMoney(operation?.total), strong: true },
-    ],
-  });
+function operationReceipt(operation, wallet = null) {
+  return financeReceipt(operation.operationId, operationName(operation), { entries: operation.entries || [operation], wallet: wallet ? { name: wallet.name, total: operation.total } : null });
 }
 
 function openWalletOperation(root, walletLayer, wallet, operationId) {
   const operation = walletOperations(wallet.id)
     .find((item) => String(item.operationId) === String(operationId));
   if (!operation) return null;
-  return openFinanceReceiptQ(walletLayer, operationName(operation), operationReceipt(operation), [{
+  return openFinanceReceiptQ(walletLayer, operationName(operation), operationReceipt(operation, wallet), [{
     label: 'Удалить операцию', variant: 'danger',
     run: receipt => openOperationSettings(root, walletLayer, receipt, wallet, operation),
   }]);

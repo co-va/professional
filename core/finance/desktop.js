@@ -63,7 +63,7 @@ export function bindFinanceHistoryTable(root, open) {
   });
 }
 
-// The financial document is Q in both Mobile and Desktop, not another Z.
+// Financial document: Desktop Q, Mobile X. No extra Z.
 export function openFinanceReceiptQ(root, title, receipt, actions = []) {
   const available = actions.filter(Boolean);
   const tools = available.map((item, index) => button(item.label, {
@@ -71,7 +71,7 @@ export function openFinanceReceiptQ(root, title, receipt, actions = []) {
     data: 'data-finance-receipt-action="' + index + '"',
     aria: item.aria || '',
   })).join('');
-  const layer = mountModal(root, modal(receipt + (tools ? '<div class="modal-actions">' + tools + '</div>' : ''), { title, variant: 'q', surface: 'app' }));
+  const layer = mountModal(root, modal(receipt + (tools ? '<div class="modal-actions">' + tools + '</div>' : ''), { title, variant: financeDesktop(root) ? 'q' : 'x', surface: 'app' }));
   if (!layer) return null;
   layer.querySelectorAll('[data-finance-receipt-action]').forEach(control => {
     const action = available[Number(control.dataset.financeReceiptAction)];

@@ -27,7 +27,7 @@ import {
   workspaceHeaderContext,
 } from '../../../ui/ui.js';
 import { financeDesktop, financeZActions, financeZSave, financeHistoryTable, bindFinanceHistoryTable, openFinanceReceiptQ } from '../desktop.js';
-import { readOnlyReceipt } from '../../../ui/receipt/index.js';
+import { financeReceipt } from '../receipt.js';
 import { DATA_EXCHANGE_ICON, TRASH_ICON } from '../../../ui/buttons/index.js';
 import { canUseCapability } from '../../access.js';
 import { getFinanceOperation } from '../data.js';
@@ -146,94 +146,6 @@ function operationListEntry(entries = []) {
     data: id ? `data-finance-operation="${id}"` : '',
     aria: id ? `Открыть финансовую операцию ${operationName(first)}` : '',
   });
-}
-
-function paymentReceiptGroups(entries = []) {
-  const rows = Array.isArray(entries) ? entries : [];
-  const first = rows[0] || {};
-  const when = shortDateTimeParts(first?.occurredAt || '');
-  const moment = [when.date, when.time].filter(Boolean).join(' - ');
-  const settlementItems = Array.isArray(first?.settlementItems) ? first.settlementItems : [];
-  const tips = rows
-    .filter((item) => item?.economicType === 'TIPS')
-    .reduce((sum, item) => sum + Math.max(0, Number(item?.amount) || 0), 0);
-
-  const identity = [];
-  const uei = String(first?.person?.uei || '').trim();
-  const person = personText(first);
-  if (uei) identity.push({ label: uei, value: '' });
-  if (person) identity.push({ label: person, value: '' });
-  settlementItems.forEach((item) => {
-    identity.push({
-      label: String(item?.name || 'Услуга'),
-      value: formatMoney(Math.max(0, Number(item?.planAmount ?? item?.price) || 0)),
-    });
-  });
-  if (tips > 0) identity.push({ label: 'Чаевые', value: formatMoney(tips) });
-
-  const allocations = Array.isArray(first?.allocations) ? first.allocations.filter((item) => Number(item?.amount) > 0) : [];
-  const payment = allocations.map((item) => ({
-    label: String(item?.walletName || item?.walletId || 'Кошелёк'),
-    value: allocations.length > 1 ? formatMoney(Math.max(0, Number(item?.amount) || 0)) : '',
-  }));
-  payment.push({
-    label: 'Итого',
-    value: formatMoney(operationTotal(rows)),
-    strong: true,
-  });
-
-  return [
-    [
-      ...(first?.workplace ? [{ label: first.workplace, value: '' }] : []),
-      ...(moment ? [{ label: moment, value: '' }] : []),
-    ],
-    identity,
-    payment,
-  ].filter((group) => group.length);
-}
-
-function operationReceiptItems(entries = []) {
-  const rows = Array.isArray(entries) ? entries : [];
-  const first = rows[0] || {};
-  const items = [];
-
-  const articles = [...new Set(rows.map((item) => String(item?.articleName || '')).filter(Boolean))];
-  if (articles.length && first?.operationKind !== 'transfer') {
-    items.push({ label: `Статья · ${articles.join(', ')}`, value: '' });
-  }
-
-  const person = personText(first);
-  const uei = String(first?.person?.uei || '').trim();
-  if (uei) items.push({ label: uei, value: '' });
-  if (person) items.push({ label: person, value: '' });
-  if (first?.workplace) items.push({ label: first.workplace, value: '' });
-
-  const wallets = [...new Set(rows.map((item) => walletText(item)).filter(Boolean))];
-  if (first?.operationKind === 'transfer') {
-    const from = rows.find((item) => item?.direction === 'OUT');
-    const to = rows.find((item) => item?.direction === 'IN');
-    if (walletText(from)) items.push({ label: `Из кошелька · ${walletText(from)}`, value: '' });
-    if (walletText(to)) items.push({ label: `В кошелёк · ${walletText(to)}`, value: '' });
-  } else if (wallets.length === 1) {
-    items.push({ label: wallets[0], value: '' });
-  } else if (wallets.length > 1) {
-    items.push({ label: wallets.join(' + '), value: '' });
-  }
-
-  if (first?.counterparty) items.push({ label: first.counterparty, value: '' });
-  if (first?.note) items.push({ label: first.note, value: '' });
-
-  const lines = first?.operationKind === 'transfer'
-    ? []
-    : rows
-      .filter((item) => String(item?.lineName || '').trim())
-      .map((item) => ({
-        label: String(item.lineName),
-        value: formatMoney(Math.max(0, Number(item?.amount) || 0)),
-      }));
-
-  items.push(...lines);
-  return { items, lineCount: lines.length };
 }
 
 function openCancellationInfo(root) {
@@ -509,23 +421,7 @@ function openFinanceOperation(root, movements, operationId) {
   const entries = movements.filter((item) => String(item?.operationId || '') === id);
   if (!entries.length) return;
   const first = entries[0];
-  const when = shortDateTimeParts(first?.occurredAt || '');
-  const receiptContent = operationReceiptItems(entries);
-  const isPayment = first?.operationKind === 'payment';
-  const receipt = readOnlyReceipt(isPayment ? {
-    title: 'Оплата услуги',
-    groups: paymentReceiptGroups(entries),
-  } : {
-    title: operationName(first).replace(' · Отменена', ''),
-    date: when.date || '—',
-    time: when.time || '—',
-    items: receiptContent.items,
-    totals: [{
-      label: 'Итого',
-      value: formatMoney(operationTotal(entries)),
-      strong: true,
-    }],
-  });
+  const receipt = financeReceipt(id, operationName(first), { entries });
   const active = first?.operationStatus !== 'cancelled';
   return openFinanceReceiptQ(root, operationName(first), receipt, [
     active ? { label: 'Корректировка', run: layer => openOperationCorrection(root, layer, entries) } : null,
