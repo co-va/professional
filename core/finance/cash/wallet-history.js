@@ -10,7 +10,7 @@ import { desktopDocumentArticles, desktopOperationDirection } from '../dds/class
 import { registeredArticle } from '../dds/article-view.js';
 import { articleCellText } from '../dds/article-view.js';
 import {readArticleOrder} from '../dds/article-order.js';
-import {DDS_SORTS,normalizeDDSView,sortDDSRows,buildDDSGroups,flattenDDSGroups} from '../dds/view-order.js';
+import {DDS_SORTS,WALLET_SORTS,normalizeWalletSort,normalizeDDSView,sortDDSRows,buildDDSGroups,flattenDDSGroups} from '../dds/view-order.js';
 import {getWallets} from './data.js';
 import {getWorkplaces} from '../../profile/workplaces/data.js';
 import {getPeople} from '../../people/data.js';
@@ -18,14 +18,6 @@ import {getPeopleSortMode} from '../../people/view-state.js';
 import {sortItems} from '../../people/sort.js';
 import { exportScopedWorkbook, reportExcelError } from '../../excel/scoped.js';
 
-const SORTS = [
-  ['dateDesc','Дата — сначала новые'], ['dateAsc','Дата — сначала ранние'],
-  ['titleAsc','Операция — от А до Я'], ['titleDesc','Операция — от Я до А'],
-  ['articleAsc','По статьям — от А до Я'], ['articleDesc','По статьям — от Я до А'],
-  ['personAsc','Клиент / контрагент — от А до Я'], ['personDesc','Клиент / контрагент — от Я до А'],
-  ['workplaceAsc','Рабочее пространство — от А до Я'], ['workplaceDesc','Рабочее пространство — от Я до А'],
-  ['amountDesc','Сумма — по убыванию'], ['amountAsc','Сумма — по возрастанию'],
-];
 const emptyFilters = () => ({ title:'', workplace:'', person:'', direction:'', article:'', from:'', to:'' });
 const ddsFilters = () => ({ ...emptyFilters(), wallet:'', status:'' });
 const money = value => new Intl.NumberFormat('ru-RU',{maximumFractionDigits:2}).format(value) + ' ₽';
@@ -68,7 +60,7 @@ export function walletHistoryRows(operations, people, { operationName, operation
     const occurredAt = String(item.occurredAt||'');
     const contact=financeTableContact(item,people);
     const classification=walletOperationClassification(item,catalog,canonical,lookup(item.operationId));
-    return {id:String(item.operationId),documentId:String(item.operationId),date:operationMoment(item),occurredAt,localDate:localDate(occurredAt),operationLabel:operationName(item),...contact,personFilter:[contact.code,contact.person].filter(Boolean).join(' · '),workplace:String(item.workplace||''),item,...classification,amount:money(value),value};
+    return {id:String(item.operationId),documentId:String(item.operationId),date:operationMoment(item),occurredAt,localDate:localDate(occurredAt),operationLabel:operationName(item),...contact,personFilter:[contact.code,contact.person].filter(Boolean).join(' · '),personKey:item.personKey||item.person?.key||item.person?.id||'',workplace:String(item.workplace||''),workplaceKey:item.workplaceKey||'',item,...classification,amount:money(value),value};
   });
 }
 
@@ -179,7 +171,7 @@ function openFilters(anchor,rows,state,refresh,dds=false) {
   });
 }
 function openSort(anchor,state,refresh,dds=false) {
-  const markup='<div class="people-action-menu">'+(dds?DDS_SORTS:SORTS).map(([value,label])=>
+  const markup='<div class="people-action-menu">'+(dds?DDS_SORTS:WALLET_SORTS).map(([value,label])=>
     button(label,{variant:'secondary',data:'data-wallet-sort-choice="'+value+'" aria-pressed="'+(value===state.sort)+'"'})).join('')+'</div>';
   const popup=mountModal(anchor,modal(markup,{title:'Сортировка',variant:'x',surface:'app',xRole:'action',className:'people-action-popup people-sort-popup'}));
   popup?.querySelectorAll('[data-wallet-sort-choice]').forEach(control=>control.addEventListener('click',()=>{
@@ -225,7 +217,7 @@ export function bindWalletHistory(layer,wallet,rows,{open,settings,dds=false,act
   const stateKey=dds?'ddsHistoryState':'walletHistoryState';
   const state=layer[stateKey] ||= {query:'',filters:dds?ddsFilters():emptyFilters(),sort:'dateDesc',...(dds?{groupArticles:true,groupValues:false}:{}),selected:new Set()};
   const tools=actions.filter(Boolean);
-  if(!dds){state.filters={...emptyFilters(),...state.filters,title:''};if(!SORTS.some(([key])=>key===state.sort))state.sort='dateDesc';}
+  if(!dds){state.filters={...emptyFilters(),...state.filters,title:''};state.sort=normalizeWalletSort(state.sort);}
   if(dds){state.collapsed ||= new Set();normalizeDDSView(state);state.filters.title='';if(state.filters.direction==='mixed')state.filters.direction='transfer';}
   const [toolbar]=setV2ZHeaderRows(layer,[
     '<section data-people-desktop-toolbar><div class="people-desktop-tools">'
@@ -261,15 +253,13 @@ export function bindWalletHistory(layer,wallet,rows,{open,settings,dds=false,act
     const groupArticles=dds&&state.groupArticles,groupValues=dds&&state.groupValues;
     const grouped=groupArticles||groupValues;
     const canonical=rows.some(row=>row.canonicalArticle);
-    visible=visibleWalletRows(rows,state.query,state.filters,dds?'dateDesc':state.sort);
+    visible=visibleWalletRows(rows,state.query,state.filters,'dateDesc');
+    const mode=state.sort;
+    visible=sortDDSRows(visible,mode,{wallets:mode==='wallet'?getWallets():[],workplaces:mode==='workplace'?getWorkplaces():[],people:mode==='person'?sortItems(getPeople(),getPeopleSortMode()):[]});
     let groups=[];
-    if(dds){
-      const mode=state.sort;
-      visible=sortDDSRows(visible,mode,{wallets:mode==='wallet'?getWallets():[],workplaces:mode==='workplace'?getWorkplaces():[],people:mode==='person'?sortItems(getPeople(),getPeopleSortMode()):[]});
-      if(grouped){
-        groups=buildDDSGroups(visible,{groupArticles,groupValues,catalog:getFinanceArticleCatalog()||[],order:readArticleOrder()});
-        visible=flattenDDSGroups(groups);
-      }
+    if(grouped){
+      groups=buildDDSGroups(visible,{groupArticles,groupValues,catalog:getFinanceArticleCatalog()||[],order:readArticleOrder()});
+      visible=flattenDDSGroups(groups);
     }
     // Selection always refers to the current visible table, never hidden rows.
     const ids=new Set(visible.map(row=>row.id));

@@ -6,6 +6,13 @@ export const DDS_SORTS=[
  ['workplace','Рабочее пространство'],['wallet','Кошелёк'],
  ['amount','Сумма'],['bonus','Бонусы']
 ];
+// A single wallet has neither a wallet-selection sort nor a bonus column.
+export const WALLET_SORTS=DDS_SORTS.filter(([mode])=>mode!=='wallet'&&mode!=='bonus');
+export function normalizeWalletSort(mode){
+ const legacy={personAsc:'person',personDesc:'person',workplaceAsc:'workplace',workplaceDesc:'workplace',amountAsc:'amount',amountDesc:'amount',codeAsc:'code',codeDesc:'code'};
+ const next=legacy[mode]||mode;
+ return WALLET_SORTS.some(([key])=>key===next)?next:'dateDesc';
+}
 export function normalizeDDSView(state){
  if(typeof state.groupArticles!=='boolean')state.groupArticles=state.sort==='articleOrder'||!state.sort;
  if(typeof state.groupValues!=='boolean')state.groupValues=false;

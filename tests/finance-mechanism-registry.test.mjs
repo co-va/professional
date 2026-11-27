@@ -1,4 +1,4 @@
-import {DDS_SORTS,normalizeDDSView,sortDDSRows,buildDDSGroups,flattenDDSGroups} from '../core/finance/dds/view-order.js';
+import {DDS_SORTS,WALLET_SORTS,normalizeWalletSort,normalizeDDSView,sortDDSRows,buildDDSGroups,flattenDDSGroups} from '../core/finance/dds/view-order.js';
 import assert from 'node:assert/strict';
 import {sortArticleDirectory,mergeArticleSectionOrder,orderDDSArticleRows} from '../core/finance/dds/article-order.js';
 import { ddsRegistryParts } from '../core/finance/dds/registry-parts.js';
@@ -110,3 +110,9 @@ for(const [mode] of DDS_SORTS){
 }
 assert.equal(matrixCount,32);
 console.log('PASS 32 DDS sorting/grouping combinations');
+
+assert.deepEqual(WALLET_SORTS.map(([mode])=>mode),['dateDesc','dateAsc','code','person','workplace','amount']);
+for(const [mode] of WALLET_SORTS){assert.equal(normalizeWalletSort(mode),mode);assert.deepEqual(sortDDSRows(viewRows,mode,matrixOptions).map(r=>r.id),expectedSort[mode]);}
+for(const mode of ['titleAsc','titleDesc','articleAsc','articleDesc','wallet','bonus'])assert.equal(normalizeWalletSort(mode),'dateDesc');
+assert.equal(normalizeWalletSort('personDesc'),'person');assert.equal(normalizeWalletSort('workplaceAsc'),'workplace');assert.equal(normalizeWalletSort('amountAsc'),'amount');
+console.log('PASS six Cash sorts use shared DDS sorting rules');
