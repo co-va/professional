@@ -582,7 +582,8 @@ function renderDDS(root) {
     const transfer = first.operationKind === 'transfer';
     const wallets = [...new Set(entries.map(walletText).filter(Boolean))];
     const articles = desktopDocumentArticles(entries,catalog);
-    if(facts&&!articles.includes(facts.article))articles.push(facts.article);
+    if(facts?.article&&!articles.includes(facts.article))articles.push(facts.article);
+    if(facts?.benefitArticle&&!articles.includes(facts.benefitArticle))articles.push(facts.benefitArticle);
     const sourceNames=[...new Set([...wallets,...(facts?.sources||[])])];
     const directions = new Set(entries.map(item=>item.direction).filter(Boolean));
     const direction = facts?.internal?'mixed':transfer?'transfer':directions.size===1&&directions.has('OUT')?'out':directions.size===1&&directions.has('IN')?'in':facts?.kind==='deposit-funding'?'in':facts?.kind==='deposit-withdrawal'?'out':'mixed';
@@ -602,7 +603,7 @@ function renderDDS(root) {
   const registryRows=rows.map(row=>{
     const doc=byId.get(row.id),f=doc.facts;
     const sum=direction=>doc.entries.filter(e=>e.direction===direction).reduce((n,e)=>n+Math.round(Number(e.amount||0)*100),0)/100;
-    return {...row,cashIn:f?.cashUnknown?null:sum('IN'),cashOut:f?.cashUnknown?null:sum('OUT'),depositPrincipal:f?.principal??null,personal:f?.personal??null,bonus:f?.bonus??null,documentAmount:operationTotal(doc.entries.length?doc.entries:[doc.first]),uncertainty:[...(f?.cashUnknown?['Кошелёк не определён']:[]),...(f?.principal===null?['Денежная часть не определена']:[]),...(f?.bonus===null?['Бонусная часть не определена']:[])].join('; ')};
+    return {...row,cashIn:f?.cashUnknown?null:sum('IN'),cashOut:f?.cashUnknown?null:sum('OUT'),depositPrincipal:f?.principal??null,personal:f?.personal??null,bonus:f?.bonus??null,depositNet:f?.depositNet??null,grossAmount:f?.discount?.grossAmount??null,benefitGranted:f?.discountUnknown?null:f?.conditionalGranted??null,benefitReversed:f?.discountUnknown?null:f?.conditionalReversed??null,benefitWrittenOff:f?.conditionalWrittenOff??null,bonusUsed:f?.bonusUnknown?null:f?.bonusUsed??null,bonusRestored:f?.bonusUnknown?null:f?.bonusRestored??null,documentAmount:operationTotal(doc.entries.length?doc.entries:[doc.first]),uncertainty:[...(f?.cashUnknown?['Кошелёк не определён']:[]),...(f?.principal===null?['Денежная часть не определена']:[]),...(f?.bonus===null?['Бонусная часть не определена']:[])].join('; ')};
   });
   const mobileRows=[...rows].sort((a,b)=>String(b.occurredAt).localeCompare(String(a.occurredAt))||a.id.localeCompare(b.id));
   const operations = desktop ? '<div data-dds-history>'+walletHistoryBody(true)+'</div>'

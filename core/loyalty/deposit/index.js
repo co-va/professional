@@ -282,8 +282,11 @@ function historyEventMarkup(item = {}, operation = null) {
   ];
   if (item?.kind === 'payment') {
     rows.push(...settlementRows(operation));
+    if(Number(item.grossAmount)>0&&Number(item.benefitGranted)>0)rows.push({label:'Сумма до выгоды',value:'−'+money(item.grossAmount)},{label:'Выгода по депозиту',value:'+'+money(item.benefitGranted)});
     rows.push({ label: 'Итого', value: `−${money(item?.amount)}` });
   } else {
+    if(item?.kind==='refund'&&Number(item.grossAmount)>0&&Number(item.benefitReversed)>0)rows.push({label:'Стоимость возврата',value:'+'+money(item.grossAmount)},{label:'Аннулирование выгоды',value:'−'+money(item.benefitReversed)});
+    if(item?.kind==='deposit-withdrawal'&&Number(operation?.data?.conditionalBenefitWrittenOff)>0)rows.push({label:'Доступный остаток',value:money(operation.data.balanceBefore)},{label:'Аннулирование выгоды по депозиту',value:'−'+money(operation.data.conditionalBenefitWrittenOff)},{label:'Основание',value:'Досрочное расторжение депозитного договора'});
     rows.push({ label: 'Сумма', value: `${incoming ? '+' : '−'}${money(item?.amount)}` });
     const walletName = String(item?.walletName || operation?.data?.walletName || '').trim();
     if (walletName) rows.push({ label: 'Кошелёк', value: walletName });
@@ -877,10 +880,11 @@ async function openWithdrawX(root, deposit, onSaved = () => {}) {
   const wallets = getWallets();
   const refundable = Math.max(0, Number(deposit?.refundableAmount ?? deposit?.principalBalance ?? 0));
   if (!deposit?.canRefund || refundable <= 0.009) {
-    openNotice({ title: 'Возврат недоступен', message: 'У этого депозита нет возвратного остатка.' });
+    openNotice({ title: 'Возврат недоступен', message: deposit?.accountingComplete===false?'Денежная и бонусная части исторических операций не подтверждены. Возврат заблокирован до сверки.':'У этого депозита нет возвратного остатка.' });
     return null;
   }
   const layer = mountModal(root, modal(`<form class="form-grid" data-deposit-withdraw-form>
+    ${Number(deposit?.conditionalWrittenOff)>0?readOnlyReceipt({groups:[[{label:'Доступный остаток',value:money(deposit.balance)},{label:'Аннулирование выгоды по депозиту',value:'−'+money(deposit.conditionalWrittenOff)}]]}):''}
     ${field({ label: 'К возврату', name: 'amount', type: 'number', min: '0.01', max: refundable, step: '0.01', inputmode: 'decimal', value: refundable, readonly: true })}
     ${select({ label: 'Кошелёк возврата', name: 'walletId', value: '', options: [{ value: '', label: 'Выберите кошелёк' }, ...wallets.map((wallet) => ({ value: wallet.id, label: wallet.name }))] })}
     ${datePicker({ label: 'Дата возврата', name: 'occurredAt', value: new Date().toISOString().slice(0, 10), showYear: true, modalVariant: 'q', modalSurface: 'app', allowClear: false })}

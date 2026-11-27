@@ -156,7 +156,7 @@ const REGISTRY_COLUMNS=[
  ['workplace','Рабочее пространство'],['occurredAt','Дата и время операции'],['code','Код'],['person','Клиент / контрагент'],['contact','Телефон'],
  ['id','Номер документа'],['title','Операция'],['article','Статья'],['status','Статус'],['wallet','Источник'],
  ['cashIn','Приход в кошельки'],['cashOut','Расход из кошельков'],['depositPrincipal','Денежная часть депозита'],['personal','Движение личного счёта'],
- ['bonus','Бонусы'],['documentAmount','Сумма документа'],['uncertainty','Неуточнённые данные'],
+ ['bonus','Бонусные движения'],['depositNet','Итог по депозиту'],['grossAmount','Стоимость до выгоды'],['benefitGranted','Предоставленная выгода'],['benefitReversed','Аннулирована при возврате'],['benefitWrittenOff','Аннулирована при расторжении'],['bonusUsed','Использовано бонусов'],['bonusRestored','Восстановлено бонусов'],['documentAmount','Сумма документа'],['uncertainty','Неуточнённые данные'],
 ];
 const registryPayload=rows=>rows.map(row=>Object.fromEntries(REGISTRY_COLUMNS.map(([key])=>[key,row[key]??null])));
 export async function exportFinanceRegistryWorkbook(rows){

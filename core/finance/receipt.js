@@ -91,12 +91,13 @@ function paymentGroups(rows, data, { walletOnly = false, facts = null } = {}) {
     breakdown.push({ label: subject || 'Состав услуг не сохранён', value: '' });
   }
   if (settlement.serviceTotal != null && settlement.planTotal != null && Number(settlement.serviceTotal) > Number(settlement.planTotal)) {
-    breakdown.push({ label: 'Скидка', value: formatMoney(Number(settlement.serviceTotal) - Number(settlement.planTotal)) });
+    breakdown.push({ label: facts?.discount||facts?.discountUnknown?'Выгода по депозиту':'Скидка', value: formatMoney(Number(settlement.serviceTotal) - Number(settlement.planTotal)) });
   }
   if (settlement.planTotal != null) breakdown.push({ label: 'К оплате', value: formatMoney(settlement.planTotal), strong: true });
   if (walletOnly) return [identity, breakdown].filter(group => group.length);
   const tips = data.tips != null ? Math.max(0, Number(data.tips) || 0) : rows.filter(item => item.economicType === 'TIPS').reduce((sum,item) => sum + Math.max(0, Number(item.amount)||0),0);
   const payment = [{ label: 'Оплата', value: formatMoney(data.total ?? operationTotal(rows)), strong: true }];
+  if(facts?.discount){payment.unshift({label:'Стоимость до выгоды',value:formatMoney(facts.discount.grossAmount)},{label:'Выгода по депозиту',value:formatMoney(-Number(facts.discount.benefitAmount),{signed:true})});}
   if (tips > 0) payment.push({ label: 'Чаевые', value: formatMoney(tips) });
   const distribution = [];
   const allocations = Array.isArray(data.allocations) && data.allocations.length ? data.allocations : (first.allocations || []);
@@ -112,8 +113,7 @@ function paymentGroups(rows, data, { walletOnly = false, facts = null } = {}) {
   if(facts){
     for(const item of facts.allocations){
       distribution.push({label:item.name.split(' · остаток ')[0],value:formatMoney(item.amount)});
-      distribution.push({label:'Денежная часть',value:item.principal===null?'Не определено':formatMoney(item.principal)});
-      distribution.push({label:'Бонусная часть',value:item.bonus===null?'Не определено':new Intl.NumberFormat('ru-RU',{maximumFractionDigits:2}).format(item.bonus)});
+      distribution.push(...depositAllocationDetails(item));
     }
   }else for (const item of (Array.isArray(data.depositAllocations) ? data.depositAllocations : [])) {
     if (Number(item.amount)>0) distribution.push({ label: item.name || 'Депозит', value: formatMoney(item.amount) });
@@ -122,6 +122,18 @@ function paymentGroups(rows, data, { walletOnly = false, facts = null } = {}) {
   return [identity,breakdown,payment,distribution].filter(group => group.length);
 }
 
+function depositAllocationDetails(item){
+ if(item.accounting){const a=item.accounting;return [
+  {label:'Сумма до выгоды',value:formatMoney(a.grossAmount)},
+  {label:'Денежная часть',value:formatMoney(a.realDelta,{signed:true})},
+  ...(a.benefitUsed?[{label:'Использовано бонусов',value:formatMoney(-a.benefitUsed,{signed:true})}]:[]),
+  ...(a.benefitGranted?[{label:'Предоставлена выгода',value:formatMoney(a.benefitGranted,{signed:true})}]:[]),
+  ...(a.benefitRestored?[{label:'Восстановлено бонусов',value:formatMoney(a.benefitRestored,{signed:true})}]:[]),
+  ...(a.benefitReversed?[{label:'Аннулирована выгода',value:formatMoney(-a.benefitReversed,{signed:true})}]:[]),
+  {label:'Итог движения по депозиту',value:formatMoney(Number(a.realDelta)+Number(a.benefitDelta),{signed:true})},
+ ];}
+ return [{label:'Денежная часть',value:item.principal===null?'Не определено':formatMoney(item.principal)},{label:'Бонусная часть',value:item.bonus===null?'Не определено':String(item.bonus)}];
+}
 function depositCashGroups(rows,data,facts=null){
   const first=rows[0]||{},person=data.person||first.person||{};
   const when=shortDateTimeParts(first.occurredAt||'');
@@ -133,7 +145,13 @@ function depositCashGroups(rows,data,facts=null){
   const subject=[{label:'Статья',value:depositArticleLabel(first)},{label:'Депозит',value:String(data.programName||first.lineName||'Не указано')}];
   const movement=[{label:'Кошелёк',value:String(data.walletName||first.walletName||'Не определён')},{label:first.operationKind==='deposit-withdrawal'?'Возвращено':'Внесено',value:formatMoney(operationTotal(rows)),strong:true}];
   if(facts&&first.operationKind==='deposit-funding'&&facts.bonus!==0)movement.push({label:'Начислено бонусов',value:facts.bonus===null?'Не определено':String(facts.bonus)});
-  if(facts&&first.operationKind==='deposit-withdrawal'&&facts.bonus!==0)movement.push({label:'Списано бонусов',value:facts.bonus===null?'Не определено':String(Math.abs(facts.bonus))});
+  if(facts&&first.operationKind==='deposit-withdrawal'){
+   if(data.balanceBefore!=null)movement.unshift({label:'Доступный остаток',value:formatMoney(data.balanceBefore)});
+   if(facts.conditionalWrittenOff>0)movement.splice(movement.length-1,0,{label:'Аннулирование выгоды по депозиту',value:formatMoney(-facts.conditionalWrittenOff,{signed:true})});
+   if(facts.bonus===null)movement.push({label:'Списано бонусов',value:'Не определено'});
+   else if(Math.abs(facts.bonus)>Number(facts.conditionalWrittenOff||0))movement.push({label:'Списано бонусов',value:String(Math.abs(facts.bonus)-Number(facts.conditionalWrittenOff||0))});
+   if(facts.conditionalWrittenOff>0)movement.push({label:'Основание',value:'Досрочное расторжение: условия депозитного договора не выполнены в части возвращаемых средств.'});
+  }
   if(first.operationKind==='deposit-withdrawal'&&data.reason)movement.push({label:'Причина',value:String(data.reason)});
   return [identity,subject,movement].filter(group=>group.length);
 }
@@ -142,8 +160,9 @@ function loyaltyOtherGroups(first,data,facts){
  const person=data.person||first.person||{};
  const identity=[{label:'Дата и время',value:[when.date,when.time].filter(Boolean).join(' · ')},{label:'Код',value:person.uei||''},{label:'Клиент',value:personText({person})}].filter(r=>r.value);
  const details=[{label:'Статья',value:facts.article}];
+ if(facts.discount&&first.operationKind==='refund')details.push({label:'Стоимость возвращаемого обслуживания',value:formatMoney(facts.discount.grossAmount)},{label:'Аннулирование выгоды по депозиту',value:formatMoney(-Number(facts.discount.benefitAmount),{signed:true})},{label:'К возврату',value:formatMoney(facts.discount.netAmount),strong:true});
  for(const item of facts.allocations){
-  details.push({label:item.name.split(' · остаток ')[0],value:formatMoney(item.amount)},{label:'Денежная часть',value:item.principal===null?'Не определено':formatMoney(item.principal)},{label:'Бонусная часть',value:item.bonus===null?'Не определено':String(item.bonus)});
+  details.push({label:item.name.split(' · остаток ')[0],value:formatMoney(item.amount)},...depositAllocationDetails(item));
  }
  if(facts.personal)details.push({label:'Личный счёт',value:formatMoney(facts.personal,{signed:true})});
  if(facts.cash)details.push({label:data.walletName||first.walletName||'Движение по кошельку',value:formatMoney(facts.cash,{signed:true})});
