@@ -28,6 +28,8 @@ import {
 } from '../../../ui/ui.js';
 import { financeDesktop, financeZActions, financeZSave, financeHistoryTable, financeTableContact, bindFinanceHistoryTable, openFinanceReceiptX } from '../desktop.js';
 import { financeReceipt } from '../receipt.js';
+import { paymentMethods, initPaymentMethods } from '../../../ui/payment/index.js';
+import { readOnlyReceipt } from '../../../ui/receipt/index.js';
 import { DATA_EXCHANGE_ICON, FINANCE_OPERATIONS_ICON, TRASH_ICON } from '../../../ui/buttons/index.js';
 import { financeOperationGroups, openFinanceOperations } from '../operations/index.js';
 import { canUseCapability } from '../../access.js';
@@ -258,6 +260,75 @@ function reopenCorrectedOperation(root, operationLayer, correctionLayer, operati
   openFinanceOperation(root, movements, operationId);
 }
 
+function openPaymentCorrectionX(root, operationLayer, operation) {
+  const data = operation.data || {};
+  const initialAllocations = Array.isArray(data.allocations) ? data.allocations : [];
+  const serviceAmount = Math.max(0, Number(data.serviceAmount) || 0);
+  // This server correction only supports wallet payments. Never silently
+  // replace a deposit/personal-account allocation or truncate saved sources.
+  if ((Array.isArray(data.depositAllocations) && data.depositAllocations.some(item=>Number(item.amount)>0)) || Number(data.personalAccountAmount)>0) {
+    openNotice({message:'Оплату с Депозита или Личного счёта нельзя исправить здесь. Отмените оплату в исходном разделе и проведите её заново.'});
+    return null;
+  }
+  if (!initialAllocations.length || initialAllocations.length > 4 || data.serviceAmount == null) {
+    openNotice({message:'Не удалось безопасно восстановить распределение исходной оплаты.'});
+    return null;
+  }
+  const wallets = getWallets();
+  if (initialAllocations.some(item=>!wallets.some(wallet=>String(wallet.id)===String(item.walletId)))) {
+    openNotice({message:'Один из кошельков исходной оплаты недоступен.'});
+    return null;
+  }
+  const summary = readOnlyReceipt({groups:[[
+    {label:'В счёт услуг',value:formatMoney(serviceAmount),strong:true},
+  ]]});
+  const content = `<div class="compact-form record-payment-entry-x" data-dds-payment-correction>
+    ${summary}
+    ${paymentMethods({wallets,total:serviceAmount,initialAllocations,showAction:false,showTotal:false})}
+    <div data-dds-payment-summary></div>
+    ${actionBlock(button('Сохранить',{data:'data-dds-payment-save',disabled:true}))}
+  </div>`;
+  const layer = mountModal(root,modal(content,{title:'Исправить оплату',variant:'x',surface:'app',className:'modal--form-sheet'}));
+  if(!layer)return null;
+  const host=layer.querySelector('[data-dds-payment-correction]');
+  const method=host.querySelector('[data-payment-methods]');
+  const submit=host.querySelector('[data-dds-payment-save]');
+  const output=host.querySelector('[data-dds-payment-summary]');
+  let state=null, pending=false;
+  const cents=value=>Math.round(Number(value||0)*100);
+  const fingerprint=rows=>JSON.stringify(rows.map(item=>[String(item.walletId),cents(item.amount)]).sort((a,b)=>a[0].localeCompare(b[0])||a[1]-b[1]));
+  const original=fingerprint(initialAllocations);
+  const canSave=()=>Boolean(state?.valid && cents(state.received)>=cents(serviceAmount) && fingerprint(state.allocations)!==original);
+  const sync=next=>{
+    state=next;
+    const tipsRow=method.querySelector('[data-payment-tips-row]');
+    if(tipsRow)tipsRow.hidden=true;
+    const rows=[{label:'Оплата',value:formatMoney(next.received),strong:true}];
+    if(cents(next.tips)>0)rows.push({label:'Чаевые',value:formatMoney(next.tips)});
+    if(cents(next.received)<cents(serviceAmount))rows.push({label:'Не хватает для исходной оплаты',value:formatMoney(serviceAmount-next.received)});
+    output.innerHTML=readOnlyReceipt({groups:[rows]});
+    submit.disabled=pending||!canSave();
+  };
+  initPaymentMethods(method,{onChange:sync});
+  submit.addEventListener('click',async()=>{
+    if(pending||!canSave())return;
+    pending=true;submit.disabled=true;
+    try{
+      const corrected=await correctFinanceOperation(operation.operationId,{
+        allocations:state.allocations,
+        serviceAmount,
+        tips:Math.max(0,(cents(state.received)-cents(serviceAmount))/100),
+        occurredAt:operation.occurredAt,
+      });
+      if(!corrected)throw new Error('Сервер не подтвердил исправление оплаты.');
+      layer.v2Close?.();
+      reopenCorrectedOperation(root,operationLayer,null,operation.operationId);
+    }catch(error){openNotice({message:String(error?.message||'Не удалось исправить оплату')});}
+    finally{pending=false;if(submit.isConnected)submit.disabled=!canSave();}
+  });
+  return layer;
+}
+
 function renderPaymentCorrection(root, operation, { onSaved = null } = {}) {
   const data = operation?.data && typeof operation.data === 'object' ? operation.data : {};
   const allocations = Array.isArray(data.allocations) ? data.allocations.slice(0, 2) : [];
@@ -412,6 +483,11 @@ function openOperationCorrection(root, operationLayer, entries) {
   if (!operation) {
     openNotice({ message: 'Операция не найдена.' });
     return;
+  }
+  if (financeDesktop(root) && operation.kind === 'payment') {
+    const layer = openPaymentCorrectionX(root, operationLayer, operation);
+    if (layer) operationLayer.v2Close?.();
+    return layer;
   }
   operationLayer.v2Close?.();
   if (financeDesktop(root) && (operation.kind === 'manual-income' || operation.kind === 'manual-expense')) {
