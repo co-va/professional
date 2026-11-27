@@ -105,7 +105,7 @@ function openArticleX(existing = null, onSaved = () => {}, getArticles = getFina
   const direction = existing?.direction || 'OUT';
   const desktopDirections=[{value:'IN',label:'Приход'},{value:'OUT',label:'Расход'}];
   // Legacy user-created transfer articles remain editable without silently changing their direction.
-  if(existing?.direction==='TRANSFER')desktopDirections.push({value:'TRANSFER',label:'Перевод'});
+  if(existing?.direction==='TRANSFER')desktopDirections.push({value:'TRANSFER',label:'Транзакция'});
   const roots=new Set(items.filter(a=>['INCOME_ROOT','EXPENSE_ROOT'].includes(a.systemKey)).map(a=>a.articleId));
   const descendants=new Set(existing?[existing.articleId]:[]);
   for(let changed=true;changed;){changed=false;for(const a of items)if(descendants.has(a.parentArticleId)&&!descendants.has(a.articleId)){descendants.add(a.articleId);changed=true;}}
@@ -207,7 +207,7 @@ function openArticleFilters(anchor,items,state,refresh,desktop=false){
   const economics=[...new Set(items.map(item=>item.economicType).filter(Boolean))].map(value=>({value,label:economicLabel(value)}));
   const fields=()=>'<div class="form-grid">'
     +select({label:'Группа',name:'parent',value:state.filters.parent,options:[none,...parents]})
-    +select({label:'Направление',name:'direction',value:state.filters.direction,options:[none,...(desktop?DIRECTION_OPTIONS.map(a=>a.value==='IN'?{...a,label:'Приход'}:a):DIRECTION_OPTIONS)]})
+    +select({label:'Направление',name:'direction',value:state.filters.direction,options:[none,...(desktop?DIRECTION_OPTIONS.map(a=>a.value==='IN'?{...a,label:'Приход'}:a.value==='TRANSFER'?{...a,label:'Транзакция'}:a):DIRECTION_OPTIONS)]})
     +(desktop?'':select({label:'Назначение',name:'economicType',value:state.filters.economicType,options:[none,...economics]}))
     +select({label:'Тип',name:'system',value:state.filters.system,options:[none,{value:'system',label:'Системная'},{value:'custom',label:'Пользовательская'}]})+'</div>';
   anchor.dataset.v2AnchorWidth='360';
@@ -248,7 +248,7 @@ function desktopArticleRows(items,state){
     return String(value(a)).localeCompare(String(value(b)),'ru',{numeric:true})*(state.sort.endsWith('Desc')?-1:1);
   });
   return treeRows(sorted).filter(a=>{
-    const direction=({IN:'Приход',OUT:'Расход',TRANSFER:'Перевод'})[a.direction]||'';
+    const direction=({IN:'Приход',OUT:'Расход',TRANSFER:'Транзакция'})[a.direction]||'';
     const type=a.systemKey?'Системная':'Пользовательская';
     return query.every(word=>normalized([a.name,names.get(a.parentArticleId),direction,type].join(' ')).includes(word))
       &&(!f.direction||a.direction===f.direction)
@@ -270,7 +270,7 @@ function renderDesktopArticleTable(host,rows,collapsed,onOpen){
   const original=host.querySelector('tbody');if(!original)return;
   const table=original.closest('table'),doc=host.ownerDocument;
   const byId=new Map([...original.querySelectorAll('[data-article-row]')].map(e=>[e.dataset.articleRow,e.closest('tr')]));
-  for(const [direction,label] of [['IN','ПРИХОД'],['OUT','РАСХОД'],['TRANSFER','ПЕРЕВОД']]){
+  for(const [direction,label] of [['IN','ПРИХОД'],['OUT','РАСХОД'],['TRANSFER','ТРАНЗАКЦИЯ']]){
     const members=rows.filter(a=>a.direction===direction);
     if(!members.length)continue;
     const heading=doc.createElement('tbody'),row=heading.insertRow();row.dataset.tableGroupLevel='system';

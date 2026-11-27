@@ -8,7 +8,7 @@ export function desktopAvailableArticles(articles,can){
  const allowed={RENT:false,TAX:false,INCOME_ROOT:true,EXPENSE_ROOT:true,SERVICE_REVENUE:journal,PRODUCT_REVENUE:journal,TIPS:journal,REFUND:journal,MATERIALS:can('inventory.stock.access'),OTHER_INCOME:false,OTHER_EXPENSE:false,LOAN_RECEIVED:special,LOAN_REPAYMENT:special,TRANSFER:special,INVESTMENT_RECEIVED:raise,INVESTMENT_RETURN:raise,INVESTMENT_INCOME_PAYMENT:raise,INVESTMENT_CAPITAL_RETURN:invest,INVESTMENT_INCOME:invest,INVESTMENT_CONTRIBUTION:invest,INVESTMENT_EXPENSE:invest};
  return articles.filter(a=>!a.archivedAt&&(!a.systemKey||allowed[a.systemKey]===true)).map(a=>({...a,name:desktopArticleName(a)}));
 }
-export const desktopOperationDirection=d=>({in:'Приход',out:'Расход',transfer:'Перевод'})[d]||'—';
+export const desktopOperationDirection=d=>({in:'Приход',out:'Расход',transfer:'Транзакция',mixed:'Транзакция'})[d]||'—';
 // Existing historical economic types are authoritative when articleId is absent.
 // Never allocate a combined document's money to inferred individual items.
 export function desktopDocumentArticles(entries,catalog){

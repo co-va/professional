@@ -52,7 +52,7 @@ export function visibleWalletRows(rows, query='', filters=emptyFilters(), sort='
       [row.contact,row.date,fullDate,row.amount].map(numeric).some(value=>value.includes(numeric(word)))))) return false;
     return (!filters.title||row.title===filters.title)&&(!filters.workplace||row.workplace===filters.workplace)
       &&(!filters.person||row.personFilter===filters.person)
-      &&(!filters.direction||(row.direction ? row.direction===filters.direction : (filters.direction==='in'?row.value>0:row.value<0)))
+      &&(!filters.direction||(row.direction ? (row.direction===filters.direction||(filters.direction==='transfer'&&row.direction==='mixed')) : (filters.direction==='in'?row.value>0:row.value<0)))
       &&(!filters.wallet||row.wallets?.includes(filters.wallet))
       &&(!filters.article||row.articles?.includes(filters.article))
       &&(!filters.status||row.status===filters.status)
@@ -110,7 +110,7 @@ function filterFields(rows, filters, dds = false) {
     +(dds?'':select({label:'Операция',name:'title',value:filters.title,options:choices(rows,'title')}))
     +select({label:'Клиент / контрагент',name:'person',value:filters.person,options:choices(rows,'personFilter')})
     +select({label:'Рабочее пространство',name:'workplace',value:filters.workplace,options:choices(rows,'workplace')})
-    +select({label:dds?'Операция':'Движение',name:'direction',value:filters.direction,options:[{value:'',label:'Без фильтра'},{value:'in',label:'Приход'},{value:'out',label:'Расход'},...(dds?[{value:'transfer',label:'Перевод'},{value:'mixed',label:'Смешанное'}]:[])]})
+    +select({label:dds?'Операция':'Движение',name:'direction',value:filters.direction,options:[{value:'',label:'Без фильтра'},{value:'in',label:'Приход'},{value:'out',label:'Расход'},...(dds?[{value:'transfer',label:'Транзакция'}]:[])]})
     +(dds?select({label:'Кошелёк',name:'wallet',value:filters.wallet,options:values('wallets')})
       +select({label:'Статья',name:'article',value:filters.article,options:values('articles')})
       +select({label:'Статус',name:'status',value:filters.status,options:choices(rows,'status')}):'')
@@ -186,7 +186,7 @@ export function bindWalletHistory(layer,wallet,rows,{open,settings,dds=false,act
   const stateKey=dds?'ddsHistoryState':'walletHistoryState';
   const state=layer[stateKey] ||= {query:'',filters:dds?ddsFilters():emptyFilters(),sort:dds?'articleAsc':'dateDesc',selected:new Set()};
   const tools=actions.filter(Boolean);
-  if(dds){state.collapsed ||= new Set();if(!DDS_SORTS.some(([key])=>key===state.sort))state.sort='articleAsc';state.filters.title='';}
+  if(dds){state.collapsed ||= new Set();if(!DDS_SORTS.some(([key])=>key===state.sort))state.sort='articleAsc';state.filters.title='';if(state.filters.direction==='mixed')state.filters.direction='transfer';}
   const [toolbar]=setV2ZHeaderRows(layer,[
     '<section data-people-desktop-toolbar><div class="people-desktop-tools">'
     +field({name:'walletSearch',type:'search',placeholder:'Поиск',autocomplete:'off',value:state.query,data:'data-wallet-search'})
