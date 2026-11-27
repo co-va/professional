@@ -80,7 +80,7 @@ export function renderService(root, navigateBack = () => {}) {
   let disposeCatalog = () => {};
   let renderVersion = 0;
   let disposed = false;
-  const desktopState={query:'',sort:'manual',kind:'',group:'',workplace:''};
+  const desktopState={query:'',sort:'manual',kind:'',group:'',workplace:'',selected:new Set(),collapsed:new Set()};
 
   const renderCurrent = () => {
     if (disposed) return;
@@ -126,10 +126,10 @@ export function renderService(root, navigateBack = () => {}) {
       desktopAccessory: desktop ? '<output data-service-count aria-live="polite">—</output>' : '',
     });
     const counter = desktop ? root.closest('[data-v2-z],[data-v2-z-layer]')?.querySelector('[data-h-accessory]>[data-service-count]') : null;
-    const onCount = (count) => {
+    const onCount = (count,selected=0) => {
       if (!counter?.isConnected || version !== renderVersion) return;
-      counter.textContent = String(count);
-      counter.setAttribute('aria-label', 'Позиций в списке: ' + count);
+      counter.textContent = selected ? selected+' / '+count : String(count);
+      counter.setAttribute('aria-label', selected ? 'Выбрано '+selected+' из '+count : 'Позиций в списке: '+count);
     };
     const navigationRoot = headerRows[0] || root;
     if (!headerRows.length) {

@@ -1,6 +1,7 @@
 // Desktop is a two-section projection of the existing Service catalogue.
 // Keep V2 rows, catalogue disclosure, price format and reorder owner.
 import {button,compactButton,field,select,modal,mountModal,emptyState,v2ListEntry,v2ListEntries,initV2ListReorder,openNotice,costListParts,durationText,escapeHtml} from '../../ui/ui.js';
+import {checkControl} from '../../ui/selection/check-list.js';
 import {catalogDisclosure} from '../inventory/catalog-ui.js';
 import {stockGroupTree,sortedStockChildren} from '../inventory/grouping.js';
 import {getProcedures,commitReorderProcedures} from './procedures/data.js';
@@ -45,14 +46,36 @@ export function renderDesktopServiceCatalog(host,{root,toolbar,onChanged,state,o
   let disposers=[];
   const fail=error=>openNotice({title:'Сервис',message:error?.message||'Не удалось сохранить.'});
   const kinds=['procedures','products'];
+  const check=(data,aria,checked=false)=>'<label class="ui-compact-check service-table-check">'+checkControl({data,aria,checked})+'</label>';
   const header=['',...Object.values(labels)];
-  host.innerHTML='<section data-service-desktop-group-list data-service-table-kind="combined"><div class="service-desktop-table-track"><div class="service-desktop-group-header">'+header.map(v=>'<span>'+v+'</span>').join('')+'</div><div class="service-desktop-group-body" data-service-group-catalog>'+kinds.map(kind=>'<section data-service-desktop-section="'+kind+'"><div class="service-table-system-heading" data-table-group-level="system">'+(kind==='procedures'?'Услуги':'Товары')+'</div><div data-service-table-host></div></section>').join('')+'</div></div></section>';
+  host.innerHTML='<section data-service-desktop-group-list data-service-table-kind="combined"><div class="service-desktop-table-track"><div class="service-desktop-group-header">'+check('data-service-select-all','Выбрать все позиции')+header.map(v=>'<span>'+v+'</span>').join('')+'</div><div class="service-desktop-group-body" data-service-group-catalog>'+kinds.map(kind=>'<section data-service-desktop-section="'+kind+'"><details data-service-system-disclosure><summary class="inventory-editor-summary service-table-system-heading" data-table-group-level="system">'+(kind==='procedures'?'Услуги':'Товары')+'</summary><div data-service-table-host></div></details></section>').join('')+'</div></div></section>';
   const sections=[...host.querySelectorAll('[data-service-desktop-section]')];
   const st=state;
+  st.selected ||= new Set();
+  st.collapsed ||= new Set();
+  let selectable=[];
+  const selectionKey=(kind,id)=>JSON.stringify([kind,key(id)]);
+  const syncSelection=()=>{
+    const available=new Set(selectable);
+    for(const id of st.selected)if(!available.has(id))st.selected.delete(id);
+    host.querySelectorAll('[data-service-select]').forEach(control=>{control.checked=st.selected.has(control.value);});
+    const all=host.querySelector('[data-service-select-all]');
+    if(all){all.disabled=!selectable.length;all.checked=selectable.length>0&&st.selected.size===selectable.length;all.indeterminate=st.selected.size>0&&!all.checked;}
+    onCount(selectable.length,st.selected.size);
+  };
+  for(const section of sections){
+    const kind=section.dataset.serviceDesktopSection;
+    const disclosure=section.querySelector('[data-service-system-disclosure]');
+    disclosure.open=!st.collapsed.has(kind);
+    disclosure.addEventListener('toggle',()=>{if(disclosure.open)st.collapsed.delete(kind);else st.collapsed.add(kind);});
+  }
+  host.querySelector('[data-service-select-all]')?.addEventListener('change',event=>{
+    st.selected=new Set(event.target.checked?selectable:[]);syncSelection();
+  });
   const refresh=()=>{
     if(disposed||!host.isConnected)return;
     disposers.forEach(fn=>fn());disposers=[];serial=0;
-    let total=0;
+    selectable=[];
     for(const section of sections){
       const kind=section.dataset.serviceDesktopSection,isService=kind==='procedures',all=dataFor(kind),levels=getServiceGroupLevels(kind);
       const workplaceNames=new Map(getWorkplaces().map(w=>[key(w.key||w.id),w.name]));
@@ -66,7 +89,7 @@ export function renderDesktopServiceCatalog(host,{root,toolbar,onChanged,state,o
       }
       const manual=st.sort==='manual'&&!st.query&&!st.group&&!st.workplace;
       section.hidden=Boolean((st.kind&&st.kind!==kind)||(st.group&&!levels.some(g=>kind+':'+g.id===st.group)));
-      total+=rows.length;
+      selectable.push(...rows.map(item=>selectionKey(kind,item.id)));
       const {tree,criteria}=serviceTree(rows,levels);
       const scopes=[];
       const row=(item,scope)=>{
@@ -74,7 +97,13 @@ export function renderDesktopServiceCatalog(host,{root,toolbar,onChanged,state,o
         const cells=[isService?durationText(item.duration):'—',String(ids(item).length),stats?String(stats.count):'—',isService?(stats?serviceSpentText(stats.minutes):'—'):'—',stats?money(stats.revenue):'—'];
         const values='<span class="list-entry__right service-desktop-price">'+[price.rightTop,price.rightBottom].filter(Boolean).map((v,i)=>'<'+(i?'small':'strong')+'>'+escapeHtml(v)+'</'+(i?'small':'strong')+'>').join('')+'</span>'+cells.map(v=>'<span class="service-desktop-value">'+escapeHtml(v)+'</span>').join('');
         let html=v2ListEntry({title:item.name||'',subtitle:'',omitEmptySubtitle:true,image:isService?procedureCardPhoto(item):productCardPhoto(item),initial:(item.name||'?').slice(0,1).toUpperCase(),interactive:true,reorderHandle:manual,reorderAria:'Изменить порядок',data:'data-service-position="'+escapeHtml(item.id)+'" data-reorder-id="'+escapeHtml(item.id)+'" data-service-reorder-scope="'+scope+'"',aria:'Открыть '+item.name});
-        html=html.replace(/(\s*<\/span>\s*<\/button>)$/,values+'$1');
+        // The shared checkbox is a real input, not a nested control in a button.
+        const selectedId=selectionKey(kind,item.id);
+        const checkbox='<label class="ui-compact-check service-table-check">'+checkControl({data:'data-service-select',aria:'Выбрать '+item.name,value:selectedId,checked:st.selected.has(selectedId)})+'</label>';
+        html=html.replace(/^<button\b/,'<div role="group"').replace(/ type="button"/,'').replace(/ aria-pressed="[^"]*"/,'').replace(/ aria-label="[^"]*"/,'').replace(/<\/button>\s*$/,'</div>');
+        html=html.replace('<span class="list-entry__content">','<span class="list-entry__content">'+checkbox);
+        html=html.replace(/(\s*<\/span>\s*<\/div>)$/,values+'$1');
+        html=html.replace('<span class="list-entry__main','<span tabindex="0" role="button" data-service-open aria-label="'+escapeHtml('Открыть '+item.name)+'" class="list-entry__main');
         return html.replace('data-reorder-handle','data-reorder-handle data-service-handle="'+scope+'"');
       };
       const walk=node=>{
@@ -111,9 +140,16 @@ export function renderDesktopServiceCatalog(host,{root,toolbar,onChanged,state,o
       const table=section.querySelector('[data-service-table-host]');
       table.innerHTML=rows.length?walk(tree):emptyState(all.length?'Ничего не найдено':isService?'Услуг пока нет':'Товаров пока нет');
       table.querySelectorAll('details').forEach(el=>{el.open=true});
-      table.querySelectorAll('[data-service-position]').forEach(el=>el.addEventListener('click',async()=>{
-        try{const m=await (isService?loadProceduresModule():loadProductsModule());if(disposed)return;const open=isService?m.openProcedureOverview:m.openProductOverview;open(root,el.dataset.servicePosition,{onChanged});}catch(e){fail(e)}
+      table.querySelectorAll('[data-service-select]').forEach(control=>control.addEventListener('change',()=>{
+        if(control.checked)st.selected.add(control.value);else st.selected.delete(control.value);syncSelection();
       }));
+      table.querySelectorAll('[data-service-position]').forEach(el=>{
+        const openRow=async()=>{
+          try{const m=await (isService?loadProceduresModule():loadProductsModule());if(disposed)return;const open=isService?m.openProcedureOverview:m.openProductOverview;open(root,el.dataset.servicePosition,{onChanged});}catch(e){fail(e)}
+        };
+        el.addEventListener('click',event=>{if(!event.target.closest('.service-table-check,[data-reorder-handle]'))void openRow();});
+        el.querySelector('[data-service-open]')?.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();void openRow();}});
+      });
       if(manual)for(const {scope,type} of scopes){
         const list=table.querySelector('[data-service-scope="'+scope+'"]');
         if(!list)continue;
@@ -136,7 +172,7 @@ export function renderDesktopServiceCatalog(host,{root,toolbar,onChanged,state,o
     }
     toolbar.querySelector('[data-service-filter]')?.setAttribute('aria-pressed',String(Boolean(st.kind||st.group||st.workplace)));
     toolbar.querySelector('[data-service-sort]')?.setAttribute('aria-pressed',String(st.sort!=='manual'));
-    onCount(total);
+    syncSelection();
   };
   toolbar.querySelector('[data-service-search]')?.addEventListener('input',e=>{st.query=e.target.value;refresh()});
   toolbar.querySelector('[data-service-filter]')?.addEventListener('click',e=>{
