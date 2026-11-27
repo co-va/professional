@@ -79,7 +79,7 @@ export function financeHistoryTable(rows, caption, columns) {
     ...column, sortable: false,
     ...(column.key === 'date' ? { label: 'Дата', header: () => twoLineHeading('Дата', 'Время'), render: row => { const [date, time] = String(row.date || '').trim().split(/\s+/, 2); return twoLineCell(date, time); } } : {}),
     ...(column.key === 'person' ? { label: 'Клиент / контрагент', header: () => twoLineHeading('Клиент / контрагент', 'Контакт'), render: row => twoLineCell(row.person, row.contact, { contact: true }) } : {}),
-    ...(column.key === 'workplace' ? { header: () => twoLineHeading('Рабочее', 'пространство') } : {}),
+    ...(column.key === 'workplace' ? (column.secondaryKey ? { header: () => '<div title="Рабочее пространство">Пространство</div><div>'+escapeHtml(column.secondaryLabel)+'</div>', render: row => twoLineCell(row.workplace,row[column.secondaryKey],{contact:true}) } : { header: () => twoLineHeading('Рабочее', 'пространство') }) : {}),
     ...(column.key === 'article' && column.articleValue ? { header: () => twoLineHeading('Статья','Значение'), render: row => twoLineCell(row.article,row.articleValue,{contact:true}) } : {}),
     ...(column.key === 'title' ? {
       ...(column.secondaryKey ? { header: () => twoLineHeading(column.label, column.secondaryLabel) } : {}),

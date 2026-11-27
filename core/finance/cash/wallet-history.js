@@ -254,8 +254,8 @@ export function bindWalletHistory(layer,wallet,rows,{open,settings,dds=false,act
     toolbar.querySelector('[data-wallet-sort]')?.setAttribute('aria-pressed',String(state.sort!=='dateDesc'));
     host.innerHTML=visible.length?financeHistoryTable(visible,dds?'Все операции':'Операции кошелька',[
       {key:'select',label:'',narrow:true,header:()=>check('data-wallet-select-all','Выбрать все видимые операции',visible.every(row=>state.selected.has(row.id))),render:row=>check('data-wallet-select="'+escapeHtml(row.id)+'"','Выбрать операцию '+row.title,state.selected.has(row.id))},
-      {key:'date',label:'Дата',narrow:true},{key:'title',label:'Операция',...(dds?{secondaryKey:canonical?'sourcePosition':'wallet',secondaryLabel:canonical?'Источник · позиция':'Источник'}:{})},{key:'code',label:'Код',narrow:true},
-      {key:'person',label:'Клиент / контрагент'},{key:'workplace',label:'Рабочее пространство'},...(!grouped||canonical?[{key:'article',label:'Статья',articleValue:canonical}]:[]),{key:'amount',label:'Сумма',narrow:true},...(dds?[{key:'bonus',label:'Бонусы',narrow:true}]:[]),
+      {key:'date',label:'Дата',narrow:true},{key:'title',label:'Операция',...(dds?{secondaryKey:'wallet',secondaryLabel:'Источник'}:{})},{key:'code',label:'Код',narrow:true},
+      {key:'person',label:'Клиент / контрагент'},{key:'workplace',label:'Рабочее пространство',...(dds?{secondaryKey:'position',secondaryLabel:'Услуга / товар'}:{})},...(!grouped||canonical?[{key:'article',label:'Статья',articleValue:canonical}]:[]),{key:'amount',label:'Сумма',narrow:true},...(dds?[{key:'bonus',label:'Бонусы',narrow:true}]:[]),
     ]):emptyState(rows.length?'Операции не найдены':'Операций пока нет',rows.length?'Измените условия поиска или фильтрации.':(dds?'Финансовые операции появятся здесь.':'Движения по этой кассе появятся здесь.'));
     if(grouped&&visible.length)applyDDSHierarchy(host,visible,state.collapsed);
     if(dds){const viewport=host.querySelector('.ui-data-table--compact');if(viewport){viewport.scrollLeft=state.scrollLeft||0;viewport.scrollTop=state.scrollTop||0;}}
