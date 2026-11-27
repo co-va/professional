@@ -1560,7 +1560,7 @@ function openWalletOperation(root, walletLayer, wallet, operationId) {
   if (!operation) return null;
   const desktop=financeDesktop(root);
   const depositDocument=desktop&&['deposit-funding','deposit-withdrawal'].includes(operation.operationKind);
-  return openFinanceReceiptX(walletLayer, depositDocument?(operation.operationKind==='deposit-funding'?'Взнос на депозит':'Возврат депозита'):operationName(operation), operationReceipt(operation, wallet,desktop), depositDocument?[]:[{
+  return openFinanceReceiptX(walletLayer, depositDocument?(operation.operationKind==='deposit-funding'?'Внесение депозита':'Возврат депозита'):operationName(operation), operationReceipt(operation, wallet,desktop), depositDocument?[]:[{
     label: 'Удалить', variant: 'danger',
     run: receipt => openOperationSettings(root, walletLayer, receipt, wallet, operation),
   }]);
