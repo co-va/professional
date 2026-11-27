@@ -466,6 +466,13 @@
  .v2-app--workspace .v2-journal-desktop-toolbar [data-journal-period-navigation]{color:var(--white)}
  .v2-app--workspace .v2-journal-desktop-toolbar [data-journal-period-navigation] .ui-compact-button{color:var(--white);border-color:var(--text-secondary)}
  .v2-app--workspace .journal-list-viewport{height:auto;min-height:0;overflow:visible}
+
+ /* DDS only: keep the amount visible where space permits; preserve scroll on narrower screens. */
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-dds-history]{min-width:0;max-width:100%}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-dds-history] .ui-data-table--compact :is(th,td)[data-table-column="article"]{width:14ch;min-width:90px;white-space:normal;overflow-wrap:anywhere}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-dds-history] .ui-data-table--compact td:is([data-table-column="title"],[data-table-column="workplace"]){white-space:normal;overflow-wrap:anywhere}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-dds-history] .ui-data-table--compact td[data-table-column="title"] .people-table-person__phone{white-space:normal;overflow-wrap:anywhere}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-dds-history] .ui-data-table--compact :is(th,td)[data-table-column="amount"]{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
  .v2-app--workspace .ui-data-table--compact tr.journal-list-record--active td{background:#EFFFBB}
  .v2-app--workspace .ui-data-table--compact tr.journal-list-record--paid td{background:#DDE8D7}
  .v2-app--workspace .ui-data-table--compact tr.journal-list-record--no-show td,.v2-app--workspace .ui-data-table--compact tr.journal-list-record--cancelled td{background:#F1DADA}

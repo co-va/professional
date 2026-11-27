@@ -477,7 +477,7 @@ function renderDDS(root) {
   const groupedOperations = operationGroupsFromLedger(movements);
   const people = financeDesktop(root) ? getAllPeople() : [];
   const operations = groupedOperations.length
-    ? (financeDesktop(root) ? financeHistoryTable(groupedOperations.map(entries => { const first = entries[0]; const transfer = first.operationKind === 'transfer'; return { id: String(first.operationId), date: operationMoment(first), title: operationName(first), ...financeTableContact(first, people), workplace: String(first.workplace || ''), wallet: transfer ? operationListSubtitle(entries) : [...new Set(entries.map(walletText).filter(Boolean))].join(' + '), article: [...new Set(entries.map(item => String(item.articleName || '')).filter(Boolean))].join(', '), amount: operationDisplayAmount(entries) }; }), 'Все операции', [{ key: 'date', label: 'Дата', narrow: true }, { key: 'title', label: 'Операция' }, { key: 'code', label: 'Код', narrow: true }, { key: 'person', label: 'Клиент / контрагент' }, { key: 'workplace', label: 'Рабочее пространство' }, { key: 'wallet', label: 'Кошелёк' }, { key: 'article', label: 'Статья' }, { key: 'amount', label: 'Сумма', narrow: true }]) : v2ListEntries(groupedOperations.map(operationListEntry)))
+    ? (financeDesktop(root) ? financeHistoryTable(groupedOperations.map(entries => { const first = entries[0]; const transfer = first.operationKind === 'transfer'; return { id: String(first.operationId), date: operationMoment(first), title: operationName(first), ...financeTableContact(first, people), workplace: String(first.workplace || ''), wallet: transfer ? operationListSubtitle(entries) : [...new Set(entries.map(walletText).filter(Boolean))].join(' + '), article: [...new Set(entries.map(item => String(item.articleName || '')).filter(Boolean))].join(', '), amount: operationDisplayAmount(entries) }; }), 'Все операции', [{ key: 'date', label: 'Дата', narrow: true }, { key: 'title', label: 'Операция', secondaryKey: 'wallet', secondaryLabel: 'Кошелёк' }, { key: 'code', label: 'Код', narrow: true }, { key: 'person', label: 'Клиент / контрагент' }, { key: 'workplace', label: 'Рабочее пространство' }, { key: 'article', label: 'Статья' }, { key: 'amount', label: 'Сумма', narrow: true }]) : v2ListEntries(groupedOperations.map(operationListEntry)))
     : emptyState('Все операции', 'Финансовых операций пока нет.');
   const settingsItems = availableDDSSettings();
   const operationGroups = ['income-expense', 'transfer'];
@@ -490,7 +490,7 @@ function renderDDS(root) {
     } : null,
   });
 
-  root.innerHTML = `${headerContext}${operations}`;
+  root.innerHTML = `${headerContext}${financeDesktop(root) ? '<div data-dds-history>' + operations + '</div>' : operations}`;
   if (financeDesktop(root)) financeZActions(root, 'Движения денежных средств', [
     { label: DATA_EXCHANGE_ICON, className: 'v2-desktop-tool-icon', aria: 'Обмен данными', run: anchor => openDDSExcel(root, movements, { anchor, onImported: () => renderDDS(root) }) },
     canUseCapability('finance.articles.access') ? { label: 'Статьи', run: () => openArticles(root) } : null,
