@@ -1,7 +1,7 @@
 // Desktop projects one active section of the existing Service catalogue.
 // Keep V2 rows, catalogue disclosure, price format and reorder owner.
 import {button,compactButton,field,select,modal,mountModal,emptyState,v2ListEntry,v2ListEntries,initV2ListReorder,openNotice,costListParts,durationText,escapeHtml} from '../../ui/ui.js';
-import {checkControl,compactCheck} from '../../ui/selection/check-list.js';
+import {checkControl,sortGroupingSection} from '../../ui/selection/check-list.js';
 import {serviceTree,serviceTableColumns,serviceUsageText,SERVICE_GROUP_PREFIX as prefix} from './catalog-view.js';
 import {getProfile} from '../profile/data.js';
 import {catalogDisclosure} from '../inventory/catalog-ui.js';
@@ -247,8 +247,10 @@ export function renderDesktopServiceCatalog(host,{root,toolbar,onChanged,state,k
       [id+':asc',label+' — '+(id==='name'?'от А до Я':'по возрастанию')],
       [id+':desc',label+' — '+(id==='name'?'от Я до А':'по убыванию')]
     ])];
-    const grouping=compactCheck({label:'По группам',checked:st.groupGroups,data:'data-service-group-groups',aria:'Группировать по группам'})+
-      compactCheck({label:'По значениям',checked:st.groupValues,data:'data-service-group-values',aria:'Группировать по значениям'});
+    const grouping=sortGroupingSection([
+      {label:'По группам',checked:st.groupGroups,data:'data-service-group-groups',aria:'Группировать по группам'},
+      {label:'По значениям',checked:st.groupValues,data:'data-service-group-values',aria:'Группировать по значениям'}
+    ]);
     const markup='<div class="people-action-menu">'+grouping+options.map(([value,label])=>
       button(escapeHtml(label),{variant:'secondary',data:'data-service-sort-choice="'+escapeHtml(value)+'" aria-pressed="'+(value===st.sort)+'"'})).join('')+'</div>';
     const layer=mountModal(anchor,modal(markup,{title:'Сортировка',variant:'x',surface:'app',xRole:'action',className:'people-action-popup people-sort-popup'}));

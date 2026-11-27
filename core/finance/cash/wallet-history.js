@@ -2,7 +2,7 @@ import {
   button, compactButton, datePicker, emptyState, escapeHtml, field,
   initDatePickers, modal, mountModal, select, setV2ZHeaderRows,
 } from '../../../ui/ui.js';
-import { checkControl, compactCheck } from '../../../ui/selection/check-list.js';
+import { checkControl, sortGroupingSection } from '../../../ui/selection/check-list.js';
 import { DATA_EXPORT_ICON } from '../../../ui/buttons/index.js';
 import { financeHistoryTable, financeTableContact } from '../desktop.js';
 import { getFinanceOperation, getFinanceArticles, getFinanceArticleCatalog } from '../data.js';
@@ -10,7 +10,7 @@ import { desktopDocumentArticles, desktopOperationDirection } from '../dds/class
 import { registeredArticle } from '../dds/article-view.js';
 import { articleCellText } from '../dds/article-view.js';
 import {readArticleOrder,readDDSGrouping,saveDDSGrouping} from '../dds/article-order.js';
-import {DDS_SORTS,WALLET_SORTS,normalizeWalletSort,normalizeDDSView,sortDDSRows,buildDDSGroups,flattenDDSGroups} from '../dds/view-order.js';
+import {DDS_SORTS,WALLET_SORTS,normalizeWalletSort,normalizeDDSView,sortDDSRows,buildDDSGroups,flattenDDSGroups,walletGroupingIdentity} from '../dds/view-order.js';
 import {getWallets} from './data.js';
 import {getWorkplaces} from '../../profile/workplaces/data.js';
 import {getPeople} from '../../people/data.js';
@@ -51,7 +51,7 @@ export function walletOperationClassification(item, catalog = getFinanceArticles
   const articles=[...new Set(classes.map(a=>a.articleName))];
   const values=[...new Set(classes.map(a=>a.valueName).filter(Boolean))];
   const tips=entries.filter(e=>e.component==='tips'||e.economicType==='TIPS'||e.economicType==='TIPS_REFUND').reduce((n,e)=>n+Math.round(Number(e.amount||0)*100),0)/100;
-  return {direction,title:desktopOperationDirection(direction),articles,article:articles.join(' · '),articleValue:articles.length===1&&values.length===1?values[0]:'',positions,positionList:positions.join(' · '),tips,canonicalArticle:true};
+  return {direction,title:desktopOperationDirection(direction),articles,article:articles.join(' · '),...walletGroupingIdentity(classes,canonical),articleValue:articles.length===1&&values.length===1?values[0]:'',positions,positionList:positions.join(' · '),tips,canonicalArticle:true};
 }
 
 export function walletHistoryRows(operations, people, { operationName, operationMoment, catalog = getFinanceArticles(), canonical = getFinanceArticleCatalog(), lookup=getFinanceOperation }) {
@@ -170,17 +170,19 @@ function openFilters(anchor,rows,state,refresh,dds=false) {
     actions.hidden=true;refresh();
   });
 }
-function openSort(anchor,state,refresh,dds=false) {
-  const grouping=dds?compactCheck({label:'По статьям',checked:state.groupArticles,data:'data-dds-group-articles',aria:'Группировать по статьям'})+
-    compactCheck({label:'По значениям',checked:state.groupValues,data:'data-dds-group-values',aria:'Группировать по значениям'}):'';
+function openSort(anchor,state,refresh,dds=false,scope='') {
+  const grouping=sortGroupingSection([
+    {label:'По статьям',checked:state.groupArticles,data:'data-dds-group-articles',aria:'Группировать по статьям'},
+    {label:'По значениям',checked:state.groupValues,data:'data-dds-group-values',aria:'Группировать по значениям'}
+  ]);
   const markup='<div class="people-action-menu">'+grouping+(dds?DDS_SORTS:WALLET_SORTS).map(([value,label])=>
     button(label,{variant:'secondary',data:'data-wallet-sort-choice="'+value+'" aria-pressed="'+(value===state.sort)+'"'})).join('')+'</div>';
   const popup=mountModal(anchor,modal(markup,{title:'Сортировка',variant:'x',surface:'app',xRole:'action',className:'people-action-popup people-sort-popup'}));
-  if(dds)for(const [selector,key] of [['[data-dds-group-articles]','groupArticles'],['[data-dds-group-values]','groupValues']]){
+  for(const [selector,key] of [['[data-dds-group-articles]','groupArticles'],['[data-dds-group-values]','groupValues']]){
     const control=popup?.querySelector(selector);
     control?.addEventListener('change',()=>{
       state[key]=control.checked;
-      saveDDSGrouping(state);
+      saveDDSGrouping(state,scope);
       refresh();
     });
   }
@@ -225,7 +227,10 @@ function applyDDSHierarchy(host,groups,collapsed){
 
 export function bindWalletHistory(layer,wallet,rows,{open,settings,dds=false,actions=[]}) {
   const stateKey=dds?'ddsHistoryState':'walletHistoryState';
-  const state=layer[stateKey] ||= {query:'',filters:dds?ddsFilters():emptyFilters(),sort:'dateDesc',...(dds?readDDSGrouping():{}),selected:new Set()};
+  const scope=dds?'':'wallet:'+String(wallet.id||'');
+  const state=layer[stateKey] ||= {query:'',filters:dds?ddsFilters():emptyFilters(),sort:'dateDesc',...readDDSGrouping(scope),selected:new Set()};
+  if(typeof state.groupArticles!=='boolean'||typeof state.groupValues!=='boolean')Object.assign(state,readDDSGrouping(scope));
+  state.collapsed ||= new Set();
   const tools=actions.filter(Boolean);
   if(!dds){state.filters={...emptyFilters(),...state.filters,title:''};state.sort=normalizeWalletSort(state.sort);}
   if(dds){state.collapsed ||= new Set();normalizeDDSView(state);state.filters.title='';if(state.filters.direction==='mixed')state.filters.direction='transfer';}
@@ -260,7 +265,7 @@ export function bindWalletHistory(layer,wallet,rows,{open,settings,dds=false,act
   const refresh=()=>{
     const previousViewport=dds?host.querySelector('.ui-data-table--compact'):null;
     if(previousViewport){state.scrollLeft=previousViewport.scrollLeft;state.scrollTop=previousViewport.scrollTop;}
-    const groupArticles=dds&&state.groupArticles,groupValues=dds&&state.groupValues;
+    const groupArticles=state.groupArticles,groupValues=state.groupValues;
     const grouped=groupArticles||groupValues;
     const canonical=rows.some(row=>row.canonicalArticle);
     visible=visibleWalletRows(rows,state.query,state.filters,'dateDesc');
@@ -279,7 +284,7 @@ export function bindWalletHistory(layer,wallet,rows,{open,settings,dds=false,act
     host.innerHTML=visible.length?financeHistoryTable(visible,dds?'Все операции':'Операции кошелька',[
       {key:'select',label:'',narrow:true,header:()=>check('data-wallet-select-all','Выбрать все видимые операции',visible.every(row=>state.selected.has(row.id))),render:row=>check('data-wallet-select="'+escapeHtml(row.id)+'"','Выбрать операцию '+row.title,state.selected.has(row.id))},
       {key:'date',label:'Дата',narrow:true},{key:'title',label:'Операция',...(dds?{secondaryKey:'wallet',secondaryLabel:'Источник'}:{})},{key:'code',label:'Код',narrow:true},
-      {key:'person',label:'Клиент / контрагент'},{key:'workplace',label:'Рабочее пространство',...(dds?{secondaryKey:'position',secondaryLabel:'Услуга / товар'}:{})},...(dds?(groupArticles&&groupValues?[]:groupArticles?(canonical?[{key:'article',label:'Значение',render:row=>escapeHtml(row.articleValue||'')}]:[]):groupValues?[{key:'article',label:'Статья'}]:[{key:'article',label:'Статья',articleValue:canonical}]):[{key:'article',label:'Статья',articleValue:canonical}]),{key:'amount',label:'Сумма',narrow:true},...(dds?[{key:'bonus',label:'Бонусы',narrow:true}]:[]),
+      {key:'person',label:'Клиент / контрагент'},{key:'workplace',label:'Рабочее пространство',...(dds?{secondaryKey:'position',secondaryLabel:'Услуга / товар'}:{})},...(groupArticles&&groupValues?[]:groupArticles?(canonical?[{key:'article',label:'Значение',render:row=>escapeHtml(row.groupArticleValue||row.articleValue||'')}]:[]):groupValues?[{key:'article',label:'Статья'}]:[{key:'article',label:'Статья',articleValue:canonical}]),{key:'amount',label:'Сумма',narrow:true},...(dds?[{key:'bonus',label:'Бонусы',narrow:true}]:[]),
     ]):emptyState(rows.length?'Операции не найдены':'Операций пока нет',rows.length?'Измените условия поиска или фильтрации.':(dds?'Финансовые операции появятся здесь.':'Движения по этой кассе появятся здесь.'));
     if(grouped&&visible.length)applyDDSHierarchy(host,groups,state.collapsed);
     if(dds){const viewport=host.querySelector('.ui-data-table--compact');if(viewport){viewport.scrollLeft=state.scrollLeft||0;viewport.scrollTop=state.scrollTop||0;}}
@@ -304,7 +309,7 @@ export function bindWalletHistory(layer,wallet,rows,{open,settings,dds=false,act
   toolbar.querySelector('[data-wallet-filter]')?.addEventListener('click',event=>{
     event.currentTarget.dataset.v2AnchorWidth='360';openFilters(event.currentTarget,rows,state,refresh,dds);
   });
-  toolbar.querySelector('[data-wallet-sort]')?.addEventListener('click',event=>openSort(event.currentTarget,state,refresh,dds));
+  toolbar.querySelector('[data-wallet-sort]')?.addEventListener('click',event=>openSort(event.currentTarget,state,refresh,dds,scope));
   toolbar.querySelectorAll('[data-dds-history-action]').forEach(control=>control.addEventListener('click',()=>{
     tools[Number(control.dataset.ddsHistoryAction)]?.run(control,walletSelection(visible,state.selected).exportRows);
   }));

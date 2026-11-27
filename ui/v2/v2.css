@@ -1203,7 +1203,7 @@
 .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-table-kind] [data-table-group-level]:is(.inventory-editor-panel)>details>summary.inventory-editor-summary{background:var(--table-level-bg);color:var(--table-level-ink);border-bottom:1px solid var(--border)}
 .v2-app--workspace [data-service-table-kind] [data-table-group-level="value"]>details>summary.inventory-editor-summary{padding-left:36px}
 .v2-app--workspace [data-service-table-host]{min-width:0}
-.v2-app--workspace [data-dds-history] .ui-data-table--compact tbody tr[data-table-group-level]>td{background:var(--table-level-bg);color:var(--table-level-ink);font-weight:750;text-align:left;padding-inline:12px;white-space:normal}
+.v2-app--workspace [data-wallet-history-host] .ui-data-table--compact tbody tr[data-table-group-level]>td{background:var(--table-level-bg);color:var(--table-level-ink);font-weight:750;text-align:left;padding-inline:12px;white-space:normal}
 }
 
 /* Compact range editor: one standard selector above two straight inputs. */
@@ -1218,13 +1218,13 @@
 .v2-app--workspace [data-service-table-kind] [data-service-collapse-key]{position:relative}
 
 .v2-app--workspace .ui-data-table--compact tr[data-table-group-level] .dds-table-disclosure>summary{display:flex;align-items:center;padding-inline:12px 40px;color:inherit;background:transparent;white-space:normal;font:inherit}
-.v2-app--workspace [data-dds-history] .ui-data-table--compact tr[data-table-group-level] .dds-table-disclosure>summary{padding-left:12px;gap:8px;list-style:none;cursor:pointer}
-.v2-app--workspace [data-dds-history] .ui-data-table--compact tr[data-table-group-level="value"] .dds-table-disclosure>summary{padding-left:32px}
-.v2-app--workspace [data-dds-history] .dds-table-disclosure>summary::-webkit-details-marker{display:none}
-.v2-app--workspace [data-dds-history] .dds-table-disclosure>summary::marker{content:""}
-.v2-app--workspace [data-dds-history] .dds-group-marker{flex:0 0 12px;text-align:center;line-height:1}
+.v2-app--workspace [data-wallet-history-host] .ui-data-table--compact tr[data-table-group-level] .dds-table-disclosure>summary{padding-left:12px;gap:8px;list-style:none;cursor:pointer}
+.v2-app--workspace [data-wallet-history-host] .ui-data-table--compact tr[data-table-group-level="value"] .dds-table-disclosure>summary{padding-left:32px}
+.v2-app--workspace [data-wallet-history-host] .dds-table-disclosure>summary::-webkit-details-marker{display:none}
+.v2-app--workspace [data-wallet-history-host] .dds-table-disclosure>summary::marker{content:""}
+.v2-app--workspace [data-wallet-history-host] .dds-group-marker{flex:0 0 12px;text-align:center;line-height:1}
 .v2-app--workspace .desktop-service-groups-q :is([data-article-count],[data-service-group-count]){display:block;width:100%;text-align:right;font-weight:650;font-variant-numeric:tabular-nums}
-.v2-app--workspace [data-dds-history] .ui-data-table--compact tbody tr[hidden]{display:none!important}
+.v2-app--workspace [data-wallet-history-host] .ui-data-table--compact tbody tr[hidden]{display:none!important}
 }
 
 /* Desktop Service: one explicit grid row; section selection is independent
@@ -1322,3 +1322,11 @@
  .v2-app--workspace .ui-data-table--compact tbody tr[data-table-group-level="system"]>td :is(summary,button){text-transform:inherit}
  .v2-app--workspace .ui-data-table--compact tbody tr[hidden],.v2-app--workspace .ui-data-table--compact tbody[hidden]{display:none!important}
 }
+
+/* Grouping is a separate, reusable pre-section of the existing sorting X. */
+.people-sort-popup .sort-grouping-section{display:grid;gap:8px;padding:8px 12px 12px;border-bottom:1px solid var(--border);margin-bottom:8px}
+.people-sort-popup .sort-menu-section-label{font-size:12px;font-weight:650;line-height:1.25;color:var(--text-secondary)}
+.people-sort-popup .sort-grouping-options{display:grid;gap:8px}
+.people-sort-popup .sort-grouping-options>.ui-compact-check{display:flex;gap:10px;width:100%;min-height:var(--ui-compact-size,28px)}
+.people-sort-popup .sort-grouping-options .ui-compact-check__label{font-weight:550;line-height:1.25;color:var(--text)}
+.people-sort-popup .sort-menu-order-label{padding:0 12px 6px}
