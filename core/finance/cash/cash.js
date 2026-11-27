@@ -34,7 +34,7 @@ import { financeDesktop, financeZActions, financeZSave, financeQSubmit, financeH
 import { readOnlyReceipt } from '../../../ui/receipt/index.js';
 import { financeReceipt } from '../receipt.js';
 import { FINANCE_OPERATIONS_ICON, VIEW_ICON } from '../../../ui/buttons/index.js';
-import { walletHistoryRows, walletHistoryBody, bindWalletHistory } from './wallet-history.js';
+import { walletHistoryRows, walletHistoryBody, bindWalletHistory, walletOperationClassification } from './wallet-history.js';
 import { isV2DesktopWorkspace } from '../../../ui/v2/geometry.js';
 import { bindDesktopRailControls } from '../../../ui/v2/horizontal-affordance.js';
 import { canUseCapability } from '../../access.js';
@@ -141,8 +141,9 @@ function renderOperationRow(operation) {
   const name = personName(operation);
   const counterparty = String(operation?.counterparty || '').trim();
   const workplace = String(operation?.workplace || '').trim();
-  const label = operationName(operation);
-  const source = [name || counterparty, workplace].filter(Boolean).join(' · ');
+  const classification = walletOperationClassification(operation);
+  const label = classification.article || classification.title;
+  const source = [classification.article ? classification.title : '', name || counterparty, workplace].filter(Boolean).join(' · ');
   return v2ListEntry({
     overline: String(operation?.person?.uei || ''),
     title: label,

@@ -5,19 +5,21 @@ import {
 import { checkControl } from '../../../ui/selection/check-list.js';
 import { DATA_EXPORT_ICON } from '../../../ui/buttons/index.js';
 import { financeHistoryTable, financeTableContact } from '../desktop.js';
-import { getFinanceOperation } from '../data.js';
+import { getFinanceOperation, getFinanceArticles } from '../data.js';
+import { desktopDocumentArticles, desktopOperationDirection } from '../dds/classification.js';
 import { exportScopedWorkbook, reportExcelError } from '../../excel/scoped.js';
 
 const SORTS = [
   ['dateDesc','Дата — сначала новые'], ['dateAsc','Дата — сначала ранние'],
   ['titleAsc','Операция — от А до Я'], ['titleDesc','Операция — от Я до А'],
+  ['articleAsc','По статьям — от А до Я'], ['articleDesc','По статьям — от Я до А'],
   ['personAsc','Клиент / контрагент — от А до Я'], ['personDesc','Клиент / контрагент — от Я до А'],
   ['workplaceAsc','Рабочее пространство — от А до Я'], ['workplaceDesc','Рабочее пространство — от Я до А'],
   ['amountDesc','Сумма — по убыванию'], ['amountAsc','Сумма — по возрастанию'],
 ];
-const emptyFilters = () => ({ title:'', workplace:'', person:'', direction:'', from:'', to:'' });
-const ddsFilters = () => ({ ...emptyFilters(), wallet:'', article:'', status:'' });
-const DDS_SORTS = [...SORTS.filter(([key])=>!key.startsWith('title')), ['walletAsc','Кошелёк — от А до Я'], ['walletDesc','Кошелёк — от Я до А'], ['articleAsc','По статьям — от А до Я'], ['articleDesc','По статьям — от Я до А'],['bonusDesc','Бонусы — по убыванию'],['bonusAsc','Бонусы — по возрастанию']];
+const emptyFilters = () => ({ title:'', workplace:'', person:'', direction:'', article:'', from:'', to:'' });
+const ddsFilters = () => ({ ...emptyFilters(), wallet:'', status:'' });
+const DDS_SORTS = [...SORTS.filter(([key])=>!key.startsWith('title')), ['walletAsc','Кошелёк — от А до Я'], ['walletDesc','Кошелёк — от Я до А'], ['bonusDesc','Бонусы — по убыванию'],['bonusAsc','Бонусы — по возрастанию']];
 const money = value => new Intl.NumberFormat('ru-RU',{maximumFractionDigits:2}).format(value) + ' ₽';
 const clean = value => String(value ?? '').toLocaleLowerCase('ru').replace(/ё/g,'е').replace(/\s+/g,' ').trim();
 const numeric = value => String(value ?? '').replace(/[^0-9]/g,'');
@@ -29,13 +31,23 @@ export function localDate(value) {
   return [date.getFullYear(),String(date.getMonth()+1).padStart(2,'0'),String(date.getDate()).padStart(2,'0')].join('-');
 }
 
-export function walletHistoryRows(operations, people, { operationName, operationMoment }) {
+// Cash shares DDS classification, but only includes this wallet's actual ledger entries.
+export function walletOperationClassification(item, catalog = getFinanceArticles()) {
+  const entries = Array.isArray(item.entries) && item.entries.length ? item.entries : [item];
+  const directions = new Set(entries.map(entry=>entry.direction).filter(Boolean));
+  const transfer = item.operationKind==='transfer' || entries.some(entry=>entry.economicType==='TRANSFER');
+  const direction = transfer ? 'transfer' : directions.size>1 ? 'mixed' : directions.has('OUT') ? 'out' : directions.has('IN') ? 'in' : Number(item.total)<0 ? 'out' : 'in';
+  const articles = desktopDocumentArticles(entries,catalog);
+  return { direction, title:desktopOperationDirection(direction), articles, article:articles.join(', ') };
+}
+
+export function walletHistoryRows(operations, people, { operationName, operationMoment, catalog = getFinanceArticles() }) {
   return operations.map(item => {
     const value = Number(item.total)||0;
     const occurredAt = String(item.occurredAt||'');
     const contact=financeTableContact(item,people);
     return { id:String(item.operationId), date:operationMoment(item), occurredAt, localDate:localDate(occurredAt),
-      title:operationName(item), ...contact, personFilter:[contact.code,contact.person].filter(Boolean).join(' · '),
+      ...walletOperationClassification(item,catalog), operationLabel:operationName(item), ...contact, personFilter:[contact.code,contact.person].filter(Boolean).join(' · '),
       workplace:String(item.workplace||''), amount:money(value), value, item };
   });
 }
@@ -89,7 +101,7 @@ export function walletExportRows(rows, wallet, lookup=getFinanceOperation) {
       invoiceTime:String(quote.invoiceTime||row.date.split(' ')[1]||''),
       participantCode:row.code, participant:row.person, phone:row.contact,
       documentNumber:String(quote.documentNumber||data.documentNumber||row.id),
-      purpose:row.title, subject:String(quote.subject||data.subject||item.sourceDetails||item.articleName||data.financeEntityName||''),
+      purpose:row.operationLabel||row.article||row.title, subject:String(quote.subject||data.subject||item.sourceDetails||item.articleName||data.financeEntityName||''),
       direction:row.value<0?'Расход':'Приход', price:quote.price==null?'':Number(quote.price), discount,
       quotedTotal:quote.quotedTotal==null?'':Number(quote.quotedTotal),
       amount:Math.abs(row.value), paymentDate:date, wallet:String(wallet.name||''),
@@ -107,13 +119,12 @@ function filterFields(rows, filters, dds = false) {
   const values = key => [{value:'',label:'Без фильтра'},...[...new Set(rows.flatMap(row=>row[key]||[]).filter(Boolean))]
     .sort((a,b)=>a.localeCompare(b,'ru',{numeric:true})).map(value=>({value,label:value}))];
   return '<div class="form-grid">'
-    +(dds?'':select({label:'Операция',name:'title',value:filters.title,options:choices(rows,'title')}))
     +select({label:'Клиент / контрагент',name:'person',value:filters.person,options:choices(rows,'personFilter')})
     +select({label:'Рабочее пространство',name:'workplace',value:filters.workplace,options:choices(rows,'workplace')})
-    +select({label:dds?'Операция':'Движение',name:'direction',value:filters.direction,options:[{value:'',label:'Без фильтра'},{value:'in',label:'Приход'},{value:'out',label:'Расход'},...(dds?[{value:'transfer',label:'Транзакция'}]:[])]})
-    +(dds?select({label:'Кошелёк',name:'wallet',value:filters.wallet,options:values('wallets')})
-      +select({label:'Статья',name:'article',value:filters.article,options:values('articles')})
-      +select({label:'Статус',name:'status',value:filters.status,options:choices(rows,'status')}):'')
+    +select({label:'Операция',name:'direction',value:filters.direction,options:[{value:'',label:'Без фильтра'},{value:'in',label:'Приход'},{value:'out',label:'Расход'},{value:'transfer',label:'Транзакция'}]})
+    +(dds?select({label:'Кошелёк',name:'wallet',value:filters.wallet,options:values('wallets')}):'')
+    +select({label:'Статья',name:'article',value:filters.article,options:values('articles')})
+    +(dds?select({label:'Статус',name:'status',value:filters.status,options:choices(rows,'status')}):'')
     +'<div class="form-grid form-grid--two">'
     +datePicker({name:'from',label:'',placeholder:'С даты',value:filters.from,allowClear:true,modalSurface:'app'})
     +datePicker({name:'to',label:'',placeholder:'По дату',value:filters.to,allowClear:true,modalSurface:'app'})
@@ -186,6 +197,7 @@ export function bindWalletHistory(layer,wallet,rows,{open,settings,dds=false,act
   const stateKey=dds?'ddsHistoryState':'walletHistoryState';
   const state=layer[stateKey] ||= {query:'',filters:dds?ddsFilters():emptyFilters(),sort:dds?'articleAsc':'dateDesc',selected:new Set()};
   const tools=actions.filter(Boolean);
+  if(!dds){state.filters={...emptyFilters(),...state.filters,title:''};if(!SORTS.some(([key])=>key===state.sort))state.sort='dateDesc';}
   if(dds){state.collapsed ||= new Set();if(!DDS_SORTS.some(([key])=>key===state.sort))state.sort='articleAsc';state.filters.title='';if(state.filters.direction==='mixed')state.filters.direction='transfer';}
   const [toolbar]=setV2ZHeaderRows(layer,[
     '<section data-people-desktop-toolbar><div class="people-desktop-tools">'
@@ -226,7 +238,7 @@ export function bindWalletHistory(layer,wallet,rows,{open,settings,dds=false,act
     host.innerHTML=visible.length?financeHistoryTable(visible,dds?'Все операции':'Операции кошелька',[
       {key:'select',label:'',narrow:true,header:()=>check('data-wallet-select-all','Выбрать все видимые операции',visible.every(row=>state.selected.has(row.id))),render:row=>check('data-wallet-select="'+escapeHtml(row.id)+'"','Выбрать операцию '+row.title,state.selected.has(row.id))},
       {key:'date',label:'Дата',narrow:true},{key:'title',label:'Операция',...(dds?{secondaryKey:'wallet',secondaryLabel:'Источник'}:{})},{key:'code',label:'Код',narrow:true},
-      {key:'person',label:'Клиент / контрагент'},{key:'workplace',label:'Рабочее пространство'},...(dds&&!grouped?[{key:'article',label:'Статья'}]:[]),{key:'amount',label:dds?'Деньги':'Сумма',narrow:true},...(dds?[{key:'bonus',label:'Бонусы',narrow:true}]:[]),
+      {key:'person',label:'Клиент / контрагент'},{key:'workplace',label:'Рабочее пространство'},...(!grouped?[{key:'article',label:'Статья'}]:[]),{key:'amount',label:dds?'Деньги':'Сумма',narrow:true},...(dds?[{key:'bonus',label:'Бонусы',narrow:true}]:[]),
     ]):emptyState(rows.length?'Операции не найдены':'Операций пока нет',rows.length?'Измените условия поиска или фильтрации.':(dds?'Финансовые операции появятся здесь.':'Движения по этой кассе появятся здесь.'));
     if(grouped&&visible.length)applyDDSHierarchy(host,visible,state.collapsed);
     host.querySelectorAll('[data-wallet-select]').forEach(control=>control.addEventListener('change',()=>{
