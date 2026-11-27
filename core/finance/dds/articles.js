@@ -1,3 +1,4 @@
+import { groupValuesMarkup, groupValueDraft, groupEditorActions, confirmGroupRemoval, renderGroupValues, renderGroupDirectory } from '../../../ui/groups/group-values.js';
 import {
   actionBlock,
   button,
@@ -119,9 +120,9 @@ function openArticleX(existing = null, onSaved = () => {}, getArticles = getFina
     ${field({label:'Название',name:'articleName',value:existing?.name||'',required:true,readonly:isSystem,placeholder:'Например, Краска'})}
     ${desktop?select({label:'Направление',name:'direction',value:direction,options:desktopDirections}):select({label:'Группа',name:'parentArticleId',value:existingParent,options:parentOptions(items,existing?.articleId||'')})+select({label:'Направление',name:'direction',value:direction,options:DIRECTION_OPTIONS})}
     ${desktop?'':select({label:'Назначение',name:'economicType',value:economicType,options:economicOptions})}
-    ${desktop&&existing&&existing.direction!=='TRANSFER'?'<div class="desktop-group-values"><div class="stock-position-group-heading"><span>Значения</span>'+compactAddButton({data:'data-article-value-add',aria:'Добавить значение'})+'</div><div data-article-value-draft></div><div data-article-values data-service-group-value-list></div></div>':''}
+    ${desktop&&existing&&existing.direction!=='TRANSFER'?groupValuesMarkup({addData:'data-article-value-add',draftData:'data-article-value-draft',listData:'data-article-values'}):''}
     <div class="form-error" role="alert" data-article-error></div>
-    ${desktop?actionBlock((existing&&!isSystem?button('Удалить',{variant:'danger',data:'data-delete-finance-article data-desktop-group-delete'}):'')+button('Сохранить',{type:'submit',data:'data-finance-article-save data-desktop-group-save',disabled:true}),{className:'desktop-group-editor-actions'}):'<div class="modal-actions finance-receipt-actions finance-receipt-actions--dds">'+(existing&&!isSystem?button('Удалить',{variant:'danger',data:'data-delete-finance-article'}):'')+button('Сохранить',{type:'submit',data:'data-finance-article-save',disabled:true})+'</div>'}
+    ${desktop?groupEditorActions({canDelete:Boolean(existing&&!isSystem),removeData:'data-delete-finance-article',saveData:'data-finance-article-save'}):'<div class="modal-actions finance-receipt-actions finance-receipt-actions--dds">'+(existing&&!isSystem?button('Удалить',{variant:'danger',data:'data-delete-finance-article'}):'')+button('Сохранить',{type:'submit',data:'data-finance-article-save',disabled:true})+'</div>'}
   </form>`;
   const layer=mountModal(document.body,modal(content,{title,variant:'x',surface:'app',...(desktop?{xRole:'editor',className:'desktop-service-group-editor-x'}:{className:'modal--form-sheet'})}));
   if(!layer)return null;
@@ -166,25 +167,23 @@ function openArticleX(existing = null, onSaved = () => {}, getArticles = getFina
   };
   const drawValues=()=>{
     if(!valueHost)return;
-    const values=currentValues();
-    valueHost.innerHTML=values.length?list({className:'ui-list--dense list-entries',items:values.map(a=>({title:a.name,interactive:false,selected:valueEdit?.articleId===a.articleId,data:'data-desktop-group-value data-article-value="'+escapeHtml(a.articleId)+'"',aria:'Изменить значение '+a.name}))}):emptyState('Значений пока нет');
-    for(const node of valueHost.querySelectorAll('[data-article-value]')){
-      const a=values.find(v=>v.articleId===node.dataset.articleValue);
-      const startEdit=()=>{if(pending||valueEdit||JSON.stringify(read())!==initial)return;valueEdit={articleId:a.articleId,name:a.name};drawDraft();drawValues();draftHost.querySelector('input')?.focus();};
-      const editTarget=node.querySelector('.ui-list__main');
-      if(editTarget){editTarget.tabIndex=0;editTarget.setAttribute('role','button');editTarget.setAttribute('aria-label','Изменить значение '+a.name);editTarget.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();startEdit();}});}
-      node.addEventListener('click',event=>{if(!event.target.closest('[data-article-value-delete]'))startEdit();});
-      node.insertAdjacentHTML('beforeend',compactRemoveButton({data:'data-article-value-delete data-desktop-value-row-delete title="Удалить значение"',aria:'Удалить значение '+a.name}));
-      node.querySelector('[data-article-value-delete]')?.addEventListener('click',event=>{
-        event.stopPropagation();if(pending||valueEdit||JSON.stringify(read())!==initial)return;
-        openFinanceDeleteConfirmation(layer,{closeOwner:false,message:'Значение «'+a.name+'» будет удалено из списка. Проведённые операции останутся в истории.',onConfirm:async()=>{if(pending||valueEdit||JSON.stringify(read())!==initial)throw new Error('Завершите редактирование.');pending=true;sync();try{return await archiveFinanceArticle(a.articleId);}finally{pending=false;sync();}},onSuccess:()=>{onSaved();drawValues();}});
-      });
-    }
+    renderGroupValues(valueHost,{
+      values:currentValues(),getId:a=>a.articleId,selectedId:valueEdit?.articleId,
+      valueData:a=>'data-article-value="'+escapeHtml(a.articleId)+'"',removeData:'data-article-value-delete',
+      onEdit:a=>{if(pending||valueEdit||JSON.stringify(read())!==initial)return;valueEdit={articleId:a.articleId,name:a.name};drawDraft();drawValues();draftHost.querySelector('input')?.focus();},
+      onRemove:a=>{
+        if(pending||valueEdit||JSON.stringify(read())!==initial)return;
+        confirmGroupRemoval({title:'Удалить значение?',message:'Значение «'+a.name+'» будет удалено из списка. Проведённые операции останутся в истории.',onConfirm:async()=>{
+          if(pending||valueEdit||JSON.stringify(read())!==initial)throw new Error('Завершите редактирование.');
+          pending=true;sync();try{return await archiveFinanceArticle(a.articleId);}finally{pending=false;sync();}
+        },onSuccess:()=>{onSaved();drawValues();}});
+      },
+    });
     sync();
   };
   const drawDraft=()=>{
     if(!draftHost)return;
-    draftHost.innerHTML=valueEdit?field({label:'Наименование значения',name:'valueName',value:valueEdit.name,required:true,maxlength:80}):'';
+    draftHost.innerHTML=groupValueDraft(valueEdit);
     sync();
   };
   plus?.addEventListener('click',()=>{if(pending||valueEdit||JSON.stringify(read())!==initial)return;valueEdit={articleId:'',name:''};drawDraft();drawValues();draftHost.querySelector('input')?.focus();});
@@ -214,11 +213,13 @@ function openArticleX(existing = null, onSaved = () => {}, getArticles = getFina
   });
   remove?.addEventListener('click',()=>{
     if(pending)return;
-    openFinanceDeleteConfirmation(layer,{
-      message:'Статья будет удалена из списка доступных статей. Ранее проведённые операции останутся в истории. Вы уверены?',
-      onConfirm:()=>archiveFinanceArticle(existing.articleId),
-      onSuccess:onSaved,
-    });
+    if(desktop){
+      confirmGroupRemoval({title:'Удалить статью?',message:articleRemovalMessage(existing),onConfirm:async()=>{
+        const fresh=getArticles().find(a=>a.articleId===existing.articleId);
+        if(pending||!fresh||fresh.systemKey)throw new Error('Статья недоступна для удаления.');
+        pending=true;sync();try{return await archiveFinanceArticle(existing.articleId);}finally{pending=false;sync();}
+      },onSuccess:()=>{layer.v2Close?.();onSaved();}});
+    }else openFinanceDeleteConfirmation(layer,{message:articleRemovalMessage(existing),onConfirm:()=>archiveFinanceArticle(existing.articleId),onSuccess:onSaved});
   });
   drawValues();sync();
   return layer;
@@ -307,41 +308,15 @@ function desktopArticleRows(items,state){
       &&(!f.parent||f.parent===(a.parentArticleId?'id:'+a.parentArticleId:'root'));
   }).map(a=>({...a,childCount:desktopArticleValues(articles,a.articleId).length}));
 }
+const articleRemovalMessage=item=>'Статья «'+item.name+'» и все её значения будут удалены из доступного справочника. Проведённые операции останутся в истории.';
 function renderDesktopArticleTable(host,rows,collapsed,onOpen,onDelete){
-  const columns=[
-    {key:'name',label:'Наименование',sortable:false,render:a=>{
-      const name=escapeHtml(a.name);
-      const attrs=' data-article-row="'+escapeHtml(a.articleId)+'" style="--article-indent:'+Math.min(a.depth,5)*12+'px"';
-      return a.systemKey&&a.direction==='TRANSFER'
-        ? '<span class="desktop-group-table-name"'+attrs+'>'+name+'</span>'
-        : '<button type="button" class="desktop-group-table-name"'+attrs+' data-finance-article="'+escapeHtml(a.articleId)+'" aria-label="'+escapeHtml('Открыть статью '+a.name)+'">'+name+'</button>';
-    }},
-    {key:'values',label:'Значения',sortable:false,render:a=>String(a.childCount)},
-    {key:'delete',label:'',narrow:true,sortable:false,render:a=>a.systemKey?'':compactRemoveButton({data:'data-article-row-delete data-desktop-group-row-delete title="Удалить статью"',aria:'Удалить статью '+a.name})},
-  ];
-  host.innerHTML='<div class="desktop-table-popup">'+dataTable({columns,rows,caption:'Статьи',compact:true})+'</div>';
-  const original=host.querySelector('tbody');if(!original)return;
-  const table=original.closest('table'),doc=host.ownerDocument;
-  const byId=new Map([...original.querySelectorAll('[data-article-row]')].map(e=>[e.dataset.articleRow,e.closest('tr')]));
-  for(const [direction,label] of [['IN','ПРИХОД'],['OUT','РАСХОД'],['TRANSFER','ТРАНЗАКЦИЯ']]){
-    const members=rows.filter(a=>a.direction===direction);
-    if(!members.length)continue;
-    const heading=doc.createElement('tbody'),row=heading.insertRow();row.dataset.tableGroupLevel='system';
-    const cell=row.insertCell();cell.colSpan=columns.length;
-    cell.innerHTML='<button type="button" class="desktop-group-section-toggle" aria-expanded="'+!collapsed.has(direction)+'"><span aria-hidden="true">'+(collapsed.has(direction)?'▸':'▾')+'</span><span>'+label+'</span></button>';
-    table.append(heading);
-    const body=doc.createElement('tbody');table.append(body);body.hidden=collapsed.has(direction);
-    const toggle=cell.querySelector('button');toggle.addEventListener('click',()=>{
-      if(collapsed.has(direction))collapsed.delete(direction);else collapsed.add(direction);
-      body.hidden=collapsed.has(direction);toggle.setAttribute('aria-expanded',String(!body.hidden));toggle.firstElementChild.textContent=body.hidden?'▸':'▾';
-    });
-    for(const a of members){
-      const tr=byId.get(a.articleId);if(!tr)continue;body.append(tr);
-      if(!a.systemKey||a.direction!=='TRANSFER')tr.addEventListener('click',event=>{if(!event.target.closest('[data-table-column="delete"]'))onOpen(a.articleId);});
-      tr.querySelector('[data-article-row-delete]')?.addEventListener('click',event=>{event.stopPropagation();if(!a.systemKey)onDelete(a.articleId);});
-    }
-  }
-  original.remove();
+  return renderGroupDirectory(host,{
+    rows,sections:[['IN','ПРИХОД'],['OUT','РАСХОД'],['TRANSFER','ТРАНЗАКЦИЯ']],collapsed,caption:'Статьи',
+    getId:a=>a.articleId,getSection:a=>a.direction,getCount:a=>a.childCount,getDepth:a=>a.depth,
+    canOpen:a=>!a.systemKey||a.direction!=='TRANSFER',canDelete:a=>!a.systemKey,
+    nameData:a=>'data-article-row="'+escapeHtml(a.articleId)+'"'+(!a.systemKey||a.direction!=='TRANSFER'?' data-finance-article="'+escapeHtml(a.articleId)+'"':''),
+    deleteData:'data-article-row-delete',deleteLabel:'Удалить статью',openLabel:'Открыть статью',onOpen,onDelete,
+  });
 }
 // The DDS directory is a tool, not a navigation destination. The same Q
 // and compact X editor are used on desktop and mobile; persisted Core article
@@ -376,7 +351,7 @@ export function openFinanceArticlesQ(root, {onSaved=()=>{}}={}) {
   const deleteFromDirectory=id=>{
     const item=getArticles().find(a=>a.articleId===id);
     if(busy||!item||item.systemKey)return;
-    openFinanceDeleteConfirmation(layer,{closeOwner:false,message:'Статья «'+item.name+'» будет удалена из списка доступных статей. Ранее проведённые операции останутся в истории.',onConfirm:async()=>{const fresh=getArticles().find(a=>a.articleId===id);if(busy||!fresh||fresh.systemKey)throw new Error('Статья недоступна для удаления.');busy=true;syncDirectory();try{return await archiveFinanceArticle(id);}finally{busy=false;syncDirectory();}},onSuccess:()=>changed()});
+    confirmGroupRemoval({title:'Удалить статью?',message:articleRemovalMessage(item),onConfirm:async()=>{const fresh=getArticles().find(a=>a.articleId===id);if(busy||!fresh||fresh.systemKey)throw new Error('Статья недоступна для удаления.');busy=true;syncDirectory();try{return await archiveFinanceArticle(id);}finally{busy=false;syncDirectory();}},onSuccess:()=>changed()});
   };
   const refresh=()=>{
     const items=getArticles();
