@@ -53,6 +53,7 @@ import {
   deleteWallet as deleteWalletData,
   deleteWalletPermanently,
   getWalletBalance,
+  getWalletTotalBalance,
   getWalletHistory,
   getWallets,
   saveWallet as saveWalletData,
@@ -450,7 +451,12 @@ function renderDesktopCashTools(root) {
     financeOperationGroups({ groups }).length ? button(operationsIcon, { variant: 'secondary', className: 'v2-desktop-tool-icon', data: 'data-cash-desktop-operations title="Финансовые операции"', aria: 'Финансовые операции' }) : '',
     canCreateCashEntity() ? button('+', { variant: 'secondary', className: 'v2-desktop-tool-primary', data: 'data-cash-desktop-add aria-haspopup="dialog"', aria: 'Добавить' }) : '',
   ].filter(Boolean);
-  const [row] = setV2ZHeaderRows(root, tools.length ? ['<div class="v2-desktop-tool-row"><div class="v2-desktop-tool-actions" data-cash-desktop-tools>' + tools.join('') + '</div></div>'] : [], { desktopTitle: 'Касса' });
+  const [row] = setV2ZHeaderRows(root, tools.length ? ['<div class="v2-desktop-tool-row"><div class="v2-desktop-tool-actions" data-cash-desktop-tools>' + tools.join('') + '</div></div>'] : [], {
+    desktopTitle: 'Касса',
+    desktopAccessory: canUseCapability('finance.cash.access')
+      ? '<output data-cash-total aria-label="Общий остаток кошельков" aria-live="polite">' + escapeHtml(formatMoney(getWalletTotalBalance())) + '</output>'
+      : '',
+  });
   row?.querySelector('[data-cash-desktop-view]')?.addEventListener('click', () => openCashAppearanceQ(root));
   const operations = row?.querySelector('[data-cash-desktop-operations]');
   operations?.addEventListener('click', () => openFinanceOperations(root, { groups, anchor: operations, onSaved: () => renderList(root) }));
@@ -1568,7 +1574,10 @@ function openOperationSettings(root, walletLayer, operationLayer, wallet, operat
       reason: 'incorrect-entry',
       occurredAt: new Date(),
     }),
-    onSuccess: () => renderWalletLayer(root, walletLayer, wallet.id),
+    onSuccess: () => {
+      renderWalletLayer(root, walletLayer, wallet.id);
+      if (financeDesktop(root) && root.isConnected) renderList(root);
+    },
   });
 }
 
