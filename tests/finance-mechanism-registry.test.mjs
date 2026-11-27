@@ -89,3 +89,24 @@ assert.equal(buildDDSGroups(viewRows,{groupValues:true,catalog:viewCatalog}).len
 assert.equal(buildDDSGroups(viewRows,{}).length,0);
 assert.deepEqual(DDS_SORTS.map(x=>x[0]),['dateDesc','dateAsc','code','person','workplace','wallet','amount','bonus']);
 console.log('PASS independent DDS grouping and simplified sorting');
+
+// Full matrix: each sort, both independent grouping switches, every leaf
+// preserved once, and the same sort inside each leaf group.
+const matrixOptions={wallets:[{id:'cash'},{id:'bank'}],workplaces:[{name:'B'},{name:'A'}],people:[{uei:'10'},{uei:'2'}]};
+const expectedSort={dateDesc:['unknown','new10','new2','old2'],dateAsc:['old2','new2','new10','unknown'],code:['new2','old2','new10','unknown'],person:['new10','new2','old2','unknown'],workplace:['new2','old2','unknown','new10'],wallet:['new10','new2','unknown','old2'],amount:['new10','new2','old2','unknown'],bonus:['new2','unknown','new10','old2']};
+let matrixCount=0;
+for(const [mode] of DDS_SORTS){
+ const sorted=sortDDSRows(viewRows,mode,matrixOptions);
+ assert.deepEqual(sorted.map(r=>r.id),expectedSort[mode],mode);
+ for(const groupArticles of [false,true])for(const groupValues of [false,true]){
+  const state=normalizeDDSView({sort:mode,groupArticles,groupValues});
+  assert.equal(state.groupArticles,groupArticles);assert.equal(state.groupValues,groupValues);
+  const groups=buildDDSGroups(sorted,{...state,catalog:viewCatalog,order:['purchase','services']});
+  const leaves=groups.length?flattenDDSGroups(groups):sorted;
+  assert.deepEqual(leaves.map(r=>r.id).sort(),viewRows.map(r=>r.id).sort());
+  const inspect=g=>{if(g.children?.length)g.children.forEach(inspect);else assert.deepEqual(g.rows.map(r=>r.id),sorted.filter(r=>g.rows.some(x=>x.id===r.id)).map(r=>r.id));};
+  groups.forEach(inspect);matrixCount++;
+ }
+}
+assert.equal(matrixCount,32);
+console.log('PASS 32 DDS sorting/grouping combinations');
