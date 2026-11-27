@@ -564,8 +564,8 @@
    white-space:normal;
    border-bottom:1px solid #E0D6D6;
  }
- .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact td{
-   height:var(--h-list-row);box-sizing:border-box;padding:4px 12px;font-size:13px;color:var(--text);border-bottom:1px solid #E0D6D6;
+ .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact tbody tr:not([data-table-group-level])>td{
+   box-sizing:border-box;padding:4px 12px;font-size:13px;color:var(--text);border-bottom:1px solid #E0D6D6;
  }
  .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact td>button{font-weight:650}
  .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact tbody tr{cursor:default}
@@ -577,7 +577,7 @@
  .v2-app--workspace>.v2-header:has(.v2-desktop-toolbar-context)::after{content:"";position:absolute;inset-inline-start:var(--v2-desktop-sidebar-width);inset-inline-end:0;bottom:-1px;height:1px;background:rgba(255,255,255,.14);pointer-events:none}
 }
 @media (min-width:768px) and (max-width:1024px) and (min-height:600px){
- .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact td{padding:4px 8px}
+ .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact tbody tr:not([data-table-group-level])>td{padding:4px 8px}
 }
 
 /* Contacts: approved pearl controls; equal compact date columns.
@@ -750,7 +750,7 @@
    Keep mobile Z and all Q geometry intact. */
 [data-h-title-row]{display:none}
 @media (min-width:768px) and (min-height:600px){
-.v2-app--workspace{--h-inset:36px;--h-top:36px;--h-bottom:48px;--h-title:36px;--h-gap:24px;--h-tools:36px;--h-list-tool-row:42px;--h-list-row:44px;--h-content-gap:24px}
+.v2-app--workspace{--h-inset:36px;--h-top:36px;--h-bottom:48px;--h-title:36px;--h-gap:24px;--h-tools:36px;--h-list-tool-row:42px;--h-list-row:44px;--desktop-table-disclosure-row:30px;--h-content-gap:24px}
 .v2-app--workspace [data-v2-z-header]>[data-v2-z-dismiss]{display:none!important;visibility:hidden!important;pointer-events:none!important}
 .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z{padding:var(--h-top) var(--h-inset) var(--h-bottom)}
 .v2-app--workspace[data-v2-desktop-surface] .v2-front>.v2-z>[data-v2-z-header]{display:grid!important;grid-template-columns:minmax(0,1fr)!important;grid-template-rows:var(--h-title) minmax(var(--h-tools),auto);align-items:center;gap:var(--h-gap);width:100%;max-width:none;align-self:stretch;min-height:0!important;margin:0!important;padding:0 0 var(--h-content-gap)!important;background:var(--v2-base)!important}
@@ -1203,8 +1203,8 @@
 /* Drag first, selection second, editable action last. System headings are not draggable. */
 .v2-app--workspace [data-service-table-kind] [data-service-position] .service-table-edit{grid-column:10;justify-self:center;align-self:center;box-sizing:border-box;width:var(--ui-compact-size);height:var(--ui-compact-size);min-height:var(--ui-compact-size);padding:0;border:0;background:transparent;color:var(--text);font-size:20px;font-weight:400;line-height:1}
 .v2-app--workspace [data-service-table-kind] [data-service-collapse-key]{position:relative}
-.v2-app--workspace [data-dds-history] .ui-data-table--compact tr[data-table-group-level]>td{padding:0}
-.v2-app--workspace [data-dds-history] .ui-data-table--compact tr[data-table-group-level] .dds-table-disclosure>summary{box-sizing:border-box;cursor:pointer;min-height:var(--h-list-row);display:flex;align-items:center;padding:0 40px 0 12px;color:inherit;background:transparent;white-space:normal;font:inherit}
+
+.v2-app--workspace .ui-data-table--compact tr[data-table-group-level] .dds-table-disclosure>summary{display:flex;align-items:center;padding-inline:12px 40px;color:inherit;background:transparent;white-space:normal;font:inherit}
 .v2-app--workspace [data-dds-history] .ui-data-table--compact tr[data-table-group-level="group"] .dds-table-disclosure>summary{padding-left:32px}
 .v2-app--workspace [data-dds-history] .ui-data-table--compact tbody tr[hidden]{display:none!important}
 }
@@ -1225,9 +1225,8 @@
 
 /* Service disclosure rows divide the catalogue without taking a full data row. */
 @media (min-width:768px) and (min-height:600px){
- .v2-app--workspace [data-service-table-kind]{--service-disclosure-row:30px}
- .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-table-kind] [data-service-collapse-key]>details>summary.inventory-editor-summary{box-sizing:border-box;height:var(--service-disclosure-row);min-height:var(--service-disclosure-row);max-height:var(--service-disclosure-row);padding-block:4px;line-height:21px}
- .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-table-kind] [data-service-collapse-key]>.inventory-editor-heading__controls{top:0;height:var(--service-disclosure-row);min-height:0;align-items:center}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-table-kind] [data-service-collapse-key]>details>summary.inventory-editor-summary{box-sizing:border-box;height:var(--desktop-table-disclosure-row);min-height:var(--desktop-table-disclosure-row);max-height:var(--desktop-table-disclosure-row);padding-block:4px;line-height:21px}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-table-kind] [data-service-collapse-key]>.inventory-editor-heading__controls{top:0;height:var(--desktop-table-disclosure-row);min-height:0;align-items:center}
 }
 
 /* Products have no duration columns: compact the actual grid, not just its cells. */
@@ -1243,7 +1242,7 @@
 /* Q group directory uses the existing compact data table and shared reorder handle. */
 @media (min-width:768px) and (min-height:600px){
  .v2-app--workspace .desktop-service-groups-q [data-desktop-group-directory-table] tbody.list-entries{display:table-row-group}
- .v2-app--workspace .desktop-service-groups-q [data-desktop-group-directory-table] :is(th,td){box-sizing:border-box;height:var(--h-list-row);padding:4px 8px;vertical-align:middle}
+ .v2-app--workspace .desktop-service-groups-q [data-desktop-group-directory-table] :is(thead th,tbody tr:not([data-table-group-level])>td){padding-inline:8px}
  .v2-app--workspace .desktop-service-groups-q [data-desktop-group-directory-table] :is(th,td)[data-table-column="drag"]{width:36px;padding:0;text-align:center}
  .v2-app--workspace .desktop-service-groups-q [data-desktop-group-directory-table] :is(th,td)[data-table-column="values"]{width:104px;padding-inline:12px;text-align:center;font-variant-numeric:tabular-nums}
  .v2-app--workspace .desktop-service-groups-q [data-desktop-group-directory-table] :is(th,td)[data-table-column="delete"]{width:40px;padding:0 6px;text-align:center}
@@ -1258,7 +1257,6 @@
 
 /* Q group directory: one header and two independent section reorder scopes. */
 @media (min-width:768px) and (min-height:600px){
- .v2-app--workspace .desktop-service-groups-q [data-desktop-group-directory-table] tr[data-table-group-level="system"]>td{height:30px;padding:4px 12px;background:var(--desktop-table-system-bg);color:var(--desktop-table-system-ink);font-size:12px;font-style:normal;font-weight:750;line-height:20px;cursor:default}
  .v2-app--workspace .desktop-service-groups-q [data-desktop-group-directory-table] .desktop-group-directory-empty{color:var(--text-secondary);cursor:default}
 }
 
@@ -1267,8 +1265,7 @@
  .v2-app--workspace .desktop-service-group-editor-x [data-service-group-value-list] .list-entry__reorder-handle{height:var(--ui-compact-size);width:var(--ui-compact-size);flex-basis:var(--ui-compact-size)}
  .v2-app--workspace .desktop-service-group-editor-x [data-desktop-group-delete][hidden]{display:none!important}
  .v2-app--workspace .desktop-service-groups-q [data-desktop-group-directory-table] tbody[hidden]{display:none!important}
- .v2-app--workspace .desktop-service-groups-q [data-desktop-group-directory-table] tr[data-table-group-level="system"]>td{padding:0;height:30px}
- .v2-app--workspace .desktop-service-groups-q [data-desktop-group-directory-table] tr[data-table-group-level="system"]>td>.desktop-group-section-toggle{display:flex;align-items:center;gap:8px;width:100%;height:29px;min-height:29px;padding:0 12px;border:0;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer;touch-action:manipulation}
+ .v2-app--workspace .desktop-service-groups-q [data-desktop-group-directory-table] tr[data-table-group-level="system"]>td>.desktop-group-section-toggle{display:flex;align-items:center;gap:8px;width:100%;height:calc(var(--desktop-table-disclosure-row) - 1px);min-height:calc(var(--desktop-table-disclosure-row) - 1px);padding:0 12px;border:0;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer;touch-action:manipulation}
 }
 
 /* Desktop group editor: use the existing H surface token for primary Save. */
@@ -1281,4 +1278,19 @@
  .v2-app--workspace .desktop-service-group-editor-x .desktop-group-editor-actions>[data-desktop-group-save]{margin-inline-start:auto}
  .v2-app--workspace .desktop-service-group-editor-x [data-desktop-group-value] .ui-list__main{cursor:pointer;touch-action:manipulation}
  .v2-app--workspace .desktop-service-group-editor-x [data-desktop-value-row-delete]{flex:0 0 var(--ui-compact-size);margin:0;color:#ff1111;touch-action:manipulation}
+}
+
+/* Shared Desktop table geometry: data/header and hierarchy are distinct row types.
+   Domain modules provide columns, content, and grouping level only. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace .ui-data-table--compact{border-radius:var(--radius-control,14px);border-color:var(--border);background:var(--white)}
+ .v2-app--workspace .ui-data-table--compact :is(thead tr,tbody tr:not([data-table-group-level])){height:var(--h-list-row)}
+ .v2-app--workspace .ui-data-table--compact :is(thead th,tbody tr:not([data-table-group-level])>td){box-sizing:border-box;height:var(--h-list-row);padding-block:4px;vertical-align:middle}
+ .v2-app--workspace .ui-data-table--compact tbody tr[data-table-group-level]{height:var(--desktop-table-disclosure-row);min-height:var(--desktop-table-disclosure-row)}
+ .v2-app--workspace .ui-data-table--compact tbody tr[data-table-group-level]>td{box-sizing:border-box;height:var(--desktop-table-disclosure-row);min-height:var(--desktop-table-disclosure-row);padding-block:0;vertical-align:middle;background:var(--table-level-bg);color:var(--table-level-ink);font-weight:750;font-style:normal;line-height:1.2}
+ .v2-app--workspace .ui-data-table--compact tbody tr[data-table-group-level]>td:has(>.dds-table-disclosure,>.desktop-group-section-toggle){padding:0}
+ .v2-app--workspace .ui-data-table--compact tbody tr[data-table-group-level]>td>.dds-table-disclosure>summary{box-sizing:border-box;height:calc(var(--desktop-table-disclosure-row) - 1px);min-height:calc(var(--desktop-table-disclosure-row) - 1px);max-height:calc(var(--desktop-table-disclosure-row) - 1px);padding-block:0;cursor:pointer;touch-action:manipulation;line-height:1.2}
+ .v2-app--workspace .ui-data-table--compact tbody tr[data-table-group-level="system"]>td{font-size:12px;text-transform:uppercase;white-space:normal}
+ .v2-app--workspace .ui-data-table--compact tbody tr[data-table-group-level="system"]>td :is(summary,button){text-transform:inherit}
+ .v2-app--workspace .ui-data-table--compact tbody tr[hidden],.v2-app--workspace .ui-data-table--compact tbody[hidden]{display:none!important}
 }

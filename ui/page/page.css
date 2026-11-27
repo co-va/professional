@@ -26,7 +26,5 @@
 /* Same H row token as the approved Clients table, for standardized Desktop
    lists only. Preserve horizontal room for data instead of growing rows. */
 @media (min-width:768px) and (min-height:600px){
- .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z:has([data-v2-z-header-row]>.v2-desktop-tool-row,[data-people-desktop-toolbar]) .ui-data-table--compact :is(th,td){box-sizing:border-box;height:var(--h-list-row);padding-block:4px}
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z:has([data-v2-z-header-row]>.v2-desktop-tool-row,[data-people-desktop-toolbar]) .ui-data-table--compact td{white-space:nowrap;overflow-wrap:normal}
- .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z:has([data-v2-z-header-row]>.v2-desktop-tool-row,[data-people-desktop-toolbar]) .ui-data-table--compact tr{height:var(--h-list-row)}
 }
