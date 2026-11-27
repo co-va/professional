@@ -7,7 +7,9 @@ import {
   list,
   openNotice,
   pageHeader,
+  workspaceHeaderContext,
 } from '../../../ui/ui.js';
+import { financeDesktop, financeZActions } from '../desktop.js';
 import { financeDateRange, financeLocalDateValue } from '../date.js';
 import { getZReport } from '../read.js';
 
@@ -56,16 +58,18 @@ function renderReport(root, from, to) {
     ? `${summaryList(report)}${breakdown('По кошелькам', report.byWallet)}${breakdown('По статьям', report.byArticle)}${breakdown('По экономическому смыслу', report.byEconomicType)}`
     : emptyState('Нет движений', 'За выбранный период в ДДС нет операций.');
 
-  root.innerHTML = `${pageHeader('Z-отчёт', `${from} — ${to}`)}
+  const desktop = financeDesktop(root);
+  root.innerHTML = `${desktop ? workspaceHeaderContext({ title: 'Z-отчёт' }) : pageHeader('Z-отчёт', `${from} — ${to}`)}
     <form class="compact-form" data-z-report-form novalidate>
       ${datePicker({ label: 'С', name: 'from', value: from, required: true, allowClear: false })}
       ${datePicker({ label: 'По', name: 'to', value: to, required: true, allowClear: false })}
-      ${button('Показать', { type: 'submit' })}
+      ${desktop ? '' : button('Показать', { type: 'submit' })}
     </form>
     ${content}
     `;
 
   initDatePickers(root);
+  if (desktop) financeZActions(root, 'Z-отчёт', [{ label: 'Показать', run: () => root.querySelector('[data-z-report-form]')?.requestSubmit() }]);
 
   root.querySelector('[data-z-report-form]')?.addEventListener('submit', (event) => {
     event.preventDefault();

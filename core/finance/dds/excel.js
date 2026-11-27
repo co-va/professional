@@ -2,6 +2,7 @@ import {
   button,datePicker,initDatePickers,initSegmentControls,modal,mountModal,
   segmentControl,select,twoColumnLayout,
 } from '../../../ui/ui.js';
+import { financeQSubmit } from '../desktop.js';
 import { getFinanceOperation } from '../data.js';
 import { getRecord } from '../../record/index.js';
 import { getWallets } from '../cash/data.js';
@@ -125,12 +126,13 @@ function exportQ(root,movements){
   if(!layer)return;
   initDatePickers(layer);initSegmentControls(layer);
   const node=layer.querySelector('[data-dds-excel-export]');
+  const submit=node?.querySelector('button[type="submit"]');
+  financeQSubmit(layer,node);
   let busy=false;
   node?.addEventListener('submit',async event=>{
     event.preventDefault();
     if(busy)return;
     busy=true;
-    const submit=node.querySelector('button[type="submit"]');
     if(submit)submit.disabled=true;
     try{
       const rows=filteredRows(movements,node);
@@ -142,7 +144,7 @@ function exportQ(root,movements){
     finally{busy=false;if(submit)submit.disabled=false;}
   });
 }
-export function openDDSExcel(root,movements,{onImported=()=>{}}={}){
+export function openDDSExcel(root,movements,{onImported=()=>{},anchor=null}={}){
   const actions=[
     {key:'export',label:'Выгрузка',run:()=>exportQ(root,movements)},
     {key:'import',label:'Загрузка',run:()=>chooseScopedImport(root,'finance',{
@@ -150,9 +152,10 @@ export function openDDSExcel(root,movements,{onImported=()=>{}}={}){
     })},
     {key:'template',label:'Шаблон',run:()=>exportScopedWorkbook('finance',[],{template:true})},
   ];
-  const layer=mountModal(root,modal('<div class="modal-actions">'
-    +actions.map(item=>button(item.label,{variant:'secondary',data:'data-dds-excel-'+item.key})).join('')
-    +'</div>',{title:'Excel',variant:'x',surface:'app',xRole:'action'}));
+  const buttons=actions.map(item=>button(item.label,{variant:'secondary',data:'data-dds-excel-'+item.key})).join('');
+  const layer=anchor
+    ? mountModal(anchor,modal('<div class="desktop-q-action-menu">'+buttons+'</div>',{variant:'x',xRole:'picker',className:'desktop-q-action-popup'}))
+    : mountModal(root,modal('<div class="modal-actions">'+buttons+'</div>',{title:'Excel',variant:'x',surface:'app',xRole:'action'}));
   if(!layer)return;
   actions.forEach(item=>layer.querySelector('[data-dds-excel-'+item.key+']')?.addEventListener('click',()=>{
     layer.v2Close?.();

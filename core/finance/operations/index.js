@@ -99,6 +99,7 @@ export function openFinanceOperations(root, {
   groups: requestedGroups = null,
   financeEntity = null,
   title = 'Финансовые операции',
+  anchor = null,
 } = {}) {
   const groups = financeOperationGroups({ groups: requestedGroups });
   if (!groups.length) return null;
@@ -111,11 +112,9 @@ export function openFinanceOperations(root, {
     })).join('')),
   )).join('');
 
-  const picker = mountModal(root, modal(content, {
-    title,
-    variant: 'x',
-    surface: 'app',
-  }));
+  const picker = anchor
+    ? mountModal(anchor, modal('<div class="desktop-q-action-menu">' + groups.flatMap(group => group.items.map(item => button(item.label, { variant: 'secondary', data: `data-finance-operation-action="${item.id}"` }))).join('') + '</div>', { variant: 'x', xRole: 'picker', className: 'desktop-q-action-popup' }))
+    : mountModal(root, modal(content, { title, variant: 'x', surface: 'app' }));
   if (!picker) return null;
 
   picker.querySelectorAll('[data-finance-operation-action]').forEach((element) => {

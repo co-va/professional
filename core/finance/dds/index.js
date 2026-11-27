@@ -26,7 +26,9 @@ import {
   v2ZLayer,
   workspaceHeaderContext,
 } from '../../../ui/ui.js';
+import { financeDesktop, financeZActions, financeZSave } from '../desktop.js';
 import { readOnlyReceipt } from '../../../ui/receipt/index.js';
+import { DATA_EXCHANGE_ICON, TRASH_ICON } from '../../../ui/buttons/index.js';
 import { canUseCapability } from '../../access.js';
 import { getFinanceOperation } from '../data.js';
 import { getWallets } from '../cash/data.js';
@@ -393,6 +395,7 @@ function renderPaymentCorrection(root, operation, { onSaved = null } = {}) {
   root.querySelector('[data-finance-payment-correction-save]')?.addEventListener('click', () => {
     root.querySelector('[data-finance-payment-correction-form]')?.requestSubmit();
   });
+  financeZSave(root, '[data-finance-payment-correction-save]', 'Корректировка · Оплата услуги');
   return true;
 }
 
@@ -466,6 +469,7 @@ function renderRefundCorrection(root, operation, { onSaved = null } = {}) {
   root.querySelector('[data-finance-refund-correction-save]')?.addEventListener('click', () => {
     root.querySelector('[data-finance-refund-correction-form]')?.requestSubmit();
   });
+  financeZSave(root, '[data-finance-refund-correction-save]', 'Корректировка · Возврат');
   return true;
 }
 
@@ -538,7 +542,7 @@ function openFinanceOperation(root, movements, operationId) {
 
   layer.innerHTML = `${workspaceHeaderContext({
     title: operationName(first),
-    v: {
+    v: financeDesktop(layer) ? null : {
       kind: 'settings',
       data: 'data-finance-operation-settings',
       aria: 'Настройки операции',
@@ -558,7 +562,14 @@ function openFinanceOperation(root, movements, operationId) {
     }],
   })}`;
 
-  layer.querySelector('[data-finance-operation-settings]')?.addEventListener('click', () => {
+  if (financeDesktop(layer)) {
+    const active = first?.operationStatus !== 'cancelled';
+    financeZActions(layer, operationName(first), [
+      active ? { label: 'Корректировка', run: () => openOperationCorrection(root, layer, entries) } : null,
+      active ? { label: 'Отменить операцию', run: () => openCancelOperation(root, layer, entries) } : null,
+      { label: TRASH_ICON, className: 'v2-desktop-tool-icon', aria: 'Удалить операцию', run: () => openDeleteOperation(root, layer, entries) },
+    ]);
+  } else layer.querySelector('[data-finance-operation-settings]')?.addEventListener('click', () => {
     openOperationSettings(root, layer, entries);
   });
 }
@@ -607,7 +618,7 @@ function renderDDS(root) {
   const settingsItems = availableDDSSettings();
   const headerContext = workspaceHeaderContext({
     title: 'Движения денежных средств',
-    v: settingsItems.length ? {
+    v: !financeDesktop(root) && settingsItems.length ? {
       kind: 'settings',
       data: 'data-finance-dds-settings',
       aria: 'Настройки ДДС',
@@ -615,7 +626,11 @@ function renderDDS(root) {
   });
 
   root.innerHTML = `${headerContext}${operations}`;
-  root.querySelector('[data-finance-dds-settings]')?.addEventListener('click', () => openDDSSettings(root, movements));
+  if (financeDesktop(root)) financeZActions(root, 'Движения денежных средств', [
+    { label: DATA_EXCHANGE_ICON, className: 'v2-desktop-tool-icon', aria: 'Обмен данными', run: anchor => openDDSExcel(root, movements, { anchor, onImported: () => renderDDS(root) }) },
+    canUseCapability('finance.articles.access') ? { label: 'Статьи', run: () => openArticles(root) } : null,
+  ]);
+  else root.querySelector('[data-finance-dds-settings]')?.addEventListener('click', () => openDDSSettings(root, movements));
   root.querySelectorAll('[data-finance-operation]').forEach((element) => {
     element.addEventListener('click', () => openFinanceOperation(root, movements, element.dataset.financeOperation));
   });

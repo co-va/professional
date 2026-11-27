@@ -30,6 +30,7 @@ import {
   v2ZLayer,
   workspaceHeaderContext,
 } from '../../../ui/ui.js';
+import { financeDesktop, financeZActions, financeZSave, financeQSubmit } from '../desktop.js';
 import { readOnlyReceipt } from '../../../ui/receipt/index.js';
 import { isV2DesktopWorkspace } from '../../../ui/v2/geometry.js';
 import { bindDesktopRailControls } from '../../../ui/v2/horizontal-affordance.js';
@@ -171,10 +172,10 @@ function cashContext({ desktop = false } = {}) {
   });
 }
 
-function walletContext(wallet, title = wallet?.name || 'Касса') {
+function walletContext(wallet, title = wallet?.name || 'Касса', desktop = false) {
   return workspaceHeaderContext({
     title,
-    v: wallet && !wallet.system ? {
+    v: !desktop && wallet && !wallet.system ? {
       kind: 'settings',
       data: 'data-wallet-settings',
       aria: `Настройки ${wallet?.name || 'кассы'}`,
@@ -182,10 +183,10 @@ function walletContext(wallet, title = wallet?.name || 'Касса') {
   });
 }
 
-function operationContext(operation) {
+function operationContext(operation, desktop = false) {
   return workspaceHeaderContext({
     title: operationName(operation),
-    v: {
+    v: desktop ? null : {
       kind: 'settings',
       data: 'data-wallet-operation-settings',
       aria: 'Настройки операции',
@@ -444,9 +445,13 @@ function openCashSettings(root) {
   });
 }
 
+function financeOperationsIcon() {
+  return '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="2"/><path d="M7.5 9v6M4.5 12h6M14 12h5"/></svg>';
+}
+
 function renderDesktopCashTools(root) {
   const groups = ['income-expense', 'transfer'];
-  const operationsIcon = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="2"/><path d="M7.5 9v6M4.5 12h6M14 12h5"/></svg>';
+  const operationsIcon = financeOperationsIcon();
   const tools = [
     cashAppearanceTypeOptions().length ? button('Вид', { variant: 'secondary', data: 'data-cash-desktop-view', aria: 'Вид' }) : '',
     financeOperationGroups({ groups }).length ? button(operationsIcon, { variant: 'secondary', className: 'v2-desktop-tool-icon', data: 'data-cash-desktop-operations title="Финансовые операции"', aria: 'Финансовые операции' }) : '',
@@ -454,7 +459,8 @@ function renderDesktopCashTools(root) {
   ].filter(Boolean);
   const [row] = setV2ZHeaderRows(root, tools.length ? ['<div class="v2-desktop-tool-row"><div class="v2-desktop-tool-actions" data-cash-desktop-tools>' + tools.join('') + '</div></div>'] : [], { desktopTitle: 'Касса' });
   row?.querySelector('[data-cash-desktop-view]')?.addEventListener('click', () => openCashAppearanceQ(root));
-  row?.querySelector('[data-cash-desktop-operations]')?.addEventListener('click', () => openFinanceOperations(root, { groups, onSaved: () => renderList(root) }));
+  const operations = row?.querySelector('[data-cash-desktop-operations]');
+  operations?.addEventListener('click', () => openFinanceOperations(root, { groups, anchor: operations, onSaved: () => renderList(root) }));
   const add = row?.querySelector('[data-cash-desktop-add]');
   add?.addEventListener('click', () => openCashCreateMenu(root, { anchor: add }));
 }
@@ -505,6 +511,8 @@ function openWalletForm(root, existing = null) {
   const layer = mountModal(root, modal(html, { title: existing ? 'Изменить кошелёк' : 'Новый кошелёк', variant: 'q' }));
   if (!layer) return;
   initPhotoField(layer);
+  if (financeDesktop(layer)) layer.querySelector('[data-wallet-form] > .modal-title')?.remove();
+  financeQSubmit(layer, layer.querySelector('[data-wallet-form]'));
   layer.querySelector('[data-wallet-form]')?.addEventListener('submit', (event) => {
     event.preventDefault();
     const form = layer.querySelector('[data-wallet-form]');
@@ -567,6 +575,8 @@ function openCashEntityForm(root, kind) {
   if (!layer) return;
   initPhotoField(layer);
   const form = layer.querySelector(`[${formData}]`);
+  if (financeDesktop(layer)) form?.querySelector(':scope > .modal-title')?.remove();
+  financeQSubmit(layer, form);
   form?.addEventListener('submit', (event) => {
     event.preventDefault();
     const validation = formValidationMessage(form);
@@ -600,7 +610,7 @@ function financeEntityById(type, id) {
   return values.find((item) => String(item?.id || '') === String(id || '')) || null;
 }
 
-function financeEntityContext(entity, type) {
+function financeEntityContext(entity, type, desktop = false) {
   const fallback = type === 'loan' ? 'Займ' : 'Инвестиция';
   const terms = type === 'investment' ? normalizeInvestmentTerms(entity) : null;
   const participant = terms?.participantAccountId
@@ -608,7 +618,7 @@ function financeEntityContext(entity, type) {
     : null;
   return workspaceHeaderContext({
     title: entity?.name || fallback,
-    v: {
+    v: desktop ? null : {
       kind: 'settings',
       data: 'data-finance-entity-settings',
       aria: `Настройки ${entity?.name || fallback}`,
@@ -695,12 +705,19 @@ function renderFinanceEntityLayer(root, layer, type, id) {
       : 'Движения и оценка инвестиции появятся здесь.');
 
   layer.innerHTML = page([
-    financeEntityContext(entity, type),
+    financeEntityContext(entity, type, financeDesktop(layer)),
     type === 'investment' ? v2Section('Расчёт', investmentSummaryRows(entity)) : '',
     v2Section('История', historyContent),
   ]);
 
-  layer.querySelector('[data-finance-entity-settings]')?.addEventListener('click', () => {
+  if (financeDesktop(layer)) {
+    const actions = financeEntityActions(root, layer, type, entity);
+    financeZActions(layer, entity.name, actions.map(action => ({
+      label: action.id === 'terms' ? 'Условия' : financeOperationsIcon(),
+      className: action.id === 'terms' ? '' : 'v2-desktop-tool-icon',
+      aria: action.label, run: action.onSelect,
+    })));
+  } else layer.querySelector('[data-finance-entity-settings]')?.addEventListener('click', () => {
     openFinanceEntitySettings(root, layer, type, entity);
   });
   layer.querySelector('[data-finance-entity-chat]')?.addEventListener('click', () => {
@@ -1009,6 +1026,7 @@ function renderInvestmentTermsLayer(root, entityLayer, layer, sourceEntity, draf
     renderInvestmentTermsLayer(root, entityLayer, layer, sourceEntity, investmentTermsFromForm(form, sourceEntity), { creating });
   });
   layer.querySelector('[data-investment-terms-save]')?.addEventListener('click', () => form.requestSubmit());
+  financeZSave(layer, '[data-investment-terms-save]', 'Условия инвестиции');
   form.addEventListener('submit', (event) => {
     event.preventDefault();
     const validation = formValidationMessage(form);
@@ -1278,6 +1296,7 @@ function renderLoanTermsLayer(root, entityLayer, layer, sourceEntity, draft = nu
   layer.querySelector('[data-loan-terms-save]')?.addEventListener('click', () => {
     form.requestSubmit();
   });
+  financeZSave(layer, '[data-loan-terms-save]', 'Условия займа');
 
   form.addEventListener('submit', (event) => {
     event.preventDefault();
@@ -1315,7 +1334,7 @@ function openLoanTerms(root, entityLayer, entity) {
   return layer;
 }
 
-function openFinanceEntitySettings(root, entityLayer, type, entity) {
+function financeEntityActions(root, entityLayer, type, entity) {
   const terms = type === 'investment' ? normalizeInvestmentTerms(entity) : null;
   const financeEntity = {
     type,
@@ -1365,10 +1384,11 @@ function openFinanceEntitySettings(root, entityLayer, type, entity) {
     });
   }
 
-  return openSharedProfileSettingsMenu({
-    title: entity.name,
-    actions,
-  });
+  return actions;
+}
+
+function openFinanceEntitySettings(root, entityLayer, type, entity) {
+  return openSharedProfileSettingsMenu({ title: entity.name, actions: financeEntityActions(root, entityLayer, type, entity) });
 }
 
 function openInvestmentEvent(root, entityLayer, entity, eventId) {
@@ -1378,7 +1398,7 @@ function openInvestmentEvent(root, entityLayer, entity, eventId) {
   const layer = mountV2ZLayer(entityLayer, v2ZLayer(page([
     workspaceHeaderContext({
       title: investmentEventTitle(event),
-      v: {
+      v: financeDesktop(root) ? null : {
         kind: 'settings',
         data: 'data-investment-event-settings',
         aria: 'Настройки события инвестиции',
@@ -1394,7 +1414,7 @@ function openInvestmentEvent(root, entityLayer, entity, eventId) {
   ])), { stack: true });
   if (!layer) return null;
 
-  layer.querySelector('[data-investment-event-settings]')?.addEventListener('click', () => {
+  const openSettings = () => {
     openSharedProfileSettingsMenu({
       title: investmentEventTitle(event),
       actions: [{
@@ -1415,7 +1435,9 @@ function openInvestmentEvent(root, entityLayer, entity, eventId) {
         },
       }],
     });
-  });
+  };
+  if (financeDesktop(layer)) financeZActions(layer, investmentEventTitle(event), [{ label: 'Удалить', run: openSettings }]);
+  else layer.querySelector('[data-investment-event-settings]')?.addEventListener('click', openSettings);
   return layer;
 }
 
@@ -1424,11 +1446,11 @@ function openFinanceEntityOperation(root, entityLayer, type, entity, operationId
     .find((item) => String(item?.operationId || '') === String(operationId || ''));
   if (!operation) return null;
   const layer = mountV2ZLayer(entityLayer, v2ZLayer(page([
-    operationContext(operation),
+    operationContext(operation, financeDesktop(root)),
     operationReceipt(operation),
   ])), { stack: true });
   if (!layer) return null;
-  layer.querySelector('[data-wallet-operation-settings]')?.addEventListener('click', () => {
+  const openSettings = () => {
     openSharedProfileSettingsMenu({
       title: operationName(operation),
       actions: [{
@@ -1450,7 +1472,9 @@ function openFinanceEntityOperation(root, entityLayer, type, entity, operationId
         },
       }],
     });
-  });
+  };
+  if (financeDesktop(layer)) financeZActions(layer, operationName(operation), [{ label: 'Удалить', run: openSettings }]);
+  else layer.querySelector('[data-wallet-operation-settings]')?.addEventListener('click', openSettings);
   return layer;
 }
 
@@ -1463,12 +1487,15 @@ function renderWalletLayer(root, layer, walletId) {
   }
   const operations = walletOperations(wallet.id);
   layer.innerHTML = page([
-    walletContext(wallet),
+    walletContext(wallet, wallet.name, financeDesktop(layer)),
     operations.length
       ? v2ListEntries(operations.map(renderOperationRow))
       : emptyState('Операций пока нет', 'Движения по этой кассе появятся здесь.'),
   ]);
-  layer.querySelector('[data-wallet-settings]')?.addEventListener('click', () => {
+  if (financeDesktop(layer)) financeZActions(layer, wallet.name, wallet.system ? [] : [{
+    label: 'Удалить', aria: 'Удалить кассу', run: () => void openWalletSettings(root, layer, wallet),
+  }]);
+  else layer.querySelector('[data-wallet-settings]')?.addEventListener('click', () => {
     void openWalletSettings(root, layer, wallet);
   });
   layer.querySelectorAll('[data-wallet-operation]').forEach((element) => {
@@ -1580,11 +1607,14 @@ function openWalletOperation(root, walletLayer, wallet, operationId) {
     .find((item) => String(item.operationId) === String(operationId));
   if (!operation) return;
   const layer = mountV2ZLayer(walletLayer, v2ZLayer(page([
-    operationContext(operation),
+    operationContext(operation, financeDesktop(root)),
     operationReceipt(operation),
   ])), { stack: true });
   if (!layer) return;
-  layer.querySelector('[data-wallet-operation-settings]')?.addEventListener('click', () => {
+  if (financeDesktop(layer)) financeZActions(layer, operationName(operation), [{
+    label: 'Удалить', run: () => openOperationSettings(root, walletLayer, layer, wallet, operation),
+  }]);
+  else layer.querySelector('[data-wallet-operation-settings]')?.addEventListener('click', () => {
     openOperationSettings(root, walletLayer, layer, wallet, operation);
   });
 }

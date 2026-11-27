@@ -12,6 +12,7 @@ import {
   v2ZLayer,
   workspaceHeaderContext,
 } from '../../../ui/ui.js';
+import { financeDesktop, financeZActions, financeZSave } from '../desktop.js';
 import { getFinanceArticles } from '../data.js';
 import { archiveFinanceArticle, createFinanceArticle, updateFinanceArticle } from '../service.js';
 
@@ -142,6 +143,7 @@ function openForm(root, existing = null) {
   layer.querySelector('[data-finance-article-save]')?.addEventListener('click', () => {
     layer.querySelector('[data-finance-article-form]')?.requestSubmit();
   });
+  financeZSave(layer, '[data-finance-article-save]', existing ? 'Редактирование статьи' : 'Новая статья');
 
   layer.querySelector('[data-delete-finance-article]')?.addEventListener('click', async () => {
     await archiveFinanceArticle(existing.articleId);
@@ -155,14 +157,15 @@ function renderList(root) {
   const rows = treeRows(items);
   root.innerHTML = `${workspaceHeaderContext({
     title: 'Статьи',
-    c: {
+    c: financeDesktop(root) ? null : {
       label: '+',
       data: 'data-add-finance-article',
       aria: 'Добавить статью',
     },
   })}${rows.length ? list({ items: rows.map(row) }) : emptyState('Статей пока нет', 'Добавьте первую статью кнопкой «+».')}`;
 
-  root.querySelector('[data-add-finance-article]')?.addEventListener('click', () => openForm(root));
+  if (financeDesktop(root)) financeZActions(root, 'Статьи', [{ label: '+', className: 'v2-desktop-tool-primary', aria: 'Добавить статью', run: () => openForm(root) }]);
+  else root.querySelector('[data-add-finance-article]')?.addEventListener('click', () => openForm(root));
   root.querySelectorAll('[data-finance-article]').forEach((element) => {
     element.addEventListener('click', () => {
       const item = getFinanceArticles().find((candidate) => candidate.articleId === element.dataset.financeArticle);

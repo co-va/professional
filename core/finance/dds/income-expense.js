@@ -11,6 +11,7 @@ import {
   textareaField,
   workspaceHeaderContext,
 } from '../../../ui/ui.js';
+import { financeZSave } from '../desktop.js';
 import { getFinanceArticles } from '../data.js';
 import { getWallets } from '../cash/data.js';
 import { financeLocalDateValue, financeOccurredAtForDate } from '../date.js';
@@ -208,5 +209,6 @@ export function renderIncomeExpenseOperation(root, direction, { onSaved = null, 
   root.querySelector('[data-finance-manual-save]')?.addEventListener('click', () => {
     root.querySelector('[data-finance-manual-form]')?.requestSubmit();
   });
+  financeZSave(root, '[data-finance-manual-save]', operation ? `Корректировка · ${isIncome ? 'Доход' : 'Расход'}` : (isIncome ? 'Доход' : 'Расход'));
   return true;
 }
