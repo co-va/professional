@@ -15,7 +15,7 @@ import {
 } from '../../../ui/ui.js';
 import { financeQSubmit, financeZSave } from '../desktop.js';
 import { canUseCapability } from '../../access.js';
-import { desktopAvailableArticles, desktopArticleGroups, desktopArticleValues } from './classification.js';
+import { desktopAvailableArticles, desktopArticleGroups, desktopArticleValues, isLoyaltyCashArticle } from './classification.js';
 import { getFinanceArticles } from '../data.js';
 import { getWallets } from '../cash/data.js';
 import { financeLocalDateValue, financeOccurredAtForDate } from '../date.js';
@@ -29,7 +29,7 @@ function articleOptions(direction,desktopArticles=false,preserveId='') {
   const groups=desktopArticles?desktopArticleGroups(visible):visible;
   if(preserveId&&!groups.some(a=>a.articleId===preserveId)){const prior=all.find(a=>a.articleId===preserveId);if(prior)groups.push(prior);}
   return groups
-    .filter((item) => item.direction === direction && item.economicType !== 'GROUP')
+    .filter((item) => item.direction === direction && item.economicType !== 'GROUP' && (!isLoyaltyCashArticle(item)||item.articleId===preserveId))
     .map((item) => ({ value: item.articleId, label: item.name }));
 }
 

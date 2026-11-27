@@ -341,7 +341,7 @@ function renderDesktopArticleTable(host,rows,collapsed,onOpen){
 // IDs and mutation rules are unchanged until the classification contract changes.
 export function openFinanceArticlesQ(root, {onSaved=()=>{}}={}) {
   const desktop=financeDesktop(root);
-  const getArticles=()=>desktop?desktopAvailableArticles(getFinanceArticles(),canUseCapability):getFinanceArticles();
+  const getArticles=()=>desktopAvailableArticles(getFinanceArticles(),canUseCapability);
   const state={query:'',filters:articleFilters(),sort:'tree'};
   const collapsed=new Set();
   const layer=mountModal(root,modal(
@@ -366,22 +366,22 @@ export function openFinanceArticlesQ(root, {onSaved=()=>{}}={}) {
   moveDesktopQTool(add);
   const refresh=()=>{
     const items=getArticles();
-    const rows=desktop?desktopArticleRows(items,state):visibleArticles(items,state);
+    const rows=desktopArticleRows(items,state);
     count.textContent=String(rows.length);
     filter?.setAttribute('aria-pressed',String(Object.values(state.filters).some(Boolean)));
     sort?.setAttribute('aria-pressed',String(state.sort!=='tree'));
     if(desktop&&rows.length){renderDesktopArticleTable(host,rows,collapsed,id=>{const item=getArticles().find(a=>a.articleId===id);if(item)openArticleX(item,changed,getArticles,true);});return;}
-    host.innerHTML=rows.length?list({items:rows.map(row)}):emptyState(items.length?'Статьи не найдены':'Статей пока нет');
+    host.innerHTML=rows.length?list({items:rows.map(a=>({...row(a),interactive:a.direction!=='TRANSFER'||!a.systemKey,data:a.direction==='TRANSFER'&&a.systemKey?'':'data-finance-article="'+escapeHtml(a.articleId)+'"'}))}):emptyState(items.length?'Статьи не найдены':'Статей пока нет');
     host.querySelectorAll('[data-finance-article]').forEach(control=>control.addEventListener('click',()=>{
       const item=getArticles().find(candidate=>candidate.articleId===control.dataset.financeArticle);
-      if(item)openArticleX(item,changed,getArticles);
+      if(item)openArticleX(item,changed,getArticles,true);
     }));
   };
   const changed=()=>{refresh();onSaved();};
   search?.addEventListener('input',()=>{state.query=search.value;refresh();});
   filter?.addEventListener('click',()=>openArticleFilters(filter,desktop?getArticles().filter(a=>!['INCOME_ROOT','EXPENSE_ROOT'].includes(a.systemKey)).map(a=>({...a,parentArticleId:['system-income','system-expense'].includes(a.parentArticleId)?'':a.parentArticleId})):getArticles(),state,refresh,desktop));
   sort?.addEventListener('click',()=>openArticleSort(sort,state,refresh,desktop));
-  add?.addEventListener('click',()=>openArticleX(null,changed,getArticles,desktop));
+  add?.addEventListener('click',()=>openArticleX(null,changed,getArticles,true));
   refresh();
   return layer;
 }

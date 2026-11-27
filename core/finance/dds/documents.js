@@ -1,4 +1,4 @@
-// Read-only Desktop document projection. Never create ledger entries or mutate balances.
+// Read-only shared DDS document projection. Never create ledger entries or mutate balances.
 const cents=v=>Math.round(Number(v||0)*100);
 const money=v=>Number.isFinite(Number(v))?Math.max(0,cents(v))/100:0;
 const arr=v=>Array.isArray(v)?v:[];
@@ -45,7 +45,7 @@ export function desktopDocuments(operations,ledger){
  for(const entry of ledger){if(!entry.operationId||entry.operationKind==='cancel')continue;if(!groups.has(entry.operationId))groups.set(entry.operationId,[]);groups.get(entry.operationId).push(entry);}
  const byId=new Map(operations.map(o=>[o.operationId,o]));
  const result=[];
- for(const [id,entries] of groups){const operation=byId.get(id);result.push({id,entries,first:entries[0],facts:operation?loyaltyDocumentFacts(operation,entries):null});}
+ for(const [id,entries] of groups){const operation=byId.get(id);const first=entries[0];if(operation?.data?.personKey&&!first.person)result.push({id,entries,first:{...first,person:{key:operation.data.personKey}},facts:loyaltyDocumentFacts(operation,entries)});else result.push({id,entries,first,facts:operation?loyaltyDocumentFacts(operation,entries):null});}
  for(const operation of operations){
   const id=operation.operationId;if(!id||groups.has(id)||operation.kind==='cancel')continue;
   const facts=loyaltyDocumentFacts(operation,[]);if(!facts)continue;

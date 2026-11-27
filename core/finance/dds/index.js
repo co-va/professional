@@ -526,7 +526,7 @@ function openFinanceOperation(root, movements, operationId, document=null) {
   if (!entries.length&&!document) return;
   const first = document?.first||entries[0];
   const desktop = financeDesktop(root);
-  const depositDocument=desktop&&isDepositCashDocument(first);
+  const depositDocument=isDepositCashDocument(first);
   const title=depositDocument?depositArticleLabel(first):operationName(first);
   const receipt = financeReceipt(id,title,{entries,desktop,document});
   if(depositDocument||document?.facts)return openFinanceReceiptX(root,title,receipt,[],{actionLayout:'dds'});
@@ -547,7 +547,7 @@ function availableDDSSettings() {
   return items;
 }
 
-function openDDSSettings(root, movements) {
+function openDDSSettings(root, movements, partialRegistry=false) {
   const items = availableDDSSettings();
   if (!items.length) return;
   const content = actionBlock(items.map((item) => button(item.label, {
@@ -564,7 +564,7 @@ function openDDSSettings(root, movements) {
     element.addEventListener('click', () => {
       const id = String(element.dataset.financeDdsTool || '');
       settings.v2Close?.();
-      if (id === 'excel') openDDSExcel(root, movements, {onImported:()=>renderDDS(root)});
+      if (id === 'excel') openDDSExcel(root, movements, {partialRegistry,onImported:()=>renderDDS(root)});
       else if (id === 'articles') openArticles(root);
     });
   });
@@ -575,10 +575,10 @@ function renderDDS(root) {
   const groupedOperations = operationGroupsFromLedger(movements);
   const people = financeDesktop(root) ? getAllPeople() : [];
   const desktop = financeDesktop(root);
-  const catalog=desktop?getFinanceArticles():[];
-  const documents=desktop?desktopDocuments(readFinanceState().operations,movements):[];
+  const catalog=getFinanceArticles();
+  const documents=desktopDocuments(readFinanceState().operations,movements);
   const byId=new Map(documents.map(doc=>[doc.id,doc]));
-  const rows = desktop ? documents.map(({entries,first,facts}) => {
+  const rows = documents.map(({entries,first,facts}) => {
     const transfer = first.operationKind === 'transfer';
     const wallets = [...new Set(entries.map(walletText).filter(Boolean))];
     const articles = desktopDocumentArticles(entries,catalog);
@@ -589,7 +589,7 @@ function renderDDS(root) {
     const contact=financeTableContact(first,people);
     const title=desktopOperationDirection(direction);
     const signed=v=>formatMoney(v,{signed:true});
-    const moneyParts=facts?[...(entries.length?[signed(facts.cash)]:facts.cashUnknown?['Кошелёк не определён']:[]),...(facts.allocations.length?[facts.principal===null?'Депозит: не определено':facts.principal!==0?'Депозит: '+signed(facts.principal):'Депозит: 0 ₽']:[]),...(facts.personal!==0?['Личный счёт: '+signed(facts.personal)]:[])]:[];
+    const moneyParts=facts?[...(entries.length?[signed(facts.cash)]:facts.cashUnknown?[signed(facts.kind.endsWith('withdrawal')?-facts.amount:facts.amount)+' · кошелёк не определён']:[]),...(facts.allocations.length?[facts.principal===null?'Депозит: не определено':facts.principal!==0?'Депозит: '+signed(facts.principal):'Депозит: 0 ₽']:[]),...(facts.personal!==0?['Личный счёт: '+signed(facts.personal)]:[])]:[];
     const amount=facts?(moneyParts.join(' · ')||'—'):operationDisplayAmount(entries);
     const bonus=facts?(facts.bonus===null?'Не определено':facts.bonus!==0?(facts.bonus>0?'+':'−')+new Intl.NumberFormat('ru-RU',{maximumFractionDigits:2}).format(Math.abs(facts.bonus)):'—'):'—';
     return { id:String(first.operationId), date:operationMoment(first), occurredAt:String(first.occurredAt||first.refundedAt||first.paidAt||''),
@@ -598,9 +598,10 @@ function renderDDS(root) {
       wallets:sourceNames, wallet:transfer?operationListSubtitle(entries):sourceNames.join(' + '), articles, article:articles.join(', '),
       direction, status:first.operationStatus==='cancelled'?'Отменена':'Активна',
       value:facts?(facts.cash||facts.principal||facts.personal||0):(direction==='out'?-operationTotal(entries):operationTotal(entries)), amount, bonus, bonusValue:facts?.bonus??0, item:first };
-  }) : [];
+  });
+  const mobileRows=[...rows].sort((a,b)=>String(b.occurredAt).localeCompare(String(a.occurredAt))||a.id.localeCompare(b.id));
   const operations = desktop ? '<div data-dds-history>'+walletHistoryBody(true)+'</div>'
-    : groupedOperations.length ? v2ListEntries(groupedOperations.map(operationListEntry)) : emptyState('Все операции','Финансовых операций пока нет.');
+    : mobileRows.length ? v2ListEntries(mobileRows.map(row=>v2ListEntry({title:row.article||row.displayTitle,subtitle:[row.displayTitle,row.person,row.wallet].filter(Boolean).join(' · '),rightTop:row.amount,rightBottom:[row.date,row.bonus&&row.bonus!=='—'?'Бонусы: '+row.bonus:''].filter(Boolean).join(' · '),interactive:true,initial:'',data:'data-finance-operation="'+row.id+'"',aria:'Открыть финансовый документ'}))) : emptyState('Все операции','Финансовых операций пока нет.');
   const settingsItems = availableDDSSettings();
   const operationGroups = ['income-expense', 'transfer'];
   const headerContext = workspaceHeaderContext({
@@ -626,9 +627,9 @@ function renderDDS(root) {
       run: anchor => openFinanceOperations(root, { groups: operationGroups, anchor, onSaved: () => renderDDS(root) }),
     } : null,
   ]});
-  else root.querySelector('[data-finance-dds-settings]')?.addEventListener('click', () => openDDSSettings(root, movements));
+  else root.querySelector('[data-finance-dds-settings]')?.addEventListener('click', () => openDDSSettings(root, movements, documents.some(d=>d.facts)));
   root.querySelectorAll('[data-finance-operation]').forEach((element) => {
-    element.addEventListener('click', () => openFinanceOperation(root, movements, element.dataset.financeOperation));
+    element.addEventListener('click', () => openFinanceOperation(root, movements, element.dataset.financeOperation, byId.get(element.dataset.financeOperation)));
   });
 }
 

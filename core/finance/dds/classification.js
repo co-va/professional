@@ -5,7 +5,7 @@ export function desktopAvailableArticles(articles,can){
  const journal=['journal.day.access','journal.month.access','journal.list.access'].some(can);
  const special=can('finance.special.access');
  const raise=can('finance.investment.raise.access'),invest=can('finance.investment.self.access')||can('finance.investment.external.access');
- const allowed={RENT:false,TAX:false,INCOME_ROOT:true,EXPENSE_ROOT:true,SERVICE_REVENUE:journal,PRODUCT_REVENUE:journal,TIPS:journal,REFUND:journal,MATERIALS:can('inventory.stock.access')||can('inventory.order.access'),OTHER_INCOME:false,OTHER_EXPENSE:false,LOAN_RECEIVED:special,LOAN_REPAYMENT:special,TRANSFER:special,INVESTMENT_RECEIVED:raise,INVESTMENT_RETURN:raise,INVESTMENT_INCOME_PAYMENT:raise,INVESTMENT_CAPITAL_RETURN:invest,INVESTMENT_INCOME:invest,INVESTMENT_CONTRIBUTION:invest,INVESTMENT_EXPENSE:invest};
+ const allowed={DEPOSIT_RECEIVED:can('loyalty.deposit.access'),DEPOSIT_RETURN:can('loyalty.deposit.access'),PERSONAL_ACCOUNT_LIABILITY_IN:can('loyalty.personal_account.access'),PERSONAL_ACCOUNT_LIABILITY_OUT:can('loyalty.personal_account.access'),RENT:false,TAX:false,INCOME_ROOT:true,EXPENSE_ROOT:true,SERVICE_REVENUE:journal,PRODUCT_REVENUE:journal,TIPS:journal,REFUND:journal,MATERIALS:can('inventory.stock.access')||can('inventory.order.access'),OTHER_INCOME:false,OTHER_EXPENSE:false,LOAN_RECEIVED:special,LOAN_REPAYMENT:special,TRANSFER:special,INVESTMENT_RECEIVED:raise,INVESTMENT_RETURN:raise,INVESTMENT_INCOME_PAYMENT:raise,INVESTMENT_CAPITAL_RETURN:invest,INVESTMENT_INCOME:invest,INVESTMENT_CONTRIBUTION:invest,INVESTMENT_EXPENSE:invest};
  const hidden=new Set(articles.filter(a=>a.archivedAt||(a.systemKey&&allowed[a.systemKey]!==true)).map(a=>a.articleId));
  // Values follow their owning system article's availability, not their own systemKey.
  for(let changed=true;changed;){changed=false;for(const a of articles)if(hidden.has(a.parentArticleId)&&!hidden.has(a.articleId)){hidden.add(a.articleId);changed=true;}}
@@ -45,3 +45,6 @@ export function desktopArticleValues(articles,articleId){
  if(!parent||parent.economicType==='GROUP'||['INCOME_ROOT','EXPENSE_ROOT'].includes(parent.systemKey)||parent.direction==='TRANSFER')return [];
  return articles.filter(a=>!a.systemKey&&a.parentArticleId===articleId&&a.direction===parent.direction&&!a.archivedAt);
 }
+
+// These articles belong to their own canonical mechanisms, not manual cash entry.
+export const isLoyaltyCashArticle=a=>['DEPOSIT_RECEIVED','DEPOSIT_RETURN','PERSONAL_ACCOUNT_LIABILITY_IN','PERSONAL_ACCOUNT_LIABILITY_OUT'].includes(a?.economicType);

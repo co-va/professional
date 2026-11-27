@@ -133,7 +133,7 @@ function depositCashGroups(rows,data,facts=null){
   const subject=[{label:'Статья',value:depositArticleLabel(first)},{label:'Депозит',value:String(data.programName||first.lineName||'Не указано')}];
   const movement=[{label:'Кошелёк',value:String(data.walletName||first.walletName||'Не определён')},{label:first.operationKind==='deposit-withdrawal'?'Возвращено':'Внесено',value:formatMoney(operationTotal(rows)),strong:true}];
   if(facts&&first.operationKind==='deposit-funding'&&facts.bonus!==0)movement.push({label:'Начислено бонусов',value:facts.bonus===null?'Не определено':String(facts.bonus)});
-  if(facts&&first.operationKind==='deposit-withdrawal'&&facts.bonusUnknown)movement.push({label:'Списано бонусов',value:'Не определено'});
+  if(facts&&first.operationKind==='deposit-withdrawal'&&facts.bonus!==0)movement.push({label:'Списано бонусов',value:facts.bonus===null?'Не определено':String(Math.abs(facts.bonus))});
   if(first.operationKind==='deposit-withdrawal'&&data.reason)movement.push({label:'Причина',value:String(data.reason)});
   return [identity,subject,movement].filter(group=>group.length);
 }
@@ -159,10 +159,10 @@ export function financeReceipt(operationId, title, { entries = [], wallet = null
   const first = rows[0] || document?.first || {};
   const operation=getFinanceOperation(id);
   const data = operation?.data || {};
-  const facts=desktop?(document?.facts||(operation?loyaltyDocumentFacts(operation,rows):null)):null;
+  const facts=(desktop||document)?(document?.facts||(operation?loyaltyDocumentFacts(operation,rows):null)):null;
   const receiptRows=rows.length?rows:[first];
   const when = shortDateTimeParts(first.occurredAt || '');
-  if(desktop&&isDepositCashDocument(first))return readOnlyReceipt({groups:depositCashGroups(receiptRows,data,facts)});
+  if((desktop||document)&&isDepositCashDocument(first))return readOnlyReceipt({groups:depositCashGroups(receiptRows,data,facts)});
   if(facts&&first.operationKind!=='payment')return readOnlyReceipt({groups:loyaltyOtherGroups(first,data,facts)});
   const groups = first.operationKind === 'payment' ? paymentGroups(receiptRows,data,{ walletOnly: Boolean(wallet),facts }) : [];
   const walletTotal = wallet ? [{ label: 'Движение по кошельку · ' + wallet.name, value: formatMoney(wallet.total), strong: true }] : [];
