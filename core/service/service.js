@@ -5,6 +5,8 @@ import {
   emptyState,
   field,
   initViewNavigation,
+  segmentControl,
+  initSegmentControls,
   openSharedProfileSettingsMenu,
   openNotice,
   page,
@@ -113,7 +115,7 @@ export function renderService(root, navigateBack = () => {}) {
     // surface geometry or introduce a second header inside the Z body.
     const navMarkup = viewNavigation({ views, activeView: view, ariaLabel: 'Сервис' });
     const toolbar = desktop ? `<section data-people-desktop-toolbar data-service-desktop-toolbar><div class="people-desktop-tools">
-      <div class="people-desktop-actions people-desktop-query-tools">${button(view==='products'?'Т':'У',{variant:'secondary',className:'people-desktop-icon service-view-switch',data:'data-service-view-switch title="'+(view==='products'?'Товары → Услуги':'Услуги → Товары')+'"',aria:view==='products'?'Товары. Переключить на услуги':'Услуги. Переключить на товары'})}</div>
+      <div class="v2-desktop-tool-context" data-service-view-switch>${segmentControl(views.map(item=>({value:item.id,label:item.label})),{value:view,name:'serviceDesktopView',aria:'Раздел сервиса'})}</div>
       ${field({name:'serviceSearch',type:'search',placeholder:'Поиск',autocomplete:'off',value:desktopState.query,data:'data-service-search'})}
       <div class="people-desktop-actions people-desktop-query-tools">
         ${compactButton({kind:'filter',data:'data-service-filter title="Фильтр" aria-haspopup="dialog" aria-pressed="false"'})}
@@ -146,10 +148,18 @@ export function renderService(root, navigateBack = () => {}) {
       if (action) control.addEventListener('click', action.onSelect);
     });
 
-    if(desktop) navigationRoot.querySelector('[data-service-view-switch]')?.addEventListener('click',()=>{
-      activeView=view==='procedures'?'products':'procedures';
-      renderCurrent();
-    });
+    if(desktop){
+      const switchHost=navigationRoot.querySelector('[data-service-view-switch]');
+      if(switchHost){
+        initSegmentControls(switchHost);
+        switchHost.addEventListener('change',event=>{
+          const next=event.target.value;
+          if(event.target.name!=='serviceDesktopView'||next===view||!views.some(item=>item.id===next))return;
+          activeView=next;
+          renderCurrent();
+        });
+      }
+    }
     if(!desktop) initViewNavigation(navigationRoot, {
       views,
       activeView: view,
