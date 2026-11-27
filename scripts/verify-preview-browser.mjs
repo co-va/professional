@@ -245,6 +245,9 @@ try {
   const helpButton=personalTools.locator('[data-personal-account-info]');
   assert.equal(await helpButton.count(),1,'Help is a direct Q tool alongside settings');
   assert.ok(await helpButton.evaluate(node=>{const a=node.getBoundingClientRect();const b=node.parentElement.querySelector('[data-personal-account-limit]').getBoundingClientRect();return a.right<=b.left && Math.abs((a.top+a.height/2)-(b.top+b.height/2))<2;}),'Help and settings in the same row');
+  const compactTools=await personalTools.evaluate(row=>['[data-personal-account-info]','[data-personal-account-limit]'].map(selector=>{const el=row.querySelector(selector);const rect=el.getBoundingClientRect();const style=getComputedStyle(el);return {width:rect.width,height:rect.height,border:style.borderTopWidth,background:style.backgroundColor,color:style.color};}));
+  for(const tool of compactTools){assert.equal(tool.width,28,'Q compact width');assert.equal(tool.height,28,'Q compact height');assert.equal(tool.border,'0px','Unframed Q icon');assert.equal(tool.background,'rgba(0, 0, 0, 0)','Transparent Q icon');}
+  assert.deepEqual(compactTools[0],compactTools[1],'Help and settings share geometry and style');
   await helpButton.click();
   const accountHelp=page.getByRole('dialog',{name:'Как работает Личный счёт',exact:true});
   await accountHelp.waitFor({timeout:10000});
