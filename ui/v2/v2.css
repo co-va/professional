@@ -1086,6 +1086,8 @@
  .v2-app--workspace :is(.desktop-q-toolbar>.desktop-q-online-booking,.desktop-q-toolbar[data-desktop-q-secondary-tools]>.ui-compact-check){order:-1;flex:0 1 auto;min-width:0;height:var(--v2-desktop-q-button-height);max-height:var(--v2-desktop-q-button-height);gap:5px}
  .v2-app--workspace .desktop-q-toolbar>.desktop-q-online-booking .ui-compact-check__label{min-width:0;font-size:12px;line-height:1.15;font-weight:700;white-space:normal;overflow-wrap:normal}
  .v2-app--workspace .desktop-q-toolbar>.desktop-q-leading-icon:is(.ui-compact-button--settings,.ui-compact-button--info){order:-1;background:transparent;border:0;color:var(--v2-base)}
+ /* The info outline is part of the glyph, not a second button frame. Match the 23px gear glyph inside the shared 28px Compact. */
+ .v2-app--workspace .desktop-q-toolbar>.desktop-q-leading-icon.ui-compact-button--info>.small-action-button__info{box-sizing:border-box;display:grid;place-items:center;justify-self:center;align-self:center;width:23px;height:23px;border:1.5px solid currentColor;border-radius:6px;padding:0;margin:0;font-size:15px;line-height:1;font-weight:700}
  .v2-app--workspace .desktop-q-toolbar>.desktop-q-h-action.ui-button{background:var(--v2-base);border-color:var(--v2-base);color:var(--white)}
  .v2-app--workspace [data-personal-account-desktop-tools]+[data-personal-account-secondary-tools]{justify-content:flex-start}
  .v2-app--workspace .desktop-q-toolbar[data-desktop-q-secondary-tools]::before{display:none}
