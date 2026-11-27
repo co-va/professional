@@ -249,7 +249,11 @@ try {
   for(const tool of compactTools){assert.equal(tool.width,28,'Q compact width');assert.equal(tool.height,28,'Q compact height');assert.equal(tool.border,'0px','Unframed Q icon');assert.equal(tool.background,'rgba(0, 0, 0, 0)','Transparent Q icon');}
   assert.deepEqual(compactTools[0],compactTools[1],'Help and settings share geometry and style');
   const glyphs=await personalTools.evaluate(row=>['[data-personal-account-info]','[data-personal-account-limit]'].map(selector=>{const el=row.querySelector(selector);const glyph=el.firstElementChild;const a=el.getBoundingClientRect();const b=glyph.getBoundingClientRect();const s=getComputedStyle(glyph);return {width:b.width,height:b.height,dx:(b.left+b.width/2)-(a.left+a.width/2),dy:(b.top+b.height/2)-(a.top+a.height/2),border:parseFloat(s.borderTopWidth),radius:parseFloat(s.borderTopLeftRadius),color:s.color};}));
-  for(const glyph of glyphs){assert.equal(glyph.width,23,'Matched glyph width');assert.equal(glyph.height,23,'Matched glyph height');assert.ok(Math.abs(glyph.dx)<1&&Math.abs(glyph.dy)<1,'Centered glyph');}
+  assert.equal(glyphs[0].width,20,'Info outline matches visible gear contour');
+  assert.equal(glyphs[0].height,20,'Square info outline');
+  assert.equal(glyphs[1].width,23,'Existing gear SVG viewport unchanged');
+  assert.equal(glyphs[1].height,23,'Existing gear SVG viewport unchanged');
+  for(const glyph of glyphs)assert.ok(Math.abs(glyph.dx)<1&&Math.abs(glyph.dy)<1,'Centered glyph');
   assert.ok(glyphs[0].border>0&&glyphs[0].radius>0,'Info rounded outline');
   assert.equal(glyphs[0].color,glyphs[1].color,'Matching glyph color');
   await helpButton.click();
