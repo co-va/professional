@@ -2,6 +2,8 @@ import {
   actionBlock,
   button,
   compactButton,
+  compactAddButton,
+  compactRemoveButton,
   dataTable,
   modal,
   mountModal,
@@ -15,7 +17,7 @@ import {
 } from '../../../ui/ui.js';
 import { openFinanceDeleteConfirmation, financeDesktop } from '../desktop.js';
 import { canUseCapability } from '../../access.js';
-import { desktopAvailableArticles } from './classification.js';
+import { desktopAvailableArticles, desktopArticleGroups, desktopArticleValues } from './classification.js';
 import { moveDesktopQTool } from '../../../ui/v2/z-layout.js';
 import { getFinanceArticles } from '../data.js';
 import { archiveFinanceArticle, createFinanceArticle, updateFinanceArticle } from '../service.js';
@@ -109,16 +111,16 @@ function openArticleX(existing = null, onSaved = () => {}, getArticles = getFina
   const roots=new Set(items.filter(a=>['INCOME_ROOT','EXPENSE_ROOT'].includes(a.systemKey)).map(a=>a.articleId));
   const descendants=new Set(existing?[existing.articleId]:[]);
   for(let changed=true;changed;){changed=false;for(const a of items)if(descendants.has(a.parentArticleId)&&!descendants.has(a.articleId)){descendants.add(a.articleId);changed=true;}}
-  const parentChoices=[{value:'',label:'Без группы'},...items.filter(a=>!roots.has(a.articleId)&&!descendants.has(a.articleId)&&(a.direction!=='TRANSFER'||existing?.direction==='TRANSFER')).map(a=>({value:a.articleId,label:a.name}))];
   const existingParent=String(existing?.parentArticleId||'');
-  if(desktop&&existingParent&&!roots.has(existingParent)&&!parentChoices.some(a=>a.value===existingParent))parentChoices.push({value:existingParent,label:'Текущая группа'});
   const economicType = existing?.economicType || 'OPERATING_EXPENSE';
   const economicOptions = ECONOMIC_OPTIONS.some(item=>item.value===economicType)
     ? ECONOMIC_OPTIONS : [...ECONOMIC_OPTIONS,{value:economicType,label:economicLabel(economicType)}];
   const content = `<form class="compact-form" data-finance-article-form novalidate>
     ${field({label:'Название',name:'articleName',value:existing?.name||'',required:true,placeholder:'Например, Краска'})}
-    ${desktop?select({label:'Направление',name:'direction',value:direction,options:desktopDirections})+(existing?select({label:'Группа',name:'parentArticleId',value:roots.has(existingParent)?'':existingParent,options:parentChoices}):''):select({label:'Группа',name:'parentArticleId',value:existingParent,options:parentOptions(items,existing?.articleId||'')})+select({label:'Направление',name:'direction',value:direction,options:DIRECTION_OPTIONS})}
+    ${desktop?select({label:'Направление',name:'direction',value:direction,options:desktopDirections}):select({label:'Группа',name:'parentArticleId',value:existingParent,options:parentOptions(items,existing?.articleId||'')})+select({label:'Направление',name:'direction',value:direction,options:DIRECTION_OPTIONS})}
     ${desktop?'':select({label:'Назначение',name:'economicType',value:economicType,options:economicOptions})}
+    ${desktop&&existing&&existing.direction!=='TRANSFER'?'<div class="desktop-group-values"><div class="stock-position-group-heading"><span>Значения</span>'+compactAddButton({data:'data-article-value-add',aria:'Добавить значение'})+'</div><div data-article-value-draft></div><div data-article-values></div></div>':''}
+    <div class="form-error" role="alert" data-article-error></div>
     <div class="modal-actions finance-receipt-actions finance-receipt-actions--dds">
       ${existing&&!isSystem?button('Удалить',{variant:'danger',data:'data-delete-finance-article'}):''}
       ${button('Сохранить',{type:'submit',data:'data-finance-article-save',disabled:true})}
@@ -129,6 +131,13 @@ function openArticleX(existing = null, onSaved = () => {}, getArticles = getFina
   const form=layer.querySelector('[data-finance-article-form]');
   const save=form.querySelector('[data-finance-article-save]');
   const remove=form.querySelector('[data-delete-finance-article]');
+  const plus=form.querySelector('[data-article-value-add]');
+  const draftHost=form.querySelector('[data-article-value-draft]');
+  const valueHost=form.querySelector('[data-article-values]');
+  const errorHost=form.querySelector('[data-article-error]');
+  let valueEdit=null;
+  const currentValues=()=>desktopArticleValues(getArticles(),existing?.articleId);
+  const valueName=()=>String(draftHost?.querySelector('[name="valueName"]')?.value||'').trim();
   if(isSystem)for(const name of ['direction','economicType']){
     const trigger=form.querySelector('input[name="'+name+'"]')?.closest('.ui-select')?.querySelector('[data-ui-select-trigger]');
     if(trigger)trigger.disabled=true;
@@ -137,14 +146,47 @@ function openArticleX(existing = null, onSaved = () => {}, getArticles = getFina
     const data=new FormData(form);
     const nextDirection=String(data.get('direction')||'');
     let parentArticleId=String(data.get('parentArticleId')||'');
-    if(desktop&&!parentArticleId)parentArticleId=items.find(a=>roots.has(a.articleId)&&a.direction===nextDirection)?.articleId||'';
+    if(desktop)parentArticleId=existing&&nextDirection===direction?existingParent:(items.find(a=>roots.has(a.articleId)&&a.direction===nextDirection)?.articleId||'');
     if(desktop&&existing&&nextDirection===direction&&!String(data.get('parentArticleId')||'')&&!existingParent)parentArticleId='';
     const nextEconomic=desktop?(existing&&nextDirection===direction?economicType:({IN:'OPERATING_REVENUE',OUT:'OPERATING_EXPENSE',TRANSFER:'TRANSFER'})[nextDirection]):String(data.get('economicType')||'');
     return {name:String(data.get('articleName')||'').trim(),parentArticleId,direction:nextDirection,economicType:nextEconomic};
   };
   const initial=JSON.stringify(read());
   let pending=false;
-  const sync=()=>{const value=read();const parent=items.find(a=>a.articleId===value.parentArticleId);const invalid=desktop&&(!desktopDirections.some(a=>a.value===value.direction)||(parent&&parent.direction!==value.direction)||(descendants.size>1&&value.direction!==direction));save.disabled=pending||!value.name||invalid||Boolean(existing&&JSON.stringify(value)===initial);if(remove)remove.disabled=pending;};
+  const sync=()=>{
+    const value=read(),parent=items.find(a=>a.articleId===value.parentArticleId);
+    const invalid=desktop&&(!desktopDirections.some(a=>a.value===value.direction)||(parent&&parent.direction!==value.direction)||((descendants.size>1||currentValues().length>0||valueEdit)&&value.direction!==direction));
+    const duplicate=valueEdit&&currentValues().some(a=>a.articleId!==valueEdit.articleId&&normalized(a.name)===normalized(valueName()));
+    const valueChanged=valueEdit&&valueName()&&!duplicate&&(!valueEdit.articleId||valueName()!==valueEdit.name);
+    const groupChanged=JSON.stringify(value)!==initial;
+    save.disabled=pending||!value.name||invalid||Boolean(valueEdit&&(!valueChanged||groupChanged))||Boolean(existing&&!valueEdit&&!groupChanged);
+    if(remove){remove.disabled=pending;remove.hidden=Boolean(valueEdit);}
+    if(plus)plus.disabled=pending||Boolean(valueEdit)||groupChanged;
+    valueHost?.querySelectorAll('[data-article-value-delete]').forEach(a=>a.disabled=pending||Boolean(valueEdit)||groupChanged);
+  };
+  const drawValues=()=>{
+    if(!valueHost)return;
+    const values=currentValues();
+    valueHost.innerHTML=values.length?list({className:'ui-list--dense list-entries',items:values.map(a=>({title:a.name,interactive:true,selected:valueEdit?.articleId===a.articleId,data:'data-article-value="'+escapeHtml(a.articleId)+'"',aria:'Изменить значение '+a.name}))}):emptyState('Значений пока нет');
+    for(const node of valueHost.querySelectorAll('[data-article-value]')){
+      const a=values.find(v=>v.articleId===node.dataset.articleValue);
+      node.addEventListener('click',event=>{if(event.target.closest('[data-article-value-delete]')||pending||valueEdit||JSON.stringify(read())!==initial)return;valueEdit={articleId:a.articleId,name:a.name};drawDraft();});
+      node.insertAdjacentHTML('beforeend',compactRemoveButton({data:'data-article-value-delete',aria:'Удалить значение '+a.name}));
+      node.querySelector('[data-article-value-delete]')?.addEventListener('click',event=>{
+        event.stopPropagation();if(pending||valueEdit||JSON.stringify(read())!==initial)return;
+        // The confirmation closes its owner after success; reopen the same group.
+        openFinanceDeleteConfirmation(layer,{message:'Значение «'+a.name+'» будет удалено из списка. Проведённые операции останутся в истории.',onConfirm:()=>archiveFinanceArticle(a.articleId),onSuccess:()=>{onSaved();const fresh=getArticles().find(v=>v.articleId===existing.articleId);if(fresh)openArticleX(fresh,onSaved,getArticles,true);}});
+      });
+    }
+    sync();
+  };
+  const drawDraft=()=>{
+    if(!draftHost)return;
+    draftHost.innerHTML=valueEdit?field({label:'Наименование значения',name:'valueName',value:valueEdit.name,required:true})+button('Отмена',{type:'button',variant:'secondary',data:'data-article-value-cancel'}):'';
+    draftHost.querySelector('[data-article-value-cancel]')?.addEventListener('click',()=>{valueEdit=null;drawDraft();drawValues();});
+    draftHost.querySelector('input')?.focus();sync();
+  };
+  plus?.addEventListener('click',()=>{if(pending||valueEdit||JSON.stringify(read())!==initial)return;valueEdit={articleId:'',name:''};drawDraft();});
   form.addEventListener('input',sync);
   form.addEventListener('change',sync);
   form.addEventListener('submit',async event=>{
@@ -155,6 +197,12 @@ function openArticleX(existing = null, onSaved = () => {}, getArticles = getFina
     if(validation){openNotice({message:validation});return;}
     pending=true;sync();
     try{
+      if(desktop&&valueEdit){
+        const payload={name:valueName(),direction,parentArticleId:existing.articleId,economicType:existing.economicType};
+        const result=valueEdit.articleId?await updateFinanceArticle(valueEdit.articleId,payload):await createFinanceArticle(payload);
+        if(!result)throw new Error('Сервер не подтвердил сохранение значения.');
+        valueEdit=null;drawDraft();onSaved();drawValues();return;
+      }
       const payload=read();
       const result=existing?await updateFinanceArticle(existing.articleId,payload):await createFinanceArticle(payload);
       if(!result)throw new Error('Сервер не подтвердил сохранение статьи.');
@@ -170,7 +218,7 @@ function openArticleX(existing = null, onSaved = () => {}, getArticles = getFina
       onSuccess:onSaved,
     });
   });
-  sync();
+  drawValues();sync();
   return layer;
 }
 
@@ -242,7 +290,8 @@ function desktopArticleRows(items,state){
   const names=new Map(articles.map(a=>[a.articleId,a.name]));
   const f=state.filters;
   const count=new Map();for(const a of articles)count.set(a.parentArticleId,(count.get(a.parentArticleId)||0)+1);
-  const sorted=state.sort==='tree'?articles:[...articles].sort((a,b)=>{
+  const groups=desktopArticleGroups(articles);
+  const sorted=state.sort==='tree'?groups:[...groups].sort((a,b)=>{
     const key=state.sort.startsWith('system')?'systemKey':'name';
     const value=a=>key==='systemKey'?(a.systemKey?'Системная':'Пользовательская'):a.name;
     return String(value(a)).localeCompare(String(value(b)),'ru',{numeric:true})*(state.sort.endsWith('Desc')?-1:1);
@@ -250,7 +299,7 @@ function desktopArticleRows(items,state){
   return treeRows(sorted).filter(a=>{
     const direction=({IN:'Приход',OUT:'Расход',TRANSFER:'Транзакция'})[a.direction]||'';
     const type=a.systemKey?'Системная':'Пользовательская';
-    return query.every(word=>normalized([a.name,names.get(a.parentArticleId),direction,type].join(' ')).includes(word))
+    return query.every(word=>normalized([a.name,names.get(a.parentArticleId),direction,type,...desktopArticleValues(articles,a.articleId).map(v=>v.name)].join(' ')).includes(word))
       &&(!f.direction||a.direction===f.direction)
       &&(!f.system||f.system===(a.systemKey?'system':'custom'))
       &&(!f.parent||f.parent===(a.parentArticleId?'id:'+a.parentArticleId:'root'));
@@ -264,7 +313,7 @@ function renderDesktopArticleTable(host,rows,collapsed,onOpen){
       return '<div style="padding-inline-start:'+Math.min(a.depth,5)*12+'px" data-article-row="'+escapeHtml(a.articleId)+'">'+content+'</div>';
     }},
     {key:'type',label:'Тип',sortable:false,render:a=>a.systemKey?'Системная':'Пользовательская'},
-    {key:'values',label:'Вложенные',sortable:false,render:a=>String(a.childCount)},
+    {key:'values',label:'Значения',sortable:false,render:a=>String(a.childCount)},
   ];
   host.innerHTML='<div class="desktop-table-popup">'+dataTable({columns,rows,caption:'Статьи',compact:true})+'</div>';
   const original=host.querySelector('tbody');if(!original)return;

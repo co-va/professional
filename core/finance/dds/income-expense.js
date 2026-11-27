@@ -15,7 +15,7 @@ import {
 } from '../../../ui/ui.js';
 import { financeQSubmit, financeZSave } from '../desktop.js';
 import { canUseCapability } from '../../access.js';
-import { desktopAvailableArticles } from './classification.js';
+import { desktopAvailableArticles, desktopArticleGroups, desktopArticleValues } from './classification.js';
 import { getFinanceArticles } from '../data.js';
 import { getWallets } from '../cash/data.js';
 import { financeLocalDateValue, financeOccurredAtForDate } from '../date.js';
@@ -26,7 +26,9 @@ function articleOptions(direction,desktopArticles=false,preserveId='') {
   const all=getFinanceArticles();
   const visible=desktopArticles?desktopAvailableArticles(all,canUseCapability):all;
   if(preserveId&&!visible.some(item=>item.articleId===preserveId)){const prior=all.find(item=>item.articleId===preserveId);if(prior)visible.push(prior);}
-  return visible
+  const groups=desktopArticles?desktopArticleGroups(visible):visible;
+  if(preserveId&&!groups.some(a=>a.articleId===preserveId)){const prior=all.find(a=>a.articleId===preserveId);if(prior)groups.push(prior);}
+  return groups
     .filter((item) => item.direction === direction && item.economicType !== 'GROUP')
     .map((item) => ({ value: item.articleId, label: item.name }));
 }
@@ -35,7 +37,8 @@ function walletOptions() {
   return getWallets().map((item) => ({ value: item.id, label: item.name }));
 }
 
-function manualLineOptions(direction) {
+function manualLineOptions(direction, articleId = null) {
+  if(articleId!==null)return desktopArticleValues(getFinanceArticles(),articleId).map(a=>({value:a.name,label:a.name}));
   const kind = direction === 'IN' ? 'manual-income' : 'manual-expense';
   return [...new Set(getLedgerEntries()
     .filter((item) => item?.operationKind === kind)
@@ -45,13 +48,13 @@ function manualLineOptions(direction) {
     .map((value) => ({ value, label: value }));
 }
 
-function detailRow(values = {}, direction = 'IN') {
+function detailRow(values = {}, direction = 'IN', articleId = null) {
   return `<div class="array-row" data-finance-manual-line>
     ${searchableSelect({
       label: 'Позиция',
       name: 'lineName',
       value: values.name ?? values.lineName ?? '',
-      options: manualLineOptions(direction),
+      options: manualLineOptions(direction,articleId),
       placeholder: 'Введите или выберите',
     })}
     ${field({
@@ -75,10 +78,10 @@ function detailRow(values = {}, direction = 'IN') {
   </div>`;
 }
 
-function modeMarkup(mode, { amount = '', lines = [], direction = 'IN' } = {}) {
+function modeMarkup(mode, { amount = '', lines = [], direction = 'IN', articleId = null } = {}) {
   if (mode === 'detail') {
     const rows = (Array.isArray(lines) && lines.length ? lines : [{}])
-      .map((item) => detailRow(item, direction))
+      .map((item) => detailRow(item, direction,articleId))
       .join('');
     return `<div class="array-group" data-finance-manual-detail>
       <span class="array-label">Позиции</span>
@@ -98,11 +101,11 @@ function modeMarkup(mode, { amount = '', lines = [], direction = 'IN' } = {}) {
   });
 }
 
-function syncMode(root, direction) {
+function syncMode(root, direction,articleId=null) {
   const mode = String(root.querySelector('input[name="entryMode"]')?.value || 'simple');
   const host = root.querySelector('[data-finance-manual-mode]');
   if (!host) return;
-  host.innerHTML = modeMarkup(mode, { direction });
+  host.innerHTML = modeMarkup(mode, { direction,articleId });
 }
 
 function collectLines(root) {
@@ -203,7 +206,7 @@ export function renderIncomeExpenseOperation(root, direction, { onSaved = null, 
       ${select({ label: 'Кошелёк', name: 'walletId', value: walletId, options: wallets })}
       ${select({ label: 'Ввод', name: 'entryMode', value: mode, options: [{ value: 'simple', label: 'Сумма' }, { value: 'detail', label: 'Детально' }] })}
       ${datePicker({ label: 'Фактическая дата', name: 'occurredDate', value: financeLocalDateValue(operation?.occurredAt || new Date()), required: true, allowClear: false })}
-      <div data-finance-manual-mode>${modeMarkup(mode, { amount: simpleAmount, lines, direction })}</div>
+      <div data-finance-manual-mode>${modeMarkup(mode, { amount: simpleAmount, lines, direction,articleId:desktopArticles?articleId:null })}</div>
       ${textareaField({ label: 'Примечание', name: 'note', value: existing.note || '', rows: 3, placeholder: 'Необязательно' })}
       ${qBody ? button('Сохранить', { type: 'submit', data: 'data-finance-manual-save', aria: isIncome ? 'Сохранить доход' : 'Сохранить расход' }) : ''}
     </form>
@@ -214,12 +217,21 @@ export function renderIncomeExpenseOperation(root, direction, { onSaved = null, 
 
   initDatePickers(root);
 
+  const selectedArticle=()=>desktopArticles?String(root.querySelector('[name="articleId"]')?.value||''):null;
   root.addEventListener('change', (event) => {
-    if (event.target?.matches?.('input[name="entryMode"]')) syncMode(root, direction);
+    if (event.target?.matches?.('input[name="entryMode"]')) syncMode(root,direction,selectedArticle());
+    if(desktopArticles&&event.target?.matches?.('[name="articleId"]')){
+      // Only refresh available choices. Preserve typed names, quantities and prices.
+      for(const row of root.querySelectorAll('[data-finance-manual-line]')){
+        const input=row.querySelector('[name="lineName"]'),selectHost=input?.closest('.ui-select');
+        if(!selectHost)continue;
+        selectHost.outerHTML=searchableSelect({label:'Позиция',name:'lineName',value:input.value,options:manualLineOptions(direction,selectedArticle()),placeholder:'Введите или выберите'});
+      }
+    }
   });
   root.addEventListener('click', (event) => {
     if (event.target.closest?.('[data-finance-manual-line-add]')) {
-      root.querySelector('[data-finance-manual-lines]')?.insertAdjacentHTML('beforeend', detailRow({}, direction));
+      root.querySelector('[data-finance-manual-lines]')?.insertAdjacentHTML('beforeend', detailRow({}, direction,selectedArticle()));
       return;
     }
     const remove = event.target.closest?.('[data-finance-manual-line-remove]');

@@ -29,3 +29,15 @@ export function desktopDocumentArticles(entries,catalog){
  }
  return [...found].filter(Boolean).sort((a,b)=>a.localeCompare(b,'ru'));
 }
+
+// A Desktop article is a group; children of user articles are its named values.
+// A child of a hidden or technical article is not silently discarded.
+export function desktopArticleGroups(articles){
+ const parents=new Set(articles.filter(a=>!a.systemKey).map(a=>a.articleId));
+ return articles.filter(a=>a.systemKey||!parents.has(a.parentArticleId));
+}
+export function desktopArticleValues(articles,articleId){
+ const parent=articles.find(a=>a.articleId===articleId);
+ if(!parent||parent.systemKey)return [];
+ return articles.filter(a=>!a.systemKey&&a.parentArticleId===articleId&&a.direction===parent.direction&&!a.archivedAt);
+}
