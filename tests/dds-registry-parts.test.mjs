@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { ddsRegistryParts } from '../core/finance/dds/registry-parts.js';
-const catalog=[{articleId:'s',systemKey:'SERVICE_REVENUE',name:'Услуги'},{articleId:'t',systemKey:'TIPS',name:'Чаевые'},{articleId:'p',systemKey:'PRODUCT_REVENUE',name:'Продажа товаров'}];
+const catalog=[{articleId:'s',systemKey:'SERVICE_REVENUE',name:'Услуги'},{articleId:'t',systemKey:'TIPS',name:'Чаевые'},{articleId:'p',systemKey:'PRODUCT_REVENUE',name:'Продажа товаров'},{articleId:'dg',systemKey:'DEPOSIT_BENEFIT_GRANTED',name:'Предоставление выгоды по депозиту'},{articleId:'ds',systemKey:'DEPOSIT_SPEND',name:'Списание с депозита'},{articleId:'dr',systemKey:'DEPOSIT_PAYMENT_REFUND',name:'Возврат на депозит'},{articleId:'db',systemKey:'DEPOSIT_BENEFIT_REVERSED',name:'Аннулирование выгоды по депозиту'},{articleId:'tr',systemKey:'TRANSFER',name:'Перевод между кошельками'}];
 const entry=(articleId,economicType,amount,direction='IN')=>({articleId,economicType,amount,direction,walletName:'Наличные'});
 const fact={kind:'payment',allocations:[{name:'Депозит'}],principal:-10000,bonus:2000,conditionalGranted:2000,conditionalReversed:0,conditionalWrittenOff:null,sources:['Депозит'],personal:0};
 const doc={id:'d',first:{operationKind:'payment'},entries:[entry('s','SERVICE_REVENUE',3000),entry('t','TIPS',500)],facts:fact};
@@ -20,4 +20,10 @@ const transfer=ddsRegistryParts({id:'x',first:{operationKind:'transfer',operatio
 assert.equal(transfer.length,1);assert.equal(transfer[0].money,500);
 const refund=ddsRegistryParts({id:'r',first:{operationKind:'refund'},entries:[],facts:{...fact,kind:'refund',principal:10000,bonus:-2000,conditionalGranted:0,conditionalReversed:2000}},catalog);
 assert.equal(refund.reduce((n,r)=>n+r.money,0),10000);assert.equal(refund.reduce((n,r)=>n+r.bonus,0),-2000);
-console.log('PASS: article rows, preserved sums, unknown values and document identity');
+assert.ok(rows.every(r=>catalog.some(a=>a.articleId===r.articleId)));
+const noCatalog=ddsRegistryParts(doc,catalog.slice(0,3));
+assert.equal(noCatalog.length,4);assert.equal(noCatalog.filter(r=>!r.article).length,2);
+assert.equal(noCatalog.reduce((n,r)=>n+r.money,0),-6500);
+const unknownName=ddsRegistryParts({id:'bad',first:{},entries:[{...entry('not-in-catalog','SERVICE_REVENUE',100),articleName:'Оплата услуг, Чаевые'}]},catalog);
+assert.equal(unknownName[0].article,'');assert.equal(unknownName[0].money,100);
+console.log('PASS: single registered article per row, missing articles never fabricated');

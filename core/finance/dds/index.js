@@ -612,7 +612,7 @@ function renderDDS(root) {
     return ddsRegistryParts(document,catalog).map(part=>{
       const title=desktopOperationDirection(part.direction);
       const bonus=part.bonus==null||part.bonus===0?'':(part.bonus>0?'+':'−')+new Intl.NumberFormat('ru-RU',{maximumFractionDigits:2}).format(Math.abs(part.bonus));
-      return {...base,id:part.id,documentId:part.documentId,article:part.article,articles:part.article?[part.article]:[],
+      return {...base,id:part.id,documentId:part.documentId,articleId:part.articleId,article:part.article,articles:part.article?[part.article]:[],
         direction:part.direction,title,displayTitle:base.status==='Отменена'?title+' · Отменена':title,
         wallet:part.direction==='transfer'?part.sources.join(' → '):part.sources.join(' + '),wallets:part.sources,
         amount:part.money==null||part.money===0?'':formatMoney(part.money,{signed:part.direction!=='transfer'}),

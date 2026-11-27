@@ -179,12 +179,12 @@ function applyDDSHierarchy(host,rows,collapsed){
  const byId=new Map([...body.querySelectorAll('[data-finance-history-row]')].map(c=>[c.dataset.financeHistoryRow,c.closest('tr')]));
  const width=host.querySelector('thead tr')?.cells.length||body.rows[0]?.cells.length||1;
  const doc=body.ownerDocument,fragment=doc.createDocumentFragment(),groups=new Map();
- for(const row of rows){const name=String(row.article||'').trim();if(!groups.has(name))groups.set(name,[]);const tr=byId.get(row.id);if(tr)groups.get(name).push(tr);}
- for(const [name,members] of groups){
-  const id=JSON.stringify(['article',name]),tr=doc.createElement('tr');tr.dataset.tableGroupLevel='group';
+ for(const row of rows){const name=String(row.article||'').trim(),key=row.articleId||'';if(!groups.has(key))groups.set(key,{name,members:[]});const tr=byId.get(row.id);if(tr)groups.get(key).members.push(tr);}
+ for(const [key,{name,members}] of groups){
+  const id=JSON.stringify(['article',key]),tr=doc.createElement('tr');tr.dataset.tableGroupLevel='group';
   const td=doc.createElement('td');td.colSpan=width;
   const details=doc.createElement('details');details.className='dds-table-disclosure';details.open=!collapsed.has(id);
-  const summary=doc.createElement('summary');summary.className='inventory-editor-summary';summary.textContent=name||'Без статьи';
+  const summary=doc.createElement('summary');summary.className='inventory-editor-summary';summary.textContent=name||'—';
   details.append(summary);td.append(details);tr.append(td);fragment.append(tr);
   const sync=()=>{for(const member of members)member.hidden=!details.open;};
   details.addEventListener('toggle',()=>{if(details.open)collapsed.delete(id);else collapsed.add(id);sync();});
