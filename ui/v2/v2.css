@@ -616,23 +616,24 @@
  .people-action-popup>[data-add-choice-error]:empty{display:none}
 }
 
-/* Contacts Desktop: the table is the only vertical scroll owner. Keep the
-   actual table header in the same table so columns never drift. */
+/* Desktop lists: the table is the only vertical scroll owner. Keep its
+   actual header in the same table so columns never drift. */
 @media (min-width:768px) and (min-height:600px){
- .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z:has([data-people-desktop-toolbar])>[data-v2-z-body]{
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z:has([data-people-list-host],[data-wallet-history-host],[data-finance-article-table])>[data-v2-z-body]{
    display:flex;flex-direction:column;overflow:hidden!important;
    padding-bottom:0;scrollbar-gutter:auto;
  }
- .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) :is([data-v2-workspace-surface],.ui-page,section:has(>[data-people-list-host]),[data-people-list-host]){
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z:has([data-people-list-host],[data-wallet-history-host],[data-finance-article-table]) :is([data-v2-workspace-surface],.ui-page,[data-dds-history],section:has(>[data-people-list-host],>[data-wallet-history-host]),[data-people-list-host],[data-wallet-history-host],[data-finance-article-table]){
    display:flex;flex-direction:column;flex:1 1 auto;min-height:0;min-width:0;
  }
- .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) [data-people-list-host]>.ui-data-table--compact{
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z section:has(>[data-wallet-history-host])>.v2-desktop-tool-row{flex:0 0 auto}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z :is([data-people-list-host],[data-wallet-history-host],[data-finance-article-table])>.ui-data-table--compact{
    flex:0 1 auto;min-height:0;overflow:auto;overscroll-behavior:none;
  }
- .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) [data-people-list-host]>.ui-data-table--compact table{
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z :is([data-people-list-host],[data-wallet-history-host],[data-finance-article-table])>.ui-data-table--compact table{
    border-collapse:separate;border-spacing:0;
  }
- .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) [data-people-list-host]>.ui-data-table--compact thead th{
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z :is([data-people-list-host],[data-wallet-history-host],[data-finance-article-table])>.ui-data-table--compact thead th{
    position:sticky;top:0;z-index:2;background:var(--desktop-table-header-bg);
  }
 }
