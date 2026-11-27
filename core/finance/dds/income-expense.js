@@ -5,13 +5,15 @@ import {
   field,
   formValidationMessage,
   initDatePickers,
+  modal,
+  mountModal,
   openNotice,
   searchableSelect,
   select,
   textareaField,
   workspaceHeaderContext,
 } from '../../../ui/ui.js';
-import { financeZSave } from '../desktop.js';
+import { financeQSubmit, financeZSave } from '../desktop.js';
 import { getFinanceArticles } from '../data.js';
 import { getWallets } from '../cash/data.js';
 import { financeLocalDateValue, financeOccurredAtForDate } from '../date.js';
@@ -149,6 +151,23 @@ async function saveManual(root, direction, onSaved, operation = null) {
   }
 }
 
+function manualOperationTitle(direction, operation) {
+  const title = direction === 'IN' ? 'Доход' : 'Расход';
+  return operation ? 'Корректировка · ' + title : title;
+}
+
+export function openIncomeExpenseQ(root, direction, { onSaved = null, operation = null } = {}) {
+  const layer = mountModal(root, modal('', {
+    title: manualOperationTitle(direction, operation), variant: 'q', surface: 'app',
+  }));
+  if (!layer) return null;
+  const rendered = renderIncomeExpenseOperation(layer, direction, {
+    operation, onSaved: () => { layer.v2Close?.(); onSaved?.(); },
+  });
+  if (!rendered) { layer.v2Close?.(); return null; }
+  return layer;
+}
+
 export function renderIncomeExpenseOperation(root, direction, { onSaved = null, operation = null } = {}) {
   const isIncome = direction === 'IN';
   const articles = articleOptions(direction);
@@ -170,9 +189,9 @@ export function renderIncomeExpenseOperation(root, direction, { onSaved = null, 
   const walletId = String(existing.walletId || wallets[0]?.value || '');
   const simpleAmount = Number(existing.total || lines[0]?.total || lines[0]?.unitPrice || 0) || '';
 
-  root.innerHTML = `${workspaceHeaderContext({
-    title: operation ? `Корректировка · ${isIncome ? 'Доход' : 'Расход'}` : (isIncome ? 'Доход' : 'Расход'),
-  })}
+  const qBody = root.querySelector('[data-v2-q-body]');
+  const title = manualOperationTitle(direction, operation);
+  (qBody || root).innerHTML = `${qBody ? '' : workspaceHeaderContext({ title })}
     <form class="compact-form" data-finance-manual-form novalidate>
       ${select({ label: 'Статья', name: 'articleId', value: articleId, options: articles, searchable: true })}
       ${select({ label: 'Кошелёк', name: 'walletId', value: walletId, options: wallets })}
@@ -180,8 +199,9 @@ export function renderIncomeExpenseOperation(root, direction, { onSaved = null, 
       ${datePicker({ label: 'Фактическая дата', name: 'occurredDate', value: financeLocalDateValue(operation?.occurredAt || new Date()), required: true, allowClear: false })}
       <div data-finance-manual-mode>${modeMarkup(mode, { amount: simpleAmount, lines, direction })}</div>
       ${textareaField({ label: 'Примечание', name: 'note', value: existing.note || '', rows: 3, placeholder: 'Необязательно' })}
+      ${qBody ? button('Сохранить', { type: 'submit', data: 'data-finance-manual-save', aria: isIncome ? 'Сохранить доход' : 'Сохранить расход' }) : ''}
     </form>
-    ${actionBlock(button('Сохранить', {
+    ${qBody ? '' : actionBlock(button('Сохранить', {
       data: 'data-finance-manual-save',
       aria: isIncome ? 'Сохранить доход' : 'Сохранить расход',
     }))}`;
@@ -206,9 +226,13 @@ export function renderIncomeExpenseOperation(root, direction, { onSaved = null, 
     event.preventDefault();
     void saveManual(root, direction, onSaved, operation);
   });
-  root.querySelector('[data-finance-manual-save]')?.addEventListener('click', () => {
-    root.querySelector('[data-finance-manual-form]')?.requestSubmit();
-  });
-  financeZSave(root, '[data-finance-manual-save]', operation ? `Корректировка · ${isIncome ? 'Доход' : 'Расход'}` : (isIncome ? 'Доход' : 'Расход'));
+  if (qBody) {
+    financeQSubmit(root, root.querySelector('[data-finance-manual-form]'));
+  } else {
+    root.querySelector('[data-finance-manual-save]')?.addEventListener('click', () => {
+      root.querySelector('[data-finance-manual-form]')?.requestSubmit();
+    });
+    financeZSave(root, '[data-finance-manual-save]', title);
+  }
   return true;
 }

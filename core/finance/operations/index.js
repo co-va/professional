@@ -8,7 +8,8 @@ import {
   v2ZLayer,
 } from '../../../ui/ui.js';
 import { canUseCapability } from '../../access.js';
-import { renderIncomeExpenseOperation } from '../dds/income-expense.js';
+import { openIncomeExpenseQ, renderIncomeExpenseOperation } from '../dds/income-expense.js';
+import { financeDesktop } from '../desktop.js';
 import {
   SPECIAL_FINANCE_ACTIONS,
   renderFinanceEntityOperation,
@@ -51,6 +52,9 @@ export function financeOperationGroups({ groups = null } = {}) {
 }
 
 export function openFinanceOperation(root, actionId, { onSaved = null, financeEntity = null } = {}) {
+  if (financeDesktop(root) && (actionId === 'manual-income' || actionId === 'manual-expense')) {
+    return openIncomeExpenseQ(root, actionId === 'manual-income' ? 'IN' : 'OUT', { onSaved });
+  }
   const layer = mountV2ZLayer(root, v2ZLayer('', { className: 'finance-operation-z' }), { stack: true });
   if (!layer) return null;
 

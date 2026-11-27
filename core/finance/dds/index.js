@@ -37,7 +37,7 @@ import { financeLocalDateValue, financeOccurredAtForDate } from '../date.js';
 import { cancelFinanceOperation, correctFinanceOperation, hardDeleteFinanceOperation } from '../service.js';
 import { getLedgerEntries } from '../read.js';
 import { renderFinanceArticles } from './articles.js';
-import { renderIncomeExpenseOperation } from './income-expense.js';
+import { openIncomeExpenseQ, renderIncomeExpenseOperation } from './income-expense.js';
 import { SPECIAL_FINANCE_ACTIONS, renderSpecialFinanceOperation } from './special-operations.js';
 import { openDDSExcel } from './excel.js';
 
@@ -394,6 +394,11 @@ function openOperationCorrection(root, operationLayer, entries) {
     return;
   }
   operationLayer.v2Close?.();
+  if (financeDesktop(root) && (operation.kind === 'manual-income' || operation.kind === 'manual-expense')) {
+    return openIncomeExpenseQ(root, operation.kind === 'manual-income' ? 'IN' : 'OUT', {
+      operation, onSaved: () => reopenCorrectedOperation(root, operationLayer, null, operation.operationId),
+    });
+  }
   const layer = mountV2ZLayer(root, v2ZLayer('', { className: 'finance-dds-correction-z' }), { stack: true });
   if (!layer) return;
   const onSaved = () => reopenCorrectedOperation(root, operationLayer, layer, operation.operationId);
