@@ -163,7 +163,7 @@ function cashContext({ desktop = false } = {}) {
       data: 'data-cash-settings',
       aria: 'Настройки кассы',
     } : null,
-    c: canCreateCashEntity() ? {
+    c: !desktop && canCreateCashEntity() ? {
       label: '+',
       data: 'data-cash-create',
       aria: 'Создать сущность кассы',
@@ -446,10 +446,12 @@ function renderDesktopCashTools(root) {
   const tools = [
     cashAppearanceTypeOptions().length ? button('Вид', { variant: 'secondary', data: 'data-cash-desktop-view', aria: 'Вид' }) : '',
     financeOperationGroups({ groups }).length ? button(operationsIcon, { variant: 'secondary', className: 'v2-desktop-tool-icon', data: 'data-cash-desktop-operations title="Финансовые операции"', aria: 'Финансовые операции' }) : '',
+    canCreateCashEntity() ? button('+', { variant: 'secondary', className: 'v2-desktop-tool-primary', data: 'data-cash-desktop-add aria-haspopup="dialog"', aria: 'Добавить' }) : '',
   ].filter(Boolean);
   const [row] = setV2ZHeaderRows(root, tools.length ? ['<div class="v2-desktop-tool-row"><div class="v2-desktop-tool-actions" data-cash-desktop-tools>' + tools.join('') + '</div></div>'] : [], { desktopTitle: 'Касса' });
   row?.querySelector('[data-cash-desktop-view]')?.addEventListener('click', () => openCashAppearanceQ(root));
   row?.querySelector('[data-cash-desktop-operations]')?.addEventListener('click', () => openFinanceOperations(root, { groups, onSaved: () => renderList(root) }));
+  row?.querySelector('[data-cash-desktop-add]')?.addEventListener('click', () => openCashCreateMenu(root));
 }
 
 function renderList(root) {
