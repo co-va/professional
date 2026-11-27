@@ -1228,8 +1228,9 @@
 
 /* Service disclosure rows divide the catalogue without taking a full data row. */
 @media (min-width:768px) and (min-height:600px){
- .v2-app--workspace [data-service-table-kind]{--service-disclosure-row:30px}
- .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-table-kind] [data-service-collapse-key]>details>summary.inventory-editor-summary{box-sizing:border-box;height:var(--service-disclosure-row);min-height:var(--service-disclosure-row);max-height:var(--service-disclosure-row);padding-block:4px;line-height:20px}
+ .v2-app--workspace [data-service-table-kind]{--service-disclosure-row:22px}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-table-kind] [data-service-collapse-key]>details>summary.inventory-editor-summary{box-sizing:border-box;height:var(--service-disclosure-row);min-height:var(--service-disclosure-row);max-height:var(--service-disclosure-row);padding-block:0;line-height:21px}
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-table-kind] [data-service-collapse-key]>.inventory-editor-heading__controls{top:0;height:var(--service-disclosure-row);min-height:0;align-items:center}
  .v2-app--workspace [data-service-table-kind] [data-service-collapse-key]>[data-reorder-handle]{box-sizing:border-box;height:var(--service-disclosure-row);min-height:0;max-height:var(--service-disclosure-row)}
+ .v2-app--workspace [data-service-table-kind] [data-service-collapse-key]>[data-reorder-handle]::before{inset:0 -5px}
 }
