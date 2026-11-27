@@ -80,7 +80,8 @@ export function renderService(root, navigateBack = () => {}) {
   let disposeCatalog = () => {};
   let renderVersion = 0;
   let disposed = false;
-  const desktopState={query:'',sort:'manual',kind:'',group:'',value:'',workplace:'',ranges:{},rangeMetric:'',selected:new Set(),collapsed:new Set(),groupCollapsed:new Set()};
+  const makeDesktopState=()=>({query:'',sort:'manual',group:'',value:'',workplace:'',ranges:{},rangeMetric:'',selected:new Set(),collapsed:new Set(),groupCollapsed:new Set()});
+  const desktopStates={procedures:makeDesktopState(),products:makeDesktopState()};
 
   const renderCurrent = () => {
     if (disposed) return;
@@ -90,6 +91,7 @@ export function renderService(root, navigateBack = () => {}) {
     const view = views.some((item) => item.id === activeView) ? activeView : 'procedures';
 
     const desktop = isV2DesktopWorkspace(root.closest('[data-v2-app]'));
+    const desktopState=desktopStates[view];
     const actions = serviceSettingsActions(root, renderCurrent);
     const addAria = view === 'products' ? 'Добавить товар' : 'Добавить услугу';
     root.innerHTML = page([
@@ -111,6 +113,7 @@ export function renderService(root, navigateBack = () => {}) {
     // surface geometry or introduce a second header inside the Z body.
     const navMarkup = viewNavigation({ views, activeView: view, ariaLabel: 'Сервис' });
     const toolbar = desktop ? `<section data-people-desktop-toolbar data-service-desktop-toolbar><div class="people-desktop-tools">
+      <div class="people-desktop-actions people-desktop-query-tools">${button(view==='products'?'Т':'У',{variant:'secondary',className:'people-desktop-icon service-view-switch',data:'data-service-view-switch title="'+(view==='products'?'Товары → Услуги':'Услуги → Товары')+'"',aria:view==='products'?'Товары. Переключить на услуги':'Услуги. Переключить на товары'})}</div>
       ${field({name:'serviceSearch',type:'search',placeholder:'Поиск',autocomplete:'off',value:desktopState.query,data:'data-service-search'})}
       <div class="people-desktop-actions people-desktop-query-tools">
         ${compactButton({kind:'filter',data:'data-service-filter title="Фильтр" aria-haspopup="dialog" aria-pressed="false"'})}
@@ -119,7 +122,7 @@ export function renderService(root, navigateBack = () => {}) {
       <div class="people-desktop-actions people-desktop-actions--right">
         ${button(GROUP_ICON,{variant:'secondary',className:'people-desktop-icon',data:'data-service-tool="grouping" title="Группы"',aria:'Группы'})}
         ${button(VIEW_ICON,{variant:'secondary',className:'people-desktop-icon',data:'data-service-tool="appearance" title="Вид"',aria:'Вид'})}
-        ${button('+',{variant:'secondary',className:'people-desktop-icon people-desktop-add',data:'data-service-add-position title="Добавить"',aria:'Добавить'})}
+        ${button('+',{variant:'secondary',className:'people-desktop-icon people-desktop-add',data:'data-service-add title="'+addAria+'"',aria:addAria})}
       </div></div></section>` : navMarkup;
     const headerRows = setV2ZHeaderRows(root, [toolbar], {
       desktopTitle: desktop ? 'Сервис' : null,
@@ -143,6 +146,10 @@ export function renderService(root, navigateBack = () => {}) {
       if (action) control.addEventListener('click', action.onSelect);
     });
 
+    if(desktop) navigationRoot.querySelector('[data-service-view-switch]')?.addEventListener('click',()=>{
+      activeView=view==='procedures'?'products':'procedures';
+      renderCurrent();
+    });
     if(!desktop) initViewNavigation(navigationRoot, {
       views,
       activeView: view,
@@ -154,7 +161,7 @@ export function renderService(root, navigateBack = () => {}) {
 
     const catalog = root.querySelector('[data-service-catalog]');
     if(catalog && desktop) {
-      disposeCatalog=renderDesktopServiceCatalog(catalog,{root,toolbar:navigationRoot,onChanged:renderCurrent,state:desktopState,onCount,loadProceduresModule,loadProductsModule});
+      disposeCatalog=renderDesktopServiceCatalog(catalog,{root,toolbar:navigationRoot,onChanged:renderCurrent,state:desktopState,kind:view,onCount,loadProceduresModule,loadProductsModule});
     } else if (catalog) {
       const modulePromise = view === 'products' ? loadProductsModule() : loadProceduresModule();
       void modulePromise.then(async (module) => {

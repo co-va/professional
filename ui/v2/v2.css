@@ -1233,3 +1233,8 @@
  .v2-app--workspace [data-service-table-kind] [data-service-system-disclosure][open]>summary.service-table-system-heading::before{content:'▾'}
  .v2-app--workspace [data-service-table-kind] [data-service-section-count]{font-style:normal;font-variant-numeric:tabular-nums;text-transform:none;white-space:nowrap;color:inherit}
 }
+
+/* Service mode: reuse the existing square H action before the search. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace [data-service-desktop-toolbar] .service-view-switch{font-size:16px;font-weight:750;line-height:1;height:36px;min-height:36px;flex:0 0 36px}
+}
