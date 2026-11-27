@@ -4,20 +4,16 @@ import {
   compactButton,
   modal,
   mountModal,
-  setV2ZHeaderRows,
-  dataTable,
   emptyState,
   escapeHtml,
   field,
   formValidationMessage,
   list,
-  mountV2ZLayer,
   openNotice,
   select,
-  v2ZLayer,
-  workspaceHeaderContext,
 } from '../../../ui/ui.js';
-import { financeDesktop, financeZSave, openFinanceDeleteConfirmation } from '../desktop.js';
+import { openFinanceDeleteConfirmation } from '../desktop.js';
+import { moveDesktopQTool } from '../../../ui/v2/z-layout.js';
 import { getFinanceArticles } from '../data.js';
 import { archiveFinanceArticle, createFinanceArticle, updateFinanceArticle } from '../service.js';
 
@@ -98,7 +94,7 @@ function row(item) {
   };
 }
 
-function openArticleX(root, existing = null) {
+function openArticleX(existing = null, onSaved = () => {}) {
   const items = getFinanceArticles();
   const isSystem = Boolean(existing?.systemKey);
   const title = existing ? 'Редактирование статьи' : 'Новая статья';
@@ -116,7 +112,7 @@ function openArticleX(root, existing = null) {
       ${button('Сохранить',{type:'submit',data:'data-finance-article-save',disabled:true})}
     </div>
   </form>`;
-  const layer=mountModal(root,modal(content,{title,variant:'x',surface:'app',className:'modal--form-sheet'}));
+  const layer=mountModal(document.body,modal(content,{title,variant:'x',surface:'app',className:'modal--form-sheet'}));
   if(!layer)return null;
   const form=layer.querySelector('[data-finance-article-form]');
   const save=form.querySelector('[data-finance-article-save]');
@@ -144,7 +140,7 @@ function openArticleX(root, existing = null) {
       const payload=read();
       const result=existing?await updateFinanceArticle(existing.articleId,payload):await createFinanceArticle(payload);
       if(!result)throw new Error('Сервер не подтвердил сохранение статьи.');
-      layer.v2Close?.();renderList(root);
+      layer.v2Close?.();onSaved();
     }catch(error){openNotice({message:String(error?.message||'Не удалось сохранить статью')});}
     finally{pending=false;sync();}
   });
@@ -153,105 +149,11 @@ function openArticleX(root, existing = null) {
     openFinanceDeleteConfirmation(layer,{
       message:'Статья будет удалена из списка доступных статей. Ранее проведённые операции останутся в истории. Вы уверены?',
       onConfirm:()=>archiveFinanceArticle(existing.articleId),
-      onSuccess:()=>renderList(root),
+      onSuccess:onSaved,
     });
   });
   sync();
   return layer;
-}
-
-function openForm(root, existing = null) {
-  if(financeDesktop(root))return openArticleX(root,existing);
-  const items = getFinanceArticles();
-  const isSystem = Boolean(existing?.systemKey);
-  const direction = existing?.direction || 'OUT';
-  const economicType = existing?.economicType === 'GROUP' ? 'OPERATING_EXPENSE' : (existing?.economicType || 'OPERATING_EXPENSE');
-  const layer = mountV2ZLayer(root, v2ZLayer('', { className: 'finance-article-edit-z' }), { stack: true });
-  if (!layer) return;
-
-  layer.innerHTML = `${workspaceHeaderContext({
-    title: existing ? 'Редактирование статьи' : 'Новая статья',
-  })}
-    <form class="compact-form" data-finance-article-form novalidate>
-      ${field({ label: 'Название', name: 'articleName', value: existing?.name || '', required: true, placeholder: 'Например, Краска' })}
-      ${select({ label: 'Родитель', name: 'parentArticleId', value: existing?.parentArticleId || '', options: parentOptions(items, existing?.articleId || '') })}
-      ${select({ label: 'Тип', name: 'direction', value: direction, options: DIRECTION_OPTIONS })}
-      ${select({ label: 'Экономический характер', name: 'economicType', value: economicType, options: ECONOMIC_OPTIONS })}
-      ${existing && !isSystem ? button('Удалить', { type: 'button', variant: 'danger', data: 'data-delete-finance-article' }) : ''}
-    </form>
-    ${actionBlock(button('Сохранить', {
-      data: 'data-finance-article-save',
-      aria: 'Сохранить статью',
-    }))}`;
-
-  layer.querySelector('[data-finance-article-form]')?.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const form = event.currentTarget;
-    const validation = formValidationMessage(form);
-    if (validation) {
-      openNotice({ message: validation });
-      return;
-    }
-    const data = new FormData(form);
-    const payload = {
-      name: String(data.get('articleName') || '').trim(),
-      parentArticleId: String(data.get('parentArticleId') || ''),
-      direction: String(data.get('direction') || ''),
-      economicType: String(data.get('economicType') || ''),
-    };
-    if (!payload.name) {
-      openNotice({ message: 'Укажите название статьи.' });
-      return;
-    }
-    if (existing) await updateFinanceArticle(existing.articleId, payload);
-    else await createFinanceArticle(payload);
-    layer.v2Close?.();
-    renderList(root);
-  });
-
-  layer.querySelector('[data-finance-article-save]')?.addEventListener('click', () => {
-    layer.querySelector('[data-finance-article-form]')?.requestSubmit();
-  });
-  financeZSave(layer, '[data-finance-article-save]', existing ? 'Редактирование статьи' : 'Новая статья');
-
-  layer.querySelector('[data-delete-finance-article]')?.addEventListener('click', async () => {
-    await archiveFinanceArticle(existing.articleId);
-    layer.v2Close?.();
-    renderList(root);
-  });
-}
-
-function articleTable(rows, items=rows) {
-  const names=new Map(items.map(item=>[item.articleId,item.name]));
-  return dataTable({compact:true,caption:'Статьи',rows,columns:[
-    {key:'name',label:'Название',sortable:false,render:item=>'<button type="button" data-finance-article="'+escapeHtml(item.articleId)+'" aria-label="Открыть статью '+escapeHtml(item.name)+'">'+escapeHtml(item.name)+'</button>'},
-    {key:'parent',label:'Группа',sortable:false,render:item=>escapeHtml(names.get(item.parentArticleId)||'—')},
-    {key:'direction',label:'Направление',sortable:false,render:item=>escapeHtml(directionLabel(item.direction))},
-    {key:'economicType',label:'Назначение',sortable:false,render:item=>escapeHtml(economicLabel(item.economicType))},
-    {key:'system',label:'Тип',sortable:false,render:item=>item.systemKey?'Системная':'Пользовательская'},
-  ]});
-}
-
-function renderList(root) {
-  if(financeDesktop(root))return renderDesktopArticles(root);
-  const items = getFinanceArticles();
-  const rows = treeRows(items);
-  root.innerHTML = `${workspaceHeaderContext({
-    title: 'Статьи',
-    c: financeDesktop(root) ? null : {
-      label: '+',
-      data: 'data-add-finance-article',
-      aria: 'Добавить статью',
-    },
-  })}${rows.length ? list({ items: rows.map(row) }) : emptyState('Статей пока нет', 'Добавьте первую статью кнопкой «+».')}`;
-
-  root.querySelector('[data-add-finance-article]')?.addEventListener('click', () => openForm(root));
-  root.querySelectorAll('[data-finance-article]').forEach((element) => {
-    (financeDesktop(root) ? element.closest('tr') || element : element).addEventListener('click', () => {
-      const item = getFinanceArticles().find((candidate) => candidate.articleId === element.dataset.financeArticle);
-      if (item) openForm(root, item);
-    });
-  });
 }
 
 const ARTICLE_SORTS=[
@@ -314,44 +216,48 @@ function openArticleSort(anchor,state,refresh){
     state.sort=control.dataset.articleSortChoice;popup.v2Close?.();refresh();
   }));
 }
-function renderDesktopArticles(root){
-  const items=getFinanceArticles();
-  const state=root.financeArticleListState||=( {query:'',filters:articleFilters(),sort:'tree'} );
-  root.innerHTML=workspaceHeaderContext({title:'Статьи'})+'<section><div class="v2-desktop-tool-row"><div class="v2-desktop-tool-context"><span><output data-article-count aria-label="Количество статей" aria-live="polite"></output></span></div></div><div data-finance-article-table></div></section>';
-  const [toolbar]=setV2ZHeaderRows(root,[
-    '<section data-people-desktop-toolbar><div class="people-desktop-tools">'
-    +field({name:'articleSearch',type:'search',placeholder:'Поиск',autocomplete:'off',value:state.query,data:'data-article-search'})
-    +'<div class="people-desktop-actions people-desktop-query-tools">'
+// The DDS directory is a tool, not a navigation destination. The same Q
+// and compact X editor are used on desktop and mobile; persisted Core article
+// IDs and mutation rules are unchanged until the classification contract changes.
+export function openFinanceArticlesQ(root, {onSaved=()=>{}}={}) {
+  const state={query:'',filters:articleFilters(),sort:'tree'};
+  const layer=mountModal(root,modal(
+    '<div class="form-grid">'
+    +'<div style="display:flex;align-items:center;gap:8px">'
+    +field({name:'articleSearch',type:'search',placeholder:'Поиск',autocomplete:'off',value:'',data:'data-article-search'})
     +compactButton({kind:'filter',data:'data-article-filter title="Фильтр" aria-haspopup="dialog" aria-pressed="false"'})
     +compactButton({kind:'sort',data:'data-article-sort title="Сортировка" aria-haspopup="dialog" aria-pressed="false"'})
-    +'</div><div class="people-desktop-actions people-desktop-actions--right">'
-    +button('+',{variant:'secondary',className:'people-desktop-icon people-desktop-add',aria:'Добавить статью',data:'data-add-finance-article'})
-    +'</div></div></section>'
-  ],{desktopTitle:'Статьи'});
-  const host=root.querySelector('[data-finance-article-table]');
-  if(!toolbar||!host)return;
-  const count=root.querySelector('[data-article-count]');
-  const search=toolbar.querySelector('[data-article-search]');
-  const filter=toolbar.querySelector('[data-article-filter]');
-  const sort=toolbar.querySelector('[data-article-sort]');
+    +'</div>'
+    +'<output data-article-count aria-label="Количество статей" aria-live="polite"></output>'
+    +'<div data-finance-article-list></div></div>'
+    +actionBlock(button('Добавить статью',{variant:'secondary',data:'data-add-finance-article',aria:'Добавить статью'})),
+    {title:'Статьи',variant:'q',surface:'app'}
+  ));
+  if(!layer)return null;
+  const host=layer.querySelector('[data-finance-article-list]');
+  const count=layer.querySelector('[data-article-count]');
+  const search=layer.querySelector('[data-article-search]');
+  const filter=layer.querySelector('[data-article-filter]');
+  const sort=layer.querySelector('[data-article-sort]');
+  const add=layer.querySelector('[data-add-finance-article]');
+  moveDesktopQTool(add);
   const refresh=()=>{
+    const items=getFinanceArticles();
     const rows=visibleArticles(items,state);
-    if(count)count.textContent=String(rows.length);
+    count.textContent=String(rows.length);
     filter?.setAttribute('aria-pressed',String(Object.values(state.filters).some(Boolean)));
     sort?.setAttribute('aria-pressed',String(state.sort!=='tree'));
-    host.innerHTML=rows.length?articleTable(rows,items):emptyState(items.length?'Статьи не найдены':'Статей пока нет',items.length?'Измените условия поиска или фильтрации.':'Добавьте первую статью кнопкой «+».');
-    host.querySelectorAll('[data-finance-article]').forEach(control=>(control.closest('tr')||control).addEventListener('click',()=>{
+    host.innerHTML=rows.length?list({items:rows.map(row)}):emptyState(items.length?'Статьи не найдены':'Статей пока нет');
+    host.querySelectorAll('[data-finance-article]').forEach(control=>control.addEventListener('click',()=>{
       const item=getFinanceArticles().find(candidate=>candidate.articleId===control.dataset.financeArticle);
-      if(item)openForm(root,item);
+      if(item)openArticleX(item,changed);
     }));
   };
+  const changed=()=>{refresh();onSaved();};
   search?.addEventListener('input',()=>{state.query=search.value;refresh();});
-  filter?.addEventListener('click',()=>openArticleFilters(filter,items,state,refresh));
+  filter?.addEventListener('click',()=>openArticleFilters(filter,getFinanceArticles(),state,refresh));
   sort?.addEventListener('click',()=>openArticleSort(sort,state,refresh));
-  toolbar.querySelector('[data-add-finance-article]')?.addEventListener('click',()=>openForm(root));
+  add?.addEventListener('click',()=>openArticleX(null,changed));
   refresh();
-}
-
-export function renderFinanceArticles(root) {
-  renderList(root);
+  return layer;
 }

@@ -39,7 +39,7 @@ import { getWallets } from '../cash/data.js';
 import { financeLocalDateValue, financeOccurredAtForDate } from '../date.js';
 import { cancelFinanceOperation, correctFinanceOperation, hardDeleteFinanceOperation } from '../service.js';
 import { getLedgerEntries } from '../read.js';
-import { renderFinanceArticles } from './articles.js';
+import { openFinanceArticlesQ } from './articles.js';
 import { openIncomeExpenseQ, renderIncomeExpenseOperation } from './income-expense.js';
 import { SPECIAL_FINANCE_ACTIONS, renderSpecialFinanceOperation } from './special-operations.js';
 import { openDDSExcel } from './excel.js';
@@ -533,9 +533,7 @@ function openFinanceOperation(root, movements, operationId) {
 }
 
 function openArticles(root) {
-  const layer = mountV2ZLayer(root, v2ZLayer('', { className: 'finance-dds-articles-z' }), { stack: true });
-  if (!layer) return;
-  renderFinanceArticles(layer);
+  return openFinanceArticlesQ(root, {onSaved:()=>renderDDS(root)});
 }
 
 function availableDDSSettings() {
