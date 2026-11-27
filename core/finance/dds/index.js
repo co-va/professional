@@ -159,56 +159,7 @@ function openCancellationInfo(root) {
   });
 }
 
-function openDesktopCancelOperation(root, operationLayer, entries) {
-  const first = entries[0] || {};
-  const payment = first.operationKind === 'payment';
-  const title = payment ? 'Отменить оплату?' : 'Отменить операцию?';
-  const message = payment
-    ? 'Оплата будет отменена во всех связанных кошельках. Остатки кошельков будут пересчитаны на выбранную дату. Информация об отмене сохранится в истории.'
-    : 'Финансовое движение будет отменено на выбранную дату. Остатки кошельков будут пересчитаны. Информация об отмене сохранится в истории.';
-  const content = `<div class="dds-operation-warning">
-    <div class="modal-title"><h2>${title}</h2><p>${message}</p></div>
-    ${datePicker({ label: 'Фактическая дата отмены', name: 'financeCancelOccurredDate', value: financeLocalDateValue(), required: true, allowClear: false })}
-    <div class="modal-actions finance-receipt-actions dds-operation-warning__pair">
-      ${button('Отменить', {variant:'danger',data:'data-finance-operation-cancel-confirm'})}
-      ${button('Не отменять', {variant:'primary',data:'data-dds-cancel-close data-modal-autofocus'})}
-    </div>
-    <div class="dds-operation-warning__delete">
-      <div class="modal-title"><h2>Полное удаление</h2><p>Для ошибочных или тестовых операций. Операция и связанные с ней финансовые записи будут удалены из истории без возможности восстановления.</p></div>
-      <div class="modal-actions finance-receipt-actions">
-        ${button('Удалить', {variant:'critical',data:'data-dds-delete-open'})}
-      </div>
-    </div>
-  </div>`;
-  const layer = mountModal(document.body, modal(content, {title,variant:'x',surface:'app',className:'dds-operation-warning-x'}));
-  if (!layer) return null;
-  initDatePickers(layer);
-  const confirm = layer.querySelector('[data-finance-operation-cancel-confirm]');
-  const close = layer.querySelector('[data-dds-cancel-close]');
-  const remove = layer.querySelector('[data-dds-delete-open]');
-  let pending = false;
-  close?.addEventListener('click',()=>{if(!pending)layer.v2Close?.();});
-  remove?.addEventListener('click',()=>{if(!pending)openDeleteOperation(root,operationLayer,entries,{parent:layer});});
-  confirm?.addEventListener('click',async()=>{
-    if(pending)return;
-    const input=layer.querySelector('input[name="financeCancelOccurredDate"]');
-    if(!input?.value){openNotice({message:'Укажите фактическую дату отмены.'});return;}
-    pending=true;
-    for(const control of [confirm,close,remove])if(control)control.disabled=true;
-    try{
-      const result=await cancelFinanceOperation(first.operationId,{reason:'incorrect-entry',occurredAt:financeOccurredAtForDate(input.value,new Date())});
-      if(!result)throw new Error('Не удалось отменить операцию');
-      layer.v2Close?.();
-      operationLayer.v2Close?.();
-      renderDDS(root);
-    }catch(error){openNotice({message:String(error?.message||'Не удалось отменить операцию')});}
-    finally{pending=false;for(const control of [confirm,close,remove])if(control)control.disabled=false;}
-  });
-  return layer;
-}
-
 function openCancelOperation(root, operationLayer, entries) {
-  if (financeDesktop(root)) return openDesktopCancelOperation(root, operationLayer, entries);
   const first = entries[0] || {};
   const content = `<div class="ui-list-toolbar"><div></div><div class="ui-list-toolbar__actions">${infoUI('', {
     aria: 'Что означает отмена операции',
@@ -249,20 +200,25 @@ function openCancelOperation(root, operationLayer, entries) {
   });
 }
 
-function openDeleteOperation(root, operationLayer, entries, {parent=null}={}) {
+function openDeleteOperation(root, operationLayer, entries) {
   const first = entries[0] || {};
-  const content = `<div class="modal-title"><h2>Удалить операцию?</h2><p>Операция и связанные с ней финансовые записи будут удалены без возможности восстановления.</p></div>
-    <div class="modal-actions">
-      ${button('Отмена', { variant: 'secondary', data: 'data-finance-operation-delete-close' })}
-      ${button('Удалить', { variant: 'critical', data: 'data-finance-operation-delete-confirm' })}
-    </div>`;
+  const desktop = financeDesktop(root);
+  const title = desktop ? 'Удалить?' : 'Удалить операцию?';
+  const warning = desktop
+    ? 'Операция и все связанные с ней финансовые записи будут полностью удалены из истории. Остатки кошельков будут пересчитаны. Восстановить удалённые данные невозможно. Вы уверены?'
+    : 'Операция и связанные с ней финансовые записи будут удалены без возможности восстановления.';
+  const remove = button('Удалить', { variant: 'critical', className: desktop ? 'v2-confirmation-destructive' : '', data: 'data-finance-operation-delete-confirm' });
+  const closeButton = button('Отмена', { variant: 'secondary', className: desktop ? 'v2-confirmation-safe' : '', data: 'data-finance-operation-delete-close data-modal-autofocus' });
+  const content = `<div class="modal-title"><h2>${title}</h2><p>${warning}</p></div>
+    <div class="modal-actions">${desktop ? remove + closeButton : closeButton + remove}</div>`;
   const confirmation = mountModal(document.body, modal(content, {
-    title: 'Удалить операцию',
+    title,
     variant: 'x',
-    className: 'modal--form-sheet',
+    className: desktop ? '' : 'modal--form-sheet',
     surface: 'app',
   }));
   if (!confirmation) return;
+  if (desktop) confirmation.setAttribute('data-v2-delete-confirmation', 'true');
 
   const close=confirmation.querySelector('[data-finance-operation-delete-close]');
   const confirm=confirmation.querySelector('[data-finance-operation-delete-confirm]');
@@ -277,7 +233,6 @@ function openDeleteOperation(root, operationLayer, entries, {parent=null}={}) {
       const result=await hardDeleteFinanceOperation(first.operationId);
       if(result==null||result===false)throw new Error('Не удалось удалить операцию');
       confirmation.v2Close?.();
-      parent?.v2Close?.();
       operationLayer.v2Close?.();
       renderDDS(root);
     } catch (error) {
@@ -496,9 +451,9 @@ function openFinanceOperation(root, movements, operationId) {
   const active = first?.operationStatus !== 'cancelled';
   const desktop = financeDesktop(root);
   const correction = active ? { label: 'Корректировка', variant: desktop ? 'primary' : 'secondary', run: layer => openOperationCorrection(root, layer, entries) } : null;
-  const cancel = active ? { label: desktop ? 'Отменить' : 'Отменить операцию', aria: 'Отменить финансовую операцию с сохранением истории', variant: 'danger', run: layer => openCancelOperation(root, layer, entries) } : null;
+  const cancel = !desktop && active ? { label: 'Отменить операцию', aria: 'Отменить финансовую операцию с сохранением истории', variant: 'danger', run: layer => openCancelOperation(root, layer, entries) } : null;
   const remove = { label: 'Удалить', variant: 'critical', run: layer => openDeleteOperation(root, layer, entries) };
-  return openFinanceReceiptX(root, operationName(first), receipt, desktop ? (active ? [cancel, correction] : [remove]) : [correction, cancel, remove], { actionLayout: 'dds' });
+  return openFinanceReceiptX(root, operationName(first), receipt, desktop ? [remove, correction] : [correction, cancel, remove], { actionLayout: 'dds' });
 }
 
 function openArticles(root) {
