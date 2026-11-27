@@ -471,12 +471,12 @@
  .v2-app--workspace [data-finance-article-table]{max-width:100%;min-width:0}
  .v2-app--workspace [data-finance-article-table] .ui-data-table--compact td{white-space:normal;overflow-wrap:anywhere}
  .v2-app--workspace [data-finance-article-table] .ui-data-table--compact tr{cursor:pointer}
- /* DDS geometry is independent of row contents and available surplus space.
-    Every column has an explicit border-box width; no flex/auto client column. */
+ /* DDS fills the approved working area. Fixed layout shares surplus across
+    explicit column bases, never by row content; minimum widths allow scroll. */
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-dds-history]{min-width:0;max-width:100%}
- .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-dds-history] .ui-data-table--compact{width:max-content;max-width:100%;overflow:auto;overscroll-behavior:none;scrollbar-gutter:stable;overflow-anchor:none}
- .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-dds-history] .ui-data-table--compact table{table-layout:fixed;width:752px;min-width:752px;max-width:752px}
- .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-dds-history] .ui-data-table--compact table:has(th[data-table-column="article"]){width:882px;min-width:882px;max-width:882px}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-dds-history] .ui-data-table--compact{width:100%;max-width:100%;overflow:auto;overscroll-behavior:none;scrollbar-gutter:stable;overflow-anchor:none}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-dds-history] .ui-data-table--compact table{table-layout:fixed;width:100%;min-width:752px}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-dds-history] .ui-data-table--compact table:has(th[data-table-column="article"]){min-width:882px}
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-dds-history] .ui-data-table--compact :is(thead th,tbody tr:not([data-table-group-level])>td){box-sizing:border-box;padding-inline:6px;overflow-wrap:normal;word-break:normal}
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-dds-history] .ui-data-table--compact :is(th,td)[data-table-column="select"]{width:32px;min-width:32px;max-width:32px;padding-inline:2px;text-align:center}
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-dds-history] .ui-data-table--compact :is(th,td)[data-table-column="date"]{width:84px;min-width:84px;max-width:84px}
