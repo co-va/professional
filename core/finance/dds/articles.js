@@ -76,7 +76,7 @@ function economicLabel(value) {
 
 function parentOptions(items, currentId = '') {
   return [
-    { value: '', label: 'Корень' },
+    { value: '', label: 'Без группы' },
     ...treeRows(items)
       .filter((item) => item.articleId !== currentId)
       .map((item) => ({
@@ -111,7 +111,6 @@ function openArticleX(root, existing = null) {
     ${select({label:'Группа',name:'parentArticleId',value:existing?.parentArticleId||'',options:parentOptions(items,existing?.articleId||'')})}
     ${select({label:'Направление',name:'direction',value:direction,options:DIRECTION_OPTIONS})}
     ${select({label:'Назначение',name:'economicType',value:economicType,options:economicOptions})}
-    ${isSystem?'<p class="ui-muted" data-system-article-note>Системную статью удалить нельзя: она используется для автоматического учёта.</p>':''}
     <div class="modal-actions finance-receipt-actions finance-receipt-actions--dds">
       ${existing&&!isSystem?button('Удалить',{variant:'danger',data:'data-delete-finance-article'}):''}
       ${button('Сохранить',{type:'submit',data:'data-finance-article-save',disabled:true})}
@@ -262,7 +261,7 @@ const ARTICLE_SORTS=[
 const articleFilters=()=>({parent:'',direction:'',economicType:'',system:''});
 const normalized=value=>String(value??'').toLocaleLowerCase('ru').replace(/ё/g,'е').trim();
 function articleValues(item,names){
-  return {name:String(item.name||''),parent:names.get(item.parentArticleId)||'Корень',direction:directionLabel(item.direction),economicType:economicLabel(item.economicType),system:item.systemKey?'Системная':'Пользовательская'};
+  return {name:String(item.name||''),parent:names.get(item.parentArticleId)||'Без группы',direction:directionLabel(item.direction),economicType:economicLabel(item.economicType),system:item.systemKey?'Системная':'Пользовательская'};
 }
 function visibleArticles(items,state){
   const names=new Map(items.map(item=>[item.articleId,item.name]));
@@ -284,7 +283,7 @@ function visibleArticles(items,state){
 function openArticleFilters(anchor,items,state,refresh){
   const names=new Map(items.map(item=>[item.articleId,item.name]));
   const none={value:'',label:'Без фильтра'};
-  const parents=[...new Set(items.map(item=>item.parentArticleId||''))].map(id=>({value:id?'id:'+id:'root',label:names.get(id)||'Корень'}));
+  const parents=[...new Set(items.map(item=>item.parentArticleId||''))].map(id=>({value:id?'id:'+id:'root',label:names.get(id)||'Без группы'}));
   const economics=[...new Set(items.map(item=>item.economicType).filter(Boolean))].map(value=>({value,label:economicLabel(value)}));
   const fields=()=>'<div class="form-grid">'
     +select({label:'Группа',name:'parent',value:state.filters.parent,options:[none,...parents]})
