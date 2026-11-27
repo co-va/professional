@@ -103,12 +103,12 @@ function replaceContextAction(root, action, onClick) {
   return control;
 }
 
+export function openInventoryStockExcel(anchor){
+  return excelAction(anchor,[{id:'export',label:'Выгрузить',run:()=>downloadWorkbook('/items/export',{fallback:'ostatki.xlsx'})}]);
+}
 function enhanceStock(root) {
-  replaceContextAction(root, { kind: 'settings', label: 'Excel', aria: 'Excel склада' }, (event) => {
-    excelAction(event.currentTarget, [
-      { id: 'export', label: 'Выгрузить', run: () => downloadWorkbook('/items/export', { fallback: 'ostatki.xlsx' }) },
-    ]);
-  });
+  if(isV2DesktopWorkspace(root.closest('[data-v2-app]')))return;
+  replaceContextAction(root,{kind:'settings',label:'Excel',aria:'Excel склада'},event=>openInventoryStockExcel(event.currentTarget));
 }
 
 function openMovementExport(trigger) {
@@ -209,12 +209,11 @@ function enhanceMovementEditor(root, layer) {
   }, true);
 }
 
+export function openInventoryMovementExcel(anchor){
+  return excelAction(anchor,[{id:'export',label:'Выгрузить за период',run:()=>openMovementExport(anchor)}]);
+}
 function enhanceMovements(root) {
-  replaceContextAction(root, { kind: 'settings', label: 'Excel', aria: 'Excel движений' }, (event) => {
-    excelAction(event.currentTarget, [
-      { id: 'export', label: 'Выгрузить за период', run: () => openMovementExport(event.currentTarget) },
-    ]);
-  });
+  if(!isV2DesktopWorkspace(root.closest('[data-v2-app]')))replaceContextAction(root,{kind:'settings',label:'Excel',aria:'Excel движений'},event=>openInventoryMovementExcel(event.currentTarget));
 
   if (root.dataset.inventoryMovementEnhancer === 'true') return;
   root.dataset.inventoryMovementEnhancer = 'true';

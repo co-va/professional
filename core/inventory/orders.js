@@ -1,3 +1,4 @@
+import {inventoryDesktop,inventoryDesktopHeader,inventoryTable,inventoryRowButton,bindInventoryTableRows} from './desktop.js';
 import {
   actionBlock, button, datePicker, emptyState, field, initDatePickers,
   modal, mountModal, mountV2ZLayer, openNotice, openSharedProfileSettingsMenu,
@@ -134,8 +135,10 @@ function orderListMarkup(root) {
   const status = String(root.dataset.inventoryOrdersStatus || '');
   const supplier = String(root.dataset.inventoryOrdersSupplier || '');
   const sorting = String(root.dataset.inventoryOrdersSort || 'recent');
+  const query=inventoryDesktop(root)?String(root.dataset.inventoryOrdersSearch||'').trim().toLocaleLowerCase('ru'):'';
   const orders = getInventoryOrders().filter(order =>
-    (!status || order.status === status) && (!supplier || order.supplier === supplier));
+    (!status || order.status === status) && (!supplier || order.supplier === supplier)
+    &&(!query||[orderNumber(order.orderId),order.supplier,order.note,statusLabel(order.status)].join(' ').toLocaleLowerCase('ru').includes(query)));
   if (!orders.length) return emptyState(
     getInventoryOrders().length ? 'Заказы не найдены' : 'Заказов пока нет',
     getInventoryOrders().length ? 'Измените фильтр.' : 'Нажмите +, чтобы сформировать заказ.',
@@ -143,6 +146,15 @@ function orderListMarkup(root) {
   if (sorting === 'oldest') orders.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
   else if (sorting === 'price') orders.sort((a, b) => Number(b.total) - Number(a.total));
   else orders.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  if(inventoryDesktop(root))return inventoryTable(orders,[
+    {key:'date',label:'Дата',render:order=>escapeHtml(dateLabel(order.createdAt))},
+    {key:'order',label:'Заказ',render:order=>inventoryRowButton('№ '+orderNumber(order.orderId),'data-inventory-order',order.orderId)},
+    {key:'supplier',label:'Поставщик'},
+    {key:'status',label:'Статус',render:order=>escapeHtml(statusLabel(order.status))},
+    {key:'count',label:'Позиций',narrow:true,render:order=>String((order.lines||[]).length)},
+    {key:'total',label:'Сумма',narrow:true,render:order=>escapeHtml(order.total==null?'':rubles(order.total))},
+    {key:'note',label:'Примечание'},
+  ],'Заказы');
   return v2ListEntries(orders.map(order => v2ListEntry({
     title: 'Заказ № ' + orderNumber(order.orderId),
     subtitle: [dateLabel(order.createdAt), order.supplier,
@@ -160,9 +172,7 @@ function refreshOrderList(root) {
   const host = root.querySelector('[data-inventory-orders-list]');
   if (!host) return;
   host.innerHTML = orderListMarkup(root);
-  host.querySelectorAll('[data-inventory-order]').forEach(node => {
-    node.addEventListener('click', () => openInventoryOrderZ(root, node.dataset.inventoryOrder));
-  });
+  bindInventoryTableRows(host,'[data-inventory-order]',node=>openInventoryOrderZ(root,node.dataset.inventoryOrder));
 }
 
 function suggestedPacks(row) {
@@ -1078,12 +1088,18 @@ function openInventoryOrderZ(root, orderId) {
 }
 
 export function renderInventoryOrders(root) {
+  const desktop=inventoryDesktop(root);
   root.innerHTML = `${workspaceHeaderContext({
     title: 'Заказы',
-    v: { data: 'data-inventory-orders-menu', aria: 'Сортировка и фильтр заказов' },
-    c: { label: '+', data: 'data-inventory-add-order', aria: 'Сформировать заказ' },
-  })}<div data-inventory-orders-list></div>`;
-  const openControls = (kind) => {
+    v: desktop?null:{ data: 'data-inventory-orders-menu', aria: 'Сортировка и фильтр заказов' },
+    c: desktop?null:{ label: '+', data: 'data-inventory-add-order', aria: 'Сформировать заказ' },
+  })}<div data-inventory-orders-list${desktop?' data-inventory-desktop-table':''}></div>`;
+  const header=desktop?inventoryDesktopHeader(root,'Заказы',field({name:'inventoryOrdersSearch',type:'search',placeholder:'Поиск',value:root.dataset.inventoryOrdersSearch||'',data:'data-inventory-orders-search'}),[
+    {kind:'filter',data:'data-inventory-orders-filter',aria:'Фильтр'},
+    {kind:'sort',data:'data-inventory-orders-sort',aria:'Сортировка'},
+    {label:'+',className:'v2-desktop-tool-primary',data:'data-inventory-add-order',aria:'Сформировать заказ'},
+  ]):null;
+  const openControls = (kind,anchor=root) => {
     const suppliers = [...new Set(getInventoryOrders().map(order => order.supplier).filter(Boolean))]
       .sort((a, b) => a.localeCompare(b, 'ru'));
     const html = `<div class="form-grid">${kind === 'sort'
@@ -1105,8 +1121,15 @@ export function renderInventoryOrders(root) {
             ...suppliers.map(value => ({ value, label: value }))] }),
       ].join('')}
       ${actionBlock(button('Применить', { data: 'data-inventory-orders-apply' }))}</div>`;
-    const popup = mountModal(root, modal(html, {
-      variant: 'q', title: kind === 'sort' ? 'Сортировка' : 'Фильтр',
+    if(desktop&&kind==='sort'){
+      const options=[['recent','Сначала новые'],['oldest','Сначала старые'],['price','По сумме']];
+      const popup=mountModal(anchor,modal('<div class="people-action-menu">'+options.map(([value,label])=>button(label,{variant:'secondary',data:'data-inventory-order-sort-choice="'+value+'" aria-pressed="'+((root.dataset.inventoryOrdersSort||'recent')===value)+'"'})).join('')+'</div>',{variant:'x',title:'Сортировка',surface:'app',xRole:'action',className:'people-action-popup people-sort-popup'}));
+      popup?.querySelectorAll('[data-inventory-order-sort-choice]').forEach(control=>control.addEventListener('click',()=>{root.dataset.inventoryOrdersSort=control.dataset.inventoryOrderSortChoice;popup.v2Close?.();refreshOrderList(root);}));
+      return;
+    }
+    const popup = mountModal(anchor, modal(html, {
+      variant: desktop?'x':'q', title: kind === 'sort' ? 'Сортировка' : 'Фильтр',
+      ...(desktop?{surface:'app',className:'people-action-popup people-filter-popup'}:{}),
     }));
     popup?.querySelector('[data-inventory-orders-apply]')?.addEventListener('click', () => {
       if (kind === 'sort') {
@@ -1124,7 +1147,10 @@ export function renderInventoryOrders(root) {
       { id: 'sort', label: 'Сортировка', onSelect: () => openControls('sort') },
       { id: 'filter', label: 'Фильтр', onSelect: () => openControls('filter') },
     ] }));
-  root.querySelector('[data-inventory-add-order]')?.addEventListener('click', () =>
+  header?.querySelector('[data-inventory-orders-search]')?.addEventListener('input',event=>{root.dataset.inventoryOrdersSearch=event.target.value;refreshOrderList(root);});
+  header?.querySelector('[data-inventory-orders-filter]')?.addEventListener('click',event=>openControls('filter',event.currentTarget));
+  header?.querySelector('[data-inventory-orders-sort]')?.addEventListener('click',event=>openControls('sort',event.currentTarget));
+  (header?.querySelector('[data-inventory-add-order]')||root.querySelector('[data-inventory-add-order]'))?.addEventListener('click', () =>
     openInventoryOrderSelection(root, null, createdOrderId => {
       refreshOrderList(root);
       if (createdOrderId) openInventoryOrderZ(root, createdOrderId);

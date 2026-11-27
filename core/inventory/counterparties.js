@@ -1,8 +1,11 @@
+import {inventoryDesktop,inventoryDesktopHeader} from './desktop.js';
+import {DATA_EXCHANGE_ICON} from '../../ui/buttons/index.js';
+import {bindDesktopRailControls} from '../../ui/v2/horizontal-affordance.js';
 import {
   actionBlock, button, emptyState, field, modal, mountModal, openNotice,
   page, select, list, v2ListEntries, v2ListEntry, v2Section, workspaceHeaderContext,
   mountV2ZLayer, v2ZLayer, openSharedProfileSettingsMenu,
-  entityVisualCard, entityCardStack, openEntityCardAppearanceQ, normalizeEntityCardAppearance,
+  entityVisualCard, entityCardStack, entityCardRail, openEntityCardAppearanceQ, normalizeEntityCardAppearance,
 } from '../../ui/ui.js';
 import { escapeHtml } from '../../ui/utils/escape-html.js';
 import { compactCheck } from '../../ui/selection/check-list.js';
@@ -1903,15 +1906,21 @@ function openCounterpartyAppearance(root, sample, onSaved = () => {}) {
 }
 
 export async function renderCounterparties(root) {
+  const desktop=inventoryDesktop(root);
   root.innerHTML = page([
     workspaceHeaderContext({
       title: 'Контрагенты',
-      v: { data: 'data-counterparty-view-menu', aria: 'Настройки контрагентов' },
-      c: { label: '+', data: 'data-counterparty-add', aria: 'Новый контрагент' },
+      v: desktop?null:{ data: 'data-counterparty-view-menu', aria: 'Настройки контрагентов' },
+      c: desktop?null:{ label: '+', data: 'data-counterparty-add', aria: 'Новый контрагент' },
     }),
     '<div data-counterparties-list></div>',
   ]);
   const host = root.querySelector('[data-counterparties-list]');
+  const header=desktop?inventoryDesktopHeader(root,'Контрагенты','',[
+    {label:'Вид',data:'data-counterparty-desktop-view',aria:'Вид'},
+    {label:DATA_EXCHANGE_ICON,className:'v2-desktop-tool-icon',data:'data-counterparty-desktop-excel',aria:'Excel'},
+    {label:'+',className:'v2-desktop-tool-primary',data:'data-counterparty-add',aria:'Новый контрагент'},
+  ]):null;
   // In-memory supplier cache is bound to the current authenticated session.
   const state = currentCompanyCache();
   const catalogCache = sharedCatalogCache;
@@ -1919,7 +1928,7 @@ export async function renderCounterparties(root) {
   const renderCards = () => {
     if (!host?.isConnected) return;
     host.innerHTML = currentCompanies.length
-      ? entityCardStack(currentCompanies.map(company => entityVisualCard({
+      ? (desktop?cards=>entityCardRail(cards,{className:'inventory-counterparty-rail'}):entityCardStack)(currentCompanies.map(company => entityVisualCard({
         appearance: counterpartyCardAppearance(),
         fields: counterpartyCardFields(company),
         interactive: true,
@@ -1927,6 +1936,7 @@ export async function renderCounterparties(root) {
         aria: 'Открыть контрагента ' + company.name,
       })))
       : emptyState('Контрагентов пока нет', 'Нажмите +, чтобы создать компанию.');
+    if(desktop)bindDesktopRailControls(host.querySelector('.inventory-counterparty-rail'),{prefix:'inventory-counterparty-rail',label:'контрагент'});
     host.querySelectorAll('[data-counterparty-open]').forEach(node => {
       node.addEventListener('click', () => {
         void openCompany(node.dataset.counterpartyOpen, root, show,
@@ -1970,7 +1980,13 @@ export async function renderCounterparties(root) {
       ],
     });
   });
-  root.querySelector('[data-counterparty-add]')?.addEventListener('click', () => openCompanyEditor(null, () => { void show(); }));
+  header?.querySelector('[data-counterparty-desktop-view]')?.addEventListener('click',()=>openCounterpartyAppearance(root,currentCompanies[0]||{},renderCards));
+  header?.querySelector('[data-counterparty-desktop-excel]')?.addEventListener('click',()=>openSharedProfileSettingsMenu({title:'Excel',actions:[
+    {id:'upload',label:'Загрузить',onSelect:()=>openImport(show)},
+    {id:'template',label:'Шаблон Excel',onSelect:()=>void download('/template/xlsx','counterparties-template.xlsx').catch(error=>openNotice({title:'Excel',message:errText(error)}))},
+    {id:'history',label:'История загрузок',onSelect:()=>openCounterpartyFiles(currentCompanies)},
+  ]}));
+  (header?.querySelector('[data-counterparty-add]')||root.querySelector('[data-counterparty-add]'))?.addEventListener('click', () => openCompanyEditor(null, () => { void show(); }));
   // Run independent data requests together. Cards still wait for the
   // appearance template before rendering, without a serial network waterfall.
   const companiesPromise = loadCompanies();

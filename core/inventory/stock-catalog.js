@@ -1,3 +1,4 @@
+import {inventoryTable,inventoryRowButton,bindInventoryTableRows} from './desktop.js';
 import {
   actionBlock, button, emptyState, field, list, modal, mountModal,
   v2ListEntries, v2ListEntry, initV2ListReorder,
@@ -197,6 +198,23 @@ export function renderStockBrandList(host, items, options = {}) {
     a.items.length-b.items.length || compare(a.name,b.name));
   const ids = new Map((options.brandValues || []).map(value=>[value.name,value.id]));
   const allowReorder=typeof options.onReorder==='function';
+  if(options.desktop){
+    host.innerHTML=groups.length?inventoryTable(groups,[
+      {key:'drag',label:'',narrow:true,render:group=>allowReorder&&ids.has(group.name)?'<span class="list-entry__reorder-handle" data-reorder-handle role="button" tabindex="0" aria-label="Изменить порядок"><span aria-hidden="true">⋮⋮</span></span>':''},
+      {key:'name',label:'Производитель',render:group=>inventoryRowButton(group.name,'data-stock-brand',group.name)},
+      {key:'count',label:'Позиций',narrow:true,render:group=>String(group.items.length)},
+    ],'Производители'):emptyState('Товаров нет','Создайте позицию или выберите её у контрагента.');
+    const body=host.querySelector('tbody');
+    body?.classList.add('list-entries');
+    host.querySelectorAll('[data-stock-brand]').forEach(button=>{
+      if(allowReorder&&ids.has(button.dataset.stockBrand))button.closest('tr').dataset.reorderId=ids.get(button.dataset.stockBrand);
+    });
+    bindInventoryTableRows(host,'[data-stock-brand]',node=>{
+      const brand=groups.find(group=>group.name===node.dataset.stockBrand);
+      if(brand)options.onBrandOpen?.(brand);
+    });
+    return allowReorder?initV2ListReorder(host,{selector:'tr[data-reorder-id]',onReorder:options.onReorder,onError:options.onReorderError||(()=>{})}):()=>{};
+  }
   host.innerHTML = groups.length ? v2ListEntries(groups.map(group=>v2ListEntry({
     title: group.name,
     rightTop: group.items.length + ' поз.',

@@ -1,3 +1,5 @@
+import {inventoryDesktop,inventoryDesktopHeader,inventoryTable,inventoryRowButton,bindInventoryTableRows} from './desktop.js';
+import {DATA_EXCHANGE_ICON,GROUP_ICON} from '../../ui/buttons/index.js';
 import {
   actionBlock,
   button,
@@ -744,7 +746,7 @@ function initStockCategoryDragPreview(sequence) {
   };
 }
 
-function stockListMarkup(manufacturer, query = '', rowsProvider = null, expanded = new Map(), selected = new Set(), allowCategoryReorder = false) {
+function stockListMarkup(manufacturer, query = '', rowsProvider = null, expanded = new Map(), selected = new Set(), allowCategoryReorder = false, desktop = false) {
   const needle = normalizedSearch(query);
   // Z2 always belongs to its manufacturer. Filtering/searching removes only
   // the nested disclosure presentation, never the manufacturer boundary.
@@ -789,7 +791,17 @@ function stockListMarkup(manufacturer, query = '', rowsProvider = null, expanded
   };
   // The compact selector is a sibling of the clickable stock row, never a
   // child of its button. Checking an item does not open its Q overview.
-  const itemList = rows => rows.map(item =>
+  const itemList = rows => desktop && rows.length ? inventoryTable(rows,[
+    {key:'select',label:'',narrow:true,render:item=>compactCheck({checked:selected.has(String(item.itemId)),aria:'Выбрать '+item.name,data:'data-stock-item-check="'+escapeHtml(item.itemId)+'"'})},
+    {key:'position',label:'№',narrow:true,render:item=>escapeHtml(Number(item.position)>0?String(item.position):'')},
+    {key:'name',label:'Наименование',render:item=>inventoryRowButton(item.name,'data-inventory-item',item.itemId)},
+    {key:'sku',label:'Артикул'},
+    {key:'type',label:'Тип',render:item=>escapeHtml(productTypeText(item))},
+    {key:'balance',label:'Остаток',narrow:true,render:item=>escapeHtml(numberText(inventoryDisplayBalance(item,STOCK_VIEW.storageScope))+' '+(item.unit||''))},
+    {key:'price',label:'Цена закупки',narrow:true,render:item=>escapeHtml(item.lastPurchasePrice==null?'':moneyText(item.lastPurchasePrice))},
+    {key:'supplier',label:'Поставщик',render:item=>escapeHtml(item.primaryOfferId||item.supplierOffers?.some(offer=>offer.counterpartyId&&offer.catalogItemId)?'Привязан':'Не привязан')},
+    {key:'completion',label:'Карточка',narrow:true,render:item=>escapeHtml(inventoryItemCompletion(item).percentage+'%')},
+  ],'Складские позиции') : rows.map(item =>
     '<div class="inventory-counterparty-product-row">' +
       compactCheck({
         checked:selected.has(String(item.itemId)),
@@ -983,10 +995,11 @@ function openManufacturerStock(root, manufacturer, groupContext = null) {
   const expandedStockGroups = new Map();
   // One selection drives both actions; no separate stock mutation owner.
   const selectedStockItems = new Set();
+  const desktop=inventoryDesktop(root);
   const markup = `
     ${context(manufacturer, {
-      v: { data: 'data-inventory-company-v', aria: 'Фильтр и сортировка позиций' },
-      c: { label: '+', data: 'data-inventory-add-item', aria: 'Добавить позицию' },
+      v: desktop?null:{ data: 'data-inventory-company-v', aria: 'Фильтр и сортировка позиций' },
+      c: desktop?null:{ label: '+', data: 'data-inventory-add-item', aria: 'Добавить позицию' },
     })}
     <div data-stock-selected-actions hidden>
       <p class="ui-list__secondary">Выбрано: <strong data-stock-selected-count>0</strong></p>
@@ -995,10 +1008,14 @@ function openManufacturerStock(root, manufacturer, groupContext = null) {
         button('Удалить', { variant: 'delete-outline', data: 'data-stock-selected-delete' })
       )}
     </div>
-    <div data-inventory-company-list>${stockListMarkup(manufacturer, '', rowsProvider, expandedStockGroups, selectedStockItems, false)}</div>`;
+    <div data-inventory-company-list>${stockListMarkup(manufacturer, '', rowsProvider, expandedStockGroups, selectedStockItems, false, desktop)}</div>`;
   const layer = mountV2ZLayer(root, v2ZLayer(markup, { className: 'inventory-manufacturer-z' }), { stack: true });
   if (!layer) return;
-  const [searchRow] = setV2ZHeaderRows(layer, [stockSearchField('', 'data-inventory-company-search')]);
+  const searchRow = desktop?inventoryDesktopHeader(layer,manufacturer,stockSearchField('', 'data-inventory-company-search'),[
+    {kind:'filter',data:'data-inventory-company-filter',aria:'Фильтр'},
+    {kind:'sort',data:'data-inventory-company-sort',aria:'Сортировка'},
+    {label:'+',className:'v2-desktop-tool-primary',data:'data-inventory-add-item',aria:'Добавить позицию'},
+  ]):setV2ZHeaderRows(layer,[stockSearchField('', 'data-inventory-company-search')])[0];
   const searchInput = searchRow?.querySelector('[data-inventory-company-search]') || null;
 
   const listHost = layer.querySelector('[data-inventory-company-list]');
@@ -1165,7 +1182,7 @@ function openManufacturerStock(root, manufacturer, groupContext = null) {
       && STOCK_VIEW.itemsSort==='position-asc' && Boolean(reorderGroup);
     if (listHost) listHost.innerHTML = stockListMarkup(
       manufacturer, query, rowsProvider, expandedStockGroups, selectedStockItems,
-      allowCategoryReorder);
+      allowCategoryReorder, desktop);
     listHost?.querySelectorAll('[data-stock-item-check]').forEach(check=>
       check.addEventListener('change',()=>{
         const id=String(check.dataset.stockItemCheck);
@@ -1217,15 +1234,14 @@ function openManufacturerStock(root, manufacturer, groupContext = null) {
       disposeCategoryPreview=initStockCategoryDragPreview(
         listHost.querySelector('.inventory-stock-category-sequence'));
     }
-    listHost?.querySelectorAll('[data-inventory-item]').forEach(control=>
-      control.addEventListener('click', () => {
-        const itemId = control.dataset.inventoryItem;
-        openInventoryProductOverview(itemId, {
-          stockScope: STOCK_VIEW.storageScope,
-          edit: (onSaved, scope) => openItemEditor(root, itemId, {}, onSaved, scope),
-          onChanged: renderList,
-        });
-      }));
+    bindInventoryTableRows(listHost,'[data-inventory-item]',control=>{
+      const itemId=control.dataset.inventoryItem;
+      openInventoryProductOverview(itemId,{
+        stockScope:STOCK_VIEW.storageScope,
+        edit:(onSaved,scope)=>openItemEditor(root,itemId,{},onSaved,scope),
+        onChanged:renderList,
+      });
+    });
     // Only an intentional summary click changes the remembered state.
     // Native initial <details open> toggle events must not override the
     // default rule when a formerly single group later gains siblings.
@@ -1248,7 +1264,9 @@ function openManufacturerStock(root, manufacturer, groupContext = null) {
       ],
     });
   });
-  layer.querySelector('[data-inventory-add-item]')?.addEventListener('click', () => {
+  searchRow?.querySelector('[data-inventory-company-filter]')?.addEventListener('click',event=>openStockControls(event.currentTarget,'items',manufacturer,renderList,'filter',rowsProvider));
+  searchRow?.querySelector('[data-inventory-company-sort]')?.addEventListener('click',event=>openStockControls(event.currentTarget,'items',manufacturer,renderList,'sort',rowsProvider));
+  (searchRow?.querySelector('[data-inventory-add-item]')||layer.querySelector('[data-inventory-add-item]'))?.addEventListener('click', () => {
     const first=groupContext?.criteria?.[0];
     const value=first?.values?.find(entry=>entry.name===manufacturer);
     const defaults=first?.legacyField
@@ -2511,18 +2529,25 @@ function renderStock(root) {
   ];
   if (!scopes.some(entry=>entry.value===STOCK_VIEW.storageScope))
     STOCK_VIEW.storageScope=INVENTORY_TOTAL_SCOPE;
+  const desktop=inventoryDesktop(root);
   const scopeSelector=select({name:'inventoryStockScope',aria:'Выбрать склад',
     value:STOCK_VIEW.storageScope,options:scopes});
   root.innerHTML = page([
     context('Остатки',{
-      v:{data:'data-inventory-stock-menu',aria:'Настройки остатков'},
-      c:{label:'+',data:'data-inventory-add-item',aria:'Добавить позицию'},
+      v:desktop?null:{data:'data-inventory-stock-menu',aria:'Настройки остатков'},
+      c:desktop?null:{label:'+',data:'data-inventory-add-item',aria:'Добавить позицию'},
     }),
-    '<div data-inventory-stock-group-list></div>',
+    '<div data-inventory-stock-group-list'+(desktop?' data-inventory-desktop-table':'')+'></div>',
   ]);
   // Z1 owns the scope selector in its Shared Header, not in the scrollable
   // brand list. Keep a visible fallback if the host has not been mounted.
-  const headerRows=setV2ZHeaderRows(root,[scopeSelector]);
+  const headerRows=desktop?[inventoryDesktopHeader(root,'Остатки',scopeSelector,[
+    {label:'Вид',data:'data-inventory-desktop-view',aria:'Вид'},
+    {label:GROUP_ICON,className:'v2-desktop-tool-icon',data:'data-inventory-desktop-groups',aria:'Группы'},
+    {label:'Склады',data:'data-inventory-desktop-storage',aria:'Склады'},
+    {label:DATA_EXCHANGE_ICON,className:'v2-desktop-tool-icon',data:'data-inventory-desktop-excel',aria:'Excel склада'},
+    {label:'+',className:'v2-desktop-tool-primary',data:'data-inventory-add-item',aria:'Добавить позицию'},
+  ])].filter(Boolean):setV2ZHeaderRows(root,[scopeSelector]);
   const listHost=root.querySelector('[data-inventory-stock-group-list]');
   if (!headerRows.length) listHost?.insertAdjacentHTML('beforebegin',
     '<div data-inventory-scope-selector>'+scopeSelector+'</div>');
@@ -2538,6 +2563,7 @@ function renderStock(root) {
     const first=stockRootCriterion(criteria);
     disposeBrandReorder=renderStockBrandList(listHost,visibleRows(),{
       scope:locationId,
+      desktop,
       itemsForView:visibleRows,
       criteria,
       brandValues:first?.values||[],
@@ -2573,7 +2599,12 @@ function renderStock(root) {
       ],
     });
   });
-  root.querySelector('[data-inventory-add-item]')?.addEventListener('click',()=>
+  const h=headerRows[0];
+  h?.querySelector('[data-inventory-desktop-view]')?.addEventListener('click',()=>openInventoryProductAppearanceQ(getInventoryItems()[0]?.itemId||'',()=>renderStock(root),STOCK_VIEW.storageScope));
+  h?.querySelector('[data-inventory-desktop-groups]')?.addEventListener('click',()=>openInventoryClassificationGroups(refresh));
+  h?.querySelector('[data-inventory-desktop-storage]')?.addEventListener('click',()=>openInventoryStorageLocations(()=>renderStock(root)));
+  h?.querySelector('[data-inventory-desktop-excel]')?.addEventListener('click',event=>{const anchor=event.currentTarget;void import('./excel-v2.js').then(m=>m.openInventoryStockExcel(anchor));});
+  (h?.querySelector('[data-inventory-add-item]')||root.querySelector('[data-inventory-add-item]'))?.addEventListener('click',()=>
     openStockCreateOptions(root,()=>renderStock(root)));
   refresh();
   // Historical gaps and missing ranks are repaired once through a dedicated
@@ -2596,11 +2627,33 @@ function renderStock(root) {
 }
 
 function renderMovements(root) {
+  const desktop=inventoryDesktop(root);
   root.innerHTML = `${context('Движения', {
-    c: { label: '+', data: 'data-inventory-add-movement', aria: 'Добавить движение' },
-  })}${movementJournalMarkup()}`;
-  root.querySelector('[data-inventory-add-movement]')?.addEventListener('click', () => openMovementEditor(root, '', ''));
-  root.querySelectorAll('[data-inventory-movement]').forEach((control) => control.addEventListener('click', () => openMovementDetails(root, control.dataset.inventoryMovement)));
+    c: desktop?null:{ label: '+', data: 'data-inventory-add-movement', aria: 'Добавить движение' },
+  })}${desktop?'<div data-inventory-desktop-table></div>':movementJournalMarkup()}`;
+  const header=desktop?inventoryDesktopHeader(root,'Движения',field({name:'inventoryMovementSearch',type:'search',placeholder:'Поиск',autocomplete:'off',data:'data-inventory-movement-search'}),[
+    {label:DATA_EXCHANGE_ICON,className:'v2-desktop-tool-icon',data:'data-inventory-desktop-excel',aria:'Excel движений'},
+    {label:'+',className:'v2-desktop-tool-primary',data:'data-inventory-add-movement',aria:'Добавить движение'},
+  ]):null;
+  const host=root.querySelector('[data-inventory-desktop-table]');
+  if(host){
+    const search=header?.querySelector('[data-inventory-movement-search]');
+    const refresh=()=>{
+      const term=normalizedSearch(search?.value||'');
+      const rows=getInventoryMovements().filter(m=>!term||normalizedSearch([movementTitle(m),movementSubtitle(m),movementMoment(m.occurredAt),...(m.lines||[]).map(l=>l.name||getInventoryItem(l.itemId)?.name||'')].join(' ')).includes(term));
+      host.innerHTML=rows.length?inventoryTable(rows,[
+        {key:'date',label:'Дата / время',render:m=>escapeHtml(movementMoment(m.occurredAt))},
+        {key:'movement',label:'Операция',render:m=>inventoryRowButton(movementTitle({...m,personUei:''}),'data-inventory-movement',m.movementId)},
+        {key:'person',label:'Код клиента',render:m=>escapeHtml(m.personUei||'')},
+        {key:'count',label:'Позиций',narrow:true,render:m=>String((m.lines||[]).length)},
+        {key:'note',label:'Примечание',render:m=>escapeHtml(movementSubtitle(m))},
+      ],'Движения'):emptyState('Движений не найдено');
+      bindInventoryTableRows(host,'[data-inventory-movement]',control=>openMovementDetails(root,control.dataset.inventoryMovement));
+    };
+    search?.addEventListener('input',refresh);refresh();
+  }else root.querySelectorAll('[data-inventory-movement]').forEach(control=>control.addEventListener('click',()=>openMovementDetails(root,control.dataset.inventoryMovement)));
+  header?.querySelector('[data-inventory-desktop-excel]')?.addEventListener('click',event=>{const anchor=event.currentTarget;void import('./excel-v2.js').then(m=>m.openInventoryMovementExcel(anchor));});
+  (header?.querySelector('[data-inventory-add-movement]')||root.querySelector('[data-inventory-add-movement]'))?.addEventListener('click',()=>openMovementEditor(root,'',''));
   notifyContext();
 }
 
