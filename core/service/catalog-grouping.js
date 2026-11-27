@@ -242,9 +242,9 @@ export function openServiceGroupingQ({ onSaved = () => {}, desktop = false } = {
   };
   const groupByKey = key => getServiceGroupEntries().find(item => item.key === key);
 
-  const confirmRemove = (title, action) => {
+  const confirmRemove = (title, action, message = 'Позиции останутся на месте, изменится только группировка.') => {
     const confirm = mountModal(document.body, modal(
-      '<p>Позиции останутся на месте, изменится только группировка.</p>' +
+      '<p>' + escapeHtml(message) + '</p>' +
         '<div class="form-error" role="alert" data-service-group-confirm-error></div>' +
         actionBlock(button('Удалить', {
           type: 'button', variant: 'danger', data: 'data-service-group-confirm-delete',
@@ -353,7 +353,15 @@ export function openServiceGroupingQ({ onSaved = () => {}, desktop = false } = {
     moveDesktopQTool(add);
     let busy=false,dispose=()=>{};
     const collapsed=new Set();
-    const sync=()=>{add.disabled=busy;};
+    const sync=()=>{add.disabled=busy;content.querySelectorAll('[data-desktop-group-row-delete]').forEach(control=>control.disabled=busy);};
+    const removeGroup=async key=>{
+      const fresh=groupByKey(key);
+      if(!fresh)throw new Error('Группа больше не существует.');
+      await commitServiceGroupLevels(fresh.kind,getServiceGroupLevels(fresh.kind).filter(item=>item.id!==fresh.id));
+      onSaved();render();
+    };
+    const groupRemovalMessage=group=>'Группировка по группе «'+group.name+'» станет недоступна. Сама группа и её значения будут удалены. Услуги и товары останутся в списках.';
+
 
     const openEditor=previous=>{
       if(busy)return;
@@ -474,10 +482,10 @@ export function openServiceGroupingQ({ onSaved = () => {}, desktop = false } = {
           if(!fresh)throw new Error('Группа больше не существует.');
           pending=true;syncEditor();
           try{
-            await commitServiceGroupLevels(fresh.kind,getServiceGroupLevels(fresh.kind).filter(item=>item.id!==fresh.id));
-            onSaved();render();pending=false;editor.v2Close?.();
+            await removeGroup(fresh.key);
+            pending=false;editor.v2Close?.();
           }finally{pending=false;syncEditor();}
-        });
+        },groupRemovalMessage(current()));
       });
       const closeEditor=editor.v2Close?.bind(editor);
       if(closeEditor)editor.v2Close=()=>{if(!pending){disposeValues();closeEditor();}};
@@ -490,6 +498,7 @@ export function openServiceGroupingQ({ onSaved = () => {}, desktop = false } = {
           {key:'drag',label:'',narrow:true,sortable:false,render:group=>'<span class="list-entry__reorder-handle" data-reorder-handle data-desktop-group-key="'+escapeHtml(group.key)+'" role="button" tabindex="0" aria-label="'+escapeHtml('Переместить '+group.name)+'"><span aria-hidden="true">⋮⋮</span></span>'},
           {key:'name',label:'Наименование',sortable:false,render:group=>button(escapeHtml(group.name),{variant:'secondary',className:'desktop-group-table-name',data:'data-desktop-group-open',aria:'Редактировать группу '+group.name})},
           {key:'values',label:'Значения',sortable:false,render:group=>String(Array.isArray(group.values)?group.values.length:0)},
+          {key:'delete',label:'',narrow:true,sortable:false,render:group=>compactRemoveButton({data:'data-desktop-group-row-delete title="Удалить группу"',aria:'Удалить группу '+group.name})},
         ];
         content.innerHTML='<div class="desktop-table-popup" data-desktop-group-directory-table>'+dataTable({columns,rows:entries,caption:'Группы',compact:true})+'</div>';
         const original=content.querySelector('tbody');
@@ -523,9 +532,20 @@ export function openServiceGroupingQ({ onSaved = () => {}, desktop = false } = {
             row.dataset.reorderId=group.key;
             body.appendChild(row);
             row.addEventListener('click',event=>{
-              if(busy||event.target.closest?.('[data-reorder-handle]'))return;
+              if(busy||event.target.closest?.('[data-reorder-handle],[data-table-column="delete"]'))return;
               const fresh=groupByKey(row.dataset.reorderId);
               if(fresh)openEditor(fresh);
+            });
+            row.querySelector('[data-desktop-group-row-delete]')?.addEventListener('click',event=>{
+              event.stopPropagation();
+              const fresh=groupByKey(row.dataset.reorderId);
+              if(busy||!fresh)return;
+              confirmRemove('Удалить группу?',async()=>{
+                if(busy)throw new Error('Дождитесь завершения сохранения.');
+                busy=true;sync();
+                try{await removeGroup(fresh.key);}
+                finally{busy=false;sync();}
+              },groupRemovalMessage(fresh));
             });
           }
           if(!groupEntries.length){
