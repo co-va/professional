@@ -21,7 +21,7 @@ import { canUseCapability } from '../../access.js';
 import { desktopAvailableArticles, desktopArticleGroups, desktopArticleValues } from './classification.js';
 import { moveDesktopQTool } from '../../../ui/v2/z-layout.js';
 import { getFinanceArticles, getFinanceArticleCatalog } from '../data.js';
-import { availableArticleDirectory } from './article-view.js';
+import { availableArticleDirectory, mechanismValueParents } from './article-view.js';
 import { archiveFinanceArticle, createFinanceArticle, updateFinanceArticle } from '../service.js';
 
 const ECONOMIC_OPTIONS = [
@@ -325,21 +325,70 @@ function canonicalDirectoryRows(items,state){
   if(state.sort!=='tree')rows.sort((a,b)=>{const key=state.sort.startsWith('system')?'systemKey':'name';return String(a[key]||'').localeCompare(String(b[key]||''),'ru',{numeric:true})*(state.sort.endsWith('Desc')?-1:1);});
   return rows;
 }
-// Registered system actions are not editable custom values. Existing custom
-// values remain editable/deletable by their original persisted identity.
+// System labels are immutable. User values use the existing persisted
+// route owner and its direction/economic type; no new accounting route.
 function openMechanismArticleX(article,onSaved,getArticles){
-  const content='<div class="compact-form">'+field({label:'Название',name:'articleName',value:article.name,readonly:true})+groupValuesMarkup({add:false,listData:'data-mechanism-values'})+groupEditorActions({saveData:'data-finance-article-save'})+'</div>';
+  const freshArticle=()=>getFinanceArticleCatalog()?.find(a=>a.articleId===article.articleId)||article;
+  const parents=()=>mechanismValueParents(freshArticle(),getArticles());
+  const content='<form class="compact-form" data-mechanism-form novalidate>'+field({label:'Название',name:'articleName',value:article.name,readonly:true})+
+    groupValuesMarkup({add:parents().length>0,addData:'data-mechanism-add',draftData:'data-mechanism-draft',listData:'data-mechanism-values'})+
+    '<div class="form-error" role="alert" data-mechanism-error></div>'+groupEditorActions({saveData:'data-finance-article-save'})+'</form>';
   const layer=mountModal(document.body,modal(content,{title:'Статья',variant:'x',surface:'app',xRole:'editor',className:'desktop-service-group-editor-x'}));
   if(!layer)return null;
-  const host=layer.querySelector('[data-mechanism-values]');
-  const draw=()=>{
-    const fresh=getFinanceArticleCatalog()?.find(a=>a.articleId===article.articleId);
-    const values=(fresh?.values||article.values||[]).filter(v=>!v.archived);
-    renderGroupValues(host,{values,getId:v=>v.valueId,canEdit:v=>Boolean(v.custom),canRemove:v=>Boolean(v.custom),onEdit:v=>{
-      const raw=getArticles().find(a=>a.articleId===v.valueId);if(!raw)return;
-      layer.v2Close?.();openArticleX(raw,onSaved,getArticles,true);
-    },onRemove:v=>confirmGroupRemoval({title:'Удалить значение?',message:'Значение «'+v.name+'» будет удалено из списка. Проведённые операции останутся в истории.',onConfirm:()=>archiveFinanceArticle(v.valueId),onSuccess:()=>{onSaved();draw();}})});
+  const form=layer.querySelector('[data-mechanism-form]'),host=form.querySelector('[data-mechanism-values]'),
+    draft=form.querySelector('[data-mechanism-draft]'),plus=form.querySelector('[data-mechanism-add]'),
+    save=form.querySelector('[data-finance-article-save]'),error=form.querySelector('[data-mechanism-error]');
+  let edit=null,pending=false;
+  const values=()=>freshArticle().values.filter(v=>!v.archived);
+  const name=()=>String(draft.querySelector('[name="valueName"]')?.value||'').trim();
+  const parent=()=>{const options=parents();return options.length===1?options[0]:options.find(a=>a.articleId===draft.querySelector('[name="valueParent"]')?.value);};
+  const sync=()=>{
+    const duplicate=edit&&values().some(v=>v.valueId!==edit.valueId&&normalized(v.name)===normalized(name()));
+    save.disabled=pending||!edit||!name()||Boolean(duplicate)||Boolean(edit?.valueId&&name()===edit.name)||Boolean(edit&&!edit.valueId&&!parent());
+    if(plus)plus.disabled=pending||Boolean(edit)||!parents().length;
+    host.querySelectorAll('[data-mechanism-value-delete]').forEach(control=>control.disabled=pending||Boolean(edit));
   };
+  const drawDraft=()=>{
+    draft.innerHTML=edit?groupValueDraft(edit)+(!edit.valueId&&parents().length>1?select({label:'Направление',name:'valueParent',value:'',options:[{value:'',label:'Выберите направление'},...parents().map(a=>({value:a.articleId,label:a.direction==='IN'?'Приход':'Расход'}))]}):''):'';
+    sync();
+  };
+  const begin=value=>{
+    if(pending||edit)return;
+    edit=value;error.textContent='';drawDraft();draw();draft.querySelector('[name="valueName"]')?.focus();
+  };
+  const draw=()=>{
+    renderGroupValues(host,{values:values(),getId:v=>v.valueId,selectedId:edit?.valueId||null,
+      canEdit:v=>Boolean(v.custom),canRemove:v=>Boolean(v.custom),removeData:'data-mechanism-value-delete',
+      onEdit:v=>{if(v.custom&&getArticles().some(a=>a.articleId===v.valueId&&!a.systemKey))begin({valueId:v.valueId,name:v.name});},
+      onRemove:v=>{
+        if(pending||edit||!v.custom)return;
+        confirmGroupRemoval({title:'Удалить значение?',message:'Значение «'+v.name+'» будет удалено из списка. Проведённые операции останутся в истории.',onConfirm:async()=>{
+          if(pending||edit||!values().some(a=>a.valueId===v.valueId&&a.custom))throw new Error('Значение недоступно для удаления.');
+          pending=true;sync();try{return await archiveFinanceArticle(v.valueId);}finally{pending=false;sync();}
+        },onSuccess:()=>{onSaved();draw();}});
+      }});
+    sync();
+  };
+  plus?.addEventListener('click',()=>begin({valueId:'',name:''}));
+  form.addEventListener('input',sync);form.addEventListener('change',sync);
+  form.addEventListener('submit',async event=>{
+    event.preventDefault();sync();if(save.disabled||pending||!edit)return;
+    const valueName=name(),valueId=edit.valueId,owner=parent();
+    pending=true;error.textContent='';sync();
+    try{
+      let result;
+      if(valueId){
+        if(!values().some(v=>v.valueId===valueId&&v.custom))throw new Error('Системное значение нельзя изменить.');
+        result=await updateFinanceArticle(valueId,{name:valueName});
+      }else{
+        if(!owner)throw new Error('Выберите направление.');
+        result=await createFinanceArticle({name:valueName,parentArticleId:owner.articleId,direction:owner.direction,economicType:owner.economicType});
+      }
+      if(!result)throw new Error('Сервер не подтвердил сохранение значения.');
+      edit=null;drawDraft();onSaved();draw();
+    }catch(cause){error.textContent=String(cause?.message||'Не удалось сохранить значение.');}
+    finally{pending=false;sync();}
+  });
   draw();return layer;
 }
 // The DDS directory is a tool, not a navigation destination. The same Q

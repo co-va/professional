@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { ddsRegistryParts } from '../core/finance/dds/registry-parts.js';
-import { registeredRoute, availableArticleDirectory } from '../core/finance/dds/article-view.js';
+import { registeredRoute, availableArticleDirectory, mechanismValueParents } from '../core/finance/dds/article-view.js';
 const canonical=[
 {articleId:'deposit',name:'Депозит',values:[{valueId:'fund',name:'Пополнение',routes:['DEPOSIT_RECEIVED']},{valueId:'pay',name:'Оплата',routes:['DEPOSIT_SPEND']},{valueId:'refund',name:'Возврат',routes:['DEPOSIT_RETURN','DEPOSIT_PAYMENT_REFUND']}],routes:[]},
 {articleId:'services',name:'Оказание услуг',values:[{valueId:'service',name:'Оплата услуг',routes:['SERVICE_REVENUE']},{valueId:'tip',name:'Чаевые',routes:['TIPS']}],routes:[]},
@@ -42,3 +42,17 @@ const purchases=ddsRegistryParts({id:'buy',first:{operationKind:'manual-expense'
 assert.equal(purchases.length,2);
 assert.deepEqual(purchases.map(p=>p.position),['Краситель','Шампунь']);
 console.log('PASS mechanism registry and position movement rows');
+
+const rawParents=[
+ {articleId:'system-service-revenue',systemKey:'SERVICE_REVENUE',direction:'IN',economicType:'OPERATING_REVENUE'},
+ {articleId:'system-tips',systemKey:'TIPS',direction:'IN',economicType:'TIPS'},
+ {articleId:'system-refund',systemKey:'REFUND',direction:'OUT',economicType:'REFUND'},
+ {articleId:'system-deposit-spend',systemKey:'DEPOSIT_SPEND',direction:'TRANSFER',economicType:'DEPOSIT_SPEND'},
+ {articleId:'system-transfer',systemKey:'TRANSFER',direction:'TRANSFER',economicType:'TRANSFER'}
+];
+const servicesMechanism={...canonical[1],capability:'journal',systemKey:'MECHANISM_SERVICES',values:[...canonical[1].values,{name:'Возврат',routes:['REFUND']},{name:'Ложный маршрут',custom:true,routes:['TRANSFER']}]};
+assert.deepEqual(mechanismValueParents(servicesMechanism,rawParents).map(a=>a.articleId),['system-service-revenue','system-refund']);
+assert.deepEqual(mechanismValueParents({...servicesMechanism,values:[{routes:['DEPOSIT_SPEND']}]},rawParents),[]);
+assert.deepEqual(mechanismValueParents({...servicesMechanism,values:[{routes:['SERVICE_REVENUE']}]},rawParents.map(a=>({...a,archivedAt:'2026-11-28'}))),[]);
+assert.deepEqual(mechanismValueParents({systemKey:'MECHANISM_TRANSFER',capability:'finance.special.access',values:[],routes:['TRANSFER']},rawParents),[]);
+console.log('PASS custom mechanism values use existing writable route owners');

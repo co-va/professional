@@ -34,3 +34,17 @@ export function articleCellText(article,value=''){return [article,value].filter(
    a.deferred?legacyIds.has(a.articleId):!a.systemKey
   )).map(a=>({...a,values:(a.values||[]).filter(v=>!v.archived)}));
  }
+
+// The catalogue mechanism IDs are projections, not writable Core article IDs.
+ // Pick a persisted route owner for each allowed cash direction. Never create
+ // a synthetic parent or turn a user label into a new system route.
+ export function mechanismValueParents(article,raw){
+  if(!article?.capability||!article.systemKey)return [];
+  const routes=(article.values||[]).filter(v=>!v.custom&&!v.archived).flatMap(v=>v.routes||[]);
+  const result=[];
+  for(const route of routes){
+   const parent=raw.find(a=>a.systemKey===route&&!a.archivedAt&&['IN','OUT'].includes(a.direction)&&a.economicType&&a.economicType!=='GROUP');
+   if(parent&&!result.some(a=>a.direction===parent.direction))result.push(parent);
+  }
+  return result;
+ }
