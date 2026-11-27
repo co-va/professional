@@ -17,7 +17,7 @@ const SORTS = [
 ];
 const emptyFilters = () => ({ title:'', workplace:'', person:'', direction:'', from:'', to:'' });
 const ddsFilters = () => ({ ...emptyFilters(), wallet:'', article:'', status:'' });
-const DDS_SORTS = [...SORTS.filter(([key])=>!key.startsWith('title')), ['walletAsc','Кошелёк — от А до Я'], ['walletDesc','Кошелёк — от Я до А'], ['articleAsc','Статья — от А до Я'], ['articleDesc','Статья — от Я до А']];
+const DDS_SORTS = [...SORTS.filter(([key])=>!key.startsWith('title')), ['walletAsc','Кошелёк — от А до Я'], ['walletDesc','Кошелёк — от Я до А'], ['articleAsc','По статьям — от А до Я'], ['articleDesc','По статьям — от Я до А']];
 const money = value => new Intl.NumberFormat('ru-RU',{maximumFractionDigits:2}).format(value) + ' ₽';
 const clean = value => String(value ?? '').toLocaleLowerCase('ru').replace(/ё/g,'е').replace(/\s+/g,' ').trim();
 const numeric = value => String(value ?? '').replace(/[^0-9]/g,'');
@@ -184,9 +184,9 @@ function applyDDSHierarchy(host,rows,collapsed){
 
 export function bindWalletHistory(layer,wallet,rows,{open,settings,dds=false,actions=[]}) {
   const stateKey=dds?'ddsHistoryState':'walletHistoryState';
-  const state=layer[stateKey] ||= {query:'',filters:dds?ddsFilters():emptyFilters(),sort:'dateDesc',selected:new Set()};
+  const state=layer[stateKey] ||= {query:'',filters:dds?ddsFilters():emptyFilters(),sort:dds?'articleAsc':'dateDesc',selected:new Set()};
   const tools=actions.filter(Boolean);
-  if(dds){state.collapsed ||= new Set();if(!DDS_SORTS.some(([key])=>key===state.sort))state.sort='dateDesc';state.filters.title='';}
+  if(dds){state.collapsed ||= new Set();if(!DDS_SORTS.some(([key])=>key===state.sort))state.sort='articleAsc';state.filters.title='';}
   const [toolbar]=setV2ZHeaderRows(layer,[
     '<section data-people-desktop-toolbar><div class="people-desktop-tools">'
     +field({name:'walletSearch',type:'search',placeholder:'Поиск',autocomplete:'off',value:state.query,data:'data-wallet-search'})
