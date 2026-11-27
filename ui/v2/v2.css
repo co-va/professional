@@ -1239,3 +1239,18 @@
  .v2-app--workspace [data-service-table-kind][data-service-table-mode="products"] [data-service-position] [data-service-column="revenue"]{grid-column:7}
  .v2-app--workspace [data-service-table-kind][data-service-table-mode="products"] [data-service-position] .service-table-edit{grid-column:8}
 }
+
+/* Q group directory uses the existing compact data table and shared reorder handle. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace .desktop-service-groups-q [data-desktop-group-directory-table] tbody.list-entries{display:table-row-group}
+ .v2-app--workspace .desktop-service-groups-q [data-desktop-group-directory-table] :is(th,td){box-sizing:border-box;height:var(--h-list-row);padding:4px 8px;vertical-align:middle}
+ .v2-app--workspace .desktop-service-groups-q [data-desktop-group-directory-table] :is(th,td)[data-table-column="drag"]{width:36px;padding:0;text-align:center}
+ .v2-app--workspace .desktop-service-groups-q [data-desktop-group-directory-table] :is(th,td)[data-table-column="kind"]{width:78px}
+ .v2-app--workspace .desktop-service-groups-q [data-desktop-group-directory-table] :is(th,td)[data-table-column="values"]{width:84px;text-align:right;font-variant-numeric:tabular-nums}
+ .v2-app--workspace .desktop-service-groups-q [data-desktop-group-directory-table] .list-entry__reorder-handle{width:36px;height:var(--ui-compact-size);margin:0 auto}
+ .v2-app--workspace .desktop-service-groups-q [data-desktop-group-directory-table] tbody tr{cursor:pointer;touch-action:manipulation}
+ .v2-app--workspace .desktop-service-groups-q [data-desktop-group-directory-table] .desktop-group-table-name{display:block;width:100%;min-width:0;white-space:normal;overflow-wrap:anywhere;line-height:1.2;font-weight:650}
+ .v2-app--workspace .desktop-service-groups-q [data-desktop-group-directory-table] tr.is-reordering{position:relative;z-index:4;transform:translateY(var(--list-entry-drag-y,0px));pointer-events:none;background:var(--white)}
+ .v2-app--workspace .desktop-service-groups-q [data-desktop-group-directory-table] tr.is-reorder-target-before>td{box-shadow:inset 0 2px var(--text)}
+ .v2-app--workspace .desktop-service-groups-q [data-desktop-group-directory-table] tr.is-reorder-target-after>td{box-shadow:inset 0 -2px var(--text)}
+}

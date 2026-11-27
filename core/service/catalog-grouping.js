@@ -1,7 +1,7 @@
 import { bindServiceNameSave } from './editor-actions.js';
 import {
   actionBlock, button, compactAddButton, compactRemoveButton, compactButton, emptyState, field, initV2ListReorder,
-  list, modal, mountModal, openNotice, select, v2ListEntries, v2ListEntry,
+  dataTable, list, modal, mountModal, openNotice, select, v2ListEntries, v2ListEntry,
 } from '../../ui/ui.js';
 import { escapeHtml } from '../../ui/utils/escape-html.js';
 import { moveDesktopQTool, pinDesktopQDanger } from '../../ui/v2/z-layout.js';
@@ -272,8 +272,75 @@ export function openServiceGroupingQ({ onSaved = () => {}, desktop = false } = {
       });
   };
 
-  // Desktop uses the existing Q shell for the directory and all edit states.
-  // Only destructive confirmation still needs X. Mobile keeps the original flow.
+  const groupEditorX = (previous = null, afterCreate = null) => {
+    const editor = mountModal(document.body, modal(
+      '<form class="compact-form" data-service-group-editor-form>' +
+        (previous ? '' : select({
+          label: 'Раздел', name: 'groupKind', value: 'procedures',
+          options: [
+            { value: 'procedures', label: 'Услуги' },
+            { value: 'products', label: 'Товары' },
+          ],
+        })) +
+        field({ label: 'Наименование группы', name: 'name',
+          value: previous?.name || '', required: true, maxlength: 80 }) +
+        '<div class="form-error" role="alert" data-service-group-editor-error></div>' +
+        actionBlock(
+          button('Сохранить', {
+            type: 'submit', data: 'data-service-group-editor-save',
+          }) +
+          (previous ? button('Удалить группу', {
+            type: 'button', variant: 'danger', data: 'data-service-group-editor-delete',
+          }) : ''),
+        ) +
+      '</form>',
+      { title: previous ? 'Группа' : 'Добавить группу',
+        variant: 'x', xRole: 'editor', surface: 'app' },
+    ));
+    if (!editor) return null;
+    const form = editor.querySelector('[data-service-group-editor-form]');
+    const saveButton = editor.querySelector('[data-service-group-editor-save]');
+    let busy = false;
+    const hasChange = bindServiceNameSave(form, saveButton, previous);
+    form?.addEventListener('submit', async event => {
+      event.preventDefault();
+      if (busy || !hasChange()) return;
+      const section = previous?.kind || String(new FormData(form).get('groupKind') || '');
+      const title = String(new FormData(form).get('name') || '').trim();
+      if (!title || !['procedures', 'products'].includes(section)) return;
+      busy = true;
+      try {
+        const existing = getServiceGroupLevels(section);
+        const next = previous
+          ? existing.map(group => group.id === previous.id
+            ? { ...group, name: title } : group)
+          : [...existing, { id: id(), name: title, values: [] }];
+        await persist(section, next);
+        editor.v2Close?.();
+        // With no groups, enter through X only. After the first save, show
+        // the same single combined Q instead of opening another blank form.
+        if (afterCreate) afterCreate();
+        else if (!layer) openServiceGroupingQ({ onSaved });
+      } catch (cause) {
+        const error = editor.querySelector('[data-service-group-editor-error]');
+        if (error) error.textContent = cause?.message || 'Не удалось сохранить.';
+      } finally { busy = false; }
+    });
+    editor.querySelector('[data-service-group-editor-delete]')
+      ?.addEventListener('click', () => {
+        if (!previous) return;
+        confirmRemove('Удалить группу?', async () => {
+          await persist(previous.kind, getServiceGroupLevels(previous.kind)
+            .filter(group => group.id !== previous.id));
+          editor.v2Close?.();
+          activeKey = null;
+          repaint();
+        });
+      });
+    return editor;
+  };
+
+  // Desktop Q contains the directory and existing group edit state; creation uses the shared X.
   if (desktop) {
     const q = mountModal(document.body, modal(
       '<div data-desktop-group-content></div>' +
@@ -303,12 +370,6 @@ export function openServiceGroupingQ({ onSaved = () => {}, desktop = false } = {
     let busy = false;
     let dispose = () => {};
     const current = () => key ? groupByKey(key) : null;
-    const valueCountText = group => {
-      const count = Array.isArray(group.values) ? group.values.length : 0;
-      const mod10 = count % 10, mod100 = count % 100;
-      return count + ' ' + (mod10 === 1 && mod100 !== 11 ? 'значение'
-        : mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14) ? 'значения' : 'значений');
-    };
     const edited = () => valueEdit && !valueEdit.isNew
       ? current()?.values?.find(value => value.id === valueEdit.id) : null;
     const nameChanged = () => Boolean(nameDraft.trim()) &&
@@ -383,21 +444,33 @@ export function openServiceGroupingQ({ onSaved = () => {}, desktop = false } = {
       error.textContent = '';
       if (!creating && !active) {
         const entries = getServiceGroupEntries();
-        content.innerHTML = entries.length ? v2ListEntries(entries.map(group => v2ListEntry({
-          title: group.name, subtitle: kindLabel(group.kind), rightBottom: valueCountText(group),
-          initial: '', interactive: true, reorderHandle: true,
-          reorderAria: 'Переместить ' + group.name,
-          data: 'data-desktop-group-key="' + escapeHtml(group.key) + '" data-reorder-id="' + escapeHtml(group.key) + '"',
-          aria: 'Открыть группу ' + group.name,
-        }))) : emptyState('Групп пока нет');
-        content.querySelectorAll('[data-desktop-group-key]').forEach(node => node.addEventListener('click', event => {
-          if (busy || event.target.closest?.('[data-reorder-handle]')) return;
-          const group = groupByKey(node.dataset.desktopGroupKey);
-          if (group) enter(group);
-        }));
-        dispose = initV2ListReorder(content, {
-          onReorder: async keys => { await commitServiceGroupOrder(keys); onSaved(); },
-          onError: fail,
+        const columns = [
+          {key:'drag',label:'',narrow:true,sortable:false,render:group=>'<span class="list-entry__reorder-handle" data-reorder-handle data-desktop-group-key="'+escapeHtml(group.key)+'" role="button" tabindex="0" aria-label="'+escapeHtml('Переместить '+group.name)+'"><span aria-hidden="true">⋮⋮</span></span>'},
+          {key:'name',label:'Наименование',sortable:false,render:group=>button(escapeHtml(group.name),{variant:'secondary',className:'desktop-group-table-name',data:'data-desktop-group-open',aria:'Редактировать группу '+group.name})},
+          {key:'kind',label:'Группа',sortable:false,render:group=>group.kind==='products'?'Товары':'Услуги'},
+          {key:'values',label:'Значения',sortable:false,render:group=>String(Array.isArray(group.values)?group.values.length:0)},
+        ];
+        content.innerHTML='<div class="desktop-table-popup" data-desktop-group-directory-table>'+dataTable({columns,rows:entries,caption:'Группы',compact:true})+'</div>'+(entries.length?'':emptyState('Групп пока нет'));
+        const body=content.querySelector('tbody');
+        body.classList.add('list-entries');
+        body.querySelectorAll('[data-desktop-group-key]').forEach(handle=>{
+          const row=handle.closest('tr');
+          row.dataset.reorderId=handle.dataset.desktopGroupKey;
+          row.addEventListener('click',event=>{
+            if(busy||event.target.closest?.('[data-reorder-handle]'))return;
+            const group=groupByKey(row.dataset.reorderId);
+            if(group)enter(group);
+          });
+        });
+        dispose=initV2ListReorder(body,{
+          selector:'tr[data-reorder-id]',
+          onReorder:async keys=>{
+            if(busy)throw new Error('Дождитесь завершения сохранения.');
+            busy=true;sync();
+            try{await commitServiceGroupOrder(keys);onSaved();}
+            finally{busy=false;sync();}
+          },
+          onError:fail,
         });
         sync(); return;
       }
@@ -464,9 +537,12 @@ export function openServiceGroupingQ({ onSaved = () => {}, desktop = false } = {
     }
     add.addEventListener('click', () => {
       if (busy || creating || valueEdit) return;
-      if (current()) valueEdit = { id: null, name: '', isNew: true };
-      else { creating = true; nameDraft = ''; kindDraft = 'procedures'; }
-      render();
+      if (current()) {
+        valueEdit = { id: null, name: '', isNew: true };
+        render();
+      } else {
+        groupEditorX(null,()=>{if(q.isConnected)render();});
+      }
     });
     cancel.addEventListener('click', () => {
       if (busy) return;
@@ -504,73 +580,6 @@ export function openServiceGroupingQ({ onSaved = () => {}, desktop = false } = {
     render();
     return q;
   }
-
-  const groupEditorX = (previous = null) => {
-    const editor = mountModal(document.body, modal(
-      '<form class="compact-form" data-service-group-editor-form>' +
-        (previous ? '' : select({
-          label: 'Раздел', name: 'groupKind', value: 'procedures',
-          options: [
-            { value: 'procedures', label: 'Услуги' },
-            { value: 'products', label: 'Товары' },
-          ],
-        })) +
-        field({ label: 'Наименование группы', name: 'name',
-          value: previous?.name || '', required: true, maxlength: 80 }) +
-        '<div class="form-error" role="alert" data-service-group-editor-error></div>' +
-        actionBlock(
-          button('Сохранить', {
-            type: 'submit', data: 'data-service-group-editor-save',
-          }) +
-          (previous ? button('Удалить группу', {
-            type: 'button', variant: 'danger', data: 'data-service-group-editor-delete',
-          }) : ''),
-        ) +
-      '</form>',
-      { title: previous ? 'Группа' : 'Добавить группу',
-        variant: 'x', xRole: 'editor', surface: 'app' },
-    ));
-    if (!editor) return null;
-    const form = editor.querySelector('[data-service-group-editor-form]');
-    const saveButton = editor.querySelector('[data-service-group-editor-save]');
-    let busy = false;
-    const hasChange = bindServiceNameSave(form, saveButton, previous);
-    form?.addEventListener('submit', async event => {
-      event.preventDefault();
-      if (busy || !hasChange()) return;
-      const section = previous?.kind || String(new FormData(form).get('groupKind') || '');
-      const title = String(new FormData(form).get('name') || '').trim();
-      if (!title || !['procedures', 'products'].includes(section)) return;
-      busy = true;
-      try {
-        const existing = getServiceGroupLevels(section);
-        const next = previous
-          ? existing.map(group => group.id === previous.id
-            ? { ...group, name: title } : group)
-          : [...existing, { id: id(), name: title, values: [] }];
-        await persist(section, next);
-        editor.v2Close?.();
-        // With no groups, enter through X only. After the first save, show
-        // the same single combined Q instead of opening another blank form.
-        if (!layer) openServiceGroupingQ({ onSaved });
-      } catch (cause) {
-        const error = editor.querySelector('[data-service-group-editor-error]');
-        if (error) error.textContent = cause?.message || 'Не удалось сохранить.';
-      } finally { busy = false; }
-    });
-    editor.querySelector('[data-service-group-editor-delete]')
-      ?.addEventListener('click', () => {
-        if (!previous) return;
-        confirmRemove('Удалить группу?', async () => {
-          await persist(previous.kind, getServiceGroupLevels(previous.kind)
-            .filter(group => group.id !== previous.id));
-          editor.v2Close?.();
-          activeKey = null;
-          repaint();
-        });
-      });
-    return editor;
-  };
 
   const valueEditorX = (groupKey, previous = null) => {
     const current = groupByKey(groupKey);
