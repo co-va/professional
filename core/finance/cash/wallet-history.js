@@ -164,21 +164,34 @@ export function walletHistoryBody(dds=false) {
 }
 // Group the existing DDS rows, never split or relabel a financial operation.
 // Mixed/transfer movements retain their own factual direction.
-function applyDDSHierarchy(host,rows){
+function applyDDSHierarchy(host,rows,collapsed){
   const body=host.querySelector('tbody');
   if(!body)return;
   const byId=new Map([...body.querySelectorAll('[data-finance-history-row]')].map(control=>[control.dataset.financeHistoryRow,control.closest('tr')]));
   const directions=[['out','Расходы'],['in','Доходы'],['transfer','Переводы'],['mixed','Смешанные операции']];
   const width=host.querySelector('thead tr')?.cells.length||body.rows[0]?.cells.length||1;
-  const fragment=body.ownerDocument.createDocumentFragment();
-  const heading=(level,title)=>{
+  const fragment=body.ownerDocument.createDocumentFragment(),sections=[];
+  const heading=(level,title,id)=>{
     const tr=body.ownerDocument.createElement('tr');tr.dataset.tableGroupLevel=level;
-    const td=body.ownerDocument.createElement('td');td.colSpan=width;td.textContent=title;tr.append(td);fragment.append(tr);
+    const td=body.ownerDocument.createElement('td');td.colSpan=width;
+    const details=body.ownerDocument.createElement('details');details.className='dds-table-disclosure';details.open=!collapsed.has(id);
+    const summary=body.ownerDocument.createElement('summary');summary.className='inventory-editor-summary';summary.textContent=title;
+    details.append(summary);td.append(details);tr.append(td);fragment.append(tr);
+    return {tr,details,id};
+  };
+  const sync=()=>{
+    for(const section of sections){
+      for(const group of section.groups){
+        if(group.heading)group.heading.tr.hidden=!section.heading.details.open;
+        const hidden=!section.heading.details.open||Boolean(group.heading&&!group.heading.details.open);
+        for(const row of group.rows)row.hidden=hidden;
+      }
+    }
   };
   for(const [direction,title] of directions){
     const members=rows.filter(row=>row.direction===direction);
     if(!members.length)continue;
-    heading('system',title);
+    const section={heading:heading('system',title,JSON.stringify([direction])),groups:[]};sections.push(section);
     const articles=new Map();
     for(const row of members){
       const name=String(row.article||'').trim();
@@ -186,19 +199,26 @@ function applyDDSHierarchy(host,rows){
       articles.get(name).push(row);
     }
     for(const [name,entries] of articles){
-      if(name)heading('group',name);
-      for(const row of entries){const tr=byId.get(row.id);if(tr)fragment.append(tr);}
+      const group={heading:name?heading('group',name,JSON.stringify([direction,name])):null,rows:[]};section.groups.push(group);
+      for(const row of entries){const tr=byId.get(row.id);if(tr){group.rows.push(tr);fragment.append(tr);}}
     }
   }
   // Unknown directions must never hide an actual financial row.
   for(const row of rows.filter(row=>!directions.some(([d])=>d===row.direction))){const tr=byId.get(row.id);if(tr)fragment.append(tr);}
   body.append(fragment);
+  for(const section of sections){
+    for(const item of [section.heading,...section.groups.map(g=>g.heading).filter(Boolean)]){
+      item.details.addEventListener('toggle',()=>{if(item.details.open)collapsed.delete(item.id);else collapsed.add(item.id);sync();});
+    }
+  }
+  sync();
 }
 
 export function bindWalletHistory(layer,wallet,rows,{open,settings,dds=false,actions=[]}) {
   const stateKey=dds?'ddsHistoryState':'walletHistoryState';
   const state=layer[stateKey] ||= {query:'',filters:dds?ddsFilters():emptyFilters(),sort:'dateDesc',selected:new Set()};
   const tools=actions.filter(Boolean);
+  if(dds)state.collapsed ||= new Set();
   const [toolbar]=setV2ZHeaderRows(layer,[
     '<section data-people-desktop-toolbar><div class="people-desktop-tools">'
     +field({name:'walletSearch',type:'search',placeholder:'Поиск',autocomplete:'off',value:state.query,data:'data-wallet-search'})
@@ -239,7 +259,7 @@ export function bindWalletHistory(layer,wallet,rows,{open,settings,dds=false,act
       {key:'date',label:'Дата',narrow:true},{key:'title',label:'Операция',...(dds?{secondaryKey:'wallet',secondaryLabel:'Кошелёк'}:{})},{key:'code',label:'Код',narrow:true},
       {key:'person',label:'Клиент / контрагент'},{key:'workplace',label:'Рабочее пространство'},...(dds?[{key:'article',label:'Статья'}]:[]),{key:'amount',label:'Сумма',narrow:true},
     ]):emptyState(rows.length?'Операции не найдены':'Операций пока нет',rows.length?'Измените условия поиска или фильтрации.':(dds?'Финансовые операции появятся здесь.':'Движения по этой кассе появятся здесь.'));
-    if(dds&&visible.length)applyDDSHierarchy(host,visible);
+    if(dds&&visible.length)applyDDSHierarchy(host,visible,state.collapsed);
     host.querySelectorAll('[data-wallet-select]').forEach(control=>control.addEventListener('change',()=>{
       if(control.checked)state.selected.add(control.dataset.walletSelect);else state.selected.delete(control.dataset.walletSelect);sync();
     }));

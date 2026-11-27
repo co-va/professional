@@ -64,13 +64,14 @@ export function renderDesktopServiceCatalog(host,{root,toolbar,onChanged,state,o
   const fail=error=>openNotice({title:'Сервис',message:error?.message||'Не удалось сохранить.'});
   const kinds=['procedures','products'];
   const check=(data,aria,checked=false)=>'<label class="ui-compact-check service-table-check">'+checkControl({data,aria,checked})+'</label>';
-  const header=['',...Object.values(labels)];
-  host.innerHTML='<section data-service-desktop-group-list data-service-table-kind="combined"><div class="service-desktop-table-track"><div class="service-desktop-group-header">'+check('data-service-select-all','Выбрать все позиции')+header.map(v=>'<span>'+v+'</span>').join('')+'</div><div class="service-desktop-group-body" data-service-group-catalog>'+kinds.map(kind=>'<section data-service-desktop-section="'+kind+'"><details data-service-system-disclosure><summary class="inventory-editor-summary service-table-system-heading" data-table-group-level="system">'+(kind==='procedures'?'Услуги':'Товары')+'</summary><div data-service-table-host></div></details></section>').join('')+'</div></div></section>';
+  const header=Object.values(labels);
+  host.innerHTML='<section data-service-desktop-group-list data-service-table-kind="combined"><div class="service-desktop-table-track"><div class="service-desktop-group-header">'+'<span aria-hidden="true"></span>'+check('data-service-select-all','Выбрать все позиции')+header.map(v=>'<span>'+v+'</span>').join('')+'<span aria-hidden="true"></span>'+'</div><div class="service-desktop-group-body" data-service-group-catalog>'+kinds.map(kind=>'<section data-service-desktop-section="'+kind+'"><details data-service-system-disclosure><summary class="inventory-editor-summary service-table-system-heading" data-table-group-level="system">'+(kind==='procedures'?'Услуги':'Товары')+'</summary><div data-service-table-host></div></details></section>').join('')+'</div></div></section>';
   const sections=[...host.querySelectorAll('[data-service-desktop-section]')];
   const st=state;
   st.selected ||= new Set();
   st.ranges ||= {};
   st.collapsed ||= new Set();
+  st.groupCollapsed ||= new Set();
   let selectable=[];
   const selectionKey=(kind,id)=>JSON.stringify([kind,key(id)]);
   const syncSelection=()=>{
@@ -120,7 +121,8 @@ export function renderDesktopServiceCatalog(host,{root,toolbar,onChanged,state,o
         const checkbox='<label class="ui-compact-check service-table-check">'+checkControl({data:'data-service-select',aria:'Выбрать '+item.name,value:selectedId,checked:st.selected.has(selectedId)})+'</label>';
         html=html.replace(/^<button\b/,'<div role="group"').replace(/ type="button"/,'').replace(/ aria-pressed="[^"]*"/,'').replace(/ aria-label="[^"]*"/,'').replace(/<\/button>\s*$/,'</div>');
         html=html.replace('<span class="list-entry__content">','<span class="list-entry__content">'+checkbox);
-        html=html.replace(/(\s*<\/span>\s*<\/div>)$/,values+'$1');
+        const edit=button('✎',{variant:'secondary',className:'ui-compact-button service-table-edit',data:'data-service-edit title="Редактировать"',aria:'Редактировать '+item.name});
+        html=html.replace(/(\s*<\/span>\s*<\/div>)$/,values+edit+'$1');
         html=html.replace('<span class="list-entry__main','<span tabindex="0" role="button" data-service-open aria-label="'+escapeHtml('Открыть '+item.name)+'" class="list-entry__main');
         return html.replace('data-reorder-handle','data-reorder-handle data-service-handle="'+scope+'"');
       };
@@ -140,11 +142,20 @@ export function renderDesktopServiceCatalog(host,{root,toolbar,onChanged,state,o
           scopes.push({scope,type:batch.type});
           html+='<div class="list-entries service-desktop-branch" data-service-scope="'+scope+'">'+batch.children.map(child=>{
             const id=groupOrder?kind+':'+child.group.id.slice(prefix.length):child.valueId;
-            let block=catalogDisclosure(child.value,walk(child),Boolean(node.key),child.items.length,'',manual?id:'').replace('<section ','<section data-table-group-level="'+(groupOrder?'group':'value')+'" ');
+            const collapseKey=JSON.stringify([kind,child.key]);
+            let block=catalogDisclosure(child.value,walk(child),Boolean(node.key),child.items.length,'',manual?id:'').replace('<section ','<section data-service-collapse-key="'+escapeHtml(collapseKey)+'" data-table-group-level="'+(groupOrder?'group':'value')+'" ');
             if(manual){
               block=block.replace('data-stock-category','data-stock-category data-service-reorder-scope="'+scope+'"');
-              const at=block.lastIndexOf('data-reorder-handle');
-              if(at>=0)block=block.slice(0,at)+'data-reorder-handle data-service-handle="'+scope+'"'+block.slice(at+'data-reorder-handle'.length);
+              // Move only this branch's existing handle, never any descendant handle.
+              const at=block.lastIndexOf('<span class="list-entry__reorder-handle"');
+              const tail=at<0?-1:block.indexOf('</span></span>',at);
+              if(tail>=0){
+                const end=tail+'</span></span>'.length;
+                const handle=block.slice(at,end).replace('data-reorder-handle','data-reorder-handle data-service-handle="'+scope+'"');
+                block=block.slice(0,at)+block.slice(end);
+                const start=block.indexOf('>');
+                block=block.slice(0,start+1)+handle+block.slice(start+1);
+              }
             }
             return block;
           }).join('')+'</div>';
@@ -157,7 +168,13 @@ export function renderDesktopServiceCatalog(host,{root,toolbar,onChanged,state,o
       };
       const table=section.querySelector('[data-service-table-host]');
       table.innerHTML=rows.length?walk(tree):emptyState(all.length?'Ничего не найдено':isService?'Услуг пока нет':'Товаров пока нет');
-      table.querySelectorAll('details').forEach(el=>{el.open=true});
+      table.querySelectorAll('[data-service-collapse-key]').forEach(panel=>{
+        const details=panel.querySelector(':scope > details');
+        if(!details)return;
+        const id=panel.dataset.serviceCollapseKey;
+        details.open=!st.groupCollapsed.has(id);
+        details.addEventListener('toggle',()=>{if(details.open)st.groupCollapsed.delete(id);else st.groupCollapsed.add(id);});
+      });
       table.querySelectorAll('[data-service-select]').forEach(control=>control.addEventListener('change',()=>{
         if(control.checked)st.selected.add(control.value);else st.selected.delete(control.value);syncSelection();
       }));
@@ -165,7 +182,18 @@ export function renderDesktopServiceCatalog(host,{root,toolbar,onChanged,state,o
         const openRow=async()=>{
           try{const m=await (isService?loadProceduresModule():loadProductsModule());if(disposed)return;const open=isService?m.openProcedureOverview:m.openProductOverview;open(root,el.dataset.servicePosition,{onChanged});}catch(e){fail(e)}
         };
-        el.addEventListener('click',event=>{if(!event.target.closest('.service-table-check,[data-reorder-handle]'))void openRow();});
+        el.addEventListener('click',event=>{if(!event.target.closest('.service-table-check,[data-reorder-handle],[data-service-edit]'))void openRow();});
+        el.querySelector('[data-service-edit]')?.addEventListener('click',async event=>{
+          event.stopPropagation();
+          try{
+            const m=await (isService?loadProceduresModule():loadProductsModule());
+            if(disposed)return;
+            const item=dataFor(kind).find(row=>key(row.id)===el.dataset.servicePosition);
+            if(!item)return;
+            const edit=isService?m.openProcedureEditor:m.openProductEditor;
+            edit(root,item,{onChanged});
+          }catch(error){fail(error)}
+        });
         el.querySelector('[data-service-open]')?.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();void openRow();}});
       });
       if(manual)for(const {scope,type} of scopes){
@@ -197,12 +225,14 @@ export function renderDesktopServiceCatalog(host,{root,toolbar,onChanged,state,o
     const anchor=e.currentTarget;anchor.dataset.v2AnchorWidth='360';
     const none={value:'',label:'Без фильтра'};
     const rangeLabels={price:'Цена, ₽',duration:'Время, мин',count:'Количество',minutes:'Затраченное время, мин',revenue:'Доход, ₽'};
-    const rangeFields=()=>rangeKeys.map(k=>{
-      const integer=k==='count'||k==='duration'||k==='minutes';
+    const rangeFields=()=>{
+      const k=st.rangeMetric||'';
       const range=st.ranges[k]||{};
-      const bound=(side,label)=>field({name:k+'_'+side,type:'number',inputmode:integer?'numeric':'decimal',placeholder:label,value:key(range[side]),step:integer?'1':'0.01',min:k==='revenue'?'':'0',data:'data-service-range="'+k+'" data-service-bound="'+side+'" aria-label="'+escapeHtml(rangeLabels[k]+' '+label.toLowerCase())+'"'});
-      return '<div class="service-filter-range"><span>'+rangeLabels[k]+'</span><div>'+bound('min','От')+bound('max','До')+'</div></div>';
-    }).join('');
+      const integer=k==='count'||k==='duration'||k==='minutes';
+      const bound=(side,label)=>field({name:'range_'+side,type:'number',inputmode:integer?'numeric':'decimal',placeholder:label,value:key(range[side]),disabled:!k,step:integer?'1':'0.01',min:k==='revenue'?'':'0',data:'data-service-range="'+escapeHtml(k)+'" data-service-bound="'+side+'" aria-label="'+escapeHtml((rangeLabels[k]||'Показатель')+' '+label.toLowerCase())+'"'});
+      return select({name:'rangeMetric',value:k,options:[{value:'',label:'Выбрать показатель'},...rangeKeys.map(value=>({value,label:rangeLabels[value]}))]})+
+        '<div class="service-filter-range">'+bound('min','От')+bound('max','До')+'</div>';
+    };
     const selectors=()=>{
       const entries=getServiceGroupEntries().filter(g=>!st.kind||g.kind===st.kind);
       const group=entries.find(g=>g.key===st.group);
@@ -211,12 +241,19 @@ export function renderDesktopServiceCatalog(host,{root,toolbar,onChanged,state,o
       (group?.values?.length?select({label:'Значение',name:'value',value:st.value,options:[none,...group.values.map(v=>({value:v.id,label:v.name}))]}):'')+
       select({label:'Рабочие пространства',name:'workplace',value:st.workplace,options:[none,{value:'none',label:'Без рабочего пространства'},...getWorkplaces().map(w=>({value:key(w.key||w.id),label:w.name}))]});
     };
-    const fields=()=>'<div class="form-grid"><div class="form-grid" data-service-filter-selectors>'+selectors()+'</div>'+rangeFields()+'</div>';
+    const fields=()=>'<div class="form-grid"><div class="form-grid" data-service-filter-selectors>'+selectors()+'</div><div class="form-grid" data-service-range-fields>'+rangeFields()+'</div></div>';
     const layer=mountModal(anchor,modal('<div data-people-filter-fields>'+fields()+'</div><div class="modal-actions" data-people-filter-actions'+(filtersActive(st)?'':' hidden')+'>'+button('Сбросить',{variant:'secondary',data:'data-people-filter-action'})+'</div>',{title:'Фильтр',variant:'x',surface:'app',className:'people-action-popup people-filter-popup'}));
     if(!layer)return;
     const actions=layer.querySelector('[data-people-filter-actions]');
     const apply=()=>{actions.hidden=!filtersActive(st);refresh()};
     layer.addEventListener('change',ev=>{
+      if(ev.target.name==='rangeMetric'){
+        const metric=ev.target.value;
+        if(!rangeKeys.includes(metric)&&metric!=='')return;
+        if(metric!==st.rangeMetric){st.rangeMetric=metric;st.ranges={};}
+        layer.querySelector('[data-service-range-fields]').innerHTML=rangeFields();
+        apply();return;
+      }
       if(!['kind','group','value','workplace'].includes(ev.target.name))return;
       st[ev.target.name]=ev.target.value;
       if(ev.target.name==='kind'){if(st.group&&st.kind&&!st.group.startsWith(st.kind+':')){st.group='';st.value='';}}
@@ -233,7 +270,7 @@ export function renderDesktopServiceCatalog(host,{root,toolbar,onChanged,state,o
       apply();
     });
     layer.querySelector('[data-people-filter-action]')?.addEventListener('click',()=>{
-      st.kind='';st.group='';st.value='';st.workplace='';st.ranges={};
+      st.kind='';st.group='';st.value='';st.workplace='';st.ranges={};st.rangeMetric='';
       layer.querySelector('[data-people-filter-fields]').innerHTML=fields();apply();
     });
   });

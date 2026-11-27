@@ -80,7 +80,7 @@ export function renderService(root, navigateBack = () => {}) {
   let disposeCatalog = () => {};
   let renderVersion = 0;
   let disposed = false;
-  const desktopState={query:'',sort:'manual',kind:'',group:'',value:'',workplace:'',ranges:{},selected:new Set(),collapsed:new Set()};
+  const desktopState={query:'',sort:'manual',kind:'',group:'',value:'',workplace:'',ranges:{},rangeMetric:'',selected:new Set(),collapsed:new Set(),groupCollapsed:new Set()};
 
   const renderCurrent = () => {
     if (disposed) return;
