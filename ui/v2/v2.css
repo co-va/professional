@@ -623,7 +623,7 @@
    display:flex;flex-direction:column;overflow:hidden!important;
    padding-bottom:0;scrollbar-gutter:auto;
  }
- .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z:has([data-people-list-host],[data-wallet-history-host],[data-finance-article-table]) :is([data-v2-workspace-surface],.ui-page,[data-dds-history],section:has(>[data-people-list-host],>[data-wallet-history-host]),[data-people-list-host],[data-wallet-history-host],[data-finance-article-table]){
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z:has([data-people-list-host],[data-wallet-history-host],[data-finance-article-table]) :is([data-v2-workspace-surface],.ui-page,[data-dds-history],section:has(>[data-people-list-host],>[data-wallet-history-host],>[data-finance-article-table]),[data-people-list-host],[data-wallet-history-host],[data-finance-article-table]){
    display:flex;flex-direction:column;flex:1 1 auto;min-height:0;min-width:0;
  }
  /* The bounded frame belongs to the table viewport, never to the moving rows.

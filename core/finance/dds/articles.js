@@ -111,7 +111,8 @@ function openArticleX(root, existing = null) {
     ${select({label:'Группа',name:'parentArticleId',value:existing?.parentArticleId||'',options:parentOptions(items,existing?.articleId||'')})}
     ${select({label:'Направление',name:'direction',value:direction,options:DIRECTION_OPTIONS})}
     ${select({label:'Назначение',name:'economicType',value:economicType,options:economicOptions})}
-    <div class="modal-actions finance-receipt-actions">
+    ${isSystem?'<p class="ui-muted" data-system-article-note>Системную статью удалить нельзя: она используется для автоматического учёта.</p>':''}
+    <div class="modal-actions finance-receipt-actions finance-receipt-actions--dds">
       ${existing&&!isSystem?button('Удалить',{variant:'danger',data:'data-delete-finance-article'}):''}
       ${button('Сохранить',{type:'submit',data:'data-finance-article-save',disabled:true})}
     </div>
@@ -151,7 +152,7 @@ function openArticleX(root, existing = null) {
   remove?.addEventListener('click',()=>{
     if(pending)return;
     openFinanceDeleteConfirmation(layer,{
-      message:'Статья будет удалена из списка доступных статей. Вы уверены?',
+      message:'Статья будет удалена из списка доступных статей. Ранее проведённые операции останутся в истории. Вы уверены?',
       onConfirm:()=>archiveFinanceArticle(existing.articleId),
       onSuccess:()=>renderList(root),
     });
@@ -317,7 +318,7 @@ function openArticleSort(anchor,state,refresh){
 function renderDesktopArticles(root){
   const items=getFinanceArticles();
   const state=root.financeArticleListState||=( {query:'',filters:articleFilters(),sort:'tree'} );
-  root.innerHTML=workspaceHeaderContext({title:'Статьи'})+'<div data-finance-article-table></div>';
+  root.innerHTML=workspaceHeaderContext({title:'Статьи'})+'<section><div class="v2-desktop-tool-row"><div class="v2-desktop-tool-context"><span><output data-article-count aria-label="Количество статей" aria-live="polite"></output></span></div></div><div data-finance-article-table></div></section>';
   const [toolbar]=setV2ZHeaderRows(root,[
     '<section data-people-desktop-toolbar><div class="people-desktop-tools">'
     +field({name:'articleSearch',type:'search',placeholder:'Поиск',autocomplete:'off',value:state.query,data:'data-article-search'})
@@ -330,11 +331,13 @@ function renderDesktopArticles(root){
   ],{desktopTitle:'Статьи'});
   const host=root.querySelector('[data-finance-article-table]');
   if(!toolbar||!host)return;
+  const count=root.querySelector('[data-article-count]');
   const search=toolbar.querySelector('[data-article-search]');
   const filter=toolbar.querySelector('[data-article-filter]');
   const sort=toolbar.querySelector('[data-article-sort]');
   const refresh=()=>{
     const rows=visibleArticles(items,state);
+    if(count)count.textContent=String(rows.length);
     filter?.setAttribute('aria-pressed',String(Object.values(state.filters).some(Boolean)));
     sort?.setAttribute('aria-pressed',String(state.sort!=='tree'));
     host.innerHTML=rows.length?articleTable(rows,items):emptyState(items.length?'Статьи не найдены':'Статей пока нет',items.length?'Измените условия поиска или фильтрации.':'Добавьте первую статью кнопкой «+».');

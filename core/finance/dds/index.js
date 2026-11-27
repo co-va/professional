@@ -607,7 +607,7 @@ function renderDDS(root) {
       const ids=new Set(selectedRows.map(row=>row.id));
       openDDSExcel(root, movements, { anchor, exportMovements:movements.filter(item=>ids.has(String(item.operationId))), onImported: () => renderDDS(root) });
     } },
-    canUseCapability('finance.articles.access') ? { label: FINANCE_ARTICLES_ICON, className: 'people-desktop-icon', aria: 'Статьи', run: () => openArticles(root) } : null,
+    canUseCapability('finance.articles.access') ? { label: FINANCE_ARTICLES_ICON, className: 'people-desktop-icon people-desktop-add', aria: 'Статьи', run: () => openArticles(root) } : null,
     financeOperationGroups({ groups: operationGroups }).length ? {
       label: FINANCE_OPERATIONS_ICON, className: 'people-desktop-icon', aria: 'Финансовые операции',
       run: anchor => openFinanceOperations(root, { groups: operationGroups, anchor, onSaved: () => renderDDS(root) }),
