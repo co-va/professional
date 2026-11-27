@@ -17,12 +17,15 @@ try {
   let releaseOperational;
   const operationalReady = new Promise(resolve => { releaseOperational = resolve; });
   // All account calls are synthetic. Never send a real token or mutate Core.
+  const smokeWallets=Array.from({length:6},(_,i)=>({id:'smoke-wallet-'+i,name:'Тестовый кошелёк '+(i+1),photo:''}));
   await page.route('**/*',async r=>{
     const url=new URL(r.request().url());
     if(isApi(url.href)) {
       const body=url.pathname.endsWith('/auth/me')?{account:{id:'preview-smoke',email:'preview@example.invalid'},tenantId:'preview-smoke'}:
         url.pathname.endsWith('/saas-access/me')?{tenantId:'preview-smoke',status:'ACTIVE',commercialMode:'LIVE',capabilities:['profile.access','workplaces.access','journal.day.access','journal.month.access','timetable.access','loyalty.deposit.access','loyalty.personal_account.access','finance.cash.access','finance.income_expense.access'].map(key=>({key,valueType:'BOOLEAN',enabled:true}))}:
-        url.pathname.endsWith('/auxiliary-state/loyalty')?{wallets:[],depositPrograms:Array.from({length:4},(_,i)=>({id:'smoke-program-'+i,name:'Тестовый депозит '+(i+1),amount:10000,amountMode:'fixed',status:'active',termMode:'indefinite'}))}:
+        url.pathname.endsWith('/auxiliary-state/wallets/recover')?{wallets:smokeWallets,recovered:[]}:
+        url.pathname.endsWith('/auxiliary-state/finance')||url.pathname.endsWith('/auxiliary-state')?{wallets:smokeWallets,investments:[],loans:[]}:
+        url.pathname.endsWith('/auxiliary-state/loyalty')?{wallets:smokeWallets,depositPrograms:Array.from({length:4},(_,i)=>({id:'smoke-program-'+i,name:'Тестовый депозит '+(i+1),amount:10000,amountMode:'fixed',status:'active',termMode:'indefinite'}))}:
         url.pathname.endsWith('/loyalty/deposits/smoke-issued-1/settings')?{depositId:'smoke-issued-1',visibleToPersonOverride:r.request().postDataJSON()?.visibleToPerson}:
         url.pathname.endsWith('/loyalty/deposits')?[{depositId:'smoke-issued-1',programId:'smoke-program-0',programName:'Тестовый депозит 1',person:{key:'smoke-person',name:'Тестовый клиент',uei:'T001'},status:'active',balance:10000,fundedAmount:10000,cardSequence:1,fundedAt:'2026-01-01T10:00:00Z',terms:{amount:10000,amountMode:'fixed',termMode:'indefinite'},history:[{operationId:'smoke-funding',kind:'deposit-funding',direction:'in',amount:10000,occurredAt:'2026-01-01T10:00:00Z',recordedAt:'2026-01-02T10:00:00Z',origin:'application',walletName:'Наличные',recordId:'smoke-record'}]},{depositId:'smoke-issued-debt',programId:'smoke-program-0',programName:'Тестовый депозит 1',person:{key:'smoke-debt-person',name:'Долг'},status:'active',balance:20000,fundedAmount:20000,cardSequence:2,fundedAt:'2025-01-01T10:00:00Z',terms:{amount:50000,amountMode:'fixed',termMode:'dated',termStartDate:'2025-01-01',termEndDate:'2099-12-31'},history:[]},{depositId:'smoke-issued-future',programId:'smoke-program-0',programName:'Тестовый депозит 1',person:{key:'smoke-future-person',name:'Будущая карта'},status:'active',balance:20000,fundedAmount:20000,cardSequence:3,fundedAt:'2025-01-01T10:00:00Z',terms:{amount:50000,amountMode:'fixed',termMode:'dated',termStartDate:'2099-01-01',termEndDate:'2099-12-31'},history:[]}]:
         url.pathname.endsWith('/loyalty/personal-accounts')?[{personKey:'smoke-person',hasActivity:true,balance:0,debtTotal:0,movements:[{id:'smoke-event',kind:'funding',amount:100,occurredAt:'2026-01-01T10:00:00Z'}],debts:[]}]:
@@ -96,6 +99,17 @@ try {
   await cashTools.waitFor({timeout:20000});
   assert.equal(await surface.locator('[data-cash-settings]').count(),0,'Desktop Cash has no legacy V');
   assert.equal(await cashTools.locator('button').count(),2,'Exactly two Cash tools');
+  const walletRail=surface.locator('.cash-wallet-rail');
+  const walletPrev=surface.locator('[data-cash-wallet-rail-prev]');
+  const walletNext=surface.locator('[data-cash-wallet-rail-next]');
+  await walletNext.waitFor({state:'visible'});
+  await page.waitForFunction(()=>document.querySelector('[data-cash-wallet-rail-prev]')?.disabled===true && document.querySelector('[data-cash-wallet-rail-next]')?.disabled===false);
+  assert.ok(await walletRail.evaluate(node=>node.scrollWidth>node.clientWidth),'Wallet rail overflows');
+  await walletNext.click();
+  await page.waitForFunction(()=>document.querySelector('.cash-wallet-rail')?.scrollLeft>1);
+  await walletPrev.click();
+  await page.waitForFunction(()=>document.querySelector('.cash-wallet-rail')?.scrollLeft<=1);
+  assert.equal(await walletPrev.isDisabled(),true,'Wallet rail returned to start');
   const cashView=cashTools.locator('[data-cash-desktop-view]');
   const cashOp=cashTools.locator('[data-cash-desktop-operations]');
   assert.equal(await cashView.textContent(),'Вид','Standard text appearance action');

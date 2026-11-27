@@ -32,6 +32,7 @@ import {
 } from '../../../ui/ui.js';
 import { readOnlyReceipt } from '../../../ui/receipt/index.js';
 import { isV2DesktopWorkspace } from '../../../ui/v2/geometry.js';
+import { bindDesktopRailControls } from '../../../ui/v2/horizontal-affordance.js';
 import { canUseCapability } from '../../access.js';
 import { findPersonByAccountId, getPeople } from '../../people/data.js';
 import {
@@ -230,9 +231,9 @@ function renderCashEntityCard(entity, kind) {
   });
 }
 
-function horizontalCards(cards = []) {
+function horizontalCards(cards = [], desktopClass = '') {
   const values = (Array.isArray(cards) ? cards : []).filter(Boolean);
-  return values.length ? entityCardRail(values) : '';
+  return values.length ? entityCardRail(values, { className: desktopClass }) : '';
 }
 
 function allowedInvestmentRoles() {
@@ -461,13 +462,17 @@ function renderList(root) {
   const canUseLoans = canUseCapability('finance.special.access');
   root.innerHTML = page([
     cashContext({ desktop }),
-    canUseWallets ? v2Section('Кошельки', horizontalCards(wallets.map(renderWalletCard))) : '',
-    canUseInvestments ? v2Section('Инвестиции', horizontalCards(investments.map((item) => renderCashEntityCard(item, 'investment')))) : '',
-    canUseLoans ? v2Section('Займ', horizontalCards(loans.map((item) => renderCashEntityCard(item, 'loan')))) : '',
+    canUseWallets ? v2Section('Кошельки', horizontalCards(wallets.map(renderWalletCard), desktop ? 'cash-wallet-rail' : '')) : '',
+    canUseInvestments ? v2Section('Инвестиции', horizontalCards(investments.map((item) => renderCashEntityCard(item, 'investment')), desktop ? 'cash-investment-rail' : '')) : '',
+    canUseLoans ? v2Section('Займ', horizontalCards(loans.map((item) => renderCashEntityCard(item, 'loan')), desktop ? 'cash-loan-rail' : '')) : '',
   ]);
 
-  if (desktop) renderDesktopCashTools(root);
-  else {
+  if (desktop) {
+    renderDesktopCashTools(root);
+    bindDesktopRailControls(root.querySelector('.cash-wallet-rail'), { prefix: 'cash-wallet-rail', label: 'кошелёк' });
+    bindDesktopRailControls(root.querySelector('.cash-investment-rail'), { prefix: 'cash-investment-rail', label: 'инвестиция' });
+    bindDesktopRailControls(root.querySelector('.cash-loan-rail'), { prefix: 'cash-loan-rail', label: 'займ' });
+  } else {
     clearV2ZHeaderRows(root);
     root.querySelector('[data-cash-settings]')?.addEventListener('click', () => openCashSettings(root));
   }
