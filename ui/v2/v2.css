@@ -626,9 +626,19 @@
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z:has([data-people-list-host],[data-wallet-history-host],[data-finance-article-table]) :is([data-v2-workspace-surface],.ui-page,[data-dds-history],section:has(>[data-people-list-host],>[data-wallet-history-host]),[data-people-list-host],[data-wallet-history-host],[data-finance-article-table]){
    display:flex;flex-direction:column;flex:1 1 auto;min-height:0;min-width:0;
  }
+ /* The bounded frame belongs to the table viewport, never to the moving rows.
+    Keep the H bottom inset outside the complete rounded frame. */
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z:has([data-people-list-host],[data-wallet-history-host],[data-finance-article-table])>[data-v2-z-body]{
+   min-height:0;box-sizing:border-box;
+ }
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z :is([data-people-list-host],[data-wallet-history-host],[data-finance-article-table]){
+   overflow:hidden;
+ }
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z section:has(>[data-wallet-history-host])>.v2-desktop-tool-row{flex:0 0 auto}
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z :is([data-people-list-host],[data-wallet-history-host],[data-finance-article-table])>.ui-data-table--compact{
-   flex:0 1 auto;min-height:0;overflow:auto;overscroll-behavior:none;
+   box-sizing:border-box;flex:0 1 auto;min-height:0;min-width:0;max-height:100%;max-width:100%;
+   border:1px solid var(--border);border-radius:14px;background:var(--white);
+   overflow:auto;overscroll-behavior:none;
  }
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z :is([data-people-list-host],[data-wallet-history-host],[data-finance-article-table])>.ui-data-table--compact table{
    border-collapse:separate;border-spacing:0;
