@@ -1254,3 +1254,9 @@
  .v2-app--workspace .desktop-service-groups-q [data-desktop-group-directory-table] tr.is-reorder-target-before>td{box-shadow:inset 0 2px var(--text)}
  .v2-app--workspace .desktop-service-groups-q [data-desktop-group-directory-table] tr.is-reorder-target-after>td{box-shadow:inset 0 -2px var(--text)}
 }
+
+/* Q group directory: one header and two independent section reorder scopes. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace .desktop-service-groups-q [data-desktop-group-directory-table] tr[data-table-group-level="system"]>td{height:30px;padding:4px 12px;background:var(--desktop-table-system-bg);color:var(--desktop-table-system-ink);font-size:12px;font-style:normal;font-weight:750;line-height:20px;cursor:default}
+ .v2-app--workspace .desktop-service-groups-q [data-desktop-group-directory-table] .desktop-group-directory-empty{color:var(--text-secondary);cursor:default}
+}

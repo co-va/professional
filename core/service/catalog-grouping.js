@@ -450,28 +450,60 @@ export function openServiceGroupingQ({ onSaved = () => {}, desktop = false } = {
           {key:'kind',label:'Группа',sortable:false,render:group=>group.kind==='products'?'Товары':'Услуги'},
           {key:'values',label:'Значения',sortable:false,render:group=>String(Array.isArray(group.values)?group.values.length:0)},
         ];
-        content.innerHTML='<div class="desktop-table-popup" data-desktop-group-directory-table>'+dataTable({columns,rows:entries,caption:'Группы',compact:true})+'</div>'+(entries.length?'':emptyState('Групп пока нет'));
-        const body=content.querySelector('tbody');
-        body.classList.add('list-entries');
-        body.querySelectorAll('[data-desktop-group-key]').forEach(handle=>{
-          const row=handle.closest('tr');
-          row.dataset.reorderId=handle.dataset.desktopGroupKey;
-          row.addEventListener('click',event=>{
-            if(busy||event.target.closest?.('[data-reorder-handle]'))return;
-            const group=groupByKey(row.dataset.reorderId);
-            if(group)enter(group);
-          });
-        });
-        dispose=initV2ListReorder(body,{
-          selector:'tr[data-reorder-id]',
-          onReorder:async keys=>{
-            if(busy)throw new Error('Дождитесь завершения сохранения.');
-            busy=true;sync();
-            try{await commitServiceGroupOrder(keys);onSaved();}
-            finally{busy=false;sync();}
-          },
-          onError:fail,
-        });
+        content.innerHTML='<div class="desktop-table-popup" data-desktop-group-directory-table>'+dataTable({columns,rows:entries,caption:'Группы',compact:true})+'</div>';
+        const original=content.querySelector('tbody');
+        const table=original.closest('table');
+        const rowsByKey=new Map([...original.querySelectorAll('[data-desktop-group-key]')].map(handle=>[handle.dataset.desktopGroupKey,handle.closest('tr')]));
+        const disposers=[];
+        for(const [kind,label] of [['procedures','УСЛУГИ'],['products','ТОВАРЫ']]){
+          const groupEntries=entries.filter(group=>group.kind===kind);
+          const heading=document.createElement('tbody');
+          const headingRow=heading.insertRow();
+          headingRow.dataset.tableGroupLevel='system';
+          const headingCell=headingRow.insertCell();
+          headingCell.colSpan=columns.length;
+          headingCell.textContent=label;
+          table.appendChild(heading);
+          const body=document.createElement('tbody');
+          body.className='list-entries';
+          body.dataset.desktopGroupKind=kind;
+          table.appendChild(body);
+          for(const group of groupEntries){
+            const row=rowsByKey.get(group.key);
+            row.dataset.reorderId=group.key;
+            body.appendChild(row);
+            row.addEventListener('click',event=>{
+              if(busy||event.target.closest?.('[data-reorder-handle]'))return;
+              const fresh=groupByKey(row.dataset.reorderId);
+              if(fresh)enter(fresh);
+            });
+          }
+          if(!groupEntries.length){
+            const cell=body.insertRow().insertCell();
+            cell.colSpan=columns.length;
+            cell.className='desktop-group-directory-empty';
+            cell.textContent='Групп пока нет';
+          }
+          disposers.push(initV2ListReorder(body,{
+            selector:'tr[data-reorder-id]',
+            onReorder:async keys=>{
+              if(busy)throw new Error('Дождитесь завершения сохранения.');
+              const fresh=getServiceGroupEntries();
+              const expected=fresh.filter(group=>group.kind===kind).map(group=>group.key);
+              const allowed=new Set(expected);
+              if(keys.length!==expected.length||new Set(keys).size!==expected.length||keys.some(key=>!allowed.has(key)))throw new Error('Список групп изменился. Откройте его повторно.');
+              // Replace only this section's slots; preserve the other section and legacy combined order.
+              let offset=0;
+              const merged=fresh.map(group=>group.kind===kind?keys[offset++]:group.key);
+              busy=true;sync();
+              try{await commitServiceGroupOrder(merged);onSaved();}
+              finally{busy=false;sync();}
+            },
+            onError:fail,
+          }));
+        }
+        original.remove();
+        dispose=()=>disposers.forEach(fn=>fn());
         sync(); return;
       }
       content.innerHTML = '<form class="compact-form" data-desktop-group-form>' +
