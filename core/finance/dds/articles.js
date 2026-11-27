@@ -100,10 +100,10 @@ function row(item) {
 }
 
 function openArticleX(existing = null, onSaved = () => {}, getArticles = getFinanceArticles, desktop = false) {
-  if(existing?.systemKey)return null;
+  if(existing?.systemKey&&(!desktop||existing.direction==='TRANSFER'||existing.economicType==='GROUP'))return null;
   const items = getArticles();
   const isSystem = Boolean(existing?.systemKey);
-  const title = existing ? 'Редактирование статьи' : 'Новая статья';
+  const title = desktop&&existing?'Статья':existing?'Редактирование статьи':'Новая статья';
   const direction = existing?.direction || 'OUT';
   const desktopDirections=[{value:'IN',label:'Приход'},{value:'OUT',label:'Расход'}];
   // Legacy user-created transfer articles remain editable without silently changing their direction.
@@ -116,17 +116,14 @@ function openArticleX(existing = null, onSaved = () => {}, getArticles = getFina
   const economicOptions = ECONOMIC_OPTIONS.some(item=>item.value===economicType)
     ? ECONOMIC_OPTIONS : [...ECONOMIC_OPTIONS,{value:economicType,label:economicLabel(economicType)}];
   const content = `<form class="compact-form" data-finance-article-form novalidate>
-    ${field({label:'Название',name:'articleName',value:existing?.name||'',required:true,placeholder:'Например, Краска'})}
+    ${field({label:'Название',name:'articleName',value:existing?.name||'',required:true,readonly:isSystem,placeholder:'Например, Краска'})}
     ${desktop?select({label:'Направление',name:'direction',value:direction,options:desktopDirections}):select({label:'Группа',name:'parentArticleId',value:existingParent,options:parentOptions(items,existing?.articleId||'')})+select({label:'Направление',name:'direction',value:direction,options:DIRECTION_OPTIONS})}
     ${desktop?'':select({label:'Назначение',name:'economicType',value:economicType,options:economicOptions})}
     ${desktop&&existing&&existing.direction!=='TRANSFER'?'<div class="desktop-group-values"><div class="stock-position-group-heading"><span>Значения</span>'+compactAddButton({data:'data-article-value-add',aria:'Добавить значение'})+'</div><div data-article-value-draft></div><div data-article-values></div></div>':''}
     <div class="form-error" role="alert" data-article-error></div>
-    <div class="modal-actions finance-receipt-actions finance-receipt-actions--dds">
-      ${existing&&!isSystem?button('Удалить',{variant:'danger',data:'data-delete-finance-article'}):''}
-      ${button('Сохранить',{type:'submit',data:'data-finance-article-save',disabled:true})}
-    </div>
+    ${desktop?actionBlock((existing&&!isSystem?button('Удалить',{variant:'danger',data:'data-delete-finance-article'}):'')+button('Сохранить',{type:'submit',data:'data-finance-article-save',disabled:true}),{className:'desktop-group-editor-actions'}):'<div class="modal-actions finance-receipt-actions finance-receipt-actions--dds">'+(existing&&!isSystem?button('Удалить',{variant:'danger',data:'data-delete-finance-article'}):'')+button('Сохранить',{type:'submit',data:'data-finance-article-save',disabled:true})+'</div>'}
   </form>`;
-  const layer=mountModal(document.body,modal(content,{title,variant:'x',surface:'app',className:'modal--form-sheet'}));
+  const layer=mountModal(document.body,modal(content,{title,variant:'x',surface:'app',...(desktop?{xRole:'editor',className:'desktop-service-group-editor-x'}:{className:'modal--form-sheet'})}));
   if(!layer)return null;
   const form=layer.querySelector('[data-finance-article-form]');
   const save=form.querySelector('[data-finance-article-save]');
@@ -143,6 +140,7 @@ function openArticleX(existing = null, onSaved = () => {}, getArticles = getFina
     if(trigger)trigger.disabled=true;
   }
   const read=()=>{
+    if(isSystem)return {name:existing.name,parentArticleId:existingParent,direction,economicType};
     const data=new FormData(form);
     const nextDirection=String(data.get('direction')||'');
     let parentArticleId=String(data.get('parentArticleId')||'');
@@ -159,7 +157,7 @@ function openArticleX(existing = null, onSaved = () => {}, getArticles = getFina
     const duplicate=valueEdit&&currentValues().some(a=>a.articleId!==valueEdit.articleId&&normalized(a.name)===normalized(valueName()));
     const valueChanged=valueEdit&&valueName()&&!duplicate&&(!valueEdit.articleId||valueName()!==valueEdit.name);
     const groupChanged=JSON.stringify(value)!==initial;
-    save.disabled=pending||!value.name||invalid||Boolean(valueEdit&&(!valueChanged||groupChanged))||Boolean(existing&&!valueEdit&&!groupChanged);
+    save.disabled=pending||(isSystem&&!valueEdit)||!value.name||invalid||Boolean(valueEdit&&(!valueChanged||groupChanged))||Boolean(existing&&!valueEdit&&!groupChanged);
     if(remove){remove.disabled=pending;remove.hidden=Boolean(valueEdit);}
     if(plus)plus.disabled=pending||Boolean(valueEdit)||groupChanged;
     valueHost?.querySelectorAll('[data-article-value-delete]').forEach(a=>a.disabled=pending||Boolean(valueEdit)||groupChanged);
@@ -203,6 +201,7 @@ function openArticleX(existing = null, onSaved = () => {}, getArticles = getFina
         if(!result)throw new Error('Сервер не подтвердил сохранение значения.');
         valueEdit=null;drawDraft();onSaved();drawValues();return;
       }
+      if(isSystem)return;
       const payload=read();
       const result=existing?await updateFinanceArticle(existing.articleId,payload):await createFinanceArticle(payload);
       if(!result)throw new Error('Сервер не подтвердил сохранение статьи.');
@@ -303,13 +302,13 @@ function desktopArticleRows(items,state){
       &&(!f.direction||a.direction===f.direction)
       &&(!f.system||f.system===(a.systemKey?'system':'custom'))
       &&(!f.parent||f.parent===(a.parentArticleId?'id:'+a.parentArticleId:'root'));
-  }).map(a=>({...a,childCount:count.get(a.articleId)||0}));
+  }).map(a=>({...a,childCount:desktopArticleValues(articles,a.articleId).length}));
 }
 function renderDesktopArticleTable(host,rows,collapsed,onOpen){
   const columns=[
     {key:'name',label:'Наименование',sortable:false,render:a=>{
       const name=escapeHtml(a.name);
-      const content=a.systemKey?name:button(name,{variant:'secondary',className:'desktop-group-table-name',data:'data-finance-article="'+escapeHtml(a.articleId)+'"',aria:'Редактировать статью '+a.name});
+      const content=a.systemKey&&a.direction==='TRANSFER'?name:button(name,{variant:'secondary',className:'desktop-group-table-name',data:'data-finance-article="'+escapeHtml(a.articleId)+'"',aria:'Открыть статью '+a.name});
       return '<div style="padding-inline-start:'+Math.min(a.depth,5)*12+'px" data-article-row="'+escapeHtml(a.articleId)+'">'+content+'</div>';
     }},
     {key:'type',label:'Тип',sortable:false,render:a=>a.systemKey?'Системная':'Пользовательская'},
@@ -331,7 +330,7 @@ function renderDesktopArticleTable(host,rows,collapsed,onOpen){
       if(collapsed.has(direction))collapsed.delete(direction);else collapsed.add(direction);
       body.hidden=collapsed.has(direction);toggle.setAttribute('aria-expanded',String(!body.hidden));toggle.firstElementChild.textContent=body.hidden?'▸':'▾';
     });
-    for(const a of members){const tr=byId.get(a.articleId);if(!tr)continue;body.append(tr);if(!a.systemKey)tr.addEventListener('click',()=>onOpen(a.articleId));}
+    for(const a of members){const tr=byId.get(a.articleId);if(!tr)continue;body.append(tr);if(!a.systemKey||a.direction!=='TRANSFER')tr.addEventListener('click',()=>onOpen(a.articleId));}
   }
   original.remove();
 }

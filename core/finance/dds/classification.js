@@ -6,7 +6,10 @@ export function desktopAvailableArticles(articles,can){
  const special=can('finance.special.access');
  const raise=can('finance.investment.raise.access'),invest=can('finance.investment.self.access')||can('finance.investment.external.access');
  const allowed={RENT:false,TAX:false,INCOME_ROOT:true,EXPENSE_ROOT:true,SERVICE_REVENUE:journal,PRODUCT_REVENUE:journal,TIPS:journal,REFUND:journal,MATERIALS:can('inventory.stock.access')||can('inventory.order.access'),OTHER_INCOME:false,OTHER_EXPENSE:false,LOAN_RECEIVED:special,LOAN_REPAYMENT:special,TRANSFER:special,INVESTMENT_RECEIVED:raise,INVESTMENT_RETURN:raise,INVESTMENT_INCOME_PAYMENT:raise,INVESTMENT_CAPITAL_RETURN:invest,INVESTMENT_INCOME:invest,INVESTMENT_CONTRIBUTION:invest,INVESTMENT_EXPENSE:invest};
- return articles.filter(a=>!a.archivedAt&&(!a.systemKey||allowed[a.systemKey]===true)).map(a=>({...a,name:desktopArticleName(a)}));
+ const hidden=new Set(articles.filter(a=>a.archivedAt||(a.systemKey&&allowed[a.systemKey]!==true)).map(a=>a.articleId));
+ // Values follow their owning system article's availability, not their own systemKey.
+ for(let changed=true;changed;){changed=false;for(const a of articles)if(hidden.has(a.parentArticleId)&&!hidden.has(a.articleId)){hidden.add(a.articleId);changed=true;}}
+ return articles.filter(a=>!hidden.has(a.articleId)).map(a=>({...a,name:desktopArticleName(a)}));
 }
 export const desktopOperationDirection=d=>({in:'Приход',out:'Расход',transfer:'Транзакция',mixed:'Транзакция'})[d]||'—';
 // Existing historical economic types are authoritative when articleId is absent.
@@ -30,14 +33,13 @@ export function desktopDocumentArticles(entries,catalog){
  return [...found].filter(Boolean).sort((a,b)=>a.localeCompare(b,'ru'));
 }
 
-// A Desktop article is a group; children of user articles are its named values.
-// A child of a hidden or technical article is not silently discarded.
+// A Desktop article is a group; children of accessible non-root articles are named values.
 export function desktopArticleGroups(articles){
- const parents=new Set(articles.filter(a=>!a.systemKey).map(a=>a.articleId));
+ const parents=new Set(articles.filter(a=>a.economicType!=='GROUP'&&!['INCOME_ROOT','EXPENSE_ROOT'].includes(a.systemKey)&&a.direction!=='TRANSFER').map(a=>a.articleId));
  return articles.filter(a=>a.systemKey||!parents.has(a.parentArticleId));
 }
 export function desktopArticleValues(articles,articleId){
  const parent=articles.find(a=>a.articleId===articleId);
- if(!parent||parent.systemKey)return [];
+ if(!parent||parent.economicType==='GROUP'||['INCOME_ROOT','EXPENSE_ROOT'].includes(parent.systemKey)||parent.direction==='TRANSFER')return [];
  return articles.filter(a=>!a.systemKey&&a.parentArticleId===articleId&&a.direction===parent.direction&&!a.archivedAt);
 }
