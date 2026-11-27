@@ -117,7 +117,7 @@ function openArticleX(existing = null, onSaved = () => {}, getArticles = getFina
     ? ECONOMIC_OPTIONS : [...ECONOMIC_OPTIONS,{value:economicType,label:economicLabel(economicType)}];
   const content = `<form class="compact-form" data-finance-article-form novalidate>
     ${field({label:'Название',name:'articleName',value:existing?.name||'',required:true,placeholder:'Например, Краска'})}
-    ${desktop?select({label:'Направление',name:'direction',value:direction,options:desktopDirections})+select({label:'Группа',name:'parentArticleId',value:roots.has(existingParent)?'':existingParent,options:parentChoices}):select({label:'Группа',name:'parentArticleId',value:existingParent,options:parentOptions(items,existing?.articleId||'')})+select({label:'Направление',name:'direction',value:direction,options:DIRECTION_OPTIONS})}
+    ${desktop?select({label:'Направление',name:'direction',value:direction,options:desktopDirections})+(existing?select({label:'Группа',name:'parentArticleId',value:roots.has(existingParent)?'':existingParent,options:parentChoices}):''):select({label:'Группа',name:'parentArticleId',value:existingParent,options:parentOptions(items,existing?.articleId||'')})+select({label:'Направление',name:'direction',value:direction,options:DIRECTION_OPTIONS})}
     ${desktop?'':select({label:'Назначение',name:'economicType',value:economicType,options:economicOptions})}
     <div class="modal-actions finance-receipt-actions finance-receipt-actions--dds">
       ${existing&&!isSystem?button('Удалить',{variant:'danger',data:'data-delete-finance-article'}):''}
