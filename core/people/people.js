@@ -534,7 +534,7 @@ function desktopPeopleTable(root, items, visitIndex) {
     { key:'debt', label:'Задолженность', sortable:false, render:row=>row.debt == null ? '—' : row.debt > 0.009 ? escapeHtml(money(row.debt)) : '' },
     { key: 'firstVisit', label: 'Первое посещение', sortable: false, header: () => '<span>Первое</span><span>посещение</span>', render: row => escapeHtml(row.firstVisit ? formatPersonVisitDate(row.firstVisit) : '') },
     { key: 'lastVisit', label: 'Последнее посещение', sortable:false, header: () => '<span>Последнее</span><span>посещение</span>', render: row => escapeHtml(row.lastVisit ? formatPersonVisitDate(row.lastVisit) : '') },
-    { key:'open',label:'',narrow:true,sortable:false,render:row=>`<button type="button" class="people-table-open" data-person="${escapeHtml(row.key)}" aria-label="Открыть клиента ${escapeHtml(row.name)}"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>` },
+    { key:'edit',label:'',narrow:true,sortable:false,render:row=>button('✎',{variant:'secondary',className:'ui-compact-button people-table-edit',data:'data-people-row-edit="'+escapeHtml(row.key)+'" title="Редактировать"',aria:'Редактировать клиента '+row.name}) },
   ];
   const rows = items.map(person => {
     const display = personDisplay(person);
@@ -606,14 +606,37 @@ function refreshPeopleList(root) {
   const visitIndex = desktop ? (root.peopleVisitIndex ||= buildPersonVisitIndex({ finance:root.peopleFinanceReady === true })) : null;
   const items = visiblePeople(root, visitIndex);
   host.innerHTML = desktop ? desktopPeopleTable(root, items, visitIndex) : listMarkup(items, query);
-  if (desktop) bindDesktopPeopleTable(root, host, items);
-  host.querySelectorAll('[data-person]').forEach((node) => {
-    const target = desktop ? node.closest('tr') || node : node;
-    target.addEventListener('click', (event) => {
-      if (desktop && event.target.closest('[data-table-column="select"]')) return;
-      openPersonOverview(root, node.dataset.person, root.peopleOptions || {});
+  if (desktop) {
+    bindDesktopPeopleTable(root, host, items);
+    host.querySelectorAll('[data-people-row-edit]').forEach(control=>{
+      const row=control.closest('tr');
+      if(!row)return;
+      const key=control.dataset.peopleRowEdit;
+      const open=()=>openPersonOverview(root,key,root.peopleOptions||{});
+      const edit=()=>openPersonEdit(root,key,{onSaved:()=>{
+        root.peopleVisitIndex=null;
+        refreshPeopleList(root);
+      }});
+      const nameCell=row.querySelector('[data-table-column="name"]');
+      if(nameCell){
+        nameCell.tabIndex=0;
+        nameCell.setAttribute('role','button');
+        nameCell.setAttribute('aria-label','Открыть клиента '+(items.find(person=>String(person.key)===key)?.name||''));
+        nameCell.addEventListener('keydown',event=>{
+          if(event.key==='Enter'||event.key===' '){event.preventDefault();open();}
+        });
+      }
+      row.addEventListener('click',event=>{
+        if(event.target.closest('[data-table-column="select"]'))return;
+        if(event.target.closest('[data-table-column="edit"]')){edit();return;}
+        open();
+      });
     });
-  });
+  } else {
+    host.querySelectorAll('[data-person]').forEach(node=>node.addEventListener('click',()=>{
+      openPersonOverview(root,node.dataset.person,root.peopleOptions||{});
+    }));
+  }
 }
 
 function listContext() {
