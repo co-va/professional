@@ -468,20 +468,27 @@
  .v2-app--workspace .v2-journal-desktop-toolbar [data-journal-period-navigation] .ui-compact-button{color:var(--white);border-color:var(--text-secondary)}
  .v2-app--workspace .journal-list-viewport{height:auto;min-height:0;overflow:visible}
 
- .v2-app--workspace [data-dds-history] .ui-data-table--compact :is(th,td)[data-table-column="select"]{width:28px;min-width:28px;padding:0 4px;text-align:center}
  .v2-app--workspace [data-finance-article-table]{max-width:100%;min-width:0}
  .v2-app--workspace [data-finance-article-table] .ui-data-table--compact td{white-space:normal;overflow-wrap:anywhere}
  .v2-app--workspace [data-finance-article-table] .ui-data-table--compact tr{cursor:pointer}
- /* DDS only: keep the amount visible where space permits; preserve scroll on narrower screens. */
+ /* DDS column geometry only. Fixed table layout prevents grouped rows and
+    long source names from redistributing the header. Shared table visuals stay intact. */
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-dds-history]{min-width:0;max-width:100%}
- .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-dds-history] .ui-data-table--compact :is(th,td)[data-table-column="article"]{width:14ch;min-width:90px;white-space:normal;overflow-wrap:anywhere}
- .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-dds-history] .ui-data-table--compact td[data-table-column="title"]{white-space:normal;overflow-wrap:anywhere}
- /* Financial history shares the same two-line workplace heading. Its words
-    must keep their intrinsic width even when DDS money columns grow. */
- .v2-app--workspace [data-wallet-history-host]>.ui-data-table--compact th[data-table-column="workplace"]>div{white-space:nowrap;overflow-wrap:normal;word-break:normal}
- .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-dds-history] .ui-data-table--compact td[data-table-column="workplace"]{white-space:normal;overflow-wrap:normal;word-break:normal}
- .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-dds-history] .ui-data-table--compact td[data-table-column="title"] .people-table-person__phone{white-space:normal;overflow-wrap:anywhere}
- .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-dds-history] .ui-data-table--compact :is(th,td)[data-table-column="amount"]{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-dds-history] .ui-data-table--compact table{table-layout:fixed;width:100%;min-width:810px}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-dds-history] .ui-data-table--compact table:has(th[data-table-column="article"]){min-width:940px}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-dds-history] .ui-data-table--compact :is(th,td)[data-table-column="select"]{box-sizing:border-box;width:36px}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-dds-history] .ui-data-table--compact :is(th,td)[data-table-column="date"]{box-sizing:border-box;width:92px}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-dds-history] .ui-data-table--compact :is(th,td)[data-table-column="title"]{box-sizing:border-box;width:130px}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-dds-history] .ui-data-table--compact :is(th,td)[data-table-column="code"]{box-sizing:border-box;width:70px}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-dds-history] .ui-data-table--compact :is(th,td)[data-table-column="workplace"]{box-sizing:border-box;width:146px}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-dds-history] .ui-data-table--compact :is(th,td)[data-table-column="article"]{box-sizing:border-box;width:130px}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-dds-history] .ui-data-table--compact :is(th,td)[data-table-column="amount"],.v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-dds-history] .ui-data-table--compact :is(th,td)[data-table-column="bonus"]{box-sizing:border-box;width:104px;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-dds-history] .ui-data-table--compact th{overflow-wrap:normal;word-break:normal}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-dds-history] .ui-data-table--compact th[data-table-column="workplace"]>div{white-space:nowrap}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-dds-history] .ui-data-table--compact td:is([data-table-column="title"],[data-table-column="person"],[data-table-column="workplace"],[data-table-column="article"]){white-space:normal;overflow-wrap:normal;word-break:normal}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-dds-history] .ui-data-table--compact td[data-table-column="title"]>button{display:block;width:100%;min-width:0}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-dds-history] .ui-data-table--compact td[data-table-column="title"] .people-table-person__phone{white-space:normal;overflow-wrap:break-word}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-dds-history] .ui-data-table--compact td[data-table-column="person"] .people-table-person__phone{white-space:normal;overflow-wrap:break-word}
  .v2-app--workspace .ui-data-table--compact tr.journal-list-record--active td{background:#EFFFBB}
  .v2-app--workspace .ui-data-table--compact tr.journal-list-record--paid td{background:#DDE8D7}
  .v2-app--workspace .ui-data-table--compact tr.journal-list-record--no-show td,.v2-app--workspace .ui-data-table--compact tr.journal-list-record--cancelled td{background:#F1DADA}
