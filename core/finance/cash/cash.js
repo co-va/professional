@@ -30,7 +30,7 @@ import {
   v2ZLayer,
   workspaceHeaderContext,
 } from '../../../ui/ui.js';
-import { financeDesktop, financeZActions, financeZSave, financeQSubmit, financeHistoryTable, financeTableContact, bindFinanceHistoryTable, openFinanceReceiptX } from '../desktop.js';
+import { financeDesktop, financeZActions, financeZSave, financeQSubmit, financeHistoryTable, financeTableContact, bindFinanceHistoryTable, openFinanceReceiptX, openFinanceDeleteConfirmation } from '../desktop.js';
 import { readOnlyReceipt } from '../../../ui/receipt/index.js';
 import { financeReceipt } from '../receipt.js';
 import { isV2DesktopWorkspace } from '../../../ui/v2/geometry.js';
@@ -1399,24 +1399,22 @@ function openInvestmentEvent(root, entityLayer, entity, eventId) {
     items: event.note ? [{ label: String(event.note), value: '' }] : [],
     totals: [{ label: '', value: formatMoney(event.amount), strong: true }],
   }), [{
-    label: 'Удалить событие', variant: 'danger',
-    run: receipt => openSharedProfileSettingsMenu({
-      title,
-      actions: [{
-        id: 'delete-event', label: 'Удалить событие', variant: 'danger',
-        onSelect: () => {
-          const current = financeEntityById('investment', entity.id) || entity;
-          saveInvestmentEntity({
-            ...current,
-            investmentEvents: (Array.isArray(current.investmentEvents) ? current.investmentEvents : [])
-              .filter((item) => String(item?.id || '') !== String(event.id || '')),
-            updatedAt: new Date().toISOString(),
-          });
-          receipt.v2Close?.();
-          renderFinanceEntityLayer(root, entityLayer, 'investment', entity.id);
-          renderList(root);
-        },
-      }],
+    label: 'Удалить', variant: 'danger',
+    run: receipt => openFinanceDeleteConfirmation(receipt, {
+      message: 'Событие инвестиции будет удалено из истории. Вы уверены?',
+      onConfirm: () => {
+        const current = financeEntityById('investment', entity.id) || entity;
+        return saveInvestmentEntity({
+          ...current,
+          investmentEvents: (Array.isArray(current.investmentEvents) ? current.investmentEvents : [])
+            .filter((item) => String(item?.id || '') !== String(event.id || '')),
+          updatedAt: new Date().toISOString(),
+        });
+      },
+      onSuccess: () => {
+        renderFinanceEntityLayer(root, entityLayer, 'investment', entity.id);
+        renderList(root);
+      },
     }),
   }]);
 }
@@ -1426,24 +1424,16 @@ function openFinanceEntityOperation(root, entityLayer, type, entity, operationId
     .find((item) => String(item?.operationId || '') === String(operationId || ''));
   if (!operation) return null;
   return openFinanceReceiptX(entityLayer, operationName(operation), operationReceipt(operation), [{
-    label: 'Удалить операцию', variant: 'danger',
-    run: receipt => openSharedProfileSettingsMenu({
-      title: operationName(operation),
-      actions: [{
-        id: 'delete-operation', label: 'Удалить операцию', variant: 'danger',
-        onSelect: async () => {
-          try {
-            await cancelFinanceOperation(operation.operationId, {
-              reason: 'incorrect-entry', occurredAt: new Date(),
-            });
-            receipt.v2Close?.();
-            renderFinanceEntityLayer(root, entityLayer, type, entity.id);
-            renderList(root);
-          } catch (error) {
-            openNotice({ message: String(error?.message || 'Не удалось удалить операцию') });
-          }
-        },
-      }],
+    label: 'Удалить', variant: 'danger',
+    run: receipt => openFinanceDeleteConfirmation(receipt, {
+      message: 'Финансовая операция будет аннулирована. Исходная операция останется в истории, а её движение будет сторнировано. Вы уверены?',
+      onConfirm: () => cancelFinanceOperation(operation.operationId, {
+        reason: 'incorrect-entry', occurredAt: new Date(),
+      }),
+      onSuccess: () => {
+        renderFinanceEntityLayer(root, entityLayer, type, entity.id);
+        renderList(root);
+      },
     }),
   }]);
 }
@@ -1562,31 +1552,19 @@ function openWalletOperation(root, walletLayer, wallet, operationId) {
     .find((item) => String(item.operationId) === String(operationId));
   if (!operation) return null;
   return openFinanceReceiptX(walletLayer, operationName(operation), operationReceipt(operation, wallet), [{
-    label: 'Удалить операцию', variant: 'danger',
+    label: 'Удалить', variant: 'danger',
     run: receipt => openOperationSettings(root, walletLayer, receipt, wallet, operation),
   }]);
 }
 
 function openOperationSettings(root, walletLayer, operationLayer, wallet, operation) {
-  return openSharedProfileSettingsMenu({
-    title: operationName(operation),
-    actions: [{
-      id: 'delete-operation',
-      label: 'Удалить операцию',
-      variant: 'danger',
-      onSelect: async () => {
-        try {
-          await cancelFinanceOperation(operation.operationId, {
-            reason: 'incorrect-entry',
-            occurredAt: new Date(),
-          });
-          operationLayer.v2Close?.();
-          renderWalletLayer(root, walletLayer, wallet.id);
-        } catch (error) {
-          openNotice({ message: String(error?.message || 'Не удалось удалить операцию') });
-        }
-      },
-    }],
+  return openFinanceDeleteConfirmation(operationLayer, {
+    message: 'Счёт будет аннулирован. Исходная операция останется в истории, а её финансовое движение будет сторнировано. Вы уверены?',
+    onConfirm: () => cancelFinanceOperation(operation.operationId, {
+      reason: 'incorrect-entry',
+      occurredAt: new Date(),
+    }),
+    onSuccess: () => renderWalletLayer(root, walletLayer, wallet.id),
   });
 }
 

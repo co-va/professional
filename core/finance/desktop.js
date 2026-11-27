@@ -1,4 +1,4 @@
-import { button, dataTable, escapeHtml, modal, mountModal, setV2ZHeaderRows } from '../../ui/ui.js';
+import { button, dataTable, escapeHtml, modal, mountModal, openNotice, setV2ZHeaderRows } from '../../ui/ui.js';
 import { isV2DesktopWorkspace } from '../../ui/v2/geometry.js';
 import { moveDesktopQTool } from '../../ui/v2/z-layout.js';
 import { formatPhone } from '../phone/index.js';
@@ -93,19 +93,55 @@ export function bindFinanceHistoryTable(root, open) {
 export function openFinanceReceiptX(root, title, receipt, actions = []) {
   const desktop = financeDesktop(root);
   const available = actions.filter(Boolean);
-  const singleDelete = desktop && available.length === 1 && /^(?:danger|critical)$/.test(available[0].variant || '');
   const tools = available.map((item, index) => button(item.label, {
     variant: item.variant || 'secondary',
     data: 'data-finance-receipt-action="' + index + '"',
     aria: item.aria || '',
-  })).join('') + (singleDelete ? button('Отмена', { variant: 'secondary', className: 'finance-receipt-close', data: 'data-finance-receipt-close' }) : '');
-  const footerClass = desktop ? 'modal-actions finance-receipt-actions' + (singleDelete ? ' finance-receipt-actions--pair' : '') : 'modal-actions';
+  })).join('');
+  const footerClass = desktop ? 'modal-actions finance-receipt-actions' : 'modal-actions';
   const layer = mountModal(root, modal(receipt + (tools ? '<div class="' + footerClass + '">' + tools + '</div>' : ''), { title, variant: 'x', surface: 'app' }));
   if (!layer) return null;
-  layer.querySelector('[data-finance-receipt-close]')?.addEventListener('click', () => layer.v2Close?.());
   layer.querySelectorAll('[data-finance-receipt-action]').forEach(control => {
     const action = available[Number(control.dataset.financeReceiptAction)];
     control.addEventListener('click', () => action.run(layer));
   });
   return layer;
+}
+
+
+// Reuse the canonical X deletion-confirmation contract. The document remains
+// open until an explicit, successful confirmation; dismissing X is harmless.
+export function openFinanceDeleteConfirmation(receipt, { message, onConfirm, onSuccess }) {
+  const title = 'Удалить?';
+  const content = `<div class="modal-title"><h2>${title}</h2><p>${escapeHtml(message)}</p></div>
+    <div class="modal-actions">
+      ${button('Отмена', { variant: 'secondary', data: 'data-finance-delete-close' })}
+      ${button('Удалить', { variant: 'danger', data: 'data-finance-delete-confirm' })}
+    </div>`;
+  const confirmation = mountModal(receipt, modal(content, { title, variant: 'x', surface: 'app' }));
+  if (!confirmation) return null;
+  const cancel = confirmation.querySelector('[data-finance-delete-close]');
+  const confirm = confirmation.querySelector('[data-finance-delete-confirm]');
+  let pending = false;
+  cancel?.addEventListener('click', () => { if (!pending) confirmation.v2Close?.(); });
+  confirm?.addEventListener('click', async () => {
+    if (pending) return;
+    pending = true;
+    confirm.disabled = true;
+    if (cancel) cancel.disabled = true;
+    try {
+      const result = await onConfirm();
+      if (result === false || result === null) throw new Error('Не удалось удалить');
+      confirmation.v2Close?.();
+      receipt.v2Close?.();
+      onSuccess?.();
+    } catch (error) {
+      openNotice({ message: String(error?.message || 'Не удалось удалить') });
+    } finally {
+      pending = false;
+      confirm.disabled = false;
+      if (cancel) cancel.disabled = false;
+    }
+  });
+  return confirmation;
 }

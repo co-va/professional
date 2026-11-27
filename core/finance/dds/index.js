@@ -427,7 +427,7 @@ function openFinanceOperation(root, movements, operationId) {
   return openFinanceReceiptX(root, operationName(first), receipt, [
     active ? { label: 'Корректировка', run: layer => openOperationCorrection(root, layer, entries) } : null,
     active ? { label: 'Отменить операцию', variant: 'danger', run: layer => openCancelOperation(root, layer, entries) } : null,
-    { label: 'Удалить операцию', variant: 'critical', run: layer => openDeleteOperation(root, layer, entries) },
+    { label: 'Удалить', variant: 'critical', run: layer => openDeleteOperation(root, layer, entries) },
   ]);
 }
 

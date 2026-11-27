@@ -780,7 +780,7 @@
 /* All deletion confirmations: safe action first, destructive action second.
    Keep the Mobile sheet geometry; Desktop confirmations are centered on a
    dimmed H backdrop, not anchored popups. Technical viewers and Q unchanged. */
-[data-v2-delete-confirmation] .modal-actions>.v2-confirmation-safe{background:var(--text);border-color:var(--text);color:var(--white)}
+[data-v2-delete-confirmation] .modal-actions>.v2-confirmation-safe{background:var(--v2-base);border-color:var(--v2-base);color:var(--white)}
 [data-v2-delete-confirmation] .modal-actions>.v2-confirmation-destructive{background:var(--ui-delete-background);border-color:var(--ui-delete-foreground);color:var(--ui-delete-foreground)}
 [data-v2-delete-confirmation] .modal-actions>.v2-confirmation-destructive:disabled{background:var(--ui-delete-background);border-color:var(--ui-delete-foreground);color:var(--ui-delete-foreground);opacity:.55}
 @media (min-width:768px) and (min-height:600px){
