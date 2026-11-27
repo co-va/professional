@@ -18,7 +18,7 @@ function clone(value) {
 }
 
 function emptyState() {
-  return { version: VERSION, articles: [], settlements: [], operations: [], ledger: [] };
+  return { version: VERSION, articles: [], articleCatalog: null, settlements: [], operations: [], ledger: [] };
 }
 
 function normalizeSettlementSnapshot(value = null) {
@@ -73,6 +73,7 @@ function normalizeLedgerEntry(row = {}) {
     relatedOperationId: String(row?.relatedOperationId || ''),
     articleId: String(row?.articleId || ''),
     articleName: String(row?.articleName || ''),
+    ...(Object.hasOwn(row,'articleClass')?{articleClass:clone(row.articleClass)}:{}),
     lineName: String(row?.lineName || ''),
     quantity: row?.quantity == null ? null : numberValue(row.quantity),
     unitPrice: row?.unitPrice == null ? null : Math.max(0, numberValue(row.unitPrice)),
@@ -84,6 +85,7 @@ function normalizedState(value) {
   if (!value || typeof value !== 'object') return null;
   return {
     version: VERSION,
+    articleCatalog: Array.isArray(value.articleCatalog)?clone(value.articleCatalog):null,
     articles: (Array.isArray(value.articles) ? value.articles : []).map((row) => ({
       articleId: String(row?.articleId || ''),
       parentArticleId: String(row?.parentArticleId || ''),
@@ -139,6 +141,9 @@ export function getStoredSettlement(type, id) {
   const row = financeState.settlements.find((item) => sourceKey(item?.source) === key);
   return row?.settlement ? clone(row.settlement) : null;
 }
+
+// Null means the old Core release is still serving the compatibility API.
+export function getFinanceArticleCatalog() { return clone(financeState.articleCatalog); }
 
 export function getFinanceArticles() {
   return clone(financeState.articles || []);

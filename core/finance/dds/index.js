@@ -34,7 +34,7 @@ import { DATA_EXCHANGE_ICON, FINANCE_OPERATIONS_ICON, GROUP_ICON, TRASH_ICON } f
 import { financeOperationGroups, openFinanceOperations } from '../operations/index.js';
 import { canUseCapability } from '../../access.js';
 import { getAllPeople } from '../../people/data.js';
-import { getFinanceOperation, getFinanceArticles, readFinanceState } from '../data.js';
+import { getFinanceOperation, getFinanceArticles, getFinanceArticleCatalog, readFinanceState } from '../data.js';
 import { desktopDocumentArticles, desktopOperationDirection, depositArticleLabel, isDepositCashDocument } from './classification.js';
 import { getWallets } from '../cash/data.js';
 import { financeLocalDateValue, financeOccurredAtForDate } from '../date.js';
@@ -42,6 +42,7 @@ import { cancelFinanceOperation, correctFinanceOperation, hardDeleteFinanceOpera
 import { getLedgerEntries } from '../read.js';
 import { desktopDocuments } from './documents.js';
 import { ddsRegistryParts } from './registry-parts.js';
+import { articleCellText } from './article-view.js';
 import { openFinanceArticlesQ } from './articles.js';
 import { openIncomeExpenseQ, renderIncomeExpenseOperation } from './income-expense.js';
 import { SPECIAL_FINANCE_ACTIONS, renderSpecialFinanceOperation } from './special-operations.js';
@@ -574,9 +575,9 @@ function openDDSSettings(root, movements, registryRows=null) {
 function renderDDS(root) {
   const movements = [...getLedgerEntries()].reverse();
   const groupedOperations = operationGroupsFromLedger(movements);
-  const people = financeDesktop(root) ? getAllPeople() : [];
+  const people = getAllPeople();
   const desktop = financeDesktop(root);
-  const catalog=getFinanceArticles();
+  const catalog=getFinanceArticles(),canonical=getFinanceArticleCatalog();
   const documents=desktopDocuments(readFinanceState().operations,movements);
   const byId=new Map(documents.map(doc=>[doc.id,doc]));
   const rows = documents.map(({entries,first,facts}) => {
@@ -601,28 +602,33 @@ function renderDDS(root) {
       direction, status:first.operationStatus==='cancelled'?'Отменена':'Активна',
       value:facts?(facts.cash||facts.principal||facts.personal||0):(direction==='out'?-operationTotal(entries):operationTotal(entries)), amount, bonus, bonusValue:facts?.bonus??0, item:first };
   });
-  const registryRows=rows.map(row=>{
+  const legacyRegistryRows=rows.map(row=>{
     const doc=byId.get(row.id),f=doc.facts;
     const sum=direction=>doc.entries.filter(e=>e.direction===direction).reduce((n,e)=>n+Math.round(Number(e.amount||0)*100),0)/100;
     return {...row,cashIn:f?.cashUnknown?null:sum('IN'),cashOut:f?.cashUnknown?null:sum('OUT'),depositPrincipal:f?.principal??null,personal:f?.personal??null,bonus:f?.bonus??null,depositNet:f?.depositNet??null,grossAmount:f?.discount?.grossAmount??null,benefitGranted:f?.discountUnknown?null:f?.conditionalGranted??null,benefitReversed:f?.discountUnknown?null:f?.conditionalReversed??null,benefitWrittenOff:f?.conditionalWrittenOff??null,bonusUsed:f?.bonusUnknown?null:f?.bonusUsed??null,bonusRestored:f?.bonusUnknown?null:f?.bonusRestored??null,documentAmount:operationTotal(doc.entries.length?doc.entries:[doc.first]),uncertainty:[...(f?.cashUnknown?['Кошелёк не определён']:[]),...(f?.principal===null?['Денежная часть не определена']:[]),...(f?.bonus===null?['Бонусная часть не определена']:[])].join('; ')};
   });
   // Article rows share the original document ID; receipts and export remain document-based.
-  const desktopRows=desktop?documents.flatMap((document,n)=>{
+  const desktopRows=documents.flatMap((document,n)=>{
     const base=rows[n];
-    return ddsRegistryParts(document,catalog).map(part=>{
+    return ddsRegistryParts(document,catalog,canonical).map(part=>{
       const title=desktopOperationDirection(part.direction);
-      const bonus=part.bonus==null||part.bonus===0?'':(part.bonus>0?'+':'−')+new Intl.NumberFormat('ru-RU',{maximumFractionDigits:2}).format(Math.abs(part.bonus));
-      return {...base,id:part.id,documentId:part.documentId,articleId:part.articleId,article:part.article,articles:part.article?[part.article]:[],
+      const bonus=part.bonus==null?'':part.bonus===0?(Array.isArray(canonical)?'0':''):(part.bonus>0?'+':'−')+new Intl.NumberFormat('ru-RU',{maximumFractionDigits:2}).format(Math.abs(part.bonus));
+      return {...base,id:part.id,documentId:part.documentId,articleId:part.articleId,article:part.article,articleValue:part.articleValue||'',articleValueId:part.articleValueId||'',articles:part.article?[part.article]:[],canonicalArticle:Array.isArray(canonical),part,
         direction:part.direction,title,displayTitle:base.status==='Отменена'?title+' · Отменена':title,
         wallet:part.direction==='transfer'?part.sources.join(' → '):part.sources.join(' + '),wallets:part.sources,
         amount:part.money==null||part.money===0?'':formatMoney(part.money,{signed:part.direction!=='transfer'}),
         value:part.money??0,bonus,bonusValue:part.bonus??0};
     });
-  }):[];
+  });
+  const registryRows=Array.isArray(canonical)?desktopRows.map((row,n)=>{
+    const part=row.part,doc=byId.get(row.documentId),f=doc.facts;
+    const first=desktopRows.findIndex(r=>r.documentId===row.documentId)===n;
+    return {...row,id:row.documentId,article:articleCellText(row.article,row.articleValue),...part.meta,bonus:part.bonus??null,documentAmount:first?operationTotal(doc.entries.length?doc.entries:[doc.first]):null,uncertainty:[...(!row.articleId?['Статья не установлена']:[]),...(part.money===null?['Денежная часть не определена']:[]),...(part.bonus===null?['Бонусная часть не определена']:[])].join('; ')};
+  }):legacyRegistryRows;
   const desktopRowById=new Map(desktopRows.map(row=>[row.id,row]));
-  const mobileRows=[...rows].sort((a,b)=>String(b.occurredAt).localeCompare(String(a.occurredAt))||a.id.localeCompare(b.id));
+  const mobileRows=[...(Array.isArray(canonical)?desktopRows:rows)].sort((a,b)=>String(b.occurredAt).localeCompare(String(a.occurredAt))||a.id.localeCompare(b.id));
   const operations = desktop ? '<div data-dds-history>'+walletHistoryBody(true)+'</div>'
-    : mobileRows.length ? v2ListEntries(mobileRows.map(row=>v2ListEntry({title:row.article||row.displayTitle,subtitle:[row.displayTitle,row.person,row.wallet].filter(Boolean).join(' · '),rightTop:row.amount,rightBottom:[row.date,row.bonus&&row.bonus!=='—'?'Бонусы: '+row.bonus:''].filter(Boolean).join(' · '),interactive:true,initial:'',data:'data-finance-operation="'+row.id+'"',aria:'Открыть финансовый документ'}))) : emptyState('Все операции','Финансовых операций пока нет.');
+    : mobileRows.length ? v2ListEntries(mobileRows.map(row=>v2ListEntry({title:row.article||row.displayTitle,subtitle:[row.articleValue,row.displayTitle,row.person,row.wallet].filter(Boolean).join(' · '),rightTop:row.amount,rightBottom:[row.date,row.bonus&&row.bonus!=='—'?'Бонусы: '+row.bonus:''].filter(Boolean).join(' · '),interactive:true,initial:'',data:'data-finance-operation="'+(row.documentId||row.id)+'"',aria:'Открыть финансовый документ'}))) : emptyState('Все операции','Финансовых операций пока нет.');
   const settingsItems = availableDDSSettings();
   const operationGroups = ['income-expense', 'transfer'];
   const headerContext = workspaceHeaderContext({

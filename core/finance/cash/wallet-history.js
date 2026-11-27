@@ -5,8 +5,10 @@ import {
 import { checkControl } from '../../../ui/selection/check-list.js';
 import { DATA_EXPORT_ICON } from '../../../ui/buttons/index.js';
 import { financeHistoryTable, financeTableContact } from '../desktop.js';
-import { getFinanceOperation, getFinanceArticles } from '../data.js';
+import { getFinanceOperation, getFinanceArticles, getFinanceArticleCatalog } from '../data.js';
 import { desktopDocumentArticles, desktopOperationDirection } from '../dds/classification.js';
+import { ddsRegistryParts } from '../dds/registry-parts.js';
+import { articleCellText } from '../dds/article-view.js';
 import { exportScopedWorkbook, reportExcelError } from '../../excel/scoped.js';
 
 const SORTS = [
@@ -41,14 +43,14 @@ export function walletOperationClassification(item, catalog = getFinanceArticles
   return { direction, title:desktopOperationDirection(direction), articles, article:articles.join(', ') };
 }
 
-export function walletHistoryRows(operations, people, { operationName, operationMoment, catalog = getFinanceArticles() }) {
-  return operations.map(item => {
+export function walletHistoryRows(operations, people, { operationName, operationMoment, catalog = getFinanceArticles(), canonical = getFinanceArticleCatalog() }) {
+  return operations.flatMap(item => {
     const value = Number(item.total)||0;
     const occurredAt = String(item.occurredAt||'');
     const contact=financeTableContact(item,people);
-    return { id:String(item.operationId), date:operationMoment(item), occurredAt, localDate:localDate(occurredAt),
-      ...walletOperationClassification(item,catalog), operationLabel:operationName(item), ...contact, personFilter:[contact.code,contact.person].filter(Boolean).join(' · '),
-      workplace:String(item.workplace||''), amount:money(value), value, item };
+    const base={ id:String(item.operationId), documentId:String(item.operationId), date:operationMoment(item), occurredAt, localDate:localDate(occurredAt), operationLabel:operationName(item), ...contact, personFilter:[contact.code,contact.person].filter(Boolean).join(' · '),workplace:String(item.workplace||''),item };
+    if(!Array.isArray(canonical))return [{...base,...walletOperationClassification(item,catalog),amount:money(value),value}];
+    return ddsRegistryParts({id:base.id,entries:item.entries?.length?item.entries:[item],first:item},catalog,canonical,{walletOnly:true}).map(part=>({...base,id:part.id,articleId:part.articleId,article:part.article,articleValue:part.articleValue,articles:part.article?[part.article]:[],canonicalArticle:true,direction:part.direction,title:desktopOperationDirection(part.direction),amount:part.money===null?'':money(part.money),value:part.money??0}));
   });
 }
 
@@ -59,7 +61,7 @@ export function visibleWalletRows(rows, query='', filters=emptyFilters(), sort='
   const items = rows.filter(row => {
     const fullDate = row.localDate ? row.localDate.split('-').reverse().join('.') : '';
     const haystack=clean([row.date,row.localDate,fullDate,row.title,row.code,row.person,row.contact,row.workplace,row.amount,
-      row.operationLabel,row.item?.sourceDetails,row.item?.articleName,row.item?.note,row.id,row.wallet,row.article,row.status,row.bonus].join(' '));
+      row.operationLabel,row.item?.sourceDetails,row.item?.articleName,row.item?.note,row.id,row.documentId,row.wallet,row.article,row.articleValue,row.status,row.bonus].join(' '));
     if (!words.every(word=>haystack.includes(word) || (/^[+\d().-]+$/.test(word)&&numeric(word)&&
       [row.contact,row.date,fullDate,row.amount].map(numeric).some(value=>value.includes(numeric(word)))))) return false;
     return (!filters.title||row.title===filters.title)&&(!filters.workplace||row.workplace===filters.workplace)
@@ -92,16 +94,16 @@ export function walletSelection(rows, selected) {
 export function walletExportRows(rows, wallet, lookup=getFinanceOperation) {
   return rows.map(row=>{
     const item=row.item||{};
-    const data=lookup(row.id)?.data||{};
+    const data=lookup(row.documentId||row.id)?.data||{};
     const quote=data.sourceQuote||{};
     const discount=quote.discountPercent!=null?String(quote.discountPercent)+'%':quote.discountMoney!=null?String(quote.discountMoney):'';
     const date=row.localDate||'';
     return {
-      operationId:row.id, workplace:row.workplace, invoiceDate:String(quote.invoiceDate||date).slice(0,10),
+      operationId:row.documentId||row.id, workplace:row.workplace, invoiceDate:String(quote.invoiceDate||date).slice(0,10),
       invoiceTime:String(quote.invoiceTime||row.date.split(' ')[1]||''),
       participantCode:row.code, participant:row.person, phone:row.contact,
-      documentNumber:String(quote.documentNumber||data.documentNumber||row.id),
-      purpose:row.operationLabel||row.article||row.title, subject:String(quote.subject||data.subject||item.sourceDetails||item.articleName||data.financeEntityName||''),
+      documentNumber:String(quote.documentNumber||data.documentNumber||row.documentId||row.id),
+      purpose:row.canonicalArticle?articleCellText(row.article,row.articleValue):row.operationLabel||row.article||row.title, subject:String(quote.subject||data.subject||item.sourceDetails||item.articleName||data.financeEntityName||''),
       direction:row.value<0?'Расход':'Приход', price:quote.price==null?'':Number(quote.price), discount,
       quotedTotal:quote.quotedTotal==null?'':Number(quote.quotedTotal),
       amount:Math.abs(row.value), paymentDate:date, wallet:String(wallet.name||''),
@@ -231,6 +233,7 @@ export function bindWalletHistory(layer,wallet,rows,{open,settings,dds=false,act
     const previousViewport=dds?host.querySelector('.ui-data-table--compact'):null;
     if(previousViewport){state.scrollLeft=previousViewport.scrollLeft;state.scrollTop=previousViewport.scrollTop;}
     const grouped=dds&&['articleAsc','articleDesc'].includes(state.sort);
+    const canonical=rows.some(row=>row.canonicalArticle);
     visible=visibleWalletRows(rows,state.query,state.filters,state.sort);
     // Selection always refers to the current visible table, never hidden rows.
     const ids=new Set(visible.map(row=>row.id));
@@ -240,7 +243,7 @@ export function bindWalletHistory(layer,wallet,rows,{open,settings,dds=false,act
     host.innerHTML=visible.length?financeHistoryTable(visible,dds?'Все операции':'Операции кошелька',[
       {key:'select',label:'',narrow:true,header:()=>check('data-wallet-select-all','Выбрать все видимые операции',visible.every(row=>state.selected.has(row.id))),render:row=>check('data-wallet-select="'+escapeHtml(row.id)+'"','Выбрать операцию '+row.title,state.selected.has(row.id))},
       {key:'date',label:'Дата',narrow:true},{key:'title',label:'Операция',...(dds?{secondaryKey:'wallet',secondaryLabel:'Источник'}:{})},{key:'code',label:'Код',narrow:true},
-      {key:'person',label:'Клиент / контрагент'},{key:'workplace',label:'Рабочее пространство'},...(!grouped?[{key:'article',label:'Статья'}]:[]),{key:'amount',label:'Сумма',narrow:true},...(dds?[{key:'bonus',label:'Бонусы',narrow:true}]:[]),
+      {key:'person',label:'Клиент / контрагент'},{key:'workplace',label:'Рабочее пространство'},...(!grouped||canonical?[{key:'article',label:'Статья',articleValue:canonical}]:[]),{key:'amount',label:'Сумма',narrow:true},...(dds?[{key:'bonus',label:'Бонусы',narrow:true}]:[]),
     ]):emptyState(rows.length?'Операции не найдены':'Операций пока нет',rows.length?'Измените условия поиска или фильтрации.':(dds?'Финансовые операции появятся здесь.':'Движения по этой кассе появятся здесь.'));
     if(grouped&&visible.length)applyDDSHierarchy(host,visible,state.collapsed);
     if(dds){const viewport=host.querySelector('.ui-data-table--compact');if(viewport){viewport.scrollLeft=state.scrollLeft||0;viewport.scrollTop=state.scrollTop||0;}}
@@ -255,7 +258,8 @@ export function bindWalletHistory(layer,wallet,rows,{open,settings,dds=false,act
     host.querySelectorAll('[data-finance-history-row]').forEach(control=>{
       (control.closest('tr')||control).addEventListener('click',event=>{
         if(event.target.closest('[data-table-column="select"]'))return;
-        open(control.dataset.financeHistoryRow);
+        const row=visible.find(r=>r.id===control.dataset.financeHistoryRow);
+        open(dds?control.dataset.financeHistoryRow:(row?.documentId||control.dataset.financeHistoryRow));
       });
     });
     sync();

@@ -137,18 +137,18 @@ function walletOperations(walletId) {
     .sort((a, b) => String(b?.occurredAt || '').localeCompare(String(a?.occurredAt || '')));
 }
 
-function renderOperationRow(operation) {
+function renderOperationRow(operation, articleRow=null) {
   const name = personName(operation);
   const counterparty = String(operation?.counterparty || '').trim();
   const workplace = String(operation?.workplace || '').trim();
-  const classification = walletOperationClassification(operation);
+  const classification = articleRow || walletOperationClassification(operation);
   const label = classification.article || classification.title;
-  const source = [classification.article ? classification.title : '', name || counterparty, workplace].filter(Boolean).join(' · ');
+  const source = [classification.articleValue,classification.article ? classification.title : '', name || counterparty, workplace].filter(Boolean).join(' · ');
   return v2ListEntry({
     overline: String(operation?.person?.uei || ''),
     title: label,
     subtitle: source,
-    rightTop: formatMoney(operation.total),
+    rightTop: articleRow ? articleRow.amount : formatMoney(operation.total),
     rightBottom: operationMoment(operation),
     initial: '',
     interactive: true,
@@ -1454,14 +1454,15 @@ function renderWalletLayer(root, layer, walletId) {
   }
   const operations = walletOperations(wallet.id);
   const desktop = financeDesktop(layer);
+  const history=walletHistoryRows(operations,getAllPeople(),{operationName,operationMoment});
   layer.innerHTML = page([
     walletContext(wallet, wallet.name, desktop),
     desktop ? walletHistoryBody() : operations.length
-      ? v2ListEntries(operations.map(renderOperationRow))
+      ? v2ListEntries(history.map(row=>renderOperationRow(row.item,row.canonicalArticle?row:null)))
       : emptyState('Операций пока нет', 'Движения по этой кассе появятся здесь.'),
   ]);
   if (desktop) {
-    bindWalletHistory(layer, wallet, walletHistoryRows(operations, getAllPeople(), { operationName, operationMoment }), {
+    bindWalletHistory(layer, wallet, history, {
       open: id => openWalletOperation(root, layer, wallet, id),
       settings: wallet.system ? null : () => void openWalletSettings(root, layer, wallet),
     });
