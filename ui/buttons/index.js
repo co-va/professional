@@ -6,6 +6,9 @@ export const DATA_EXCHANGE_ICON = '<svg viewBox="0 0 24 24" width="20" height="2
 // Existing Excel export symbol shared by the export menu and direct export.
 export const DATA_EXPORT_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V3m-5 5 5-5 5 5M4 16v4h16v-4"/></svg>';
 
+// Financial operations (income/expense), identical in Cash and DDS.
+export const FINANCE_OPERATIONS_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="2"/><path d="M7.5 9v6M4.5 12h6M14 12h5"/></svg>';
+
 // Full-size destructive tool icon; keep Compact remove (×) unchanged.
 export const TRASH_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></svg>';
 

@@ -33,6 +33,7 @@ import {
 import { financeDesktop, financeZActions, financeZSave, financeQSubmit, financeHistoryTable, financeTableContact, bindFinanceHistoryTable, openFinanceReceiptX, openFinanceDeleteConfirmation } from '../desktop.js';
 import { readOnlyReceipt } from '../../../ui/receipt/index.js';
 import { financeReceipt } from '../receipt.js';
+import { FINANCE_OPERATIONS_ICON } from '../../../ui/buttons/index.js';
 import { walletHistoryRows, walletHistoryBody, bindWalletHistory } from './wallet-history.js';
 import { isV2DesktopWorkspace } from '../../../ui/v2/geometry.js';
 import { bindDesktopRailControls } from '../../../ui/v2/horizontal-affordance.js';
@@ -439,13 +440,11 @@ function openCashSettings(root) {
   });
 }
 
-function financeOperationsIcon() {
-  return '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="2"/><path d="M7.5 9v6M4.5 12h6M14 12h5"/></svg>';
-}
+
 
 function renderDesktopCashTools(root) {
   const groups = ['income-expense', 'transfer'];
-  const operationsIcon = financeOperationsIcon();
+  const operationsIcon = FINANCE_OPERATIONS_ICON;
   const tools = [
     cashAppearanceTypeOptions().length ? button('Вид', { variant: 'secondary', data: 'data-cash-desktop-view', aria: 'Вид' }) : '',
     financeOperationGroups({ groups }).length ? button(operationsIcon, { variant: 'secondary', className: 'v2-desktop-tool-icon', data: 'data-cash-desktop-operations title="Финансовые операции"', aria: 'Финансовые операции' }) : '',
@@ -712,7 +711,7 @@ function renderFinanceEntityLayer(root, layer, type, id) {
   if (financeDesktop(layer)) {
     const actions = financeEntityActions(root, layer, type, entity);
     financeZActions(layer, entity.name, actions.map(action => ({
-      label: action.id === 'terms' ? 'Условия' : financeOperationsIcon(),
+      label: action.id === 'terms' ? 'Условия' : FINANCE_OPERATIONS_ICON,
       className: action.id === 'terms' ? '' : 'v2-desktop-tool-icon',
       aria: action.label, run: action.onSelect,
     })));

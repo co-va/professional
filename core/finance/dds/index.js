@@ -28,7 +28,8 @@ import {
 } from '../../../ui/ui.js';
 import { financeDesktop, financeZActions, financeZSave, financeHistoryTable, financeTableContact, bindFinanceHistoryTable, openFinanceReceiptX } from '../desktop.js';
 import { financeReceipt } from '../receipt.js';
-import { DATA_EXCHANGE_ICON, TRASH_ICON } from '../../../ui/buttons/index.js';
+import { DATA_EXCHANGE_ICON, FINANCE_OPERATIONS_ICON, TRASH_ICON } from '../../../ui/buttons/index.js';
+import { financeOperationGroups, openFinanceOperations } from '../operations/index.js';
 import { canUseCapability } from '../../access.js';
 import { getAllPeople } from '../../people/data.js';
 import { getFinanceOperation } from '../data.js';
@@ -479,6 +480,7 @@ function renderDDS(root) {
     ? (financeDesktop(root) ? financeHistoryTable(groupedOperations.map(entries => { const first = entries[0]; const transfer = first.operationKind === 'transfer'; return { id: String(first.operationId), date: operationMoment(first), title: operationName(first), ...financeTableContact(first, people), workplace: String(first.workplace || ''), wallet: transfer ? operationListSubtitle(entries) : [...new Set(entries.map(walletText).filter(Boolean))].join(' + '), article: [...new Set(entries.map(item => String(item.articleName || '')).filter(Boolean))].join(', '), amount: operationDisplayAmount(entries) }; }), 'Все операции', [{ key: 'date', label: 'Дата', narrow: true }, { key: 'title', label: 'Операция' }, { key: 'code', label: 'Код', narrow: true }, { key: 'person', label: 'Клиент / контрагент' }, { key: 'workplace', label: 'Рабочее пространство' }, { key: 'wallet', label: 'Кошелёк' }, { key: 'article', label: 'Статья' }, { key: 'amount', label: 'Сумма', narrow: true }]) : v2ListEntries(groupedOperations.map(operationListEntry)))
     : emptyState('Все операции', 'Финансовых операций пока нет.');
   const settingsItems = availableDDSSettings();
+  const operationGroups = ['income-expense', 'transfer'];
   const headerContext = workspaceHeaderContext({
     title: 'Движения денежных средств',
     v: !financeDesktop(root) && settingsItems.length ? {
@@ -492,6 +494,10 @@ function renderDDS(root) {
   if (financeDesktop(root)) financeZActions(root, 'Движения денежных средств', [
     { label: DATA_EXCHANGE_ICON, className: 'v2-desktop-tool-icon', aria: 'Обмен данными', run: anchor => openDDSExcel(root, movements, { anchor, onImported: () => renderDDS(root) }) },
     canUseCapability('finance.articles.access') ? { label: 'Статьи', run: () => openArticles(root) } : null,
+    financeOperationGroups({ groups: operationGroups }).length ? {
+      label: FINANCE_OPERATIONS_ICON, className: 'v2-desktop-tool-icon', aria: 'Финансовые операции',
+      run: anchor => openFinanceOperations(root, { groups: operationGroups, anchor, onSaved: () => renderDDS(root) }),
+    } : null,
   ]);
   else root.querySelector('[data-finance-dds-settings]')?.addEventListener('click', () => openDDSSettings(root, movements));
   if (financeDesktop(root)) bindFinanceHistoryTable(root, id => openFinanceOperation(root, movements, id));
