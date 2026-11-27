@@ -96,9 +96,17 @@ try {
   await cashTools.waitFor({timeout:20000});
   assert.equal(await surface.locator('[data-cash-settings]').count(),0,'Desktop Cash has no legacy V');
   assert.equal(await cashTools.locator('button').count(),2,'Exactly two Cash tools');
-  const cashGeometry=await cashTools.locator('button').evaluateAll(nodes=>nodes.map(node=>{const r=node.getBoundingClientRect();const icon=node.querySelector('svg').getBoundingClientRect();return {width:r.width,height:r.height,y:r.top+r.height/2,iconX:icon.left+icon.width/2-(r.left+r.width/2),iconY:icon.top+icon.height/2-(r.top+r.height/2),text:node.textContent.trim()};}));
-  for(const g of cashGeometry){assert.equal(g.width,36);assert.equal(g.height,36);assert.equal(g.text,'');assert.ok(Math.abs(g.iconX)<1&&Math.abs(g.iconY)<1,'Centered H icon');}
-  assert.ok(Math.abs(cashGeometry[0].y-cashGeometry[1].y)<0.5,'Shared H axis');
+  const cashView=cashTools.locator('[data-cash-desktop-view]');
+  const cashOp=cashTools.locator('[data-cash-desktop-operations]');
+  assert.equal(await cashView.textContent(),'Вид','Standard text appearance action');
+  assert.equal(await cashView.locator('svg').count(),0);
+  assert.equal(await cashOp.textContent(),'','Finance operations remains icon-only');
+  const viewStyle=node=>{const r=node.getBoundingClientRect();const s=getComputedStyle(node);return {width:r.width,height:r.height,border:s.border,borderRadius:s.borderRadius,background:s.backgroundColor,color:s.color,fontSize:s.fontSize,padding:s.padding};};
+  const cashViewStyle=await cashView.evaluate(viewStyle);
+  const cashGeometry=await cashOp.evaluate(node=>{const r=node.getBoundingClientRect();const icon=node.querySelector('svg').getBoundingClientRect();const view=node.parentElement.querySelector('[data-cash-desktop-view]').getBoundingClientRect();return {width:r.width,height:r.height,dy:r.top+r.height/2-(view.top+view.height/2),iconX:icon.left+icon.width/2-(r.left+r.width/2),iconY:icon.top+icon.height/2-(r.top+r.height/2)};});
+  assert.equal(cashGeometry.width,36);assert.equal(cashGeometry.height,36);
+  assert.ok(Math.abs(cashGeometry.iconX)<1&&Math.abs(cashGeometry.iconY)<1,'Centered H icon');
+  assert.ok(Math.abs(cashGeometry.dy)<0.5,'Shared H axis');
   await cashTools.locator('[data-cash-desktop-view]').click();
   const cashAppearance=page.getByRole('dialog',{name:'Вид',exact:true});
   await cashAppearance.locator('[name="entityCardAppearanceType"]').waitFor({state:'attached'});
@@ -114,6 +122,7 @@ try {
   assert.equal(await programs.locator('[data-deposit-program]').count(),4,'All synthetic deposit programs rendered');
   assert.equal(await shell.locator('[data-v2-secondary-item="programs"]').count(),1);
   assert.equal(await surface.locator('[data-h-title]').textContent(),'Программы');
+  assert.deepEqual(await surface.locator('[data-program-view]').evaluate(viewStyle),cashViewStyle,'Cash and Loyalty use identical View button styles');
   await surface.locator('[data-program-view]').click({timeout:10000});
   const appearance=page.locator('.desktop-appearance-q');
   await appearance.locator('[name="entityCardAppearanceType"]').waitFor({state:'attached'});
