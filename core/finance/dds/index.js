@@ -450,7 +450,7 @@ function openFinanceOperation(root, movements, operationId) {
   const receipt = financeReceipt(id, operationName(first), { entries });
   const active = first?.operationStatus !== 'cancelled';
   const desktop = financeDesktop(root);
-  const correction = active ? { label: 'Корректировка', variant: desktop ? 'primary' : 'secondary', run: layer => openOperationCorrection(root, layer, entries) } : null;
+  const correction = active ? { label: desktop ? 'Исправить' : 'Корректировка', variant: desktop ? 'primary' : 'secondary', run: layer => openOperationCorrection(root, layer, entries) } : null;
   const cancel = !desktop && active ? { label: 'Отменить операцию', aria: 'Отменить финансовую операцию с сохранением истории', variant: 'danger', run: layer => openCancelOperation(root, layer, entries) } : null;
   const remove = { label: 'Удалить', variant: 'critical', run: layer => openDeleteOperation(root, layer, entries) };
   return openFinanceReceiptX(root, operationName(first), receipt, desktop ? [remove, correction] : [correction, cancel, remove], { actionLayout: 'dds' });
