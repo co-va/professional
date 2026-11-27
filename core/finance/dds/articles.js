@@ -2,6 +2,7 @@ import {
   actionBlock,
   button,
   compactButton,
+  dataTable,
   modal,
   mountModal,
   emptyState,
@@ -96,20 +97,27 @@ function row(item) {
   };
 }
 
-function openArticleX(existing = null, onSaved = () => {}, getArticles = getFinanceArticles) {
+function openArticleX(existing = null, onSaved = () => {}, getArticles = getFinanceArticles, desktop = false) {
   if(existing?.systemKey)return null;
   const items = getArticles();
   const isSystem = Boolean(existing?.systemKey);
   const title = existing ? 'Редактирование статьи' : 'Новая статья';
   const direction = existing?.direction || 'OUT';
+  const desktopDirections=[{value:'IN',label:'Приход'},{value:'OUT',label:'Расход'},{value:'TRANSFER',label:'Перевод'}];
+  const roots=new Set(items.filter(a=>['INCOME_ROOT','EXPENSE_ROOT'].includes(a.systemKey)).map(a=>a.articleId));
+  const descendants=new Set(existing?[existing.articleId]:[]);
+  for(let changed=true;changed;){changed=false;for(const a of items)if(descendants.has(a.parentArticleId)&&!descendants.has(a.articleId)){descendants.add(a.articleId);changed=true;}}
+  const parentChoices=[{value:'',label:'Без группы'},...items.filter(a=>!roots.has(a.articleId)&&!descendants.has(a.articleId)).map(a=>({value:a.articleId,label:a.name}))];
+  const existingParent=String(existing?.parentArticleId||'');
+  if(desktop&&existingParent&&!roots.has(existingParent)&&!parentChoices.some(a=>a.value===existingParent))parentChoices.push({value:existingParent,label:'Текущая группа'});
   const economicType = existing?.economicType || 'OPERATING_EXPENSE';
   const economicOptions = ECONOMIC_OPTIONS.some(item=>item.value===economicType)
     ? ECONOMIC_OPTIONS : [...ECONOMIC_OPTIONS,{value:economicType,label:economicLabel(economicType)}];
   const content = `<form class="compact-form" data-finance-article-form novalidate>
     ${field({label:'Название',name:'articleName',value:existing?.name||'',required:true,placeholder:'Например, Краска'})}
-    ${select({label:'Группа',name:'parentArticleId',value:existing?.parentArticleId||'',options:parentOptions(items,existing?.articleId||'')})}
-    ${select({label:'Направление',name:'direction',value:direction,options:DIRECTION_OPTIONS})}
-    ${select({label:'Назначение',name:'economicType',value:economicType,options:economicOptions})}
+    ${select({label:'Направление',name:'direction',value:direction,options:desktop?desktopDirections:DIRECTION_OPTIONS})}
+    ${select({label:'Группа',name:'parentArticleId',value:desktop&&roots.has(existingParent)?'':existingParent,options:desktop?parentChoices:parentOptions(items,existing?.articleId||'')})}
+    ${desktop?'':select({label:'Назначение',name:'economicType',value:economicType,options:economicOptions})}
     <div class="modal-actions finance-receipt-actions finance-receipt-actions--dds">
       ${existing&&!isSystem?button('Удалить',{variant:'danger',data:'data-delete-finance-article'}):''}
       ${button('Сохранить',{type:'submit',data:'data-finance-article-save',disabled:true})}
@@ -126,11 +134,16 @@ function openArticleX(existing = null, onSaved = () => {}, getArticles = getFina
   }
   const read=()=>{
     const data=new FormData(form);
-    return {name:String(data.get('articleName')||'').trim(),parentArticleId:String(data.get('parentArticleId')||''),direction:String(data.get('direction')||''),economicType:String(data.get('economicType')||'')};
+    const nextDirection=String(data.get('direction')||'');
+    let parentArticleId=String(data.get('parentArticleId')||'');
+    if(desktop&&!parentArticleId)parentArticleId=items.find(a=>roots.has(a.articleId)&&a.direction===nextDirection)?.articleId||'';
+    if(desktop&&existing&&nextDirection===direction&&!String(data.get('parentArticleId')||'')&&!existingParent)parentArticleId='';
+    const nextEconomic=desktop?(existing&&nextDirection===direction?economicType:({IN:'OPERATING_REVENUE',OUT:'OPERATING_EXPENSE',TRANSFER:'TRANSFER'})[nextDirection]):String(data.get('economicType')||'');
+    return {name:String(data.get('articleName')||'').trim(),parentArticleId,direction:nextDirection,economicType:nextEconomic};
   };
   const initial=JSON.stringify(read());
   let pending=false;
-  const sync=()=>{const value=read();save.disabled=pending||!value.name||Boolean(existing&&JSON.stringify(value)===initial);if(remove)remove.disabled=pending;};
+  const sync=()=>{const value=read();const parent=items.find(a=>a.articleId===value.parentArticleId);const invalid=desktop&&((parent&&parent.direction!==value.direction)||(descendants.size>1&&value.direction!==direction));save.disabled=pending||!value.name||invalid||Boolean(existing&&JSON.stringify(value)===initial);if(remove)remove.disabled=pending;};
   form.addEventListener('input',sync);
   form.addEventListener('change',sync);
   form.addEventListener('submit',async event=>{
@@ -185,15 +198,15 @@ function visibleArticles(items,state){
   const sign=state.sort.endsWith('Desc')?-1:1;
   return rows.sort((a,b)=>String(articleValues(a,names)[key]||'').localeCompare(String(articleValues(b,names)[key]||''),'ru',{numeric:true})*sign||String(a.name).localeCompare(String(b.name),'ru'));
 }
-function openArticleFilters(anchor,items,state,refresh){
+function openArticleFilters(anchor,items,state,refresh,desktop=false){
   const names=new Map(items.map(item=>[item.articleId,item.name]));
   const none={value:'',label:'Без фильтра'};
   const parents=[...new Set(items.map(item=>item.parentArticleId||''))].map(id=>({value:id?'id:'+id:'root',label:names.get(id)||'Без группы'}));
   const economics=[...new Set(items.map(item=>item.economicType).filter(Boolean))].map(value=>({value,label:economicLabel(value)}));
   const fields=()=>'<div class="form-grid">'
     +select({label:'Группа',name:'parent',value:state.filters.parent,options:[none,...parents]})
-    +select({label:'Направление',name:'direction',value:state.filters.direction,options:[none,...DIRECTION_OPTIONS]})
-    +select({label:'Назначение',name:'economicType',value:state.filters.economicType,options:[none,...economics]})
+    +select({label:'Направление',name:'direction',value:state.filters.direction,options:[none,...(desktop?DIRECTION_OPTIONS.map(a=>a.value==='IN'?{...a,label:'Приход'}:a):DIRECTION_OPTIONS)]})
+    +(desktop?'':select({label:'Назначение',name:'economicType',value:state.filters.economicType,options:[none,...economics]}))
     +select({label:'Тип',name:'system',value:state.filters.system,options:[none,{value:'system',label:'Системная'},{value:'custom',label:'Пользовательская'}]})+'</div>';
   anchor.dataset.v2AnchorWidth='360';
   const popup=mountModal(anchor,modal('<div data-people-filter-fields>'+fields()+'</div><div class="modal-actions" data-people-filter-actions'+(Object.values(state.filters).some(Boolean)?'':' hidden')+'>'+button('Сбросить',{variant:'secondary',data:'data-people-filter-action'})+'</div>',{title:'Фильтр',variant:'x',surface:'app',className:'people-action-popup people-filter-popup'}));
@@ -212,12 +225,64 @@ function openArticleFilters(anchor,items,state,refresh){
     actions.hidden=true;refresh();
   });
 }
-function openArticleSort(anchor,state,refresh){
-  const content='<div class="people-action-menu">'+ARTICLE_SORTS.map(([value,label])=>button(label,{variant:'secondary',data:'data-article-sort-choice="'+value+'" aria-pressed="'+(value===state.sort)+'"'})).join('')+'</div>';
+function openArticleSort(anchor,state,refresh,desktop=false){
+  const content='<div class="people-action-menu">'+(desktop?ARTICLE_SORTS.filter(([key])=>key==='tree'||key.startsWith('name')||key.startsWith('system')):ARTICLE_SORTS).map(([value,label])=>button(label,{variant:'secondary',data:'data-article-sort-choice="'+value+'" aria-pressed="'+(value===state.sort)+'"'})).join('')+'</div>';
   const popup=mountModal(anchor,modal(content,{title:'Сортировка',variant:'x',surface:'app',xRole:'action',className:'people-action-popup people-sort-popup'}));
   popup?.querySelectorAll('[data-article-sort-choice]').forEach(control=>control.addEventListener('click',()=>{
     state.sort=control.dataset.articleSortChoice;popup.v2Close?.();refresh();
   }));
+}
+// Use the same compact table and system disclosure geometry as Service Groups.
+function desktopArticleRows(items,state){
+  const roots=new Set(items.filter(a=>['INCOME_ROOT','EXPENSE_ROOT'].includes(a.systemKey)).map(a=>a.articleId));
+  const articles=items.filter(a=>!roots.has(a.articleId)).map(a=>({...a,parentArticleId:roots.has(a.parentArticleId)?'':a.parentArticleId}));
+  const query=normalized(state.query).split(/\s+/).filter(Boolean);
+  const names=new Map(articles.map(a=>[a.articleId,a.name]));
+  const f=state.filters;
+  const count=new Map();for(const a of articles)count.set(a.parentArticleId,(count.get(a.parentArticleId)||0)+1);
+  const sorted=state.sort==='tree'?articles:[...articles].sort((a,b)=>{
+    const key=state.sort.startsWith('system')?'systemKey':'name';
+    const value=a=>key==='systemKey'?(a.systemKey?'Системная':'Пользовательская'):a.name;
+    return String(value(a)).localeCompare(String(value(b)),'ru',{numeric:true})*(state.sort.endsWith('Desc')?-1:1);
+  });
+  return treeRows(sorted).filter(a=>{
+    const direction=({IN:'Приход',OUT:'Расход',TRANSFER:'Перевод'})[a.direction]||'';
+    const type=a.systemKey?'Системная':'Пользовательская';
+    return query.every(word=>normalized([a.name,names.get(a.parentArticleId),direction,type].join(' ')).includes(word))
+      &&(!f.direction||a.direction===f.direction)
+      &&(!f.system||f.system===(a.systemKey?'system':'custom'))
+      &&(!f.parent||f.parent===(a.parentArticleId?'id:'+a.parentArticleId:'root'));
+  }).map(a=>({...a,childCount:count.get(a.articleId)||0}));
+}
+function renderDesktopArticleTable(host,rows,collapsed,onOpen){
+  const columns=[
+    {key:'name',label:'Наименование',sortable:false,render:a=>{
+      const name=escapeHtml(a.name);
+      const content=a.systemKey?name:button(name,{variant:'secondary',className:'desktop-group-table-name',data:'data-finance-article="'+escapeHtml(a.articleId)+'"',aria:'Редактировать статью '+a.name});
+      return '<div style="padding-inline-start:'+Math.min(a.depth,5)*12+'px" data-article-row="'+escapeHtml(a.articleId)+'">'+content+'</div>';
+    }},
+    {key:'type',label:'Тип',sortable:false,render:a=>a.systemKey?'Системная':'Пользовательская'},
+    {key:'values',label:'Вложенные',sortable:false,render:a=>String(a.childCount)},
+  ];
+  host.innerHTML='<div class="desktop-table-popup">'+dataTable({columns,rows,caption:'Статьи',compact:true})+'</div>';
+  const original=host.querySelector('tbody');if(!original)return;
+  const table=original.closest('table'),doc=host.ownerDocument;
+  const byId=new Map([...original.querySelectorAll('[data-article-row]')].map(e=>[e.dataset.articleRow,e.closest('tr')]));
+  for(const [direction,label] of [['IN','ПРИХОД'],['OUT','РАСХОД'],['TRANSFER','ПЕРЕВОД']]){
+    const members=rows.filter(a=>a.direction===direction);
+    if(!members.length)continue;
+    const heading=doc.createElement('tbody'),row=heading.insertRow();row.dataset.tableGroupLevel='system';
+    const cell=row.insertCell();cell.colSpan=columns.length;
+    cell.innerHTML='<button type="button" class="desktop-group-section-toggle" aria-expanded="'+!collapsed.has(direction)+'"><span aria-hidden="true">'+(collapsed.has(direction)?'▸':'▾')+'</span><span>'+label+'</span></button>';
+    table.append(heading);
+    const body=doc.createElement('tbody');table.append(body);body.hidden=collapsed.has(direction);
+    const toggle=cell.querySelector('button');toggle.addEventListener('click',()=>{
+      if(collapsed.has(direction))collapsed.delete(direction);else collapsed.add(direction);
+      body.hidden=collapsed.has(direction);toggle.setAttribute('aria-expanded',String(!body.hidden));toggle.firstElementChild.textContent=body.hidden?'▸':'▾';
+    });
+    for(const a of members){const tr=byId.get(a.articleId);if(!tr)continue;body.append(tr);if(!a.systemKey)tr.addEventListener('click',()=>onOpen(a.articleId));}
+  }
+  original.remove();
 }
 // The DDS directory is a tool, not a navigation destination. The same Q
 // and compact X editor are used on desktop and mobile; persisted Core article
@@ -226,6 +291,7 @@ export function openFinanceArticlesQ(root, {onSaved=()=>{}}={}) {
   const desktop=financeDesktop(root);
   const getArticles=()=>desktop?desktopAvailableArticles(getFinanceArticles(),canUseCapability):getFinanceArticles();
   const state={query:'',filters:articleFilters(),sort:'tree'};
+  const collapsed=new Set();
   const layer=mountModal(root,modal(
     '<div class="form-grid">'
     +'<div style="display:flex;align-items:center;gap:8px">'
@@ -248,10 +314,11 @@ export function openFinanceArticlesQ(root, {onSaved=()=>{}}={}) {
   moveDesktopQTool(add);
   const refresh=()=>{
     const items=getArticles();
-    const rows=visibleArticles(items,state);
+    const rows=desktop?desktopArticleRows(items,state):visibleArticles(items,state);
     count.textContent=String(rows.length);
     filter?.setAttribute('aria-pressed',String(Object.values(state.filters).some(Boolean)));
     sort?.setAttribute('aria-pressed',String(state.sort!=='tree'));
+    if(desktop&&rows.length){renderDesktopArticleTable(host,rows,collapsed,id=>{const item=getArticles().find(a=>a.articleId===id);if(item)openArticleX(item,changed,getArticles,true);});return;}
     host.innerHTML=rows.length?list({items:rows.map(row)}):emptyState(items.length?'Статьи не найдены':'Статей пока нет');
     host.querySelectorAll('[data-finance-article]').forEach(control=>control.addEventListener('click',()=>{
       const item=getArticles().find(candidate=>candidate.articleId===control.dataset.financeArticle);
@@ -260,9 +327,9 @@ export function openFinanceArticlesQ(root, {onSaved=()=>{}}={}) {
   };
   const changed=()=>{refresh();onSaved();};
   search?.addEventListener('input',()=>{state.query=search.value;refresh();});
-  filter?.addEventListener('click',()=>openArticleFilters(filter,getArticles(),state,refresh));
-  sort?.addEventListener('click',()=>openArticleSort(sort,state,refresh));
-  add?.addEventListener('click',()=>openArticleX(null,changed,getArticles));
+  filter?.addEventListener('click',()=>openArticleFilters(filter,desktop?getArticles().filter(a=>!['INCOME_ROOT','EXPENSE_ROOT'].includes(a.systemKey)).map(a=>({...a,parentArticleId:['system-income','system-expense'].includes(a.parentArticleId)?'':a.parentArticleId})):getArticles(),state,refresh,desktop));
+  sort?.addEventListener('click',()=>openArticleSort(sort,state,refresh,desktop));
+  add?.addEventListener('click',()=>openArticleX(null,changed,getArticles,desktop));
   refresh();
   return layer;
 }

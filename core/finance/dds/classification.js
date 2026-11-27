@@ -3,9 +3,9 @@ const labels={SERVICE_REVENUE:'Оплата услуг',LOAN_RECEIVED:'Полу�
 export const desktopArticleName=a=>labels[a?.systemKey]||a?.name||'';
 export function desktopAvailableArticles(articles,can){
  const journal=['journal.day.access','journal.month.access','journal.list.access'].some(can);
- const manual=can('finance.income_expense.access'),special=can('finance.special.access');
+ const special=can('finance.special.access');
  const raise=can('finance.investment.raise.access'),invest=can('finance.investment.self.access')||can('finance.investment.external.access');
- const allowed={RENT:false,TAX:false,INCOME_ROOT:true,EXPENSE_ROOT:true,SERVICE_REVENUE:journal,PRODUCT_REVENUE:journal,TIPS:journal,REFUND:journal,MATERIALS:can('inventory.stock.access'),OTHER_INCOME:manual,OTHER_EXPENSE:manual,LOAN_RECEIVED:special,LOAN_REPAYMENT:special,TRANSFER:special,INVESTMENT_RECEIVED:raise,INVESTMENT_RETURN:raise,INVESTMENT_INCOME_PAYMENT:raise,INVESTMENT_CAPITAL_RETURN:invest,INVESTMENT_INCOME:invest,INVESTMENT_CONTRIBUTION:invest,INVESTMENT_EXPENSE:invest};
+ const allowed={RENT:false,TAX:false,INCOME_ROOT:true,EXPENSE_ROOT:true,SERVICE_REVENUE:journal,PRODUCT_REVENUE:journal,TIPS:journal,REFUND:journal,MATERIALS:can('inventory.stock.access'),OTHER_INCOME:false,OTHER_EXPENSE:false,LOAN_RECEIVED:special,LOAN_REPAYMENT:special,TRANSFER:special,INVESTMENT_RECEIVED:raise,INVESTMENT_RETURN:raise,INVESTMENT_INCOME_PAYMENT:raise,INVESTMENT_CAPITAL_RETURN:invest,INVESTMENT_INCOME:invest,INVESTMENT_CONTRIBUTION:invest,INVESTMENT_EXPENSE:invest};
  return articles.filter(a=>!a.archivedAt&&(!a.systemKey||allowed[a.systemKey]===true)).map(a=>({...a,name:desktopArticleName(a)}));
 }
 export const desktopOperationDirection=d=>({in:'Приход',out:'Расход',transfer:'Перевод'})[d]||'—';
