@@ -1011,15 +1011,15 @@
  .v2-app--workspace .desktop-service-groups-q [data-desktop-group-content] .ui-list__secondary{font-size:12px;line-height:14px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
  .v2-app--workspace .desktop-service-groups-q [data-desktop-group-content] .ui-list__item>.list-entry__reorder-handle{height:var(--ui-compact-size);width:var(--ui-compact-size);flex-basis:var(--ui-compact-size)}
  .v2-app--workspace .desktop-service-groups-q [data-desktop-group-content] .ui-list__right-secondary{font-size:13px;line-height:16px;font-variant-numeric:tabular-nums;white-space:nowrap}
- .v2-app--workspace .desktop-service-groups-q [data-service-group-value-list] .desktop-group-empty-row .ui-list__title{color:var(--text-secondary);font-weight:400}
+ .v2-app--workspace .desktop-service-group-editor-x [data-service-group-value-list] .desktop-group-empty-row .ui-list__title{color:var(--text-secondary);font-weight:400}
 }
 
 /* Service group directory keeps original LS2. Only value rows use the dense
    workplace-style list, including a single empty row in the same frame. */
 @media (min-width:768px) and (min-height:600px){
- .v2-app--workspace .desktop-service-groups-q .desktop-group-values{display:grid;gap:6px;min-width:0}
- .v2-app--workspace .desktop-service-groups-q [data-service-group-value-list]>.ui-list--dense.list-entries{box-sizing:border-box;border-radius:var(--radius-control,14px);min-height:0;height:auto;gap:0;padding:0;margin:0}
- .v2-app--workspace .desktop-service-groups-q [data-service-group-value-list] .ui-list__item.desktop-group-empty-row{height:44px;min-height:44px;max-height:44px;padding:4px 12px;flex:0 0 44px}
+ .v2-app--workspace .desktop-service-group-editor-x .desktop-group-values{display:grid;gap:6px;min-width:0}
+ .v2-app--workspace .desktop-service-group-editor-x [data-service-group-value-list]>.ui-list--dense.list-entries{box-sizing:border-box;border-radius:var(--radius-control,14px);min-height:0;height:auto;gap:0;padding:0;margin:0}
+ .v2-app--workspace .desktop-service-group-editor-x [data-service-group-value-list] .ui-list__item.desktop-group-empty-row{height:44px;min-height:44px;max-height:44px;padding:4px 12px;flex:0 0 44px}
 }
 
 /* Shared Service Z2: the existing visual card and workplace mini-cards
@@ -1259,4 +1259,13 @@
 @media (min-width:768px) and (min-height:600px){
  .v2-app--workspace .desktop-service-groups-q [data-desktop-group-directory-table] tr[data-table-group-level="system"]>td{height:30px;padding:4px 12px;background:var(--desktop-table-system-bg);color:var(--desktop-table-system-ink);font-size:12px;font-style:normal;font-weight:750;line-height:20px;cursor:default}
  .v2-app--workspace .desktop-service-groups-q [data-desktop-group-directory-table] .desktop-group-directory-empty{color:var(--text-secondary);cursor:default}
+}
+
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace .desktop-service-group-editor-x [data-service-group-value-list] .ui-list__item{box-sizing:border-box;min-height:44px;padding:4px 12px}
+ .v2-app--workspace .desktop-service-group-editor-x [data-service-group-value-list] .list-entry__reorder-handle{height:var(--ui-compact-size);width:var(--ui-compact-size);flex-basis:var(--ui-compact-size)}
+ .v2-app--workspace .desktop-service-group-editor-x [data-desktop-group-delete][hidden]{display:none!important}
+ .v2-app--workspace .desktop-service-groups-q [data-desktop-group-directory-table] tbody[hidden]{display:none!important}
+ .v2-app--workspace .desktop-service-groups-q [data-desktop-group-directory-table] tr[data-table-group-level="system"]>td{padding:0;height:30px}
+ .v2-app--workspace .desktop-service-groups-q [data-desktop-group-directory-table] tr[data-table-group-level="system"]>td>.desktop-group-section-toggle{display:flex;align-items:center;gap:8px;width:100%;height:29px;min-height:29px;padding:0 12px;border:0;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer;touch-action:manipulation}
 }

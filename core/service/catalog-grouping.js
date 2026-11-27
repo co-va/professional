@@ -4,7 +4,7 @@ import {
   dataTable, list, modal, mountModal, openNotice, select, v2ListEntries, v2ListEntry,
 } from '../../ui/ui.js';
 import { escapeHtml } from '../../ui/utils/escape-html.js';
-import { moveDesktopQTool, pinDesktopQDanger } from '../../ui/v2/z-layout.js';
+import { moveDesktopQTool } from '../../ui/v2/z-layout.js';
 import { catalogDisclosure } from '../inventory/catalog-ui.js';
 import { stockGroupTree, sortedStockChildren } from '../inventory/grouping.js';
 import {
@@ -340,109 +340,151 @@ export function openServiceGroupingQ({ onSaved = () => {}, desktop = false } = {
     return editor;
   };
 
-  // Desktop Q contains the directory and existing group edit state; creation uses the shared X.
+  // Desktop Q is a directory only. Creation and editing use X.
   if (desktop) {
-    const q = mountModal(document.body, modal(
-      '<div data-desktop-group-content></div>' +
-      '<div class="form-error" role="alert" data-desktop-group-error></div>' +
-      compactButton({kind:'add',className:'v2-desktop-tool-primary',data:'data-desktop-group-add title="Добавить группу"',aria:'Добавить группу'}) +
-      actionBlock(button('Отмена', { variant: 'secondary', data: 'data-desktop-group-cancel' })) +
-      actionBlock(button('Сохранить', { data: 'data-desktop-group-save' })) +
-      actionBlock(button('Удалить группу', { variant: 'danger', data: 'data-desktop-group-delete' })),
-      { title: 'Группы', variant: 'q', surface: 'app', className: 'desktop-service-groups-q' }
+    const q=mountModal(document.body,modal(
+      '<div data-desktop-group-content></div>'+
+      compactButton({kind:'add',className:'v2-desktop-tool-primary',data:'data-desktop-group-add title="Добавить группу"',aria:'Добавить группу'}),
+      {title:'Группы',variant:'q',surface:'app',className:'desktop-service-groups-q'}
     ));
-    if (!q) return null;
-    const content = q.querySelector('[data-desktop-group-content]');
-    const error = q.querySelector('[data-desktop-group-error]');
-    const add = q.querySelector('[data-desktop-group-add]');
-    const cancel = q.querySelector('[data-desktop-group-cancel]');
-    const saveButton = q.querySelector('[data-desktop-group-save]');
-    const remove = q.querySelector('[data-desktop-group-delete]');
-    for (const control of [cancel, saveButton, add]) moveDesktopQTool(control);
-    pinDesktopQDanger(remove);
-    const title = q.querySelector('.v2-q-title');
-    const visible = (control, yes) => { control.closest('.modal-actions').hidden = !yes; };
-    let key = null;
-    let creating = false;
-    let kindDraft = 'procedures';
-    let nameDraft = '';
-    let valueEdit = null;
-    let busy = false;
-    let dispose = () => {};
-    const current = () => key ? groupByKey(key) : null;
-    const edited = () => valueEdit && !valueEdit.isNew
-      ? current()?.values?.find(value => value.id === valueEdit.id) : null;
-    const nameChanged = () => Boolean(nameDraft.trim()) &&
-      (creating || nameDraft.trim() !== String(current()?.name || '').trim());
-    const kindChanged = () => Boolean(current() && kindDraft !== current().kind);
-    const valueChanged = () => Boolean(valueEdit?.name.trim()) &&
-      (valueEdit.isNew || valueEdit.name.trim() !== String(edited()?.name || '').trim());
-    const canSave = () => Boolean((creating || current()) && nameDraft.trim() &&
-      (!valueEdit || valueEdit.name.trim()) && (nameChanged() || kindChanged() || valueChanged()));
-    const sync = () => {
-      const active = current();
-      const addLabel = active ? 'Добавить значение' : 'Добавить группу';
-      add.title = addLabel;
-      add.setAttribute('aria-label', addLabel);
-      add.hidden = creating || Boolean(valueEdit);
-      visible(cancel, creating || Boolean(valueEdit));
-      visible(saveButton, canSave());
-      visible(remove, Boolean(active && (!valueEdit || !valueEdit.isNew)));
-      remove.textContent = valueEdit && !valueEdit.isNew ? 'Удалить значение' : 'Удалить группу';
-      for (const control of [add, cancel, saveButton, remove]) control.disabled = busy;
-    };
-    const reset = () => {
-      key = null; creating = false; nameDraft = ''; valueEdit = null;
-    };
-    const enter = group => {
-      key = group.key; creating = false; kindDraft = group.kind;
-      nameDraft = group.name; valueEdit = null;
-      render();
-    };
-    const save = async () => {
-      if (busy || !canSave()) return;
-      const active = current();
-      const kind = kindDraft;
-      const originalKind = creating ? kind : active.kind;
-      const newId = creating ? id() : active.id;
-      const name = nameDraft.trim();
-      const nextValue = valueEdit ? { ...valueEdit, name: valueEdit.name.trim() } : null;
-      busy = true; sync(); error.textContent = '';
-      try {
-        const existing = getServiceGroupLevels(originalKind);
-        if (!creating && !existing.some(group => group.id === newId))
-          throw new Error('Группа больше не существует.');
-        if (nextValue && !nextValue.isNew && !active.values?.some(value => value.id === nextValue.id))
-          throw new Error('Значение больше не существует.');
-        const next = creating
-          ? [...existing, { id: newId, name, values: [] }]
-          : existing.map(group => {
-            if (group.id !== newId) return group;
-            const values = group.values || [];
-            return { ...group, name, values: !nextValue ? values : nextValue.isNew
-              ? [...values, { id: id(), name: nextValue.name }]
-              : values.map(value => value.id === nextValue.id ? { ...value, name: nextValue.name } : value) };
+    if(!q)return null;
+    const content=q.querySelector('[data-desktop-group-content]');
+    const add=q.querySelector('[data-desktop-group-add]');
+    moveDesktopQTool(add);
+    let busy=false,dispose=()=>{};
+    const collapsed=new Set();
+    const sync=()=>{add.disabled=busy;};
+
+    const openEditor=previous=>{
+      if(busy)return;
+      const editor=mountModal(q,modal(
+        '<form class="compact-form" data-desktop-group-form>'+
+        select({label:'Раздел',name:'groupKind',value:previous?.kind||'procedures',options:[{value:'procedures',label:'Услуги'},{value:'products',label:'Товары'}]})+
+        field({label:'Наименование группы',name:'name',value:previous?.name||'',required:true,maxlength:80})+
+        (previous?'<div class="desktop-group-values"><div class="stock-position-group-heading"><span>Значения</span>'+compactAddButton({data:'data-desktop-group-value-add',aria:'Добавить значение'})+'</div><div data-desktop-group-value-draft></div><div data-service-group-value-list></div></div>':'')+
+        '<div class="form-error" role="alert" data-desktop-group-error></div>'+
+        actionBlock((previous?button('Удалить группу',{variant:'danger',data:'data-desktop-group-delete'}):'')+
+          button('Сохранить',{type:'submit',data:'data-desktop-group-save'}))+
+        '</form>',
+        {title:previous?'Группа':'Добавить группу',variant:'x',xRole:'editor',surface:'app',className:'desktop-service-group-editor-x'}
+      ));
+      if(!editor)return;
+      const form=editor.querySelector('[data-desktop-group-form]');
+      const error=editor.querySelector('[data-desktop-group-error]');
+      const save=editor.querySelector('[data-desktop-group-save]');
+      const remove=editor.querySelector('[data-desktop-group-delete]');
+      const plus=editor.querySelector('[data-desktop-group-value-add]');
+      const draftHost=editor.querySelector('[data-desktop-group-value-draft]');
+      const listHost=editor.querySelector('[data-service-group-value-list]');
+      let group=previous,pending=false,valueEdit=null,disposeValues=()=>{};
+      const current=()=>group?groupByKey(group.key):null;
+      const name=()=>String(form.elements.namedItem('name')?.value||'').trim();
+      const kind=()=>String(form.elements.namedItem('groupKind')?.value||'');
+      const valueName=()=>String(draftHost?.querySelector('[name="valueName"]')?.value||'').trim();
+      const canSave=()=>Boolean(name()&&(!valueEdit||valueName())&&(!group||name()!==group.name||kind()!==group.kind||(valueEdit&&(valueEdit.isNew||valueName()!==valueEdit.name))));
+      const syncEditor=()=>{
+        save.style.display=canSave()?'':'none';
+        save.disabled=pending;
+        if(remove){remove.disabled=pending;remove.hidden=Boolean(valueEdit);}
+        if(plus)plus.disabled=pending||Boolean(valueEdit);
+        draftHost?.querySelectorAll('button').forEach(button=>button.disabled=pending);
+      };
+      const drawValues=()=>{
+        if(!listHost)return;
+        disposeValues();disposeValues=()=>{};
+        const values=current()?.values||[];
+        listHost.innerHTML=values.length?list({className:'ui-list--dense list-entries',items:values.map(value=>({
+          title:value.name,interactive:true,reorderHandle:!valueEdit,selected:valueEdit?.id===value.id,
+          data:'data-desktop-group-value="'+escapeHtml(value.id)+'" data-reorder-id="'+escapeHtml(value.id)+'"',
+          aria:'Изменить значение '+value.name,
+        }))}):emptyState('Значений пока нет');
+        listHost.querySelectorAll('[data-desktop-group-value]').forEach(node=>node.addEventListener('click',event=>{
+          if(pending||valueEdit||event.target.closest?.('[data-reorder-handle]'))return;
+          const value=current()?.values?.find(item=>item.id===node.dataset.desktopGroupValue);
+          if(value){valueEdit={...value,isNew:false};drawDraft();drawValues();}
+        }));
+        if(!valueEdit)disposeValues=initV2ListReorder(listHost,{
+          onReorder:async ids=>{
+            const fresh=current();
+            if(pending||!fresh)throw new Error('Группа недоступна.');
+            const byId=new Map((fresh.values||[]).map(value=>[value.id,value]));
+            if(ids.length!==byId.size||new Set(ids).size!==byId.size||ids.some(id=>!byId.has(id)))throw new Error('Список значений изменился.');
+            pending=true;syncEditor();
+            try{
+              await commitServiceGroupLevels(fresh.kind,getServiceGroupLevels(fresh.kind).map(item=>item.id===fresh.id?{...item,values:ids.map(id=>byId.get(id))}:item));
+              group=current();onSaved();render();
+            }finally{pending=false;syncEditor();}
+          },onError:fail,
+        });
+        syncEditor();
+      };
+      const drawDraft=()=>{
+        if(!draftHost)return;
+        draftHost.innerHTML=valueEdit?field({label:'Наименование значения',name:'valueName',value:valueEdit.name,required:true,maxlength:80})+
+          actionBlock((valueEdit.isNew?'':button('Удалить значение',{variant:'danger',data:'data-desktop-value-delete'}))+
+          button('Отмена',{variant:'secondary',data:'data-desktop-value-cancel'})):'';
+        draftHost.querySelector('[data-desktop-value-cancel]')?.addEventListener('click',()=>{valueEdit=null;drawDraft();drawValues();});
+        draftHost.querySelector('[data-desktop-value-delete]')?.addEventListener('click',()=>{
+          const valueId=valueEdit?.id;
+          if(pending||!valueId)return;
+          confirmRemove('Удалить значение?',async()=>{
+            const fresh=current();
+            if(!fresh)throw new Error('Группа больше не существует.');
+            pending=true;syncEditor();
+            try{
+              await commitServiceGroupLevels(fresh.kind,getServiceGroupLevels(fresh.kind).map(item=>item.id===fresh.id?{...item,values:(item.values||[]).filter(value=>value.id!==valueId)}:item));
+              group=current();valueEdit=null;onSaved();render();drawDraft();drawValues();
+            }finally{pending=false;syncEditor();}
           });
-        if (!creating && originalKind !== kind) {
-          await commitServiceGroupSection(originalKind, kind, next.find(group => group.id === newId));
-        } else {
-          await commitServiceGroupLevels(kind, next);
-        }
-        onSaved();
-        const fresh = getServiceGroupEntries().find(group => group.kind === kind && group.id === newId);
-        if (fresh) enter(fresh);
-        else { reset(); render(); }
-      } catch (cause) {
-        error.textContent = cause?.message || 'Не удалось сохранить.';
-      } finally { busy = false; sync(); }
+        });
+        syncEditor();
+      };
+      plus?.addEventListener('click',()=>{if(!pending&&!valueEdit){valueEdit={id:null,name:'',isNew:true};drawDraft();drawValues();draftHost.querySelector('input')?.focus();}});
+      form.addEventListener('input',syncEditor);
+      form.addEventListener('change',syncEditor);
+      form.addEventListener('submit',async event=>{
+        event.preventDefault();
+        if(pending||!canSave()||!['procedures','products'].includes(kind()))return;
+        const section=kind(),title=name(),fresh=current(),editingValue=valueEdit;
+        if(group&&!fresh){error.textContent='Группа больше не существует.';return;}
+        const nextId=fresh?.id||id();
+        const values=fresh?.values||[];
+        if(editingValue&&!editingValue.isNew&&!values.some(value=>value.id===editingValue.id)){error.textContent='Значение больше не существует.';return;}
+        const nextValues=!editingValue?values:editingValue.isNew?[...values,{id:id(),name:valueName()}]:values.map(value=>value.id===editingValue.id?{...value,name:valueName()}:value);
+        const nextGroup={...(fresh||{}),id:nextId,name:title,values:nextValues};
+        pending=true;syncEditor();error.textContent='';
+        try{
+          if(fresh&&fresh.kind!==section)await commitServiceGroupSection(fresh.kind,section,nextGroup);
+          else{
+            const entries=getServiceGroupLevels(section);
+            await commitServiceGroupLevels(section,fresh?entries.map(item=>item.id===nextId?nextGroup:item):[...entries,nextGroup]);
+          }
+          onSaved();render();
+          if(editingValue){
+            group=getServiceGroupEntries().find(item=>item.kind===section&&item.id===nextId);
+            valueEdit=null;drawDraft();drawValues();
+          }else{pending=false;editor.v2Close?.();}
+        }catch(cause){error.textContent=cause?.message||'Не удалось сохранить.';}
+        finally{pending=false;syncEditor();}
+      });
+      remove?.addEventListener('click',()=>{
+        if(pending||!current())return;
+        confirmRemove('Удалить группу?',async()=>{
+          const fresh=current();
+          if(!fresh)throw new Error('Группа больше не существует.');
+          pending=true;syncEditor();
+          try{
+            await commitServiceGroupLevels(fresh.kind,getServiceGroupLevels(fresh.kind).filter(item=>item.id!==fresh.id));
+            onSaved();render();pending=false;editor.v2Close?.();
+          }finally{pending=false;syncEditor();}
+        });
+      });
+      const closeEditor=editor.v2Close?.bind(editor);
+      if(closeEditor)editor.v2Close=()=>{if(!pending){disposeValues();closeEditor();}};
+      drawValues();syncEditor();
     };
-    function render() {
-      dispose(); dispose = () => {};
-      const active = current();
-      if (key && !active) reset();
-      if (title) title.textContent = creating ? 'Новая группа' : active ? 'Группа' : 'Группы';
-      error.textContent = '';
-      if (!creating && !active) {
+    function render(){
+      dispose();dispose=()=>{};
         const entries = getServiceGroupEntries();
         const columns = [
           {key:'drag',label:'',narrow:true,sortable:false,render:group=>'<span class="list-entry__reorder-handle" data-reorder-handle data-desktop-group-key="'+escapeHtml(group.key)+'" role="button" tabindex="0" aria-label="'+escapeHtml('Переместить '+group.name)+'"><span aria-hidden="true">⋮⋮</span></span>'},
@@ -462,12 +504,21 @@ export function openServiceGroupingQ({ onSaved = () => {}, desktop = false } = {
           headingRow.dataset.tableGroupLevel='system';
           const headingCell=headingRow.insertCell();
           headingCell.colSpan=columns.length;
-          headingCell.textContent=label;
+          headingCell.innerHTML='<button type="button" class="desktop-group-section-toggle" aria-expanded="'+(!collapsed.has(kind))+'"><span aria-hidden="true">'+(collapsed.has(kind)?'▸':'▾')+'</span><span>'+label+'</span></button>';
           table.appendChild(heading);
           const body=document.createElement('tbody');
           body.className='list-entries';
           body.dataset.desktopGroupKind=kind;
           table.appendChild(body);
+          body.hidden=collapsed.has(kind);
+          const toggle=headingCell.querySelector('button');
+          toggle.addEventListener('click',()=>{
+            if(busy)return;
+            if(collapsed.has(kind))collapsed.delete(kind);else collapsed.add(kind);
+            body.hidden=collapsed.has(kind);
+            toggle.setAttribute('aria-expanded',String(!body.hidden));
+            toggle.firstElementChild.textContent=body.hidden?'▸':'▾';
+          });
           for(const group of groupEntries){
             const row=rowsByKey.get(group.key);
             row.dataset.reorderId=group.key;
@@ -475,7 +526,7 @@ export function openServiceGroupingQ({ onSaved = () => {}, desktop = false } = {
             row.addEventListener('click',event=>{
               if(busy||event.target.closest?.('[data-reorder-handle]'))return;
               const fresh=groupByKey(row.dataset.reorderId);
-              if(fresh)enter(fresh);
+              if(fresh)openEditor(fresh);
             });
           }
           if(!groupEntries.length){
@@ -504,113 +555,13 @@ export function openServiceGroupingQ({ onSaved = () => {}, desktop = false } = {
         }
         original.remove();
         dispose=()=>disposers.forEach(fn=>fn());
-        sync(); return;
-      }
-      content.innerHTML = '<form class="compact-form" data-desktop-group-form>' +
-        select({ label: 'Раздел', name: 'groupKind', value: kindDraft,
-          options: [{ value: 'procedures', label: 'Услуги' }, { value: 'products', label: 'Товары' }] }) +
-        field({ label: 'Наименование группы', name: 'name', value: nameDraft, required: true, maxlength: 80 }) +
-        (valueEdit ? field({ label: 'Наименование значения', name: 'valueName', value: valueEdit.name,
-          required: true, maxlength: 80 }) : '') +
-        (!creating ? '<div class="desktop-group-values"><div class="inventory-editor-label">Значения</div><div data-service-group-value-list></div></div>' : '') +
-        '</form>';
-      const form = content.querySelector('[data-desktop-group-form]');
-      form.addEventListener('input', event => {
-        if (event.target.name === 'name') nameDraft = event.target.value;
-        if (event.target.name === 'valueName' && valueEdit) valueEdit.name = event.target.value;
-        sync();
-      });
-      form.addEventListener('change', event => {
-        if (event.target.name === 'groupKind') kindDraft = event.target.value;
-        sync();
-      });
-      form.addEventListener('submit', event => { event.preventDefault(); void save(); });
-      if (!creating) {
-        const listHost = form.querySelector('[data-service-group-value-list]');
-        const values = active.values || [];
-        listHost.innerHTML = values.length ? list({
-          className: 'ui-list--dense list-entries',
-          items: values.map(value => ({
-            title: value.name, interactive: true, reorderHandle: true,
-            selected: valueEdit?.id === value.id,
-            data: 'data-desktop-group-value="' + escapeHtml(value.id) + '" data-reorder-id="' + escapeHtml(value.id) + '"',
-            aria: 'Изменить значение ' + value.name,
-          })),
-        }) : list({
-          className: 'ui-list--dense list-entries',
-          items: [{ title: 'Значений пока нет', className: 'desktop-group-empty-row' }],
-        });
-        listHost.querySelectorAll('[data-desktop-group-value]').forEach(node => node.addEventListener('click', event => {
-          if (busy || event.target.closest?.('[data-reorder-handle]')) return;
-          if (valueEdit) return;
-          const value = current()?.values?.find(item => item.id === node.dataset.desktopGroupValue);
-          if (!value) return;
-          valueEdit = { id: value.id, name: value.name, isNew: false };
-          render();
-        }));
-        dispose = initV2ListReorder(listHost, {
-          onReorder: async ids => {
-            if (busy) throw new Error('Дождитесь завершения сохранения.');
-            const fresh = current();
-            if (!fresh) throw new Error('Группа больше не существует.');
-            const byId = new Map((fresh.values || []).map(value => [value.id, value]));
-            if (ids.length !== byId.size || ids.some(id => !byId.has(id))) throw new Error('Список значений изменился.');
-            busy = true; sync();
-            try {
-              await commitServiceGroupLevels(fresh.kind, getServiceGroupLevels(fresh.kind).map(group =>
-                group.id === fresh.id ? { ...group, values: ids.map(id => byId.get(id)) } : group));
-              onSaved();
-            } finally { busy = false; sync(); }
-          },
-          onError: fail,
-        });
-      }
+
       sync();
     }
-    add.addEventListener('click', () => {
-      if (busy || creating || valueEdit) return;
-      if (current()) {
-        valueEdit = { id: null, name: '', isNew: true };
-        render();
-      } else {
-        groupEditorX(null,()=>{if(q.isConnected)render();});
-      }
-    });
-    cancel.addEventListener('click', () => {
-      if (busy) return;
-      if (valueEdit) valueEdit = null;
-      else if (creating) reset();
-      render();
-    });
-    saveButton.addEventListener('click', () => void save());
-    remove.addEventListener('click', () => {
-      const active = current();
-      if (busy || !active || valueEdit?.isNew) return;
-      const valueId = valueEdit?.id || null;
-      confirmRemove(valueId ? 'Удалить значение?' : 'Удалить группу?', async () => {
-        busy = true; sync();
-        try {
-          const groups = getServiceGroupLevels(active.kind);
-          await commitServiceGroupLevels(active.kind, valueId
-            ? groups.map(group => group.id === active.id ? { ...group, values: (group.values || []).filter(value => value.id !== valueId) } : group)
-            : groups.filter(group => group.id !== active.id));
-          onSaved();
-          if (valueId) valueEdit = null;
-          else reset();
-          render();
-        } finally { busy = false; sync(); }
-      });
-    });
-    q.v2Back = () => {
-      if (busy) return true;
-      if (valueEdit) { valueEdit = null; render(); return true; }
-      if (creating || key) { reset(); render(); return true; }
-      return false;
-    };
-    const close = q.v2Close?.bind(q);
-    if (close) q.v2Close = () => { if (!busy) { dispose(); close(); } };
-    render();
-    return q;
+    add.addEventListener('click',()=>openEditor(null));
+    const close=q.v2Close?.bind(q);
+    if(close)q.v2Close=()=>{if(!busy){dispose();close();}};
+    render();return q;
   }
 
   const valueEditorX = (groupKey, previous = null) => {
