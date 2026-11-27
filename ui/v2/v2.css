@@ -475,7 +475,11 @@
  /* DDS only: keep the amount visible where space permits; preserve scroll on narrower screens. */
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-dds-history]{min-width:0;max-width:100%}
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-dds-history] .ui-data-table--compact :is(th,td)[data-table-column="article"]{width:14ch;min-width:90px;white-space:normal;overflow-wrap:anywhere}
- .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-dds-history] .ui-data-table--compact td:is([data-table-column="title"],[data-table-column="workplace"]){white-space:normal;overflow-wrap:anywhere}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-dds-history] .ui-data-table--compact td[data-table-column="title"]{white-space:normal;overflow-wrap:anywhere}
+ /* Financial history shares the same two-line workplace heading. Its words
+    must keep their intrinsic width even when DDS money columns grow. */
+ .v2-app--workspace [data-wallet-history-host]>.ui-data-table--compact th[data-table-column="workplace"]>div{white-space:nowrap;overflow-wrap:normal;word-break:normal}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-dds-history] .ui-data-table--compact td[data-table-column="workplace"]{white-space:normal;overflow-wrap:normal;word-break:normal}
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-dds-history] .ui-data-table--compact td[data-table-column="title"] .people-table-person__phone{white-space:normal;overflow-wrap:anywhere}
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-dds-history] .ui-data-table--compact :is(th,td)[data-table-column="amount"]{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
  .v2-app--workspace .ui-data-table--compact tr.journal-list-record--active td{background:#EFFFBB}
