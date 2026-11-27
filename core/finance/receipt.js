@@ -67,7 +67,7 @@ function operationReceiptItems(entries = []) {
   return { items, lineCount: lines.length };
 }
 
-function paymentGroups(rows, data) {
+function paymentGroups(rows, data, { walletOnly = false } = {}) {
   const first = rows[0] || {};
   const person = first.person || data.person || {};
   const when = shortDateTimeParts(first.occurredAt || '');
@@ -92,6 +92,7 @@ function paymentGroups(rows, data) {
     breakdown.push({ label: 'Стоимость до скидки', value: formatMoney(settlement.serviceTotal) }, { label: 'Скидка', value: formatMoney(Number(settlement.serviceTotal) - Number(settlement.planTotal)) });
   }
   if (settlement.planTotal != null) breakdown.push({ label: 'К оплате по счёту', value: formatMoney(settlement.planTotal), strong: true });
+  if (walletOnly) return [identity, breakdown].filter(group => group.length);
   const tips = data.tips != null ? Math.max(0, Number(data.tips) || 0) : rows.filter(item => item.economicType === 'TIPS').reduce((sum,item) => sum + Math.max(0, Number(item.amount)||0),0);
   const payment = [];
   if (data.serviceAmount != null) payment.push({ label: 'Оплачено за услуги', value: formatMoney(data.serviceAmount) });
@@ -122,9 +123,12 @@ export function financeReceipt(operationId, title, { entries = [], wallet = null
   const first = rows[0] || {};
   const data = getFinanceOperation(id)?.data || {};
   const when = shortDateTimeParts(first.occurredAt || '');
-  const groups = first.operationKind === 'payment' ? paymentGroups(rows,data) : [];
+  const groups = first.operationKind === 'payment' ? paymentGroups(rows,data,{ walletOnly: Boolean(wallet) }) : [];
   const walletTotal = wallet ? [{ label: 'Движение по кошельку · ' + wallet.name, value: formatMoney(wallet.total), strong: true }] : [];
-  if (groups.length) return readOnlyReceipt({ groups, totals: walletTotal });
+  if (groups.length) {
+    const movement = Number(wallet?.total) || 0;
+    return readOnlyReceipt({ groups, totals: wallet ? [{ label: movement < 0 ? 'Списано' : 'Поступило', value: formatMoney(Math.abs(movement)), strong: true }] : [] });
+  }
   const details = operationReceiptItems(rows).items;
   if (data.financeEntityName) details.push({ label: 'Наименование', value: data.financeEntityName });
   return readOnlyReceipt({ date: when.date || '—', time: when.time || '—', items: details, totals: [{label:'Итого',value:formatMoney(operationTotal(rows)),strong:true},...walletTotal] });

@@ -91,14 +91,18 @@ export function bindFinanceHistoryTable(root, open) {
 
 // Financial document: X in both layouts, actions below the receipt.
 export function openFinanceReceiptX(root, title, receipt, actions = []) {
+  const desktop = financeDesktop(root);
   const available = actions.filter(Boolean);
+  const singleDelete = desktop && available.length === 1 && /^(?:danger|critical)$/.test(available[0].variant || '');
   const tools = available.map((item, index) => button(item.label, {
     variant: item.variant || 'secondary',
     data: 'data-finance-receipt-action="' + index + '"',
     aria: item.aria || '',
-  })).join('');
-  const layer = mountModal(root, modal(receipt + (tools ? '<div class="modal-actions">' + tools + '</div>' : ''), { title, variant: 'x', surface: 'app' }));
+  })).join('') + (singleDelete ? button('Отмена', { variant: 'secondary', className: 'finance-receipt-close', data: 'data-finance-receipt-close' }) : '');
+  const footerClass = desktop ? 'modal-actions finance-receipt-actions' + (singleDelete ? ' finance-receipt-actions--pair' : '') : 'modal-actions';
+  const layer = mountModal(root, modal(receipt + (tools ? '<div class="' + footerClass + '">' + tools + '</div>' : ''), { title, variant: 'x', surface: 'app' }));
   if (!layer) return null;
+  layer.querySelector('[data-finance-receipt-close]')?.addEventListener('click', () => layer.v2Close?.());
   layer.querySelectorAll('[data-finance-receipt-action]').forEach(control => {
     const action = available[Number(control.dataset.financeReceiptAction)];
     control.addEventListener('click', () => action.run(layer));
