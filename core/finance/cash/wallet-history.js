@@ -16,12 +16,14 @@ const SORTS = [
   ['amountDesc','Сумма — по убыванию'], ['amountAsc','Сумма — по возрастанию'],
 ];
 const emptyFilters = () => ({ title:'', workplace:'', person:'', direction:'', from:'', to:'' });
+const ddsFilters = () => ({ ...emptyFilters(), wallet:'', article:'', status:'' });
+const DDS_SORTS = [...SORTS, ['walletAsc','Кошелёк — от А до Я'], ['walletDesc','Кошелёк — от Я до А'], ['articleAsc','Статья — от А до Я'], ['articleDesc','Статья — от Я до А']];
 const money = value => new Intl.NumberFormat('ru-RU',{maximumFractionDigits:2}).format(value) + ' ₽';
 const clean = value => String(value ?? '').toLocaleLowerCase('ru').replace(/ё/g,'е').replace(/\s+/g,' ').trim();
 const numeric = value => String(value ?? '').replace(/[^0-9]/g,'');
 const sum = rows => rows.reduce((total,row)=>total+Math.round(row.value*100),0)/100;
 
-function localDate(value) {
+export function localDate(value) {
   const date = new Date(value);
   if (!value || !Number.isFinite(date.getTime())) return '';
   return [date.getFullYear(),String(date.getMonth()+1).padStart(2,'0'),String(date.getDate()).padStart(2,'0')].join('-');
@@ -45,12 +47,15 @@ export function visibleWalletRows(rows, query='', filters=emptyFilters(), sort='
   const items = rows.filter(row => {
     const fullDate = row.localDate ? row.localDate.split('-').reverse().join('.') : '';
     const haystack=clean([row.date,row.localDate,fullDate,row.title,row.code,row.person,row.contact,row.workplace,row.amount,
-      row.item?.sourceDetails,row.item?.articleName,row.item?.note,row.id].join(' '));
+      row.item?.sourceDetails,row.item?.articleName,row.item?.note,row.id,row.wallet,row.article,row.status].join(' '));
     if (!words.every(word=>haystack.includes(word) || (/^[+\d().-]+$/.test(word)&&numeric(word)&&
       [row.contact,row.date,fullDate,row.amount].map(numeric).some(value=>value.includes(numeric(word)))))) return false;
     return (!filters.title||row.title===filters.title)&&(!filters.workplace||row.workplace===filters.workplace)
       &&(!filters.person||row.personFilter===filters.person)
-      &&(!filters.direction||(filters.direction==='in'?row.value>0:row.value<0))
+      &&(!filters.direction||(row.direction ? row.direction===filters.direction : (filters.direction==='in'?row.value>0:row.value<0)))
+      &&(!filters.wallet||row.wallets?.includes(filters.wallet))
+      &&(!filters.article||row.articles?.includes(filters.article))
+      &&(!filters.status||row.status===filters.status)
       &&(!filters.from||(row.localDate&&row.localDate>=filters.from))
       &&(!filters.to||(row.localDate&&row.localDate<=filters.to));
   });
@@ -98,21 +103,26 @@ function choices(rows,key) {
   return [{value:'',label:'Без фильтра'},...[...new Set(rows.map(row=>row[key]).filter(Boolean))]
     .sort((a,b)=>a.localeCompare(b,'ru',{numeric:true})).map(value=>({value,label:value}))];
 }
-function filterFields(rows, filters) {
+function filterFields(rows, filters, dds = false) {
+  const values = key => [{value:'',label:'Без фильтра'},...[...new Set(rows.flatMap(row=>row[key]||[]).filter(Boolean))]
+    .sort((a,b)=>a.localeCompare(b,'ru',{numeric:true})).map(value=>({value,label:value}))];
   return '<div class="form-grid">'
     +select({label:'Операция',name:'title',value:filters.title,options:choices(rows,'title')})
     +select({label:'Клиент / контрагент',name:'person',value:filters.person,options:choices(rows,'personFilter')})
     +select({label:'Рабочее пространство',name:'workplace',value:filters.workplace,options:choices(rows,'workplace')})
-    +select({label:'Движение',name:'direction',value:filters.direction,options:[{value:'',label:'Без фильтра'},{value:'in',label:'Приход'},{value:'out',label:'Расход'}]})
+    +select({label:'Движение',name:'direction',value:filters.direction,options:[{value:'',label:'Без фильтра'},{value:'in',label:'Приход'},{value:'out',label:'Расход'},...(dds?[{value:'transfer',label:'Перевод'},{value:'mixed',label:'Смешанное'}]:[])]})
+    +(dds?select({label:'Кошелёк',name:'wallet',value:filters.wallet,options:values('wallets')})
+      +select({label:'Статья',name:'article',value:filters.article,options:values('articles')})
+      +select({label:'Статус',name:'status',value:filters.status,options:choices(rows,'status')}):'')
     +'<div class="form-grid form-grid--two">'
     +datePicker({name:'from',label:'',placeholder:'С даты',value:filters.from,allowClear:true,modalSurface:'app'})
     +datePicker({name:'to',label:'',placeholder:'По дату',value:filters.to,allowClear:true,modalSurface:'app'})
     +'</div></div>';
 }
-function openFilters(anchor,rows,state,refresh) {
+function openFilters(anchor,rows,state,refresh,dds=false) {
   let draft={...state.filters};
   const popup=mountModal(anchor,modal(
-    '<div data-people-filter-fields>'+filterFields(rows,draft)+'</div>'
+    '<div data-people-filter-fields>'+filterFields(rows,draft,dds)+'</div>'
     +'<div class="modal-actions" data-people-filter-actions'+(Object.values(draft).some(Boolean)?'':' hidden')+'>'
     +button('Сбросить',{variant:'secondary',data:'data-people-filter-action'})+'</div>',
     {title:'Фильтр',variant:'x',surface:'app',className:'people-action-popup people-filter-popup'}));
@@ -131,14 +141,14 @@ function openFilters(anchor,rows,state,refresh) {
     refresh();
   });
   popup.querySelector('[data-people-filter-action]')?.addEventListener('click',()=>{
-    state.filters=emptyFilters();draft={...state.filters};
+    state.filters=dds?ddsFilters():emptyFilters();draft={...state.filters};
     const host=popup.querySelector('[data-people-filter-fields]');
-    host.innerHTML=filterFields(rows,draft);initDatePickers(host);
+    host.innerHTML=filterFields(rows,draft,dds);initDatePickers(host);
     actions.hidden=true;refresh();
   });
 }
-function openSort(anchor,state,refresh) {
-  const markup='<div class="people-action-menu">'+SORTS.map(([value,label])=>
+function openSort(anchor,state,refresh,dds=false) {
+  const markup='<div class="people-action-menu">'+(dds?DDS_SORTS:SORTS).map(([value,label])=>
     button(label,{variant:'secondary',data:'data-wallet-sort-choice="'+value+'" aria-pressed="'+(value===state.sort)+'"'})).join('')+'</div>';
   const popup=mountModal(anchor,modal(markup,{title:'Сортировка',variant:'x',surface:'app',xRole:'action',className:'people-action-popup people-sort-popup'}));
   popup?.querySelectorAll('[data-wallet-sort-choice]').forEach(control=>control.addEventListener('click',()=>{
@@ -146,14 +156,16 @@ function openSort(anchor,state,refresh) {
   }));
 }
 const check=(data,aria,checked)=>'<label class="ui-compact-check">'+checkControl({data,aria,checked})+'</label>';
-export function walletHistoryBody() {
+export function walletHistoryBody(dds=false) {
   // Regular text, not the 30px H title/accessory counter.
   return '<section><div class="v2-desktop-tool-row"><div class="v2-desktop-tool-context"><span><output data-wallet-count aria-label="Количество операций" aria-live="polite"></output></span></div>'
-    +'<div class="v2-desktop-tool-actions"><span><output data-wallet-sum aria-label="Сумма операций" aria-live="polite"></output></span></div></div>'
+    +(dds?'':'<div class="v2-desktop-tool-actions"><span><output data-wallet-sum aria-label="Сумма операций" aria-live="polite"></output></span></div>')+'</div>'
     +'<div data-wallet-history-host></div></section>';
 }
-export function bindWalletHistory(layer,wallet,rows,{open,settings}) {
-  const state=layer.walletHistoryState ||= {query:'',filters:emptyFilters(),sort:'dateDesc',selected:new Set()};
+export function bindWalletHistory(layer,wallet,rows,{open,settings,dds=false,actions=[]}) {
+  const stateKey=dds?'ddsHistoryState':'walletHistoryState';
+  const state=layer[stateKey] ||= {query:'',filters:dds?ddsFilters():emptyFilters(),sort:'dateDesc',selected:new Set()};
+  const tools=actions.filter(Boolean);
   const [toolbar]=setV2ZHeaderRows(layer,[
     '<section data-people-desktop-toolbar><div class="people-desktop-tools">'
     +field({name:'walletSearch',type:'search',placeholder:'Поиск',autocomplete:'off',value:state.query,data:'data-wallet-search'})
@@ -161,8 +173,9 @@ export function bindWalletHistory(layer,wallet,rows,{open,settings}) {
     +compactButton({kind:'filter',data:'data-wallet-filter title="Фильтр" aria-haspopup="dialog" aria-pressed="false"'})
     +compactButton({kind:'sort',data:'data-wallet-sort title="Сортировка" aria-haspopup="dialog" aria-pressed="false"'})
     +'</div><div class="people-desktop-actions people-desktop-actions--right">'
-    +button(DATA_EXPORT_ICON,{variant:'secondary',className:'people-desktop-icon',data:'data-wallet-export title="Выгрузить в Excel"',aria:'Выгрузить в Excel'})
-    +(settings?button('Удалить',{variant:'secondary',data:'data-wallet-settings',aria:'Удалить кассу'}):'')
+    +(dds?tools.map((action,index)=>button(action.label,{variant:'secondary',className:action.className||'',aria:action.aria||'',data:'data-dds-history-action="'+index+'"'})).join('')
+      :button(DATA_EXPORT_ICON,{variant:'secondary',className:'people-desktop-icon',data:'data-wallet-export title="Выгрузить в Excel"',aria:'Выгрузить в Excel'})
+        +(settings?button('Удалить',{variant:'secondary',data:'data-wallet-settings',aria:'Удалить кассу'}):''))
     +'</div></div></section>',
   ],{desktopTitle:wallet.name});
   const host=layer.querySelector('[data-wallet-history-host]');
@@ -176,10 +189,10 @@ export function bindWalletHistory(layer,wallet,rows,{open,settings}) {
   const sync=()=>{
     const result=walletSelection(visible,state.selected);
     count.textContent=result.selectedCount?result.selectedCount+' / '+result.count:String(result.count);
-    total.textContent=result.selectedCount?money(result.selectedTotal)+' / '+money(result.total):money(result.total);
+    if(total)total.textContent=result.selectedCount?money(result.selectedTotal)+' / '+money(result.total):money(result.total);
     const all=host.querySelector('[data-wallet-select-all]');
     if(all){all.checked=result.count>0&&result.selectedCount===result.count;all.indeterminate=result.selectedCount>0&&!all.checked;}
-    exportControl.disabled=busy||!result.exportRows.length;
+    if(exportControl)exportControl.disabled=busy||!result.exportRows.length;
   };
   const refresh=()=>{
     visible=visibleWalletRows(rows,state.query,state.filters,state.sort);
@@ -188,11 +201,11 @@ export function bindWalletHistory(layer,wallet,rows,{open,settings}) {
     for(const id of state.selected)if(!ids.has(id))state.selected.delete(id);
     toolbar.querySelector('[data-wallet-filter]')?.setAttribute('aria-pressed',String(Object.values(state.filters).some(Boolean)));
     toolbar.querySelector('[data-wallet-sort]')?.setAttribute('aria-pressed',String(state.sort!=='dateDesc'));
-    host.innerHTML=visible.length?financeHistoryTable(visible,'Операции кошелька',[
+    host.innerHTML=visible.length?financeHistoryTable(visible,dds?'Все операции':'Операции кошелька',[
       {key:'select',label:'',narrow:true,header:()=>check('data-wallet-select-all','Выбрать все видимые операции',visible.every(row=>state.selected.has(row.id))),render:row=>check('data-wallet-select="'+escapeHtml(row.id)+'"','Выбрать операцию '+row.title,state.selected.has(row.id))},
-      {key:'date',label:'Дата',narrow:true},{key:'title',label:'Операция'},{key:'code',label:'Код',narrow:true},
-      {key:'person',label:'Клиент / контрагент'},{key:'workplace',label:'Рабочее пространство'},{key:'amount',label:'Сумма',narrow:true},
-    ]):emptyState(rows.length?'Операции не найдены':'Операций пока нет',rows.length?'Измените условия поиска или фильтрации.':'Движения по этой кассе появятся здесь.');
+      {key:'date',label:'Дата',narrow:true},{key:'title',label:'Операция',...(dds?{secondaryKey:'wallet',secondaryLabel:'Кошелёк'}:{})},{key:'code',label:'Код',narrow:true},
+      {key:'person',label:'Клиент / контрагент'},{key:'workplace',label:'Рабочее пространство'},...(dds?[{key:'article',label:'Статья'}]:[]),{key:'amount',label:'Сумма',narrow:true},
+    ]):emptyState(rows.length?'Операции не найдены':'Операций пока нет',rows.length?'Измените условия поиска или фильтрации.':(dds?'Финансовые операции появятся здесь.':'Движения по этой кассе появятся здесь.'));
     host.querySelectorAll('[data-wallet-select]').forEach(control=>control.addEventListener('change',()=>{
       if(control.checked)state.selected.add(control.dataset.walletSelect);else state.selected.delete(control.dataset.walletSelect);sync();
     }));
@@ -211,9 +224,12 @@ export function bindWalletHistory(layer,wallet,rows,{open,settings}) {
   };
   search?.addEventListener('input',()=>{state.query=search.value;refresh();});
   toolbar.querySelector('[data-wallet-filter]')?.addEventListener('click',event=>{
-    event.currentTarget.dataset.v2AnchorWidth='360';openFilters(event.currentTarget,rows,state,refresh);
+    event.currentTarget.dataset.v2AnchorWidth='360';openFilters(event.currentTarget,rows,state,refresh,dds);
   });
-  toolbar.querySelector('[data-wallet-sort]')?.addEventListener('click',event=>openSort(event.currentTarget,state,refresh));
+  toolbar.querySelector('[data-wallet-sort]')?.addEventListener('click',event=>openSort(event.currentTarget,state,refresh,dds));
+  toolbar.querySelectorAll('[data-dds-history-action]').forEach(control=>control.addEventListener('click',()=>{
+    tools[Number(control.dataset.ddsHistoryAction)]?.run(control,walletSelection(visible,state.selected).exportRows);
+  }));
   toolbar.querySelector('[data-wallet-settings]')?.addEventListener('click',()=>settings?.());
   exportControl?.addEventListener('click',()=>{
     if(busy)return;const result=walletSelection(visible,state.selected);

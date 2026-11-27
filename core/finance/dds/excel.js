@@ -144,9 +144,9 @@ function exportQ(root,movements){
     finally{busy=false;if(submit)submit.disabled=false;}
   });
 }
-export function openDDSExcel(root,movements,{onImported=()=>{},anchor=null}={}){
+export function openDDSExcel(root,movements,{onImported=()=>{},anchor=null,exportMovements=movements}={}){
   const actions=[
-    {key:'export',label:'Выгрузка',run:()=>exportQ(root,movements)},
+    {key:'export',label:'Выгрузка',run:()=>exportQ(root,exportMovements)},
     {key:'import',label:'Загрузка',run:()=>chooseScopedImport(root,'finance',{
       onImported:async()=>{await refreshFinanceState();await onImported();},
     })},

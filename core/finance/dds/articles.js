@@ -1,6 +1,7 @@
 import {
   actionBlock,
   button,
+  dataTable,
   emptyState,
   escapeHtml,
   field,
@@ -65,7 +66,8 @@ function directionLabel(value) {
 
 function economicLabel(value) {
   if (value === 'GROUP') return 'Группа';
-  return ECONOMIC_OPTIONS.find((item) => item.value === value)?.label || value;
+  const labels = {INVESTMENT_CAPITAL_RETURN:'Возврат капитала',INVESTMENT_INCOME:'Доход инвестиции',INVESTMENT_CONTRIBUTION:'Вложение',INVESTMENT_EXPENSE:'Расход инвестиции',INVESTMENT_INCOME_PAYMENT:'Выплата дохода инвестору'};
+  return ECONOMIC_OPTIONS.find((item) => item.value === value)?.label || labels[value] || value;
 }
 
 function parentOptions(items, currentId = '') {
@@ -152,6 +154,17 @@ function openForm(root, existing = null) {
   });
 }
 
+function articleTable(rows) {
+  const names=new Map(rows.map(item=>[item.articleId,item.name]));
+  return '<div data-finance-article-table>'+dataTable({compact:true,caption:'Статьи',rows,columns:[
+    {key:'name',label:'Название',sortable:false,render:item=>'<button type="button" data-finance-article="'+escapeHtml(item.articleId)+'" aria-label="Открыть статью '+escapeHtml(item.name)+'">'+escapeHtml(item.name)+'</button>'},
+    {key:'parent',label:'Группа',sortable:false,render:item=>escapeHtml(names.get(item.parentArticleId)||'—')},
+    {key:'direction',label:'Направление',sortable:false,render:item=>escapeHtml(directionLabel(item.direction))},
+    {key:'economicType',label:'Назначение',sortable:false,render:item=>escapeHtml(economicLabel(item.economicType))},
+    {key:'system',label:'Тип',sortable:false,render:item=>item.systemKey?'Системная':'Пользовательская'},
+  ]})+'</div>';
+}
+
 function renderList(root) {
   const items = getFinanceArticles();
   const rows = treeRows(items);
@@ -162,12 +175,12 @@ function renderList(root) {
       data: 'data-add-finance-article',
       aria: 'Добавить статью',
     },
-  })}${rows.length ? list({ items: rows.map(row) }) : emptyState('Статей пока нет', 'Добавьте первую статью кнопкой «+».')}`;
+  })}${rows.length ? (financeDesktop(root) ? articleTable(rows) : list({ items: rows.map(row) })) : emptyState('Статей пока нет', 'Добавьте первую статью кнопкой «+».')}`;
 
   if (financeDesktop(root)) financeZActions(root, 'Статьи', [{ label: '+', className: 'v2-desktop-tool-primary', aria: 'Добавить статью', run: () => openForm(root) }]);
   else root.querySelector('[data-add-finance-article]')?.addEventListener('click', () => openForm(root));
   root.querySelectorAll('[data-finance-article]').forEach((element) => {
-    element.addEventListener('click', () => {
+    (financeDesktop(root) ? element.closest('tr') || element : element).addEventListener('click', () => {
       const item = getFinanceArticles().find((candidate) => candidate.articleId === element.dataset.financeArticle);
       if (item) openForm(root, item);
     });
