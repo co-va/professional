@@ -1426,7 +1426,7 @@ function openFinanceEntityOperation(root, entityLayer, type, entity, operationId
   return openFinanceReceiptX(entityLayer, operationName(operation), operationReceipt(operation), [{
     label: 'Удалить', variant: 'danger',
     run: receipt => openFinanceDeleteConfirmation(receipt, {
-      message: 'Финансовая операция будет аннулирована. Исходная операция останется в истории, а её движение будет сторнировано. Вы уверены?',
+      message: 'Операция будет отменена, остатки кошельков пересчитаны. Информация об отмене сохранится в истории. Вы уверены?',
       onConfirm: () => cancelFinanceOperation(operation.operationId, {
         reason: 'incorrect-entry', occurredAt: new Date(),
       }),
@@ -1559,7 +1559,9 @@ function openWalletOperation(root, walletLayer, wallet, operationId) {
 
 function openOperationSettings(root, walletLayer, operationLayer, wallet, operation) {
   return openFinanceDeleteConfirmation(operationLayer, {
-    message: 'Счёт будет аннулирован. Исходная операция останется в истории, а её финансовое движение будет сторнировано. Вы уверены?',
+    message: operation.operationKind === 'payment'
+      ? 'Оплата будет отменена, остатки кошельков пересчитаны. Информация об отмене сохранится в истории. Вы уверены?'
+      : 'Операция будет отменена, остатки кошельков пересчитаны. Информация об отмене сохранится в истории. Вы уверены?',
     onConfirm: () => cancelFinanceOperation(operation.operationId, {
       reason: 'incorrect-entry',
       occurredAt: new Date(),
