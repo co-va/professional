@@ -4,6 +4,7 @@ import { readOnlyReceipt } from '../../ui/receipt/index.js';
 import { getFinanceOperation } from './data.js';
 import { getLedgerEntries } from './read.js';
 import { depositArticleLabel, isDepositCashDocument } from './dds/classification.js';
+import { loyaltyDocumentFacts } from './dds/documents.js';
 
 function formatMoney(value = 0, { signed = false } = {}) {
   return formatSignedMoney(value, signed);
@@ -68,7 +69,7 @@ function operationReceiptItems(entries = []) {
   return { items, lineCount: lines.length };
 }
 
-function paymentGroups(rows, data, { walletOnly = false } = {}) {
+function paymentGroups(rows, data, { walletOnly = false, facts = null } = {}) {
   const first = rows[0] || {};
   const person = first.person || data.person || {};
   const when = shortDateTimeParts(first.occurredAt || '');
@@ -108,14 +109,20 @@ function paymentGroups(rows, data, { walletOnly = false } = {}) {
     }
     for (const [label,amount] of wallets) distribution.push({ label, value: formatMoney(amount) });
   }
-  for (const item of (Array.isArray(data.depositAllocations) ? data.depositAllocations : [])) {
+  if(facts){
+    for(const item of facts.allocations){
+      distribution.push({label:item.name.split(' · остаток ')[0],value:formatMoney(item.amount)});
+      distribution.push({label:'Денежная часть',value:item.principal===null?'Не определено':formatMoney(item.principal)});
+      distribution.push({label:'Бонусная часть',value:item.bonus===null?'Не определено':new Intl.NumberFormat('ru-RU',{maximumFractionDigits:2}).format(item.bonus)});
+    }
+  }else for (const item of (Array.isArray(data.depositAllocations) ? data.depositAllocations : [])) {
     if (Number(item.amount)>0) distribution.push({ label: item.name || 'Депозит', value: formatMoney(item.amount) });
   }
   if (Number(data.personalAccountAmount)>0) distribution.push({ label: 'Личный счёт', value: formatMoney(data.personalAccountAmount) });
   return [identity,breakdown,payment,distribution].filter(group => group.length);
 }
 
-function depositCashGroups(rows,data){
+function depositCashGroups(rows,data,facts=null){
   const first=rows[0]||{},person=data.person||first.person||{};
   const when=shortDateTimeParts(first.occurredAt||'');
   const identity=[
@@ -125,19 +132,39 @@ function depositCashGroups(rows,data){
   ].filter(row=>row.value);
   const subject=[{label:'Статья',value:depositArticleLabel(first)},{label:'Депозит',value:String(data.programName||first.lineName||'Не указано')}];
   const movement=[{label:'Кошелёк',value:String(data.walletName||first.walletName||'Не определён')},{label:first.operationKind==='deposit-withdrawal'?'Возвращено':'Внесено',value:formatMoney(operationTotal(rows)),strong:true}];
+  if(facts&&first.operationKind==='deposit-funding'&&facts.bonus!==0)movement.push({label:'Начислено бонусов',value:facts.bonus===null?'Не определено':String(facts.bonus)});
+  if(facts&&first.operationKind==='deposit-withdrawal'&&facts.bonusUnknown)movement.push({label:'Списано бонусов',value:'Не определено'});
   if(first.operationKind==='deposit-withdrawal'&&data.reason)movement.push({label:'Причина',value:String(data.reason)});
   return [identity,subject,movement].filter(group=>group.length);
 }
+function loyaltyOtherGroups(first,data,facts){
+ const when=shortDateTimeParts(first.occurredAt||'');
+ const person=data.person||first.person||{};
+ const identity=[{label:'Дата и время',value:[when.date,when.time].filter(Boolean).join(' · ')},{label:'Код',value:person.uei||''},{label:'Клиент',value:personText({person})}].filter(r=>r.value);
+ const details=[{label:'Статья',value:facts.article}];
+ for(const item of facts.allocations){
+  details.push({label:item.name.split(' · остаток ')[0],value:formatMoney(item.amount)},{label:'Денежная часть',value:item.principal===null?'Не определено':formatMoney(item.principal)},{label:'Бонусная часть',value:item.bonus===null?'Не определено':String(item.bonus)});
+ }
+ if(facts.personal)details.push({label:'Личный счёт',value:formatMoney(facts.personal,{signed:true})});
+ if(facts.cash)details.push({label:data.walletName||first.walletName||'Движение по кошельку',value:formatMoney(facts.cash,{signed:true})});
+ if(facts.cashUnknown)details.push({label:'Кошелёк',value:'Не определён'});
+ if(data.reason)details.push({label:'Причина',value:String(data.reason)});
+ return [identity,details,[{label:'Итого',value:formatMoney(facts.amount||Math.abs(facts.cash)),strong:true}]];
+}
 // Use the historical operation snapshot, not the current price list or record.
-export function financeReceipt(operationId, title, { entries = [], wallet = null, desktop = false } = {}) {
+export function financeReceipt(operationId, title, { entries = [], wallet = null, desktop = false, document = null } = {}) {
   const id = String(operationId || '');
   const all = getLedgerEntries().filter(item => String(item.operationId || '') === id);
   const rows = all.length ? all : entries;
-  const first = rows[0] || {};
-  const data = getFinanceOperation(id)?.data || {};
+  const first = rows[0] || document?.first || {};
+  const operation=getFinanceOperation(id);
+  const data = operation?.data || {};
+  const facts=desktop?(document?.facts||(operation?loyaltyDocumentFacts(operation,rows):null)):null;
+  const receiptRows=rows.length?rows:[first];
   const when = shortDateTimeParts(first.occurredAt || '');
-  if(desktop&&isDepositCashDocument(first))return readOnlyReceipt({groups:depositCashGroups(rows,data)});
-  const groups = first.operationKind === 'payment' ? paymentGroups(rows,data,{ walletOnly: Boolean(wallet) }) : [];
+  if(desktop&&isDepositCashDocument(first))return readOnlyReceipt({groups:depositCashGroups(receiptRows,data,facts)});
+  if(facts&&first.operationKind!=='payment')return readOnlyReceipt({groups:loyaltyOtherGroups(first,data,facts)});
+  const groups = first.operationKind === 'payment' ? paymentGroups(receiptRows,data,{ walletOnly: Boolean(wallet),facts }) : [];
   const walletTotal = wallet ? [{ label: 'Движение по кошельку · ' + wallet.name, value: formatMoney(wallet.total), strong: true }] : [];
   if (groups.length) {
     const movement = Number(wallet?.total) || 0;

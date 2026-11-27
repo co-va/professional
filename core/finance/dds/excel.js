@@ -104,9 +104,10 @@ function filteredRows(movements,form){
     &&(!kind||kindGroup(row)===kind)
     &&(!wallet||row.wallet===wallet));
 }
-function exportQ(root,movements){
+function exportQ(root,movements,partialRegistry=false){
   const wallets=getWallets().map(wallet=>({value:String(wallet.name||''),label:String(wallet.name||'')}));
   const form='<form class="form-grid" data-dds-excel-export>'
+    +(partialRegistry?'<p>Текущий формат выгрузки не включает все операции депозитов, личного счёта и бонусов. Выгружаются только поддерживаемые денежные операции.</p>':'')
     +twoColumnLayout(datePicker({label:'С',name:'from',showYear:true}),
       datePicker({label:'По',name:'to',showYear:true}),{ariaLabel:'Период'})
     +select({label:'Операции',name:'kind',value:'',options:[
@@ -145,9 +146,9 @@ function exportQ(root,movements){
     finally{busy=false;if(submit)submit.disabled=false;}
   });
 }
-export function openDDSExcel(root,movements,{onImported=()=>{},anchor=null,exportMovements=movements}={}){
+export function openDDSExcel(root,movements,{onImported=()=>{},anchor=null,exportMovements=movements,partialRegistry=false}={}){
   const actions=[
-    {key:'export',label:'Выгрузка',run:()=>exportQ(root,exportMovements)},
+    {key:'export',label:'Выгрузка',run:()=>exportQ(root,exportMovements,partialRegistry)},
     {key:'import',label:'Загрузка',run:()=>chooseScopedImport(root,'finance',{
       onImported:async()=>{await refreshFinanceState();await onImported();},
     })},

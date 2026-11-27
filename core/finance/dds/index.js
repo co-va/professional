@@ -34,12 +34,13 @@ import { DATA_EXCHANGE_ICON, FINANCE_OPERATIONS_ICON, GROUP_ICON, TRASH_ICON } f
 import { financeOperationGroups, openFinanceOperations } from '../operations/index.js';
 import { canUseCapability } from '../../access.js';
 import { getAllPeople } from '../../people/data.js';
-import { getFinanceOperation, getFinanceArticles } from '../data.js';
+import { getFinanceOperation, getFinanceArticles, readFinanceState } from '../data.js';
 import { desktopDocumentArticles, desktopOperationDirection, depositArticleLabel, isDepositCashDocument } from './classification.js';
 import { getWallets } from '../cash/data.js';
 import { financeLocalDateValue, financeOccurredAtForDate } from '../date.js';
 import { cancelFinanceOperation, correctFinanceOperation, hardDeleteFinanceOperation } from '../service.js';
 import { getLedgerEntries } from '../read.js';
+import { desktopDocuments } from './documents.js';
 import { openFinanceArticlesQ } from './articles.js';
 import { openIncomeExpenseQ, renderIncomeExpenseOperation } from './income-expense.js';
 import { SPECIAL_FINANCE_ACTIONS, renderSpecialFinanceOperation } from './special-operations.js';
@@ -519,16 +520,16 @@ function openOperationCorrection(root, operationLayer, entries) {
 
 
 
-function openFinanceOperation(root, movements, operationId) {
+function openFinanceOperation(root, movements, operationId, document=null) {
   const id = String(operationId || '');
-  const entries = movements.filter((item) => String(item?.operationId || '') === id);
-  if (!entries.length) return;
-  const first = entries[0];
+  const entries = document?.entries||movements.filter((item) => String(item?.operationId || '') === id);
+  if (!entries.length&&!document) return;
+  const first = document?.first||entries[0];
   const desktop = financeDesktop(root);
   const depositDocument=desktop&&isDepositCashDocument(first);
   const title=depositDocument?depositArticleLabel(first):operationName(first);
-  const receipt = financeReceipt(id,title,{entries,desktop});
-  if(depositDocument)return openFinanceReceiptX(root,title,receipt,[],{actionLayout:'dds'});
+  const receipt = financeReceipt(id,title,{entries,desktop,document});
+  if(depositDocument||document?.facts)return openFinanceReceiptX(root,title,receipt,[],{actionLayout:'dds'});
   const active = first?.operationStatus !== 'cancelled';
   const correction = active ? { label: desktop ? 'Исправить' : 'Корректировка', variant: desktop ? 'primary' : 'secondary', run: layer => openOperationCorrection(root, layer, entries) } : null;
   const cancel = !desktop && active ? { label: 'Отменить операцию', aria: 'Отменить финансовую операцию с сохранением истории', variant: 'danger', run: layer => openCancelOperation(root, layer, entries) } : null;
@@ -575,21 +576,28 @@ function renderDDS(root) {
   const people = financeDesktop(root) ? getAllPeople() : [];
   const desktop = financeDesktop(root);
   const catalog=desktop?getFinanceArticles():[];
-  const rows = desktop ? groupedOperations.map(entries => {
-    const first = entries[0];
+  const documents=desktop?desktopDocuments(readFinanceState().operations,movements):[];
+  const byId=new Map(documents.map(doc=>[doc.id,doc]));
+  const rows = desktop ? documents.map(({entries,first,facts}) => {
     const transfer = first.operationKind === 'transfer';
     const wallets = [...new Set(entries.map(walletText).filter(Boolean))];
     const articles = desktopDocumentArticles(entries,catalog);
+    if(facts&&!articles.includes(facts.article))articles.push(facts.article);
+    const sourceNames=[...new Set([...wallets,...(facts?.sources||[])])];
     const directions = new Set(entries.map(item=>item.direction).filter(Boolean));
-    const direction = transfer ? 'transfer' : directions.size===1&&directions.has('OUT') ? 'out' : directions.size===1&&directions.has('IN') ? 'in' : 'mixed';
+    const direction = facts?.internal?'mixed':transfer?'transfer':directions.size===1&&directions.has('OUT')?'out':directions.size===1&&directions.has('IN')?'in':facts?.kind==='deposit-funding'?'in':facts?.kind==='deposit-withdrawal'?'out':'mixed';
     const contact=financeTableContact(first,people);
     const title=desktopOperationDirection(direction);
+    const signed=v=>formatMoney(v,{signed:true});
+    const moneyParts=facts?[...(entries.length?[signed(facts.cash)]:facts.cashUnknown?['Кошелёк не определён']:[]),...(facts.allocations.length?[facts.principal===null?'Депозит: не определено':facts.principal!==0?'Депозит: '+signed(facts.principal):'Депозит: 0 ₽']:[]),...(facts.personal!==0?['Личный счёт: '+signed(facts.personal)]:[])]:[];
+    const amount=facts?(moneyParts.join(' · ')||'—'):operationDisplayAmount(entries);
+    const bonus=facts?(facts.bonus===null?'Не определено':facts.bonus!==0?(facts.bonus>0?'+':'−')+new Intl.NumberFormat('ru-RU',{maximumFractionDigits:2}).format(Math.abs(facts.bonus)):'—'):'—';
     return { id:String(first.operationId), date:operationMoment(first), occurredAt:String(first.occurredAt||first.refundedAt||first.paidAt||''),
       localDate:localDate(first.occurredAt||first.refundedAt||first.paidAt||''), title, displayTitle:first.operationStatus==='cancelled'?title+' · Отменена':title, operationLabel:operationName(first), ...contact,
       personFilter:[contact.code,contact.person].filter(Boolean).join(' · '), workplace:String(first.workplace||''),
-      wallets, wallet:transfer?operationListSubtitle(entries):wallets.join(' + '), articles, article:articles.join(', '),
+      wallets:sourceNames, wallet:transfer?operationListSubtitle(entries):sourceNames.join(' + '), articles, article:articles.join(', '),
       direction, status:first.operationStatus==='cancelled'?'Отменена':'Активна',
-      value:direction==='out'?-operationTotal(entries):operationTotal(entries), amount:operationDisplayAmount(entries), item:first };
+      value:facts?(facts.cash||facts.principal||facts.personal||0):(direction==='out'?-operationTotal(entries):operationTotal(entries)), amount, bonus, bonusValue:facts?.bonus??0, item:first };
   }) : [];
   const operations = desktop ? '<div data-dds-history>'+walletHistoryBody(true)+'</div>'
     : groupedOperations.length ? v2ListEntries(groupedOperations.map(operationListEntry)) : emptyState('Все операции','Финансовых операций пока нет.');
@@ -606,10 +614,11 @@ function renderDDS(root) {
 
   root.innerHTML = `${headerContext}${operations}`;
   if (desktop) bindWalletHistory(root, {name:'Движения денежных средств'}, rows, {
-    dds:true, open:id=>openFinanceOperation(root,movements,id), actions:[
+    dds:true, open:id=>openFinanceOperation(root,movements,id,byId.get(id)), actions:[
     { label: DATA_EXCHANGE_ICON, className: 'people-desktop-icon', aria: 'Обмен данными', run: (anchor, selectedRows) => {
       const ids=new Set(selectedRows.map(row=>row.id));
-      openDDSExcel(root, movements, { anchor, exportMovements:movements.filter(item=>ids.has(String(item.operationId))), onImported: () => renderDDS(root) });
+      const incomplete=selectedRows.some(row=>byId.get(row.id)?.facts);
+      openDDSExcel(root, movements, { anchor, exportMovements:movements.filter(item=>ids.has(String(item.operationId))), partialRegistry:incomplete, onImported: () => renderDDS(root) });
     } },
     canUseCapability('finance.articles.access') ? { label: GROUP_ICON, className: 'people-desktop-icon', aria: 'Статьи', run: () => openArticles(root) } : null,
     financeOperationGroups({ groups: operationGroups }).length ? {

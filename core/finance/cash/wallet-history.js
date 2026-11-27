@@ -17,7 +17,7 @@ const SORTS = [
 ];
 const emptyFilters = () => ({ title:'', workplace:'', person:'', direction:'', from:'', to:'' });
 const ddsFilters = () => ({ ...emptyFilters(), wallet:'', article:'', status:'' });
-const DDS_SORTS = [...SORTS.filter(([key])=>!key.startsWith('title')), ['walletAsc','Кошелёк — от А до Я'], ['walletDesc','Кошелёк — от Я до А'], ['articleAsc','По статьям — от А до Я'], ['articleDesc','По статьям — от Я до А']];
+const DDS_SORTS = [...SORTS.filter(([key])=>!key.startsWith('title')), ['walletAsc','Кошелёк — от А до Я'], ['walletDesc','Кошелёк — от Я до А'], ['articleAsc','По статьям — от А до Я'], ['articleDesc','По статьям — от Я до А'],['bonusDesc','Бонусы — по убыванию'],['bonusAsc','Бонусы — по возрастанию']];
 const money = value => new Intl.NumberFormat('ru-RU',{maximumFractionDigits:2}).format(value) + ' ₽';
 const clean = value => String(value ?? '').toLocaleLowerCase('ru').replace(/ё/g,'е').replace(/\s+/g,' ').trim();
 const numeric = value => String(value ?? '').replace(/[^0-9]/g,'');
@@ -47,7 +47,7 @@ export function visibleWalletRows(rows, query='', filters=emptyFilters(), sort='
   const items = rows.filter(row => {
     const fullDate = row.localDate ? row.localDate.split('-').reverse().join('.') : '';
     const haystack=clean([row.date,row.localDate,fullDate,row.title,row.code,row.person,row.contact,row.workplace,row.amount,
-      row.operationLabel,row.item?.sourceDetails,row.item?.articleName,row.item?.note,row.id,row.wallet,row.article,row.status].join(' '));
+      row.operationLabel,row.item?.sourceDetails,row.item?.articleName,row.item?.note,row.id,row.wallet,row.article,row.status,row.bonus].join(' '));
     if (!words.every(word=>haystack.includes(word) || (/^[+\d().-]+$/.test(word)&&numeric(word)&&
       [row.contact,row.date,fullDate,row.amount].map(numeric).some(value=>value.includes(numeric(word)))))) return false;
     return (!filters.title||row.title===filters.title)&&(!filters.workplace||row.workplace===filters.workplace)
@@ -62,7 +62,7 @@ export function visibleWalletRows(rows, query='', filters=emptyFilters(), sort='
   const key=sort.replace(/Asc$|Desc$/,'');
   const direction=sort.endsWith('Desc')?-1:1;
   return items.sort((a,b)=>{
-    const comparison=key==='amount'?a.value-b.value:key==='date'?
+    const comparison=key==='amount'?a.value-b.value:key==='bonus'?(a.bonusValue||0)-(b.bonusValue||0):key==='date'?
       (Date.parse(a.occurredAt)||0)-(Date.parse(b.occurredAt)||0):
       String(a[key]||'').localeCompare(String(b[key]||''),'ru',{numeric:true});
     return comparison*direction || String(b.occurredAt).localeCompare(String(a.occurredAt)) || a.id.localeCompare(b.id);
@@ -225,8 +225,8 @@ export function bindWalletHistory(layer,wallet,rows,{open,settings,dds=false,act
     toolbar.querySelector('[data-wallet-sort]')?.setAttribute('aria-pressed',String(state.sort!=='dateDesc'));
     host.innerHTML=visible.length?financeHistoryTable(visible,dds?'Все операции':'Операции кошелька',[
       {key:'select',label:'',narrow:true,header:()=>check('data-wallet-select-all','Выбрать все видимые операции',visible.every(row=>state.selected.has(row.id))),render:row=>check('data-wallet-select="'+escapeHtml(row.id)+'"','Выбрать операцию '+row.title,state.selected.has(row.id))},
-      {key:'date',label:'Дата',narrow:true},{key:'title',label:'Операция',...(dds?{secondaryKey:'wallet',secondaryLabel:'Кошелёк'}:{})},{key:'code',label:'Код',narrow:true},
-      {key:'person',label:'Клиент / контрагент'},{key:'workplace',label:'Рабочее пространство'},...(dds&&!grouped?[{key:'article',label:'Статья'}]:[]),{key:'amount',label:'Сумма',narrow:true},
+      {key:'date',label:'Дата',narrow:true},{key:'title',label:'Операция',...(dds?{secondaryKey:'wallet',secondaryLabel:'Источник'}:{})},{key:'code',label:'Код',narrow:true},
+      {key:'person',label:'Клиент / контрагент'},{key:'workplace',label:'Рабочее пространство'},...(dds&&!grouped?[{key:'article',label:'Статья'}]:[]),{key:'amount',label:dds?'Деньги':'Сумма',narrow:true},...(dds?[{key:'bonus',label:'Бонусы',narrow:true}]:[]),
     ]):emptyState(rows.length?'Операции не найдены':'Операций пока нет',rows.length?'Измените условия поиска или фильтрации.':(dds?'Финансовые операции появятся здесь.':'Движения по этой кассе появятся здесь.'));
     if(grouped&&visible.length)applyDDSHierarchy(host,visible,state.collapsed);
     host.querySelectorAll('[data-wallet-select]').forEach(control=>control.addEventListener('change',()=>{
