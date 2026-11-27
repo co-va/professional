@@ -30,7 +30,7 @@ import {
   v2ZLayer,
   workspaceHeaderContext,
 } from '../../../ui/ui.js';
-import { financeDesktop, financeZActions, financeZSave, financeQSubmit, financeHistoryTable, bindFinanceHistoryTable, openFinanceReceiptQ } from '../desktop.js';
+import { financeDesktop, financeZActions, financeZSave, financeQSubmit, financeHistoryTable, bindFinanceHistoryTable, openFinanceReceiptX } from '../desktop.js';
 import { readOnlyReceipt } from '../../../ui/receipt/index.js';
 import { financeReceipt } from '../receipt.js';
 import { isV2DesktopWorkspace } from '../../../ui/v2/geometry.js';
@@ -1392,7 +1392,7 @@ function openInvestmentEvent(root, entityLayer, entity, eventId) {
     .find((item) => String(item?.id || '') === String(eventId || '') && !item?.deletedAt);
   if (!event) return null;
   const title = investmentEventTitle(event);
-  return openFinanceReceiptQ(entityLayer, title, readOnlyReceipt({
+  return openFinanceReceiptX(entityLayer, title, readOnlyReceipt({
     title,
     date: shortDate(event.occurredDate || event.occurredAt || '', '—'),
     time: '',
@@ -1425,7 +1425,7 @@ function openFinanceEntityOperation(root, entityLayer, type, entity, operationId
   const operation = financeEntityOperations(type, entity.id)
     .find((item) => String(item?.operationId || '') === String(operationId || ''));
   if (!operation) return null;
-  return openFinanceReceiptQ(entityLayer, operationName(operation), operationReceipt(operation), [{
+  return openFinanceReceiptX(entityLayer, operationName(operation), operationReceipt(operation), [{
     label: 'Удалить операцию', variant: 'danger',
     run: receipt => openSharedProfileSettingsMenu({
       title: operationName(operation),
@@ -1560,7 +1560,7 @@ function openWalletOperation(root, walletLayer, wallet, operationId) {
   const operation = walletOperations(wallet.id)
     .find((item) => String(item.operationId) === String(operationId));
   if (!operation) return null;
-  return openFinanceReceiptQ(walletLayer, operationName(operation), operationReceipt(operation, wallet), [{
+  return openFinanceReceiptX(walletLayer, operationName(operation), operationReceipt(operation, wallet), [{
     label: 'Удалить операцию', variant: 'danger',
     run: receipt => openOperationSettings(root, walletLayer, receipt, wallet, operation),
   }]);

@@ -63,20 +63,19 @@ export function bindFinanceHistoryTable(root, open) {
   });
 }
 
-// Financial document: Desktop Q, Mobile X. No extra Z.
-export function openFinanceReceiptQ(root, title, receipt, actions = []) {
+// Financial document: X in both layouts, actions below the receipt.
+export function openFinanceReceiptX(root, title, receipt, actions = []) {
   const available = actions.filter(Boolean);
   const tools = available.map((item, index) => button(item.label, {
     variant: item.variant || 'secondary',
     data: 'data-finance-receipt-action="' + index + '"',
     aria: item.aria || '',
   })).join('');
-  const layer = mountModal(root, modal(receipt + (tools ? '<div class="modal-actions">' + tools + '</div>' : ''), { title, variant: financeDesktop(root) ? 'q' : 'x', surface: 'app' }));
+  const layer = mountModal(root, modal(receipt + (tools ? '<div class="modal-actions">' + tools + '</div>' : ''), { title, variant: 'x', surface: 'app' }));
   if (!layer) return null;
   layer.querySelectorAll('[data-finance-receipt-action]').forEach(control => {
     const action = available[Number(control.dataset.financeReceiptAction)];
     control.addEventListener('click', () => action.run(layer));
-    if (action.variant !== 'danger' && action.variant !== 'critical') moveDesktopQTool(control);
   });
   return layer;
 }

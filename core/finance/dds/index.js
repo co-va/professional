@@ -26,7 +26,7 @@ import {
   v2ZLayer,
   workspaceHeaderContext,
 } from '../../../ui/ui.js';
-import { financeDesktop, financeZActions, financeZSave, financeHistoryTable, bindFinanceHistoryTable, openFinanceReceiptQ } from '../desktop.js';
+import { financeDesktop, financeZActions, financeZSave, financeHistoryTable, bindFinanceHistoryTable, openFinanceReceiptX } from '../desktop.js';
 import { financeReceipt } from '../receipt.js';
 import { DATA_EXCHANGE_ICON, TRASH_ICON } from '../../../ui/buttons/index.js';
 import { canUseCapability } from '../../access.js';
@@ -423,7 +423,7 @@ function openFinanceOperation(root, movements, operationId) {
   const first = entries[0];
   const receipt = financeReceipt(id, operationName(first), { entries });
   const active = first?.operationStatus !== 'cancelled';
-  return openFinanceReceiptQ(root, operationName(first), receipt, [
+  return openFinanceReceiptX(root, operationName(first), receipt, [
     active ? { label: 'Корректировка', run: layer => openOperationCorrection(root, layer, entries) } : null,
     active ? { label: 'Отменить операцию', variant: 'danger', run: layer => openCancelOperation(root, layer, entries) } : null,
     { label: 'Удалить операцию', variant: 'critical', run: layer => openDeleteOperation(root, layer, entries) },
