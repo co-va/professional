@@ -1,4 +1,4 @@
-import { button, setV2ZHeaderRows } from '../../ui/ui.js';
+import { button, dataTable, escapeHtml, modal, mountModal, setV2ZHeaderRows } from '../../ui/ui.js';
 import { isV2DesktopWorkspace } from '../../ui/v2/geometry.js';
 import { moveDesktopQTool } from '../../ui/v2/z-layout.js';
 
@@ -46,4 +46,36 @@ export function financeQSubmit(layer, form) {
   control.type = 'button';
   control.classList.add('desktop-q-h-action');
   control.addEventListener('click', () => form.requestSubmit());
+}
+
+// Existing compact table; whole-row click delegates to the keyboard-accessible
+// operation button, just as in the accepted Deposit list.
+export function financeHistoryTable(rows, caption, columns) {
+  return dataTable({ compact: true, caption, columns: columns.map(column => ({
+    ...column, sortable: false,
+    ...(column.key === 'title' ? { render: row => '<button type="button" data-finance-history-row="' + escapeHtml(row.id) + '" aria-label="' + escapeHtml(row.title) + '">' + escapeHtml(row.title) + '</button>' } : {}),
+  })), rows });
+}
+
+export function bindFinanceHistoryTable(root, open) {
+  root.querySelectorAll('[data-finance-history-row]').forEach(control => {
+    (control.closest('tr') || control).addEventListener('click', () => open(control.dataset.financeHistoryRow));
+  });
+}
+
+export function openFinanceReceiptQ(root, title, receipt, actions = []) {
+  const available = actions.filter(Boolean);
+  const tools = available.map((item, index) => button(item.label, {
+    variant: item.variant || 'secondary',
+    data: 'data-finance-receipt-action="' + index + '"',
+    aria: item.aria || '',
+  })).join('');
+  const layer = mountModal(root, modal(receipt + (tools ? '<div class="modal-actions">' + tools + '</div>' : ''), { title, variant: 'q', surface: 'app' }));
+  if (!layer) return null;
+  layer.querySelectorAll('[data-finance-receipt-action]').forEach(control => {
+    const action = available[Number(control.dataset.financeReceiptAction)];
+    control.addEventListener('click', () => action.run(layer));
+    if (action.variant !== 'danger' && action.variant !== 'critical') moveDesktopQTool(control);
+  });
+  return layer;
 }

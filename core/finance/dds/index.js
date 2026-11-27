@@ -26,7 +26,7 @@ import {
   v2ZLayer,
   workspaceHeaderContext,
 } from '../../../ui/ui.js';
-import { financeDesktop, financeZActions, financeZSave } from '../desktop.js';
+import { financeDesktop, financeZActions, financeZSave, financeHistoryTable, bindFinanceHistoryTable, openFinanceReceiptQ } from '../desktop.js';
 import { readOnlyReceipt } from '../../../ui/receipt/index.js';
 import { DATA_EXCHANGE_ICON, TRASH_ICON } from '../../../ui/buttons/index.js';
 import { canUseCapability } from '../../access.js';
@@ -480,7 +480,9 @@ function openOperationCorrection(root, operationLayer, entries) {
     openNotice({ message: 'Операция не найдена.' });
     return;
   }
-  const layer = mountV2ZLayer(operationLayer, v2ZLayer('', { className: 'finance-dds-correction-z' }), { stack: true });
+  const desktop = financeDesktop(root);
+  if (desktop) operationLayer.v2Close?.();
+  const layer = mountV2ZLayer(desktop ? root : operationLayer, v2ZLayer('', { className: 'finance-dds-correction-z' }), { stack: true });
   if (!layer) return;
   const onSaved = () => reopenCorrectedOperation(root, operationLayer, layer, operation.operationId);
   let rendered = false;
@@ -537,17 +539,7 @@ function openFinanceOperation(root, movements, operationId) {
   const when = shortDateTimeParts(first?.occurredAt || '');
   const receiptContent = operationReceiptItems(entries);
   const isPayment = first?.operationKind === 'payment';
-  const layer = mountV2ZLayer(root, v2ZLayer('', { className: 'finance-dds-receipt-z' }), { stack: true });
-  if (!layer) return;
-
-  layer.innerHTML = `${workspaceHeaderContext({
-    title: operationName(first),
-    v: financeDesktop(layer) ? null : {
-      kind: 'settings',
-      data: 'data-finance-operation-settings',
-      aria: 'Настройки операции',
-    },
-  })}${readOnlyReceipt(isPayment ? {
+  const receipt = readOnlyReceipt(isPayment ? {
     title: 'Оплата услуги',
     groups: paymentReceiptGroups(entries),
   } : {
@@ -560,16 +552,20 @@ function openFinanceOperation(root, movements, operationId) {
       value: formatMoney(operationTotal(entries)),
       strong: true,
     }],
-  })}`;
-
-  if (financeDesktop(layer)) {
+  });
+  if (financeDesktop(root)) {
     const active = first?.operationStatus !== 'cancelled';
-    financeZActions(layer, operationName(first), [
-      active ? { label: 'Корректировка', run: () => openOperationCorrection(root, layer, entries) } : null,
-      active ? { label: 'Отменить операцию', run: () => openCancelOperation(root, layer, entries) } : null,
-      { label: TRASH_ICON, className: 'v2-desktop-tool-icon', aria: 'Удалить операцию', run: () => openDeleteOperation(root, layer, entries) },
+    return openFinanceReceiptQ(root, operationName(first), receipt, [
+      active ? { label: 'Корректировка', run: layer => openOperationCorrection(root, layer, entries) } : null,
+      active ? { label: 'Отменить операцию', variant: 'danger', run: layer => openCancelOperation(root, layer, entries) } : null,
+      { label: 'Удалить операцию', variant: 'critical', run: layer => openDeleteOperation(root, layer, entries) },
     ]);
-  } else layer.querySelector('[data-finance-operation-settings]')?.addEventListener('click', () => {
+  }
+  const layer = mountV2ZLayer(root, v2ZLayer('', { className: 'finance-dds-receipt-z' }), { stack: true });
+  if (!layer) return;
+  layer.innerHTML = `${workspaceHeaderContext({ title: operationName(first), v: { kind: 'settings', data: 'data-finance-operation-settings', aria: 'Настройки операции' } })}${receipt}`;
+
+  layer.querySelector('[data-finance-operation-settings]')?.addEventListener('click', () => {
     openOperationSettings(root, layer, entries);
   });
 }
@@ -613,7 +609,7 @@ function renderDDS(root) {
   const movements = [...getLedgerEntries()].reverse();
   const groupedOperations = operationGroupsFromLedger(movements);
   const operations = groupedOperations.length
-    ? v2ListEntries(groupedOperations.map(operationListEntry))
+    ? (financeDesktop(root) ? financeHistoryTable(groupedOperations.map(entries => { const first = entries[0]; const transfer = first.operationKind === 'transfer'; return { id: String(first.operationId), date: operationMoment(first), title: operationName(first), person: personText(first), workplace: String(first.workplace || ''), wallet: transfer ? operationListSubtitle(entries) : [...new Set(entries.map(walletText).filter(Boolean))].join(' + '), article: [...new Set(entries.map(item => String(item.articleName || '')).filter(Boolean))].join(', '), amount: operationDisplayAmount(entries) }; }), 'Все операции', [{ key: 'date', label: 'Дата и время', narrow: true }, { key: 'title', label: 'Операция' }, { key: 'person', label: 'Клиент' }, { key: 'workplace', label: 'Рабочее пространство' }, { key: 'wallet', label: 'Кошелёк' }, { key: 'article', label: 'Статья' }, { key: 'amount', label: 'Сумма', narrow: true }]) : v2ListEntries(groupedOperations.map(operationListEntry)))
     : emptyState('Все операции', 'Финансовых операций пока нет.');
   const settingsItems = availableDDSSettings();
   const headerContext = workspaceHeaderContext({
@@ -631,6 +627,7 @@ function renderDDS(root) {
     canUseCapability('finance.articles.access') ? { label: 'Статьи', run: () => openArticles(root) } : null,
   ]);
   else root.querySelector('[data-finance-dds-settings]')?.addEventListener('click', () => openDDSSettings(root, movements));
+  if (financeDesktop(root)) bindFinanceHistoryTable(root, id => openFinanceOperation(root, movements, id));
   root.querySelectorAll('[data-finance-operation]').forEach((element) => {
     element.addEventListener('click', () => openFinanceOperation(root, movements, element.dataset.financeOperation));
   });
