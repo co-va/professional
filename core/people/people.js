@@ -608,7 +608,11 @@ function refreshPeopleList(root) {
   host.innerHTML = desktop ? desktopPeopleTable(root, items, visitIndex) : listMarkup(items, query);
   if (desktop) bindDesktopPeopleTable(root, host, items);
   host.querySelectorAll('[data-person]').forEach((node) => {
-    node.addEventListener('click', () => openPersonOverview(root, node.dataset.person, root.peopleOptions || {}));
+    const target = desktop ? node.closest('tr') || node : node;
+    target.addEventListener('click', (event) => {
+      if (desktop && event.target.closest('[data-table-column="select"]')) return;
+      openPersonOverview(root, node.dataset.person, root.peopleOptions || {});
+    });
   });
 }
 

@@ -712,6 +712,7 @@
  .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact :is(th,td)[data-table-column="open"]{width:36px;min-width:36px;padding:0 2px;text-align:center}
  .v2-app--workspace [data-people-list-host] .ui-data-table--compact td>.people-table-open{display:grid;place-items:center;width:32px;height:40px;margin:auto;color:#41484F;touch-action:manipulation;cursor:pointer}
  .v2-app--workspace [data-people-list-host] .people-table-open:hover{background:var(--surface-soft);border-radius:8px}
+ .v2-app--workspace [data-people-list-host] .ui-data-table--compact tbody td:not([data-table-column="select"]){cursor:pointer}
 }
 
 /* Desktop Contacts / View: content-specific constructor and selector styles only. */
