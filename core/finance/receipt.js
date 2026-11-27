@@ -1,7 +1,8 @@
 import { formatSignedMoney } from '../../ui/utils/values.js';
 import { shortDateTimeParts } from '../../ui/ui.js';
 import { readOnlyReceipt } from '../../ui/receipt/index.js';
-import { getFinanceOperation } from './data.js';
+import { getFinanceOperation, getFinanceArticleCatalog } from './data.js';
+import { registeredLedgerArticle, registeredRoute } from './dds/article-view.js';
 import { getLedgerEntries } from './read.js';
 import { depositArticleLabel, isDepositCashDocument } from './dds/classification.js';
 import { loyaltyDocumentFacts } from './dds/documents.js';
@@ -31,8 +32,12 @@ function operationReceiptItems(entries = []) {
   const items = [];
 
   const articles = [...new Set(rows.map((item) => String(item?.articleName || '')).filter(Boolean))];
-  if (articles.length && first?.operationKind !== 'transfer') {
-    items.push({ label: `Статья · ${articles.join(', ')}`, value: '' });
+  const catalog=getFinanceArticleCatalog();
+  if(Array.isArray(catalog)){
+    const registered=new Map();for(const row of rows){const a=registeredLedgerArticle(row,catalog);if(a)registered.set(JSON.stringify([a.articleId,a.valueId]),a);}
+    for(const a of registered.values())items.push({label:'Статья',value:[a.articleName,a.valueName].filter(Boolean).join(' · ')});
+  }else if (articles.length && first?.operationKind !== 'transfer') {
+    for(const article of articles)items.push({ label: 'Статья', value: article });
   }
 
   const person = personText(first);
@@ -142,7 +147,8 @@ function depositCashGroups(rows,data,facts=null){
     {label:'Код',value:person.uei||''},
     {label:'Клиент',value:[person.name,person.surname].filter(Boolean).join(' ')},
   ].filter(row=>row.value);
-  const subject=[{label:'Статья',value:depositArticleLabel(first)},{label:'Депозит',value:String(data.programName||first.lineName||'Не указано')}];
+  const catalog=getFinanceArticleCatalog(),classification=registeredRoute(catalog,first.operationKind==='deposit-withdrawal'?'DEPOSIT_RETURN':'DEPOSIT_RECEIVED');
+  const subject=[{label:'Статья',value:classification?[classification.articleName,classification.valueName].filter(Boolean).join(' · '):depositArticleLabel(first)},{label:'Депозит',value:String(data.programName||first.lineName||'Не указано')}];
   const movement=[{label:'Кошелёк',value:String(data.walletName||first.walletName||'Не определён')},{label:first.operationKind==='deposit-withdrawal'?'Возвращено':'Внесено',value:formatMoney(operationTotal(rows)),strong:true}];
   if(facts&&first.operationKind==='deposit-funding'&&facts.bonus!==0)movement.push({label:'Начислено бонусов',value:facts.bonus===null?'Не определено':String(facts.bonus)});
   if(facts&&first.operationKind==='deposit-withdrawal'){
@@ -159,7 +165,15 @@ function loyaltyOtherGroups(first,data,facts){
  const when=shortDateTimeParts(first.occurredAt||'');
  const person=data.person||first.person||{};
  const identity=[{label:'Дата и время',value:[when.date,when.time].filter(Boolean).join(' · ')},{label:'Код',value:person.uei||''},{label:'Клиент',value:personText({person})}].filter(r=>r.value);
- const details=[{label:'Статья',value:facts.article}];
+ const catalog=getFinanceArticleCatalog(),details=[];
+ if(Array.isArray(catalog)){
+  const refund=facts.kind==='refund',keys=[];
+  if(facts.allocations.length||facts.discount||facts.discountUnknown)keys.push(refund?'DEPOSIT_PAYMENT_REFUND':'DEPOSIT_SPEND');
+  if(facts.personal)keys.push(refund?'PERSONAL_ACCOUNT_PAYMENT_REFUND':'PERSONAL_ACCOUNT_SPEND');
+  const cashKey={'deposit-funding':'DEPOSIT_RECEIVED','deposit-withdrawal':'DEPOSIT_RETURN','personal-account-funding':'PERSONAL_ACCOUNT_LIABILITY_IN','personal-account-withdrawal':'PERSONAL_ACCOUNT_LIABILITY_OUT','personal-account-debt-settlement':'PERSONAL_ACCOUNT_DEBT_SETTLEMENT'}[facts.kind];
+  if(cashKey)keys.push(cashKey);
+  for(const key of new Set(keys)){const a=registeredRoute(catalog,key);if(a)details.push({label:'Статья',value:[a.articleName,a.valueName].filter(Boolean).join(' · ')});}
+ }else details.push({label:'Статья',value:facts.article});
  if(facts.discount&&first.operationKind==='refund')details.push({label:'Стоимость возвращаемого обслуживания',value:formatMoney(facts.discount.grossAmount)},{label:'Аннулирование выгоды по депозиту',value:formatMoney(-Number(facts.discount.benefitAmount),{signed:true})},{label:'К возврату',value:formatMoney(facts.discount.netAmount),strong:true});
  for(const item of facts.allocations){
   details.push({label:item.name.split(' · остаток ')[0],value:formatMoney(item.amount)},...depositAllocationDetails(item));

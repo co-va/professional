@@ -10,8 +10,8 @@ import { emptyState } from '../states/index.js';
 import { modal, mountModal } from '../modals/index.js';
 import { escapeHtml } from '../utils/escape-html.js';
 
-export function groupValuesMarkup({addData='',draftData='',listData=''}={}){
-  return '<div class="desktop-group-values"><div class="stock-position-group-heading"><span>Значения</span>'+compactAddButton({data:'data-group-value-add '+addData,aria:'Добавить значение'})+'</div><div data-group-value-draft '+draftData+'></div><div data-group-values-list data-service-group-value-list '+listData+'></div></div>';
+export function groupValuesMarkup({addData='',draftData='',listData='',add=true}={}){
+  return '<div class="desktop-group-values"><div class="stock-position-group-heading"><span>Значения</span>'+(add?compactAddButton({data:'data-group-value-add '+addData,aria:'Добавить значение'}):'')+'</div><div data-group-value-draft '+draftData+'></div><div data-group-values-list data-service-group-value-list '+listData+'></div></div>';
 }
 export function groupValueDraft(edit){
   return edit?field({label:'Наименование значения',name:'valueName',value:edit.name,required:true,maxlength:80}):'';
@@ -42,21 +42,23 @@ export function confirmGroupRemoval({title,message,onConfirm,onSuccess}){
   });
   return confirm;
 }
-export function renderGroupValues(host,{values=[],getId=value=>value.id,selectedId=null,reorder=false,valueData=()=>'',removeData='',onEdit,onRemove,onReorder,onError}={}){
+export function renderGroupValues(host,{values=[],getId=value=>value.id,selectedId=null,reorder=false,valueData=()=>'',removeData='',canEdit=()=>true,canRemove=()=>true,onEdit,onRemove,onReorder,onError}={}){
   if(!host)return ()=>{};
   host.innerHTML=values.length?list({className:'ui-list--dense list-entries',items:values.map(value=>{
     const id=String(getId(value));
-    return {title:value.name,interactive:false,reorderHandle:reorder,selected:selectedId===id,data:'data-desktop-group-value="'+escapeHtml(id)+'"'+(reorder?' data-reorder-id="'+escapeHtml(id)+'"':'')+' '+valueData(value),aria:'Изменить значение '+value.name};
+    return {title:value.name,interactive:false,reorderHandle:reorder,selected:selectedId===id,data:'data-desktop-group-value="'+escapeHtml(id)+'"'+(reorder?' data-reorder-id="'+escapeHtml(id)+'"':'')+' '+valueData(value),aria:canEdit(value)?'Изменить значение '+value.name:value.name};
   })}):emptyState('Значений пока нет');
   for(const node of host.querySelectorAll('[data-desktop-group-value]')){
     const value=values.find(item=>String(getId(item))===node.dataset.desktopGroupValue);
     if(!value)continue;
     const startEdit=()=>onEdit?.(value);
     const target=node.querySelector('.ui-list__main');
-    if(target){target.tabIndex=0;target.setAttribute('role','button');target.setAttribute('aria-label','Изменить значение '+value.name);target.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();startEdit();}});}
-    node.addEventListener('click',event=>{if(!event.target.closest?.('[data-reorder-handle],[data-desktop-value-row-delete]'))startEdit();});
-    node.insertAdjacentHTML('beforeend',compactRemoveButton({data:'data-desktop-value-row-delete title="Удалить значение" '+removeData,aria:'Удалить значение '+value.name}));
-    node.querySelector('[data-desktop-value-row-delete]')?.addEventListener('click',event=>{event.stopPropagation();onRemove?.(value);});
+    if(target&&canEdit(value)){target.tabIndex=0;target.setAttribute('role','button');target.setAttribute('aria-label','Изменить значение '+value.name);target.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();startEdit();}});}
+    if(canEdit(value))node.addEventListener('click',event=>{if(!event.target.closest?.('[data-reorder-handle],[data-desktop-value-row-delete]'))startEdit();});
+    if(canRemove(value)){
+      node.insertAdjacentHTML('beforeend',compactRemoveButton({data:'data-desktop-value-row-delete title="Удалить значение" '+removeData,aria:'Удалить значение '+value.name}));
+      node.querySelector('[data-desktop-value-row-delete]')?.addEventListener('click',event=>{event.stopPropagation();onRemove?.(value);});
+    }
   }
   return reorder&&onReorder?initV2ListReorder(host,{onReorder,onError}):()=>{};
 }

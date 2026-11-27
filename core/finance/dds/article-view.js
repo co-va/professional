@@ -21,3 +21,16 @@ export function registeredLedgerArticle(entry,catalog){
  return registeredArticle(catalog,entry?.articleClass);
 }
 export function articleCellText(article,value=''){return [article,value].filter(Boolean).join('\n');}
+
+ // Capabilities hide a mechanism from the directory, never from its history.
+ // Existing unapproved loan/investment rows retain their previous access gates.
+ export function availableArticleDirectory(catalog,legacy,can){
+  if(!Array.isArray(catalog))return null;
+  const legacyIds=new Set(legacy.map(a=>a.articleId));
+  return catalog.filter(a=>!a.archived&&(
+   a.capability==='journal'?['journal.day.access','journal.month.access','journal.list.access'].some(can):
+   a.capability==='inventory'?['inventory.stock.access','inventory.order.access'].some(can):
+   a.capability?can(a.capability):
+   a.deferred?legacyIds.has(a.articleId):!a.systemKey
+  )).map(a=>({...a,values:(a.values||[]).filter(v=>!v.archived)}));
+ }

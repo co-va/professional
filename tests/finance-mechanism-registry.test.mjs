@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { ddsRegistryParts } from '../core/finance/dds/registry-parts.js';
-import { registeredRoute } from '../core/finance/dds/article-view.js';
+import { registeredRoute, availableArticleDirectory } from '../core/finance/dds/article-view.js';
 const canonical=[
 {articleId:'deposit',name:'Депозит',values:[{valueId:'fund',name:'Пополнение',routes:['DEPOSIT_RECEIVED']},{valueId:'pay',name:'Оплата',routes:['DEPOSIT_SPEND']},{valueId:'refund',name:'Возврат',routes:['DEPOSIT_RETURN','DEPOSIT_PAYMENT_REFUND']}],routes:[]},
 {articleId:'services',name:'Оказание услуг',values:[{valueId:'service',name:'Оплата услуг',routes:['SERVICE_REVENUE']},{valueId:'tip',name:'Чаевые',routes:['TIPS']}],routes:[]},
@@ -24,4 +24,8 @@ const purchase=run([entry('MATERIALS_REFUND',1200)],null);
 assert.deepEqual([purchase[0].article,purchase[0].articleValue,purchase[0].direction,purchase[0].money],['Закупка','Возврат','in',1200]);
 const unresolved=run([{articleClass:null,amount:42,direction:'IN',walletName:'Наличные'}],null);
 assert.equal(unresolved[0].article,'');assert.equal(unresolved[0].money,42);
-console.log('PASS mechanism registry');
+const directory=[{articleId:'services',capability:'journal',systemKey:'MECHANISM_SERVICES',name:'Оказание услуг',values:[]},{articleId:'deposit',capability:'loyalty.deposit.access',systemKey:'MECHANISM_DEPOSIT',name:'Депозит',values:[{name:'Оплата'},{name:'Старое значение',archived:true}]},{articleId:'loan',deferred:true,systemKey:'LOAN_RECEIVED',name:'Займ',values:[]},{articleId:'retired',archived:true,name:'Прочие расходы',values:[]},{articleId:'custom',name:'Моя статья',values:[]}];
+const available=availableArticleDirectory(directory,[],key=>key==='loyalty.deposit.access');
+assert.deepEqual(available.map(a=>a.articleId),['deposit','custom']);assert.deepEqual(available[0].values.map(v=>v.name),['Оплата']);
+assert.equal(availableArticleDirectory(null,[],()=>true),null);
+console.log('PASS mechanism registry and capability-gated directory');

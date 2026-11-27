@@ -20,7 +20,8 @@ import { openFinanceDeleteConfirmation, financeDesktop } from '../desktop.js';
 import { canUseCapability } from '../../access.js';
 import { desktopAvailableArticles, desktopArticleGroups, desktopArticleValues } from './classification.js';
 import { moveDesktopQTool } from '../../../ui/v2/z-layout.js';
-import { getFinanceArticles } from '../data.js';
+import { getFinanceArticles, getFinanceArticleCatalog } from '../data.js';
+import { availableArticleDirectory } from './article-view.js';
 import { archiveFinanceArticle, createFinanceArticle, updateFinanceArticle } from '../service.js';
 
 const ECONOMIC_OPTIONS = [
@@ -251,15 +252,15 @@ function visibleArticles(items,state){
   const sign=state.sort.endsWith('Desc')?-1:1;
   return rows.sort((a,b)=>String(articleValues(a,names)[key]||'').localeCompare(String(articleValues(b,names)[key]||''),'ru',{numeric:true})*sign||String(a.name).localeCompare(String(b.name),'ru'));
 }
-function openArticleFilters(anchor,items,state,refresh,desktop=false){
+function openArticleFilters(anchor,items,state,refresh,desktop=false,canonical=false){
   const names=new Map(items.map(item=>[item.articleId,item.name]));
   const none={value:'',label:'Без фильтра'};
   const parents=[...new Set(items.map(item=>item.parentArticleId||''))].map(id=>({value:id?'id:'+id:'root',label:names.get(id)||'Без группы'}));
   const economics=[...new Set(items.map(item=>item.economicType).filter(Boolean))].map(value=>({value,label:economicLabel(value)}));
   const fields=()=>'<div class="form-grid">'
-    +select({label:'Группа',name:'parent',value:state.filters.parent,options:[none,...parents]})
+    +(canonical?'':select({label:'Группа',name:'parent',value:state.filters.parent,options:[none,...parents]})
     +select({label:'Направление',name:'direction',value:state.filters.direction,options:[none,...(desktop?DIRECTION_OPTIONS.map(a=>a.value==='IN'?{...a,label:'Приход'}:a.value==='TRANSFER'?{...a,label:'Транзакция'}:a):DIRECTION_OPTIONS)]})
-    +(desktop?'':select({label:'Назначение',name:'economicType',value:state.filters.economicType,options:[none,...economics]}))
+    +(desktop?'':select({label:'Назначение',name:'economicType',value:state.filters.economicType,options:[none,...economics]})))
     +select({label:'Тип',name:'system',value:state.filters.system,options:[none,{value:'system',label:'Системная'},{value:'custom',label:'Пользовательская'}]})+'</div>';
   anchor.dataset.v2AnchorWidth='360';
   const popup=mountModal(anchor,modal('<div data-people-filter-fields>'+fields()+'</div><div class="modal-actions" data-people-filter-actions'+(Object.values(state.filters).some(Boolean)?'':' hidden')+'>'+button('Сбросить',{variant:'secondary',data:'data-people-filter-action'})+'</div>',{title:'Фильтр',variant:'x',surface:'app',className:'people-action-popup people-filter-popup'}));
@@ -309,14 +310,37 @@ function desktopArticleRows(items,state){
   }).map(a=>({...a,childCount:desktopArticleValues(articles,a.articleId).length}));
 }
 const articleRemovalMessage=item=>'Статья «'+item.name+'» и все её значения будут удалены из доступного справочника. Проведённые операции останутся в истории.';
-function renderDesktopArticleTable(host,rows,collapsed,onOpen,onDelete){
+function renderDesktopArticleTable(host,rows,collapsed,onOpen,onDelete,canonical=false){
   return renderGroupDirectory(host,{
-    rows,sections:[['IN','ПРИХОД'],['OUT','РАСХОД'],['TRANSFER','ТРАНЗАКЦИЯ']],collapsed,caption:'Статьи',
-    getId:a=>a.articleId,getSection:a=>a.direction,getCount:a=>a.childCount,getDepth:a=>a.depth,
-    canOpen:a=>!a.systemKey||a.direction!=='TRANSFER',canDelete:a=>!a.systemKey,
-    nameData:a=>'data-article-row="'+escapeHtml(a.articleId)+'"'+(!a.systemKey||a.direction!=='TRANSFER'?' data-finance-article="'+escapeHtml(a.articleId)+'"':''),
+    rows,sections:canonical?[['system','СИСТЕМНЫЕ'],['custom','ПОЛЬЗОВАТЕЛЬСКИЕ']]:[['IN','ПРИХОД'],['OUT','РАСХОД'],['TRANSFER','ТРАНЗАКЦИЯ']],collapsed,caption:'Статьи',
+    getId:a=>a.articleId,getSection:a=>canonical?(a.systemKey?'system':'custom'):a.direction,getCount:a=>a.childCount,getDepth:a=>a.depth,
+    canOpen:a=>canonical||!a.systemKey||a.direction!=='TRANSFER',canDelete:a=>!a.systemKey,
+    nameData:a=>'data-article-row="'+escapeHtml(a.articleId)+'"'+(canonical||!a.systemKey||a.direction!=='TRANSFER'?' data-finance-article="'+escapeHtml(a.articleId)+'"':''),
     deleteData:'data-article-row-delete',deleteLabel:'Удалить статью',openLabel:'Открыть статью',onOpen,onDelete,
   });
+}
+function canonicalDirectoryRows(items,state){
+  const words=normalized(state.query).split(/\s+/).filter(Boolean);
+  const rows=items.filter(a=>(!state.filters.system||state.filters.system===(a.systemKey?'system':'custom'))&&words.every(word=>normalized([a.name,...a.values.map(v=>v.name)].join(' ')).includes(word))).map(a=>({...a,depth:0,childCount:a.values.length}));
+  if(state.sort!=='tree')rows.sort((a,b)=>{const key=state.sort.startsWith('system')?'systemKey':'name';return String(a[key]||'').localeCompare(String(b[key]||''),'ru',{numeric:true})*(state.sort.endsWith('Desc')?-1:1);});
+  return rows;
+}
+// Registered system actions are not editable custom values. Existing custom
+// values remain editable/deletable by their original persisted identity.
+function openMechanismArticleX(article,onSaved,getArticles){
+  const content='<div class="compact-form">'+field({label:'Название',name:'articleName',value:article.name,readonly:true})+groupValuesMarkup({add:false,listData:'data-mechanism-values'})+groupEditorActions({saveData:'data-finance-article-save'})+'</div>';
+  const layer=mountModal(document.body,modal(content,{title:'Статья',variant:'x',surface:'app',xRole:'editor',className:'desktop-service-group-editor-x'}));
+  if(!layer)return null;
+  const host=layer.querySelector('[data-mechanism-values]');
+  const draw=()=>{
+    const fresh=getFinanceArticleCatalog()?.find(a=>a.articleId===article.articleId);
+    const values=(fresh?.values||article.values||[]).filter(v=>!v.archived);
+    renderGroupValues(host,{values,getId:v=>v.valueId,canEdit:v=>Boolean(v.custom),canRemove:v=>Boolean(v.custom),onEdit:v=>{
+      const raw=getArticles().find(a=>a.articleId===v.valueId);if(!raw)return;
+      layer.v2Close?.();openArticleX(raw,onSaved,getArticles,true);
+    },onRemove:v=>confirmGroupRemoval({title:'Удалить значение?',message:'Значение «'+v.name+'» будет удалено из списка. Проведённые операции останутся в истории.',onConfirm:()=>archiveFinanceArticle(v.valueId),onSuccess:()=>{onSaved();draw();}})});
+  };
+  draw();return layer;
 }
 // The DDS directory is a tool, not a navigation destination. The same Q
 // and compact X editor are used on desktop and mobile; persisted Core article
@@ -324,6 +348,7 @@ function renderDesktopArticleTable(host,rows,collapsed,onOpen,onDelete){
 export function openFinanceArticlesQ(root, {onSaved=()=>{}}={}) {
   const desktop=financeDesktop(root);
   const getArticles=()=>desktopAvailableArticles(getFinanceArticles(),canUseCapability);
+  const getDirectory=()=>availableArticleDirectory(getFinanceArticleCatalog(),getArticles(),canUseCapability);
   const state={query:'',filters:articleFilters(),sort:'tree'};
   const collapsed=new Set();
   const layer=mountModal(root,modal(
@@ -353,23 +378,29 @@ export function openFinanceArticlesQ(root, {onSaved=()=>{}}={}) {
     if(busy||!item||item.systemKey)return;
     confirmGroupRemoval({title:'Удалить статью?',message:articleRemovalMessage(item),onConfirm:async()=>{const fresh=getArticles().find(a=>a.articleId===id);if(busy||!fresh||fresh.systemKey)throw new Error('Статья недоступна для удаления.');busy=true;syncDirectory();try{return await archiveFinanceArticle(id);}finally{busy=false;syncDirectory();}},onSuccess:()=>changed()});
   };
+  const openRow=id=>{
+    if(busy)return;
+    const mechanism=getDirectory()?.find(a=>a.articleId===id&&a.capability);
+    if(mechanism){openMechanismArticleX(mechanism,changed,getArticles);return;}
+    const item=getArticles().find(a=>a.articleId===id);if(item)openArticleX(item,changed,getArticles,true);
+  };
   const refresh=()=>{
+    const directory=getDirectory(),canonical=Array.isArray(directory);
     const items=getArticles();
-    const rows=desktopArticleRows(items,state);
+    const rows=canonical?canonicalDirectoryRows(directory,state):desktopArticleRows(items,state);
     count.textContent=String(rows.length);
     filter?.setAttribute('aria-pressed',String(Object.values(state.filters).some(Boolean)));
     sort?.setAttribute('aria-pressed',String(state.sort!=='tree'));
-    if(desktop&&rows.length){renderDesktopArticleTable(host,rows,collapsed,id=>{if(busy)return;const item=getArticles().find(a=>a.articleId===id);if(item)openArticleX(item,changed,getArticles,true);},deleteFromDirectory);syncDirectory();return;}
-    host.innerHTML=rows.length?list({items:rows.map(a=>({...row(a),interactive:a.direction!=='TRANSFER'||!a.systemKey,data:a.direction==='TRANSFER'&&a.systemKey?'':'data-finance-article="'+escapeHtml(a.articleId)+'"'}))}):emptyState(items.length?'Статьи не найдены':'Статей пока нет');
+    if(desktop&&rows.length){renderDesktopArticleTable(host,rows,collapsed,openRow,deleteFromDirectory,canonical);syncDirectory();return;}
+    host.innerHTML=rows.length?list({items:rows.map(a=>canonical?{title:a.name,secondary:a.values.map(v=>v.name).join(' · '),interactive:true,data:'data-finance-article="'+escapeHtml(a.articleId)+'"',aria:'Открыть статью '+a.name}:({...row(a),interactive:a.direction!=='TRANSFER'||!a.systemKey,data:a.direction==='TRANSFER'&&a.systemKey?'':'data-finance-article="'+escapeHtml(a.articleId)+'"'}))}):emptyState(items.length?'Статьи не найдены':'Статей пока нет');
     host.querySelectorAll('[data-finance-article]').forEach(control=>control.addEventListener('click',()=>{
-      const item=getArticles().find(candidate=>candidate.articleId===control.dataset.financeArticle);
-      if(item)openArticleX(item,changed,getArticles,true);
+      openRow(control.dataset.financeArticle);
     }));
   };
   const changed=()=>{refresh();onSaved();};
   search?.addEventListener('input',()=>{state.query=search.value;refresh();});
-  filter?.addEventListener('click',()=>openArticleFilters(filter,desktop?getArticles().filter(a=>!['INCOME_ROOT','EXPENSE_ROOT'].includes(a.systemKey)).map(a=>({...a,parentArticleId:['system-income','system-expense'].includes(a.parentArticleId)?'':a.parentArticleId})):getArticles(),state,refresh,desktop));
-  sort?.addEventListener('click',()=>openArticleSort(sort,state,refresh,desktop));
+  filter?.addEventListener('click',()=>{const directory=getDirectory();openArticleFilters(filter,directory|| (desktop?getArticles().filter(a=>!['INCOME_ROOT','EXPENSE_ROOT'].includes(a.systemKey)).map(a=>({...a,parentArticleId:['system-income','system-expense'].includes(a.parentArticleId)?'':a.parentArticleId})):getArticles()),state,refresh,desktop||Boolean(directory),Boolean(directory));});
+  sort?.addEventListener('click',()=>openArticleSort(sort,state,refresh,desktop||Boolean(getDirectory())));
   add?.addEventListener('click',()=>{if(!busy)openArticleX(null,changed,getArticles,true);});
   refresh();
   return layer;

@@ -16,21 +16,27 @@ import {
 import { financeQSubmit, financeZSave } from '../desktop.js';
 import { canUseCapability } from '../../access.js';
 import { desktopAvailableArticles, desktopArticleGroups, desktopArticleValues, isLoyaltyCashArticle } from './classification.js';
-import { getFinanceArticles } from '../data.js';
+import { getFinanceArticles, getFinanceArticleCatalog } from '../data.js';
+import { registeredRoute, registeredArticle } from './article-view.js';
 import { getWallets } from '../cash/data.js';
 import { financeLocalDateValue, financeOccurredAtForDate } from '../date.js';
 import { getLedgerEntries } from '../read.js';
 import { correctFinanceOperation, recordManualFinanceOperation } from '../service.js';
 
 function articleOptions(direction,desktopArticles=false,preserveId='') {
-  const all=getFinanceArticles();
+  const all=getFinanceArticles(),canonical=getFinanceArticleCatalog();
   const visible=desktopArticles?desktopAvailableArticles(all,canUseCapability):all;
   if(preserveId&&!visible.some(item=>item.articleId===preserveId)){const prior=all.find(item=>item.articleId===preserveId);if(prior)visible.push(prior);}
   const groups=desktopArticles?desktopArticleGroups(visible):visible;
   if(preserveId&&!groups.some(a=>a.articleId===preserveId)){const prior=all.find(a=>a.articleId===preserveId);if(prior)groups.push(prior);}
   return groups
     .filter((item) => item.direction === direction && item.economicType !== 'GROUP' && (!isLoyaltyCashArticle(item)||item.articleId===preserveId))
-    .map((item) => ({ value: item.articleId, label: item.name }));
+    .flatMap(item=>{
+      if(!Array.isArray(canonical))return [{value:item.articleId,label:item.name}];
+      const a=item.systemKey?registeredRoute(canonical,item.systemKey):registeredArticle(canonical,{articleId:item.articleId});
+      if(!a)return item.articleId===preserveId?[{value:item.articleId,label:item.name}]:[];
+      return [{value:item.articleId,label:[a.articleName,a.valueName].filter(Boolean).join(' · ')}];
+    });
 }
 
 function walletOptions() {
@@ -108,12 +114,16 @@ function syncMode(root, direction,articleId=null) {
   host.innerHTML = modeMarkup(mode, { direction,articleId });
 }
 
-function collectLines(root) {
+function collectLines(root, articleId='') {
+  const values=Array.isArray(getFinanceArticleCatalog())?desktopArticleValues(getFinanceArticles(),articleId):[];
   return [...root.querySelectorAll('[data-finance-manual-line]')].map((row) => ({
     name: String(row.querySelector('[name="lineName"]')?.value || '').trim(),
     quantity: Number(row.querySelector('[name="lineQuantity"]')?.value || 0),
     unitPrice: Number(row.querySelector('[name="linePrice"]')?.value || 0),
-  })).filter((row) => row.name && row.quantity > 0 && row.unitPrice > 0);
+  })).filter((row) => row.name && row.quantity > 0 && row.unitPrice > 0).map(row=>{
+    const matches=values.filter(v=>v.name===row.name);
+    return matches.length===1?{...row,articleId:matches[0].articleId}:row;
+  });
 }
 
 async function saveManual(root, direction, onSaved, operation = null) {
@@ -138,7 +148,7 @@ async function saveManual(root, direction, onSaved, operation = null) {
     walletId,
     walletName: wallet?.name || '',
     amount: mode === 'simple' ? Number(data.get('amount') || 0) : null,
-    lines: mode === 'detail' ? collectLines(root) : [],
+    lines: mode === 'detail' ? collectLines(root,String(data.get('articleId')||'')) : [],
     note: String(data.get('note') || '').trim(),
     occurredAt,
   };

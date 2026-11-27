@@ -620,9 +620,10 @@ function renderDDS(root) {
         value:part.money??0,bonus,bonusValue:part.bonus??0};
     });
   });
-  const registryRows=Array.isArray(canonical)?desktopRows.map((row,n)=>{
-    const part=row.part,doc=byId.get(row.documentId),f=doc.facts;
-    const first=desktopRows.findIndex(r=>r.documentId===row.documentId)===n;
+  const exportedDocuments=new Set();
+  const registryRows=Array.isArray(canonical)?desktopRows.map(row=>{
+    const part=row.part,doc=byId.get(row.documentId);
+    const first=!exportedDocuments.has(row.documentId);exportedDocuments.add(row.documentId);
     return {...row,id:row.documentId,article:articleCellText(row.article,row.articleValue),...part.meta,bonus:part.bonus??null,documentAmount:first?operationTotal(doc.entries.length?doc.entries:[doc.first]):null,uncertainty:[...(!row.articleId?['Статья не установлена']:[]),...(part.money===null?['Денежная часть не определена']:[]),...(part.bonus===null?['Бонусная часть не определена']:[])].join('; ')};
   }):legacyRegistryRows;
   const desktopRowById=new Map(desktopRows.map(row=>[row.id,row]));
