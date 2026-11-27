@@ -112,7 +112,7 @@ export function renderService(root, navigateBack = () => {}) {
         ${navMarkup}
       </div>
       <div class="v2-desktop-tool-actions">
-        ${button(GROUP_ICON, { variant: 'secondary', className: 'v2-desktop-tool-icon v2-desktop-tool-accent', data: 'data-service-tool="grouping" title="Группы"', aria: 'Группы' })}
+        ${button(GROUP_ICON, { variant: 'secondary', className: 'v2-desktop-tool-icon', data: 'data-service-tool="grouping" title="Группы"', aria: 'Группы' })}
         ${actions.filter(action => action.id !== 'grouping').map(action => button(action.id === 'appearance' ? VIEW_ICON : action.label, { variant: 'secondary', className: action.id === 'appearance' ? 'v2-desktop-tool-icon' : '', data: `data-service-tool="${action.id}"${action.id === 'appearance' ? ' title="Вид"' : ''}`, aria: action.label })).join('')}
         ${button('<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>', { variant: 'secondary', className: 'v2-desktop-tool-primary', data: 'data-service-add', aria: addAria })}
       </div>

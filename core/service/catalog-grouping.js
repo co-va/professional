@@ -227,7 +227,6 @@ export function renderServiceGroupTree(items = [], kind = 'procedures', renderRo
 // Groups and all their values share one existing Service auxiliary dataset.
 // Only creation/editing uses compact X. There is never a second Q for values.
 export function openServiceGroupingQ({ onSaved = () => {}, desktop = false } = {}) {
-  const initialEntries = getServiceGroupEntries();
   let layer = null;
   let activeKey = null;
   let disposeDrag = () => {};
@@ -279,7 +278,7 @@ export function openServiceGroupingQ({ onSaved = () => {}, desktop = false } = {
     const q = mountModal(document.body, modal(
       '<div data-desktop-group-content></div>' +
       '<div class="form-error" role="alert" data-desktop-group-error></div>' +
-      actionBlock(button('+ Добавить группу', { variant: 'secondary', data: 'data-desktop-group-add' })) +
+      compactButton({kind:'add',className:'v2-desktop-tool-primary',data:'data-desktop-group-add title="Добавить группу"',aria:'Добавить группу'}) +
       actionBlock(button('Отмена', { variant: 'secondary', data: 'data-desktop-group-cancel' })) +
       actionBlock(button('Сохранить', { data: 'data-desktop-group-save' })) +
       actionBlock(button('Удалить группу', { variant: 'danger', data: 'data-desktop-group-delete' })),
@@ -321,8 +320,10 @@ export function openServiceGroupingQ({ onSaved = () => {}, desktop = false } = {
       (!valueEdit || valueEdit.name.trim()) && (nameChanged() || kindChanged() || valueChanged()));
     const sync = () => {
       const active = current();
-      add.textContent = active ? '+ Добавить значение' : '+ Добавить группу';
-      visible(add, !creating && !valueEdit);
+      const addLabel = active ? 'Добавить значение' : 'Добавить группу';
+      add.title = addLabel;
+      add.setAttribute('aria-label', addLabel);
+      add.hidden = creating || Boolean(valueEdit);
       visible(cancel, creating || Boolean(valueEdit));
       visible(saveButton, canSave());
       visible(remove, Boolean(active && (!valueEdit || !valueEdit.isNew)));
@@ -634,9 +635,7 @@ export function openServiceGroupingQ({ onSaved = () => {}, desktop = false } = {
     return editor;
   };
 
-  // No definitions yet: only a compact X ("Добавить группу").
-  if (!initialEntries.length) return groupEditorX();
-
+  // The directory remains a Q even before the first group is created.
   layer = mountModal(document.body, modal(
     '<div data-service-group-directory></div>' +
       '<div data-service-group-detail hidden></div>' +
@@ -645,9 +644,8 @@ export function openServiceGroupingQ({ onSaved = () => {}, desktop = false } = {
         button('Изменить группу', {
           type: 'button', variant: 'secondary', data: 'data-service-groups-edit-action',
         }) +
-        button('Добавить группу', {
-          type: 'button', data: 'data-service-groups-main-action',
-        }),
+        compactButton({kind:'add',className:'v2-desktop-tool-primary',
+          data:'data-service-groups-main-action title="Добавить группу"',aria:'Добавить группу'}),
       ),
     { title: 'Группы', variant: 'q', surface: 'app' },
   ));
@@ -673,7 +671,8 @@ export function openServiceGroupingQ({ onSaved = () => {}, desktop = false } = {
     }
     directory.hidden = inDetail;
     detail.hidden = !inDetail;
-    action.textContent = inDetail ? 'Добавить значение' : 'Добавить группу';
+    action.title = inDetail ? 'Добавить значение' : 'Добавить группу';
+    action.setAttribute('aria-label',action.title);
     if (editAction) editAction.style.display = inDetail ? '' : 'none';
     if (error) error.textContent = '';
     if (!inDetail) {

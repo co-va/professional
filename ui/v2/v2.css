@@ -853,8 +853,8 @@
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-desktop-tool-context>.ui-compact-button:focus-visible{outline-color:var(--white)}
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-desktop-tool-actions{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:8px;margin-left:auto;min-width:0}
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-desktop-tool-actions>.ui-button{box-sizing:border-box;width:auto;height:var(--h-tools);min-height:var(--h-tools);max-height:var(--h-tools);padding:0 12px;margin:0;border:1px solid var(--white);border-radius:10px;background:var(--white);color:#41484F;font-size:13px;line-height:1;white-space:nowrap}
- .v2-app--workspace[data-v2-desktop-surface="list"] .v2-desktop-tool-actions>:is(.v2-desktop-tool-primary,.v2-desktop-tool-accent),
- .v2-app--workspace .desktop-q-toolbar>.desktop-q-action-slot.v2-desktop-tool-primary{background:#E0D6D6;border-color:#E0D6D6;color:#41484F}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-desktop-tool-actions>:is(.v2-desktop-tool-primary,.v2-desktop-tool-accent){background:#E0D6D6;border-color:#E0D6D6;color:#41484F}
+ .v2-app--workspace .desktop-q-toolbar>.desktop-q-action-slot.v2-desktop-tool-primary{background:var(--v2-base);border-color:var(--v2-base);color:var(--white)}
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-desktop-tool-actions>:is(.v2-desktop-tool-primary,.v2-desktop-tool-icon){display:grid;place-items:center;width:var(--h-tools);min-width:var(--h-tools);padding:0}
  .v2-app--workspace[data-v2-desktop-surface="list"] :is(.v2-desktop-tool-context,.v2-desktop-tool-actions)>.segment-control{box-sizing:border-box;width:auto;min-width:0;height:var(--h-tools);min-height:var(--h-tools);margin:0}
  .v2-app--workspace[data-v2-desktop-surface="list"] :is(.v2-desktop-tool-context,.v2-desktop-tool-actions)>.segment-control>button{flex:1 0 auto}
@@ -922,7 +922,7 @@
  .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-q-fixed-tools .desktop-q-toolbar>.desktop-q-action-slot:is(.ui-button),.v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-q-fixed-tools .desktop-q-toolbar>.desktop-q-action-slot>.ui-button{box-sizing:border-box;width:var(--v2-desktop-q-button-width);min-width:var(--v2-desktop-q-button-width);max-width:var(--v2-desktop-q-button-width);height:var(--v2-desktop-q-button-height);min-height:var(--v2-desktop-q-button-height);max-height:var(--v2-desktop-q-button-height);padding:0 4px;margin:0;border-width:1px;border-radius:10px;font-size:12px;line-height:1.15;white-space:normal;overflow-wrap:normal;overflow:hidden;text-overflow:clip}
  .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-q-fixed-tools .desktop-q-toolbar>.desktop-q-action-slot.modal-actions{position:static;height:var(--v2-desktop-q-button-height);min-height:var(--v2-desktop-q-button-height);max-height:var(--v2-desktop-q-button-height);display:grid;gap:0}
  .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-q-fixed-tools .desktop-q-toolbar>.desktop-q-action-slot.ui-compact-button{flex:0 0 var(--ui-compact-size);width:var(--ui-compact-size);min-width:var(--ui-compact-size);max-width:var(--ui-compact-size)}
- .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-q-fixed-tools .desktop-q-toolbar>.desktop-q-action-slot.ui-compact-button.v2-desktop-tool-primary{flex:0 0 var(--h-tools);width:var(--h-tools);min-width:var(--h-tools);max-width:var(--h-tools);height:var(--h-tools);min-height:var(--h-tools);max-height:var(--h-tools);border:1px solid #E0D6D6;border-radius:10px;font-size:24px}
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-q-fixed-tools .desktop-q-toolbar>.desktop-q-action-slot.ui-compact-button.v2-desktop-tool-primary{flex:0 0 var(--h-tools);width:var(--h-tools);min-width:var(--h-tools);max-width:var(--h-tools);height:var(--h-tools);min-height:var(--h-tools);max-height:var(--h-tools);border:1px solid var(--v2-base);border-radius:10px;font-size:24px}
 
 }
 
@@ -1162,3 +1162,7 @@
 }
 
 [data-personal-account-help-row]{display:flex;justify-content:flex-start}
+
+/* Q add controls share the existing compact glyph and H surface, never the H toolbar beige. */
+.v2-app--workspace [data-v2-q-body] .ui-compact-button--add.v2-desktop-tool-primary{background:var(--v2-base);color:var(--white);border:1px solid var(--v2-base);border-radius:10px;width:var(--h-tools);min-width:var(--h-tools);max-width:var(--h-tools);height:var(--h-tools);min-height:var(--h-tools);max-height:var(--h-tools);flex-basis:var(--h-tools);font-size:24px;margin-left:auto}
+.v2-app--workspace [data-v2-q-body] .ui-compact-button--add.v2-desktop-tool-primary[hidden]{display:none!important}

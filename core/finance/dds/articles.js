@@ -86,15 +86,16 @@ function row(item) {
   return {
     overline: `${directionLabel(item.direction)} · ${economicLabel(item.economicType)}`,
     title: `${'— '.repeat(item.depth)}${item.name}`,
-    secondary: item.systemKey ? 'Системная статья' : '',
-    right: '',
-    interactive: true,
-    data: `data-finance-article="${escapeHtml(item.articleId)}"`,
-    aria: `Открыть статью ${item.name}`,
+    secondary: '',
+    right: item.direction === 'IN' ? '+' : item.direction === 'OUT' ? '−' : '⇄',
+    interactive: !item.systemKey,
+    data: item.systemKey ? '' : `data-finance-article="${escapeHtml(item.articleId)}"`,
+    aria: item.systemKey ? item.name : `Открыть статью ${item.name}`,
   };
 }
 
 function openArticleX(existing = null, onSaved = () => {}) {
+  if(existing?.systemKey)return null;
   const items = getFinanceArticles();
   const isSystem = Boolean(existing?.systemKey);
   const title = existing ? 'Редактирование статьи' : 'Новая статья';
@@ -230,7 +231,7 @@ export function openFinanceArticlesQ(root, {onSaved=()=>{}}={}) {
     +'</div>'
     +'<output data-article-count aria-label="Количество статей" aria-live="polite"></output>'
     +'<div data-finance-article-list></div></div>'
-    +actionBlock(button('Добавить статью',{variant:'secondary',data:'data-add-finance-article',aria:'Добавить статью'})),
+    +compactButton({kind:'add',className:'v2-desktop-tool-primary',data:'data-add-finance-article title="Добавить статью"',aria:'Добавить статью'}),
     {title:'Статьи',variant:'q',surface:'app'}
   ));
   if(!layer)return null;
