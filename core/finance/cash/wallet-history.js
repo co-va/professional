@@ -182,10 +182,11 @@ function openSort(anchor,state,refresh,dds=false) {
   }));
 }
 const check=(data,aria,checked)=>'<label class="ui-compact-check">'+checkControl({data,aria,checked})+'</label>';
+const walletCountMarkup='<output data-wallet-count aria-label="Количество операций" aria-live="polite"></output>';
 export function walletHistoryBody(dds=false) {
-  // Regular text, not the 30px H title/accessory counter.
-  return '<section><div class="v2-desktop-tool-row"><div class="v2-desktop-tool-context"><span><output data-wallet-count aria-label="Количество операций" aria-live="polite"></output></span></div>'
-    +(dds?'':'<div class="v2-desktop-tool-actions"><span><output data-wallet-sum aria-label="Сумма операций" aria-live="polite"></output></span></div>')+'</div>'
+  // DDS count belongs to H title accessory, exactly like Service.
+  return '<section>'+(dds?'':'<div class="v2-desktop-tool-row"><div class="v2-desktop-tool-context"><span>'+walletCountMarkup+'</span></div>'
+    +'<div class="v2-desktop-tool-actions"><span><output data-wallet-sum aria-label="Сумма операций" aria-live="polite"></output></span></div></div>')
     +'<div data-wallet-history-host></div></section>';
 }
 // Optional article hierarchy; preserve one row per document.
@@ -199,9 +200,12 @@ function applyDDSHierarchy(host,rows,collapsed){
   const id=JSON.stringify(['article',key]),tr=doc.createElement('tr');tr.dataset.tableGroupLevel='group';
   const td=doc.createElement('td');td.colSpan=width;
   const details=doc.createElement('details');details.className='dds-table-disclosure';details.open=!collapsed.has(id);
-  const summary=doc.createElement('summary');summary.className='inventory-editor-summary';summary.textContent=name||'—';
+  const summary=doc.createElement('summary');summary.className='inventory-editor-summary';
+  const marker=doc.createElement('span');marker.className='dds-group-marker';marker.setAttribute('aria-hidden','true');
+  const label=doc.createElement('span');label.textContent=name||'—';
+  summary.append(marker,label);
   details.append(summary);td.append(details);tr.append(td);fragment.append(tr);
-  const sync=()=>{for(const member of members)member.hidden=!details.open;};
+  const sync=()=>{marker.textContent=details.open?'▾':'▸';for(const member of members)member.hidden=!details.open;};
   details.addEventListener('toggle',()=>{if(details.open)collapsed.delete(id);else collapsed.add(id);sync();});
   for(const member of members)fragment.append(member);sync();
  }
@@ -225,18 +229,18 @@ export function bindWalletHistory(layer,wallet,rows,{open,settings,dds=false,act
       :button(DATA_EXPORT_ICON,{variant:'secondary',className:'people-desktop-icon',data:'data-wallet-export title="Выгрузить в Excel"',aria:'Выгрузить в Excel'})
         +(settings?button('Удалить',{variant:'secondary',data:'data-wallet-settings',aria:'Удалить кассу'}):''))
     +'</div></div></section>',
-  ],{desktopTitle:wallet.name});
+  ],{desktopTitle:wallet.name,desktopAccessory:dds?walletCountMarkup:''});
   const host=layer.querySelector('[data-wallet-history-host]');
   if(!toolbar||!host)return;
   const search=toolbar.querySelector('[data-wallet-search]');
   if(search)search.value=state.query;
   const exportControl=toolbar.querySelector('[data-wallet-export]');
-  const count=layer.querySelector('[data-wallet-count]');
+  const count=dds?layer.closest('[data-v2-z],[data-v2-z-layer]')?.querySelector(':scope > [data-v2-z-header] > [data-h-title-row] > [data-h-accessory] > [data-wallet-count]'):layer.querySelector('[data-wallet-count]');
   const total=layer.querySelector('[data-wallet-sum]');
   let visible=[],busy=false;
   const sync=()=>{
     const result=walletSelection(visible,state.selected);
-    count.textContent=result.selectedCount?result.selectedCount+' / '+result.count:String(result.count);
+    if(count)count.textContent=result.selectedCount?result.selectedCount+' / '+result.count:String(result.count);
     if(total)total.textContent=result.selectedCount?money(result.selectedTotal)+' / '+money(result.total):money(result.total);
     const all=host.querySelector('[data-wallet-select-all]');
     if(all){all.checked=result.count>0&&result.selectedCount===result.count;all.indeterminate=result.selectedCount>0&&!all.checked;}

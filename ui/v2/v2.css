@@ -771,7 +771,7 @@
 .v2-app--workspace [data-h-title-row]>[data-h-title]{grid-column:1;justify-self:start;display:block;width:100%;min-width:0;margin:0!important;padding:0!important;text-align:left!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--white);font-size:30px;line-height:1.2;font-weight:720;letter-spacing:-.035em}
 .v2-app--workspace [data-h-title-row]>[data-h-accessory]{grid-column:2;justify-self:end}
 .v2-app--workspace [data-h-accessory]:empty{display:none}
-.v2-app--workspace :is([data-h-accessory]>:is([data-people-count],[data-service-count],[data-cash-total]),.v2-section__accessory>[data-deposit-count]){color:var(--white);font-size:30px;line-height:1.2;font-weight:720;letter-spacing:-.035em;font-variant-numeric:tabular-nums;white-space:nowrap}
+.v2-app--workspace :is([data-h-accessory]>:is([data-people-count],[data-service-count],[data-cash-total],[data-wallet-count]),.v2-section__accessory>[data-deposit-count]){color:var(--white);font-size:30px;line-height:1.2;font-weight:720;letter-spacing:-.035em;font-variant-numeric:tabular-nums;white-space:nowrap}
  .v2-app--workspace .v2-section__heading{display:flex;align-items:center;justify-content:space-between;gap:16px;min-width:0}
  .v2-app--workspace .v2-section__accessory{flex:0 0 auto}
 .v2-app--workspace [data-h-back]{grid-column:3;justify-self:end;display:none;background:transparent;border:0;padding:0;color:var(--white);font:inherit;font-size:14px;line-height:1.2;min-height:36px;cursor:pointer}
@@ -1218,7 +1218,11 @@
 .v2-app--workspace [data-service-table-kind] [data-service-collapse-key]{position:relative}
 
 .v2-app--workspace .ui-data-table--compact tr[data-table-group-level] .dds-table-disclosure>summary{display:flex;align-items:center;padding-inline:12px 40px;color:inherit;background:transparent;white-space:normal;font:inherit}
-.v2-app--workspace [data-dds-history] .ui-data-table--compact tr[data-table-group-level="group"] .dds-table-disclosure>summary{padding-left:32px}
+.v2-app--workspace [data-dds-history] .ui-data-table--compact tr[data-table-group-level="group"] .dds-table-disclosure>summary{padding-left:12px;gap:8px;list-style:none;cursor:pointer}
+.v2-app--workspace [data-dds-history] .dds-table-disclosure>summary::-webkit-details-marker{display:none}
+.v2-app--workspace [data-dds-history] .dds-table-disclosure>summary::marker{content:""}
+.v2-app--workspace [data-dds-history] .dds-group-marker{flex:0 0 12px;text-align:center;line-height:1}
+.v2-app--workspace .desktop-service-groups-q :is([data-article-count],[data-service-group-count]){display:block;width:100%;text-align:right;font-weight:650;font-variant-numeric:tabular-nums}
 .v2-app--workspace [data-dds-history] .ui-data-table--compact tbody tr[hidden]{display:none!important}
 }
 
