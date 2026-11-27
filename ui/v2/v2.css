@@ -1203,7 +1203,7 @@
 
 @media (min-width:768px) and (min-height:600px){
 /* Drag first, selection second, editable action last. System headings are not draggable. */
-.v2-app--workspace [data-service-table-kind] [data-service-position] .service-table-edit{grid-column:9;justify-self:center;align-self:center;box-sizing:border-box;width:var(--ui-compact-size);height:var(--ui-compact-size);min-height:var(--ui-compact-size);padding:0;border:0;background:transparent;color:var(--text);font-size:20px;font-weight:400;line-height:1}
+.v2-app--workspace [data-service-table-kind] [data-service-position] .service-table-edit{grid-column:10;justify-self:center;align-self:center;box-sizing:border-box;width:var(--ui-compact-size);height:var(--ui-compact-size);min-height:var(--ui-compact-size);padding:0;border:0;background:transparent;color:var(--text);font-size:20px;font-weight:400;line-height:1}
 .v2-app--workspace [data-service-table-kind] [data-service-collapse-key]{position:relative}
 .v2-app--workspace [data-service-table-kind] [data-service-collapse-key]>[data-reorder-handle]{position:absolute;top:0;left:12px;width:36px;height:var(--h-list-row);margin:0;z-index:3}
 .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-table-kind] [data-service-collapse-key]:has(>[data-reorder-handle])>details>summary.inventory-editor-summary{padding-left:58px}
@@ -1212,4 +1212,24 @@
 .v2-app--workspace [data-dds-history] .ui-data-table--compact tr[data-table-group-level] .dds-table-disclosure>summary{box-sizing:border-box;cursor:pointer;min-height:var(--h-list-row);display:flex;align-items:center;padding:0 40px 0 12px;color:inherit;background:transparent;white-space:normal;font:inherit}
 .v2-app--workspace [data-dds-history] .ui-data-table--compact tr[data-table-group-level="group"] .dds-table-disclosure>summary{padding-left:32px}
 .v2-app--workspace [data-dds-history] .ui-data-table--compact tbody tr[hidden]{display:none!important}
+}
+
+/* Desktop Service: one explicit grid row; section selection is independent
+   from the native disclosure and from the other section. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-table-kind] [data-service-position]>.list-entry__content{grid-template-rows:minmax(0,1fr);grid-auto-rows:0;align-items:center}
+ .v2-app--workspace [data-service-table-kind] [data-service-position]>.list-entry__content>*{grid-row:1;min-width:0}
+ .v2-app--workspace [data-service-table-kind] [data-service-position] [data-service-column="duration"]{grid-column:5}
+ .v2-app--workspace [data-service-table-kind] [data-service-position] [data-service-column="workplaces"]{grid-column:6}
+ .v2-app--workspace [data-service-table-kind] [data-service-position] [data-service-column="count"]{grid-column:7}
+ .v2-app--workspace [data-service-table-kind] [data-service-position] [data-service-column="minutes"]{grid-column:8}
+ .v2-app--workspace [data-service-table-kind] [data-service-position] [data-service-column="revenue"]{grid-column:9}
+ .v2-app--workspace [data-service-table-kind] [data-service-position] .list-entry__reorder-handle{height:var(--ui-compact-size);margin:0;justify-self:center}
+ .v2-app--workspace [data-service-table-kind] [data-service-desktop-section]{position:relative}
+ .v2-app--workspace [data-service-table-kind] [data-service-desktop-section]>.service-table-check{position:absolute;top:0;left:58px;width:28px;height:var(--h-list-row);display:grid;place-items:center;z-index:2}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-table-kind] [data-service-system-disclosure]>summary.service-table-system-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 40px 0 96px;color:var(--desktop-table-system-ink);background:var(--desktop-table-system-bg);font-style:normal;font-weight:750;text-transform:uppercase;list-style:none}
+ .v2-app--workspace [data-service-table-kind] .service-table-system-heading::-webkit-details-marker{display:none}
+ .v2-app--workspace [data-service-table-kind] .service-table-system-heading::before{content:'▸';position:absolute;left:24px;color:inherit}
+ .v2-app--workspace [data-service-table-kind] [data-service-system-disclosure][open]>summary.service-table-system-heading::before{content:'▾'}
+ .v2-app--workspace [data-service-table-kind] [data-service-section-count]{font-style:normal;font-variant-numeric:tabular-nums;text-transform:none;white-space:nowrap;color:inherit}
 }
