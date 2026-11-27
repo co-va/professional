@@ -1550,15 +1550,17 @@ async function openWalletSettings(root, walletLayer, wallet) {
   });
 }
 
-function operationReceipt(operation, wallet = null) {
-  return financeReceipt(operation.operationId, operationName(operation), { entries: operation.entries || [operation], wallet: wallet ? { name: wallet.name, total: operation.total } : null });
+function operationReceipt(operation, wallet = null, desktop = false) {
+  return financeReceipt(operation.operationId, operationName(operation), { entries: operation.entries || [operation], wallet: wallet ? { name: wallet.name, total: operation.total } : null, desktop });
 }
 
 function openWalletOperation(root, walletLayer, wallet, operationId) {
   const operation = walletOperations(wallet.id)
     .find((item) => String(item.operationId) === String(operationId));
   if (!operation) return null;
-  return openFinanceReceiptX(walletLayer, operationName(operation), operationReceipt(operation, wallet), [{
+  const desktop=financeDesktop(root);
+  const depositDocument=desktop&&['deposit-funding','deposit-withdrawal'].includes(operation.operationKind);
+  return openFinanceReceiptX(walletLayer, depositDocument?(operation.operationKind==='deposit-funding'?'Оплата депозита':'Возврат депозита'):operationName(operation), operationReceipt(operation, wallet,desktop), depositDocument?[]:[{
     label: 'Удалить', variant: 'danger',
     run: receipt => openOperationSettings(root, walletLayer, receipt, wallet, operation),
   }]);

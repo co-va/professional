@@ -3,6 +3,7 @@ import { shortDateTimeParts } from '../../ui/ui.js';
 import { readOnlyReceipt } from '../../ui/receipt/index.js';
 import { getFinanceOperation } from './data.js';
 import { getLedgerEntries } from './read.js';
+import { depositArticleLabel, isDepositCashDocument } from './dds/classification.js';
 
 function formatMoney(value = 0, { signed = false } = {}) {
   return formatSignedMoney(value, signed);
@@ -114,14 +115,28 @@ function paymentGroups(rows, data, { walletOnly = false } = {}) {
   return [identity,breakdown,payment,distribution].filter(group => group.length);
 }
 
+function depositCashGroups(rows,data){
+  const first=rows[0]||{},person=data.person||first.person||{};
+  const when=shortDateTimeParts(first.occurredAt||'');
+  const identity=[
+    {label:'Дата и время оплаты',value:[when.date,when.time].filter(Boolean).join(' · ')},
+    {label:'Код',value:person.uei||''},
+    {label:'Клиент',value:[person.name,person.surname].filter(Boolean).join(' ')},
+  ].filter(row=>row.value);
+  const subject=[{label:'Статья',value:depositArticleLabel(first)},{label:'Депозит',value:String(data.programName||first.lineName||'Не указано')}];
+  const movement=[{label:'Кошелёк',value:String(data.walletName||first.walletName||'Не определён')},{label:first.operationKind==='deposit-withdrawal'?'Возвращено':'Оплачено',value:formatMoney(operationTotal(rows)),strong:true}];
+  if(first.operationKind==='deposit-withdrawal'&&data.reason)movement.push({label:'Причина',value:String(data.reason)});
+  return [identity,subject,movement].filter(group=>group.length);
+}
 // Use the historical operation snapshot, not the current price list or record.
-export function financeReceipt(operationId, title, { entries = [], wallet = null } = {}) {
+export function financeReceipt(operationId, title, { entries = [], wallet = null, desktop = false } = {}) {
   const id = String(operationId || '');
   const all = getLedgerEntries().filter(item => String(item.operationId || '') === id);
   const rows = all.length ? all : entries;
   const first = rows[0] || {};
   const data = getFinanceOperation(id)?.data || {};
   const when = shortDateTimeParts(first.occurredAt || '');
+  if(desktop&&isDepositCashDocument(first))return readOnlyReceipt({groups:depositCashGroups(rows,data)});
   const groups = first.operationKind === 'payment' ? paymentGroups(rows,data,{ walletOnly: Boolean(wallet) }) : [];
   const walletTotal = wallet ? [{ label: 'Движение по кошельку · ' + wallet.name, value: formatMoney(wallet.total), strong: true }] : [];
   if (groups.length) {

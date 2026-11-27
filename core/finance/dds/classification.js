@@ -12,6 +12,8 @@ export function desktopAvailableArticles(articles,can){
  return articles.filter(a=>!hidden.has(a.articleId)).map(a=>({...a,name:desktopArticleName(a)}));
 }
 export const desktopOperationDirection=d=>({in:'Приход',out:'Расход',transfer:'Транзакция',mixed:'Транзакция'})[d]||'—';
+export const depositArticleLabel=entry=>({DEPOSIT_RECEIVED:'Оплата депозита',DEPOSIT_RETURN:'Возврат депозита'})[entry?.economicType]||({'deposit-funding':'Оплата депозита','deposit-withdrawal':'Возврат депозита'})[entry?.operationKind]||'';
+export const isDepositCashDocument=entry=>['deposit-funding','deposit-withdrawal'].includes(entry?.operationKind);
 // Existing historical economic types are authoritative when articleId is absent.
 // Never allocate a combined document's money to inferred individual items.
 export function desktopDocumentArticles(entries,catalog){
@@ -28,7 +30,7 @@ export function desktopDocumentArticles(entries,catalog){
   if(e.articleName){found.add(a?.systemKey?desktopArticleName(a):e.articleName);continue;}
   if(a){found.add(desktopArticleName(a));continue;}
   const k=({SERVICE_REFUND:'REFUND',TIPS_REFUND:'REFUND'})[e.economicType]||e.economicType;
-  add(k);
+  if(byKey.has(k))add(k);else if(depositArticleLabel(e))found.add(depositArticleLabel(e));
  }
  return [...found].filter(Boolean).sort((a,b)=>a.localeCompare(b,'ru'));
 }

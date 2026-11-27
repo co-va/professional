@@ -35,7 +35,7 @@ import { financeOperationGroups, openFinanceOperations } from '../operations/ind
 import { canUseCapability } from '../../access.js';
 import { getAllPeople } from '../../people/data.js';
 import { getFinanceOperation, getFinanceArticles } from '../data.js';
-import { desktopDocumentArticles, desktopOperationDirection } from './classification.js';
+import { desktopDocumentArticles, desktopOperationDirection, depositArticleLabel, isDepositCashDocument } from './classification.js';
 import { getWallets } from '../cash/data.js';
 import { financeLocalDateValue, financeOccurredAtForDate } from '../date.js';
 import { cancelFinanceOperation, correctFinanceOperation, hardDeleteFinanceOperation } from '../service.js';
@@ -524,9 +524,12 @@ function openFinanceOperation(root, movements, operationId) {
   const entries = movements.filter((item) => String(item?.operationId || '') === id);
   if (!entries.length) return;
   const first = entries[0];
-  const receipt = financeReceipt(id, operationName(first), { entries });
-  const active = first?.operationStatus !== 'cancelled';
   const desktop = financeDesktop(root);
+  const depositDocument=desktop&&isDepositCashDocument(first);
+  const title=depositDocument?depositArticleLabel(first):operationName(first);
+  const receipt = financeReceipt(id,title,{entries,desktop});
+  if(depositDocument)return openFinanceReceiptX(root,title,receipt,[],{actionLayout:'dds'});
+  const active = first?.operationStatus !== 'cancelled';
   const correction = active ? { label: desktop ? 'Исправить' : 'Корректировка', variant: desktop ? 'primary' : 'secondary', run: layer => openOperationCorrection(root, layer, entries) } : null;
   const cancel = !desktop && active ? { label: 'Отменить операцию', aria: 'Отменить финансовую операцию с сохранением истории', variant: 'danger', run: layer => openCancelOperation(root, layer, entries) } : null;
   const remove = { label: 'Удалить', variant: 'critical', run: layer => openDeleteOperation(root, layer, entries) };
