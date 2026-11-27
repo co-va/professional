@@ -81,7 +81,7 @@ function paymentGroups(rows, data, { walletOnly = false } = {}) {
     { label: 'Клиент', value: [person.name, person.surname].filter(Boolean).join(' ') },
   ].filter(row => row.value);
   const breakdown = items.map(item => {
-    const amount = item.planAmount ?? item.price;
+    const amount = item.price ?? item.cost;
     return { label: String(item.name || 'Услуга'), value: amount != null && Number.isFinite(Number(amount)) ? formatMoney(Number(amount)) : '—' };
   });
   if (!breakdown.length) {
@@ -89,13 +89,13 @@ function paymentGroups(rows, data, { walletOnly = false } = {}) {
     breakdown.push({ label: subject || 'Состав услуг не сохранён', value: '' });
   }
   if (settlement.serviceTotal != null && settlement.planTotal != null && Number(settlement.serviceTotal) > Number(settlement.planTotal)) {
-    breakdown.push({ label: 'Стоимость до скидки', value: formatMoney(settlement.serviceTotal) }, { label: 'Скидка', value: formatMoney(Number(settlement.serviceTotal) - Number(settlement.planTotal)) });
+    breakdown.push({ label: 'Скидка', value: formatMoney(Number(settlement.serviceTotal) - Number(settlement.planTotal)) });
   }
-  if (settlement.planTotal != null) breakdown.push({ label: 'К оплате по счёту', value: formatMoney(settlement.planTotal), strong: true });
+  if (settlement.planTotal != null) breakdown.push({ label: 'К оплате', value: formatMoney(settlement.planTotal), strong: true });
   if (walletOnly) return [identity, breakdown].filter(group => group.length);
   const tips = data.tips != null ? Math.max(0, Number(data.tips) || 0) : rows.filter(item => item.economicType === 'TIPS').reduce((sum,item) => sum + Math.max(0, Number(item.amount)||0),0);
   const payment = [];
-  if (data.serviceAmount != null) payment.push({ label: 'Оплачено за услуги', value: formatMoney(data.serviceAmount) });
+  if (data.serviceAmount != null) payment.push({ label: 'Оплата', value: formatMoney(data.serviceAmount) });
   if (tips > 0) payment.push({ label: 'Чаевые', value: formatMoney(tips) });
   const allocations = Array.isArray(data.allocations) && data.allocations.length ? data.allocations : (first.allocations || []);
   if (allocations.length) allocations.filter(item => Number(item.amount)>0).forEach(item => payment.push({ label: item.walletName || item.walletId || 'Кошелёк', value: formatMoney(item.amount) }));

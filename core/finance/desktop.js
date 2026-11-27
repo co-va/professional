@@ -93,7 +93,7 @@ export function bindFinanceHistoryTable(root, open) {
 }
 
 // Financial document: X in both layouts, actions below the receipt.
-export function openFinanceReceiptX(root, title, receipt, actions = []) {
+export function openFinanceReceiptX(root, title, receipt, actions = [], { actionLayout = '' } = {}) {
   const desktop = financeDesktop(root);
   const available = actions.filter(Boolean);
   const tools = available.map((item, index) => button(item.label, {
@@ -101,7 +101,7 @@ export function openFinanceReceiptX(root, title, receipt, actions = []) {
     data: 'data-finance-receipt-action="' + index + '"',
     aria: item.aria || '',
   })).join('');
-  const footerClass = desktop ? 'modal-actions finance-receipt-actions' : 'modal-actions';
+  const footerClass = desktop ? 'modal-actions finance-receipt-actions' + (actionLayout === 'dds' ? ' finance-receipt-actions--dds' : '') : 'modal-actions';
   const layer = mountModal(root, modal(receipt + (tools ? '<div class="' + footerClass + '">' + tools + '</div>' : ''), { title, variant: 'x', surface: 'app' }));
   if (!layer) return null;
   layer.querySelectorAll('[data-finance-receipt-action]').forEach(control => {
