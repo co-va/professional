@@ -231,8 +231,8 @@ export function openWalletExportConfirmation(root,wallet,rows,{onBusy=()=>{},exp
   const title='Выгрузка';
   const markup='<div class="modal-title"><h2>'+title+'</h2><p>Количество операций: '+rows.length+' · '+escapeHtml(money(sum(rows)))+'</p><p>Выгрузить в Excel?</p></div>'
     +'<div class="modal-actions">'
-    +button('Выгрузить',{variant:'secondary',data:'data-wallet-export-confirm'})
-    +button('Отмена',{variant:'secondary',data:'data-wallet-export-cancel data-modal-autofocus',className:'v2-confirmation-safe'})
+    +button('Отмена',{variant:'secondary',data:'data-wallet-export-cancel data-modal-autofocus'})
+    +button('Выгрузить',{variant:'primary',data:'data-wallet-export-confirm'})
     +'</div>';
   const popup=mountModal(root,modal(markup,{title,variant:'x',surface:'app',className:'desktop-export-confirmation'}));
   if(!popup)return null;
