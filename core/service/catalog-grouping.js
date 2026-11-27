@@ -489,7 +489,6 @@ export function openServiceGroupingQ({ onSaved = () => {}, desktop = false } = {
         const columns = [
           {key:'drag',label:'',narrow:true,sortable:false,render:group=>'<span class="list-entry__reorder-handle" data-reorder-handle data-desktop-group-key="'+escapeHtml(group.key)+'" role="button" tabindex="0" aria-label="'+escapeHtml('Переместить '+group.name)+'"><span aria-hidden="true">⋮⋮</span></span>'},
           {key:'name',label:'Наименование',sortable:false,render:group=>button(escapeHtml(group.name),{variant:'secondary',className:'desktop-group-table-name',data:'data-desktop-group-open',aria:'Редактировать группу '+group.name})},
-          {key:'kind',label:'Группа',sortable:false,render:group=>group.kind==='products'?'Товары':'Услуги'},
           {key:'values',label:'Значения',sortable:false,render:group=>String(Array.isArray(group.values)?group.values.length:0)},
         ];
         content.innerHTML='<div class="desktop-table-popup" data-desktop-group-directory-table>'+dataTable({columns,rows:entries,caption:'Группы',compact:true})+'</div>';

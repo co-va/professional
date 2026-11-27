@@ -1245,8 +1245,7 @@
  .v2-app--workspace .desktop-service-groups-q [data-desktop-group-directory-table] tbody.list-entries{display:table-row-group}
  .v2-app--workspace .desktop-service-groups-q [data-desktop-group-directory-table] :is(th,td){box-sizing:border-box;height:var(--h-list-row);padding:4px 8px;vertical-align:middle}
  .v2-app--workspace .desktop-service-groups-q [data-desktop-group-directory-table] :is(th,td)[data-table-column="drag"]{width:36px;padding:0;text-align:center}
- .v2-app--workspace .desktop-service-groups-q [data-desktop-group-directory-table] :is(th,td)[data-table-column="kind"]{width:78px}
- .v2-app--workspace .desktop-service-groups-q [data-desktop-group-directory-table] :is(th,td)[data-table-column="values"]{width:84px;text-align:right;font-variant-numeric:tabular-nums}
+ .v2-app--workspace .desktop-service-groups-q [data-desktop-group-directory-table] :is(th,td)[data-table-column="values"]{width:104px;padding-inline:12px;text-align:center;font-variant-numeric:tabular-nums}
  .v2-app--workspace .desktop-service-groups-q [data-desktop-group-directory-table] .list-entry__reorder-handle{width:36px;height:var(--ui-compact-size);margin:0 auto}
  .v2-app--workspace .desktop-service-groups-q [data-desktop-group-directory-table] tbody tr{cursor:pointer;touch-action:manipulation}
  .v2-app--workspace .desktop-service-groups-q [data-desktop-group-directory-table] .desktop-group-table-name{display:block;width:100%;min-width:0;white-space:normal;overflow-wrap:anywhere;line-height:1.2;font-weight:650}
