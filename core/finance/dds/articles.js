@@ -103,11 +103,13 @@ function openArticleX(existing = null, onSaved = () => {}, getArticles = getFina
   const isSystem = Boolean(existing?.systemKey);
   const title = existing ? 'Редактирование статьи' : 'Новая статья';
   const direction = existing?.direction || 'OUT';
-  const desktopDirections=[{value:'IN',label:'Приход'},{value:'OUT',label:'Расход'},{value:'TRANSFER',label:'Перевод'}];
+  const desktopDirections=[{value:'IN',label:'Приход'},{value:'OUT',label:'Расход'}];
+  // Legacy user-created transfer articles remain editable without silently changing their direction.
+  if(existing?.direction==='TRANSFER')desktopDirections.push({value:'TRANSFER',label:'Перевод'});
   const roots=new Set(items.filter(a=>['INCOME_ROOT','EXPENSE_ROOT'].includes(a.systemKey)).map(a=>a.articleId));
   const descendants=new Set(existing?[existing.articleId]:[]);
   for(let changed=true;changed;){changed=false;for(const a of items)if(descendants.has(a.parentArticleId)&&!descendants.has(a.articleId)){descendants.add(a.articleId);changed=true;}}
-  const parentChoices=[{value:'',label:'Без группы'},...items.filter(a=>!roots.has(a.articleId)&&!descendants.has(a.articleId)).map(a=>({value:a.articleId,label:a.name}))];
+  const parentChoices=[{value:'',label:'Без группы'},...items.filter(a=>!roots.has(a.articleId)&&!descendants.has(a.articleId)&&(a.direction!=='TRANSFER'||existing?.direction==='TRANSFER')).map(a=>({value:a.articleId,label:a.name}))];
   const existingParent=String(existing?.parentArticleId||'');
   if(desktop&&existingParent&&!roots.has(existingParent)&&!parentChoices.some(a=>a.value===existingParent))parentChoices.push({value:existingParent,label:'Текущая группа'});
   const economicType = existing?.economicType || 'OPERATING_EXPENSE';
@@ -142,11 +144,12 @@ function openArticleX(existing = null, onSaved = () => {}, getArticles = getFina
   };
   const initial=JSON.stringify(read());
   let pending=false;
-  const sync=()=>{const value=read();const parent=items.find(a=>a.articleId===value.parentArticleId);const invalid=desktop&&((parent&&parent.direction!==value.direction)||(descendants.size>1&&value.direction!==direction));save.disabled=pending||!value.name||invalid||Boolean(existing&&JSON.stringify(value)===initial);if(remove)remove.disabled=pending;};
+  const sync=()=>{const value=read();const parent=items.find(a=>a.articleId===value.parentArticleId);const invalid=desktop&&(!desktopDirections.some(a=>a.value===value.direction)||(parent&&parent.direction!==value.direction)||(descendants.size>1&&value.direction!==direction));save.disabled=pending||!value.name||invalid||Boolean(existing&&JSON.stringify(value)===initial);if(remove)remove.disabled=pending;};
   form.addEventListener('input',sync);
   form.addEventListener('change',sync);
   form.addEventListener('submit',async event=>{
     event.preventDefault();
+    sync();
     if(pending||save.disabled)return;
     const validation=formValidationMessage(form);
     if(validation){openNotice({message:validation});return;}
