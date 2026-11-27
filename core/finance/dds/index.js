@@ -644,7 +644,7 @@ function renderDDS(root) {
   root.innerHTML = `${headerContext}${operations}`;
   if (desktop) bindWalletHistory(root, {name:'Движения денежных средств'}, desktopRows, {
     dds:true, open:id=>{const documentId=desktopRowById.get(id)?.documentId;if(documentId)openFinanceOperation(root,movements,documentId,byId.get(documentId));}, actions:[
-    { label: DATA_EXCHANGE_ICON, className: 'people-desktop-icon', aria: 'Обмен данными', run: (anchor, selectedRows) => {
+    { label: DATA_EXCHANGE_ICON, className: 'people-desktop-icon', aria: 'Excel — загрузка и выгрузка', run: (anchor, selectedRows) => {
       const ids=new Set(selectedRows.map(row=>row.documentId||row.id));
       const selected=new Set(selectedRows.map(row=>row.id));
       openDDSExcel(root, movements, { anchor, exportMovements:movements.filter(item=>ids.has(String(item.operationId))), registryRows:registryRows.filter(row=>Array.isArray(canonical)?selected.has(row.registryRowId):ids.has(row.id)), onImported: () => renderDDS(root) });

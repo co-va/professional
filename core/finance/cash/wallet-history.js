@@ -225,7 +225,7 @@ export function bindWalletHistory(layer,wallet,rows,{open,settings,dds=false,act
     +compactButton({kind:'filter',data:'data-wallet-filter title="Фильтр" aria-haspopup="dialog" aria-pressed="false"'})
     +compactButton({kind:'sort',data:'data-wallet-sort title="Сортировка" aria-haspopup="dialog" aria-pressed="false"'})
     +'</div><div class="people-desktop-actions people-desktop-actions--right">'
-    +(dds?tools.map((action,index)=>button(action.label,{variant:'secondary',className:action.className||'',aria:action.aria||'',data:'data-dds-history-action="'+index+'"'})).join('')
+    +(dds?tools.map((action,index)=>button(action.label,{variant:'secondary',className:action.className||'',aria:action.aria||'',data:'data-dds-history-action="'+index+'" title="'+escapeHtml(action.aria||'')+'"'})).join('')
       :button(DATA_EXPORT_ICON,{variant:'secondary',className:'people-desktop-icon',data:'data-wallet-export title="Выгрузить в Excel"',aria:'Выгрузить в Excel'})
         +(settings?button('Удалить',{variant:'secondary',data:'data-wallet-settings',aria:'Удалить кассу'}):''))
     +'</div></div></section>',
