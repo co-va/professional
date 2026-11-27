@@ -371,8 +371,8 @@ export function openServiceGroupingQ({ onSaved = () => {}, desktop = false } = {
         field({label:'Наименование группы',name:'name',value:previous?.name||'',required:true,maxlength:80})+
         (previous?'<div class="desktop-group-values"><div class="stock-position-group-heading"><span>Значения</span>'+compactAddButton({data:'data-desktop-group-value-add',aria:'Добавить значение'})+'</div><div data-desktop-group-value-draft></div><div data-service-group-value-list></div></div>':'')+
         '<div class="form-error" role="alert" data-desktop-group-error></div>'+
-        actionBlock((previous?button('Удалить группу',{variant:'danger',data:'data-desktop-group-delete'}):'')+
-          button('Сохранить',{type:'submit',data:'data-desktop-group-save',disabled:!previous}),{className:'desktop-group-editor-actions'})+
+        actionBlock((previous?button('Удалить',{variant:'danger',data:'data-desktop-group-delete'}):'')+
+          button('Сохранить',{type:'submit',data:'data-desktop-group-save',disabled:true}),{className:'desktop-group-editor-actions'})+
         '</form>',
         {title:previous?'Группа':'Добавить группу',variant:'x',xRole:'editor',surface:'app',className:'desktop-service-group-editor-x'}
       ));
@@ -391,7 +391,6 @@ export function openServiceGroupingQ({ onSaved = () => {}, desktop = false } = {
       const valueName=()=>String(draftHost?.querySelector('[name="valueName"]')?.value||'').trim();
       const canSave=()=>Boolean(name()&&['procedures','products'].includes(kind())&&(!valueEdit||valueName())&&(!group||name()!==group.name||kind()!==group.kind||(valueEdit&&(valueEdit.isNew||valueName()!==valueEdit.name))));
       const syncEditor=()=>{
-        save.style.display=!previous||valueEdit||canSave()?'':'none';
         save.disabled=pending||!canSave();
         if(remove){remove.disabled=pending;remove.hidden=Boolean(valueEdit);}
         if(plus)plus.disabled=pending||Boolean(valueEdit);
