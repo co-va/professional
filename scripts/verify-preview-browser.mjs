@@ -256,6 +256,8 @@ try {
   for(const glyph of glyphs)assert.ok(Math.abs(glyph.dx)<1&&Math.abs(glyph.dy)<1,'Centered glyph');
   assert.ok(glyphs[0].border>0&&glyphs[0].radius>0,'Info rounded outline');
   assert.equal(glyphs[0].color,glyphs[1].color,'Matching glyph color');
+  const centerY=await personalTools.evaluate(row=>['[data-personal-account-info] > .small-action-button__info','[data-personal-account-limit] > svg','[data-personal-account-fund]'].map(selector=>{const r=row.querySelector(selector).getBoundingClientRect();return r.top+r.height/2;}));
+  assert.ok(Math.max(...centerY)-Math.min(...centerY)<0.5,'Info, gear and top-up share one horizontal center axis');
   await helpButton.click();
   const accountHelp=page.getByRole('dialog',{name:'Как работает Личный счёт',exact:true});
   await accountHelp.waitFor({timeout:10000});
