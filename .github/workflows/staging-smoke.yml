@@ -73,4 +73,5 @@ jobs:
         run: |
           npm install --no-save --no-package-lock playwright@1.56.1
           npx playwright install chromium
+          node scripts/verify-dds-table-browser.mjs
           node scripts/verify-preview-browser.mjs https://professional-volokovykh.msk1.amvera.tech/

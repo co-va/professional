@@ -228,6 +228,8 @@ export function bindWalletHistory(layer,wallet,rows,{open,settings,dds=false,act
     if(exportControl)exportControl.disabled=busy||!result.exportRows.length;
   };
   const refresh=()=>{
+    const previousViewport=dds?host.querySelector('.ui-data-table--compact'):null;
+    if(previousViewport){state.scrollLeft=previousViewport.scrollLeft;state.scrollTop=previousViewport.scrollTop;}
     const grouped=dds&&['articleAsc','articleDesc'].includes(state.sort);
     visible=visibleWalletRows(rows,state.query,state.filters,state.sort);
     // Selection always refers to the current visible table, never hidden rows.
@@ -241,6 +243,7 @@ export function bindWalletHistory(layer,wallet,rows,{open,settings,dds=false,act
       {key:'person',label:'Клиент / контрагент'},{key:'workplace',label:'Рабочее пространство'},...(!grouped?[{key:'article',label:'Статья'}]:[]),{key:'amount',label:'Сумма',narrow:true},...(dds?[{key:'bonus',label:'Бонусы',narrow:true}]:[]),
     ]):emptyState(rows.length?'Операции не найдены':'Операций пока нет',rows.length?'Измените условия поиска или фильтрации.':(dds?'Финансовые операции появятся здесь.':'Движения по этой кассе появятся здесь.'));
     if(grouped&&visible.length)applyDDSHierarchy(host,visible,state.collapsed);
+    if(dds){const viewport=host.querySelector('.ui-data-table--compact');if(viewport){viewport.scrollLeft=state.scrollLeft||0;viewport.scrollTop=state.scrollTop||0;}}
     host.querySelectorAll('[data-wallet-select]').forEach(control=>control.addEventListener('change',()=>{
       if(control.checked)state.selected.add(control.dataset.walletSelect);else state.selected.delete(control.dataset.walletSelect);sync();
     }));
