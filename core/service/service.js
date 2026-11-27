@@ -80,7 +80,7 @@ export function renderService(root, navigateBack = () => {}) {
   let disposeCatalog = () => {};
   let renderVersion = 0;
   let disposed = false;
-  const makeDesktopState=()=>({query:'',sort:'manual',group:'',value:'',workplace:'',ranges:{},rangeMetric:'',selected:new Set(),collapsed:new Set(),groupCollapsed:new Set()});
+  const makeDesktopState=()=>({query:'',sort:'manual',group:'',value:'',workplace:'',ranges:{},rangeMetric:'',selected:new Set(),groupCollapsed:new Set()});
   const desktopStates={procedures:makeDesktopState(),products:makeDesktopState()};
 
   const renderCurrent = () => {

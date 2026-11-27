@@ -65,15 +65,13 @@ export function renderDesktopServiceCatalog(host,{root,toolbar,onChanged,state,k
   const kinds=[activeKind==='products'?'products':'procedures'];
   const check=(data,aria,checked=false)=>'<label class="ui-compact-check service-table-check">'+checkControl({data,aria,checked})+'</label>';
   const header=Object.values(labels);
-  host.innerHTML='<section data-service-desktop-group-list data-service-table-kind="combined"><div class="service-desktop-table-track"><div class="service-desktop-group-header">'+'<span aria-hidden="true"></span>'+check('data-service-select-all','Выбрать все позиции')+header.map(v=>'<span>'+v+'</span>').join('')+'<span aria-hidden="true"></span>'+'</div><div class="service-desktop-group-body" data-service-group-catalog>'+kinds.map(kind=>'<section data-service-desktop-section="'+kind+'">'+check('data-service-select-section',kind==='procedures'?'Выбрать все услуги':'Выбрать все товары')+'<details data-service-system-disclosure><summary class="inventory-editor-summary service-table-system-heading" data-table-group-level="system"><span>'+(kind==='procedures'?'УСЛУГИ':'ТОВАРЫ')+'</span><span data-service-section-count>0 поз.</span></summary><div data-service-table-host></div></details></section>').join('')+'</div></div></section>';
+  host.innerHTML='<section data-service-desktop-group-list data-service-table-kind="combined"><div class="service-desktop-table-track"><div class="service-desktop-group-header">'+'<span aria-hidden="true"></span>'+check('data-service-select-all','Выбрать все позиции')+header.map(v=>'<span>'+v+'</span>').join('')+'<span aria-hidden="true"></span>'+'</div><div class="service-desktop-group-body" data-service-group-catalog>'+kinds.map(kind=>'<section data-service-desktop-section="'+kind+'"><div data-service-table-host></div></section>').join('')+'</div></div></section>';
   const sections=[...host.querySelectorAll('[data-service-desktop-section]')];
   const st=state;
   st.selected ||= new Set();
   st.ranges ||= {};
-  st.collapsed ||= new Set();
   st.groupCollapsed ||= new Set();
   let selectable=[];
-  const sectionKeys=new Map();
   const selectionKey=(kind,id)=>JSON.stringify([kind,key(id)]);
   const syncSelection=()=>{
     const available=new Set(selectable);
@@ -81,35 +79,15 @@ export function renderDesktopServiceCatalog(host,{root,toolbar,onChanged,state,k
     host.querySelectorAll('[data-service-select]').forEach(control=>{control.checked=st.selected.has(control.value);});
     const all=host.querySelector('[data-service-select-all]');
     if(all){all.disabled=!selectable.length;all.checked=selectable.length>0&&st.selected.size===selectable.length;all.indeterminate=st.selected.size>0&&!all.checked;}
-    for(const section of sections){
-      const keys=sectionKeys.get(section.dataset.serviceDesktopSection)||[];
-      const control=section.querySelector('[data-service-select-section]');
-      const count=keys.filter(id=>st.selected.has(id)).length;
-      control.disabled=!keys.length;
-      control.checked=keys.length>0&&count===keys.length;
-      control.indeterminate=count>0&&count<keys.length;
-    }
     onCount(selectable.length,st.selected.size);
   };
-  for(const section of sections){
-    const kind=section.dataset.serviceDesktopSection;
-    const disclosure=section.querySelector('[data-service-system-disclosure]');
-    disclosure.open=!st.collapsed.has(kind);
-    section.querySelector('[data-service-select-section]').addEventListener('change',event=>{
-      for(const id of sectionKeys.get(kind)||[]){
-        if(event.target.checked)st.selected.add(id);else st.selected.delete(id);
-      }
-      syncSelection();
-    });
-    disclosure.addEventListener('toggle',()=>{if(disclosure.open)st.collapsed.delete(kind);else st.collapsed.add(kind);});
-  }
   host.querySelector('[data-service-select-all]')?.addEventListener('change',event=>{
     st.selected=new Set(event.target.checked?selectable:[]);syncSelection();
   });
   const refresh=()=>{
     if(disposed||!host.isConnected)return;
     disposers.forEach(fn=>fn());disposers=[];serial=0;
-    selectable=[];sectionKeys.clear();
+    selectable=[];
     for(const section of sections){
       const kind=section.dataset.serviceDesktopSection,isService=kind==='procedures',all=dataFor(kind),levels=getServiceGroupLevels(kind);
       const workplaceNames=new Map(getWorkplaces().map(w=>[key(w.key||w.id),w.name]));
@@ -122,11 +100,7 @@ export function renderDesktopServiceCatalog(host,{root,toolbar,onChanged,state,k
         rows.sort((a,b)=>{const x=data(a)[column],y=data(b)[column];if(x==null||y==null)return x==null?(y==null?compare(a.name,b.name):1):-1;return ((typeof x==='number'&&typeof y==='number')?x-y:compare(x,y))*(dir==='desc'?-1:1)||compare(a.name,b.name)});
       }
       const manual=st.sort==='manual'&&!st.query&&!filtersActive(st);
-      section.hidden=false;
-      const keys=rows.map(item=>selectionKey(kind,item.id));
-      sectionKeys.set(kind,keys);
-      section.querySelector('[data-service-section-count]').textContent=keys.length+' поз.';
-      selectable.push(...keys);
+      selectable.push(...rows.map(item=>selectionKey(kind,item.id)));
       const {tree,criteria}=serviceTree(rows,levels);
       const scopes=[];
       const row=(item,scope)=>{
