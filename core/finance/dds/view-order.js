@@ -57,32 +57,16 @@ export function buildDDSGroups(rows,{groupArticles=false,groupValues=false,catal
  const last=Number.MAX_SAFE_INTEGER;
  const articleRank=r=>articles.get(r.articleId)?.rank??last;
  const valueRank=r=>{const values=articles.get(r.articleId)?.item.values||[],i=values.findIndex(v=>v.valueId===r.articleValueId);return i<0?last:i;};
- const articleKey=r=>text(r.groupArticleKey)||text(r.articleId)||text(r.article);
- const valueKey=r=>JSON.stringify([articleKey(r),text(r.groupValueKey)||text(r.articleValueId)||text(r.articleValue)]);
+ const articleKey=r=>text(r.articleId)||text(r.article);
+ const valueKey=r=>JSON.stringify([articleKey(r),text(r.articleValueId)||text(r.articleValue)]);
  const split=(items,key,label,compareGroups,level,path=[])=>{
   const groups=new Map();
   for(const row of items){const k=key(row);if(!groups.has(k))groups.set(k,{key:k,label:label(row),rows:[],level,path:[...path,k]});groups.get(k).rows.push(row);}
   return [...groups.values()].sort((a,b)=>compareGroups(a.rows[0],b.rows[0]));
  };
- const values=(items,path=[])=>split(items,valueKey,r=>[text(r.groupArticleValue)||text(r.articleValue)||'Без значения',...(!groupArticles&&r.article&&!r.groupArticleValue?.includes(' / ')?[r.article]:[])].join(' · '),(a,b)=>articleRank(a)-articleRank(b)||valueRank(a)-valueRank(b),'value',path);
- if(groupArticles)return split(rows,articleKey,r=>text(r.groupArticleLabel)||text(r.article)||'—',(a,b)=>articleRank(a)-articleRank(b),'group').map(g=>({...g,children:groupValues?values(g.rows,g.path):[]}));
+ const values=(items,path=[])=>split(items,valueKey,r=>[text(r.articleValue)||'Без значения',...(!groupArticles&&r.article?[r.article]:[])].join(' · '),(a,b)=>articleRank(a)-articleRank(b)||valueRank(a)-valueRank(b),'value',path);
+ if(groupArticles)return split(rows,articleKey,r=>text(r.article)||'—',(a,b)=>articleRank(a)-articleRank(b),'group').map(g=>({...g,children:groupValues?values(g.rows,g.path):[]}));
  if(groupValues)return values(rows);
  return [];
 }
 export function flattenDDSGroups(groups){return groups.flatMap(g=>g.children?.length?flattenDDSGroups(g.children):g.rows);}
-
-export function walletGroupingIdentity(classes=[],catalog=[]){
- const unique=new Map(classes.map(c=>[JSON.stringify([c.articleId,c.valueId]),c]));
- const ordered=[...unique.values()].sort((a,b)=>{
-   const ai=catalog.findIndex(x=>x.articleId===a.articleId),bi=catalog.findIndex(x=>x.articleId===b.articleId);
-   if(ai!==bi)return ai-bi;
-   const values=catalog[ai]?.values||[];
-   return values.findIndex(v=>v.valueId===a.valueId)-values.findIndex(v=>v.valueId===b.valueId)||compare(a.valueId,b.valueId);
- });
- const articles=[...new Map(ordered.map(c=>[c.articleId,c.articleName])).entries()];
- const groupArticleValue=ordered.map(c=>articles.length>1?[c.articleName,c.valueName].filter(Boolean).join(' / '):c.valueName).filter(Boolean).join(' · ');
- return {articleId:articles.length===1?articles[0][0]:'',articleValueId:ordered.length===1?ordered[0].valueId:'',
-   groupArticleKey:articles.length?JSON.stringify(articles.map(([id])=>id)):'',
-   groupValueKey:ordered.length?JSON.stringify(ordered.map(c=>[c.articleId,c.valueId])):'',
-   groupArticleLabel:articles.map(([,name])=>name).join(' · '),groupArticleValue};
-}

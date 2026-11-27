@@ -12,18 +12,18 @@ export function readArticleOrder(){
  }catch{return [];}
 }
 // Grouping is a view preference, independent of sorting and the article editor.
-export function readDDSGrouping(scope=''){
- const fallback={groupArticles:!scope,groupValues:false};
+export function readDDSGrouping(){
+ const fallback={groupArticles:true,groupValues:false};
  try{
   const id=key();if(!id)return fallback;
-  const value=JSON.parse(localStorage.getItem(id+':grouping'+(scope?':'+scope:''))||'null');
+  const value=JSON.parse(localStorage.getItem(id+':grouping')||'null');
   return value&&typeof value.groupArticles==='boolean'&&typeof value.groupValues==='boolean'?{groupArticles:value.groupArticles,groupValues:value.groupValues}:fallback;
  }catch{return fallback;}
 }
-export function saveDDSGrouping(state,scope=''){
+export function saveDDSGrouping(state){
  try{
   const id=key();if(!id)return false;
-  localStorage.setItem(id+':grouping'+(scope?':'+scope:''),JSON.stringify({groupArticles:state.groupArticles===true,groupValues:state.groupValues===true}));return true;
+  localStorage.setItem(id+':grouping',JSON.stringify({groupArticles:state.groupArticles===true,groupValues:state.groupValues===true}));return true;
  }catch{return false;}
 }
 export function sortArticleDirectory(items,order=[]){
