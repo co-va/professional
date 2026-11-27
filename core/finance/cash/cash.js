@@ -30,13 +30,13 @@ import {
   v2ZLayer,
   workspaceHeaderContext,
 } from '../../../ui/ui.js';
-import { financeDesktop, financeZActions, financeZSave, financeQSubmit, financeHistoryTable, bindFinanceHistoryTable, openFinanceReceiptX } from '../desktop.js';
+import { financeDesktop, financeZActions, financeZSave, financeQSubmit, financeHistoryTable, financeTableContact, bindFinanceHistoryTable, openFinanceReceiptX } from '../desktop.js';
 import { readOnlyReceipt } from '../../../ui/receipt/index.js';
 import { financeReceipt } from '../receipt.js';
 import { isV2DesktopWorkspace } from '../../../ui/v2/geometry.js';
 import { bindDesktopRailControls } from '../../../ui/v2/horizontal-affordance.js';
 import { canUseCapability } from '../../access.js';
-import { findPersonByAccountId, getPeople } from '../../people/data.js';
+import { findPersonByAccountId, getPeople, getAllPeople } from '../../people/data.js';
 import {
   canPermanentlyDeleteFinanceData,
   cancelFinanceOperation,
@@ -1456,10 +1456,11 @@ function renderWalletLayer(root, layer, walletId) {
     return;
   }
   const operations = walletOperations(wallet.id);
+  const people = financeDesktop(layer) ? getAllPeople() : [];
   layer.innerHTML = page([
     walletContext(wallet, wallet.name, financeDesktop(layer)),
     operations.length
-      ? (financeDesktop(layer) ? financeHistoryTable(operations.map(item => ({ id: item.operationId, date: operationMoment(item), code: String(item.person?.uei || ''), title: operationName(item), person: personName(item) || String(item.counterparty || ''), workplace: String(item.workplace || ''), amount: formatMoney(item.total) })), 'Операции кошелька', [{ key: 'date', label: 'Дата и время', narrow: true }, { key: 'title', label: 'Операция' }, { key: 'code', label: 'Код', narrow: true }, { key: 'person', label: 'Клиент / контрагент' }, { key: 'workplace', label: 'Рабочее пространство' }, { key: 'amount', label: 'Сумма', narrow: true }]) : v2ListEntries(operations.map(renderOperationRow)))
+      ? (financeDesktop(layer) ? financeHistoryTable(operations.map(item => ({ id: item.operationId, date: operationMoment(item), title: operationName(item), ...financeTableContact(item, people), workplace: String(item.workplace || ''), amount: formatMoney(item.total) })), 'Операции кошелька', [{ key: 'date', label: 'Дата', narrow: true }, { key: 'title', label: 'Операция' }, { key: 'code', label: 'Код', narrow: true }, { key: 'person', label: 'Клиент / контрагент' }, { key: 'workplace', label: 'Рабочее пространство' }, { key: 'amount', label: 'Сумма', narrow: true }]) : v2ListEntries(operations.map(renderOperationRow)))
       : emptyState('Операций пока нет', 'Движения по этой кассе появятся здесь.'),
   ]);
   if (financeDesktop(layer)) financeZActions(layer, wallet.name, wallet.system ? [] : [{

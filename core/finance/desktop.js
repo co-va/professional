@@ -1,6 +1,7 @@
 import { button, dataTable, escapeHtml, modal, mountModal, setV2ZHeaderRows } from '../../ui/ui.js';
 import { isV2DesktopWorkspace } from '../../ui/v2/geometry.js';
 import { moveDesktopQTool } from '../../ui/v2/z-layout.js';
+import { formatPhone } from '../phone/index.js';
 
 export function financeDesktop(root) {
   return isV2DesktopWorkspace(root?.closest('[data-v2-app]'));
@@ -48,11 +49,36 @@ export function financeQSubmit(layer, form) {
   control.addEventListener('click', () => form.requestSubmit());
 }
 
+// Financial table contact uses the operation snapshot first, then an exact
+// contact identity match. Never infer a phone from a person's name.
+export function financeTableContact(item = {}, people = []) {
+  const person = item.person || {};
+  const code = String(person.uei || '').trim();
+  const key = String(person.key || person.personKey || item.personKey || '').trim();
+  const linked = people.find(candidate => (key && String(candidate.key) === key) || (code && String(candidate.uei) === code));
+  const counterparty = item.counterparty;
+  const partyName = typeof counterparty === 'string' ? counterparty : String(counterparty?.name || '');
+  const name = [person.name, person.surname].filter(Boolean).join(' ').trim() || partyName;
+  const phone = person.phones?.[0] || person.phone || (name && !person.name ? counterparty?.phone || item.counterpartyPhone : '') || linked?.phones?.[0] || linked?.phone || '';
+  return { code: code || linked?.uei || '', person: name, contact: phone ? formatPhone(phone) : '' };
+}
+
+function twoLineCell(top, bottom = '') {
+  return '<div><div class="people-table-person__name">' + escapeHtml(top || '—') + '</div><div class="people-table-person__phone">' + escapeHtml(bottom || '—') + '</div></div>';
+}
+
+function twoLineHeading(top, bottom) {
+  return '<div>' + escapeHtml(top) + '</div><div>' + escapeHtml(bottom) + '</div>';
+}
+
 // Existing compact table; whole-row click delegates to the keyboard-accessible
 // operation button, just as in the accepted Deposit list.
 export function financeHistoryTable(rows, caption, columns) {
   return dataTable({ compact: true, caption, columns: columns.map(column => ({
     ...column, sortable: false,
+    ...(column.key === 'date' ? { label: 'Дата', header: () => twoLineHeading('Дата', 'Время'), render: row => { const [date, time] = String(row.date || '').trim().split(/\s+/, 2); return twoLineCell(date, time); } } : {}),
+    ...(column.key === 'person' ? { label: 'Клиент / контрагент', header: () => twoLineHeading('Клиент / контрагент', 'Контакт'), render: row => twoLineCell(row.person, row.contact) } : {}),
+    ...(column.key === 'workplace' ? { header: () => twoLineHeading('Рабочее', 'пространство') } : {}),
     ...(column.key === 'title' ? { render: row => '<button type="button" data-finance-history-row="' + escapeHtml(row.id) + '" aria-label="' + escapeHtml(row.title) + '">' + escapeHtml(row.title) + '</button>' } : {}),
   })), rows });
 }
