@@ -1,3 +1,4 @@
+import {DDS_SORTS,normalizeDDSView,sortDDSRows,buildDDSGroups,flattenDDSGroups} from '../core/finance/dds/view-order.js';
 import assert from 'node:assert/strict';
 import {sortArticleDirectory,mergeArticleSectionOrder,orderDDSArticleRows} from '../core/finance/dds/article-order.js';
 import { ddsRegistryParts } from '../core/finance/dds/registry-parts.js';
@@ -65,3 +66,26 @@ assert.deepEqual(savedOrder,['products','services','rent','tax','hidden']);
 assert.throws(()=>mergeArticleSectionOrder(orderCatalog,[],'system',['rent','services']));
 assert.deepEqual(orderDDSArticleRows([{id:'s1',articleId:'services'},{id:'r',articleId:'rent'},{id:'p',articleId:'products'},{id:'s2',articleId:'services'},{id:'x',articleId:''}],orderCatalog,savedOrder).map(r=>r.id),['p','s1','s2','r','x']);
 console.log('PASS article display order and section boundaries');
+
+const viewRows=[
+{id:'old2',code:'2',articleId:'services',article:'Услуги',articleValueId:'pay',articleValue:'Оплата',occurredAt:'2026-01-01',walletId:'bank',workplace:'B',value:100,bonusValue:0},
+{id:'new10',code:'10',articleId:'services',article:'Услуги',articleValueId:'tip',articleValue:'Чаевые',occurredAt:'2026-01-03',walletId:'cash',workplace:'A',value:-300,bonusValue:0},
+{id:'new2',code:'2',articleId:'services',article:'Услуги',articleValueId:'pay',articleValue:'Оплата',occurredAt:'2026-01-02',walletId:'cash',workplace:'B',value:200,bonusValue:-4},
+{id:'unknown',code:'',articleId:'purchase',article:'Закупка',articleValueId:'purchase-pay',articleValue:'Оплата',occurredAt:'2026-01-04',walletId:'bank',workplace:'A',value:1,bonusValue:0}
+];
+const viewCatalog=[{articleId:'services',systemKey:'s',values:[{valueId:'pay'},{valueId:'tip'}]},{articleId:'purchase',systemKey:'p',values:[{valueId:'purchase-pay'}]}];
+assert.deepEqual(sortDDSRows(viewRows,'code').map(r=>r.id),['new2','old2','new10','unknown']);
+assert.deepEqual(sortDDSRows(viewRows,'wallet',{wallets:[{id:'cash'},{id:'bank'}]}).map(r=>r.id),['new10','new2','unknown','old2']);
+assert.deepEqual(sortDDSRows(viewRows,'workplace',{workplaces:[{name:'B'},{name:'A'}]}).map(r=>r.id),['new2','old2','unknown','new10']);
+assert.deepEqual(sortDDSRows(viewRows,'person',{people:[{uei:'10'},{uei:'2'}]}).map(r=>r.id),['new10','new2','old2','unknown']);
+assert.deepEqual(sortDDSRows(viewRows,'bonus').map(r=>r.id),['new2','unknown','new10','old2']);
+assert.deepEqual(sortDDSRows(viewRows,'amount').map(r=>r.id),['new10','new2','old2','unknown']);
+const config=normalizeDDSView({sort:'articleOrder'});assert.equal(config.groupArticles,true);
+config.sort='code';config.groupValues=true;normalizeDDSView(config);assert.equal(config.groupArticles,true);assert.equal(config.groupValues,true);
+const grouped=buildDDSGroups(sortDDSRows(viewRows,'code'),{...config,catalog:viewCatalog,order:['purchase','services']});
+assert.equal(grouped.length,2);assert.equal(grouped[1].children.length,2);
+assert.deepEqual(flattenDDSGroups(grouped).map(r=>r.id),['unknown','new2','old2','new10']);
+assert.equal(buildDDSGroups(viewRows,{groupValues:true,catalog:viewCatalog}).length,3);
+assert.equal(buildDDSGroups(viewRows,{}).length,0);
+assert.deepEqual(DDS_SORTS.map(x=>x[0]),['dateDesc','dateAsc','code','person','workplace','wallet','amount','bonus']);
+console.log('PASS independent DDS grouping and simplified sorting');

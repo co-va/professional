@@ -1218,7 +1218,8 @@
 .v2-app--workspace [data-service-table-kind] [data-service-collapse-key]{position:relative}
 
 .v2-app--workspace .ui-data-table--compact tr[data-table-group-level] .dds-table-disclosure>summary{display:flex;align-items:center;padding-inline:12px 40px;color:inherit;background:transparent;white-space:normal;font:inherit}
-.v2-app--workspace [data-dds-history] .ui-data-table--compact tr[data-table-group-level="group"] .dds-table-disclosure>summary{padding-left:12px;gap:8px;list-style:none;cursor:pointer}
+.v2-app--workspace [data-dds-history] .ui-data-table--compact tr[data-table-group-level] .dds-table-disclosure>summary{padding-left:12px;gap:8px;list-style:none;cursor:pointer}
+.v2-app--workspace [data-dds-history] .ui-data-table--compact tr[data-table-group-level="value"] .dds-table-disclosure>summary{padding-left:32px}
 .v2-app--workspace [data-dds-history] .dds-table-disclosure>summary::-webkit-details-marker{display:none}
 .v2-app--workspace [data-dds-history] .dds-table-disclosure>summary::marker{content:""}
 .v2-app--workspace [data-dds-history] .dds-group-marker{flex:0 0 12px;text-align:center;line-height:1}

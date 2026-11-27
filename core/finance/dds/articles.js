@@ -1,3 +1,5 @@
+import {compactCheck} from '../../../ui/selection/check-list.js';
+import {normalizeDDSView} from './view-order.js';
 import { groupValuesMarkup, groupValueDraft, groupEditorActions, confirmGroupRemoval, renderGroupValues, renderGroupDirectory } from '../../../ui/groups/group-values.js';
 import {
   actionBlock,
@@ -396,7 +398,7 @@ function openMechanismArticleX(article,onSaved,getArticles){
 // The DDS directory is a tool, not a navigation destination. The same Q
 // and compact X editor are used on desktop and mobile; persisted Core article
 // IDs and mutation rules are unchanged until the classification contract changes.
-export function openFinanceArticlesQ(root, {onSaved=()=>{}}={}) {
+export function openFinanceArticlesQ(root, {onSaved=()=>{},grouping=null,onGroupingChanged=()=>{}}={}) {
   const desktop=financeDesktop(root);
   const getArticles=()=>desktopAvailableArticles(getFinanceArticles(),canUseCapability);
   const getDirectory=()=>availableArticleDirectory(getFinanceArticleCatalog(),getArticles(),canUseCapability);
@@ -408,6 +410,9 @@ export function openFinanceArticlesQ(root, {onSaved=()=>{}}={}) {
     +compactButton({kind:'filter',data:'data-article-filter title="Фильтр" aria-haspopup="dialog" aria-pressed="false"'})
     +compactButton({kind:'sort',data:'data-article-sort title="Сортировка" aria-haspopup="dialog" aria-pressed="false"'})
     +'</div>')
+    +(desktop&&grouping?'<div class="v2-desktop-tool-row"><div class="v2-desktop-tool-context">'+
+       compactCheck({label:'По статьям',checked:grouping.groupArticles,data:'data-dds-group-articles',aria:'Группировать по статьям'})+
+       compactCheck({label:'По значениям',checked:grouping.groupValues,data:'data-dds-group-values',aria:'Группировать по значениям'})+'</div></div>':'')
     +'<output data-article-count aria-label="Количество статей" aria-live="polite"></output>'
     +'<div data-finance-article-list></div>'+(desktop?'':'</div>')
     +compactButton({kind:'add',className:'v2-desktop-tool-primary',data:'data-add-finance-article title="Добавить статью"',aria:'Добавить статью'}),
@@ -421,6 +426,13 @@ export function openFinanceArticlesQ(root, {onSaved=()=>{}}={}) {
   const sort=layer.querySelector('[data-article-sort]');
   const add=layer.querySelector('[data-add-finance-article]');
   moveDesktopQTool(add);
+  if(desktop&&grouping){
+    normalizeDDSView(grouping);
+    for(const [selector,key] of [['[data-dds-group-articles]','groupArticles'],['[data-dds-group-values]','groupValues']]){
+      const control=layer.querySelector(selector);if(!control)continue;control.checked=grouping[key];
+      control.addEventListener('change',()=>{grouping[key]=control.checked;onGroupingChanged();});
+    }
+  }
   let busy=false,dispose=()=>{};
   const syncDirectory=()=>{if(add)add.disabled=busy;host.querySelectorAll('[data-article-row-delete]').forEach(control=>control.disabled=busy);};
   const deleteFromDirectory=id=>{

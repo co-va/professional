@@ -540,7 +540,7 @@ function openFinanceOperation(root, movements, operationId, document=null) {
 }
 
 function openArticles(root) {
-  return openFinanceArticlesQ(root, {onSaved:()=>renderDDS(root)});
+  return openFinanceArticlesQ(root, {onSaved:()=>renderDDS(root),grouping:root.ddsHistoryState||null,onGroupingChanged:()=>renderDDS(root)});
 }
 
 function availableDDSSettings() {
@@ -597,7 +597,7 @@ function renderDDS(root) {
     const bonus=facts?(facts.bonus===null?'Не определено':facts.bonus!==0?(facts.bonus>0?'+':'−')+new Intl.NumberFormat('ru-RU',{maximumFractionDigits:2}).format(Math.abs(facts.bonus)):'—'):'—';
     return { id:String(first.operationId), date:operationMoment(first), occurredAt:String(first.occurredAt||first.refundedAt||first.paidAt||''),
       localDate:localDate(first.occurredAt||first.refundedAt||first.paidAt||''), title, displayTitle:first.operationStatus==='cancelled'?title+' · Отменена':title, operationLabel:operationName(first), ...contact,
-      personFilter:[contact.code,contact.person].filter(Boolean).join(' · '), workplace:String(first.workplace||''),
+      personFilter:[contact.code,contact.person].filter(Boolean).join(' · '), personKey:String(first.person?.key||first.person?.personKey||first.personKey||''), workplace:String(first.workplace||''), workplaceKey:String(first.workplaceKey||''),
       wallets:sourceNames, wallet:transfer?operationListSubtitle(entries):sourceNames.join(' + '), articles, article:articles.join(', '),
       direction, status:first.operationStatus==='cancelled'?'Отменена':'Активна',
       value:facts?(facts.cash||facts.principal||facts.personal||0):(direction==='out'?-operationTotal(entries):operationTotal(entries)), amount, bonus, bonusValue:facts?.bonus??0, item:first };
@@ -614,7 +614,7 @@ function renderDDS(root) {
       const title=desktopOperationDirection(part.direction);
       const bonus=part.bonus==null?'':part.bonus===0?(Array.isArray(canonical)?'0':''):(part.bonus>0?'+':'−')+new Intl.NumberFormat('ru-RU',{maximumFractionDigits:2}).format(Math.abs(part.bonus));
       return {...base,id:part.id,documentId:part.documentId,articleId:part.articleId,article:part.article,articleValue:part.articleValue||'',articleValueId:part.articleValueId||'',position:part.position||'',positionId:part.positionId||'',articles:part.article?[part.article]:[],canonicalArticle:Array.isArray(canonical),part,
-        direction:part.direction,title,displayTitle:base.status==='Отменена'?title+' · Отменена':title,
+        direction:part.direction,walletId:(()=>{try{const key=JSON.parse(part.partKey)[3];return typeof key==='string'&&key.startsWith('wallet:')?key.slice(7):'';}catch{return '';}})(),title,displayTitle:base.status==='Отменена'?title+' · Отменена':title,
         wallet:part.direction==='transfer'?part.sources.join(' → '):part.sources.join(' + '),wallets:part.sources,sourcePosition:[part.direction==='transfer'?part.sources.join(' → '):part.sources.join(' + '),part.position].filter(Boolean).join(' · '),
         amount:part.money==null||part.money===0?'':formatMoney(part.money,{signed:part.direction!=='transfer'}),
         value:part.money??0,bonus,bonusValue:part.bonus??0};
