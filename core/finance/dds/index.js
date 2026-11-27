@@ -540,7 +540,7 @@ function openFinanceOperation(root, movements, operationId, document=null) {
 }
 
 function openArticles(root) {
-  return openFinanceArticlesQ(root, {onSaved:()=>renderDDS(root),grouping:root.ddsHistoryState||null,onGroupingChanged:()=>renderDDS(root)});
+  return openFinanceArticlesQ(root, {onSaved:()=>renderDDS(root)});
 }
 
 function availableDDSSettings() {

@@ -2,14 +2,14 @@ import {
   button, compactButton, datePicker, emptyState, escapeHtml, field,
   initDatePickers, modal, mountModal, select, setV2ZHeaderRows,
 } from '../../../ui/ui.js';
-import { checkControl } from '../../../ui/selection/check-list.js';
+import { checkControl, compactCheck } from '../../../ui/selection/check-list.js';
 import { DATA_EXPORT_ICON } from '../../../ui/buttons/index.js';
 import { financeHistoryTable, financeTableContact } from '../desktop.js';
 import { getFinanceOperation, getFinanceArticles, getFinanceArticleCatalog } from '../data.js';
 import { desktopDocumentArticles, desktopOperationDirection } from '../dds/classification.js';
 import { registeredArticle } from '../dds/article-view.js';
 import { articleCellText } from '../dds/article-view.js';
-import {readArticleOrder} from '../dds/article-order.js';
+import {readArticleOrder,readDDSGrouping,saveDDSGrouping} from '../dds/article-order.js';
 import {DDS_SORTS,WALLET_SORTS,normalizeWalletSort,normalizeDDSView,sortDDSRows,buildDDSGroups,flattenDDSGroups} from '../dds/view-order.js';
 import {getWallets} from './data.js';
 import {getWorkplaces} from '../../profile/workplaces/data.js';
@@ -171,9 +171,19 @@ function openFilters(anchor,rows,state,refresh,dds=false) {
   });
 }
 function openSort(anchor,state,refresh,dds=false) {
-  const markup='<div class="people-action-menu">'+(dds?DDS_SORTS:WALLET_SORTS).map(([value,label])=>
+  const grouping=dds?compactCheck({label:'По статьям',checked:state.groupArticles,data:'data-dds-group-articles',aria:'Группировать по статьям'})+
+    compactCheck({label:'По значениям',checked:state.groupValues,data:'data-dds-group-values',aria:'Группировать по значениям'}):'';
+  const markup='<div class="people-action-menu">'+grouping+(dds?DDS_SORTS:WALLET_SORTS).map(([value,label])=>
     button(label,{variant:'secondary',data:'data-wallet-sort-choice="'+value+'" aria-pressed="'+(value===state.sort)+'"'})).join('')+'</div>';
   const popup=mountModal(anchor,modal(markup,{title:'Сортировка',variant:'x',surface:'app',xRole:'action',className:'people-action-popup people-sort-popup'}));
+  if(dds)for(const [selector,key] of [['[data-dds-group-articles]','groupArticles'],['[data-dds-group-values]','groupValues']]){
+    const control=popup?.querySelector(selector);
+    control?.addEventListener('change',()=>{
+      state[key]=control.checked;
+      saveDDSGrouping(state);
+      refresh();
+    });
+  }
   popup?.querySelectorAll('[data-wallet-sort-choice]').forEach(control=>control.addEventListener('click',()=>{
     state.sort=control.dataset.walletSortChoice;popup.v2Close?.();refresh();
   }));
@@ -215,7 +225,7 @@ function applyDDSHierarchy(host,groups,collapsed){
 
 export function bindWalletHistory(layer,wallet,rows,{open,settings,dds=false,actions=[]}) {
   const stateKey=dds?'ddsHistoryState':'walletHistoryState';
-  const state=layer[stateKey] ||= {query:'',filters:dds?ddsFilters():emptyFilters(),sort:'dateDesc',...(dds?{groupArticles:true,groupValues:false}:{}),selected:new Set()};
+  const state=layer[stateKey] ||= {query:'',filters:dds?ddsFilters():emptyFilters(),sort:'dateDesc',...(dds?readDDSGrouping():{}),selected:new Set()};
   const tools=actions.filter(Boolean);
   if(!dds){state.filters={...emptyFilters(),...state.filters,title:''};state.sort=normalizeWalletSort(state.sort);}
   if(dds){state.collapsed ||= new Set();normalizeDDSView(state);state.filters.title='';if(state.filters.direction==='mixed')state.filters.direction='transfer';}
