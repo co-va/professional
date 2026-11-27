@@ -41,6 +41,7 @@ import { financeLocalDateValue, financeOccurredAtForDate } from '../date.js';
 import { cancelFinanceOperation, correctFinanceOperation, hardDeleteFinanceOperation } from '../service.js';
 import { getLedgerEntries } from '../read.js';
 import { desktopDocuments } from './documents.js';
+import { ddsRegistryParts } from './registry-parts.js';
 import { openFinanceArticlesQ } from './articles.js';
 import { openIncomeExpenseQ, renderIncomeExpenseOperation } from './income-expense.js';
 import { SPECIAL_FINANCE_ACTIONS, renderSpecialFinanceOperation } from './special-operations.js';
@@ -605,6 +606,20 @@ function renderDDS(root) {
     const sum=direction=>doc.entries.filter(e=>e.direction===direction).reduce((n,e)=>n+Math.round(Number(e.amount||0)*100),0)/100;
     return {...row,cashIn:f?.cashUnknown?null:sum('IN'),cashOut:f?.cashUnknown?null:sum('OUT'),depositPrincipal:f?.principal??null,personal:f?.personal??null,bonus:f?.bonus??null,depositNet:f?.depositNet??null,grossAmount:f?.discount?.grossAmount??null,benefitGranted:f?.discountUnknown?null:f?.conditionalGranted??null,benefitReversed:f?.discountUnknown?null:f?.conditionalReversed??null,benefitWrittenOff:f?.conditionalWrittenOff??null,bonusUsed:f?.bonusUnknown?null:f?.bonusUsed??null,bonusRestored:f?.bonusUnknown?null:f?.bonusRestored??null,documentAmount:operationTotal(doc.entries.length?doc.entries:[doc.first]),uncertainty:[...(f?.cashUnknown?['Кошелёк не определён']:[]),...(f?.principal===null?['Денежная часть не определена']:[]),...(f?.bonus===null?['Бонусная часть не определена']:[])].join('; ')};
   });
+  // Article rows share the original document ID; receipts and export remain document-based.
+  const desktopRows=desktop?documents.flatMap((document,n)=>{
+    const base=rows[n];
+    return ddsRegistryParts(document,catalog).map(part=>{
+      const title=desktopOperationDirection(part.direction);
+      const bonus=part.bonus==null||part.bonus===0?'':(part.bonus>0?'+':'−')+new Intl.NumberFormat('ru-RU',{maximumFractionDigits:2}).format(Math.abs(part.bonus));
+      return {...base,id:part.id,documentId:part.documentId,article:part.article,articles:part.article?[part.article]:[],
+        direction:part.direction,title,displayTitle:base.status==='Отменена'?title+' · Отменена':title,
+        wallet:part.direction==='transfer'?part.sources.join(' → '):part.sources.join(' + '),wallets:part.sources,
+        amount:part.money==null||part.money===0?'':formatMoney(part.money,{signed:part.direction!=='transfer'}),
+        value:part.money??0,bonus,bonusValue:part.bonus??0};
+    });
+  }):[];
+  const desktopRowById=new Map(desktopRows.map(row=>[row.id,row]));
   const mobileRows=[...rows].sort((a,b)=>String(b.occurredAt).localeCompare(String(a.occurredAt))||a.id.localeCompare(b.id));
   const operations = desktop ? '<div data-dds-history>'+walletHistoryBody(true)+'</div>'
     : mobileRows.length ? v2ListEntries(mobileRows.map(row=>v2ListEntry({title:row.article||row.displayTitle,subtitle:[row.displayTitle,row.person,row.wallet].filter(Boolean).join(' · '),rightTop:row.amount,rightBottom:[row.date,row.bonus&&row.bonus!=='—'?'Бонусы: '+row.bonus:''].filter(Boolean).join(' · '),interactive:true,initial:'',data:'data-finance-operation="'+row.id+'"',aria:'Открыть финансовый документ'}))) : emptyState('Все операции','Финансовых операций пока нет.');
@@ -620,10 +635,10 @@ function renderDDS(root) {
   });
 
   root.innerHTML = `${headerContext}${operations}`;
-  if (desktop) bindWalletHistory(root, {name:'Движения денежных средств'}, rows, {
-    dds:true, open:id=>openFinanceOperation(root,movements,id,byId.get(id)), actions:[
+  if (desktop) bindWalletHistory(root, {name:'Движения денежных средств'}, desktopRows, {
+    dds:true, open:id=>{const documentId=desktopRowById.get(id)?.documentId;if(documentId)openFinanceOperation(root,movements,documentId,byId.get(documentId));}, actions:[
     { label: DATA_EXCHANGE_ICON, className: 'people-desktop-icon', aria: 'Обмен данными', run: (anchor, selectedRows) => {
-      const ids=new Set(selectedRows.map(row=>row.id));
+      const ids=new Set(selectedRows.map(row=>row.documentId||row.id));
       openDDSExcel(root, movements, { anchor, exportMovements:movements.filter(item=>ids.has(String(item.operationId))), registryRows:registryRows.filter(row=>ids.has(row.id)), onImported: () => renderDDS(root) });
     } },
     canUseCapability('finance.articles.access') ? { label: GROUP_ICON, className: 'people-desktop-icon', aria: 'Статьи', run: () => openArticles(root) } : null,
