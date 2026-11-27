@@ -5,7 +5,7 @@ import {checkControl} from '../../ui/selection/check-list.js';
 import {catalogDisclosure} from '../inventory/catalog-ui.js';
 import {stockGroupTree,sortedStockChildren} from '../inventory/grouping.js';
 import {getProcedures,commitReorderProcedures} from './procedures/data.js';
-import {getProducts,commitReorderProducts,getServiceGroupLevels,getServiceGroupEntries,commitServiceGroupOrder,commitServiceGroupLevels} from './products/data.js';
+import {getProducts,commitReorderProducts,getServiceGroupLevels,getServiceGroupEntries} from './products/data.js';
 import {getWorkplaces} from '../profile/workplaces/data.js';
 import {procedureCardPhoto,productCardPhoto} from './card-presentation.js';
 import {loadInventory} from '../inventory/service.js';
@@ -125,40 +125,16 @@ export function renderDesktopServiceCatalog(host,{root,toolbar,onChanged,state,k
       };
       const walk=node=>{
         const children=sortedStockChildren(node,criteria);
-        // Group definitions and values reorder in separate sibling scopes.
-        const batches=[];
-        for(const child of children){
-          const groupId=child.group.id;
-          const type=groupId.startsWith(prefix)?'groups':'values:'+groupId;
-          if(batches.at(-1)?.type!==type)batches.push({type,children:[]});
-          batches.at(-1).children.push(child);
-        }
-        let html='';
-        for(const batch of batches){
-          const scope='s'+(++serial),groupOrder=batch.type==='groups';
-          scopes.push({scope,type:batch.type});
-          html+='<div class="list-entries service-desktop-branch" data-service-scope="'+scope+'">'+batch.children.map(child=>{
-            const id=groupOrder?kind+':'+child.group.id.slice(prefix.length):child.valueId;
-            const collapseKey=JSON.stringify([kind,child.key]);
-            let block=catalogDisclosure(child.value,walk(child),Boolean(node.key),child.items.length,'',manual?id:'').replace('<section ','<section data-service-collapse-key="'+escapeHtml(collapseKey)+'" data-table-group-level="'+(groupOrder?'group':'value')+'" ');
-            if(manual){
-              block=block.replace('data-stock-category','data-stock-category data-service-reorder-scope="'+scope+'"');
-              // Move only this branch's existing handle, never any descendant handle.
-              const at=block.lastIndexOf('<span class="list-entry__reorder-handle"');
-              const tail=at<0?-1:block.indexOf('</span></span>',at);
-              if(tail>=0){
-                const end=tail+'</span></span>'.length;
-                const handle=block.slice(at,end).replace('data-reorder-handle','data-reorder-handle data-service-handle="'+scope+'"');
-                block=block.slice(0,at)+block.slice(end);
-                const start=block.indexOf('>');
-                block=block.slice(0,start+1)+handle+block.slice(start+1);
-              }
-            }
-            return block;
-          }).join('')+'</div>';
-        }
+        // Group and value order belongs exclusively to the Groups editor.
+        // Catalogue headings disclose content; only positions can be reordered here.
+        let html=children.length?'<div class="list-entries service-desktop-branch">'+children.map(child=>{
+          const groupOrder=child.group.id.startsWith(prefix);
+          const collapseKey=JSON.stringify([kind,child.key]);
+          return catalogDisclosure(child.value,walk(child),Boolean(node.key),child.items.length)
+            .replace('<section ','<section data-service-collapse-key="'+escapeHtml(collapseKey)+'" data-table-group-level="'+(groupOrder?'group':'value')+'" ');
+        }).join('')+'</div>':'';
         if(node.direct.length){
-          const scope='s'+(++serial);scopes.push({scope,type:'items'});
+          const scope='s'+(++serial);scopes.push(scope);
           html+='<div class="list-entries" data-service-scope="'+scope+'">'+node.direct.map(item=>row(item,scope)).join('')+'</div>';
         }
         return html;
@@ -193,22 +169,12 @@ export function renderDesktopServiceCatalog(host,{root,toolbar,onChanged,state,k
         });
         el.querySelector('[data-service-open]')?.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();void openRow();}});
       });
-      if(manual)for(const {scope,type} of scopes){
+      if(manual)for(const scope of scopes){
         const list=table.querySelector('[data-service-scope="'+scope+'"]');
         if(!list)continue;
         disposers.push(initV2ListReorder(list,{selector:'[data-service-reorder-scope="'+scope+'"]',handleSelector:'[data-service-handle="'+scope+'"]',onReorder:async ordered=>{
-          if(type==='items'){
-            const merged=mergeServiceOrder(dataFor(kind).map(i=>key(i.id)),ordered);
-            await (isService?commitReorderProcedures(merged):commitReorderProducts(merged));
-          }else if(type==='groups'){
-            await commitServiceGroupOrder(mergeServiceOrder(getServiceGroupEntries().map(g=>g.key),ordered));
-          }else{
-            const gid=type.slice(7),fresh=getServiceGroupLevels(kind),g=fresh.find(v=>v.id===gid);
-            if(!g)throw Error('Группа больше не существует.');
-            const byId=new Map(g.values.map(v=>[v.id,v]));
-            const order=mergeServiceOrder(g.values.map(v=>v.id),ordered);
-            await commitServiceGroupLevels(kind,fresh.map(v=>v.id===gid?{...v,values:order.map(id=>byId.get(id))}:v));
-          }
+          const merged=mergeServiceOrder(dataFor(kind).map(i=>key(i.id)),ordered);
+          await (isService?commitReorderProcedures(merged):commitReorderProducts(merged));
           refresh();
         },onError:fail}));
       }

@@ -1189,7 +1189,6 @@
 .v2-app--workspace [data-service-table-kind] .inventory-editor-panel__body{padding:0!important}.v2-app--workspace [data-service-table-kind] .inventory-editor-panel{margin:0;border:0;border-radius:0;box-shadow:none}.v2-app--workspace [data-service-table-kind] .service-desktop-branch{gap:0}
 .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-table-kind] [data-table-group-level]:is(.inventory-editor-panel)>details>summary.inventory-editor-summary{background:var(--table-level-bg);color:var(--table-level-ink);border-bottom:1px solid var(--border)}
 .v2-app--workspace [data-service-table-kind] [data-table-group-level="value"]>details>summary.inventory-editor-summary{padding-left:36px}
-.v2-app--workspace [data-service-table-kind] .inventory-stock-category.is-reordering{position:relative;z-index:4;transform:translateY(var(--list-entry-drag-y,0px));pointer-events:none}.v2-app--workspace [data-service-table-kind] .inventory-stock-category.is-reorder-target-before{border-top:2px solid var(--text)}.v2-app--workspace [data-service-table-kind] .inventory-stock-category.is-reorder-target-after{border-bottom:2px solid var(--text)}
 .v2-app--workspace [data-service-table-host]{min-width:0}
 .v2-app--workspace [data-dds-history] .ui-data-table--compact tbody tr[data-table-group-level]>td{background:var(--table-level-bg);color:var(--table-level-ink);font-weight:750;text-align:left;padding-inline:12px;white-space:normal}
 }
@@ -1204,9 +1203,6 @@
 /* Drag first, selection second, editable action last. System headings are not draggable. */
 .v2-app--workspace [data-service-table-kind] [data-service-position] .service-table-edit{grid-column:10;justify-self:center;align-self:center;box-sizing:border-box;width:var(--ui-compact-size);height:var(--ui-compact-size);min-height:var(--ui-compact-size);padding:0;border:0;background:transparent;color:var(--text);font-size:20px;font-weight:400;line-height:1}
 .v2-app--workspace [data-service-table-kind] [data-service-collapse-key]{position:relative}
-.v2-app--workspace [data-service-table-kind] [data-service-collapse-key]>[data-reorder-handle]{position:absolute;top:0;left:12px;width:36px;height:var(--h-list-row);margin:0;z-index:3}
-.v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-table-kind] [data-service-collapse-key]:has(>[data-reorder-handle])>details>summary.inventory-editor-summary{padding-left:58px}
-.v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-table-kind] [data-table-group-level="value"]:has(>[data-reorder-handle])>details>summary.inventory-editor-summary{padding-left:78px}
 .v2-app--workspace [data-dds-history] .ui-data-table--compact tr[data-table-group-level]>td{padding:0}
 .v2-app--workspace [data-dds-history] .ui-data-table--compact tr[data-table-group-level] .dds-table-disclosure>summary{box-sizing:border-box;cursor:pointer;min-height:var(--h-list-row);display:flex;align-items:center;padding:0 40px 0 12px;color:inherit;background:transparent;white-space:normal;font:inherit}
 .v2-app--workspace [data-dds-history] .ui-data-table--compact tr[data-table-group-level="group"] .dds-table-disclosure>summary{padding-left:32px}
@@ -1232,8 +1228,6 @@
  .v2-app--workspace [data-service-table-kind]{--service-disclosure-row:30px}
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-table-kind] [data-service-collapse-key]>details>summary.inventory-editor-summary{box-sizing:border-box;height:var(--service-disclosure-row);min-height:var(--service-disclosure-row);max-height:var(--service-disclosure-row);padding-block:4px;line-height:21px}
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-table-kind] [data-service-collapse-key]>.inventory-editor-heading__controls{top:0;height:var(--service-disclosure-row);min-height:0;align-items:center}
- .v2-app--workspace [data-service-table-kind] [data-service-collapse-key]>[data-reorder-handle]{box-sizing:border-box;height:var(--service-disclosure-row);min-height:0;max-height:var(--service-disclosure-row)}
- .v2-app--workspace [data-service-table-kind] [data-service-collapse-key]>[data-reorder-handle]::before{inset:0 -5px}
 }
 
 /* Products have no duration columns: compact the actual grid, not just its cells. */
