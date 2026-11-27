@@ -94,25 +94,24 @@ function paymentGroups(rows, data, { walletOnly = false } = {}) {
   if (settlement.planTotal != null) breakdown.push({ label: 'К оплате', value: formatMoney(settlement.planTotal), strong: true });
   if (walletOnly) return [identity, breakdown].filter(group => group.length);
   const tips = data.tips != null ? Math.max(0, Number(data.tips) || 0) : rows.filter(item => item.economicType === 'TIPS').reduce((sum,item) => sum + Math.max(0, Number(item.amount)||0),0);
-  const payment = [];
-  if (data.serviceAmount != null) payment.push({ label: 'Оплата', value: formatMoney(data.serviceAmount) });
+  const payment = [{ label: 'Оплата', value: formatMoney(data.total ?? operationTotal(rows)), strong: true }];
   if (tips > 0) payment.push({ label: 'Чаевые', value: formatMoney(tips) });
+  const distribution = [];
   const allocations = Array.isArray(data.allocations) && data.allocations.length ? data.allocations : (first.allocations || []);
-  if (allocations.length) allocations.filter(item => Number(item.amount)>0).forEach(item => payment.push({ label: item.walletName || item.walletId || 'Кошелёк', value: formatMoney(item.amount) }));
+  if (allocations.length) allocations.filter(item => Number(item.amount)>0).forEach(item => distribution.push({ label: item.walletName || item.walletId || 'Кошелёк', value: formatMoney(item.amount) }));
   else {
     const wallets = new Map();
     for (const item of rows) {
       const label = walletText(item);
       if (label) wallets.set(label, (wallets.get(label)||0) + Math.max(0, Number(item.amount)||0));
     }
-    for (const [label,amount] of wallets) payment.push({ label, value: formatMoney(amount) });
+    for (const [label,amount] of wallets) distribution.push({ label, value: formatMoney(amount) });
   }
   for (const item of (Array.isArray(data.depositAllocations) ? data.depositAllocations : [])) {
-    if (Number(item.amount)>0) payment.push({ label: item.name || 'Депозит', value: formatMoney(item.amount) });
+    if (Number(item.amount)>0) distribution.push({ label: item.name || 'Депозит', value: formatMoney(item.amount) });
   }
-  if (Number(data.personalAccountAmount)>0) payment.push({ label: 'Личный счёт', value: formatMoney(data.personalAccountAmount) });
-  payment.push({ label: 'Итого оплачено', value: formatMoney(data.total ?? operationTotal(rows)), strong: true });
-  return [identity,breakdown,payment].filter(group => group.length);
+  if (Number(data.personalAccountAmount)>0) distribution.push({ label: 'Личный счёт', value: formatMoney(data.personalAccountAmount) });
+  return [identity,breakdown,payment,distribution].filter(group => group.length);
 }
 
 // Use the historical operation snapshot, not the current price list or record.
