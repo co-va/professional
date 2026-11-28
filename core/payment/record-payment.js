@@ -12,6 +12,9 @@ import {
   paymentMethods,
   select,
   workspaceHeaderContext,
+  escapeHtml,
+  v2ListEntry,
+  v2ListEntries,
 } from '../../ui/ui.js';
 import {
   correctFinanceOperation,
@@ -344,10 +347,11 @@ async function openPaymentEntry(record, onCompleted = () => {}) {
     ${prepayment?'<div data-record-prepayment-limit hidden role="status"></div>':''}`;
 
   const submit = host.querySelector('[data-record-payment-entry-submit]');
+  const allocationHost = host.querySelector('[data-payment-methods]');
   let allocationState = null;
 
   const syncPrimary = () => {
-    if (!submit) return;
+    if (!submit || paymentInFlightRecords.has(recordId)) return;
     const hasMoney = Number(allocationState?.received || 0) > 0.009;
     const canCompleteWithoutMoney = gratuityOnly && !state.fullyPaid;
     const label = prepayment?'Предоплата':canCompleteWithoutMoney && !hasMoney ? 'Завершить' : 'Оплата';
@@ -364,14 +368,19 @@ async function openPaymentEntry(record, onCompleted = () => {}) {
   };
 
   submit?.addEventListener('click', async () => {
-    const hasMoney = Number(allocationState?.received || 0) > 0.009;
-    if (hasMoney && !allocationState?.valid) return;
-    if(prepayment&&(!hasMoney||allocationState.remaining<=0.009||allocationState.tips>0.009))return;
+    if (paymentInFlightRecords.has(recordId)) return;
+    const selected = allocationState ? {
+      ...allocationState,
+      allocations: allocationState.allocations.map(item => ({ ...item })),
+      depositAllocations: allocationState.depositAllocations.map(item => ({ ...item })),
+    } : null;
+    const hasMoney = Number(selected?.received || 0) > 0.009;
+    if (hasMoney && !selected?.valid) return;
+    if(prepayment&&(!hasMoney||selected.remaining<=0.009||selected.tips>0.009))return;
     if (!hasMoney && (!gratuityOnly || state.fullyPaid)) return;
     const latest = getRecord(recordId) || current;
     const latestState = paymentStateForRecord(latest);
-    if ((latestState.fullyPaid && !canAcceptRecordTips(latest, latestState))
-      || paymentInFlightRecords.has(recordId)) {
+    if (latestState.fullyPaid && !canAcceptRecordTips(latest, latestState)) {
       layer.v2Close?.();
       onCompleted?.();
       return;
@@ -382,6 +391,7 @@ async function openPaymentEntry(record, onCompleted = () => {}) {
     submit.setAttribute('aria-busy', 'true');
     let completed = null;
     paymentInFlightRecords.add(recordId);
+    if (allocationHost) allocationHost.inert = true;
     try {
       // The payment X may stay open across a program expiry or a second-device
       // edit. Recheck before committing an irreversible financial operation.
@@ -410,13 +420,13 @@ async function openPaymentEntry(record, onCompleted = () => {}) {
           workplace: workplaceName(latest.workplaceId),
           person: recordPerson(latest),
           settlement,
-          allocations: allocationState.allocations,
-          depositAllocations: allocationState.depositAllocations,
-          personalAccountAmount: allocationState.personalAccountAmount,
-          finalizeDebt: !prepayment&&allocationState.remaining > 0.009,
+          allocations: selected.allocations,
+          depositAllocations: selected.depositAllocations,
+          personalAccountAmount: selected.personalAccountAmount,
+          finalizeDebt: !prepayment&&selected.remaining > 0.009,
           maxAmount: Math.max(0, Number(settlement?.planTotal || 0) - Number(latestState?.paidTotal || 0)),
-          serviceAmount: allocationState.applied,
-          tips: allocationState.tips,
+          serviceAmount: selected.applied,
+          tips: selected.tips,
           paymentTiming:prepayment?'prepayment':'settlement',
           occurredAt,
         });
@@ -424,16 +434,23 @@ async function openPaymentEntry(record, onCompleted = () => {}) {
     } catch (error) {
       openNotice({ message: String(error?.message || (hasMoney ? 'Не удалось провести оплату' : 'Не удалось завершить запись')) });
     } finally {
-      paymentInFlightRecords.delete(recordId);
+      if (!completed) {
+        paymentInFlightRecords.delete(recordId);
+        if (allocationHost) allocationHost.inert = false;
+      }
     }
 
     if (!completed) {
       if (submit.isConnected) syncPrimary();
       return;
     }
-    if(newContract)await refreshFinanceState().catch(()=>null);
-    layer.v2Close?.();
-    onCompleted?.(completed);
+    try {
+      if(newContract)await refreshFinanceState().catch(()=>null);
+      layer.v2Close?.();
+      onCompleted?.(completed);
+    } finally {
+      paymentInFlightRecords.delete(recordId);
+    }
   });
 
   initPaymentMethods(host.querySelector('[data-payment-methods]'), {
@@ -512,6 +529,47 @@ async function openPaymentCorrection(record, payment, onSaved) {
     onChange: (next) => { allocationState = next; syncPrimary(); },
   });
   syncPrimary();
+  return layer;
+}
+
+
+// The quick payment X never displays past allocations. Correction alone
+// selects the actual payment document when there is more than one.
+function openPaymentCorrectionSelection(record, state, onSaved) {
+  const payments = (Array.isArray(state?.payments) ? state.payments : []).filter(payment => payment?.id);
+  if (!payments.length) return null;
+  if (payments.length === 1) return openPaymentCorrection(record, payments[0], onSaved);
+  const layer = mountPaymentQ(record, {
+    title: 'Корректировка оплаты',
+    className: 'record-payment-correction-q',
+    hostData: 'data-record-payment-correction-list',
+  });
+  const host = layer?.querySelector('[data-record-payment-correction-list]');
+  if (!host) return layer;
+  host.innerHTML = v2ListEntries(payments.map(payment => {
+    const parts = zonedDateTimeParts(payment.occurredAt || payment.paidAt, paymentWorkplaceTimeZone(record));
+    const date = parts.date ? parts.date.split('-').reverse().join('.') : '';
+    const sources = [
+      ...paymentAllocations(payment).map(item => item.walletName || item.walletId),
+      ...paymentDepositAllocations(payment).map(item => item.name || item.programName || 'Депозит'),
+      ...(Number(payment.personalAccountAmount || 0) > 0.009 ? ['Личный счёт'] : []),
+    ].filter(Boolean);
+    return v2ListEntry({
+      title: [date, parts.time].filter(Boolean).join(' · ') || 'Оплата',
+      subtitle: sources.join(' · '),
+      rightTop: money(payment.total),
+      leadingIcon: 'document',
+      initial: '',
+      data: 'data-record-payment-correction-id="' + escapeHtml(payment.id) + '"',
+      aria: 'Корректировка оплаты',
+    });
+  }));
+  host.querySelectorAll('[data-record-payment-correction-id]').forEach(control => control.addEventListener('click', () => {
+    const payment = payments.find(item => String(item.id) === control.dataset.recordPaymentCorrectionId);
+    if (!payment) return;
+    layer.v2Close?.();
+    void openPaymentCorrection(record, payment, onSaved);
+  }));
   return layer;
 }
 
@@ -620,7 +678,7 @@ function paymentActionsBody(state, extraActions = '') {
 function bindPaymentBodyActions(host, record, state, onSaved) {
   const payment = state?.latestPayment || null;
   if (!payment) return;
-  host.querySelector('[data-record-payment-correct]')?.addEventListener('click', () => openPaymentCorrection(record, payment, onSaved));
+  host.querySelector('[data-record-payment-correct]')?.addEventListener('click', () => openPaymentCorrectionSelection(record, paymentStateForRecord(getRecord(record.id) || record), onSaved));
   host.querySelector('[data-record-payment-refund]')?.addEventListener('click', () => openPaymentRefund(record, payment, onSaved));
   host.querySelector('[data-record-payment-delete]')?.addEventListener('click', () => openPaymentDeletion(payment, onSaved));
 }

@@ -43,6 +43,8 @@ function operationMovement(operation = null) {
       movementType: 'income',
       incomeType: 'payment',
       allocations,
+      depositAllocations: Array.isArray(data.depositAllocations) ? data.depositAllocations.map((entry) => ({ ...entry })) : [],
+      personalAccountAmount: Math.max(0, financialNumber(data.personalAccountAmount)),
       walletId: allocations.length === 1 ? String(allocations[0]?.walletId || '') : '',
       walletName: allocations.length === 1 ? String(allocations[0]?.walletName || '') : '',
       paidAt: String(operation.occurredAt || ''),
