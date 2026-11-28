@@ -1218,7 +1218,7 @@
 .v2-app--workspace [data-service-table-kind] [data-service-collapse-key]{position:relative}
 
 .v2-app--workspace .ui-data-table--compact tr[data-table-group-level] .dds-table-disclosure>summary{padding-inline:12px 40px;color:inherit;background:transparent;white-space:normal;font:inherit}
-.v2-app--workspace [data-dds-history] .ui-data-table--compact tr[data-table-group-level="value"] .dds-table-disclosure>summary{padding-left:32px}
+.v2-app--workspace :is([data-dds-history],[data-inventory-company-list]) .ui-data-table--compact tr[data-table-group-level="value"] .dds-table-disclosure>summary{padding-left:32px}
 .v2-app--workspace .desktop-service-groups-q :is([data-article-count],[data-service-group-count]){display:block;width:100%;text-align:right;font-weight:650;font-variant-numeric:tabular-nums}
 .v2-app--workspace [data-dds-history] .ui-data-table--compact tbody tr[hidden]{display:none!important}
 }
@@ -1333,6 +1333,9 @@
    auto-column constraints and preserve the existing table row group for drag. */
 @media (min-width:768px) and (min-height:600px){
  .v2-app--workspace [data-inventory-table].ui-data-table--compact table{width:100%;table-layout:auto}
+ .v2-app--workspace [data-inventory-company-list] [data-stock-group-count]{white-space:nowrap;text-align:right;font-variant-numeric:tabular-nums}
+ .v2-app--workspace [data-inventory-company-list] [data-stock-group-count]>.list-entry__reorder-handle{display:inline-grid;vertical-align:middle;height:var(--ui-compact-size);margin:0}
+ .v2-app--workspace [data-inventory-company-list] [data-table-column="select"]{width:36px;min-width:36px;padding:0 4px;text-align:center}
  .v2-app--workspace .v2-front>.v2-z [data-inventory-table].ui-data-table--compact thead th{white-space:nowrap;overflow-wrap:normal;word-break:normal}
  .v2-app--workspace [data-inventory-table].ui-data-table--compact :is(th,td)[data-table-column="drag"]{width:36px;min-width:36px;padding:0;text-align:center}
  .v2-app--workspace [data-inventory-table].ui-data-table--compact :is(th,td)[data-table-narrow]:not([data-table-column="drag"],[data-table-column="select"]){white-space:nowrap;overflow-wrap:normal;word-break:normal}

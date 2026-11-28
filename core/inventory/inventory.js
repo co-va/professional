@@ -811,6 +811,7 @@ function stockListMarkup(manufacturer, query = '', rowsProvider = null, expanded
       list({className:'ui-list--dense',items:[itemRow(item)]}) +
     '</div>'
   ).join('');
+  if (desktop) return itemList(items);
   if (flat) return '<div class="list-entries inventory-stock-category-sequence">' +
     itemList(items) + '</div>';
   const nestedCriteria = stockNestedCriteria(inventoryCriterionGroups());
@@ -842,6 +843,64 @@ function stockListMarkup(manufacturer, query = '', rowsProvider = null, expanded
   };
   return '<div class="list-entries inventory-stock-category-sequence">' +
     render(tree) + '</div>';
+}
+
+// Desktop shares the DDS native table disclosure presentation. The existing
+// stock criteria tree still owns membership, configured order and item identity.
+function applyStockTableHierarchy(host,items,criteria,expanded,selected,allowReorder){
+  const body=host?.querySelector('tbody');
+  const membership=new Map();
+  if(!body)return membership;
+  const byId=new Map([...body.querySelectorAll('[data-stock-item-check]')].map(control=>[String(control.dataset.stockItemCheck),control.closest('tr')]));
+  const tree=stockGroupTree(items.filter(item=>byId.has(String(item.itemId))),criteria);
+  const width=host.querySelector('thead tr').cells.length;
+  const doc=body.ownerDocument,fragment=doc.createDocumentFragment(),disclosures=[];
+  body.classList.add('list-entries');
+  const append=(node,ancestors=[])=>{
+    const children=sortedStockChildren(node,criteria);
+    const sole=children.length===1&&node.direct.length===0;
+    for(const child of children){
+      const tr=doc.createElement('tr');
+      tr.dataset.tableGroupLevel=ancestors.length?'value':'group';
+      const ids=child.items.map(item=>String(item.itemId));
+      membership.set(child.key,ids);
+      const selection=doc.createElement('td');selection.dataset.tableColumn='select';
+      selection.innerHTML=compactCheck({checked:ids.every(id=>selected.has(id)),aria:'Выбрать все позиции группы '+child.value,data:'data-stock-group-check="'+escapeHtml(child.key)+'"'});
+      const heading=doc.createElement('td');heading.colSpan=width-2;
+      const details=doc.createElement('details');details.className='dds-table-disclosure';
+      details.open=expanded.has(child.key)?expanded.get(child.key):sole;
+      const summary=doc.createElement('summary');summary.className='inventory-editor-summary';
+      summary.textContent=child.value;details.append(summary);heading.append(details);
+      const count=doc.createElement('td');count.dataset.stockGroupCount='';
+      count.textContent=ids.length+' поз.';
+      const value=child.group.values?.find(v=>v.id===child.valueId||v.name===child.value);
+      if(allowReorder&&!ancestors.length&&value?.id){
+        tr.dataset.stockCategory='';tr.dataset.reorderId=value.id;
+        const handle=doc.createElement('span');handle.className='list-entry__reorder-handle';
+        handle.dataset.reorderHandle='';handle.tabIndex=0;handle.setAttribute('role','button');
+        handle.setAttribute('aria-label','Переместить группу '+child.value);
+        handle.textContent='⋮⋮';count.append(handle);
+      }
+      tr.append(selection,heading,count);fragment.append(tr);
+      const entry={tr,details,ancestors,leaves:[]};disclosures.push(entry);
+      append(child,[...ancestors,entry]);
+      details.addEventListener('toggle',()=>{sync();});
+      summary.addEventListener('click',()=>expanded.set(child.key,!details.open));
+    }
+    for(const item of node.direct){
+      const row=byId.get(String(item.itemId));
+      if(!row)continue;
+      if(ancestors.length)ancestors[ancestors.length-1].leaves.push(row);
+      fragment.append(row);
+    }
+  };
+  const sync=()=>{for(const entry of disclosures){
+    const hidden=entry.ancestors.some(parent=>!parent.details.open);
+    entry.tr.hidden=hidden;
+    for(const row of entry.leaves)row.hidden=hidden||!entry.details.open;
+  }};
+  append(tree);body.append(fragment);sync();
+  return membership;
 }
 
 function stockSortOptions(level) {
@@ -1014,7 +1073,7 @@ function openManufacturerStock(root, manufacturer, groupContext = null) {
         button('Удалить', { variant: 'delete-outline', data: 'data-stock-selected-delete' })
       )}
     </div>
-    <div data-inventory-company-list>${stockListMarkup(manufacturer, '', rowsProvider, expandedStockGroups, selectedStockItems, false, desktop)}</div>`;
+    <div data-inventory-company-list${desktop?' data-inventory-desktop-table':''}>${stockListMarkup(manufacturer, '', rowsProvider, expandedStockGroups, selectedStockItems, false, desktop)}</div>`;
   const layer = mountV2ZLayer(root, v2ZLayer(markup, { className: 'inventory-manufacturer-z' }), { stack: true });
   if (!layer) return;
   const searchRow = desktop?inventoryDesktopHeader(layer,manufacturer,stockSearchField('', 'data-inventory-company-search'),[
@@ -1027,12 +1086,15 @@ function openManufacturerStock(root, manufacturer, groupContext = null) {
   const listHost = layer.querySelector('[data-inventory-company-list]');
   const selectionActions = layer.querySelector('[data-stock-selected-actions]');
   const selectedCount = layer.querySelector('[data-stock-selected-count]');
+  let desktopMembership=new Map();
+  const groupRows=check=>desktop
+    ? [...(listHost?.querySelectorAll('[data-stock-item-check]')||[])].filter(row=>(desktopMembership.get(check.dataset.stockGroupCheck)||[]).includes(String(row.dataset.stockItemCheck)))
+    : [...(check.closest('.inventory-editor-panel')?.querySelectorAll('[data-stock-item-check]')||[])];
   const syncGroupChecks = () => {
     // Parent categories include all nested types. Partial selections
     // remain distinct from fully selected groups.
     listHost?.querySelectorAll('[data-stock-group-check]').forEach(check => {
-      const rows = [...(check.closest('.inventory-editor-panel')
-        ?.querySelectorAll('[data-stock-item-check]') || [])];
+      const rows = groupRows(check);
       const chosen = rows.filter(row => selectedStockItems.has(String(row.dataset.stockItemCheck))).length;
       check.checked = rows.length > 0 && chosen === rows.length;
       check.indeterminate = chosen > 0 && chosen < rows.length;
@@ -1189,6 +1251,12 @@ function openManufacturerStock(root, manufacturer, groupContext = null) {
     if (listHost) listHost.innerHTML = stockListMarkup(
       manufacturer, query, rowsProvider, expandedStockGroups, selectedStockItems,
       allowCategoryReorder, desktop);
+    if(desktop){
+      // Search/filter previously flattened the stock list; keep that contract.
+      desktopMembership=!query.trim()&&!hasStockFilters(STOCK_VIEW.itemsFilters)
+        ? applyStockTableHierarchy(listHost,sortItems(allRows,STOCK_VIEW.itemsSort),nestedCriteria,expandedStockGroups,selectedStockItems,allowCategoryReorder)
+        : new Map();
+    }
     listHost?.querySelectorAll('[data-stock-item-check]').forEach(check=>
       check.addEventListener('change',()=>{
         const id=String(check.dataset.stockItemCheck);
@@ -1199,8 +1267,7 @@ function openManufacturerStock(root, manufacturer, groupContext = null) {
       }));
     listHost?.querySelectorAll('[data-stock-group-check]').forEach(check =>
       check.addEventListener('change', () => {
-        const rows = check.closest('.inventory-editor-panel')
-          ?.querySelectorAll('[data-stock-item-check]') || [];
+        const rows = groupRows(check);
         rows.forEach(row => {
           const id = String(row.dataset.stockItemCheck);
           if (check.checked) selectedStockItems.add(id);
@@ -1234,10 +1301,11 @@ function openManufacturerStock(root, manufacturer, groupContext = null) {
           problem.className='form-error';
           problem.textContent=error instanceof Error
             ? error.message : 'Порядок групп не сохранился.';
+          if(desktop)renderList();
           listHost.prepend(problem);
         },
       });
-      disposeCategoryPreview=initStockCategoryDragPreview(
+      if(!desktop)disposeCategoryPreview=initStockCategoryDragPreview(
         listHost.querySelector('.inventory-stock-category-sequence'));
     }
     bindInventoryTableRows(listHost,'[data-inventory-item]',control=>{
