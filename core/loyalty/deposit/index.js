@@ -1200,7 +1200,7 @@ async function openDepositQ(root, depositId, onChanged = () => {}) {
       }),
       personDepositCard(deposit, { interactive: true, summary: true }),
       v2Section('История', historyListMarkup(deposit, items)),
-      desktop ? actionBlock(button('Удалить карту', {
+      desktop ? actionBlock(button('Удалить', {
         variant: 'danger', data: 'data-deposit-instance-delete data-ui-keyboard-action="auxiliary"',
       })) : '',
     ]);
