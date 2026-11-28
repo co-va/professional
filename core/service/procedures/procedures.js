@@ -202,7 +202,7 @@ function renderProcedureOverview(layer, baseRoot, id, { onChanged = () => {}, st
     title: procedure.name || 'Услуга',
     card: procedureOverviewCard(procedure, statistics),
     workplaceCards: procedureWorkplaceCards(procedure, statistics),
-    actions: (showAdd ? serviceWorkplaceAddButton() : '') + consumablesAction,
+    actions: consumablesAction + (showAdd ? serviceWorkplaceAddButton() : ''),
     mobileActions: button('Расходник', { variant: 'secondary', className: 'v2-desktop-tool-accent', data: 'data-procedure-open-consumables' }),
     mobileAdd: showAdd ? { label: '+', data: 'data-service-workplace-add', aria: 'Добавить рабочее пространство' } : null,
   });
