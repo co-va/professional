@@ -22,3 +22,10 @@
 .form-grid--two[data-manual-wallet-entry]{align-items:end}
 .form-grid--two[data-manual-wallet-entry]:has(>.ui-compact-button){grid-template-columns:repeat(2,minmax(0,1fr)) var(--ui-compact-size)}
 .form-grid--two[data-manual-wallet-entry]>.ui-compact-button{margin-bottom:calc((var(--ui-field-height) - var(--ui-compact-size))/2)}
+
+/* Detailed manual finance: same Compact add/remove controls as wallet rows. */
+[data-manual-detail-desktop]>.array-group__header{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:var(--ui-compact-size)}
+[data-manual-detail-desktop]>[data-finance-manual-lines]{display:grid;gap:8px;min-width:0}
+.form-grid[data-manual-line-desktop]{grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1.15fr) var(--ui-compact-size);gap:8px;align-items:end;min-width:0}
+.form-grid[data-manual-line-desktop]>.field{min-width:0}
+.form-grid[data-manual-line-desktop]>.ui-compact-button{margin-bottom:calc((var(--ui-field-height) - var(--ui-compact-size))/2)}
