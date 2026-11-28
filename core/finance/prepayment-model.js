@@ -55,3 +55,10 @@ export function recordPaymentPresentation(record,payment,timeZone,now=new Date()
  const status=phase==='before'?'Предоплата':phase==='after'?'Задолженность':'Оплата';
  return {phase,action,status,amount:phase==='before'?(advance>0?advance:null):remaining,outstandingLabel:phase==='after'?'Задолженность':'К оплате'};
 }
+
+// The entry button is a balance projection, independent of the payment form's date-dependent action.
+export function recordPaymentButtonSummary(payment){
+ return payment?.fullyPaid
+  ? {label:'Оплачено',amount:Math.max(0,Number(payment.paidTotal)||0)}
+  : {label:'К оплате',amount:Math.max(0,Number(payment?.remaining)||0)};
+}

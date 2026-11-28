@@ -30,7 +30,7 @@ import { openPersonHistoryQ } from '../people/people.js';
 import { personDisplay } from '../people/presentation.js';
 import { getRecordPaymentState, resolveRecordSettlement } from '../finance/index.js';
 import { readFinanceState } from '../finance/data.js';
-import { recordPaymentReport, recordPaymentPresentation, netRecordPrepayment } from '../finance/prepayment-model.js';
+import { recordPaymentReport, recordPaymentPresentation, recordPaymentButtonSummary } from '../finance/prepayment-model.js';
 import { zonedDateTimeToDate } from '../time/zone.js';
 import { shiftTimeDateKey } from '../time/math.js';
 import { getRecordProgramOptions, recordProgramSelection } from '../loyalty/record-program.js';
@@ -707,11 +707,8 @@ export function openRecordView(record, {
 
     const cancelled = source.status === 'cancelled';
     const tipsOnlyAvailable = !cancelled && !readOnlyHistory && canAcceptRecordTips(source, payment);
-    const advance=netRecordPrepayment(readFinanceState().operations,[String(source.id)]);
-    const presentation=recordPaymentPresentation(source,payment,recordWorkplaceTimeZone(source),new Date(),advance);
-    const paymentStateLabel=presentation.status
-      ? presentation.status+(presentation.amount==null?'':': '+formatMoney(presentation.amount))
-      : 'Оплата';
+    const paymentSummary=recordPaymentButtonSummary(payment);
+    const paymentStateLabel=`${paymentSummary.label}: ${formatMoney(paymentSummary.amount)}`;
     root.innerHTML = `<div class="record-screen record-screen--state-view record-screen--record-view">
       ${card}
       ${capabilities.consumables && !readOnlyHistory && !cancelled && procedures.length ? recordConsumablesSticker(source, payment) : ''}
@@ -733,7 +730,7 @@ export function openRecordView(record, {
             ? button(tipsOnlyAvailable ? 'Tips' : paymentStateLabel, {
               data: 'data-record-view-payment',
               className: payment.tipsTotal > 0.009 ? 'record-payment-button--has-tips' : '',
-              aria: payment.tipsTotal > 0.009 ? `${presentation.action}, есть Tips` : presentation.action,
+              aria: payment.tipsTotal > 0.009 ? `${paymentStateLabel}, есть Tips` : paymentStateLabel,
             })
             : button(paymentStateLabel, {
               disabled: true,

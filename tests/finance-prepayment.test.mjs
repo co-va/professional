@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {supportsFinancePrepayment,manualWalletAllocation,netRecordPrepayment,recordPaymentReport,recordPaymentPresentation,supportsRecordPaymentCalendar} from '../core/finance/prepayment-model.js';
+import {supportsFinancePrepayment,manualWalletAllocation,netRecordPrepayment,recordPaymentReport,recordPaymentPresentation,supportsRecordPaymentCalendar,recordPaymentButtonSummary} from '../core/finance/prepayment-model.js';
 const catalog=[{articleId:'mechanism-services',values:[{valueId:'services-prepayment',routes:['SERVICE_PREPAYMENT']}]}];
 assert.equal(supportsFinancePrepayment(catalog),true);
 assert.equal(supportsFinancePrepayment([]),false);
@@ -24,3 +24,10 @@ assert.deepEqual(recordPaymentPresentation(record,partial,tz,'2026-12-03T21:00:0
 assert.equal(recordPaymentPresentation(record,{fullyPaid:true,paidTotal:12000},tz,'2026-12-04T10:00:00Z').status,'Оплачено');
 assert.equal(recordPaymentPresentation(record,{remaining:12000},tz,'2026-12-02T20:00:00Z').amount,null);
 console.log('PASS single payment action, calendar dates and overdue status');
+
+assert.deepEqual(recordPaymentButtonSummary({remaining:12000,paidTotal:0}),{label:'К оплате',amount:12000});
+assert.deepEqual(recordPaymentButtonSummary(partial),{label:'К оплате',amount:7000});
+assert.deepEqual(recordPaymentButtonSummary({fullyPaid:true,remaining:0,paidTotal:12000}),{label:'Оплачено',amount:12000});
+assert.equal(recordPaymentPresentation(record,partial,tz,'2026-12-02T20:59:59Z',5000).action,'Предоплата');
+assert.equal(recordPaymentPresentation(record,partial,tz,'2026-12-03T21:00:00Z',5000).action,'Оплата');
+console.log('PASS record entry balance and independent payment form action');
