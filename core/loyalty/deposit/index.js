@@ -1,5 +1,5 @@
 import { dataTable, setSharedActionVisible } from '../../../ui/page/page.js';
-import { DATA_EXCHANGE_ICON, TRASH_ICON, VIEW_ICON } from '../../../ui/buttons/index.js';
+import { DATA_EXCHANGE_ICON, VIEW_ICON } from '../../../ui/buttons/index.js';
 import { moveDesktopQTool } from '../../../ui/v2/z-layout.js';
 import { isV2DesktopWorkspace } from '../../../ui/v2/geometry.js';
 import { compactCheck } from '../../../ui/selection/check-list.js';
@@ -1007,13 +1007,14 @@ function bindDesktopProgramTools(layer, program, settings) {
     <div class="v2-desktop-tool-actions">
       ${button(escapeHtml(programUei(program) || 'Код'), { variant: 'secondary', data: 'data-deposit-program-action="code"', aria: 'Изменить код программы' })}
       ${button('Создать копию', { variant: 'secondary', data: 'data-deposit-program-action="copy"' })}
-      ${button(TRASH_ICON, { variant: 'danger', className: 'v2-desktop-tool-icon', data: 'data-deposit-program-action="delete" title="Удалить программу"', aria: 'Удалить программу' })}
       ${button('+', { variant: 'secondary', className: 'v2-desktop-tool-primary', data: 'data-deposit-program-action="fund" title="Оформить карту"', aria: 'Оформить карту' })}
     </div>
   </div>`;
   const [tools] = setV2ZHeaderRows(layer, [toolsMarkup], { desktopTitle: settings.title });
-  if (!tools) return;
-  tools.querySelectorAll('[data-deposit-program-action]').forEach(control => {
+  const controls = [...(tools?.querySelectorAll('[data-deposit-program-action]') || [])];
+  const remove = layer.querySelector('[data-deposit-program-action="delete"]');
+  if (remove) controls.push(remove);
+  controls.forEach(control => {
     control.addEventListener('click', () => {
       const action = settings.actions.find(item => item.id === control.dataset.depositProgramAction);
       if (!action) return;
@@ -1247,6 +1248,10 @@ async function openProgramLayer(root, programId, { person = null, onChanged = ()
       v2Section('Оформленные депозиты', issuedList(issued, desktop, program), {
         accessory: desktop ? '<output data-deposit-count aria-live="polite"></output>' : '',
       }),
+      desktop ? actionBlock(
+        button('Удалить', { variant: 'danger', data: 'data-deposit-program-action="delete" data-ui-keyboard-action="auxiliary" title="Удалить программу"', aria: 'Удалить программу' }),
+        { className: 'v2-desktop-danger-footer' },
+      ) : '',
     ]);
     if (desktop) {
       const counter = layer.querySelector('[data-deposit-count]');
