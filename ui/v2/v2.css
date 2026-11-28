@@ -585,7 +585,7 @@
  .v2-app--workspace>.v2-header>.v2-desktop-toolbar-context,
  .v2-app--workspace>.v2-header>.v2-desktop-toolbar-user,
  .v2-app--workspace>.v2-header .v2-desktop-toolbar-divider,
- .v2-app--workspace>.v2-header .v2-desktop-toolbar-user>button:not([data-desktop-profile]){color:#E0D6D6}
+ .v2-app--workspace>.v2-header .v2-desktop-toolbar-user>button:not([data-desktop-profile]){color:var(--desktop-h-secondary-ink)}
  .v2-app--workspace>.v2-header:has(.v2-desktop-toolbar-context){position:relative;border-bottom:1px solid transparent}
  .v2-app--workspace>.v2-header:has(.v2-desktop-toolbar-context)::after{content:"";position:absolute;inset-inline-start:var(--v2-desktop-sidebar-width);inset-inline-end:0;bottom:-1px;height:1px;background:rgba(255,255,255,.14);pointer-events:none}
 }
@@ -1159,7 +1159,7 @@
 
 /* Canonical Desktop table/group header (Clients, Service and every shared table). */
 @media (min-width:768px) and (min-height:600px){
- .v2-app--workspace{--desktop-table-header-bg:#E0D6D6;--desktop-table-header-ink:#41484F;--desktop-table-system-bg:#927D7D;--desktop-table-system-ink:#FFFFFF;--desktop-table-group-bg:#CDBABA;--desktop-table-group-ink:#41484F;--desktop-table-value-bg:#EFE5E5;--desktop-table-value-ink:#41484F;--desktop-h-secondary-ink:#D1D4D6}
+ .v2-app--workspace{--desktop-table-header-bg:#E0D6D6;--desktop-table-header-ink:#41484F;--desktop-table-system-bg:#927D7D;--desktop-table-system-ink:#FFFFFF;--desktop-table-group-bg:#CDBABA;--desktop-table-group-ink:#41484F;--desktop-table-value-bg:#EFE5E5;--desktop-table-value-ink:#41484F;--desktop-h-secondary-ink:#E0D6D6}
  .v2-app--workspace :is(.ui-data-table th,.service-desktop-group-header){background:var(--desktop-table-header-bg);color:var(--desktop-table-header-ink);font-size:12px;font-weight:750;font-style:normal;line-height:1.2;letter-spacing:0;text-transform:uppercase}
  .v2-app--workspace .ui-data-table th button{font-style:inherit;font-weight:inherit;text-transform:inherit}
  .v2-app--workspace :is(.loyalty-deposit-program-z,[data-personal-account-list-host]) .ui-data-table--compact :is(th,td){box-sizing:border-box;height:var(--h-list-row);padding-block:4px}
