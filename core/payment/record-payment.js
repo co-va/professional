@@ -342,7 +342,8 @@ async function openPaymentEntry(record, onCompleted = () => {}) {
   host.innerHTML = `
     ${readOnlyReceipt({ totals: [...(priorAdvance>0?[{label:'Предоплата',value:money(priorAdvance)}]:[]),{ label: presentation.outstandingLabel, value: money(total), strong: true }] })}
     ${paymentMethods({ wallets, deposits, personalAccount, total, showAction: false, showTotal: false, initialDepositAllocations })}
-    ${actionBlock(button(prepayment?'Предоплата':gratuityOnly ? 'Завершить' : 'Оплата', { data: 'data-record-payment-entry-submit', disabled: !gratuityOnly }))}`;
+    ${actionBlock(button(prepayment?'Предоплата':gratuityOnly ? 'Завершить' : 'Оплата', { data: 'data-record-payment-entry-submit', disabled: !gratuityOnly }))}
+    ${prepayment?'<div data-record-prepayment-limit hidden role="status"></div>':''}`;
 
   const submit = host.querySelector('[data-record-payment-entry-submit]');
   let allocationState = null;
@@ -356,6 +357,12 @@ async function openPaymentEntry(record, onCompleted = () => {}) {
     submit.setAttribute('aria-label', label);
     submit.removeAttribute('aria-busy');
     submit.disabled = prepayment?!(allocationState?.valid&&allocationState.applied>0&&allocationState.remaining>0.009&&allocationState.tips<=0.009):hasMoney ? !allocationState?.valid : !canCompleteWithoutMoney;
+    const limit=host.querySelector('[data-record-prepayment-limit]');
+    if(limit){
+      const full=hasMoney&&allocationState?.remaining<=0.009;
+      limit.hidden=!full;
+      limit.textContent=full?'Пока доступна только частичная предоплата. Уменьшите сумму.':'';
+    }
   };
 
   submit?.addEventListener('click', async () => {

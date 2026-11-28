@@ -13,3 +13,7 @@
 .payment-item-head__remove{justify-self:end}
 
 .record-payment-actions{align-self:start}
+
+/* Payment X has one existing action; keep it visible when another source row
+   makes the form scroll. Do not change global X/Q/Z geometry. */
+.v2-layer--bottom .record-payment-entry-x > .modal-actions{position:sticky;bottom:0;z-index:2;margin-top:0;padding:8px 0 0;background:var(--v2-inner-surface,#F5F5F3)}
