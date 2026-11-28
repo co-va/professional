@@ -2,6 +2,7 @@ import { apiRequest, apiResponseJson as responseJson } from '../auth.js';
 import { flushBusinessPersistence } from '../business-persistence.js';
 import { applyFinancePatch, hydrateFinanceFromServer } from './data.js';
 import { financialNumber } from './rules.js';
+import { supportsFinancePrepayment } from './prepayment-model.js';
 import './read.js';
 
 function notifyFinanceChanged(detail = {}) {
@@ -44,6 +45,7 @@ function operationProjection(operation = null) {
     walletId: String(data?.walletId || ''),
     walletName: String(data?.walletName || ''),
     reason: String(data?.reason || ''),
+    paymentTiming:String(data?.paymentTiming||''),
     occurredAt: String(operation?.occurredAt || ''),
     recordedAt: String(operation?.recordedAt || ''),
     createdAt: String(operation?.recordedAt || operation?.occurredAt || ''),
@@ -110,11 +112,12 @@ export async function archiveFinanceArticle(articleId) {
   return state;
 }
 
-export async function recordManualFinanceOperation({ direction = '', articleId = '', walletId = '', walletName = '', amount = null, lines = [], note = '', occurredAt = null } = {}) {
+export async function recordManualFinanceOperation({ direction = '', articleId = '', walletId = '', walletName = '', amount = null, lines = [], note = '', occurredAt = null, canonicalArticleId = '', articleValueId = '', allocations = null, requestId = '' } = {}) {
   if (!occurredAt) return null;
+  if((allocations||canonicalArticleId)&&!supportsFinancePrepayment((await refreshFinanceState()).articleCatalog))throw new Error('Новая версия Core ещё недоступна. Обновите приложение после выпуска.');
   const response = await apiRequest('/finance/operations/manual', {
     method: 'POST',
-    body: JSON.stringify({ direction, articleId, walletId, walletName, amount, lines, note, occurredAt: occurredAt instanceof Date ? occurredAt.toISOString() : occurredAt }),
+    body: JSON.stringify({ direction, articleId, walletId, walletName, amount, lines, note, ...(canonicalArticleId?{canonicalArticleId,articleValueId}:{}), ...(allocations?{allocations,requestId}:{}), occurredAt: occurredAt instanceof Date ? occurredAt.toISOString() : occurredAt }),
   });
   const state = await applyServerState(response, 'Не удалось сохранить доход или расход');
   notifyFinanceChanged({ action: 'manual-operation', direction });
@@ -146,6 +149,7 @@ export async function recordPaymentIncome({
   serviceAmount = null,
   tips = 0,
   occurredAt = null,
+  paymentTiming = '',
 } = {}) {
   if (!source?.type || !source?.id || !settlement || !occurredAt) return null;
   const preparedAllocations = (Array.isArray(allocations) ? allocations : [])
@@ -165,6 +169,7 @@ export async function recordPaymentIncome({
   if (maxAmount != null && applied > Math.max(0, financialNumber(maxAmount)) + 0.009) return null;
   if (Math.abs(received - applied - tipsTotal) > 0.009) return null;
 
+  if(paymentTiming&&!supportsFinancePrepayment((await refreshFinanceState()).articleCatalog))throw new Error('Новая версия Core ещё недоступна.');
   const response = await apiRequest('/finance/operations/payment', {
     method: 'POST',
     body: JSON.stringify({
@@ -178,6 +183,7 @@ export async function recordPaymentIncome({
       finalizeDebt: finalizeDebt === true,
       serviceAmount: applied,
       tips: tipsTotal,
+      ...(paymentTiming?{paymentTiming}:{}),
       occurredAt: occurredAt instanceof Date ? occurredAt.toISOString() : occurredAt,
     }),
   });
@@ -202,6 +208,7 @@ export async function recordPaymentIncome({
 export async function correctFinanceOperation(operationId, payload = {}) {
   const id = String(operationId || '').trim();
   if (!id) return null;
+  if((payload.allocations&&payload.canonicalArticleId||payload.canonicalArticleId)&&!supportsFinancePrepayment((await refreshFinanceState()).articleCatalog))throw new Error('Новая версия Core ещё недоступна.');
   const response = await apiRequest(`/finance/operations/${encodeURIComponent(id)}`, {
     method: 'PUT',
     body: JSON.stringify({ ...payload, occurredAt: payload?.occurredAt instanceof Date ? payload.occurredAt.toISOString() : payload?.occurredAt }),

@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import {supportsFinancePrepayment,manualWalletAllocation,netRecordPrepayment,recordPaymentReport} from '../core/finance/prepayment-model.js';
+const catalog=[{articleId:'mechanism-services',values:[{valueId:'services-prepayment',routes:['SERVICE_PREPAYMENT']}]}];
+assert.equal(supportsFinancePrepayment(catalog),true);
+assert.equal(supportsFinancePrepayment([]),false);
+assert.deepEqual(manualWalletAllocation([{walletId:'cash',amount:50},{walletId:'card',amount:70}],120).map(a=>a.amount),[50,70]);
+assert.equal(manualWalletAllocation([{walletId:'cash',amount:50},{walletId:'cash',amount:70}],120),null);
+assert.equal(manualWalletAllocation([{walletId:'cash',amount:49},{walletId:'card',amount:70}],120),null);
+const op=(id,kind,data,record='r',originalOperationId='')=>({operationId:id,kind,status:'completed',source:{type:'record',id:record},data,originalOperationId});
+const ops=[op('advance','payment',{paymentTiming:'prepayment',serviceAmount:6000,cashServiceAmount:6000}),op('refund','refund',{serviceAmount:1000,cashServiceAmount:1000},'r','advance'),op('cash','payment',{serviceAmount:5000,cashServiceAmount:5000}),op('card','payment',{serviceAmount:20000,cashServiceAmount:20000}),op('other','payment',{paymentTiming:'prepayment',serviceAmount:10000},'other')];
+const ledger=[{operationId:'cash',walletId:'cash',walletName:'Наличные',direction:'IN',amount:5000,component:'service'},{operationId:'card',walletId:'card',walletName:'Карта',direction:'IN',amount:20000,component:'service'}];
+assert.equal(netRecordPrepayment(ops,['r']),5000);
+assert.deepEqual(recordPaymentReport(ops,ledger,['r']),{prepayment:5000,wallets:[{label:'Наличные',amount:5000},{label:'Карта',amount:20000}]});
+assert.deepEqual(recordPaymentReport(ops,[],['r']),{prepayment:5000,wallets:[]});
+assert.equal(netRecordPrepayment(ops,['missing']),0);
+console.log('PASS prepayment net, wallet split and report reconciliation');

@@ -1,5 +1,5 @@
 // Translate visible canonical article/value into an actual writable Core article ID.
-export function manualArticleChoices(raw,catalogue,direction,{preserveId='',allowedIds=null,fullCatalogue=catalogue}={}){
+export function manualArticleChoices(raw,catalogue,direction,{preserveId='',allowedIds=null,fullCatalogue=catalogue,allowEmptySystemValue=false}={}){
  const allowed=allowedIds?new Set(allowedIds):null;
  const eligible=raw.filter(a=>a.direction===direction&&a.economicType!=='GROUP'&&(!a.archivedAt||a.articleId===preserveId)&&(!['DEPOSIT_RECEIVED','DEPOSIT_RETURN','PERSONAL_ACCOUNT_LIABILITY_IN','PERSONAL_ACCOUNT_LIABILITY_OUT'].includes(a.economicType)||a.articleId===preserveId)&&(!allowed||!a.systemKey||allowed.has(a.articleId)||a.articleId===preserveId));
  const byId=id=>eligible.find(a=>a.articleId===id);
@@ -16,18 +16,19 @@ export function manualArticleChoices(raw,catalogue,direction,{preserveId='',allo
    if(a.archived&&a.articleId!==preserveId&&!a.values?.some(v=>v.valueId===preserveId))return [];
    const direct=byId(a.articleId)||byRoutes(a.routes||[]);
    const values=(a.values||[]).flatMap(v=>{
-     if(v.archived&&v.valueId!==preserveId)return [];
+     if((v.archived&&v.valueId!==preserveId)||v.routes?.includes('SERVICE_PREPAYMENT'))return [];
      const row=byId(v.valueId)||byRoutes(v.routes||[]);
      return row?[{value:v.valueId,label:v.name,rawId:row.articleId}]:[];
    });
-   return direct||values.length?[{value:a.articleId,label:a.name,rawId:direct?.articleId||'',values}]:[];
+   const emptyRaw=direct?.articleId||(allowEmptySystemValue?values.find(v=>v.rawId)?.rawId:'')||'';
+   return direct||values.length?[{value:a.articleId,label:a.name,rawId:emptyRaw,values,canonical:known.has(a.articleId)}]:[];
  });
 }
 export function manualArticleSelection(choices,rawId){
  for(const a of choices){
-   if(a.rawId===rawId)return {articleId:a.value,valueId:''};
    const v=a.values.find(v=>v.rawId===rawId);
    if(v)return {articleId:a.value,valueId:v.value};
+   if(a.rawId===rawId)return {articleId:a.value,valueId:''};
  }
  return {articleId:'',valueId:''};
 }

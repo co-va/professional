@@ -19,6 +19,7 @@ import {
   getRefundsForPayment,
   hardDeleteFinanceOperation,
   recordPaymentIncome,
+  refreshFinanceState,
   recordRefundExpense,
   resolveRecordSettlement,
   saveSettlementSnapshot,
@@ -35,6 +36,8 @@ import { flushBusinessPersistence } from '../business-persistence.js';
 import { loadWalletCatalog } from '../runtime/auxiliary-state.js';
 import { getProfile } from '../profile/data.js';
 import { readOnlyReceipt } from '../../ui/receipt/index.js';
+import { supportsFinancePrepayment, netRecordPrepayment } from '../finance/prepayment-model.js';
+import { readFinanceState } from '../finance/data.js';
 
 const money = (value) => `${new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(Number(value || 0)).replaceAll('\u00a0', ' ')} ₽`;
 const paymentInFlightRecords = new Set();
@@ -280,6 +283,7 @@ async function openPaymentEntry(record, onCompleted = () => {}) {
   let state = null;
   let total = 0;
   let gratuityOnly = false;
+  let prepayment=false,newContract=false;
   let deposits = [];
   let verifiedPersonDeposits = [];
   let personalAccount = null;
@@ -288,11 +292,16 @@ async function openPaymentEntry(record, onCompleted = () => {}) {
     const key = String(personForRecord(current)?.key || personForRecord(current)?.id || '').trim();
     // A cold Journal/Record route may not have loaded Finance/Cash.
     // Resolve the actual wallet catalog before rendering any source picker.
+    const refreshed=await loadVerifiedPaymentSource(()=>refreshFinanceState(),'Финансы');
+    newContract=supportsFinancePrepayment(refreshed.articleCatalog);
     [wallets, verifiedPersonDeposits] = await Promise.all([
       loadVerifiedPaymentSource(() => loadWalletCatalog(), 'Кошельки'),
       key ? loadVerifiedPaymentSource(() => listPersonDeposits(key,current?.date), 'Условия скидки') : Promise.resolve([]),
     ]);
     const verifiedRecord = getRecord(recordId) || current;
+    const start=zonedIntervalMoment(verifiedRecord,'from',paymentWorkplaceTimeZone(verifiedRecord));
+    prepayment=Boolean(start&&new Date()<start);
+    if(prepayment&&!newContract)throw new Error('Предоплата будет доступна после обновления Core.');
     settlement = settlementForRecord(verifiedRecord);
     state = paymentStateForRecord(verifiedRecord);
     if (state.fullyPaid && !canAcceptRecordTips(verifiedRecord, state)) {
@@ -301,7 +310,8 @@ async function openPaymentEntry(record, onCompleted = () => {}) {
     }
     total = Math.max(0, Number(settlement?.planTotal || 0) - Number(state?.paidTotal || 0));
     gratuityOnly = total <= 0.009 && Number(settlement?.serviceTotal || 0) > 0.009;
-    [deposits, personalAccount] = gratuityOnly
+    if(prepayment&&(total<=0.01||settlement.items?.some(i=>i.sourceType==='product')||Number(settlement.pricePercent||0)>0))throw new Error('Для этой записи предоплата пока недоступна.');
+    [deposits, personalAccount] = gratuityOnly||prepayment
       ? [[], null]
       : await Promise.all([
         depositsForRecord(verifiedRecord, null, verifiedPersonDeposits),
@@ -326,10 +336,11 @@ async function openPaymentEntry(record, onCompleted = () => {}) {
   const initialDepositAllocations = defaultDeposit && defaultDepositAmount > 0.009
     ? [{ depositId: String(defaultDeposit.depositId || defaultDeposit.id), amount: defaultDepositAmount }]
     : [];
+  const priorAdvance=netRecordPrepayment(readFinanceState().operations,[recordId]);
   host.innerHTML = `
-    ${readOnlyReceipt({ totals: [{ label: 'К оплате', value: money(total), strong: true }] })}
+    ${readOnlyReceipt({ totals: [...(priorAdvance>0?[{label:'Предоплата',value:money(priorAdvance)}]:[]),{ label: 'К оплате', value: money(total), strong: true }] })}
     ${paymentMethods({ wallets, deposits, personalAccount, total, showAction: false, showTotal: false, initialDepositAllocations })}
-    ${actionBlock(button(gratuityOnly ? 'Завершить' : 'Оплатить', { data: 'data-record-payment-entry-submit', disabled: !gratuityOnly }))}`;
+    ${actionBlock(button(prepayment?'Предоплата':gratuityOnly ? 'Завершить' : 'Оплатить', { data: 'data-record-payment-entry-submit', disabled: !gratuityOnly }))}`;
 
   const submit = host.querySelector('[data-record-payment-entry-submit]');
   let allocationState = null;
@@ -338,16 +349,17 @@ async function openPaymentEntry(record, onCompleted = () => {}) {
     if (!submit) return;
     const hasMoney = Number(allocationState?.received || 0) > 0.009;
     const canCompleteWithoutMoney = gratuityOnly && !state.fullyPaid;
-    const label = canCompleteWithoutMoney && !hasMoney ? 'Завершить' : 'Оплатить';
+    const label = prepayment?'Предоплата':canCompleteWithoutMoney && !hasMoney ? 'Завершить' : 'Оплатить';
     submit.textContent = label;
     submit.setAttribute('aria-label', label);
     submit.removeAttribute('aria-busy');
-    submit.disabled = hasMoney ? !allocationState?.valid : !canCompleteWithoutMoney;
+    submit.disabled = prepayment?!(allocationState?.valid&&allocationState.applied>0&&allocationState.remaining>0.009&&allocationState.tips<=0.009):hasMoney ? !allocationState?.valid : !canCompleteWithoutMoney;
   };
 
   submit?.addEventListener('click', async () => {
     const hasMoney = Number(allocationState?.received || 0) > 0.009;
     if (hasMoney && !allocationState?.valid) return;
+    if(prepayment&&(!hasMoney||allocationState.remaining<=0.009||allocationState.tips>0.009))return;
     if (!hasMoney && (!gratuityOnly || state.fullyPaid)) return;
     const latest = getRecord(recordId) || current;
     const latestState = paymentStateForRecord(latest);
@@ -382,9 +394,8 @@ async function openPaymentEntry(record, onCompleted = () => {}) {
         completed = await persistRecordCompletion(latest);
         if (!completed) throw new Error('Не удалось завершить запись');
       } else {
-        const occurredAt = recordServiceOccurredAt(latest);
+        const occurredAt = newContract?new Date():recordServiceOccurredAt(latest);
         if (!occurredAt) throw new Error('У записи отсутствует дата факта обслуживания.');
-        // Finance occurredAt belongs to the service day. Server recordedAt/createdAt keeps the actual entry moment.
         completed = await recordPaymentIncome({
           source: { type: 'record', id: latest.id },
           workplace: workplaceName(latest.workplaceId),
@@ -393,10 +404,11 @@ async function openPaymentEntry(record, onCompleted = () => {}) {
           allocations: allocationState.allocations,
           depositAllocations: allocationState.depositAllocations,
           personalAccountAmount: allocationState.personalAccountAmount,
-          finalizeDebt: allocationState.remaining > 0.009,
+          finalizeDebt: !prepayment&&allocationState.remaining > 0.009,
           maxAmount: Math.max(0, Number(settlement?.planTotal || 0) - Number(latestState?.paidTotal || 0)),
           serviceAmount: allocationState.applied,
           tips: allocationState.tips,
+          paymentTiming:newContract?(prepayment?'prepayment':'settlement'):'',
           occurredAt,
         });
       }
@@ -410,6 +422,7 @@ async function openPaymentEntry(record, onCompleted = () => {}) {
       if (submit.isConnected) syncPrimary();
       return;
     }
+    if(newContract)await refreshFinanceState().catch(()=>null);
     layer.v2Close?.();
     onCompleted?.(completed);
   });

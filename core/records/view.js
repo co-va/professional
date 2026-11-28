@@ -29,6 +29,8 @@ import { listPersonDeposits } from '../loyalty/deposit/data.js';
 import { openPersonHistoryQ } from '../people/people.js';
 import { personDisplay } from '../people/presentation.js';
 import { getRecordPaymentState, resolveRecordSettlement } from '../finance/index.js';
+import { readFinanceState } from '../finance/data.js';
+import { recordPaymentReport } from '../finance/prepayment-model.js';
 import { getRecordProgramOptions, recordProgramSelection } from '../loyalty/record-program.js';
 import { normalizeWorkplaceTimeZone, zonedIntervalMoment, hasZonedIntervalEnded } from '../time/index.js';
 import { canAcceptRecordTips, openRecordPayment } from '../payment/record-payment.js';
@@ -145,6 +147,9 @@ function openRecordZReport(record) {
       }] : []),
     ];
   });
+  const finance=readFinanceState();
+  const paymentReport=recordPaymentReport(finance.operations,finance.ledger,[String(current.id)]);
+  const paymentRows=paymentReport.prepayment>0?[{label:'Предоплата',value:formatReportRubles(paymentReport.prepayment)},...paymentReport.wallets.map(w=>({label:w.label,value:formatReportRubles(w.amount)}))]:[];
   const groups = [
     [
       { label: workplaceName(current?.workplaceId), value: dateLabel },
@@ -162,7 +167,7 @@ function openRecordZReport(record) {
       }] : []),
     ],
     [{ label: 'Итого', value: formatReportRubles(total), strong: true }],
-    recordReportStatusRows(current, state),
+    [...recordReportStatusRows(current,state),...paymentRows],
     [{ label: 'Tips', value: formatReportRubles(state?.tipsTotal) }],
   ];
   return mountModal(document.body, modal(readOnlyReceipt({
@@ -719,7 +724,7 @@ export function openRecordView(record, {
             aria: payment.tipsTotal > 0.009 ? `${paymentStateLabel}, есть Tips` : paymentStateLabel,
           })
           : capabilities.payment
-            ? button(tipsOnlyAvailable ? 'Tips' : `К оплате: ${formatMoney(payment.remaining)}`, {
+            ? button(tipsOnlyAvailable ? 'Tips' : !started&&!payment.hasPayments?'Предоплата':`К оплате: ${formatMoney(payment.remaining)}`, {
               data: 'data-record-view-payment',
               className: payment.tipsTotal > 0.009 ? 'record-payment-button--has-tips' : '',
               aria: payment.tipsTotal > 0.009 ? 'Оплата записи, есть Tips' : 'Оплата записи',

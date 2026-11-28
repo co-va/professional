@@ -10,6 +10,8 @@ import { canUseCapability } from '../core/access.js';
 import { getAllWorkplacesMonthStats, getWorkplaceMonthStats, getWorkplaceMonthStatsMap, getWorkingDays, getWorkplaces } from '../core/workplace-time.js';
 import { getActiveDayWorkplaces, getAvailableDayWorkplaces } from '../core/day/index.js';
 import { getRecordPaymentState } from '../core/finance/index.js';
+import { readFinanceState } from '../core/finance/data.js';
+import { recordPaymentReport } from '../core/finance/prepayment-model.js';
 import { hasZonedIntervalEnded } from '../core/time/index.js';
 import { applyTimetableWorkingDays, makeTimetableDayOff, openTimetableDayTimeEditor } from '../timetable/day-editor.js';
 import { getRecordsInRange, getRecordsForDay } from '../core/record/index.js';
@@ -402,9 +404,12 @@ export function renderJournal(root, options = {}) {
       { label: 'Средний чек часа', value: formatRubles(averageHour) },
       isMonth ? { label: 'Средний чек за рабочий день', value: formatRubles(averageWorkingDay) } : null,
     ].filter(Boolean);
+    const finance=readFinanceState();
+    const paymentReport=recordPaymentReport(finance.operations,finance.ledger,records.map(r=>String(r.id)));
+    const paymentRows=paymentReport.prepayment>0?[{label:'Предоплата',value:formatRubles(paymentReport.prepayment)},...paymentReport.wallets.map(w=>({label:w.label,value:formatRubles(w.amount)}))]:[];
     const groups = [
       summaryRows,
-      statusRows,
+      [...statusRows,...paymentRows],
       [{ label: 'Tips', value: formatRubles(tipsTotal) }],
       [{ label: 'Сумма', value: formatRubles(total), strong: true }],
     ];

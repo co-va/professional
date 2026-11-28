@@ -35,3 +35,7 @@ assert.equal(manualRawArticle(customChoices,'custom','child'),'child');
 assert.equal(manualRawArticle(customChoices,'fresh',''),'fresh');
 assert.deepEqual(manualArticleChoices(customRaw,null,'IN',{allowedIds:[]}).map(a=>a.label),['Мой доход']);
 assert.equal(manualArticleChoices(customRaw,[],'OUT',{allowedIds:[],fullCatalogue:customCatalog}).some(a=>a.value==='custom'),false);
+
+const emptySystem=manualArticleChoices(raw,catalog,'IN',{allowEmptySystemValue:true});
+assert.equal(manualRawArticle(emptySystem,'mechanism-services',''),'s');
+assert.deepEqual(manualArticleSelection(emptySystem,'s'),{articleId:'mechanism-services',valueId:'payment'});

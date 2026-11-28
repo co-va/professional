@@ -33,6 +33,7 @@ function operationMovement(operation = null) {
     occurredAt: String(operation.occurredAt || ''),
     recordedAt: String(operation.recordedAt || ''),
     createdAt: String(operation.recordedAt || operation.occurredAt || ''),
+    paymentTiming:String(data.paymentTiming||''),
   };
 
   if (operation.kind === 'payment') {
