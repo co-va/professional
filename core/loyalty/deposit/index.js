@@ -1,5 +1,5 @@
 import { dataTable, setSharedActionVisible } from '../../../ui/page/page.js';
-import { DATA_EXCHANGE_ICON, VIEW_ICON } from '../../../ui/buttons/index.js';
+import { DATA_EXCHANGE_ICON, VIEW_ICON, PROGRAM_DUPLICATE_ICON } from '../../../ui/buttons/index.js';
 import { moveDesktopQTool } from '../../../ui/v2/z-layout.js';
 import { isV2DesktopWorkspace } from '../../../ui/v2/geometry.js';
 import { compactCheck } from '../../../ui/selection/check-list.js';
@@ -1005,8 +1005,8 @@ function bindProgramVisibility(control, save, title) {
 function bindDesktopProgramTools(layer, program, settings) {
   const toolsMarkup = `<div class="v2-desktop-tool-row" data-deposit-program-toolbar>
     <div class="v2-desktop-tool-actions">
+      ${button(PROGRAM_DUPLICATE_ICON, { variant: 'secondary', className: 'v2-desktop-tool-icon v2-desktop-tool-icon--unfilled', data: 'data-deposit-program-action="copy" title="Дублирование программы"', aria: 'Дублирование программы' })}
       ${button(escapeHtml(programUei(program) || 'Код'), { variant: 'secondary', data: 'data-deposit-program-action="code"', aria: 'Изменить код программы' })}
-      ${button('Создать копию', { variant: 'secondary', data: 'data-deposit-program-action="copy"' })}
       ${button('+', { variant: 'secondary', className: 'v2-desktop-tool-primary', data: 'data-deposit-program-action="fund" title="Оформить карту"', aria: 'Оформить карту' })}
     </div>
   </div>`;
