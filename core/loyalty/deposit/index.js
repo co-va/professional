@@ -1474,7 +1474,7 @@ export async function renderDeposit(root) {
       settingsAria: 'Настройки депозита',
       c: desktop ? null : { label: '+', data: 'data-deposit-program-add', aria: 'Создать депозитную программу' },
     }),
-    '<div data-deposit-program-cards>' + (cards.length
+    '<div data-deposit-program-cards data-loyalty-program-section="deposit">' + (cards.length
       ? (desktop ? entityCardRail(cards) : entityCardStack(cards))
       : emptyState('Депозитных программ пока нет', 'Создайте первую программу кнопкой «+».')) + '</div>',
   ]);
