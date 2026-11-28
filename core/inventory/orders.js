@@ -1091,8 +1091,10 @@ export function renderInventoryOrders(root) {
   const desktop=inventoryDesktop(root);
   root.innerHTML = `${workspaceHeaderContext({
     title: 'Заказы',
-    v: desktop?null:{ data: 'data-inventory-orders-menu', aria: 'Сортировка и фильтр заказов' },
-    c: desktop?null:{ label: '+', data: 'data-inventory-add-order', aria: 'Сформировать заказ' },
+    ...(desktop ? {} : {
+      v: { data: 'data-inventory-orders-menu', aria: 'Сортировка и фильтр заказов' },
+      c: { label: '+', data: 'data-inventory-add-order', aria: 'Сформировать заказ' },
+    }),
   })}<div data-inventory-orders-list${desktop?' data-inventory-desktop-table':''}></div>`;
   const header=desktop?inventoryDesktopHeader(root,'Заказы',field({name:'inventoryOrdersSearch',type:'search',placeholder:'Поиск',value:root.dataset.inventoryOrdersSearch||'',data:'data-inventory-orders-search'}),[
     {kind:'filter',data:'data-inventory-orders-filter',aria:'Фильтр'},

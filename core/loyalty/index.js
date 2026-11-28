@@ -1,5 +1,5 @@
 import { button, emptyState, escapeHtml, modal, mountModal, openEntityCardAppearanceQ, page, setV2ZHeaderRows } from '../../ui/ui.js';
-import { DATA_EXCHANGE_ICON, VIEW_ICON } from '../../ui/buttons/index.js';
+import { DATA_EXCHANGE_ICON } from '../../ui/buttons/index.js';
 import { isV2DesktopWorkspace } from '../../ui/v2/geometry.js';
 import { loyaltyHeader } from './shared.js';
 import { canUseCapability } from '../access.js';
@@ -66,7 +66,7 @@ async function renderDesktopPrograms(root) {
   const owners = new Map();
   const toolbar = '<div class="v2-desktop-tool-row"><div class="v2-desktop-tool-actions">' +
     button(DATA_EXCHANGE_ICON, { variant: 'secondary', className: 'v2-desktop-tool-icon', data: 'data-program-excel title="Обмен данными"', aria: 'Обмен данными', disabled: true }) +
-    button(VIEW_ICON, { variant: 'secondary', className: 'v2-desktop-tool-icon', data: 'data-program-view title="Вид"', aria: 'Вид', disabled: true }) +
+    button('Вид', { variant: 'secondary', data: 'data-program-view title="Вид"', aria: 'Вид', disabled: true }) +
     button('+', { variant: 'secondary', className: 'v2-desktop-tool-primary', data: 'data-program-add aria-haspopup="dialog"', aria: 'Добавить программу', disabled: true }) +
     '</div></div>';
   const [tools] = setV2ZHeaderRows(root, [toolbar], { desktopTitle: 'Программы' });

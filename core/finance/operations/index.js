@@ -117,7 +117,7 @@ export function openFinanceOperations(root, {
   )).join('');
 
   const picker = anchor
-    ? mountModal(anchor, modal('<div class="desktop-q-action-menu">' + groups.flatMap(group => group.items.map(item => button(item.label, { variant: 'secondary', data: `data-finance-operation-action="${item.id}"` }))).join('') + '</div>', { variant: 'x', xRole: 'picker', className: 'desktop-q-action-popup' }))
+    ? mountModal(anchor, modal('<div class="desktop-q-action-menu">' + groups.flatMap(group => group.items.map(item => button(item.label, { variant: 'secondary', data: `data-finance-operation-action="${item.id}"` }))).join('') + '</div>', { title, variant: 'x', xRole: 'picker', className: 'desktop-q-action-popup' }))
     : mountModal(root, modal(content, { title, variant: 'x', surface: 'app' }));
   if (!picker) return null;
 
