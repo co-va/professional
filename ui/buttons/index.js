@@ -28,6 +28,9 @@ export const GROUP_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" fill=
 export const WORKPLACE_ADD_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 5-8 12-8 12S4 15 4 10a8 8 0 0 1 16 0Z"/><path d="M9 10h6m-3-3v6"/></svg>';
 export const CONSUMABLES_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 7-7.5-4.5L1 7l7.5 4.5L12 7Zm0 0 7.5-4.5L23 7l-7.5 4.5L12 7ZM3.5 8.5v9L12 22l8.5-4.5v-9M12 12v10"/></svg>';
 
+// Program duplication creates a new entity; it is not clipboard copy.
+export const PROGRAM_DUPLICATE_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="13" height="9" rx="2"/><rect x="8" y="15" width="13" height="7" rx="2"/><path d="M19 4v7 M15.5 7.5h7"/></svg>';
+
 // Full-size destructive tool icon; keep Compact remove (×) unchanged.
 export const TRASH_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></svg>';
 
