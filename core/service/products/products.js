@@ -28,6 +28,7 @@ import { getWorkplaces } from '../../profile/workplaces/data.js';
 import { renderServiceOverviewLayout, notifyServiceContext } from '../context.js';
 import { bindServiceWorkplaceAssignments, serviceWorkplaceAddButton, serviceWorkplaceControls, serviceOverviewWorkplaces } from '../workplace-selection.js';
 import { moveDesktopQTool, pinDesktopQDanger } from '../../../ui/v2/z-layout.js';
+import { isV2DesktopWorkspace } from '../../../ui/v2/geometry.js';
 import { setSharedActionVisible } from '../../../ui/page/page.js';
 import { productEditorSignature } from '../editor-signature.js';
 import { scheduleServiceStatistics, serviceItemStatistics } from '../statistics.js';
@@ -430,7 +431,10 @@ export function openProductEditor(root, existing = null, {
 
   moveDesktopQTool(primary);
   const deleteButton = layer.querySelector('[data-product-editor-delete]');
-  if (deleteButton) pinDesktopQDanger(deleteButton);
+  if (deleteButton) {
+    if (isV2DesktopWorkspace(layer.closest('[data-v2-app]'))) deleteButton.textContent = 'Удалить';
+    pinDesktopQDanger(deleteButton);
+  }
 
   form.addEventListener('input', syncDirty);
   form.addEventListener('change', syncDirty);
