@@ -1215,12 +1215,8 @@
 .v2-app--workspace [data-service-table-kind] [data-service-position] .service-table-edit{grid-column:9;justify-self:center;align-self:center;box-sizing:border-box;width:var(--ui-compact-size);height:var(--ui-compact-size);min-height:var(--ui-compact-size);padding:0;border:0;background:transparent;color:var(--text);font-size:20px;font-weight:400;line-height:1}
 .v2-app--workspace [data-service-table-kind] [data-service-collapse-key]{position:relative}
 
-.v2-app--workspace .ui-data-table--compact tr[data-table-group-level] .dds-table-disclosure>summary{display:flex;align-items:center;padding-inline:12px 40px;color:inherit;background:transparent;white-space:normal;font:inherit}
-.v2-app--workspace [data-dds-history] .ui-data-table--compact tr[data-table-group-level] .dds-table-disclosure>summary{padding-left:12px;gap:8px;list-style:none;cursor:pointer}
+.v2-app--workspace .ui-data-table--compact tr[data-table-group-level] .dds-table-disclosure>summary{padding-inline:12px 40px;color:inherit;background:transparent;white-space:normal;font:inherit}
 .v2-app--workspace [data-dds-history] .ui-data-table--compact tr[data-table-group-level="value"] .dds-table-disclosure>summary{padding-left:32px}
-.v2-app--workspace [data-dds-history] .dds-table-disclosure>summary::-webkit-details-marker{display:none}
-.v2-app--workspace [data-dds-history] .dds-table-disclosure>summary::marker{content:""}
-.v2-app--workspace [data-dds-history] .dds-group-marker{flex:0 0 12px;text-align:center;line-height:1}
 .v2-app--workspace .desktop-service-groups-q :is([data-article-count],[data-service-group-count]){display:block;width:100%;text-align:right;font-weight:650;font-variant-numeric:tabular-nums}
 .v2-app--workspace [data-dds-history] .ui-data-table--compact tbody tr[hidden]{display:none!important}
 }
@@ -1246,9 +1242,11 @@
  .v2-app--workspace [data-service-table-kind] [data-service-desktop-section]{position:relative}
 }
 
-/* Service disclosure rows divide the catalogue without taking a full data row. */
+/* Shared native disclosure marker and typography for Service and DDS hierarchy rows. */
 @media (min-width:768px) and (min-height:600px){
- .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-table-kind] [data-service-collapse-key]>details>summary.inventory-editor-summary{box-sizing:border-box;height:var(--desktop-table-disclosure-row);min-height:var(--desktop-table-disclosure-row);max-height:var(--desktop-table-disclosure-row);padding-block:4px;line-height:21px}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-table-kind] [data-service-collapse-key]>details>summary.inventory-editor-summary,
+ .v2-app--workspace .ui-data-table--compact tr[data-table-group-level] .dds-table-disclosure>summary.inventory-editor-summary{display:list-item;box-sizing:border-box;padding-block:4px;font-size:13px;font-weight:750;line-height:21px;cursor:pointer}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-table-kind] [data-service-collapse-key]>details>summary.inventory-editor-summary{height:var(--desktop-table-disclosure-row);min-height:var(--desktop-table-disclosure-row);max-height:var(--desktop-table-disclosure-row)}
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-table-kind] [data-service-collapse-key]>.inventory-editor-heading__controls{top:0;height:var(--desktop-table-disclosure-row);min-height:0;align-items:center}
 }
 
@@ -1315,7 +1313,7 @@
  .v2-app--workspace .ui-data-table--compact tbody tr[data-table-group-level]{height:var(--desktop-table-disclosure-row);min-height:var(--desktop-table-disclosure-row)}
  .v2-app--workspace .ui-data-table--compact tbody tr[data-table-group-level]>td{box-sizing:border-box;height:var(--desktop-table-disclosure-row);min-height:var(--desktop-table-disclosure-row);padding-block:0;vertical-align:middle;background:var(--table-level-bg);color:var(--table-level-ink);font-weight:750;font-style:normal;line-height:1.2}
  .v2-app--workspace .ui-data-table--compact tbody tr[data-table-group-level]>td:has(>.dds-table-disclosure,>.desktop-group-section-toggle){padding:0}
- .v2-app--workspace .ui-data-table--compact tbody tr[data-table-group-level]>td>.dds-table-disclosure>summary{box-sizing:border-box;height:calc(var(--desktop-table-disclosure-row) - 1px);min-height:calc(var(--desktop-table-disclosure-row) - 1px);max-height:calc(var(--desktop-table-disclosure-row) - 1px);padding-block:0;cursor:pointer;touch-action:manipulation;line-height:1.2}
+ .v2-app--workspace .ui-data-table--compact tbody tr[data-table-group-level]>td>.dds-table-disclosure>summary{box-sizing:border-box;height:calc(var(--desktop-table-disclosure-row) - 1px);min-height:calc(var(--desktop-table-disclosure-row) - 1px);max-height:calc(var(--desktop-table-disclosure-row) - 1px);touch-action:manipulation}
  .v2-app--workspace .ui-data-table--compact tbody tr[data-table-group-level="system"]>td{font-size:12px;text-transform:uppercase;white-space:normal}
  .v2-app--workspace .ui-data-table--compact tbody tr[data-table-group-level="system"]>td :is(summary,button){text-transform:inherit}
  .v2-app--workspace .ui-data-table--compact tbody tr[hidden],.v2-app--workspace .ui-data-table--compact tbody[hidden]{display:none!important}
