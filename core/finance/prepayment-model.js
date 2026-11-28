@@ -1,3 +1,4 @@
+import { recordPaymentCalendarPhase } from '../time/payment-date.js';
 // Read-only compatibility check against the actual Core snapshot, not Git SHA.
 export function supportsFinancePrepayment(catalog){
  return Array.isArray(catalog)&&catalog.some(a=>a.articleId==='mechanism-services'&&a.values?.some(v=>v.valueId==='services-prepayment'&&v.routes?.includes('SERVICE_PREPAYMENT')));
@@ -39,4 +40,18 @@ export function recordPaymentReport(operations,ledger,recordIds){
    }
  }
  return {prepayment:netRecordPrepayment(operations,recordIds),wallets:complete?[...byWallet.values()].filter(w=>w.amount!==0).map(w=>({label:w.label,amount:w.amount/100})):[]};
+}
+
+export function supportsRecordPaymentCalendar(state){
+ return state?.recordPaymentDateMode==='workplace-calendar-day'&&supportsFinancePrepayment(state.articleCatalog);
+}
+export function recordPaymentPresentation(record,payment,timeZone,now=new Date(),advance=0){
+ const phase=recordPaymentCalendarPhase(record?.date,now,timeZone);
+ const action=phase==='before'?'Предоплата':'Оплата';
+ const remaining=Math.max(0,Number(payment?.remaining)||0);
+ const paid=Math.max(0,Number(payment?.paidTotal)||0);
+ if(!phase)return {phase,action:'',status:'',amount:null,outstandingLabel:'К оплате'};
+ if(payment?.fullyPaid)return {phase,action,status:'Оплачено',amount:paid,outstandingLabel:'К оплате'};
+ const status=phase==='before'?'Предоплата':phase==='after'?'Задолженность':'Оплата';
+ return {phase,action,status,amount:phase==='before'?(advance>0?advance:null):remaining,outstandingLabel:phase==='after'?'Задолженность':'К оплате'};
 }

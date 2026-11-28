@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {supportsFinancePrepayment,manualWalletAllocation,netRecordPrepayment,recordPaymentReport} from '../core/finance/prepayment-model.js';
+import {supportsFinancePrepayment,manualWalletAllocation,netRecordPrepayment,recordPaymentReport,recordPaymentPresentation,supportsRecordPaymentCalendar} from '../core/finance/prepayment-model.js';
 const catalog=[{articleId:'mechanism-services',values:[{valueId:'services-prepayment',routes:['SERVICE_PREPAYMENT']}]}];
 assert.equal(supportsFinancePrepayment(catalog),true);
 assert.equal(supportsFinancePrepayment([]),false);
@@ -14,3 +14,13 @@ assert.deepEqual(recordPaymentReport(ops,ledger,['r']),{prepayment:5000,wallets:
 assert.deepEqual(recordPaymentReport(ops,[],['r']),{prepayment:5000,wallets:[]});
 assert.equal(netRecordPrepayment(ops,['missing']),0);
 console.log('PASS prepayment net, wallet split and report reconciliation');
+
+const record={date:'2026-12-03'},partial={remaining:7000,paidTotal:5000},tz='Europe/Moscow';
+assert.equal(supportsRecordPaymentCalendar({articleCatalog:catalog}),false);
+assert.equal(supportsRecordPaymentCalendar({articleCatalog:catalog,recordPaymentDateMode:'workplace-calendar-day'}),true);
+assert.deepEqual(recordPaymentPresentation(record,partial,tz,'2026-12-02T20:59:59Z',5000),{phase:'before',action:'Предоплата',status:'Предоплата',amount:5000,outstandingLabel:'К оплате'});
+assert.deepEqual(recordPaymentPresentation(record,partial,tz,'2026-12-02T21:00:00Z',5000),{phase:'on',action:'Оплата',status:'Оплата',amount:7000,outstandingLabel:'К оплате'});
+assert.deepEqual(recordPaymentPresentation(record,partial,tz,'2026-12-03T21:00:00Z',5000),{phase:'after',action:'Оплата',status:'Задолженность',amount:7000,outstandingLabel:'Задолженность'});
+assert.equal(recordPaymentPresentation(record,{fullyPaid:true,paidTotal:12000},tz,'2026-12-04T10:00:00Z').status,'Оплачено');
+assert.equal(recordPaymentPresentation(record,{remaining:12000},tz,'2026-12-02T20:00:00Z').amount,null);
+console.log('PASS single payment action, calendar dates and overdue status');

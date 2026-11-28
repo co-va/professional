@@ -11,7 +11,7 @@ import { getAllWorkplacesMonthStats, getWorkplaceMonthStats, getWorkplaceMonthSt
 import { getActiveDayWorkplaces, getAvailableDayWorkplaces } from '../core/day/index.js';
 import { getRecordPaymentState } from '../core/finance/index.js';
 import { readFinanceState } from '../core/finance/data.js';
-import { recordPaymentReport } from '../core/finance/prepayment-model.js';
+import { recordPaymentReport, recordPaymentPresentation } from '../core/finance/prepayment-model.js';
 import { hasZonedIntervalEnded } from '../core/time/index.js';
 import { applyTimetableWorkingDays, makeTimetableDayOff, openTimetableDayTimeEditor } from '../timetable/day-editor.js';
 import { getRecordsInRange, getRecordsForDay } from '../core/record/index.js';
@@ -375,10 +375,10 @@ export function renderJournal(root, options = {}) {
     const tipsTotal = paymentStates.reduce((sum, item) => sum + Math.max(0, Number(item.state?.tipsTotal) || 0), 0);
     const outstanding = paymentStates.filter((item) => Math.max(0, Number(item.state?.remaining) || 0) > 0.009);
     const dueTotal = outstanding
-      .filter((item) => !recordHasEnded(item.record))
+      .filter((item) => recordPaymentPresentation(item.record,item.state,workplaces.find(w=>String(w?.key||'')===String(item.record?.workplaceId||''))?.timeZone).phase!=='after')
       .reduce((sum, item) => sum + Math.max(0, Number(item.state?.remaining) || 0), 0);
     const debtTotal = outstanding
-      .filter((item) => recordHasEnded(item.record))
+      .filter((item) => recordPaymentPresentation(item.record,item.state,workplaces.find(w=>String(w?.key||'')===String(item.record?.workplaceId||''))?.timeZone).phase==='after')
       .reduce((sum, item) => sum + Math.max(0, Number(item.state?.remaining) || 0), 0);
     const periodLabel = isMonth
       ? selectedDate.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })

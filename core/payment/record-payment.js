@@ -36,7 +36,7 @@ import { flushBusinessPersistence } from '../business-persistence.js';
 import { loadWalletCatalog } from '../runtime/auxiliary-state.js';
 import { getProfile } from '../profile/data.js';
 import { readOnlyReceipt } from '../../ui/receipt/index.js';
-import { supportsFinancePrepayment, netRecordPrepayment } from '../finance/prepayment-model.js';
+import { supportsRecordPaymentCalendar, netRecordPrepayment, recordPaymentPresentation } from '../finance/prepayment-model.js';
 import { readFinanceState } from '../finance/data.js';
 
 const money = (value) => `${new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(Number(value || 0)).replaceAll('\u00a0', ' ')} ₽`;
@@ -293,15 +293,16 @@ async function openPaymentEntry(record, onCompleted = () => {}) {
     // A cold Journal/Record route may not have loaded Finance/Cash.
     // Resolve the actual wallet catalog before rendering any source picker.
     const refreshed=await loadVerifiedPaymentSource(()=>refreshFinanceState(),'Финансы');
-    newContract=supportsFinancePrepayment(refreshed.articleCatalog);
+    newContract=supportsRecordPaymentCalendar(refreshed);
+    if(!newContract)throw new Error('Обновление Core для оплаты по дате записи ещё недоступно.');
     [wallets, verifiedPersonDeposits] = await Promise.all([
       loadVerifiedPaymentSource(() => loadWalletCatalog(), 'Кошельки'),
       key ? loadVerifiedPaymentSource(() => listPersonDeposits(key,current?.date), 'Условия скидки') : Promise.resolve([]),
     ]);
     const verifiedRecord = getRecord(recordId) || current;
-    const start=zonedIntervalMoment(verifiedRecord,'from',paymentWorkplaceTimeZone(verifiedRecord));
-    prepayment=Boolean(start&&new Date()<start);
-    if(prepayment&&!newContract)throw new Error('Предоплата будет доступна после обновления Core.');
+    const presentation=recordPaymentPresentation(verifiedRecord,{},paymentWorkplaceTimeZone(verifiedRecord));
+    if(!presentation.phase)throw new Error('Не определена дата записи.');
+    prepayment=presentation.phase==='before';
     settlement = settlementForRecord(verifiedRecord);
     state = paymentStateForRecord(verifiedRecord);
     if (state.fullyPaid && !canAcceptRecordTips(verifiedRecord, state)) {
@@ -337,10 +338,11 @@ async function openPaymentEntry(record, onCompleted = () => {}) {
     ? [{ depositId: String(defaultDeposit.depositId || defaultDeposit.id), amount: defaultDepositAmount }]
     : [];
   const priorAdvance=netRecordPrepayment(readFinanceState().operations,[recordId]);
+  const presentation=recordPaymentPresentation(getRecord(recordId)||current,state,paymentWorkplaceTimeZone(current),new Date(),priorAdvance);
   host.innerHTML = `
-    ${readOnlyReceipt({ totals: [...(priorAdvance>0?[{label:'Предоплата',value:money(priorAdvance)}]:[]),{ label: 'К оплате', value: money(total), strong: true }] })}
+    ${readOnlyReceipt({ totals: [...(priorAdvance>0?[{label:'Предоплата',value:money(priorAdvance)}]:[]),{ label: presentation.outstandingLabel, value: money(total), strong: true }] })}
     ${paymentMethods({ wallets, deposits, personalAccount, total, showAction: false, showTotal: false, initialDepositAllocations })}
-    ${actionBlock(button(prepayment?'Предоплата':gratuityOnly ? 'Завершить' : 'Оплатить', { data: 'data-record-payment-entry-submit', disabled: !gratuityOnly }))}`;
+    ${actionBlock(button(prepayment?'Предоплата':gratuityOnly ? 'Завершить' : 'Оплата', { data: 'data-record-payment-entry-submit', disabled: !gratuityOnly }))}`;
 
   const submit = host.querySelector('[data-record-payment-entry-submit]');
   let allocationState = null;
@@ -349,7 +351,7 @@ async function openPaymentEntry(record, onCompleted = () => {}) {
     if (!submit) return;
     const hasMoney = Number(allocationState?.received || 0) > 0.009;
     const canCompleteWithoutMoney = gratuityOnly && !state.fullyPaid;
-    const label = prepayment?'Предоплата':canCompleteWithoutMoney && !hasMoney ? 'Завершить' : 'Оплатить';
+    const label = prepayment?'Предоплата':canCompleteWithoutMoney && !hasMoney ? 'Завершить' : 'Оплата';
     submit.textContent = label;
     submit.setAttribute('aria-label', label);
     submit.removeAttribute('aria-busy');
@@ -383,6 +385,8 @@ async function openPaymentEntry(record, onCompleted = () => {}) {
       const checkedRecord = getRecord(recordId) || latest;
       const checkedSettlement = settlementForRecord(checkedRecord);
       const checkedPayment = paymentStateForRecord(checkedRecord);
+      const checkedPresentation=recordPaymentPresentation(checkedRecord,checkedPayment,paymentWorkplaceTimeZone(checkedRecord));
+      if(!checkedPresentation.phase||checkedPresentation.phase!==presentation.phase)throw new Error('Дата записи изменилась. Закройте оплату и откройте её заново.');
       const changed = Math.abs(Number(checkedSettlement?.planTotal || 0) - Number(settlement?.planTotal || 0)) > 0.009
         || Math.abs(Number(checkedSettlement?.pricePercent || 0) - Number(settlement?.pricePercent || 0)) > 0.009
         || Math.abs(Number(checkedPayment?.paidTotal || 0) - Number(state?.paidTotal || 0)) > 0.009
@@ -394,7 +398,7 @@ async function openPaymentEntry(record, onCompleted = () => {}) {
         completed = await persistRecordCompletion(latest);
         if (!completed) throw new Error('Не удалось завершить запись');
       } else {
-        const occurredAt = newContract?new Date():recordServiceOccurredAt(latest);
+        const occurredAt = new Date();
         if (!occurredAt) throw new Error('У записи отсутствует дата факта обслуживания.');
         completed = await recordPaymentIncome({
           source: { type: 'record', id: latest.id },
@@ -408,7 +412,7 @@ async function openPaymentEntry(record, onCompleted = () => {}) {
           maxAmount: Math.max(0, Number(settlement?.planTotal || 0) - Number(latestState?.paidTotal || 0)),
           serviceAmount: allocationState.applied,
           tips: allocationState.tips,
-          paymentTiming:newContract?(prepayment?'prepayment':'settlement'):'',
+          paymentTiming:prepayment?'prepayment':'settlement',
           occurredAt,
         });
       }

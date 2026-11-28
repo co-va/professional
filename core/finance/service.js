@@ -2,7 +2,7 @@ import { apiRequest, apiResponseJson as responseJson } from '../auth.js';
 import { flushBusinessPersistence } from '../business-persistence.js';
 import { applyFinancePatch, hydrateFinanceFromServer } from './data.js';
 import { financialNumber } from './rules.js';
-import { supportsFinancePrepayment } from './prepayment-model.js';
+import { supportsFinancePrepayment, supportsRecordPaymentCalendar } from './prepayment-model.js';
 import './read.js';
 
 function notifyFinanceChanged(detail = {}) {
@@ -169,7 +169,7 @@ export async function recordPaymentIncome({
   if (maxAmount != null && applied > Math.max(0, financialNumber(maxAmount)) + 0.009) return null;
   if (Math.abs(received - applied - tipsTotal) > 0.009) return null;
 
-  if(paymentTiming&&!supportsFinancePrepayment((await refreshFinanceState()).articleCatalog))throw new Error('Новая версия Core ещё недоступна.');
+  if(paymentTiming&&!supportsRecordPaymentCalendar(await refreshFinanceState()))throw new Error('Обновление Core для оплаты по дате записи ещё недоступно.');
   const response = await apiRequest('/finance/operations/payment', {
     method: 'POST',
     body: JSON.stringify({

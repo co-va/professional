@@ -30,7 +30,9 @@ import { openPersonHistoryQ } from '../people/people.js';
 import { personDisplay } from '../people/presentation.js';
 import { getRecordPaymentState, resolveRecordSettlement } from '../finance/index.js';
 import { readFinanceState } from '../finance/data.js';
-import { recordPaymentReport } from '../finance/prepayment-model.js';
+import { recordPaymentReport, recordPaymentPresentation, netRecordPrepayment } from '../finance/prepayment-model.js';
+import { zonedDateTimeToDate } from '../time/zone.js';
+import { shiftTimeDateKey } from '../time/math.js';
 import { getRecordProgramOptions, recordProgramSelection } from '../loyalty/record-program.js';
 import { normalizeWorkplaceTimeZone, zonedIntervalMoment, hasZonedIntervalEnded } from '../time/index.js';
 import { canAcceptRecordTips, openRecordPayment } from '../payment/record-payment.js';
@@ -112,7 +114,7 @@ function recordReportStatusRows(record, state) {
       ? [{ label: 'Оплачено', value: formatReportRubles(paidTotal) }]
       : [{ label: 'К оплате', value: formatReportRubles(0) }];
   }
-  const outstandingLabel = recordHasEnded(record) ? 'Задолженность' : 'К оплате';
+  const outstandingLabel = recordPaymentPresentation(record,state,recordWorkplaceTimeZone(record)).outstandingLabel;
   if (paidTotal > 0.009) {
     return [
       { label: 'Оплачено', value: formatReportRubles(paidTotal) },
@@ -590,9 +592,11 @@ export function openRecordView(record, {
     if (startTimer) clearTimeout(startTimer);
     startTimer = null;
     const start = appointmentStart(source);
-    if (!start) return;
-    const delay = start.getTime() - Date.now();
-    if (delay <= 0) return;
+    const zone=recordWorkplaceTimeZone(source),day=String(source?.date||'').slice(0,10);
+    const transitions=[start,zonedDateTimeToDate(day+'T00:00:00',zone),zonedDateTimeToDate(shiftTimeDateKey(day,1)+'T00:00:00',zone)]
+      .filter(at=>at&&Number.isFinite(at.getTime())&&at.getTime()>Date.now());
+    if(!transitions.length)return;
+    const delay=Math.min(...transitions.map(at=>at.getTime()))-Date.now();
     startTimer = setTimeout(() => {
       startTimer = null;
       if (layer.isConnected) render();
@@ -703,9 +707,11 @@ export function openRecordView(record, {
 
     const cancelled = source.status === 'cancelled';
     const tipsOnlyAvailable = !cancelled && !readOnlyHistory && canAcceptRecordTips(source, payment);
-    const paymentStateLabel = payment.fullyPaid
-      ? `Оплачено: ${formatMoney(payment.paidTotal)}`
-      : `${recordHasEnded(source) ? 'Задолженность' : 'К оплате'}: ${formatMoney(payment.remaining)}`;
+    const advance=netRecordPrepayment(readFinanceState().operations,[String(source.id)]);
+    const presentation=recordPaymentPresentation(source,payment,recordWorkplaceTimeZone(source),new Date(),advance);
+    const paymentStateLabel=presentation.status
+      ? presentation.status+(presentation.amount==null?'':': '+formatMoney(presentation.amount))
+      : 'Оплата';
     root.innerHTML = `<div class="record-screen record-screen--state-view record-screen--record-view">
       ${card}
       ${capabilities.consumables && !readOnlyHistory && !cancelled && procedures.length ? recordConsumablesSticker(source, payment) : ''}
@@ -724,10 +730,10 @@ export function openRecordView(record, {
             aria: payment.tipsTotal > 0.009 ? `${paymentStateLabel}, есть Tips` : paymentStateLabel,
           })
           : capabilities.payment
-            ? button(tipsOnlyAvailable ? 'Tips' : !started&&!payment.hasPayments?'Предоплата':`К оплате: ${formatMoney(payment.remaining)}`, {
+            ? button(tipsOnlyAvailable ? 'Tips' : paymentStateLabel, {
               data: 'data-record-view-payment',
               className: payment.tipsTotal > 0.009 ? 'record-payment-button--has-tips' : '',
-              aria: payment.tipsTotal > 0.009 ? 'Оплата записи, есть Tips' : 'Оплата записи',
+              aria: payment.tipsTotal > 0.009 ? `${presentation.action}, есть Tips` : presentation.action,
             })
             : button(paymentStateLabel, {
               disabled: true,
