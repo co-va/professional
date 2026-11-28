@@ -36,7 +36,7 @@
   min-width:0;
 }
 .entity-card-editor__preview{display:flex;justify-content:center;min-width:0;margin:0}
-.entity-card-editor__tabs{margin:0}
+.entity-card-editor .entity-card-editor__tabs{margin:0}
 .entity-card-editor__tabs button{min-height:38px}
 .entity-card-editor__workspace{min-height:236px}
 .entity-card-editor>[data-card-error]:empty{display:none}
