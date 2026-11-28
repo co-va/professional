@@ -1097,6 +1097,7 @@
    per norm/position. The Q width is local and retains the global 50% cap. */
 @media (min-width:768px) and (min-height:600px){
  .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.service-consumables-q{--v2-desktop-q-width:520px}
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.finance-manual-q:has([data-finance-manual-mode]:not([hidden])){--v2-desktop-q-width:600px;--v2-desktop-q-max-width:75%}
  .v2-app--workspace .service-consumables-q [data-procedure-consumable-items]>.ui-data-table--compact{border-radius:10px;overflow:hidden}
  .v2-app--workspace .service-consumables-q .ui-data-table--compact table{width:100%;min-width:0;table-layout:fixed;border-collapse:collapse}
  .v2-app--workspace .service-consumables-q .ui-data-table--compact td{box-sizing:border-box;padding:4px 8px;vertical-align:middle;text-align:left}
