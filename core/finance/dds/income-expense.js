@@ -141,7 +141,7 @@ async function saveManual(root, direction, onSaved, operation = null, articles =
     articleId,
     walletId,
     walletName: wallet?.name || '',
-    amount: mode === 'simple' ? Number(data.get('amount') || 0) : null,
+    amount: mode === 'simple' ? (split ? manualWalletTotal(readWalletRows(form)) : Number(data.get('amount') || 0)) : null,
     lines: mode === 'detail' ? collectLines(root) : [],
     note: String(data.get('note') || '').trim(),
     occurredAt,
@@ -182,22 +182,34 @@ function readWalletRows(root){
   return {walletId,walletName:getWallets().find(w=>w.id===walletId)?.name||'',amount:row.querySelector('[name="splitWalletAmount"]')?.value||''};
  });
 }
-function walletRowsMarkup(rows,wallets){
- return rows.map((row,index)=>`<div class="array-row" data-manual-wallet-row>
-   ${select({label:'Кошелёк',name:'splitWalletId',value:row.walletId,options:wallets,placeholder:'Выберите кошелёк'})}
-   ${field({label:'Сумма',name:'splitWalletAmount',type:'number',inputmode:'decimal',value:row.amount??'',data:'min="0.01" step="0.01"'})}
-   ${index>0?compactButton({kind:'remove',data:'data-manual-wallet-remove',aria:'Удалить кошелёк'}):''}
- </div>`).join('');
+function manualWalletTotal(rows){
+ return rows.reduce((sum,row)=>sum+Math.round(Number(row.amount||0)*100),0)/100;
 }
-function walletEditorMarkup(mode,amount,walletId,rows,wallets,newContract){
+function walletRowsMarkup(rows,wallets,mode,canSplit){
  const split=rows.length>1;
- return `<div data-manual-wallet-single${split?' hidden':''}>
-   ${split?'':select({label:'Кошелёк',name:'walletId',value:walletId,options:wallets,placeholder:'Выберите кошелёк'})}
- </div>
- <div data-finance-manual-amount>${walletAmountMarkup(mode,amount)}</div>
- <div data-manual-wallet-rows>${split?walletRowsMarkup(rows,wallets):''}</div>
- ${split?'<output data-manual-wallet-remainder aria-live="polite"></output>':''}
- ${newContract?button('+ Добавить кошелёк',{type:'button',variant:'secondary',data:'data-manual-wallet-add'}):''}`;
+ return rows.map((row,index)=>{
+   const action=index>0
+     ? compactButton({kind:'remove',data:'data-manual-wallet-remove',aria:'Удалить строку оплаты'})
+     : canSplit&&wallets.length>1
+       ? compactButton({kind:'add',data:'data-manual-wallet-add',aria:'Добавить строку оплаты',disabled:rows.length>=wallets.length})
+       : '';
+   return `<div class="form-grid form-grid--two" data-manual-wallet-entry${split?' data-manual-wallet-row':''}>
+     <div class="field">
+       <div class="field-inline-label"><span>Кошелёк</span>${action}</div>
+       ${select({name:split?'splitWalletId':'walletId',value:row.walletId,options:wallets,placeholder:'Выберите кошелёк',aria:'Кошелёк '+(index+1)})}
+     </div>
+     ${split?field({label:'Сумма',name:'splitWalletAmount',type:'number',inputmode:'decimal',value:row.amount??'',required:true,placeholder:'0',data:'min="0.01" step="0.01"'}) : walletAmountMarkup(mode,row.amount)}
+   </div>`;
+ }).join('');
+}
+function walletEditorMarkup(mode,amount,walletId,rows,wallets,canSplit){
+ const entries=rows.length?rows:[{walletId,amount}];
+ const detailSplit=mode==='detail'&&entries.length>1;
+ return `<div class="form-grid" data-manual-wallet-rows>
+   ${detailSplit?walletAmountMarkup(mode):''}
+   ${walletRowsMarkup(entries,wallets,mode,canSplit)}
+   ${detailSplit?'<output data-manual-wallet-remainder aria-live="polite"></output>':''}
+ </div>`;
 }
 function manualOperationTitle(direction, operation) {
   const title = direction === 'IN' ? 'Доход' : 'Расход';
@@ -276,7 +288,15 @@ export function renderIncomeExpenseOperation(root, direction, { onSaved = null, 
   let savedAmount=simpleAmount;
   let activeMode=mode;
   const walletHost=root.querySelector('[data-manual-wallet-editor]');
-  const total=()=>activeMode==='detail'?manualDetailTotal(collectLines(root)):Number(root.querySelector('[name="amount"]')?.value||0);
+  const total=()=>activeMode==='detail'?manualDetailTotal(collectLines(root)):
+    (root.querySelector('[data-manual-wallet-row]')?manualWalletTotal(readWalletRows(root)):Number(root.querySelector('[name="amount"]')?.value||0));
+  const walletDraft=()=>root.querySelector('[data-manual-wallet-row]')?readWalletRows(root):[{
+    walletId:root.querySelector('[name="walletId"]')?.value||'',
+    amount:activeMode==='detail'?(total()||''):(root.querySelector('[name="amount"]')?.value||''),
+  }];
+  const renderWalletDraft=rows=>{
+    walletHost.innerHTML=walletEditorMarkup(activeMode,rows[0]?.amount??'',rows[0]?.walletId||'',rows,wallets,canSplit);
+  };
   const syncWalletRemainder=(fill=false)=>{
     syncTotal(root);
     const rows=readWalletRows(root),out=root.querySelector('[data-manual-wallet-remainder]');
@@ -298,12 +318,14 @@ export function renderIncomeExpenseOperation(root, direction, { onSaved = null, 
     if(event.target?.matches?.('[name="entryMode"]')){
       const next=event.target.value;
       if(next===activeMode)return;
+      const rows=walletDraft();
       if(activeMode==='detail')savedLines=collectLines(root);
-      else savedAmount=root.querySelector('[name="amount"]')?.value||'';
+      else savedAmount=rows.length===1?rows[0].amount:manualWalletTotal(rows);
       activeMode=next;
       const modeHost=root.querySelector('[data-finance-manual-mode]');
       modeHost.innerHTML=modeMarkup(next,{lines:savedLines,direction});modeHost.hidden=next==='simple';
-      root.querySelector('[data-finance-manual-amount]').innerHTML=walletAmountMarkup(next,savedAmount);
+      if(next==='simple'&&rows.length===1)rows[0].amount=savedAmount||rows[0].amount;
+      renderWalletDraft(rows);
       syncWalletRemainder(true);
     }
   });
@@ -313,19 +335,17 @@ export function renderIncomeExpenseOperation(root, direction, { onSaved = null, 
   });
   root.addEventListener('click', (event) => {
     if(event.target.closest?.('[data-manual-wallet-add]')){
-      const rows=readWalletRows(root),amount=root.querySelector('[name="amount"]')?.value||savedAmount;
-      const currentWallet=root.querySelector('[name="walletId"]')?.value||'';
-      if(!rows.length)rows.push({walletId:currentWallet,amount:''});
-      if(rows.length>=wallets.length)return;
+      const rows=walletDraft();
+      if(!canSplit||rows.length>=wallets.length)return;
       rows.push({walletId:'',amount:''});
-      walletHost.innerHTML=walletEditorMarkup(activeMode,amount,currentWallet,rows,wallets,canSplit);
+      renderWalletDraft(rows);
       syncWalletRemainder(true);return;
     }
     const removeWallet=event.target.closest?.('[data-manual-wallet-remove]');
     if(removeWallet){
-      const amount=root.querySelector('[name="amount"]')?.value||savedAmount;
-      removeWallet.closest('[data-manual-wallet-row]')?.remove();const rows=readWalletRows(root);
-      walletHost.innerHTML=walletEditorMarkup(activeMode,amount,rows[0]?.walletId||'',rows,wallets,canSplit);
+      removeWallet.closest('[data-manual-wallet-row]')?.remove();
+      const rows=readWalletRows(root);
+      renderWalletDraft(rows);
       syncWalletRemainder(true);return;
     }
     if (event.target.closest?.('[data-finance-manual-line-add]')) {
