@@ -36,6 +36,7 @@ import {
   workspaceHeaderContext,
 } from '../../../ui/ui.js';
 import { getFinanceOperation, getWallets, refreshFinanceState } from '../../finance/index.js';
+import { financeDesktop, financeQSubmit } from '../../finance/desktop.js';
 import { readOnlyReceipt } from '../../../ui/receipt/index.js';
 import { getProfile } from '../../profile/data.js';
 import { getAllPeople } from '../../people/data.js';
@@ -332,10 +333,12 @@ async function openDepositHistoryEvent(root, item, { deposit = null, onSaved = (
   const operation = await resolveHistoryOperation(item);
   const funding = deposit && item?.kind === 'deposit-funding' && String(item?.operationId || '');
   const allowDelete = funding && fundingEntries(deposit).length > 1;
-  const actions = funding ? actionBlock([
-    button('Корректировать', { variant: 'secondary', data: 'data-deposit-history-correct' }),
-    ...(allowDelete ? [button('Удалить платёж', { variant: 'danger', data: 'data-deposit-history-delete' })] : []),
-  ].join('')) : '';
+  const desktop = financeDesktop(root);
+  const correction = funding ? button('Корректировать', { variant: desktop ? 'primary' : 'secondary', data: 'data-deposit-history-correct' }) : '';
+  const remove = allowDelete ? button(desktop ? 'Удалить' : 'Удалить платёж', { variant: 'danger', data: 'data-deposit-history-delete' }) : '';
+  const actions = !funding ? '' : desktop
+    ? '<div class="modal-actions finance-receipt-actions finance-receipt-actions--dds">' + remove + correction + '</div>'
+    : actionBlock(correction + remove);
   const layer = mountModal(root, modal(historyEventMarkup(item, operation) + actions, {
     variant: funding ? 'x' : 's',
     surface: 'app',
@@ -804,11 +807,11 @@ async function openPaymentsQ(root, deposit, { onSaved = () => {}, operationId: s
     ]);
     initDatePickers(host);
     host.querySelectorAll('[data-deposit-payment-form]').forEach((form) => {
+      const submit = form.querySelector('button[type="submit"]');
       form.addEventListener('submit', async (event) => {
         event.preventDefault();
         const values = formObject(form);
         const errorNode = form.querySelector('[data-deposit-payment-error]');
-        const submit = form.querySelector('button[type="submit"]');
         const wallet = wallets.find((item) => String(item?.id) === String(values.walletId));
         const amount = Math.max(0, Number(String(values.amount || '0').replace(',', '.')) || 0);
         if (!wallet || amount <= 0) {
@@ -869,6 +872,8 @@ async function openPaymentsQ(root, deposit, { onSaved = () => {}, operationId: s
           layer.v2Close?.();
         }
       });
+      // Keep the original submit control and its in-flight lock in Q H.
+      if (selectedOperationId) financeQSubmit(layer, form);
     });
   };
 
