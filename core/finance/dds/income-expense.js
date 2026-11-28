@@ -194,11 +194,9 @@ function walletRowsMarkup(rows,wallets,mode,canSplit){
        ? compactButton({kind:'add',data:'data-manual-wallet-add',aria:'Добавить строку оплаты',disabled:rows.length>=wallets.length})
        : '';
    return `<div class="form-grid form-grid--two" data-manual-wallet-entry${split?' data-manual-wallet-row':''}>
-     <div class="field">
-       <div class="field-inline-label"><span>Кошелёк</span>${action}</div>
-       ${select({name:split?'splitWalletId':'walletId',value:row.walletId,options:wallets,placeholder:'Выберите кошелёк',aria:'Кошелёк '+(index+1)})}
-     </div>
+     ${select({label:'Кошелёк',name:split?'splitWalletId':'walletId',value:row.walletId,options:wallets,placeholder:'Выберите кошелёк',aria:'Кошелёк '+(index+1)})}
      ${split?field({label:'Сумма',name:'splitWalletAmount',type:'number',inputmode:'decimal',value:row.amount??'',required:true,placeholder:'0',data:'min="0.01" step="0.01"'}) : walletAmountMarkup(mode,row.amount)}
+     ${action}
    </div>`;
  }).join('');
 }
