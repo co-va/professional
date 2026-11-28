@@ -12,7 +12,7 @@ const INVENTORY_NAVIGATION = [
 export function inventoryNavigationItems(desktop = false) {
   const available=INVENTORY_NAVIGATION.filter(item=>canUseCapability(item.capability));
   const combined=desktop&&available.some(item=>item.id==='orders')&&available.some(item=>item.id==='counterparties');
-  return available.filter(item=>!combined||item.id!=='counterparties').map(({id,label})=>({id,label}));
+  return available.filter(item=>!combined||item.id!=='counterparties').map(({id,label})=>({id,label:combined&&id==='orders'?'Контрагенты':label}));
 }
 
 export async function renderInventorySection(root, section = 'stock') {

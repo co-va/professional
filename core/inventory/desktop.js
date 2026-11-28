@@ -38,7 +38,8 @@ export function inventoryDesktopFilter(anchor,values,fields,onChange){
  });
 }
 export function inventoryTable(rows,columns,caption){
- return dataTable({compact:true,caption,rows,columns:columns.map(c=>({...c,sortable:false}))});
+ return dataTable({compact:true,caption,rows,columns:columns.map(c=>({...c,sortable:false}))})
+  .replace('<div class="ui-data-table','<div data-inventory-table class="ui-data-table');
 }
 export function inventoryRowButton(label,attribute,id){
  return '<button type="button" '+attribute+'="'+escapeHtml(id)+'" aria-label="'+escapeHtml(label)+'">'+escapeHtml(label)+'</button>';

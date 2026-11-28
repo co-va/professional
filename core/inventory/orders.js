@@ -3,7 +3,7 @@ import {
   actionBlock, button, datePicker, emptyState, field, initDatePickers,
   modal, mountModal, mountV2ZLayer, openNotice, openSharedProfileSettingsMenu,
   select, list, twoColumnLayout, v2ListEntries, v2ListEntry, v2ZLayer,
-  workspaceHeaderContext,
+  workspaceHeaderContext, v2Section,
 } from '../../ui/ui.js';
 import { canUseCapability } from '../access.js';
 import { VIEW_ICON, DATA_EXCHANGE_ICON } from '../../ui/buttons/index.js';
@@ -1099,7 +1099,10 @@ export async function renderInventoryOrders(root) {
       v: { data: 'data-inventory-orders-menu', aria: 'Сортировка и фильтр заказов' },
       c: { label: '+', data: 'data-inventory-add-order', aria: 'Сформировать заказ' },
     }),
-  })}${combined?'<section><h2 class="v2-section__title">Контрагенты</h2><div data-counterparties-list></div></section><h2 class="v2-section__title">Заказы</h2>':''}<div data-inventory-orders-list${desktop?' data-inventory-desktop-table':''}></div>`;
+  })}${combined
+    ? v2Section('Контрагенты','<div data-counterparties-list></div>')+
+      v2Section('Заказы','<div data-inventory-orders-list data-inventory-desktop-table></div>',{className:'inventory-orders-section'})
+    : '<div data-inventory-orders-list'+(desktop?' data-inventory-desktop-table':'')+'></div>'}`;
   const header=desktop?inventoryDesktopHeader(root,'Заказы',field({name:'inventoryOrdersSearch',type:'search',placeholder:'Поиск',value:root.dataset.inventoryOrdersSearch||'',data:'data-inventory-orders-search'}),[
     {kind:'filter',data:'data-inventory-orders-filter',aria:'Фильтр'},
     {kind:'sort',data:'data-inventory-orders-sort',aria:'Сортировка'},
