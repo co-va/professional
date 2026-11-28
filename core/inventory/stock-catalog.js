@@ -191,7 +191,9 @@ export function renderStockBrandList(host, items, options = {}) {
   if (valueOrder.size) groups.sort((a,b)=>
     (valueOrder.get(a.name) ?? Number.MAX_SAFE_INTEGER) -
     (valueOrder.get(b.name) ?? Number.MAX_SAFE_INTEGER) || compare(a.name,b.name));
-  if (options.sort === 'name-desc') groups.reverse();
+  if (options.desktop&&options.sort==='name-asc') groups.sort((a,b)=>compare(a.name,b.name));
+  else if (options.desktop&&options.sort==='name-desc') groups.sort((a,b)=>compare(b.name,a.name));
+  else if (options.sort === 'name-desc') groups.reverse();
   else if (options.sort === 'count-desc') groups.sort((a,b)=>
     b.items.length-a.items.length || compare(a.name,b.name));
   else if (options.sort === 'count-asc') groups.sort((a,b)=>

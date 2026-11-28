@@ -1,5 +1,5 @@
-import {inventoryDesktop,inventoryDesktopHeader,inventoryTable,inventoryRowButton,bindInventoryTableRows} from './desktop.js';
-import {DATA_EXCHANGE_ICON,GROUP_ICON} from '../../ui/buttons/index.js';
+import {inventoryDesktop,inventoryDesktopHeader,inventoryDesktopFilter,inventoryDesktopSort,inventoryTable,inventoryRowButton,bindInventoryTableRows} from './desktop.js';
+import {DATA_EXCHANGE_ICON,GROUP_ICON,VIEW_ICON} from '../../ui/buttons/index.js';
 import {
   actionBlock,
   button,
@@ -940,9 +940,15 @@ function openStockControls(trigger, level, manufacturer, onChange, mode = 'sort'
       + button('Применить', {data:'data-inventory-stock-filter-action'})
       + '</div></div>' : '')
     + '</div>';
+  const desktop=inventoryDesktop(trigger);
+  if(desktop&&mode==='sort'){
+    inventoryDesktopSort(trigger,stockSortOptions(level),STOCK_VIEW[sortKey],value=>{saveInventorySortMode(sortKey,value);onChange?.();});
+    return;
+  }
   const modalRoot = mountModal(trigger, modal(content, {
     title:mode === 'filter' ? 'Фильтр' : 'Сортировка',
     variant:'x',
+    ...(desktop?{surface:'app',className:'people-action-popup people-filter-popup'}:{}),
   }));
   modalRoot?.querySelector('input[name="inventorySort"]')?.addEventListener('change', event => {
     saveInventorySortMode(sortKey,event.target.value);
@@ -2541,20 +2547,25 @@ function renderStock(root) {
   ]);
   // Z1 owns the scope selector in its Shared Header, not in the scrollable
   // brand list. Keep a visible fallback if the host has not been mounted.
-  const headerRows=desktop?[inventoryDesktopHeader(root,'Остатки',scopeSelector,[
-    {label:'Вид',data:'data-inventory-desktop-view',aria:'Вид'},
+  const headerRows=desktop?[inventoryDesktopHeader(root,'Остатки',field({name:'inventoryRootSearch',type:'search',placeholder:'Поиск',autocomplete:'off',data:'data-inventory-root-search'}),[
+    {kind:'filter',data:'data-inventory-root-filter',aria:'Фильтр'},
+    {kind:'sort',data:'data-inventory-root-sort',aria:'Сортировка'},
+    {label:VIEW_ICON,className:'v2-desktop-tool-icon',data:'data-inventory-desktop-view',aria:'Вид'},
     {label:GROUP_ICON,className:'v2-desktop-tool-icon',data:'data-inventory-desktop-groups',aria:'Группы'},
     {label:'Склады',data:'data-inventory-desktop-storage',aria:'Склады'},
     {label:DATA_EXCHANGE_ICON,className:'v2-desktop-tool-icon',data:'data-inventory-desktop-excel',aria:'Excel склада'},
     {label:'+',className:'v2-desktop-tool-primary',data:'data-inventory-add-item',aria:'Добавить позицию'},
-  ])].filter(Boolean):setV2ZHeaderRows(root,[scopeSelector]);
+  ],{context:scopeSelector})].filter(Boolean):setV2ZHeaderRows(root,[scopeSelector]);
   const listHost=root.querySelector('[data-inventory-stock-group-list]');
   if (!headerRows.length) listHost?.insertAdjacentHTML('beforebegin',
     '<div data-inventory-scope-selector>'+scopeSelector+'</div>');
   const scopeInput=headerRows[0]?.querySelector('[name="inventoryStockScope"]')
     || root.querySelector('[name="inventoryStockScope"]');
-  // Companies are navigated directly; no search or filter on Z1.
-  const visibleRows=()=>getInventoryItems().filter(item=>inventoryItemBelongsToStorage(item,STOCK_VIEW.storageScope));
+  const scopeRows=()=>getInventoryItems().filter(item=>inventoryItemBelongsToStorage(item,STOCK_VIEW.storageScope));
+  const search=headerRows[0]?.querySelector('[data-inventory-root-search]');
+  let filters={availability:'',supplier:'',usage:''},sort='manual';
+  const visibleRows=()=>scopeRows().filter(item=>!desktop||
+    ((!normalizedSearch(search?.value)||itemSearchText(item).includes(normalizedSearch(search?.value)))&&matchesStockFilters(item,filters,getInventoryClassificationGroups(),getInventoryStorageLocations())));
   let disposeBrandReorder=()=>{};
   const refresh=()=>{
     disposeBrandReorder();
@@ -2567,7 +2578,8 @@ function renderStock(root) {
       itemsForView:visibleRows,
       criteria,
       brandValues:first?.values||[],
-      onReorder:first ? async ids=>{
+      sort:desktop?sort:undefined,
+      onReorder:first&&(!desktop||sort==='manual'&&!normalizedSearch(search?.value)&&!Object.values(filters).some(Boolean)) ? async ids=>{
         await reorderInventoryCriterionValues(first.id,ids);
       } : null,
       onReorderError:error=>{
@@ -2578,7 +2590,7 @@ function renderStock(root) {
         listHost.prepend(message);
       },
       // Z1 company → native Z2, never a Q with forced item selection.
-      onBrandOpen:brand=>openManufacturerStock(root,brand.name,{criteria,itemsForView:visibleRows}),
+      onBrandOpen:brand=>openManufacturerStock(root,brand.name,{criteria,itemsForView:scopeRows}),
     });
   };
   scopeInput?.addEventListener('change',event=>{
@@ -2600,6 +2612,12 @@ function renderStock(root) {
     });
   });
   const h=headerRows[0];
+  search?.addEventListener('input',refresh);
+  h?.querySelector('[data-inventory-root-sort]')?.addEventListener('click',event=>inventoryDesktopSort(event.currentTarget,[{value:'manual',label:'По порядку'},...stockSortOptions('manufacturers')],sort,value=>{sort=value;refresh();}));
+  h?.querySelector('[data-inventory-root-filter]')?.addEventListener('click',event=>inventoryDesktopFilter(event.currentTarget,filters,state=>'<div class="form-grid">'+
+    select({label:'Наличие',name:'availability',value:state.availability,options:[{value:'',label:'Все'},{value:'positive',label:'Есть на складе'},{value:'zero',label:'Нет на складе'},{value:'minimum',label:'На минимуме / ниже'},{value:'target',label:'На цели / ниже'}]})+
+    select({label:'Поставщик',name:'supplier',value:state.supplier,options:[{value:'',label:'Все'},...stockFilterOptions(scopeRows(),stockSupplierNames).map(value=>({value,label:value}))]})+
+    select({label:'Использование',name:'usage',value:state.usage,options:[{value:'',label:'Любое'},{value:'consume',label:'Расход'},{value:'sale',label:'Продажа'},{value:'both',label:'Расход и продажа'},{value:'track',label:'Только учёт'}]})+'</div>',value=>{filters=value;refresh();}));
   h?.querySelector('[data-inventory-desktop-view]')?.addEventListener('click',()=>openInventoryProductAppearanceQ(getInventoryItems()[0]?.itemId||'',()=>renderStock(root),STOCK_VIEW.storageScope));
   h?.querySelector('[data-inventory-desktop-groups]')?.addEventListener('click',()=>openInventoryClassificationGroups(refresh));
   h?.querySelector('[data-inventory-desktop-storage]')?.addEventListener('click',()=>openInventoryStorageLocations(()=>renderStock(root)));
@@ -2632,15 +2650,19 @@ function renderMovements(root) {
     c: desktop?null:{ label: '+', data: 'data-inventory-add-movement', aria: 'Добавить движение' },
   })}${desktop?'<div data-inventory-desktop-table></div>':movementJournalMarkup()}`;
   const header=desktop?inventoryDesktopHeader(root,'Движения',field({name:'inventoryMovementSearch',type:'search',placeholder:'Поиск',autocomplete:'off',data:'data-inventory-movement-search'}),[
+    {kind:'filter',data:'data-inventory-movement-filter',aria:'Фильтр'},
+    {kind:'sort',data:'data-inventory-movement-sort',aria:'Сортировка'},
     {label:DATA_EXCHANGE_ICON,className:'v2-desktop-tool-icon',data:'data-inventory-desktop-excel',aria:'Excel движений'},
     {label:'+',className:'v2-desktop-tool-primary',data:'data-inventory-add-movement',aria:'Добавить движение'},
   ]):null;
   const host=root.querySelector('[data-inventory-desktop-table]');
   if(host){
     const search=header?.querySelector('[data-inventory-movement-search]');
+    let filters={kind:'',client:''},sort='recent';
     const refresh=()=>{
       const term=normalizedSearch(search?.value||'');
-      const rows=getInventoryMovements().filter(m=>!term||normalizedSearch([movementTitle(m),movementSubtitle(m),movementMoment(m.occurredAt),...(m.lines||[]).map(l=>l.name||getInventoryItem(l.itemId)?.name||'')].join(' ')).includes(term));
+      const rows=getInventoryMovements().filter(m=>(!filters.kind||m.kind===filters.kind)&&(!filters.client||String(m.personUei||'')===filters.client)&&(!term||normalizedSearch([movementTitle({...m,personUei:''}),m.personUei,movementSubtitle(m),movementMoment(m.occurredAt),...(m.lines||[]).map(l=>l.name||getInventoryItem(l.itemId)?.name||'')].join(' ')).includes(term)));
+      rows.sort((a,b)=>sort==='count'?((b.lines||[]).length-(a.lines||[]).length):sort==='oldest'?new Date(a.occurredAt)-new Date(b.occurredAt):new Date(b.occurredAt)-new Date(a.occurredAt));
       host.innerHTML=rows.length?inventoryTable(rows,[
         {key:'date',label:'Дата / время',render:m=>escapeHtml(movementMoment(m.occurredAt))},
         {key:'movement',label:'Операция',render:m=>inventoryRowButton(movementTitle({...m,personUei:''}),'data-inventory-movement',m.movementId)},
@@ -2650,7 +2672,12 @@ function renderMovements(root) {
       ],'Движения'):emptyState('Движений не найдено');
       bindInventoryTableRows(host,'[data-inventory-movement]',control=>openMovementDetails(root,control.dataset.inventoryMovement));
     };
-    search?.addEventListener('input',refresh);refresh();
+    search?.addEventListener('input',refresh);
+    header?.querySelector('[data-inventory-movement-sort]')?.addEventListener('click',event=>inventoryDesktopSort(event.currentTarget,[{value:'recent',label:'Сначала новые'},{value:'oldest',label:'Сначала старые'},{value:'count',label:'Больше позиций сначала'}],sort,value=>{sort=value;refresh();}));
+    header?.querySelector('[data-inventory-movement-filter]')?.addEventListener('click',event=>inventoryDesktopFilter(event.currentTarget,filters,state=>'<div class="form-grid">'+
+      select({label:'Операция',name:'kind',value:state.kind,options:[{value:'',label:'Все'},...stockFilterOptions(getInventoryMovements(),m=>m.kind).map(value=>({value,label:movementTitle({kind:value})}))]})+
+      select({label:'Код клиента',name:'client',value:state.client,options:[{value:'',label:'Все'},...stockFilterOptions(getInventoryMovements(),m=>m.personUei).map(value=>({value,label:value}))]})+'</div>',value=>{filters=value;refresh();}));
+    refresh();
   }else root.querySelectorAll('[data-inventory-movement]').forEach(control=>control.addEventListener('click',()=>openMovementDetails(root,control.dataset.inventoryMovement)));
   header?.querySelector('[data-inventory-desktop-excel]')?.addEventListener('click',event=>{const anchor=event.currentTarget;void import('./excel-v2.js').then(m=>m.openInventoryMovementExcel(anchor));});
   (header?.querySelector('[data-inventory-add-movement]')||root.querySelector('[data-inventory-add-movement]'))?.addEventListener('click', () => openMovementEditor(root, '', ''));

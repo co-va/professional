@@ -1,4 +1,4 @@
-import {inventoryDesktop,inventoryDesktopHeader,inventoryTable,inventoryRowButton,bindInventoryTableRows} from './desktop.js';
+import {inventoryDesktop,inventoryDesktopHeader,inventoryDesktopFilter,inventoryDesktopSort,inventoryTable,inventoryRowButton,bindInventoryTableRows} from './desktop.js';
 import {
   actionBlock, button, compactButton, emptyState, escapeHtml, field,
   list, modal, mountModal, page, select, workspaceHeaderContext,
@@ -349,15 +349,20 @@ export function renderConsumptionGroups(root) {
     '<div data-consumption-groups-list'+(desktop?' data-inventory-desktop-table':'')+'></div>',
   ]);
   const host = root.querySelector('[data-consumption-groups-list]');
-  const header=desktop?inventoryDesktopHeader(root,'Группы расхода','',[
+  const header=desktop?inventoryDesktopHeader(root,'Группы расхода',field({name:'consumptionGroupsSearch',type:'search',placeholder:'Поиск',autocomplete:'off',data:'data-consumption-groups-search'}),[
+    {kind:'filter',data:'data-consumption-groups-filter',aria:'Фильтр'},
+    {kind:'sort',data:'data-consumption-groups-sort',aria:'Сортировка'},
     {label:'+',className:'v2-desktop-tool-primary',data:'data-consumption-group-add',aria:'Добавить группу расхода'},
   ]):null;
-  const refresh = async () => {
-    host.innerHTML = emptyState('Загрузка','Загружаем группы расхода.');
-    try {
-      const result = await request();
-      if (disposed || !root.isConnected) return;
-      const groups = Array.isArray(result.groups) ? result.groups : [];
+  let allGroups=[],filters={unit:'',balance:''},sort='name-asc';
+  const search=header?.querySelector('[data-consumption-groups-search]');
+  const render=()=>{
+      if(disposed||!host.isConnected)return;
+      const query=text(search?.value).toLocaleLowerCase('ru');
+      const groups=desktop?allGroups.filter(group=>(!query||text(group.name).toLocaleLowerCase('ru').includes(query))&&(!filters.unit||group.unit===filters.unit)&&(!filters.balance||(filters.balance==='positive'?Number(group.physicalBalance)>0:group.physicalBalance!=null&&Number(group.physicalBalance)<=0))).sort((a,b)=>{
+        const byName=text(a.name).localeCompare(text(b.name),'ru',{numeric:true});
+        return sort==='name-desc'?-byName:sort==='count-desc'?(b.itemIds||[]).length-(a.itemIds||[]).length||byName:byName;
+      }):allGroups;
       host.innerHTML = groups.length ? desktop?inventoryTable(groups,[
         {key:'name',label:'Наименование',render:group=>inventoryRowButton(group.name,'data-consumption-group-open',group.groupId)},
         {key:'count',label:'Позиций',narrow:true,render:group=>String((group.itemIds||[]).length)},
@@ -376,12 +381,25 @@ export function renderConsumptionGroups(root) {
         const group=groups.find(row=>String(row.groupId)===node.dataset.consumptionGroupOpen);
         if(group)openGroupEditor(group,()=>{if(!disposed)void refresh();});
       });
+  };
+  const refresh=async()=>{
+    host.innerHTML=emptyState('Загрузка','Загружаем группы расхода.');
+    try{
+      const result=await request();
+      if(disposed||!host.isConnected)return;
+      allGroups=Array.isArray(result.groups)?result.groups:[];
+      render();
     } catch (error) {
       if (disposed || !root.isConnected) return;
       host.innerHTML = emptyState('Не удалось загрузить группы',
         error instanceof Error ? error.message : 'Проверьте соединение.');
     }
   };
+  search?.addEventListener('input',render);
+  header?.querySelector('[data-consumption-groups-sort]')?.addEventListener('click',event=>inventoryDesktopSort(event.currentTarget,[{value:'name-asc',label:'Название А—Я'},{value:'name-desc',label:'Название Я—А'},{value:'count-desc',label:'Больше позиций сначала'}],sort,value=>{sort=value;render();}));
+  header?.querySelector('[data-consumption-groups-filter]')?.addEventListener('click',event=>inventoryDesktopFilter(event.currentTarget,filters,state=>'<div class="form-grid">'+
+    select({label:'Единица',name:'unit',value:state.unit,options:[{value:'',label:'Все'},...[...new Set(allGroups.map(g=>g.unit).filter(Boolean))].map(value=>({value,label:value}))]})+
+    select({label:'Остаток',name:'balance',value:state.balance,options:[{value:'',label:'Все'},{value:'positive',label:'Есть остаток'},{value:'zero',label:'Нет остатка'}]})+'</div>',value=>{filters=value;render();}));
   (header?.querySelector('[data-consumption-group-add]')||root.querySelector('[data-consumption-group-add]'))?.addEventListener('click',
     () => openGroupEditor(null, () => { if (!disposed) void refresh(); }));
   void refresh();
