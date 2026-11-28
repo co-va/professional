@@ -2657,8 +2657,8 @@ function renderMovements(root) {
   notifyContext();
 }
 
-function renderOrders(root) {
-  renderInventoryOrders(root);
+async function renderOrders(root) {
+  await renderInventoryOrders(root);
   notifyContext();
 }
 
@@ -2695,7 +2695,7 @@ export async function renderInventory(root, section = 'stock') {
     }
   }
   if (section === 'movements') renderMovements(root);
-  else if (section === 'orders') renderOrders(root);
+  else if (section === 'orders') await renderOrders(root);
   else {
     renderStock(root);
     if (legacyError) openNotice({

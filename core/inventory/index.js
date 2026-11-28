@@ -1,4 +1,5 @@
 import { canUseCapability } from '../access.js';
+import { inventoryDesktop } from './desktop.js';
 
 const INVENTORY_NAVIGATION = [
   { id: 'stock', label: 'Остатки', capability: 'inventory.stock.access' },
@@ -8,13 +9,16 @@ const INVENTORY_NAVIGATION = [
   { id: 'consumption-groups', label: 'Группы расхода', capability: 'inventory.consumption_groups.access' },
 ];
 
-export function inventoryNavigationItems() {
-  return INVENTORY_NAVIGATION.filter((item) => canUseCapability(item.capability)).map(({ id, label }) => ({ id, label }));
+export function inventoryNavigationItems(desktop = false) {
+  const available=INVENTORY_NAVIGATION.filter(item=>canUseCapability(item.capability));
+  const combined=desktop&&available.some(item=>item.id==='orders')&&available.some(item=>item.id==='counterparties');
+  return available.filter(item=>!combined||item.id!=='counterparties').map(({id,label})=>({id,label}));
 }
 
 export async function renderInventorySection(root, section = 'stock') {
-  const allowed = inventoryNavigationItems();
-  const target = allowed.some((item) => item.id === section) ? section : allowed[0]?.id;
+  const allowed = inventoryNavigationItems(inventoryDesktop(root));
+  const requested=section==='counterparties'&&inventoryDesktop(root)&&allowed.some(item=>item.id==='orders')&&!allowed.some(item=>item.id==='counterparties')?'orders':section;
+  const target = allowed.some((item) => item.id === requested) ? requested : allowed[0]?.id;
   if (!target) { root.replaceChildren(); return; }
   if (target === 'consumption-groups') {
     const { renderConsumptionGroups } = await import('./consumption-groups.js');

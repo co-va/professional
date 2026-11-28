@@ -1,5 +1,5 @@
 import {inventoryDesktop,inventoryDesktopHeader} from './desktop.js';
-import {DATA_EXCHANGE_ICON} from '../../ui/buttons/index.js';
+import {DATA_EXCHANGE_ICON,VIEW_ICON} from '../../ui/buttons/index.js';
 import {bindDesktopRailControls} from '../../ui/v2/horizontal-affordance.js';
 import {
   actionBlock, button, emptyState, field, modal, mountModal, openNotice,
@@ -1905,9 +1905,9 @@ function openCounterpartyAppearance(root, sample, onSaved = () => {}) {
   });
 }
 
-export async function renderCounterparties(root) {
+export async function renderCounterparties(root,{embedded=false,sharedHeader=null,onCreateReady=()=>{}}={}) {
   const desktop=inventoryDesktop(root);
-  root.innerHTML = page([
+  if(!embedded)root.innerHTML = page([
     workspaceHeaderContext({
       title: 'Контрагенты',
       v: desktop?null:{ data: 'data-counterparty-view-menu', aria: 'Настройки контрагентов' },
@@ -1916,8 +1916,8 @@ export async function renderCounterparties(root) {
     '<div data-counterparties-list></div>',
   ]);
   const host = root.querySelector('[data-counterparties-list]');
-  const header=desktop?inventoryDesktopHeader(root,'Контрагенты','',[
-    {label:'Вид',data:'data-counterparty-desktop-view',aria:'Вид'},
+  const header=embedded?sharedHeader:desktop?inventoryDesktopHeader(root,'Контрагенты','',[
+    {label:VIEW_ICON,className:'v2-desktop-tool-icon',data:'data-counterparty-desktop-view',aria:'Вид'},
     {label:DATA_EXCHANGE_ICON,className:'v2-desktop-tool-icon',data:'data-counterparty-desktop-excel',aria:'Excel'},
     {label:'+',className:'v2-desktop-tool-primary',data:'data-counterparty-add',aria:'Новый контрагент'},
   ]):null;
@@ -1927,15 +1927,17 @@ export async function renderCounterparties(root) {
   let currentCompanies = [];
   const renderCards = () => {
     if (!host?.isConnected) return;
-    host.innerHTML = currentCompanies.length
-      ? (desktop?cards=>entityCardRail(cards,{className:'inventory-counterparty-rail'}):entityCardStack)(currentCompanies.map(company => entityVisualCard({
+    const query=embedded?String(header?.querySelector('[data-inventory-orders-search]')?.value||'').trim().toLocaleLowerCase('ru'):'';
+    const visible=currentCompanies.filter(company=>!query||String(company.name||'').toLocaleLowerCase('ru').includes(query));
+    host.innerHTML = visible.length
+      ? (desktop?cards=>entityCardRail(cards,{className:'inventory-counterparty-rail'}):entityCardStack)(visible.map(company => entityVisualCard({
         appearance: counterpartyCardAppearance(),
         fields: counterpartyCardFields(company),
         interactive: true,
         data: 'data-counterparty-open="' + escapeHtml(company.id) + '"',
         aria: 'Открыть контрагента ' + company.name,
       })))
-      : emptyState('Контрагентов пока нет', 'Нажмите +, чтобы создать компанию.');
+      : query?emptyState('Контрагенты не найдены'):emptyState('Контрагентов пока нет', 'Нажмите +, чтобы создать компанию.');
     if(desktop)bindDesktopRailControls(host.querySelector('.inventory-counterparty-rail'),{prefix:'inventory-counterparty-rail',label:'контрагент'});
     host.querySelectorAll('[data-counterparty-open]').forEach(node => {
       node.addEventListener('click', () => {
@@ -1986,7 +1988,12 @@ export async function renderCounterparties(root) {
     {id:'template',label:'Шаблон Excel',onSelect:()=>void download('/template/xlsx','counterparties-template.xlsx').catch(error=>openNotice({title:'Excel',message:errText(error)}))},
     {id:'history',label:'История загрузок',onSelect:()=>openCounterpartyFiles(currentCompanies)},
   ]}));
-  (header?.querySelector('[data-counterparty-add]')||root.querySelector('[data-counterparty-add]'))?.addEventListener('click', () => openCompanyEditor(null, () => { void show(); }));
+  const create=()=>openCompanyEditor(null,()=>{void show();});
+  (header?.querySelector('[data-counterparty-add]')||root.querySelector('[data-counterparty-add]'))?.addEventListener('click',create);
+  if(embedded){
+    onCreateReady(create);
+    header?.querySelector('[data-inventory-orders-search]')?.addEventListener('input',renderCards);
+  }
   // Run independent data requests together. Cards still wait for the
   // appearance template before rendering, without a serial network waterfall.
   const companiesPromise = loadCompanies();

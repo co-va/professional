@@ -1,10 +1,12 @@
-import {inventoryDesktop,inventoryDesktopHeader,inventoryTable,inventoryRowButton,bindInventoryTableRows} from './desktop.js';
+import {inventoryDesktop,inventoryDesktopHeader,inventoryDesktopFilter,inventoryDesktopSort,inventoryTable,inventoryRowButton,bindInventoryTableRows} from './desktop.js';
 import {
   actionBlock, button, datePicker, emptyState, field, initDatePickers,
   modal, mountModal, mountV2ZLayer, openNotice, openSharedProfileSettingsMenu,
   select, list, twoColumnLayout, v2ListEntries, v2ListEntry, v2ZLayer,
   workspaceHeaderContext,
 } from '../../ui/ui.js';
+import { canUseCapability } from '../access.js';
+import { VIEW_ICON, DATA_EXCHANGE_ICON } from '../../ui/buttons/index.js';
 import { compactCheck } from '../../ui/selection/check-list.js';
 import { escapeHtml } from '../../ui/utils/escape-html.js';
 import {
@@ -1087,23 +1089,36 @@ function openInventoryOrderZ(root, orderId) {
   render();
 }
 
-export function renderInventoryOrders(root) {
+export async function renderInventoryOrders(root) {
   const desktop=inventoryDesktop(root);
+  const combined=desktop&&canUseCapability('inventory.counterparties.access')&&canUseCapability('inventory.order.access');
+  let createCounterparty=null;
   root.innerHTML = `${workspaceHeaderContext({
     title: 'Заказы',
     ...(desktop ? {} : {
       v: { data: 'data-inventory-orders-menu', aria: 'Сортировка и фильтр заказов' },
       c: { label: '+', data: 'data-inventory-add-order', aria: 'Сформировать заказ' },
     }),
-  })}<div data-inventory-orders-list${desktop?' data-inventory-desktop-table':''}></div>`;
+  })}${combined?'<section><h2 class="v2-section__title">Контрагенты</h2><div data-counterparties-list></div></section><h2 class="v2-section__title">Заказы</h2>':''}<div data-inventory-orders-list${desktop?' data-inventory-desktop-table':''}></div>`;
   const header=desktop?inventoryDesktopHeader(root,'Заказы',field({name:'inventoryOrdersSearch',type:'search',placeholder:'Поиск',value:root.dataset.inventoryOrdersSearch||'',data:'data-inventory-orders-search'}),[
     {kind:'filter',data:'data-inventory-orders-filter',aria:'Фильтр'},
     {kind:'sort',data:'data-inventory-orders-sort',aria:'Сортировка'},
-    {label:'+',className:'v2-desktop-tool-primary',data:'data-inventory-add-order',aria:'Сформировать заказ'},
+    ...(combined?[
+      {label:DATA_EXCHANGE_ICON,className:'v2-desktop-tool-icon',data:'data-counterparty-desktop-excel',aria:'Обмен данными контрагентов'},
+      {label:VIEW_ICON,className:'v2-desktop-tool-icon',data:'data-counterparty-desktop-view',aria:'Вид карты контрагента'},
+    ]:[]),
+    {label:'+',className:'v2-desktop-tool-primary',data:'data-inventory-add-order',aria:combined?'Добавить':'Сформировать заказ'},
   ]):null;
   const openControls = (kind,anchor=root) => {
     const suppliers = [...new Set(getInventoryOrders().map(order => order.supplier).filter(Boolean))]
       .sort((a, b) => a.localeCompare(b, 'ru'));
+    if(desktop&&kind==='filter'){
+      inventoryDesktopFilter(anchor,{ordersZ1Status:root.dataset.inventoryOrdersStatus||'',ordersZ1Supplier:root.dataset.inventoryOrdersSupplier||''},state=>'<div class="form-grid">'+
+        select({label:'Статус',name:'ordersZ1Status',value:state.ordersZ1Status,options:[{value:'',label:'Все'},{value:'formed',label:'Сформирован'},{value:'paid',label:'Оплачен'},{value:'received',label:'Получен'}]})+
+        select({label:'Поставщик',name:'ordersZ1Supplier',value:state.ordersZ1Supplier,options:[{value:'',label:'Все'},...suppliers.map(value=>({value,label:value}))]})+'</div>',state=>{
+        root.dataset.inventoryOrdersStatus=state.ordersZ1Status;root.dataset.inventoryOrdersSupplier=state.ordersZ1Supplier;refreshOrderList(root);
+      });return;
+    }
     const html = `<div class="form-grid">${kind === 'sort'
       ? select({ label: 'Сортировка', name: 'ordersZ1Sort',
         value: root.dataset.inventoryOrdersSort || 'recent',
@@ -1124,10 +1139,7 @@ export function renderInventoryOrders(root) {
       ].join('')}
       ${actionBlock(button('Применить', { data: 'data-inventory-orders-apply' }))}</div>`;
     if(desktop&&kind==='sort'){
-      const options=[['recent','Сначала новые'],['oldest','Сначала старые'],['price','По сумме']];
-      const popup=mountModal(anchor,modal('<div class="people-action-menu">'+options.map(([value,label])=>button(label,{variant:'secondary',data:'data-inventory-order-sort-choice="'+value+'" aria-pressed="'+((root.dataset.inventoryOrdersSort||'recent')===value)+'"'})).join('')+'</div>',{variant:'x',title:'Сортировка',surface:'app',xRole:'action',className:'people-action-popup people-sort-popup'}));
-      popup?.querySelectorAll('[data-inventory-order-sort-choice]').forEach(control=>control.addEventListener('click',()=>{root.dataset.inventoryOrdersSort=control.dataset.inventoryOrderSortChoice;popup.v2Close?.();refreshOrderList(root);}));
-      return;
+      inventoryDesktopSort(anchor,[{value:'recent',label:'Сначала новые'},{value:'oldest',label:'Сначала старые'},{value:'price',label:'По сумме'}],root.dataset.inventoryOrdersSort||'recent',value=>{root.dataset.inventoryOrdersSort=value;refreshOrderList(root);});return;
     }
     const popup = mountModal(anchor, modal(html, {
       variant: desktop?'x':'q', title: kind === 'sort' ? 'Сортировка' : 'Фильтр',
@@ -1152,10 +1164,22 @@ export function renderInventoryOrders(root) {
   header?.querySelector('[data-inventory-orders-search]')?.addEventListener('input',event=>{root.dataset.inventoryOrdersSearch=event.target.value;refreshOrderList(root);});
   header?.querySelector('[data-inventory-orders-filter]')?.addEventListener('click',event=>openControls('filter',event.currentTarget));
   header?.querySelector('[data-inventory-orders-sort]')?.addEventListener('click',event=>openControls('sort',event.currentTarget));
-  (header?.querySelector('[data-inventory-add-order]')||root.querySelector('[data-inventory-add-order]'))?.addEventListener('click', () =>
-    openInventoryOrderSelection(root, null, createdOrderId => {
-      refreshOrderList(root);
-      if (createdOrderId) openInventoryOrderZ(root, createdOrderId);
-    }));
+  const createOrder=()=>openInventoryOrderSelection(root,null,createdOrderId=>{
+    refreshOrderList(root);if(createdOrderId)openInventoryOrderZ(root,createdOrderId);
+  });
+  (header?.querySelector('[data-inventory-add-order]')||root.querySelector('[data-inventory-add-order]'))?.addEventListener('click',event=>{
+    if(!combined){createOrder();return;}
+    const popup=mountModal(event.currentTarget,modal('<div class="people-action-menu">'+
+      button('Заказ',{variant:'secondary',data:'data-inventory-add-order-choice'})+
+      button('Контрагент',{variant:'secondary',data:'data-inventory-add-counterparty-choice',disabled:!createCounterparty})+'</div>',{variant:'x',title:'Добавить',surface:'app',xRole:'action',className:'people-action-popup'}));
+    popup?.querySelector('[data-inventory-add-counterparty-choice]')?.addEventListener('click',()=>{popup.v2Close?.();createCounterparty?.();});
+    popup?.querySelector('[data-inventory-add-order-choice]')?.addEventListener('click',()=>{popup.v2Close?.();createOrder();});
+  });
+  header?.querySelector('[data-inventory-orders-filter]')?.setAttribute('aria-pressed',String(Boolean(root.dataset.inventoryOrdersStatus||root.dataset.inventoryOrdersSupplier)));
   refreshOrderList(root);
+  if(combined){
+    const {renderCounterparties}=await import('./counterparties.js');
+    if(root.isConnected&&root.querySelector('[data-counterparties-list]'))
+      await renderCounterparties(root,{embedded:true,sharedHeader:header,onCreateReady:handler=>{createCounterparty=handler;}});
+  }
 }

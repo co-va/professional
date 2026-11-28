@@ -194,7 +194,7 @@ function activeRootSection() {
 
 function secondaryItems(section = activeRootSection()) {
   if (section === 'finance') return financeNavigationItems();
-  if (section === 'inventory') return inventoryNavigationItems();
+  if (section === 'inventory') return inventoryNavigationItems(Boolean(window.matchMedia?.(V2_DESKTOP_MEDIA).matches));
   if (section === 'loyalty' && window.matchMedia?.(V2_DESKTOP_MEDIA).matches) return loyaltyWorkspaceNavigationItems(true);
   if (section === 'loyalty') return loyaltyNavigationItems();
   if (section === 'settings') return settingsNavigationItems();
@@ -206,6 +206,9 @@ function ensureSecondary(section) {
   if (!items.length) return '';
   const selected = String(state.secondary[section] || '');
   if (items.some((item) => item.id === selected)) return selected;
+  if(section==='inventory'&&selected==='counterparties'&&items.some(item=>item.id==='orders')){
+    state.secondary[section]='orders';return 'orders';
+  }
   state.secondary[section] = items[0].id;
   return items[0].id;
 }
