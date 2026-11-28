@@ -408,6 +408,7 @@ function openCashAppearanceQ(root) {
   return openEntityCardAppearanceQ(root, {
     title: 'Вид',
     typeLabel: 'Тип карты',
+    showTypeSelector: true,
     typeOptions: types,
     initialType: types[0]?.value || 'wallet',
     targetLabel: 'Карта',

@@ -1,7 +1,7 @@
 import { renderPeople } from '../core/people/people.js';
 import { financeNavigationItems, renderFinanceSection } from '../core/finance/index.js';
 import { inventoryNavigationItems, renderInventorySection } from '../core/inventory/index.js';
-import { loyaltyWorkspaceNavigationItems, renderLoyaltySection } from '../core/loyalty/index.js';
+import { loyaltyNavigationItems, loyaltyWorkspaceNavigationItems, renderLoyaltySection } from '../core/loyalty/index.js';
 import { renderJournal } from '../journal/journal.js';
 import { mountJournalMonthCalendar } from '../journal/месяц.js';
 import { renderJournalGraphMode } from '../journal/график.js';
@@ -195,7 +195,8 @@ function activeRootSection() {
 function secondaryItems(section = activeRootSection()) {
   if (section === 'finance') return financeNavigationItems();
   if (section === 'inventory') return inventoryNavigationItems();
-  if (section === 'loyalty') return loyaltyWorkspaceNavigationItems(Boolean(window.matchMedia?.(V2_DESKTOP_MEDIA).matches));
+  if (section === 'loyalty' && window.matchMedia?.(V2_DESKTOP_MEDIA).matches) return loyaltyWorkspaceNavigationItems(true);
+  if (section === 'loyalty') return loyaltyNavigationItems();
   if (section === 'settings') return settingsNavigationItems();
   return [];
 }

@@ -131,11 +131,11 @@ function sortedItems(items, mode = 'position') {
   });
 }
 
-function orderListMarkup(root) {
+function orderListMarkup(root, desktop = false) {
   const status = String(root.dataset.inventoryOrdersStatus || '');
   const supplier = String(root.dataset.inventoryOrdersSupplier || '');
   const sorting = String(root.dataset.inventoryOrdersSort || 'recent');
-  const query=inventoryDesktop(root)?String(root.dataset.inventoryOrdersSearch||'').trim().toLocaleLowerCase('ru'):'';
+  const query=desktop?String(root.dataset.inventoryOrdersSearch||'').trim().toLocaleLowerCase('ru'):'';
   const orders = getInventoryOrders().filter(order =>
     (!status || order.status === status) && (!supplier || order.supplier === supplier)
     &&(!query||[orderNumber(order.orderId),order.supplier,order.note,statusLabel(order.status)].join(' ').toLocaleLowerCase('ru').includes(query)));
@@ -146,7 +146,7 @@ function orderListMarkup(root) {
   if (sorting === 'oldest') orders.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
   else if (sorting === 'price') orders.sort((a, b) => Number(b.total) - Number(a.total));
   else orders.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-  if(inventoryDesktop(root))return inventoryTable(orders,[
+  if(desktop)return inventoryTable(orders,[
     {key:'date',label:'Дата',render:order=>escapeHtml(dateLabel(order.createdAt))},
     {key:'order',label:'Заказ',render:order=>inventoryRowButton('№ '+orderNumber(order.orderId),'data-inventory-order',order.orderId)},
     {key:'supplier',label:'Поставщик'},
@@ -171,7 +171,7 @@ function orderListMarkup(root) {
 function refreshOrderList(root) {
   const host = root.querySelector('[data-inventory-orders-list]');
   if (!host) return;
-  host.innerHTML = orderListMarkup(root);
+  host.innerHTML = orderListMarkup(root, inventoryDesktop(root));
   bindInventoryTableRows(host,'[data-inventory-order]',node=>openInventoryOrderZ(root,node.dataset.inventoryOrder));
 }
 

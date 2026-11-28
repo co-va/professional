@@ -1015,7 +1015,7 @@ function openManufacturerStock(root, manufacturer, groupContext = null) {
     {kind:'filter',data:'data-inventory-company-filter',aria:'Фильтр'},
     {kind:'sort',data:'data-inventory-company-sort',aria:'Сортировка'},
     {label:'+',className:'v2-desktop-tool-primary',data:'data-inventory-add-item',aria:'Добавить позицию'},
-  ]):setV2ZHeaderRows(layer,[stockSearchField('', 'data-inventory-company-search')])[0];
+  ]):setV2ZHeaderRows(layer, [stockSearchField('', 'data-inventory-company-search')])[0];
   const searchInput = searchRow?.querySelector('[data-inventory-company-search]') || null;
 
   const listHost = layer.querySelector('[data-inventory-company-list]');
@@ -2653,7 +2653,7 @@ function renderMovements(root) {
     search?.addEventListener('input',refresh);refresh();
   }else root.querySelectorAll('[data-inventory-movement]').forEach(control=>control.addEventListener('click',()=>openMovementDetails(root,control.dataset.inventoryMovement)));
   header?.querySelector('[data-inventory-desktop-excel]')?.addEventListener('click',event=>{const anchor=event.currentTarget;void import('./excel-v2.js').then(m=>m.openInventoryMovementExcel(anchor));});
-  (header?.querySelector('[data-inventory-add-movement]')||root.querySelector('[data-inventory-add-movement]'))?.addEventListener('click',()=>openMovementEditor(root,'',''));
+  (header?.querySelector('[data-inventory-add-movement]')||root.querySelector('[data-inventory-add-movement]'))?.addEventListener('click', () => openMovementEditor(root, '', ''));
   notifyContext();
 }
 

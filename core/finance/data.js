@@ -18,7 +18,7 @@ function clone(value) {
 }
 
 function emptyState() {
-  return { version: VERSION, recordPaymentDateMode: '', articles: [], articleCatalog: null, settlements: [], operations: [], ledger: [] };
+  return { version: VERSION, articles: [], articleCatalog: null, settlements: [], operations: [], ledger: [] };
 }
 
 function normalizeSettlementSnapshot(value = null) {
@@ -85,7 +85,6 @@ function normalizedState(value) {
   if (!value || typeof value !== 'object') return null;
   return {
     version: VERSION,
-    recordPaymentDateMode: String(value.recordPaymentDateMode || ''),
     articleCatalog: Array.isArray(value.articleCatalog)?clone(value.articleCatalog):null,
     articles: (Array.isArray(value.articles) ? value.articles : []).map((row) => ({
       articleId: String(row?.articleId || ''),

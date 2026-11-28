@@ -1,4 +1,5 @@
 import { recordPaymentCalendarPhase } from '../time/payment-date.js';
+import { zonedIntervalMoment } from '../time/zone.js';
 // Read-only compatibility check against the actual Core snapshot, not Git SHA.
 export function supportsFinancePrepayment(catalog){
  return Array.isArray(catalog)&&catalog.some(a=>a.articleId==='mechanism-services'&&a.values?.some(v=>v.valueId==='services-prepayment'&&v.routes?.includes('SERVICE_PREPAYMENT')));
@@ -42,8 +43,12 @@ export function recordPaymentReport(operations,ledger,recordIds){
  return {prepayment:netRecordPrepayment(operations,recordIds),wallets:complete?[...byWallet.values()].filter(w=>w.amount!==0).map(w=>({label:w.label,amount:w.amount/100})):[]};
 }
 
-export function supportsRecordPaymentCalendar(state){
- return state?.recordPaymentDateMode==='workplace-calendar-day'&&supportsFinancePrepayment(state.articleCatalog);
+// Approved Core #950 determines operation type by the visit's start instant.
+export function recordPaymentTiming(record,timeZone,now=new Date()){
+ const start=zonedIntervalMoment(record,'from',timeZone);
+ const instant=now instanceof Date?now:new Date(now);
+ if(!start||!Number.isFinite(instant.getTime())||!Number.isFinite(start.getTime()))return '';
+ return instant<start?'prepayment':'settlement';
 }
 export function recordPaymentPresentation(record,payment,timeZone,now=new Date(),advance=0){
  const phase=recordPaymentCalendarPhase(record?.date,now,timeZone);

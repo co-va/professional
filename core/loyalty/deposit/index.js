@@ -1502,4 +1502,5 @@ export async function renderDeposit(root) {
   notifyContext();
 }
 
-export { renderDeposit as render, openDepositExcelQ as openProgramExcel };
+export { renderDeposit as render };
+export { openDepositExcelQ as openProgramExcel };

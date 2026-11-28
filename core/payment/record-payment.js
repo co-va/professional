@@ -36,7 +36,7 @@ import { flushBusinessPersistence } from '../business-persistence.js';
 import { loadWalletCatalog } from '../runtime/auxiliary-state.js';
 import { getProfile } from '../profile/data.js';
 import { readOnlyReceipt } from '../../ui/receipt/index.js';
-import { supportsRecordPaymentCalendar, recordPaymentPresentation } from '../finance/prepayment-model.js';
+import { supportsFinancePrepayment, recordPaymentTiming, recordPaymentPresentation } from '../finance/prepayment-model.js';
 
 const money = (value) => `${new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(Number(value || 0)).replaceAll('\u00a0', ' ')} ₽`;
 const paymentInFlightRecords = new Set();
@@ -292,16 +292,16 @@ async function openPaymentEntry(record, onCompleted = () => {}) {
     // A cold Journal/Record route may not have loaded Finance/Cash.
     // Resolve the actual wallet catalog before rendering any source picker.
     const refreshed=await loadVerifiedPaymentSource(()=>refreshFinanceState(),'Финансы');
-    newContract=supportsRecordPaymentCalendar(refreshed);
-    if(!newContract)throw new Error('Обновление Core для оплаты по дате записи ещё недоступно.');
+    newContract=supportsFinancePrepayment(refreshed.articleCatalog);
+    if(!newContract)throw new Error('Обновление Core для предоплаты ещё недоступно.');
     [wallets, verifiedPersonDeposits] = await Promise.all([
       loadVerifiedPaymentSource(() => loadWalletCatalog(), 'Кошельки'),
       key ? loadVerifiedPaymentSource(() => listPersonDeposits(key,current?.date), 'Условия скидки') : Promise.resolve([]),
     ]);
     const verifiedRecord = getRecord(recordId) || current;
-    const presentation=recordPaymentPresentation(verifiedRecord,{},paymentWorkplaceTimeZone(verifiedRecord));
-    if(!presentation.phase)throw new Error('Не определена дата записи.');
-    prepayment=presentation.phase==='before';
+    const timing=recordPaymentTiming(verifiedRecord,paymentWorkplaceTimeZone(verifiedRecord));
+    if(!timing)throw new Error('Не определены дата и время записи.');
+    prepayment=timing==='prepayment';
     settlement = settlementForRecord(verifiedRecord);
     state = paymentStateForRecord(verifiedRecord);
     if (state.fullyPaid && !canAcceptRecordTips(verifiedRecord, state)) {
@@ -390,8 +390,8 @@ async function openPaymentEntry(record, onCompleted = () => {}) {
       const checkedRecord = getRecord(recordId) || latest;
       const checkedSettlement = settlementForRecord(checkedRecord);
       const checkedPayment = paymentStateForRecord(checkedRecord);
-      const checkedPresentation=recordPaymentPresentation(checkedRecord,checkedPayment,paymentWorkplaceTimeZone(checkedRecord));
-      if(!checkedPresentation.phase||checkedPresentation.phase!==presentation.phase)throw new Error('Дата записи изменилась. Закройте оплату и откройте её заново.');
+      const checkedTiming=recordPaymentTiming(checkedRecord,paymentWorkplaceTimeZone(checkedRecord));
+      if(!checkedTiming||checkedTiming!==(prepayment?'prepayment':'settlement'))throw new Error('Время записи изменилось. Закройте оплату и откройте её заново.');
       const changed = Math.abs(Number(checkedSettlement?.planTotal || 0) - Number(settlement?.planTotal || 0)) > 0.009
         || Math.abs(Number(checkedSettlement?.pricePercent || 0) - Number(settlement?.pricePercent || 0)) > 0.009
         || Math.abs(Number(checkedPayment?.paidTotal || 0) - Number(state?.paidTotal || 0)) > 0.009
