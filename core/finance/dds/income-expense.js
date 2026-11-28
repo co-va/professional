@@ -16,6 +16,8 @@ import {
 import { financeQSubmit, financeZSave } from '../desktop.js';
 import { canUseCapability } from '../../access.js';
 import { desktopAvailableArticles } from './classification.js';
+import { availableArticleDirectory } from './article-view.js';
+import { readArticleOrder, sortArticleDirectory } from './article-order.js';
 import { getFinanceArticles, getFinanceArticleCatalog } from '../data.js';
 import { manualArticleChoices, manualArticleSelection, manualRawArticle, manualDetailTotal, validManualLine } from './manual-entry-model.js';
 import { getWallets } from '../cash/data.js';
@@ -26,7 +28,8 @@ import { correctFinanceOperation, recordManualFinanceOperation } from '../servic
 function articleOptions(direction,desktopArticles=false,preserveId='') {
   const all=getFinanceArticles(),canonical=getFinanceArticleCatalog();
   const visible=desktopArticles?desktopAvailableArticles(all,canUseCapability):all;
-  return manualArticleChoices(all,canonical,direction,{preserveId,allowedIds:visible.map(a=>a.articleId)});
+  const directory=availableArticleDirectory(canonical,visible,canUseCapability);
+  return manualArticleChoices(all,Array.isArray(directory)?sortArticleDirectory(directory,readArticleOrder()):null,direction,{preserveId,allowedIds:visible.map(a=>a.articleId),fullCatalogue:canonical});
 }
 function valueMarkup(articles,articleId,valueId='') {
   const article=articles.find(a=>a.value===articleId);
@@ -206,7 +209,7 @@ export function renderIncomeExpenseOperation(root, direction, { onSaved = null, 
   const title = manualOperationTitle(direction, operation);
   (qBody || root).innerHTML = `${qBody ? '' : workspaceHeaderContext({ title })}
     <form class="compact-form" data-finance-manual-form novalidate>
-      ${select({ label: 'Статья', name: 'articleId', value: articleId, options: articles, searchable: true, placeholder:'Выберите статью' })}
+      ${select({ label: 'Статья', name: 'articleId', value: articleId, options: articles, placeholder:'Выберите статью' })}
       <div data-finance-manual-value${articles.find(a=>a.value===articleId)?.values.length?'':' hidden'}>${valueMarkup(articles,articleId,prior.valueId)}</div>
       ${select({ label: 'Ввод', name: 'entryMode', value: mode, options: [{ value: 'simple', label: 'Сумма' }, { value: 'detail', label: 'Детально' }] })}
       ${datePicker({ label: 'Фактическая дата', name: 'occurredDate', value: financeLocalDateValue(operation?.occurredAt || new Date()), required: true, allowClear: false })}

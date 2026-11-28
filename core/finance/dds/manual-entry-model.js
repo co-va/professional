@@ -1,11 +1,18 @@
 // Translate visible canonical article/value into an actual writable Core article ID.
-export function manualArticleChoices(raw,catalogue,direction,{preserveId='',allowedIds=null}={}){
+export function manualArticleChoices(raw,catalogue,direction,{preserveId='',allowedIds=null,fullCatalogue=catalogue}={}){
  const allowed=allowedIds?new Set(allowedIds):null;
- const eligible=raw.filter(a=>a.direction===direction&&a.economicType!=='GROUP'&&(!a.archivedAt||a.articleId===preserveId)&&(!['DEPOSIT_RECEIVED','DEPOSIT_RETURN','PERSONAL_ACCOUNT_LIABILITY_IN','PERSONAL_ACCOUNT_LIABILITY_OUT'].includes(a.economicType)||a.articleId===preserveId)&&(!allowed||allowed.has(a.articleId)||a.articleId===preserveId));
+ const eligible=raw.filter(a=>a.direction===direction&&a.economicType!=='GROUP'&&(!a.archivedAt||a.articleId===preserveId)&&(!['DEPOSIT_RECEIVED','DEPOSIT_RETURN','PERSONAL_ACCOUNT_LIABILITY_IN','PERSONAL_ACCOUNT_LIABILITY_OUT'].includes(a.economicType)||a.articleId===preserveId)&&(!allowed||!a.systemKey||allowed.has(a.articleId)||a.articleId===preserveId));
  const byId=id=>eligible.find(a=>a.articleId===id);
  const byRoutes=routes=>routes.flatMap(route=>eligible.filter(a=>a.systemKey===route))[0];
- if(!Array.isArray(catalogue))return [];
- return catalogue.flatMap(a=>{
+ const directory=Array.isArray(catalogue)?catalogue:[];
+ const full=Array.isArray(fullCatalogue)?fullCatalogue:[];
+ const known=new Set(full.flatMap(a=>[a.articleId,...(a.values||[]).map(v=>v.valueId)]));
+ const roots=new Set(['INCOME_ROOT','EXPENSE_ROOT']);
+ const fallback=eligible.filter(a=>!a.systemKey&&!known.has(a.articleId)&&(()=>{
+   const parent=raw.find(p=>p.articleId===a.parentArticleId);
+   return !parent||roots.has(parent.systemKey)||parent.economicType==='GROUP';
+ })()).map(a=>({...a,values:eligible.filter(v=>!v.systemKey&&v.parentArticleId===a.articleId).map(v=>({valueId:v.articleId,name:v.name,routes:[]}))}));
+ return [...directory,...fallback].flatMap(a=>{
    if(a.archived&&a.articleId!==preserveId&&!a.values?.some(v=>v.valueId===preserveId))return [];
    const direct=byId(a.articleId)||byRoutes(a.routes||[]);
    const values=(a.values||[]).flatMap(v=>{
