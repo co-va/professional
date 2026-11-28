@@ -224,7 +224,7 @@ function applyDDSHierarchy(host,groups,collapsed){
  groups.forEach(group=>append(group));body.append(fragment);sync();
 }
 
-export function bindWalletHistory(layer,wallet,rows,{open,settings,dds=false,actions=[]}) {
+export function bindWalletHistory(layer,wallet,rows,{open,dds=false,actions=[]}) {
   const stateKey=dds?'ddsHistoryState':'walletHistoryState';
   const state=layer[stateKey] ||= {query:'',filters:dds?ddsFilters():emptyFilters(),sort:'dateDesc',...(dds?readDDSGrouping():{}),selected:new Set()};
   const tools=actions.filter(Boolean);
@@ -239,7 +239,7 @@ export function bindWalletHistory(layer,wallet,rows,{open,settings,dds=false,act
     +'</div><div class="people-desktop-actions people-desktop-actions--right">'
     +(dds?tools.map((action,index)=>button(action.label,{variant:'secondary',className:action.className||'',aria:action.aria||'',data:'data-dds-history-action="'+index+'" title="'+escapeHtml(action.aria||'')+'"'})).join('')
       :button(DATA_EXPORT_ICON,{variant:'secondary',className:'people-desktop-icon',data:'data-wallet-export title="Выгрузить в Excel"',aria:'Выгрузить в Excel'})
-        +(settings?button('Удалить',{variant:'secondary',data:'data-wallet-settings',aria:'Удалить кассу'}):''))
+        )
     +'</div></div></section>',
   ],{desktopTitle:wallet.name,desktopAccessory:dds?walletCountMarkup:''});
   const host=layer.querySelector('[data-wallet-history-host]');
@@ -309,7 +309,6 @@ export function bindWalletHistory(layer,wallet,rows,{open,settings,dds=false,act
   toolbar.querySelectorAll('[data-dds-history-action]').forEach(control=>control.addEventListener('click',()=>{
     tools[Number(control.dataset.ddsHistoryAction)]?.run(control,walletSelection(visible,state.selected).exportRows);
   }));
-  toolbar.querySelector('[data-wallet-settings]')?.addEventListener('click',()=>settings?.());
   exportControl?.addEventListener('click',()=>{
     if(busy)return;const result=walletSelection(visible,state.selected);
     if(!result.exportRows.length)return;
