@@ -291,7 +291,14 @@ function openInventoryRetailEditorQ(itemId, {
 
   moveDesktopQTool(primary);
   const deleteButton = layer.querySelector('[data-service-retail-product-delete]');
-  if (deleteButton) pinDesktopQDanger(deleteButton);
+  if (deleteButton) {
+    if (isV2DesktopWorkspace(layer.closest('[data-v2-app]'))) {
+      deleteButton.textContent = 'Снять';
+      deleteButton.title = 'Снять с продажи';
+      deleteButton.setAttribute('aria-label','Снять с продажи');
+    }
+    pinDesktopQDanger(deleteButton);
+  }
 
   form.addEventListener('input', sync);
   form.addEventListener('change', sync);
