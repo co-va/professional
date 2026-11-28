@@ -2,7 +2,7 @@ import { modal, mountModal } from '../../ui/modals/index.js';
 import { moveDesktopQTool, pinDesktopQDanger } from '../../ui/v2/z-layout.js';
 import { isV2DesktopWorkspace } from '../../ui/v2/geometry.js';
 import { escapeHtml } from '../../ui/utils/escape-html.js';
-import { button } from '../../ui/buttons/index.js';
+import { button, WORKPLACE_ADD_ICON } from '../../ui/buttons/index.js';
 import { collectCost, costField, initCostFields, validateCostDefinition, costListParts } from '../../ui/cost/index.js';
 import { durationPicker, durationText, initDurationPickers } from '../../ui/duration/index.js';
 import { textareaField } from '../../ui/inputs/index.js';
@@ -56,8 +56,9 @@ export function serviceWorkplaceAssignmentList() {
 }
 
 export function serviceWorkplaceAddButton() {
-  return button('+ Рабочее пространство', {
-    variant: 'secondary', className: 'service-workplace-add-button', data: 'data-service-workplace-add',
+  return button(WORKPLACE_ADD_ICON, {
+    variant: 'secondary', className: 'v2-desktop-tool-primary',
+    data: 'data-service-workplace-add title="Добавить рабочее пространство"', aria: 'Добавить рабочее пространство',
   });
 }
 
