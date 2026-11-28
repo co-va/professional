@@ -20,3 +20,5 @@
 
 /* Manual finance: align the existing selector and amount controls on one row. */
 .form-grid--two[data-manual-wallet-entry]{align-items:end}
+.form-grid--two[data-manual-wallet-entry]:has(>.ui-compact-button){grid-template-columns:repeat(2,minmax(0,1fr)) var(--ui-compact-size)}
+.form-grid--two[data-manual-wallet-entry]>.ui-compact-button{margin-bottom:calc((var(--ui-field-height) - var(--ui-compact-size))/2)}
