@@ -1,6 +1,8 @@
 import { button, escapeHtml, field, list, modal, mountModal,
-  openNotice, select, v2ListEntry, v2ListEntries } from '../../ui/ui.js';
+  openNotice, select, dataTable, v2ListEntry, v2ListEntries } from '../../ui/ui.js';
 import { compactCheck } from '../../ui/selection/check-list.js';
+import { isV2DesktopWorkspace } from '../../ui/v2/geometry.js';
+import { moveDesktopQTool } from '../../ui/v2/z-layout.js';
 import { catalogDisclosure } from '../inventory/catalog-ui.js';
 import { apiRequest } from '../auth.js';
 import { getAllPeople, hydratePeopleFromServer } from './data.js';
@@ -214,7 +216,179 @@ function content(batch,people=[]){
     button('Применить',{data:'data-review-apply'})+
   '</div>';
 }
+// Keep the server decision payload identical for Desktop and Mobile.
+function reviewOperation(item,requested,candidate,manual){
+  if(!requested||!decisionOptions(item).some(o=>o.value===requested))throw Error('Выберите правильное значение');
+  const mode=requested==='manual'||(requested==='add'&&item.field==='note')?'replace':requested;
+  if(mode==='same'&&(!candidate||!item.owners?.some(o=>text(o.key)===candidate)))throw Error('Выберите человека из найденных контактов');
+  let value=mode==='same'?candidate:'';
+  if(mode==='replace'||mode==='add'){
+    value=requested==='manual'?text(manual):item.field==='discountPercent'?discountValue(item.excel):text(item.excel);
+    if(requested==='add'&&item.field==='note'){
+      value=[text(item.system),text(item.excel)].filter(Boolean).join('\n');
+      if(value.length>500)throw Error('Примечание слишком длинное. Не более 500 символов.');
+    }
+    if(!value)throw Error('Укажите новое значение');
+    if(item.field==='discountPercent'&&!validDiscount(value))throw Error('Процент должен быть от 0 до 100');
+  }
+  return {rowNumber:item.rowNumber,field:item.field,mode,value};
+}
+
+function openDesktopContactImportReview(root,batchId,onLoaded){
+  const layer=mountModal(root,modal(
+    '<div data-review-content>Загрузка…</div><p class="form-error" role="alert" data-review-error></p>'+
+    button('Применить',{data:'data-review-apply',disabled:true}),
+    {title:'Сверка контактов',variant:'q',surface:'app'}
+  ));
+  if(!layer)return null;
+  const host=layer.querySelector('[data-review-content]'),apply=layer.querySelector('[data-review-apply]'),error=layer.querySelector('[data-review-error]');
+  moveDesktopQTool(apply);
+  const drafts=new Map(),collapsed=new Set(['__done','__unchanged']);
+  let current=null,busy=false,loading=true;
+  const draftFor=item=>{
+    const key=rowKey(item);
+    if(!drafts.has(key))drafts.set(key,{checked:false,mode:'',candidate:item.owners?.length===1?text(item.owners[0].key):'',manual:item.field==='discountPercent'?discountValue(item.excel):text(item.excel)});
+    return drafts.get(key);
+  };
+  const groups=()=>reviewGroups(current||{});
+  const issues=()=>groups().flatMap(g=>g.items);
+  const chosen=()=>issues().filter(i=>draftFor(i).checked);
+  const operation=item=>{const d=draftFor(item);return reviewOperation(item,d.mode,item.owners?.length===1?text(item.owners[0].key):d.candidate,d.manual);};
+  function sync(){
+    host.querySelectorAll('[data-review-group-check]').forEach(control=>{
+      const group=groups().find(g=>g.field===control.dataset.reviewGroupCheck);
+      const n=(group?.items||[]).filter(i=>draftFor(i).checked).length;
+      control.checked=n>0&&n===group.items.length;
+      control.indeterminate=n>0&&n<group.items.length;
+    });
+    let ready=false;
+    try{const items=chosen();ready=items.length>0&&items.map(operation).length===items.length;}catch{}
+    apply.disabled=loading||busy||!ready;
+    host.inert=loading||busy;
+  }
+  function show(){
+    if(!layer.isConnected||!current)return;
+    const people=getAllPeople(),g=groups(),rows=Array.isArray(current.rows)?current.rows:[];
+    const done=rows.filter(r=>r.status==='done'),unchanged=rows.filter(r=>r.status==='unchanged');
+    const activeKeys=new Set(issues().map(rowKey));
+    for(const key of drafts.keys())if(!activeKeys.has(key))drafts.delete(key);
+    const tableRows=g.flatMap(group=>group.items.map(item=>{
+      const person=personForIssue(item,people),owner=matchingOwner(item);
+      const title=item.field==='identity'?(owner?personHeading(owner.code,owner.name):text(item.system)||'Контакт'):personHeading(person?.uei,personName(person)||text(item.contact).replace(/^[0-9A-Za-z]{1,4}\s+/,'').trim());
+      const system=item.field==='discountPercent'?(/Уточните: процент или доля/i.test(text(item.system))?'—':discountLabel(item.system)):text(item.system)||'—';
+      const excel=item.field==='discountPercent'?discountLabel(item.excel):item.field==='identity'?fromExcel(item.excel):text(item.excel)||'—';
+      return {id:rowKey(item),item,title,system,excel};
+    }));
+    for(const [id,values] of [['__done',done],['__unchanged',unchanged]])
+      for(const row of values)tableRows.push({id:id+':'+row.rowNumber,title:personHeading(row.code,row.name),system:'',excel:'Строка '+row.rowNumber});
+    const columns=[
+      {key:'selected',label:'',narrow:true,sortable:false,render:row=>row.item?compactCheck({checked:draftFor(row.item).checked,data:'data-review-select="'+escapeHtml(row.id)+'"',aria:'Выбрать '+row.title}):compactCheck({disabled:true,aria:'Обработано'})},
+      {key:'title',label:'Контакт',sortable:false,render:row=>'<span data-review-table-id="'+escapeHtml(row.id)+'">'+escapeHtml(row.title)+'</span>'},
+      {key:'system',label:'В системе',sortable:false},
+      {key:'excel',label:'Excel',sortable:false},
+      {key:'decision',label:'Решение',sortable:false,render:row=>{
+        if(!row.item)return '';
+        const item=row.item,d=draftFor(item),id=escapeHtml(row.id);
+        return select({name:'reviewMode-'+row.id,value:d.mode,aria:'Решение для '+row.title,options:decisionOptions(item),data:'data-review-mode="'+id+'"'})+
+          (item.field==='identity'&&item.owners?.length>1?'<div data-review-candidate-wrap'+(d.mode==='same'?'':' hidden')+'>'+
+            select({name:'reviewCandidate-'+row.id,value:d.candidate,aria:'Существующий контакт',options:[{value:'',label:'Выберите контакт'},...item.owners.map(o=>({value:o.key,label:personHeading(o.code,o.name)}))],data:'data-review-candidate="'+id+'"'})+'</div>':'')+
+          '<div data-review-manual-wrap'+(d.mode==='manual'?'':' hidden')+'>'+
+          field({name:'reviewManual-'+row.id,value:d.manual,type:item.field==='discountPercent'?'number':'text',...(item.field==='discountPercent'?{min:'0',max:'100',step:'any',inputmode:'decimal'}:{}),data:'aria-label="Новое значение" data-review-manual-value="'+id+'"'})+'</div>';
+      }},
+    ];
+    host.innerHTML='<div><strong>'+escapeHtml(progress(current))+'</strong><p class="ui-list__secondary">'+Number(current.pending||0)+' требуют решения · '+g.length+' групп различий</p></div>'+
+      (tableRows.length?dataTable({compact:true,caption:'Сверка контактов',columns,rows:tableRows}):'<p class="ui-list__secondary">Нет данных для сверки.</p>');
+    const body=host.querySelector('tbody');
+    if(!body){sync();return;}
+    const doc=body.ownerDocument,members=new Map([...body.querySelectorAll('[data-review-table-id]')].map(n=>[n.dataset.reviewTableId,n.closest('tr')]));
+    const all=[...g.map(g=>({id:g.field,label:g.label,items:g.items,ids:g.items.map(rowKey)})),...[['__done','Загружено',done],['__unchanged','Без изменений',unchanged]].filter(([, ,a])=>a.length).map(([id,label,a])=>({id,label,items:[],ids:a.map(r=>id+':'+r.rowNumber)}))];
+    for(const group of all){
+      const tr=doc.createElement('tr');tr.dataset.tableGroupLevel='group';
+      const check=doc.createElement('td');
+      if(group.items.length)check.innerHTML=compactCheck({data:'data-review-group-check="'+escapeHtml(group.id)+'"',aria:'Выбрать всю группу '+group.label});
+      const td=doc.createElement('td');td.colSpan=columns.length-2;
+      const details=doc.createElement('details');details.className='dds-table-disclosure';details.open=!collapsed.has(group.id);
+      const summary=doc.createElement('summary');summary.className='inventory-editor-summary';summary.textContent=group.label+' · '+group.ids.length;
+      details.append(summary);td.append(details);
+      const bulk=doc.createElement('td');
+      if(group.items.length>1){
+        const common=decisionOptions(group.items[0]).filter(o=>o.value&&group.items.every(i=>decisionOptions(i).some(c=>c.value===o.value)));
+        if(common.length)bulk.innerHTML=select({name:'reviewBulk-'+group.id,value:'',aria:'Решение для группы '+group.label,options:[{value:'',label:'Для группы'},...common],data:'data-review-bulk="'+escapeHtml(group.id)+'"'});
+      }
+      tr.append(check,td,bulk);body.append(tr);
+      const groupRows=group.ids.map(id=>members.get(id)).filter(Boolean);
+      groupRows.forEach(row=>body.append(row));
+      const toggle=()=>{groupRows.forEach(row=>row.hidden=!details.open);if(details.open)collapsed.delete(group.id);else collapsed.add(group.id);};
+      details.addEventListener('toggle',toggle);toggle();
+    }
+    host.querySelectorAll('[data-review-select]').forEach(control=>{control.closest('tr').dataset.reviewTableKey=control.dataset.reviewSelect;});
+    sync();
+  }
+  function update(event){
+    if(loading||busy)return;
+    const target=event.target,groupId=target.dataset?.reviewGroupCheck,bulkId=target.dataset?.reviewBulk;
+    if(groupId!==undefined||bulkId!==undefined){
+      const group=groups().find(g=>g.field===(groupId??bulkId));
+      if(!group)return;
+      for(const item of group.items){
+        const d=draftFor(item);
+        if(groupId!==undefined)d.checked=target.checked;
+        else if(target.value){d.checked=true;d.mode=target.value;}
+      }
+      if(bulkId!==undefined&&target.value){collapsed.delete(group.field);show();}
+      else{
+        host.querySelectorAll('[data-review-select]').forEach(c=>{const item=group.items.find(i=>rowKey(i)===c.dataset.reviewSelect);if(item)c.checked=draftFor(item).checked;});
+        sync();
+      }
+      return;
+    }
+    const row=target.closest('tr[data-review-table-key]');
+    if(!row)return;
+    const item=issues().find(i=>rowKey(i)===row.dataset.reviewTableKey);
+    if(!item)return;
+    const d=draftFor(item);
+    if(target.matches('[data-review-select]'))d.checked=target.checked;
+    else if(target.matches('[data-review-mode]')){
+      d.mode=target.value;d.checked=Boolean(d.mode);row.querySelector('[data-review-select]').checked=d.checked;
+      const candidate=row.querySelector('[data-review-candidate-wrap]'),manual=row.querySelector('[data-review-manual-wrap]');
+      if(candidate)candidate.hidden=d.mode!=='same';
+      if(manual)manual.hidden=d.mode!=='manual';
+    }else if(target.matches('[data-review-candidate]'))d.candidate=target.value;
+    else if(target.matches('[data-review-manual-value]'))d.manual=target.value;
+    sync();
+  }
+  host.addEventListener('change',update);
+  host.addEventListener('input',event=>{if(event.target.matches('[data-review-manual-value]'))update(event);});
+  apply.addEventListener('click',async()=>{
+    if(loading||busy||apply.disabled)return;
+    const items=chosen();let operations;
+    try{operations=items.map(operation);}catch(err){error.textContent=text(err.message);return;}
+    if(!operations.length)return;
+    busy=true;error.textContent='';sync();
+    try{
+      for(const [i,op] of operations.entries()){current=await request('decide',{batchId,...op});drafts.delete(rowKey(items[i]));}
+      await reloadContacts(onLoaded);current=await request('detail',{batchId});
+    }catch(err){
+      error.textContent=text(err.message)||'Не удалось сохранить';
+      try{current=await request('detail',{batchId});await reloadContacts(onLoaded);}catch{}
+    }finally{busy=false;show();}
+  });
+  void (async()=>{
+    try{
+      current=await request('detail',{batchId});
+      while(layer.isConnected&&current?.rows?.some(row=>row.status==='new')){
+        current=await request('advance',{batchId,limit:40});if(!current.more)break;
+      }
+      await reloadContacts(onLoaded);
+      if(layer.isConnected)show();
+    }catch(err){error.textContent=text(err.message);}
+    finally{loading=false;sync();}
+  })();
+  return layer;
+}
+
 export function openContactImportReview(root,batchId,{onLoaded=()=>{}}={}){
+  if(isV2DesktopWorkspace(root.closest('[data-v2-app]')))return openDesktopContactImportReview(root,batchId,onLoaded);
   const layer=mountModal(root,modal('<div data-review-content>Загрузка…</div>',{
     title:'Сверка контактов',variant:'q',surface:'app',
   }));
@@ -345,32 +519,10 @@ export function openContactImportReview(root,batchId,{onLoaded=()=>{}}={}){
         operations=items.map((item,index)=>{
           const key=shared()?'common':String(index);
           const requested=text(form.elements.namedItem('reviewMode-'+key)?.value);
-          if(!requested)throw Error('Выберите правильное значение');
-          // Notes are one text field, while contact channels are arrays.
-          // Append a note using the existing guarded replace operation; other
-          // multi-value fields use the server's add operation.
-          const mode=requested==='manual'||(requested==='add'&&item.field==='note')
-            ?'replace':requested;
           const candidate=item.field==='identity'
             ?item.owners?.length===1?text(item.owners[0].key)
               :text(form.elements.namedItem('reviewCandidate-'+key)?.value):'';
-          if(mode==='same'&&!candidate)
-            throw Error('Выберите человека из найденных контактов');
-          let value=mode==='same'?candidate:'';
-          if(mode==='replace'||mode==='add'){
-            value=requested==='manual'
-              ?text(form.elements.namedItem('reviewManual-'+key)?.value)
-              :item.field==='discountPercent'?discountValue(item.excel):text(item.excel);
-            if(requested==='add'&&item.field==='note'){
-              const previous=text(item.system),incoming=text(item.excel);
-              value=[previous,incoming].filter(Boolean).join('\n');
-              if(value.length>500)throw Error('Примечание слишком длинное. Не более 500 символов.');
-            }
-            if(!value)throw Error('Укажите новое значение');
-            if(item.field==='discountPercent'&&!validDiscount(value))
-              throw Error('Процент должен быть от 0 до 100');
-          }
-          return {rowNumber:item.rowNumber,field:item.field,mode,value};
+          return reviewOperation(item,requested,candidate,form.elements.namedItem('reviewManual-'+key)?.value);
         });
       }catch(err){if(error)error.textContent=text(err.message);return;}
       busy=true;
@@ -431,15 +583,21 @@ export function openContactImportBatches(root,{onLoaded=()=>{}}={}){
   }));
   if(!layer)return null;
   const host=layer.querySelector('[data-contact-review-list]');
+  const desktop=isV2DesktopWorkspace(layer.closest('[data-v2-app]'));
   const refresh=async()=>{
     const batches=await request('batches');
     if(layer.isConnected)host.innerHTML=batches.length
-      ?v2ListEntries(batches.map(batchRow))
+      ?(desktop?dataTable({compact:true,caption:'История загрузок',rows:batches,columns:[
+        {key:'filename',label:'Файл',sortable:false,render:batch=>'<button type="button" data-contact-review-open="'+escapeHtml(batch.id)+'">'+escapeHtml(text(batch.filename)||'Контакты.xlsx')+'</button>'},
+        {key:'done',label:'Обработано',sortable:false,render:batch=>escapeHtml(String(Number(batch.done||0))+' / '+String(Number(batch.total||0)))},
+        {key:'pending',label:'Ожидают',sortable:false,render:batch=>String(Number(batch.pending||0))},
+        {key:'groupCount',label:'Группы',sortable:false,render:batch=>String(Number(batch.groupCount||0))},
+      ]}):v2ListEntries(batches.map(batchRow)))
       :'<p class="ui-list__secondary">Загруженных файлов пока нет.</p>';
   };
   host.addEventListener('click',event=>{
     const item=event.target.closest('[data-contact-review-open]');
-    if(item)openContactImportReview(root,item.dataset.contactReviewOpen,{
+    if(item)openContactImportReview(desktop?layer:root,item.dataset.contactReviewOpen,{
       onLoaded:()=>{onLoaded?.();void refresh().catch(errorNotice);},
     });
   });
