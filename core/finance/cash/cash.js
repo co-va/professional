@@ -33,7 +33,7 @@ import {
 import { financeDesktop, financeZActions, financeZSave, financeQSubmit, financeHistoryTable, financeTableContact, bindFinanceHistoryTable, openFinanceReceiptX, openFinanceDeleteConfirmation } from '../desktop.js';
 import { readOnlyReceipt } from '../../../ui/receipt/index.js';
 import { financeReceipt } from '../receipt.js';
-import { FINANCE_OPERATIONS_ICON } from '../../../ui/buttons/index.js';
+import { FINANCE_OPERATIONS_ICON, VIEW_ICON } from '../../../ui/buttons/index.js';
 import { walletHistoryRows, walletHistoryBody, bindWalletHistory, walletOperationClassification } from './wallet-history.js';
 import { isV2DesktopWorkspace } from '../../../ui/v2/geometry.js';
 import { bindDesktopRailControls } from '../../../ui/v2/horizontal-affordance.js';
@@ -448,7 +448,7 @@ function renderDesktopCashTools(root) {
   const groups = ['income-expense', 'transfer'];
   const operationsIcon = FINANCE_OPERATIONS_ICON;
   const tools = [
-    cashAppearanceTypeOptions().length ? button('Вид', { variant: 'secondary', data: 'data-cash-desktop-view title="Вид"', aria: 'Вид' }) : '',
+    cashAppearanceTypeOptions().length ? button(VIEW_ICON, { variant: 'secondary', className: 'v2-desktop-tool-icon', data: 'data-cash-desktop-view title="Вид"', aria: 'Вид' }) : '',
     financeOperationGroups({ groups }).length ? button(operationsIcon, { variant: 'secondary', className: 'v2-desktop-tool-icon', data: 'data-cash-desktop-operations title="Финансовые операции"', aria: 'Финансовые операции' }) : '',
     canCreateCashEntity() ? button('+', { variant: 'secondary', className: 'v2-desktop-tool-primary', data: 'data-cash-desktop-add aria-haspopup="dialog"', aria: 'Добавить' }) : '',
   ].filter(Boolean);
@@ -1461,12 +1461,16 @@ function renderWalletLayer(root, layer, walletId) {
     desktop ? walletHistoryBody() : operations.length
       ? v2ListEntries(history.map(row=>renderOperationRow(row.item,row.canonicalArticle?row:null)))
       : emptyState('Операций пока нет', 'Движения по этой кассе появятся здесь.'),
+    desktop && !wallet.system ? actionBlock(
+      button('Удалить', { variant: 'danger', data: 'data-wallet-settings data-ui-keyboard-action="auxiliary" title="Удалить кассу"', aria: 'Удалить кассу' }),
+      { className: 'v2-desktop-danger-footer' },
+    ) : '',
   ]);
   if (desktop) {
     bindWalletHistory(layer, wallet, history, {
       open: id => openWalletOperation(root, layer, wallet, id),
-      settings: wallet.system ? null : () => void openWalletSettings(root, layer, wallet),
     });
+    layer.querySelector('[data-wallet-settings]')?.addEventListener('click', () => void openWalletSettings(root, layer, wallet));
   } else {
     layer.querySelector('[data-wallet-settings]')?.addEventListener('click', () => void openWalletSettings(root, layer, wallet));
     layer.querySelectorAll('[data-wallet-operation]').forEach(element => {
