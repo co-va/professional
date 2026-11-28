@@ -28,7 +28,7 @@ export function paymentAllocationRemainder(total, rows = []) {
 export function nextPaymentAllocation(total, rows = []) {
   const selected = selectedPaymentRows(rows);
   const remainder = paymentAllocationRemainder(total, selected);
-  return { needed: !selected.length || (selected.every(row => numberValue(row.amount) > 0) && remainder > 0), suggested: selected.length ? remainder : null };
+  return { needed: !selected.length || (selected.every(row => numberValue(row.amount) > 0) && remainder > 0), suggested: remainder > 0 ? remainder : null };
 }
 
 
@@ -171,7 +171,7 @@ export function paymentMethodsMarkup({
   return `<div class="form-grid" data-payment-allocation-owner>
     ${showTotal ? `<div data-payment-remaining>${totalReceipt('К оплате', total)}</div>` : ''}
     <div class="form-grid" data-payment-allocation-rows>
-      ${Array.from({ length: rowCount }, (_, index) => allocationRow(index, wallets, deposits, personalAccount, initial[index] || {})).join('')}
+      ${Array.from({ length: rowCount }, (_, index) => allocationRow(index, wallets, deposits, personalAccount, initial[index] || { amount: total > 0 ? total : null })).join('')}
     </div>
     <div data-payment-tips-row hidden></div>
     ${showAction ? `<div class="modal-actions">${button('Сохранить', { data: 'data-payment-allocation-submit' })}</div>` : ''}

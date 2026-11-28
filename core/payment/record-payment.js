@@ -36,8 +36,7 @@ import { flushBusinessPersistence } from '../business-persistence.js';
 import { loadWalletCatalog } from '../runtime/auxiliary-state.js';
 import { getProfile } from '../profile/data.js';
 import { readOnlyReceipt } from '../../ui/receipt/index.js';
-import { supportsRecordPaymentCalendar, netRecordPrepayment, recordPaymentPresentation } from '../finance/prepayment-model.js';
-import { readFinanceState } from '../finance/data.js';
+import { supportsRecordPaymentCalendar, recordPaymentPresentation } from '../finance/prepayment-model.js';
 
 const money = (value) => `${new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(Number(value || 0)).replaceAll('\u00a0', ' ')} ₽`;
 const paymentInFlightRecords = new Set();
@@ -334,13 +333,12 @@ async function openPaymentEntry(record, onCompleted = () => {}) {
   const defaultDeposit = deposits.find((item) => String(item?.depositId || item?.id || '') === selectedDepositId)
     || (deposits.length === 1 ? deposits[0] : null);
   const defaultDepositAmount = Math.min(Math.max(0, total), Math.max(0, Number(defaultDeposit?.balance || 0)));
-  const initialDepositAllocations = defaultDeposit && defaultDepositAmount > 0.009
+  const initialDepositAllocations = !state.hasPayments && defaultDeposit && defaultDepositAmount > 0.009
     ? [{ depositId: String(defaultDeposit.depositId || defaultDeposit.id), amount: defaultDepositAmount }]
     : [];
-  const priorAdvance=netRecordPrepayment(readFinanceState().operations,[recordId]);
-  const presentation=recordPaymentPresentation(getRecord(recordId)||current,state,paymentWorkplaceTimeZone(current),new Date(),priorAdvance);
+  const presentation=recordPaymentPresentation(getRecord(recordId)||current,state,paymentWorkplaceTimeZone(current));
   host.innerHTML = `
-    ${readOnlyReceipt({ totals: [...(priorAdvance>0?[{label:'Предоплата',value:money(priorAdvance)}]:[]),{ label: presentation.outstandingLabel, value: money(total), strong: true }] })}
+    ${readOnlyReceipt({ totals: [{ label: presentation.outstandingLabel, value: money(total), strong: true }] })}
     ${paymentMethods({ wallets, deposits, personalAccount, total, showAction: false, showTotal: false, initialDepositAllocations })}
     ${actionBlock(button(prepayment?'Предоплата':gratuityOnly ? 'Завершить' : 'Оплата', { data: 'data-record-payment-entry-submit', disabled: !gratuityOnly }))}
     ${prepayment?'<div data-record-prepayment-limit hidden role="status"></div>':''}`;
