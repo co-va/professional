@@ -328,7 +328,7 @@ function openDepositSummaryS(root, deposit) {
   }));
 }
 
-async function openDepositHistoryEventS(root, item, { deposit = null, onSaved = () => {} } = {}) {
+async function openDepositHistoryEvent(root, item, { deposit = null, onSaved = () => {} } = {}) {
   const operation = await resolveHistoryOperation(item);
   const funding = deposit && item?.kind === 'deposit-funding' && String(item?.operationId || '');
   const allowDelete = funding && fundingEntries(deposit).length > 1;
@@ -337,7 +337,7 @@ async function openDepositHistoryEventS(root, item, { deposit = null, onSaved = 
     ...(allowDelete ? [button('Удалить платёж', { variant: 'danger', data: 'data-deposit-history-delete' })] : []),
   ].join('')) : '';
   const layer = mountModal(root, modal(historyEventMarkup(item, operation) + actions, {
-    variant: 's',
+    variant: funding ? 'x' : 's',
     surface: 'app',
     title: historyKindLabel(item?.kind),
   }));
@@ -377,7 +377,7 @@ function bindDepositHistory(root, items, options = {}) {
   root.querySelectorAll('[data-deposit-history-entry]').forEach((node) => {
     node.addEventListener('click', () => {
       const item = items[Number(node.dataset.depositHistoryEntry)];
-      if (item) void openDepositHistoryEventS(root, item, options);
+      if (item) void openDepositHistoryEvent(root, item, options);
     });
   });
 }
