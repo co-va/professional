@@ -14,7 +14,7 @@ import {
   textareaField,
   workspaceHeaderContext,
 } from '../../../ui/ui.js';
-import { financeQSubmit, financeZSave } from '../desktop.js';
+import { financeDesktop, financeQSubmit, financeZSave } from '../desktop.js';
 import { canUseCapability } from '../../access.js';
 import { desktopAvailableArticles } from './classification.js';
 import { availableArticleDirectory } from './article-view.js';
@@ -55,8 +55,8 @@ function manualLineOptions(direction) {
     .map((value) => ({ value, label: value }));
 }
 
-function detailRow(values = {}, direction = 'IN', articleId = null) {
-  return `<div class="array-row" data-finance-manual-line>
+function detailRow(values = {}, direction = 'IN', articleId = null, desktop = false) {
+  return `<div class="${desktop ? 'form-grid' : 'array-row'}" data-finance-manual-line${desktop ? ' data-manual-line-desktop' : ''}>
     ${searchableSelect({
       label: 'Позиция',
       name: 'lineName',
@@ -81,19 +81,19 @@ function detailRow(values = {}, direction = 'IN', articleId = null) {
       placeholder: '0',
       data: 'min="0" step="0.01"',
     })}
-    <button type="button" class="remove-button" data-finance-manual-line-remove aria-label="Удалить строку">×</button>
+    ${desktop ? compactButton({kind:'remove',data:'data-finance-manual-line-remove title="Удалить позицию"',aria:'Удалить позицию'}) : '<button type="button" class="remove-button" data-finance-manual-line-remove aria-label="Удалить строку">×</button>'}
   </div>`;
 }
 
-function modeMarkup(mode, { amount = '', lines = [], direction = 'IN', articleId = null } = {}) {
+function modeMarkup(mode, { amount = '', lines = [], direction = 'IN', articleId = null, desktop = false } = {}) {
   if (mode === 'detail') {
     const rows = (Array.isArray(lines) && lines.length ? lines : [{}])
-      .map((item) => detailRow(item, direction,articleId))
+      .map((item) => detailRow(item, direction,articleId,desktop))
       .join('');
-    return `<div class="array-group" data-finance-manual-detail>
-      <span class="array-label">Позиции</span>
+    return `<div class="array-group" data-finance-manual-detail${desktop ? ' data-manual-detail-desktop' : ''}>
+      ${desktop ? '<div class="array-group__header"><span class="array-label">Позиции</span>'+compactButton({kind:'add',data:'data-finance-manual-line-add title="Добавить позицию"',aria:'Добавить позицию'})+'</div>' : '<span class="array-label">Позиции</span>'}
       <div data-finance-manual-lines>${rows}</div>
-      ${button('+ Добавить позицию', { type: 'button', variant: 'secondary', data: 'data-finance-manual-line-add' })}
+      ${desktop ? '' : button('+ Добавить позицию', { type: 'button', variant: 'secondary', data: 'data-finance-manual-line-add' })}
     </div>`;
   }
   return '';
@@ -216,7 +216,7 @@ function manualOperationTitle(direction, operation) {
 
 export function openIncomeExpenseQ(root, direction, { onSaved = null, operation = null } = {}) {
   const layer = mountModal(root, modal('', {
-    title: manualOperationTitle(direction, operation), variant: 'q', surface: 'app',
+    title: manualOperationTitle(direction, operation), variant: 'q', surface: 'app', className: 'finance-manual-q',
   }));
   if (!layer) return null;
   const rendered = renderIncomeExpenseOperation(layer, direction, {
@@ -262,6 +262,7 @@ export function renderIncomeExpenseOperation(root, direction, { onSaved = null, 
   const canSplit=newContract&&(!operation||group.length>0);
 
   const qBody = root.querySelector('[data-v2-q-body]');
+  const desktop = financeDesktop(root);
   const title = manualOperationTitle(direction, operation);
   (qBody || root).innerHTML = `${qBody ? '' : workspaceHeaderContext({ title })}
     <form class="compact-form" data-finance-manual-form novalidate>
@@ -269,7 +270,7 @@ export function renderIncomeExpenseOperation(root, direction, { onSaved = null, 
       <div data-finance-manual-value${articles.find(a=>a.value===articleId)?.values.length?'':' hidden'}>${valueMarkup(articles,articleId,prior.valueId)}</div>
       ${select({ label: 'Ввод', name: 'entryMode', value: mode, options: [{ value: 'simple', label: 'Сумма' }, { value: 'detail', label: 'Детально' }] })}
       ${datePicker({ label: 'Фактическая дата', name: 'occurredDate', value: financeLocalDateValue(operation?.occurredAt || new Date()), required: true, allowClear: false })}
-      <div data-finance-manual-mode${mode==='simple'?' hidden':''}>${modeMarkup(mode, { lines, direction })}</div>
+      <div data-finance-manual-mode${mode==='simple'?' hidden':''}>${modeMarkup(mode, { lines, direction, desktop })}</div>
       <div data-manual-wallet-editor>${walletEditorMarkup(mode,simpleAmount,walletId,initialWalletRows,wallets,canSplit)}</div>
       ${textareaField({ label: 'Примечание', name: 'note', value: existing.note || '', rows: 3, placeholder: 'Необязательно' })}
       ${qBody ? button('Сохранить', { type: 'submit', data: 'data-finance-manual-save', aria: isIncome ? 'Сохранить доход' : 'Сохранить расход' }) : ''}
@@ -297,6 +298,10 @@ export function renderIncomeExpenseOperation(root, direction, { onSaved = null, 
   };
   const syncWalletRemainder=(fill=false)=>{
     syncTotal(root);
+    if(desktop){
+      const lines=root.querySelectorAll('[data-finance-manual-line]');
+      lines.forEach(row=>{const remove=row.querySelector('[data-finance-manual-line-remove]');if(remove)remove.disabled=lines.length<=1;});
+    }
     const rows=readWalletRows(root),out=root.querySelector('[data-manual-wallet-remainder]');
     if(!out)return;
     if(fill&&rows.length>1){
@@ -321,7 +326,7 @@ export function renderIncomeExpenseOperation(root, direction, { onSaved = null, 
       else savedAmount=rows.length===1?rows[0].amount:manualWalletTotal(rows);
       activeMode=next;
       const modeHost=root.querySelector('[data-finance-manual-mode]');
-      modeHost.innerHTML=modeMarkup(next,{lines:savedLines,direction});modeHost.hidden=next==='simple';
+      modeHost.innerHTML=modeMarkup(next,{lines:savedLines,direction,desktop});modeHost.hidden=next==='simple';
       if(next==='simple'&&rows.length===1)rows[0].amount=savedAmount||rows[0].amount;
       renderWalletDraft(rows);
       syncWalletRemainder(true);
@@ -347,7 +352,7 @@ export function renderIncomeExpenseOperation(root, direction, { onSaved = null, 
       syncWalletRemainder(true);return;
     }
     if (event.target.closest?.('[data-finance-manual-line-add]')) {
-      root.querySelector('[data-finance-manual-lines]')?.insertAdjacentHTML('beforeend', detailRow({}, direction));
+      root.querySelector('[data-finance-manual-lines]')?.insertAdjacentHTML('beforeend', detailRow({}, direction, null, desktop));
       syncWalletRemainder(true);
       return;
     }
