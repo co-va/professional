@@ -2,9 +2,10 @@ import { downloadBlob } from '../excel/scoped.js';
 import { desktopExcelActionLabel } from '../../ui/buttons/index.js';
 import {
   button, modal, mountModal, openNotice, selectFile,
-  segmentControl, initSegmentControls,
+  segmentControl, initSegmentControls, select,
 } from '../../ui/ui.js';
 import { apiRequest } from '../auth.js';
+import { isV2DesktopWorkspace } from '../../ui/v2/geometry.js';
 import { getPersonPriceCondition } from './data.js';
 import { openContactImportUpload, openContactImportBatches } from './contact-import-review.js';
 
@@ -89,17 +90,20 @@ function getCsv(rows) {
 }
 
 function openPeopleExport(root, getRows) {
+  const desktop = isV2DesktopWorkspace(root.closest('[data-v2-app]'));
   const content = '<form class="form-grid" data-people-excel-export-form>'
-    + segmentControl([
+    + (desktop ? select({ name: 'format', value: 'xlsx', aria: 'Формат выгрузки', options: [
       {value: 'xlsx', label: 'Excel'}, {value: 'csv', label: 'CSV'},
-    ], {value:'xlsx', name:'format', aria:'Формат выгрузки'})
+    ] }) : segmentControl([
+      {value: 'xlsx', label: 'Excel'}, {value: 'csv', label: 'CSV'},
+    ], {value:'xlsx', name:'format', aria:'Формат выгрузки'}))
     + button('Выгрузить', {type:'submit'})
     + '</form>';
   const layer = mountModal(root, modal(content, {
     title: 'Выгрузка', variant: 'x', surface: 'app', xRole: 'action',
   }));
   if (!layer) return null;
-  initSegmentControls(layer);
+  if (!desktop) initSegmentControls(layer);
   const form = layer.querySelector('[data-people-excel-export-form]');
   let running = false;
   form?.addEventListener('submit', async event => {
@@ -130,6 +134,36 @@ function openPeopleExport(root, getRows) {
   return layer;
 }
 
+function confirmPeopleTemplate(root) {
+  const layer = mountModal(root, modal('<div class="modal-title"><h2>Скачать шаблон?</h2></div>'
+    + '<div class="modal-actions">'
+    + button('Скачать', { data: 'data-template-download' })
+    + button('Отмена', { variant: 'secondary', data: 'data-template-cancel' })
+    + '</div>', { title: 'Скачать шаблон', variant: 'x', surface: 'app' }));
+  if (!layer) return null;
+  let running = false;
+  const download = layer.querySelector('[data-template-download]');
+  const cancel = layer.querySelector('[data-template-cancel]');
+  cancel?.addEventListener('click', () => { if (!running) layer.v2Close?.(); });
+  download?.addEventListener('click', async () => {
+    if (running) return;
+    running = true;
+    download.disabled = true;
+    if (cancel) cancel.disabled = true;
+    try {
+      await getWorkbook([], true);
+      layer.v2Close?.();
+    } catch (error) {
+      notice(error);
+    } finally {
+      running = false;
+      if (download.isConnected) download.disabled = false;
+      if (cancel?.isConnected) cancel.disabled = false;
+    }
+  });
+  return layer;
+}
+
 async function chooseAndLoad(root, onLoaded) {
   // Must start directly inside the iOS click gesture.
   const file = await selectFile({
@@ -143,12 +177,12 @@ async function chooseAndLoad(root, onLoaded) {
 }
 
 export function openPeopleExcelMenu(root, { getRows = () => [], onLoaded = () => {}, anchor = null } = {}) {
+  const desktopMenu = Boolean(anchor?.matches?.('[data-people-desktop-excel]'));
   const actions = [
     { id: 'export', label: 'Выгрузка', run: () => openPeopleExport(root, getRows) },
     { id: 'import', label: 'Загрузка', run: () => chooseAndLoad(root, onLoaded) },
-    { id: 'template', label: 'Шаблон', run: () => getWorkbook([], true) },
+    { id: 'template', label: 'Шаблон', run: () => desktopMenu ? confirmPeopleTemplate(root) : getWorkbook([], true) },
   ];
-  const desktopMenu = Boolean(anchor?.matches?.('[data-people-desktop-excel]'));
   if (desktopMenu) actions.push({id:'history',label:'История загрузок',run:()=>openContactImportBatches(root,{onLoaded})});
 
   const markup = '<div class="' + (desktopMenu ? 'people-action-menu' : 'modal-actions') + '">'
