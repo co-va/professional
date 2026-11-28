@@ -1,5 +1,32 @@
 import { escapeHtml } from '../utils/escape-html.js';
 
+// Desktop Excel entry uses the same symbol in every business module.
+export const DATA_EXCHANGE_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3v18m-4-4 4 4 4-4M17 21V3m-4 4 4-4 4 4"/></svg>';
+
+// Existing Excel export symbol shared by the export menu and direct export.
+export const DATA_EXPORT_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V3m-5 5 5-5 5 5M4 16v4h16v-4"/></svg>';
+
+// Canonical Desktop Excel action labels, taken unchanged from Contacts.
+const DESKTOP_EXCEL_ACTION_LABELS = {
+  history: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9h8M8 13h8M8 17h5"/></svg><span>История загрузок</span>',
+  export: DATA_EXPORT_ICON + '<span>Выгрузить</span>',
+  import: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v13m-5-5 5 5 5-5M4 16v4h16v-4"/></svg><span>Загрузить</span>',
+  template: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H5v18h14V8l-5-5Zm0 0v5h5M8 12h8m-8 4h8m-4-4v4"/></svg><span>Скачать шаблон</span>',
+};
+export function desktopExcelActionLabel(key, fallback = '') {
+  return DESKTOP_EXCEL_ACTION_LABELS[key] || escapeHtml(fallback);
+}
+
+// Financial operations (income/expense), identical in Cash and DDS.
+export const FINANCE_OPERATIONS_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 5.5v13M1 12h11M16 12h7"/></svg>';
+
+// Shared desktop toolbar symbols; retain the existing button geometry.
+export const VIEW_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>';
+export const GROUP_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h8l10 10-7 7L3 10V4Z"/><circle cx="7.5" cy="8.5" r="1"/></svg>';
+
+// Full-size destructive tool icon; keep Compact remove (×) unchanged.
+export const TRASH_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></svg>';
+
 const BUTTON_VARIANTS = {
   primary: '',
   'delete-outline': 'ui-button--delete-outline',
@@ -27,7 +54,7 @@ export function compactButton({ kind = 'add', symbol = '', className = '', data 
     : variant === 'copy' ? copyIcon
     : variant === 'filter' ? '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h18l-7 8v6l-4 2v-8z"/></svg>'
     : variant === 'sort' ? '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4v16m-3-3 3 3 3-3M10 5h11M10 10h8M10 15h5"/></svg>'
-    : variant === 'group' ? '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h8l10 10-7 7L3 10V4Z"/><circle cx="7.5" cy="8.5" r="1"/></svg>'
+    : variant === 'group' ? GROUP_ICON
     : variant === 'document' ? '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M8 13h8M8 17h8"/></svg>'
     : variant === 'payment' ? '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="2"/><path d="M3 9h18M6 15h5"/></svg>'
     : variant === 'history' ? '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 1 2.6 6.4M3 12V5m0 7h7M12 7v5l3 2"/></svg>'

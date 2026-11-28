@@ -55,6 +55,7 @@ import {
   text,
   uid,
 } from '../shared.js';
+import { renderDesktopProgramSection, loyaltyAppearanceOptions } from '../shared.js';
 
 const fallbackPeople = [];
 
@@ -222,7 +223,7 @@ function expiryFromProgram(program = {}, issuedDate = '') {
   return date.toISOString().slice(0, 10);
 }
 
-async function openCreateProgramQ(root, rerender, editingProgram = null) {
+export async function openCreateProgramQ(root, rerender, editingProgram = null) {
   const editing = Boolean(editingProgram?.id);
   const title = editing ? 'Корректировать сертификат' : 'Новый сертификат';
   const selectedIds = Array.isArray(editingProgram?.serviceIds) ? editingProgram.serviceIds : [];
@@ -469,6 +470,7 @@ function personCertificateCard({ instance, program }) {
     metaLeft: instance?.expiresAt || program?.term || 'Бессрочно',
     metaRight: program?.type === 'amount' ? money(instance?.balance) : (instance?.status === 'used' ? 'Использован' : 'Активен'),
   }), {
+    programId: program?.id,
     data: `data-person-program="certificate:${escapeHtml(instance?.id || '')}"`,
     aria: `Открыть сертификат ${program?.name || ''}`,
   });
@@ -504,23 +506,34 @@ export function getPersonLoyaltyCards(person = {}) {
     }),
   };
 }
+const programAppearanceFields = program => programCardFields(program || programs[0] || { name: 'Сертификат', type: 'amount', amount: 10000, term: '12 мес.', status: 'active' });
+
+export function programAppearanceOptions(onSaved = () => {}) {
+  return loyaltyAppearanceOptions({ type: 'certificate', fields: programAppearanceFields, programs: () => programs, onSaved });
+}
+
 export async function renderCertificate(root) {
   const render = async () => {
-    const cards = programs.length ? entityCardStack(programs.map((program) => loyaltyVisualCard('certificate', programCardFields(program), {
+    const items = programs.map((program) => loyaltyVisualCard('certificate', programCardFields(program), { programId: program.id,
       data: `data-certificate-program="${program.id}"`,
       aria: `Открыть ${program.name}`,
-    }))) : emptyState('Сертификатов пока нет', 'Создайте первый вид сертификата кнопкой «+».');
-
-    root.innerHTML = page([
+    }));
+    const empty = emptyState('Сертификатов пока нет', 'Создайте первый вид сертификата кнопкой «+».');
+    if (root.hasAttribute('data-loyalty-program-section')) {
+      renderDesktopProgramSection(root, items, empty);
+    } else {
+      const cards = items.length ? entityCardStack(items) : empty;
+      root.innerHTML = page([
       loyaltyHeader('Сертификат', {
         settings: true,
         c: { label: '+', data: 'data-certificate-create', aria: 'Создать вид сертификата' },
       }),
       cards,
     ]);
+    }
     bindViewSettings(root, 'Сертификат', {
       type: 'certificate',
-      fields: () => programCardFields(programs[0] || { name: 'Сертификат', type: 'amount', amount: 10000, term: '12 мес.', status: 'active' }),
+      fields: programAppearanceFields,
       onSaved: render,
     });
     root.querySelector('[data-certificate-create]')?.addEventListener('click', () => openCreateProgramQ(root, render));

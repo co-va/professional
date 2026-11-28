@@ -1,0 +1,528 @@
+{
+  "version": 1,
+  "cutoff": "44c08cc944019cefaea90abaa058984eb53749bd",
+  "note": "Exact historical metadata repair for the 58 invalid records reported by Professional Release job 140829846761. Original claims, immutable commit SHAs and strict final-version verification remain. No new or unknown history is admitted.",
+  "entries": [
+    {
+      "sha": "3149d51aba30e1ea66ea3dc9e1cf33675884c9e1",
+      "original": "Operational-Evidence: {\"kind\":\"candidate\",\"files\":[\"core/finance/cash/cash.js\",\"scripts/verify-preview-browser.mjs\",\"PROJECT_STATE.md\"],\"criteria\":[\"start.finance\",\"platform\"],\"result\":\"Desktop Касса: два H значка вместо V, сохранены права и Mobile.\",\"remaining\":\"Live smoke и визуальная приёмка.\",\"checks\":[\"Парсинг модуля, изолированные Desktop/Mobile контексты и два графических действия с обработчиками.\"]}",
+      "to": [
+        "finance.prof",
+        "finance.cash",
+        "platform"
+      ]
+    },
+    {
+      "sha": "7142232c5bf5cdd5873ed721e0b06e6c10aeb5bb",
+      "original": "Operational-Evidence: {\"kind\":\"candidate\",\"files\":[\"core/finance/cash/cash.js\",\"scripts/verify-preview-browser.mjs\",\"PROJECT_STATE.md\"],\"criteria\":[\"start.finance\",\"platform\"],\"result\":\"Стандартный текстовый Вид, финансовые операции — банкнота +/− без стрелок.\",\"remaining\":\"Live smoke и визуальная приёмка.\",\"checks\":[\"Парсинг модуля и изолированная проверка разметки, обработчиков и Mobile контекста.\"]}",
+      "to": [
+        "finance.prof",
+        "finance.cash",
+        "platform"
+      ]
+    },
+    {
+      "sha": "d39bca919a0ed8ddc765577e7dfeca5ea7291dfe",
+      "original": "Operational-Evidence: {\"kind\":\"candidate\",\"files\":[\"core/finance/cash/cash.js\",\"scripts/verify-preview-browser.mjs\",\"PROJECT_STATE.md\"],\"criteria\":[\"start.finance\",\"platform\"],\"result\":\"Три Desktop ряда Кассы используют общий bindDesktopRailControls, Mobile сохранён.\",\"remaining\":\"Live smoke и визуальная приёмка.\",\"checks\":[\"Парсинг модуля; изолированный контракт ряда; три подключения общего механизма.\"]}",
+      "to": [
+        "finance.prof",
+        "finance.cash",
+        "platform"
+      ]
+    },
+    {
+      "sha": "96153678f9cd10fde56a82d474f69e9ad8a66fd6",
+      "original": "Operational-Evidence: {\"kind\":\"candidate\",\"files\":[\"core/finance/cash/cash.js\",\"scripts/verify-preview-browser.mjs\",\"PROJECT_STATE.md\"],\"criteria\":[\"start.finance\",\"platform\"],\"result\":\"Desktop C заменён штатным H +, Mobile и операции сохранены.\",\"remaining\":\"Live smoke и визуальная приёмка.\",\"checks\":[\"Парсинг модуля; изолированные контексты и разметка; вызов существующего меню.\"]}",
+      "to": [
+        "finance.prof",
+        "finance.cash",
+        "platform"
+      ]
+    },
+    {
+      "sha": "94dad56e7df91b721bde2c1af2ffcbe5281a3bda",
+      "original": "Operational-Evidence: {\"kind\":\"candidate\",\"files\":[\"core/finance/cash/cash.js\",\"scripts/verify-preview-browser.mjs\",\"PROJECT_STATE.md\"],\"criteria\":[\"start.finance\",\"platform\"],\"result\":\"Desktop + opens shared anchored X picker; Mobile unchanged.\",\"remaining\":\"Live smoke and visual acceptance.\",\"checks\":[\"Module parsing; isolated desktop/mobile picker contracts.\"]}",
+      "to": [
+        "finance.prof",
+        "finance.cash",
+        "platform"
+      ]
+    },
+    {
+      "sha": "c9fcea70be1b1a2354c3e1b9841c3a1985fa4e9e",
+      "original": "Operational-Evidence: {\"kind\":\"candidate\",\"files\":[\"core/finance/cash/cash.js\",\"core/finance/dds/index.js\",\"core/finance/dds/articles.js\",\"core/finance/dds/income-expense.js\",\"core/finance/dds/special-operations.js\",\"core/finance/dds/excel.js\",\"core/finance/operations/index.js\",\"core/finance/z-report/index.js\",\"core/finance/desktop.js\",\"PROJECT_STATE.md\"],\"criteria\":[\"start.finance\",\"shared.modal\",\"platform\"],\"result\":\"Касса, ДДС, Z-отчёт и формы: существующие H/Z/Q/X механизмы без изменения финансовых обработчиков.\",\"remaining\":\"Live smoke, табличная компоновка, визуальная приёмка, полнота ДДС лояльности.\",\"checks\":[\"Синтаксический разбор изменённых модулей.\"]}",
+      "to": [
+        "finance.prof",
+        "finance.cash",
+        "platform"
+      ]
+    },
+    {
+      "sha": "c5168f862e083c7596dfc1a0e174cb6ecb212463",
+      "original": "Operational-Evidence: {\"kind\":\"candidate\",\"files\":[\"core/finance/desktop.js\",\"core/finance/cash/cash.js\",\"core/finance/dds/index.js\",\"PROJECT_STATE.md\"],\"criteria\":[\"start.finance\",\"shared.modal\",\"shared.list\"],\"result\":\"Desktop finance tables and Q receipt route; Mobile retained.\",\"remaining\":\"Live smoke, viewport geometry, real action acceptance.\",\"checks\":[\"Syntax parse of modified modules.\"]}",
+      "to": [
+        "finance.prof",
+        "finance.cash",
+        "platform"
+      ]
+    },
+    {
+      "sha": "f87a82cb6e6339a7230405df0ef2d21373708daf",
+      "original": "Operational-Evidence: {\"kind\":\"candidate\",\"files\":[\"core/finance/cash/cash.js\",\"core/finance/dds/index.js\",\"core/finance/desktop.js\",\"PROJECT_STATE.md\"],\"criteria\":[\"start.finance\",\"shared.modal\"],\"result\":\"Касса Z1→Z2→Q; ДДС Z1→Q в обеих версиях.\",\"remaining\":\"Live preview and device acceptance; no financial mutations tested.\",\"checks\":[\"Syntax and isolated direct Q routing.\"]}",
+      "to": [
+        "finance.prof",
+        "finance.cash",
+        "platform"
+      ]
+    },
+    {
+      "sha": "41f58f543e66251229785762f81596799a7dd2bf",
+      "original": "Operational-Evidence: {\"kind\":\"candidate\",\"files\":[\"core/finance/cash/cash.js\",\"core/finance/dds/index.js\",\"core/finance/desktop.js\",\"core/finance/receipt.js\",\"PROJECT_STATE.md\"],\"criteria\":[\"start.finance\",\"shared.modal\"],\"result\":\"Shared financial receipt; Mobile X, Desktop Q; historical service and allocation breakdown.\",\"remaining\":\"Live preview and actual account document verification.\",\"checks\":[\"Syntax; synthetic split-payment receipt; isolated modal routing.\"]}",
+      "to": [
+        "finance.prof",
+        "finance.cash",
+        "platform"
+      ]
+    },
+    {
+      "sha": "6b8710a460f6c16720c8162a0b2aeffc08b15ff2",
+      "original": "Operational-Evidence: {\"kind\":\"candidate\",\"files\":[\"core/finance/desktop.js\",\"core/finance/cash/cash.js\",\"core/finance/dds/index.js\",\"PROJECT_STATE.md\"],\"criteria\":[\"start.finance\",\"shared.modal\"],\"result\":\"Касса и ДДС: единый X документа, действия снизу, Mobile/Desktop.\",\"remaining\":\"Live preview and device acceptance.\",\"checks\":[\"Syntax; isolated X markup and three action callbacks.\"]}",
+      "to": [
+        "finance.prof",
+        "finance.cash",
+        "platform"
+      ]
+    },
+    {
+      "sha": "6d8f60ac07d06ad00ebe6c19b9a8dc419c50fb91",
+      "original": "Operational-Evidence: {\"kind\":\"candidate\",\"files\":[\"core/finance/desktop.js\",\"core/finance/cash/cash.js\",\"core/finance/dds/index.js\",\"PROJECT_STATE.md\"],\"criteria\":[\"start.finance\",\"shared.list\"],\"result\":\"Дата/время и имя/контакт в двух строках, рабочее пространство в двух строках заголовка.\",\"remaining\":\"Device visual acceptance.\",\"checks\":[\"Syntax; isolated two-line markup and stable contact identity matching.\"]}",
+      "to": [
+        "finance.prof",
+        "finance.cash",
+        "platform"
+      ]
+    },
+    {
+      "sha": "b9a7715eb49e79023508c5b8711535363c5e3a49",
+      "original": "Operational-Evidence: {\"kind\":\"candidate\",\"files\":[\"core/finance/receipt.js\",\"core/finance/desktop.js\",\"ui/receipt/receipt.css\",\"PROJECT_STATE.md\"],\"criteria\":[\"start.finance\",\"shared.modal\",\"shared.button\"],\"result\":\"Локальный итог кошелька вместо повторов, Desktop X компактные действия.\",\"remaining\":\"Device visual acceptance.\",\"checks\":[\"Isolated split payment receipt and X action callbacks.\"]}",
+      "to": [
+        "finance.prof",
+        "finance.cash",
+        "platform"
+      ]
+    },
+    {
+      "sha": "a1fb00e161a1995b2f64e48f4fda2f87c6f48a10",
+      "original": "Operational-Evidence: {\"kind\":\"candidate\",\"files\":[\"core/finance/desktop.js\",\"core/finance/cash/cash.js\",\"core/finance/dds/index.js\",\"ui/v2/v2.css\",\"ui/receipt/receipt.css\",\"PROJECT_STATE.md\"],\"criteria\":[\"start.finance\",\"shared.modal\",\"shared.button\"],\"result\":\"Касса: X чека с одной кнопкой Удалить и отдельным подтверждением; H-цвет общей Отмены; отступы; ДДС краткая подпись.\",\"remaining\":\"Live preview, device acceptance and real financial mutations.\",\"checks\":[\"Isolated confirmation handlers: open/cancel/confirm/failure; static assertions for labels, palette and spacing.\"]}",
+      "to": [
+        "finance.prof",
+        "finance.cash",
+        "platform"
+      ]
+    },
+    {
+      "sha": "b6e1bd589552561906cf6134288abef5ef53db36",
+      "original": "Operational-Evidence: {\"kind\":\"candidate\",\"files\":[\"core/finance/cash/cash.js\",\"PROJECT_STATE.md\"],\"criteria\":[\"start.finance\"],\"result\":\"Простые предупреждения отмены оплаты и операций Кассы; кнопки и обработчики без изменений.\",\"remaining\":\"Визуальная приёмка и развёртывание.\",\"checks\":[\"Сверка Core/main cancelOperation; точечная замена двух текстов; проверка отсутствия прежних терминов.\"]}",
+      "to": [
+        "finance.prof",
+        "finance.cash"
+      ]
+    },
+    {
+      "sha": "5cf627b9bce27bc01b46431573ba00afb7af3442",
+      "original": "Operational-Evidence: {\"kind\":\"candidate\",\"files\":[\"core/finance/cash/cash.js\",\"core/finance/cash/wallet-history.js\",\"PROJECT_STATE.md\"],\"criteria\":[\"start.finance\",\"shared.list\"],\"result\":\"Desktop таблица кошелька: H поиск, фильтр, сортировка, выбор, компактные суммы и выгрузка выбранных/видимых движений.\",\"remaining\":\"Живой браузер, геометрия на iPad/PC, фактическое скачивание XLSX через Core.\",\"checks\":[\"Multi-column search; Phone search; Date search; Historical service search; Combined workplace/date filters; Expense filter; Numeric sorting; Date sorting; Count and signed amount selection; Export selected visible rows only; No selection exports visible rows; Split payment wallet only; signed movement encoded once; No oversized title counters; Checkbox cell does not open receipt; Mobile retains original list\"]}",
+      "to": [
+        "finance.prof",
+        "finance.cash",
+        "platform"
+      ]
+    },
+    {
+      "sha": "da3850ac7478d02c6f754445f38bf452de93fe25",
+      "original": "Operational-Evidence: {\"kind\":\"candidate\",\"files\":[\"core/finance/cash/wallet-history.js\",\"core/people/excel.js\",\"ui/buttons/index.js\",\"core/finance/cash/cash.js\",\"PROJECT_STATE.md\"],\"criteria\":[\"start.finance\",\"shared.button\",\"contacts.prof\"],\"result\":\"Только два числовых счётчика; точная пиктограмма выгрузки Клиентов, без дублирующего остатка и видимых подписей.\",\"remaining\":\"Live preview / визуальная приёмка.\",\"checks\":[\"Visible labels and duplicate balance removed\",\"No duplicate balance or text export button\",\"Exact existing Clients export SVG, same 36px button class, Clients menu visually unchanged\",\"Counter formatting, fractions, font wrappers and calculation unchanged\",\"Export handler unchanged\",\"Only two regular-size counter outputs\"]}",
+      "to": [
+        "finance.prof",
+        "finance.cash",
+        "platform",
+        "contacts.prof",
+        "integration.transfer"
+      ]
+    },
+    {
+      "sha": "123e7ebc93119b43c847ddd642abf7d74528ea3d",
+      "original": "Operational-Evidence: {\"kind\":\"candidate\",\"files\":[\"core/finance/cash/wallet-history.js\",\"ui/v2/v2.css\",\"PROJECT_STATE.md\"],\"criteria\":[\"start.finance\",\"shared.modal\",\"shared.button\"],\"result\":\"X подтверждения выгрузки с количеством и суммой, только явное подтверждение вызывает прежний Excel API; таблица принята владельцем.\",\"remaining\":\"Визуальная приёмка и реальное скачивание после X.\",\"checks\":[\"X modal\",\"Opening does not export; exact count and amount\",\"Cancel closes without export\",\"X modal\",\"Confirmed export exact payload\",\"X modal\",\"Failure preserves confirmation for retry\",\"Shared compact horizontal confirmation geometry\",\"No immediate export\"]}",
+      "to": [
+        "finance.prof",
+        "finance.cash",
+        "platform"
+      ]
+    },
+    {
+      "sha": "9454a64a4ef01edcf9d3c5a14ee0ea92b3e72944",
+      "original": "Operational-Evidence: {\"kind\":\"candidate\",\"files\":[\"core/finance/cash/wallet-history.js\",\"ui/v2/v2.css\",\"PROJECT_STATE.md\"],\"criteria\":[\"start.finance\",\"shared.modal\",\"shared.button\"],\"result\":\"X выгрузки: вторичная Отмена слева, первичная Выгрузить справа, H-палитра. Удаление и обработчики неизменны.\",\"remaining\":\"Визуальная приёмка.\",\"checks\":[\"DOM order and primary/secondary variants\",\"H colors, outline cancel\",\"Desktop cancel left, export right\",\"Existing shared dimensions and spacing\",\"Existing handlers unchanged\",\"Deletion confirmation color/order unchanged\"]}",
+      "to": [
+        "finance.prof",
+        "finance.cash",
+        "platform"
+      ]
+    },
+    {
+      "sha": "b56cbfd726c374329f4478636a6ae49fe1ce7202",
+      "original": "Operational-Evidence: {\"kind\":\"candidate\",\"files\":[\"core/finance/cash/cash.js\",\"ui/v2/v2.css\",\"PROJECT_STATE.md\"],\"criteria\":[\"start.finance\",\"shared.modal\"],\"result\":\"Общий остаток всех кошельков в H заголовке Кассы, типографика Клиентов, обновление после отмены.\",\"remaining\":\"Визуальная приёмка и проверка прав аккаунта для займов/инвестиций.\",\"checks\":[\"Canonical total: positive, zero/negative net amounts across wallets\",\"Empty wallet list returns zero\",\"Desktop heading total uses existing balance source and rights gate\",\"Same title counter typography as Clients\",\"After confirmed wallet cancellation refresh main cash cards and total\"]}",
+      "to": [
+        "finance.prof",
+        "finance.cash",
+        "platform"
+      ]
+    },
+    {
+      "sha": "0c7b7c988aacd6c80e164aa4c7879abf1c699747",
+      "original": "Operational-Evidence: {\"kind\":\"candidate\",\"files\":[\"core/finance/dds/income-expense.js\",\"core/finance/operations/index.js\",\"core/finance/dds/index.js\",\"PROJECT_STATE.md\"],\"criteria\":[\"start.finance\",\"shared.modal\"],\"result\":\"Desktop ручной доход/расход и их корректировка в Q; штатная Q-кнопка Сохранить; бизнес-логика и Mobile сохранены.\",\"remaining\":\"Визуальная приёмка и реальное сохранение.\",\"checks\":[\"Financial payload, validation and API unchanged\",\"Existing Q frame preserved; Save moves through shared Q toolbar\",\"All original form fields retained\",\"Desktop manual income/expense routes directly to Q\",\"Existing Mobile Z path retained\",\"Desktop manual correction Q; other corrections unchanged\",\"Opening Q does not save\",\"Successful save closes Q and refreshes owner\",\"Correction uses same Q\",\"Unavailable form closes Q\"]}",
+      "to": [
+        "finance.prof",
+        "finance.cash",
+        "platform"
+      ]
+    },
+    {
+      "sha": "d87e75f7510937e4d40d1fe7191def3d4aaa01e8",
+      "original": "Operational-Evidence: {\"kind\":\"candidate\",\"files\":[\"core/finance/dds/index.js\",\"core/finance/cash/cash.js\",\"ui/buttons/index.js\",\"PROJECT_STATE.md\"],\"criteria\":[\"start.finance\",\"shared.button\"],\"result\":\"Desktop DDS H: общий вход финансовых операций, существующий X и Q с правами и обновлением.\",\"remaining\":\"Визуальная приёмка и реальная запись из ДДС.\",\"checks\":[\"Same accepted banknote +/- icon and H button in Cash and DDS\",\"Same capability-filtered operation menu as Cash\",\"Existing operation picker; refresh DDS after save\",\"Existing Mobile, Excel and Articles unaffected\",\"Both entries use same Desktop Q\"]}",
+      "to": [
+        "finance.prof",
+        "finance.cash",
+        "platform"
+      ]
+    },
+    {
+      "sha": "87d3ef25a5500c28278cbe6c6df31d05be376794",
+      "original": "Operational-Evidence: {\"kind\":\"candidate\",\"files\":[\"core/finance/dds/index.js\",\"core/finance/desktop.js\",\"ui/v2/v2.css\"],\"criteria\":[\"start.finance\",\"shared.list\"],\"result\":\"Desktop DDS: operation/wallet two-line cell, standalone wrapping article, compact workspace, right-aligned amount. Existing status marker, ledger and mobile unchanged.\",\"remaining\":\"Visual acceptance on user's viewport.\",\"checks\":[\"Two-line operation/wallet heading\",\"Wallet displayed beneath operation; split wallets retained, clickable\",\"Cash operation cell unchanged\",\"One fewer column; Article independent\",\"Original status suffix, sums and Mobile path preserved\",\"Scoped article wrapping and amount alignment\"]}",
+      "to": [
+        "finance.prof",
+        "finance.cash",
+        "platform"
+      ]
+    },
+    {
+      "sha": "c215b042821015a2867ef98db9e658ea9492931f",
+      "original": "Operational-Evidence: {\"kind\":\"candidate\",\"files\":[\"core/finance/dds/index.js\",\"core/finance/dds/articles.js\",\"core/finance/cash/wallet-history.js\",\"core/finance/dds/excel.js\",\"ui/v2/v2.css\"],\"criteria\":[\"start.finance\",\"shared.list\"],\"result\":\"DDS uses existing wallet table controller with count only, extra filters and selected export scope; article Z2 uses compact table. Mobile and Core unchanged.\",\"remaining\":\"Live layout, selection/export and article visual acceptance; existing DDS export excludes cancelled/unsupported operations.\",\"checks\":[\"Syntax core/finance/dds/index.js\",\"Syntax core/finance/dds/articles.js\",\"Syntax core/finance/cash/wallet-history.js\",\"Syntax core/finance/dds/excel.js\",\"Search split wallets\",\"Exact wallet and transfer filtering\",\"Article/status filtering\",\"Numeric sorting\",\"Selection is operation-scoped\",\"No total amount output in DDS\",\"Export scope retains all ledger lines of selected documents\",\"Desktop article table, parent names, mobile list preserved\"]}",
+      "to": [
+        "finance.prof",
+        "finance.cash",
+        "platform"
+      ]
+    },
+    {
+      "sha": "243112148666717bef27096e4acf3c527291d796",
+      "original": "Operational-Evidence: {\"kind\":\"candidate\",\"files\":[\"ui/buttons/index.js\",\"core/people/excel.js\",\"core/loyalty/deposit/excel.js\",\"core/finance/dds/excel.js\",\"journal/excel.js\",\"journal/journal.js\",\"core/inventory/excel-v2.js\",\"ui/v2/v2.css\"],\"criteria\":[\"shared.button\",\"shared.modal\"],\"result\":\"Shared exact Contacts menu labels for Contacts, Deposits, DDS, Journal, Warehouse; Journal entry icon; original actions retained.\",\"remaining\":\"Live visual acceptance; Warehouse entry toolbar remains for its Desktop adaptation.\",\"checks\":[\"Syntax ui/buttons/index.js\",\"Syntax core/people/excel.js\",\"Syntax core/loyalty/deposit/excel.js\",\"Syntax core/finance/dds/excel.js\",\"Syntax journal/excel.js\",\"Syntax journal/journal.js\",\"Syntax core/inventory/excel-v2.js\",\"Canonical export symbol and label\",\"Canonical import symbol and label\",\"Canonical template symbol and label\",\"Canonical history symbol and label\",\"All five identified Excel action menu owners share the renderer\",\"Journal uses exchange icon and anchored menu\",\"Mobile labels unchanged\"]}",
+      "to": [
+        "platform",
+        "contacts.prof",
+        "integration.transfer",
+        "loyalty.programs",
+        "loyalty.balances",
+        "finance.prof",
+        "records.prof",
+        "inventory.stock"
+      ]
+    },
+    {
+      "sha": "20ae0ba54f567959e23591bafd173967eb7cfcb4",
+      "original": "Operational-Evidence: {\"kind\":\"candidate\",\"files\":[\"ui/v2/v2.css\"],\"criteria\":[\"shared.button\"],\"result\":\"Shared Contacts/Cash/DDS query toolbar: beige border and glyph in both states; subtle active tint.\",\"remaining\":\"Live visual acceptance.\",\"checks\":[\"Both shared query controls use existing #E0D6D6 for glyph and 1px border regardless of aria-pressed\",\"Active state retains distinct subtle beige tint without size/border change\",\"Focus outline same palette\",\"No module-specific overrides or handler changes\"]}",
+      "to": [
+        "platform"
+      ]
+    },
+    {
+      "sha": "75a7f11116f6f3ac8a3c5dfce2f2ed6a94c8be03",
+      "original": "Operational-Evidence: {\"kind\":\"candidate\",\"files\":[\"ui/v2/v2.css\"],\"criteria\":[\"shared.list\"],\"result\":\"Shared Contacts scroll contract applied to Wallet/DDS/Articles; fixed H and table headings, bounded scroll area.\",\"remaining\":\"Browser/iPad scroll acceptance.\",\"checks\":[\"Contacts existing flex-chain and sticky header values retained\",\"Finance wallet and DDS use the same scrolling table host selector\",\"DDS intermediate wrapper and wallet section are shrinkable flex containers\",\"Counter row outside the scroll container does not shrink\",\"Article table in Z2 gets same sticky header\",\"Horizontal overflow retained by overflow:auto\",\"Desktop media only; mobile unaffected\"]}",
+      "to": [
+        "platform"
+      ]
+    },
+    {
+      "sha": "1e9155018f8443df5f298f5cfb09626287a39a52",
+      "original": "Operational-Evidence: {\"kind\":\"candidate\",\"files\":[\"ui/v2/v2.css\"],\"criteria\":[\"shared.list\"],\"result\":\"Shared fixed table viewport frame and original H bottom inset for Clients, Wallet/DDS/Articles.\",\"remaining\":\"Actual iPad visual and scroll verification.\",\"checks\":[\"Shared table viewport owns complete 1px border and 14px radius matching Clients\",\"Table frame is shrinkable and bounded by parent in both axes; host clips overflow outside frame\",\"Existing H bottom inset unchanged (48px desktop, 36px tablet)\",\"Sticky table header and internal overflow:auto unchanged\",\"Desktop media only\"]}",
+      "to": [
+        "platform"
+      ]
+    },
+    {
+      "sha": "353c5ee301e4f6a05142e29383eaef35be33a68a",
+      "original": "Operational-Evidence: {\"kind\":\"candidate\",\"files\":[\"core/people/people.js\",\"ui/v2/v2.css\"],\"criteria\":[\"shared.list\"],\"result\":\"Desktop client row opens once, checkbox column remains independent, arrow retained.\",\"remaining\":\"Actual iPad interaction acceptance.\",\"checks\":[\"Desktop row and arrow use one handler, no double open\",\"Selection cell excluded\",\"Mobile original click target retained\"]}",
+      "to": [
+        "platform",
+        "contacts.prof"
+      ]
+    },
+    {
+      "sha": "1b834dc72faf67f1507d91e58c93ea755d55abb8",
+      "original": "Operational-Evidence: {\"kind\":\"candidate\",\"files\":[\"core/finance/receipt.js\",\"core/finance/dds/index.js\",\"core/finance/desktop.js\",\"ui/receipt/receipt.css\"],\"criteria\":[\"start.finance\",\"shared.modal\"],\"result\":\"Historical receipt line price before discounts, single discount, К оплате, Оплата; existing wallet distribution; DDS Desktop three actions in one row.\",\"remaining\":\"Actual visual verification and owner acceptance of three-action hierarchy.\",\"checks\":[\"Screenshot invoice values and sequence\",\"Screenshot payment values\",\"Multiple original item prices, partial payment, split wallets, no zero tips\",\"Wallet-specific receipt still excludes full allocation\",\"No invention of missing historical price\",\"Three distinct original actions preserved; desktop order only\",\"Single-row layout scoped to DDS Desktop\",\"Syntax core/finance/receipt.js\",\"Syntax core/finance/dds/index.js\",\"Syntax core/finance/desktop.js\"]}",
+      "to": [
+        "finance.prof",
+        "finance.cash",
+        "platform"
+      ]
+    },
+    {
+      "sha": "d893ae8096f9cb0948451b62a052a0ed31b862cc",
+      "original": "Operational-Evidence: {\"kind\":\"candidate\",\"files\":[\"core/finance/dds/index.js\",\"ui/receipt/receipt.css\"],\"criteria\":[\"start.finance\",\"shared.modal\"],\"result\":\"Two receipt actions; cancellation warning with actual date and separate permanent deletion confirmation. Existing server actions preserved.\",\"remaining\":\"Live UI acceptance; wallet action naming and per-wallet DDS grouping remain unchanged.\",\"checks\":[\"DDS syntax\",\"Active Desktop receipt two buttons, cancelled receipt can still be deleted\",\"Explicit separate delete confirmation; closes parent only on successful delete\",\"Cancellation date and double-click guard retained\",\"Mobile receipt retains prior actions\",\"Two aligned compact buttons; previous triple layout removed\"]}",
+      "to": [
+        "finance.prof",
+        "finance.cash",
+        "platform"
+      ]
+    },
+    {
+      "sha": "ca0511230e4d577bb0205cf4e8ac905257e2caed",
+      "original": "Operational-Evidence: {\"kind\":\"candidate\",\"files\":[\"core/finance/dds/index.js\",\"ui/receipt/receipt.css\"],\"criteria\":[\"start.finance\",\"shared.modal\"],\"result\":\"Desktop DDS retains Delete and Correction only, direct standard irreversible delete X. Cancelled operations can be deleted. Wallet, Mobile, Core unchanged.\",\"remaining\":\"Actual iPad visual and live deletion acceptance; per-wallet DDS grouping unchanged.\",\"checks\":[\"DDS syntax\",\"Desktop active receipt Delete + Correction, cancelled receipt Delete only; Mobile unchanged\",\"Obsolete desktop cancellation UI removed\",\"Existing confirmation style, left pink Delete and right H Cancel\",\"Opening X does not delete; warning explicit\",\"Confirmation only; duplicate click blocked\",\"Successful deletion closes both X layers and refreshes DDS\"]}",
+      "to": [
+        "finance.prof",
+        "finance.cash",
+        "platform"
+      ]
+    },
+    {
+      "sha": "0c48380b36d22cc178a8499e2d5cae7206b0c062",
+      "original": "Operational-Evidence: Desktop receipt label Исправить; existing handler and mobile retained; syntax checked; visual verification pending.",
+      "to": [
+        "finance.prof"
+      ]
+    },
+    {
+      "sha": "f1fb3627845186badacd3b8c3d2ee6139fc35dc6",
+      "original": "Operational-Evidence: {\"kind\":\"candidate\",\"files\":[\"core/finance/receipt.js\"],\"criteria\":[\"start.finance\"],\"result\":\"Payment receipt shows gross transaction amount, optional tips and separate payment sources, without duplicate total. Wallet receipt unchanged.\",\"remaining\":\"Actual visual acceptance; historical debt snapshot not persisted; Excel schema and grouping pending agreement.\",\"checks\":[\"Gross payment, tips explanation and wallet in separate groups\",\"No duplicate total\",\"Partial payment shows only actual amount; no fabricated outstanding debt\",\"Split wallets preserved\",\"Wallet receipt unchanged\",\"Historical ledger fallback\",\"Receipt syntax\",\"Current Excel output independently reproduced; missing quote and tips columns\"]}",
+      "to": [
+        "finance.prof",
+        "finance.cash"
+      ]
+    },
+    {
+      "sha": "4ccf0af83e7c60362ad725bf56a2e59746893a3e",
+      "original": "Operational-Evidence: {\"kind\":\"candidate\",\"files\":[\"core/finance/dds/index.js\"],\"criteria\":[\"start.finance\",\"shared.modal\"],\"result\":\"Existing payment allocation component in X with gross amount/tips, unchanged invoice contribution and original date, only save on changed valid allocation.\",\"remaining\":\"Real iPad visual and live save verification; Core and other correction types unchanged.\",\"checks\":[\"Syntax checked\",\"Desktop payment correction uses existing paymentMethods/initPaymentMethods in X, no Z mount\",\"Initial allocations are preserved; unsupported loyalty or missing sources blocked\",\"Existing fixed serviceAmount and original occurredAt retained\",\"Gross payment and optional tips shown, insufficient allocation prevents save, unchanged allocation cannot save\",\"Mobile and other correction branches unchanged\"]}",
+      "to": [
+        "finance.prof",
+        "finance.cash",
+        "platform"
+      ]
+    },
+    {
+      "sha": "c71b0116e054db51007bbcd247e08e0c5f810df0",
+      "original": "Operational-Evidence: {\"kind\":\"candidate\",\"files\":[\"core/finance/dds/articles.js\"],\"criteria\":[\"start.finance\",\"shared.list\",\"shared.modal\"],\"result\":\"Article desktop search across all columns, immediate filters, sorting, existing list viewport and standard X editor, system direction/purpose locked, dirty save.\",\"remaining\":\"Actual visual and API acceptance; mobile, Excel and Core unchanged.\",\"checks\":[\"Syntax verified\",\"Default structure retained\",\"Search across parent and name\",\"Search across purpose and type\",\"Combined filters\",\"Alphabetical sorting\",\"Desktop X and unchanged mobile Z\",\"Actual locked system values displayed, including GROUP\",\"No unchanged save and API success required\",\"Parent labels remain available after filtering; existing scrolling host preserved\"]}",
+      "to": [
+        "finance.prof",
+        "finance.cash",
+        "platform"
+      ]
+    },
+    {
+      "sha": "aaaf07a1442f4493f8ece56190ab8fee8bb2330c",
+      "original": "Operational-Evidence: Shared VIEW_ICON and FINANCE_ARTICLES_ICON, high-legibility plus/minus symbol. Existing toolbar geometry and action handlers preserved. Nine JS files syntax checked. Actual visual verification pending.",
+      "to": [
+        "finance.prof",
+        "loyalty.programs",
+        "loyalty.balances",
+        "contacts.prof",
+        "workspace.profile",
+        "catalog.prof",
+        "platform"
+      ]
+    },
+    {
+      "sha": "17ee2cd50fe93c271e8d3f415736b177b0727e22",
+      "original": "Operational-Evidence: {\"kind\":\"candidate\",\"files\":[\"core/finance/dds/index.js\",\"core/finance/dds/articles.js\",\"ui/v2/v2.css\"],\"criteria\":[\"start.finance\",\"shared.list\"],\"result\":\"Beige articles navigation, visible rows count, existing safe archive action, system article explanation. Core archive contract verified; history untouched.\",\"remaining\":\"Actual visual and live archive acceptance.\",\"checks\":[\"JS syntax\",\"Only Articles transition reuses beige primary navigation style\",\"Live visible count and table scroll flex chain\",\"Custom archive only, system protections explained\",\"Archive warning clarifies history preservation\",\"Counter source covers search, filter, sort, empty\"]}",
+      "to": [
+        "finance.prof",
+        "finance.cash",
+        "platform"
+      ]
+    },
+    {
+      "sha": "c49d120cf9d63c104d6789bed456624c0808679f",
+      "original": "Operational-Evidence: Remove unwanted system article note; use Без группы in article selectors and filters. Syntax checked. Article protections and business logic unchanged; visual verification pending.",
+      "to": [
+        "finance.prof"
+      ]
+    },
+    {
+      "sha": "f875aeb1c9c54544a0221d9d0713700531e24372",
+      "original": "Operational-Evidence: Shared existing tag glyph for groups and articles; move Service Groups to right tools with existing beige navigation style. DDS article action preserved. Syntax and placement checks passed; no classification logic changed.",
+      "to": [
+        "finance.prof",
+        "catalog.prof",
+        "platform"
+      ]
+    },
+    {
+      "sha": "f15590e0f9361a6d5c2d76c5461f19e9640e8c81",
+      "original": "Operational-Evidence: {\"kind\":\"candidate\",\"files\":[\"core/finance/dds/articles.js\",\"core/finance/dds/index.js\"],\"criteria\":[\"start.finance\",\"shared.modal\"],\"result\":\"Both desktop and mobile DDS open a Q directory; create/edit uses existing X, search/filter/sort/count remain inside Q. Existing Core article contract untouched.\",\"remaining\":\"Visual and live mutation verification; separate classification architecture change still pending.\",\"checks\":[\"No directory or editor Z stack\",\"Single Q for both entry paths\",\"Shared X create/edit\",\"Existing search/filter/sort/count moved to compact Q\",\"Existing Core mutations retained\",\"Mobile and desktop entry point retained\"]}",
+      "to": [
+        "finance.prof",
+        "finance.cash",
+        "platform"
+      ]
+    },
+    {
+      "sha": "c43dbd124bfea676814662cce0030ed814107c58",
+      "original": "Operational-Evidence: {\"kind\":\"candidate\",\"files\":[\"core/service/service.js\",\"core/service/catalog-grouping.js\",\"core/finance/dds/articles.js\",\"core/finance/dds/index.js\",\"ui/v2/v2.css\"],\"criteria\":[\"shared.modal\",\"start.finance\"],\"result\":\"White classification buttons on H. Compact H-colored plus in Service and Finance Q, shared Q primary no beige, system finance rows noninteractive. Service order unchanged.\",\"remaining\":\"Live UI verification; Core finance article/values/reorder contract remains pending, no fake local order.\",\"checks\":[\"Four JS syntax checks\",\"White secondary H group buttons\",\"Service Q plus stays a glyph in directory and values\",\"Finance Q plus uses same shared glyph and Q toolbar\",\"Shared Q primary H color instead of beige\",\"System records noninteractive, no editor access\",\"Existing service reorder persistence unchanged\"]}",
+      "to": [
+        "platform",
+        "finance.prof",
+        "finance.cash",
+        "catalog.prof"
+      ]
+    },
+    {
+      "sha": "62774aa4fb4363ec93f4821f10a733772ec36b76",
+      "original": "Operational-Evidence: Desktop only: existing V2 catalogue rows/disclosures and order owners; both sections, fixed headers, independent search/filter/sort, group/value/position reorder, all-workplace statistics. JS parse and subset merge checked. Live visual and statistic verification pending; sales count is records, not units.",
+      "to": [
+        "catalog.prof",
+        "platform"
+      ]
+    },
+    {
+      "sha": "8c283a284a273b0a266c76de28b1da6fb10ca934",
+      "original": "Operational-Evidence: {\"kind\":\"candidate\",\"files\":[\"core/service/service.js\",\"core/service/desktop-catalog.js\",\"ui/v2/v2.css\",\"core/finance/cash/wallet-history.js\"],\"checks\":[\"One shared toolbar\",\"One column header and one viewport\",\"Same columns, time not applicable for products\",\"Service hierarchy levels\",\"Approved shared palette\",\"Sticky table header\",\"Existing filter/sort patterns\",\"DDS uses genuine directions, no rows fabricated or discarded\"],\"remaining\":\"Actual visual, scroll, filter, drag and DDS selection/export verification. Finance values await Core schema; existing articles only. Service quantity remains record count.\"}",
+      "to": [
+        "catalog.prof",
+        "platform",
+        "finance.prof"
+      ]
+    },
+    {
+      "sha": "19bc523220f6e66a0b6d62bab66b7dbfe38f2fe6",
+      "original": "Operational-Evidence: {\"kind\":\"candidate\",\"files\":[\"core/service/service.js\",\"core/service/desktop-catalog.js\",\"ui/v2/v2.css\"],\"checks\":[\"Independent collapsible system sections, state retained during rerender\",\"Shared checkbox and select all\",\"Namespaced selection IDs, filtered-out positions pruned\",\"Selection and drag do not open position\",\"Selected / total count\",\"Existing reorders unchanged\",\"No batch actions introduced\"],\"remaining\":\"Visual and keyboard/pointer verification. Select all covers filtered positions including collapsed sections; no batch mutations.\"}",
+      "to": [
+        "catalog.prof",
+        "platform"
+      ]
+    },
+    {
+      "sha": "36176a80027d1b91d48bf46c5360d61fc9eafbc8",
+      "original": "Operational-Evidence: {\"kind\":\"candidate\",\"checks\":[\"Zero sales filter\",\"Unloaded statistics not zero\",\"Product time not applicable\",\"Combined inclusive bounds\",\"Negative revenue supported\",\"Inverted bounds match no rows\",\"Price lower-bound and missing price\",\"Active filter and reset\",\"Manual default and compact sort\"],\"remaining\":\"Browser verification pending. Price ranges filter by displayed lower price; quantity statistics count records; no mobile or Core changes.\"}",
+      "to": [
+        "catalog.prof",
+        "platform"
+      ]
+    },
+    {
+      "sha": "fce74b5eb4b596a3163616e57add1fdf196579dc",
+      "original": "Operational-Evidence: {\"kind\":\"candidate\",\"checks\":[\"One numeric metric, one pair of bounds; no hidden numeric constraints\",\"Rectangular 28px range inputs\",\"Drag first, checkbox second\",\"Existing document pencil and direct editors\",\"Group and value controls, saved disclosure state\",\"DDS disclosure hierarchy, no finance mutations\",\"Preserved reorder persistence\"],\"remaining\":\"Visual and actual pointer/keyboard verification pending. No mass actions, no Core ordering for articles, one active numeric metric at a time.\"}",
+      "to": [
+        "finance.prof",
+        "catalog.prof",
+        "platform"
+      ]
+    },
+    {
+      "sha": "72825ef9df92b2b6df0b756189ab5710c9941363",
+      "original": "Operational-Evidence: {\"kind\":\"candidate\",\"files\":[\"ui/groups/group-values.js\",\"core/service/catalog-grouping.js\",\"core/finance/dds/articles.js\",\"ui/v2/v2.css\"],\"criteria\":[\"finance.prof\",\"start.service\"],\"result\":\"Shared group directory, values, editor action markup and confirmation; explicit subtree archive warning, domain mutation adapters retained\",\"remaining\":\"Browser and actual API acceptance; Core PR #949 release; Inventory not migrated\",\"checks\":[\"JS syntax, both consumers invoke shared renderers, synthetic shared form and protected delete markup checks\"]}",
+      "to": [
+        "finance.prof",
+        "catalog.prof",
+        "platform"
+      ]
+    },
+    {
+      "sha": "132f81ba9f5e2e91b370365625f8aa2e34deece8",
+      "original": "Operational-Evidence: Desktop smoke fixture width specificity corrected; real narrow and wide bounds asserted; runtime CI pending.",
+      "to": [
+        "platform"
+      ]
+    },
+    {
+      "sha": "507cc57c00763be502060e0c2a98114292427a6f",
+      "original": "Operational-Evidence: {\"kind\":\"candidate\",\"files\":[\"core/finance/dds/articles.js\",\"core/finance/cash/wallet-history.js\",\"core/service/catalog-grouping.js\",\"tests/finance-mechanism-registry.test.mjs\",\"core/finance/dds/article-order.js\"],\"criteria\":[\"finance.prof\",\"finance.reconcile\",\"service.catalog\"],\"result\":\"Service group count; shared article drag within sections; DDS grouped order uses account-scoped view preference\",\"remaining\":\"Browser CI and cross-device Core order contract\",\"checks\":[\"Verified Core article catalogue and update API; added deterministic order and section-boundary tests\"]}",
+      "to": [
+        "finance.prof",
+        "finance.reconcile",
+        "catalog.prof",
+        "platform"
+      ]
+    },
+    {
+      "sha": "b9929d2bb25231f59bf985a021ce7d94a9fbb2ad",
+      "original": "Operational-Evidence: {\"kind\":\"candidate\",\"files\":[\"core/finance/cash/wallet-history.js\",\"ui/v2/v2.css\"],\"criteria\":[\"finance.prof\",\"finance.reconcile\",\"service.catalog\"],\"result\":\"DDS H accessory count, right-aligned directory counts and explicit disclosure arrow, no changes to finance data or column geometry\",\"remaining\":\"Browser and owner acceptance\",\"checks\":[\"Verified shared H accessory, existing count markup and shared directory disclosure behavior\"]}",
+      "to": [
+        "finance.prof",
+        "finance.reconcile",
+        "catalog.prof",
+        "platform"
+      ]
+    },
+    {
+      "sha": "3b8408a34505d0a0146e5eb4d30102c4a1381687",
+      "original": "Operational-Evidence: {\"kind\":\"candidate\",\"files\":[\"core/service/desktop-catalog.js\",\"ui/v2/v2.css\",\"scripts/ci/inventory-grouping-smoke.mjs\",\"core/service/catalog-view.js\"],\"criteria\":[\"service.catalog\"],\"result\":\"Independent Service grouping toggles, combined workplace/visit count, shared header/body columns, unchanged statistical calculation\",\"remaining\":\"Browser geometry and owner acceptance\",\"checks\":[\"Executed grouping matrix and column schemas against actual inventory grouping implementation; kept existing sort choices\"]}",
+      "to": [
+        "catalog.prof",
+        "platform"
+      ]
+    },
+    {
+      "sha": "9b9a7f8821530b3b570732f454d937e3bc88a592",
+      "original": "Operational-Evidence: {\"kind\":\"implemented\",\"files\":[\"core/finance/dds/income-expense.js\",\"core/finance/dds/manual-entry-model.js\",\"tests/manual-finance-entry.test.mjs\"],\"criteria\":[\"start.finance\"],\"result\":\"Separate canonical article/value, one wallet, detail total and payload mapping\",\"remaining\":\"Browser and authenticated API acceptance; Core multi-wallet and nullable system value\",\"checks\":[\"Pure model assertions executed via JS isolate PASS\",\"Form module syntax compilation PASS\"]}",
+      "to": [
+        "finance.prof",
+        "finance.cash",
+        "platform"
+      ]
+    },
+    {
+      "sha": "72f2104f56fd0aca2fdb6e8b1412ac28c71ac14b",
+      "original": "Operational-Evidence: {\"kind\":\"implemented\",\"files\":[\"core/finance/dds/income-expense.js\",\"core/finance/dds/manual-entry-model.js\",\"tests/manual-finance-entry.test.mjs\"],\"criteria\":[\"start.finance\"],\"result\":\"Article selector uses registered directory and custom raw IDs, no search; direction and archive checks retained\",\"remaining\":\"Verify actual tenant article list and API save; Core unchanged\",\"checks\":[\"Pure model assertions including custom visibility and stale catalogue PASS\",\"Form module syntax PASS\"]}",
+      "to": [
+        "finance.prof",
+        "finance.cash",
+        "platform"
+      ]
+    },
+    {
+      "sha": "a20f740e13bc54fce314c53dc3b1b1d6f30fe3b0",
+      "original": "Operational-Evidence: {\"kind\":\"candidate\",\"files\":[\"core/finance/service.js\",\"core/finance/dds/income-expense.js\",\"core/finance/dds/manual-entry-model.js\",\"core/payment/record-payment.js\",\"core/finance/read.js\",\"journal/journal.js\",\"core/records/view.js\",\"tests/manual-finance-entry.test.mjs\",\"core/finance/prepayment-model.js\",\"tests/finance-prepayment.test.mjs\"],\"criteria\":[\"start.finance\",\"journal.payment\"],\"result\":\"Connect approved Core #950 in Professional staging: canonical article/value, wallet allocation, partial advance, Journal Z report\",\"remaining\":\"Verify deployed Core supports new catalogue; browser/API and wallet-group correction acceptance; whole-group cancellation UI, full advance, product/deposit overlap remain\",\"checks\":[\"Actual pure prepayment and manual article model assertions PASS via JS isolate\",\"Syntax compile of all modified JS modules PASS\"]}",
+      "to": [
+        "finance.prof",
+        "finance.cash",
+        "records.prof",
+        "platform"
+      ]
+    },
+    {
+      "sha": "9ff992d55132ed2b5dd04303f911cd65ab9a1a02",
+      "original": "Operational-Evidence: {\"kind\":\"candidate\",\"files\":[\"core/finance/data.js\",\"core/finance/service.js\",\"core/finance/prepayment-model.js\",\"core/payment/record-payment.js\",\"core/records/view.js\",\"journal/journal.js\",\"tests/finance-prepayment.test.mjs\",\"core/time/payment-date.js\"],\"criteria\":[\"journal.payment\",\"start.finance\"],\"result\":\"Single payment action and status using workplace calendar date, with unchanged report totals and overdue balance\",\"remaining\":\"Core PR #951 must deploy first; CI and live browser verification; PROJECT_STATE.md unavailable (connector returns empty)\",\"checks\":[\"JS syntax and actual pure model assertions PASS including midnight and net prepayment\"]}",
+      "to": [
+        "finance.prof",
+        "records.prof",
+        "finance.cash",
+        "platform"
+      ]
+    },
+    {
+      "sha": "af52bb78d2dabe7d7c09a3612cff0995746d5543",
+      "original": "Operational-Evidence: {\"kind\":\"candidate\",\"files\":[\"core/records/view.js\",\"core/finance/prepayment-model.js\",\"tests/finance-prepayment.test.mjs\"],\"criteria\":[\"journal.payment\"],\"result\":\"Record entry button remains К оплате with remaining balance or Оплачено with paid total; date-dependent action stays inside payment form\",\"remaining\":\"Browser and authenticated end-to-end verification; Core #951 deployment before release\",\"checks\":[\"Actual model assertions PASS; modified JS syntax PASS\"]}",
+      "to": [
+        "finance.prof",
+        "records.prof",
+        "platform"
+      ]
+    },
+    {
+      "sha": "b452f7134f05ff50e97944d2ce61f835169c3805",
+      "original": "Operational-Evidence: {\"kind\":\"candidate\",\"files\":[\"ui/payment/methods.js\",\"ui/payment/payment.css\",\"core/payment/record-payment.js\",\"tests/payment-allocation-progressive.test.mjs\"],\"criteria\":[\"journal.payment\",\"start.finance\"],\"result\":\"Shared payment allocator begins with one source; selecting source fills residual, later unselected row previews remaining balance without becoming a payment. Single payment X action remains visible while content scrolls.\",\"remaining\":\"Real iOS/desktop visual and authenticated API acceptance; Core #951 deployment. Full advance remains blocked by server contract; existing partial and loyalty flows preserved.\",\"checks\":[\"Actual allocator handler simulation and progressive row assertions PASS in JS isolate\",\"Modified JS syntax PASS\"]}",
+      "to": [
+        "finance.prof",
+        "records.prof",
+        "finance.cash",
+        "platform"
+      ]
+    },
+    {
+      "sha": "44c08cc944019cefaea90abaa058984eb53749bd",
+      "original": "Operational-Evidence: {\"kind\":\"candidate\",\"files\":[\"core/payment/record-payment.js\",\"ui/payment/methods.js\",\"tests/payment-allocation-progressive.test.mjs\"],\"criteria\":[\"journal.payment\",\"start.finance\"],\"result\":\"Reopened payment starts from remaining balance only, hides prior payment receipt row, no automatic deposit allocation after any existing payment, unselected source displays suggested remainder without creating a payment\",\"remaining\":\"Browser and authenticated end-to-end verification, Core #951 deployment\",\"checks\":[\"Actual allocator handler simulation: first and reopened 7000 payment, progressive residual 3000/4000, syntax PASS\"]}",
+      "to": [
+        "finance.prof",
+        "records.prof",
+        "finance.cash",
+        "platform"
+      ]
+    }
+  ]
+}

@@ -1,5 +1,7 @@
 import {
   datePicker,
+  entityCardRail,
+  v2Section,
   details,
   emptyState,
   entityVisualCard,
@@ -17,6 +19,7 @@ import {
   v2ListEntry,
   workspaceHeaderContext,
 } from '../../ui/ui.js';
+import { bindDesktopRailControls } from '../../ui/v2/horizontal-affordance.js';
 import { compactCheck } from '../../ui/selection/check-list.js';
 import { settingsPanel } from '../../ui/settings/index.js';
 import { flushBusinessPersistence } from '../business-persistence.js';
@@ -32,6 +35,7 @@ import {
   loyaltyCardPhoto,
   loyaltyCardPhotoPosition,
   loyaltyCardScope,
+  loyaltyProgramCardScope,
 } from './card-presentation.js';
 
 export const money = (value) => `${new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(Number(value || 0)).replaceAll('\u00a0', ' ')} ₽`;
@@ -84,53 +88,74 @@ export function loyaltyHeader(title, { settings = false, c = null, settingsData 
   });
 }
 
-export function loyaltyVisualCard(type, fields, { data = '', aria = '', interactive = true } = {}) {
+export function loyaltyVisualCard(type, fields, { data = '', aria = '', interactive = true, programId = '' } = {}) {
   return entityVisualCard({
-    appearance: loyaltyCardAppearance(type),
+    appearance: loyaltyCardAppearance(type, programId),
     fields,
-    image: loyaltyCardPhoto(type),
-    imagePosition: loyaltyCardPhotoPosition(type),
+    image: loyaltyCardPhoto(type, programId),
+    imagePosition: loyaltyCardPhotoPosition(type, programId),
     interactive,
     data,
     aria,
   });
 }
 
-export function openLoyaltyAppearanceQ(root, {
+export function loyaltyAppearanceOptions({
   type,
   fields = loyaltyCardFields({ title: loyaltyCardLabel(type), subtitle: loyaltyCardLabel(type), status: 'Активна' }),
   onSaved = () => {},
+  programs = null,
 } = {}) {
   const scope = loyaltyCardScope(type);
   const label = loyaltyCardLabel(type);
   const resolveFields = typeof fields === 'function' ? fields : () => fields;
-  return openEntityCardAppearanceQ(root, {
+  const values = () => typeof programs === 'function' ? programs().filter(item => item?.id && !item.archivedAt) : [];
+  const targets = () => values().length
+    ? values().map(item => ({ value: String(item.id), label: item.name || label }))
+    : [{ value: 'all', label: 'Общий вид' }];
+  const idFor = target => target && target !== 'all' ? target : '';
+  return {
     title: 'Вид',
     typeLabel: 'Тип карты',
     typeOptions: [{ value: scope, label }],
     initialType: scope,
-    targetOptions: () => [],
+    targetOptions: programs ? targets : () => [],
+    showTargetSelector: Boolean(programs),
+    defaultTarget: () => targets()[0]?.value,
     allowPhoto: true,
-    resolve: () => ({
-      appearance: loyaltyCardAppearance(type),
-      fields: resolveFields(),
-      photo: loyaltyCardPhoto(type),
-      photoPosition: loyaltyCardPhotoPosition(type),
+    resolve: (_type, target) => ({
+      appearance: loyaltyCardAppearance(type, idFor(target)),
+      fields: resolveFields(values().find(item => String(item.id) === target)),
+      photo: loyaltyCardPhoto(type, idFor(target)),
+      photoPosition: loyaltyCardPhotoPosition(type, idFor(target)),
     }),
-    save: async ({ appearance, photo, editor }) => {
-      const current = getCardAppearanceTemplate(scope);
-      saveCardAppearanceTemplate(scope, {
+    save: async ({ target, appearance, photo, editor }) => {
+      const id = idFor(target);
+      if (id && !values().some(item => String(item.id) === id)) throw new Error('Программа недоступна');
+      const key = id ? loyaltyProgramCardScope(type, id) : scope;
+      const current = getCardAppearanceTemplate(key);
+      saveCardAppearanceTemplate(key, {
         appearance,
         photo,
-        photoPosition: editor?.photoPosition || current?.photoPosition || loyaltyCardPhotoPosition(type),
+        photoPosition: editor?.photoPosition || current?.photoPosition || loyaltyCardPhotoPosition(type, id),
       });
       await flushBusinessPersistence();
     },
     onSaved,
-  });
+  };
+}
+
+export function openLoyaltyAppearanceQ(root, options = {}) {
+  return openEntityCardAppearanceQ(root, loyaltyAppearanceOptions(options));
+}
+
+export function renderDesktopProgramSection(root, cards, empty) {
+  root.innerHTML = v2Section(root.dataset.loyaltyOverviewTitle, cards.length ? entityCardRail(cards) : empty, { className: 'loyalty-program-section' });
+  bindDesktopRailControls(root.querySelector('[data-entity-card-rail]'), { prefix: 'loyalty-rail', label: root.dataset.loyaltyOverviewTitle });
 }
 
 export function bindViewSettings(root, title, { type, fields, onSaved = () => {} } = {}) {
+  if (root?.hasAttribute('data-loyalty-program-section')) return;
   root?.querySelector?.('[data-loyalty-e-settings]')?.addEventListener('click', () => {
     openSharedProfileSettingsMenu({
       title,
@@ -235,7 +260,7 @@ export function normalizeOptionalUei(value = '') {
 
 export function optionalUeiField({ name = 'uei', value = '' } = {}) {
   return field({
-    label: 'UEI',
+    label: 'Код',
     name,
     value: normalizeOptionalUei(value),
     maxlength: 4,

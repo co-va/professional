@@ -10,6 +10,7 @@ import {
   textareaField,
   workspaceHeaderContext,
 } from '../../../ui/ui.js';
+import { financeZSave } from '../desktop.js';
 import { getWallets } from '../cash/data.js';
 import { getInvestmentEntities, getLoanEntities } from '../cash/entities.js';
 import { financeLocalDateValue, financeOccurredAtForDate } from '../date.js';
@@ -214,6 +215,7 @@ function renderOperationForm(root, action, {
   root.querySelector('[data-finance-special-save]')?.addEventListener('click', () => {
     form?.requestSubmit();
   });
+  financeZSave(root, '[data-finance-special-save]', operation ? `Корректировка · ${action.title}` : (actionChoices.length > 1 ? 'Финансовая операция' : action.title));
   return true;
 }
 

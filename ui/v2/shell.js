@@ -34,8 +34,9 @@ ${v2ZFrame(body)}
   </section>`;
 }
 
-export function v2Section(title = '', content = '', { className = '' } = {}) {
-  return `<section class="v2-section ${text(className)}"><h2 class="v2-section__title">${text(title)}</h2><div class="v2-section__content">${content}</div></section>`;
+export function v2Section(title = '', content = '', { className = '', accessory = '' } = {}) {
+  const heading = `<h2 class="v2-section__title">${text(title)}</h2>`;
+  return `<section class="v2-section ${text(className)}">${accessory ? `<div class="v2-section__heading">${heading}<div class="v2-section__accessory">${accessory}</div></div>` : heading}<div class="v2-section__content">${content}</div></section>`;
 }
 
 export function v2HorizontalRail(content = '', { className = '' } = {}) {

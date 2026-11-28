@@ -1,7 +1,7 @@
 import { renderPeople } from '../core/people/people.js';
 import { financeNavigationItems, renderFinanceSection } from '../core/finance/index.js';
 import { inventoryNavigationItems, renderInventorySection } from '../core/inventory/index.js';
-import { loyaltyNavigationItems, renderLoyaltySection } from '../core/loyalty/index.js';
+import { loyaltyNavigationItems, loyaltyWorkspaceNavigationItems, renderLoyaltySection } from '../core/loyalty/index.js';
 import { renderJournal } from '../journal/journal.js';
 import { mountJournalMonthCalendar } from '../journal/месяц.js';
 import { renderJournalGraphMode } from '../journal/график.js';
@@ -26,7 +26,7 @@ import { getJournalTimeUsages } from '../journal/time-usage-source.js';
 import { configureWorkplaceSource } from '../core/workplace-time.js';
 import { configureTimeUsageSource } from '../core/time/index.js';
 import { activateDemo, canUseCapability, getAccess, loadAccess } from '../core/access.js';
-import { ALL_WORKPLACES_ID, viewNavigation, initViewNavigation, select, button, modal, mountModal, mountV2ZLayer, openNotice, initV2WorkspaceInteraction, setV2DeckOpen, v2CardDeck, v2Header, v2Shell, v2Sticker, v2ZLayer } from '../ui/ui.js';
+import { ALL_WORKPLACES_ID, calendar as calendarMarkup, viewNavigation, initViewNavigation, select, button, modal, mountModal, mountV2ZLayer, openNotice, initV2WorkspaceInteraction, setV2DeckOpen, v2CardDeck, v2Header, v2Shell, v2Sticker, v2ZLayer } from '../ui/ui.js';
 import { startPlatformNotices } from '../core/platform-notices.js';
 import { setThemeColor } from '../ui/viewport/index.js';
 import { isV2DesktopWorkspace, V2_DESKTOP_MEDIA } from '../ui/v2/geometry.js';
@@ -158,7 +158,7 @@ function rootDisplayLabel(section) {
   if (section === 'workplaces') return 'Рабочие пространства';
   const definition = rootDefinition(section);
   if (!definition) return '';
-  if (section === 'settings' && window.matchMedia?.(V2_DESKTOP_MEDIA).matches) return definition.label;
+  if ((section === 'settings' || section === 'loyalty') && window.matchMedia?.(V2_DESKTOP_MEDIA).matches) return definition.label;
   const children = secondaryItems(section);
   return children.length === 1 ? children[0].label : definition.label;
 }
@@ -195,6 +195,7 @@ function activeRootSection() {
 function secondaryItems(section = activeRootSection()) {
   if (section === 'finance') return financeNavigationItems();
   if (section === 'inventory') return inventoryNavigationItems();
+  if (section === 'loyalty' && window.matchMedia?.(V2_DESKTOP_MEDIA).matches) return loyaltyWorkspaceNavigationItems(true);
   if (section === 'loyalty') return loyaltyNavigationItems();
   if (section === 'settings') return settingsNavigationItems();
   return [];
@@ -453,10 +454,26 @@ function bindDesktopCalendar(shell) {
   const allowed = () => isV2DesktopWorkspace(shell) && canUseCapability('journal.month.access');
   const modes = [{ id: 'records', label: 'Записи' }, ...(canUseCapability('timetable.access') ? [{ id: 'schedule', label: 'График' }] : [])];
   const context = () => state.desktopCalendarContext || getWorkplaceContext([...getWorkplaces(), { key: ALL_WORKPLACES_ID }], { scope: 'journal' });
+  // Use the canonical date grid while the server-owned occupancy is unknown.
+  // Reveal F only once the first real calendar has its final height.
+  const reserve = () => {
+    host.setAttribute('aria-busy', 'true');
+    host.inert = true;
+    if (host.querySelector('[data-v2-sidebar-month]')) return;
+    const selected = context();
+    const month = state.desktopCalendarMonth || selected.date;
+    const active = modes.some(item => item.id === state.desktopCalendarMode) ? state.desktopCalendarMode : 'records';
+    host.dataset.sidebarCalendarInitializing = '';
+    host.innerHTML = viewNavigation({ views: modes, activeView: active })
+      + '<div data-v2-sidebar-month>' + calendarMarkup({ month, selectedValue: localDateKey(selected.date) }) + '</div>';
+  };
   const render = () => {
     if (disposed || !host.isConnected) return;
     host.hidden = !allowed();
     if (!allowed() || !ready) { disposeGraph(); disposeGraph = () => {}; graphActive = false; return; }
+    host.removeAttribute('aria-busy');
+    host.inert = false;
+    delete host.dataset.sidebarCalendarInitializing;
     disposeGraph(); disposeGraph = () => {}; graphActive = false;
     if (!modes.some(item => item.id === state.desktopCalendarMode)) state.desktopCalendarMode = 'records';
     const active = state.desktopCalendarMode;
@@ -510,9 +527,19 @@ function bindDesktopCalendar(shell) {
     if (!allowed()) { disposeGraph(); disposeGraph=()=>{}; graphActive=false; return; }
     if (ready) { if(!graphActive) render(); return; }
     if (loading) return;
+    reserve();
     loading = Promise.all([loadProfileState(), loadBusinessState(), loadOperationalState(), loadFinanceState()])
       .then(() => { ready = true; render(); })
-      .catch(error => { if (!disposed) { host.textContent = 'Не удалось загрузить календарь'; console.error(error); } })
+      .catch(error => {
+        if (disposed || !host.isConnected) return;
+        host.removeAttribute('aria-busy');
+        host.inert = false;
+        delete host.dataset.sidebarCalendarInitializing;
+        host.querySelectorAll('button, input, select, textarea').forEach(control => { control.disabled = true; });
+        const monthLabel = host.querySelector('.calendar__month');
+        if (monthLabel) monthLabel.textContent = 'Календарь недоступен';
+        console.error(error);
+      })
       .finally(() => { loading = null; });
   };
   let queued = false;

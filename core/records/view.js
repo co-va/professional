@@ -29,6 +29,10 @@ import { listPersonDeposits } from '../loyalty/deposit/data.js';
 import { openPersonHistoryQ } from '../people/people.js';
 import { personDisplay } from '../people/presentation.js';
 import { getRecordPaymentState, resolveRecordSettlement } from '../finance/index.js';
+import { readFinanceState } from '../finance/data.js';
+import { recordPaymentReport, recordPaymentPresentation, recordPaymentButtonSummary } from '../finance/prepayment-model.js';
+import { zonedDateTimeToDate } from '../time/zone.js';
+import { shiftTimeDateKey } from '../time/math.js';
 import { getRecordProgramOptions, recordProgramSelection } from '../loyalty/record-program.js';
 import { normalizeWorkplaceTimeZone, zonedIntervalMoment, hasZonedIntervalEnded } from '../time/index.js';
 import { canAcceptRecordTips, openRecordPayment } from '../payment/record-payment.js';
@@ -110,7 +114,7 @@ function recordReportStatusRows(record, state) {
       ? [{ label: 'Оплачено', value: formatReportRubles(paidTotal) }]
       : [{ label: 'К оплате', value: formatReportRubles(0) }];
   }
-  const outstandingLabel = recordHasEnded(record) ? 'Задолженность' : 'К оплате';
+  const outstandingLabel = recordPaymentPresentation(record,state,recordWorkplaceTimeZone(record)).outstandingLabel;
   if (paidTotal > 0.009) {
     return [
       { label: 'Оплачено', value: formatReportRubles(paidTotal) },
@@ -145,6 +149,9 @@ function openRecordZReport(record) {
       }] : []),
     ];
   });
+  const finance=readFinanceState();
+  const paymentReport=recordPaymentReport(finance.operations,finance.ledger,[String(current.id)]);
+  const paymentRows=paymentReport.prepayment>0?[{label:'Предоплата',value:formatReportRubles(paymentReport.prepayment)},...paymentReport.wallets.map(w=>({label:w.label,value:formatReportRubles(w.amount)}))]:[];
   const groups = [
     [
       { label: workplaceName(current?.workplaceId), value: dateLabel },
@@ -162,7 +169,7 @@ function openRecordZReport(record) {
       }] : []),
     ],
     [{ label: 'Итого', value: formatReportRubles(total), strong: true }],
-    recordReportStatusRows(current, state),
+    [...recordReportStatusRows(current,state),...paymentRows],
     [{ label: 'Tips', value: formatReportRubles(state?.tipsTotal) }],
   ];
   return mountModal(document.body, modal(readOnlyReceipt({
@@ -585,9 +592,11 @@ export function openRecordView(record, {
     if (startTimer) clearTimeout(startTimer);
     startTimer = null;
     const start = appointmentStart(source);
-    if (!start) return;
-    const delay = start.getTime() - Date.now();
-    if (delay <= 0) return;
+    const zone=recordWorkplaceTimeZone(source),day=String(source?.date||'').slice(0,10);
+    const transitions=[start,zonedDateTimeToDate(day+'T00:00:00',zone),zonedDateTimeToDate(shiftTimeDateKey(day,1)+'T00:00:00',zone)]
+      .filter(at=>at&&Number.isFinite(at.getTime())&&at.getTime()>Date.now());
+    if(!transitions.length)return;
+    const delay=Math.min(...transitions.map(at=>at.getTime()))-Date.now();
     startTimer = setTimeout(() => {
       startTimer = null;
       if (layer.isConnected) render();
@@ -698,9 +707,8 @@ export function openRecordView(record, {
 
     const cancelled = source.status === 'cancelled';
     const tipsOnlyAvailable = !cancelled && !readOnlyHistory && canAcceptRecordTips(source, payment);
-    const paymentStateLabel = payment.fullyPaid
-      ? `Оплачено: ${formatMoney(payment.paidTotal)}`
-      : `${recordHasEnded(source) ? 'Задолженность' : 'К оплате'}: ${formatMoney(payment.remaining)}`;
+    const paymentSummary=recordPaymentButtonSummary(payment);
+    const paymentStateLabel=`${paymentSummary.label}: ${formatMoney(paymentSummary.amount)}`;
     root.innerHTML = `<div class="record-screen record-screen--state-view record-screen--record-view">
       ${card}
       ${capabilities.consumables && !readOnlyHistory && !cancelled && procedures.length ? recordConsumablesSticker(source, payment) : ''}
@@ -719,10 +727,10 @@ export function openRecordView(record, {
             aria: payment.tipsTotal > 0.009 ? `${paymentStateLabel}, есть Tips` : paymentStateLabel,
           })
           : capabilities.payment
-            ? button(tipsOnlyAvailable ? 'Tips' : `К оплате: ${formatMoney(payment.remaining)}`, {
+            ? button(tipsOnlyAvailable ? 'Tips' : paymentStateLabel, {
               data: 'data-record-view-payment',
               className: payment.tipsTotal > 0.009 ? 'record-payment-button--has-tips' : '',
-              aria: payment.tipsTotal > 0.009 ? 'Оплата записи, есть Tips' : 'Оплата записи',
+              aria: payment.tipsTotal > 0.009 ? `${paymentStateLabel}, есть Tips` : paymentStateLabel,
             })
             : button(paymentStateLabel, {
               disabled: true,

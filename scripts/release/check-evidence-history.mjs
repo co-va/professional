@@ -42,6 +42,47 @@ for (const entry of manifest.entries) {
   assert.equal(parseEvidence(replacement).length,1,entry.sha + ': migrated record must pass original Core parser');
   entries.set(entry.sha, {original:records[0],replacement});
 }
+
+// Exact second historical batch. Keep the pinned parser and final-version checks.
+const metadataCutoff = '44c08cc944019cefaea90abaa058984eb53749bd';
+const metadata = JSON.parse(readFileSync(new URL('./legacy-evidence-20261128.json', import.meta.url), 'utf8'));
+assert.equal(metadata.version, 1);
+assert.equal(metadata.cutoff, metadataCutoff);
+assert.equal(metadata.entries.length, 58, 'Fixed historical metadata correction batch');
+git(['merge-base','--is-ancestor',metadataCutoff,head]);
+for (const entry of metadata.entries) {
+  assert.ok(sha.test(entry.sha) && !entries.has(entry.sha), 'Unique exact historical SHA required');
+  assert.ok(Array.isArray(entry.to) && entry.to.length && new Set(entry.to).size === entry.to.length);
+  git(['merge-base','--is-ancestor',entry.sha,metadataCutoff]);
+  const original = git(['show','-s','--format=%B',entry.sha]);
+  const records = original.split(/\r?\n/).filter(line => line.startsWith(prefix));
+  assert.equal(records.length, 1, entry.sha + ': exactly one historical evidence line required');
+  assert.equal(records[0], entry.original, entry.sha + ': immutable evidence mismatch');
+  assert.throws(() => parseEvidence(original), entry.sha + ': valid records must never be rewritten');
+  const raw = records[0].slice(prefix.length);
+  let record;
+  try { record = JSON.parse(raw); } catch { record = null; }
+  const paths = record?.files ?? git(['diff-tree','--no-commit-id','--name-only','--no-renames','-r','-z',entry.sha]).split('\0').filter(Boolean).sort();
+  assert.ok(paths.length && new Set(paths).size === paths.length, 'Exact historical paths required');
+  let migrated;
+  if (record) {
+    assert.ok(Array.isArray(record.checks) && record.checks.length);
+    assert.ok(typeof record.remaining === 'string');
+    for (const criterion of record.criteria || []) {
+      let valid = false;
+      try { parseEvidence(prefix + JSON.stringify({kind:'candidate',files:paths,criteria:[criterion],result:'Criterion validation only',remaining:'',checks:['Validate historical criterion']})); valid = true; } catch {}
+      if (valid) assert.ok(entry.to.includes(criterion), entry.sha + ': valid historical criterion removed');
+    }
+    migrated = {...record,files:paths,criteria:entry.to,result:record.result ?? original.split(/\r?\n/)[0],checks:[...new Set(record.checks)]};
+  } else {
+    assert.match(raw, /syntax|checked|checks|parse|assert/i);
+    migrated = {kind:'candidate',files:paths,criteria:entry.to,result:raw,remaining:'Unstructured historical statement preserved; no new tests or owner acceptance asserted.',checks:[raw]};
+  }
+  const replacement = prefix + JSON.stringify(migrated);
+  assert.equal(parseEvidence(replacement).length, 1, entry.sha + ': corrected metadata must pass original parser');
+  entries.set(entry.sha,{original:records[0],replacement});
+}
+
 const ancestor = git(['merge-base',base,head]).trim();
 const files = git(['diff','--name-only','--no-renames','-z',ancestor,head]).split('\0').filter(Boolean);
 const applied = [];

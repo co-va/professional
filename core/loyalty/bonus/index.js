@@ -52,6 +52,7 @@ import {
   text,
   uid,
 } from '../shared.js';
+import { renderDesktopProgramSection, loyaltyAppearanceOptions } from '../shared.js';
 
 let programs = [
   {
@@ -285,7 +286,7 @@ function initBonusConstructor(layer, editingProgram = null) {
   syncCondition(); syncReward(); syncExpiry(); syncRecurrence(); renderTiers(); renderPositionRules();
 }
 
-async function openCreateProgramQ(root, rerender, editingProgram = null) {
+export async function openCreateProgramQ(root, rerender, editingProgram = null) {
   const editing = Boolean(editingProgram?.id);
   const title = editing ? 'Корректировать бонусную программу' : 'Новая бонусная программа';
   const serviceItems = services();
@@ -548,6 +549,7 @@ function personBonusCard({ program, participant = null }) {
     metaLeft: program?.term || 'Бессрочно',
     metaRight: participant ? `${Math.max(0, Number(participant.available || 0))} бонусов` : `${Math.max(0, Number(program?.rewardValue || 0))}${program?.rewardType === 'percent' ? '%' : ''}`,
   }), {
+    programId: program?.id,
     data: `data-person-program="bonus:${escapeHtml(program?.id || '')}"`,
     aria: `Открыть бонусную программу ${program?.name || ''}`,
   });
@@ -583,25 +585,34 @@ export function getPersonLoyaltyCards(person = {}) {
     }),
   };
 }
+const programAppearanceFields = program => programCardFields(program || programs[0] || { name: 'Бонусная программа', condition: 'each-paid', assignment: 'all', rewardType: 'percent', rewardValue: 5, status: 'active' });
+
+export function programAppearanceOptions(onSaved = () => {}) {
+  return loyaltyAppearanceOptions({ type: 'bonus', fields: programAppearanceFields, programs: () => programs, onSaved });
+}
+
 export async function renderBonus(root) {
   const render = async () => {
-    const cards = programs.length
-      ? entityCardStack(programs.map((program) => loyaltyVisualCard('bonus', programCardFields(program), {
+    const items = programs.map((program) => loyaltyVisualCard('bonus', programCardFields(program), { programId: program.id,
           data: `data-bonus-program="${program.id}"`,
           aria: `Открыть ${program.name}`,
-        })))
-      : emptyState('Бонусных программ пока нет', 'Создайте первую программу кнопкой «+».');
-
-    root.innerHTML = page([
+        }));
+    const empty = emptyState('Бонусных программ пока нет', 'Создайте первую программу кнопкой «+».');
+    if (root.hasAttribute('data-loyalty-program-section')) {
+      renderDesktopProgramSection(root, items, empty);
+    } else {
+      const cards = items.length ? entityCardStack(items) : empty;
+      root.innerHTML = page([
       loyaltyHeader('Бонусная программа', {
         settings: true,
         c: { label: '+', data: 'data-bonus-create', aria: 'Создать бонусную программу' },
       }),
       cards,
     ]);
+    }
     bindViewSettings(root, 'Бонусная программа', {
       type: 'bonus',
-      fields: () => programCardFields(programs[0] || { name: 'Бонусная программа', condition: 'each-paid', assignment: 'all', rewardType: 'percent', rewardValue: 5, status: 'active' }),
+      fields: programAppearanceFields,
       onSaved: render,
     });
     root.querySelector('[data-bonus-create]')?.addEventListener('click', () => openCreateProgramQ(root, render));

@@ -1,13 +1,15 @@
+import { desktopExcelActionLabel } from '../../../ui/buttons/index.js';
 import {
   button,datePicker,initDatePickers,initSegmentControls,modal,mountModal,
   segmentControl,select,twoColumnLayout,
 } from '../../../ui/ui.js';
+import { financeQSubmit } from '../desktop.js';
 import { getFinanceOperation } from '../data.js';
 import { getRecord } from '../../record/index.js';
 import { getWallets } from '../cash/data.js';
 import { getWorkplaces } from '../../workplace-time.js';
 import { refreshFinanceState } from '../service.js';
-import { chooseScopedImport,exportScopedCsv,exportScopedWorkbook,reportExcelError } from '../../excel/scoped.js';
+import { chooseScopedImport,exportScopedCsv,exportScopedWorkbook,reportExcelError,exportFinanceRegistryWorkbook,exportFinanceRegistryCsv } from '../../excel/scoped.js';
 
 const NAMES={
   'manual-income':'Доход','manual-expense':'Расход',transfer:'Перевод',
@@ -102,16 +104,18 @@ function filteredRows(movements,form){
     &&(!kind||kindGroup(row)===kind)
     &&(!wallet||row.wallet===wallet));
 }
-function exportQ(root,movements){
-  const wallets=getWallets().map(wallet=>({value:String(wallet.name||''),label:String(wallet.name||'')}));
+function exportQ(root,movements,registryRows=null){
+  const registry=Array.isArray(registryRows);
+  const wallets=registry?[...new Set(registryRows.flatMap(row=>row.wallets||[]).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ru')).map(value=>({value,label:value})):getWallets().map(wallet=>({value:String(wallet.name||''),label:String(wallet.name||'')}));
   const form='<form class="form-grid" data-dds-excel-export>'
+    +(registry?'<p>Реестр документов. Для загрузки используйте отдельный шаблон Финансов.</p>':'')
     +twoColumnLayout(datePicker({label:'С',name:'from',showYear:true}),
       datePicker({label:'По',name:'to',showYear:true}),{ariaLabel:'Период'})
     +select({label:'Операции',name:'kind',value:'',options:[
-      {value:'',label:'Все'},...[
+      {value:'',label:'Все'},...(registry?[['in','Приход'],['out','Расход'],['transfer','Транзакция']]:[
         ['income','Доходы'],['expense','Расходы'],['loan','Займы'],
         ['investment','Инвестиции'],['transfer','Переводы'],
-      ].map(([value,label])=>({value,label})),
+      ]).map(([value,label])=>({value,label})),
     ]})
     +select({label:'Кошелёк',name:'wallet',value:'',options:[{value:'',label:'Все'},...wallets]})
     +select({label:'Статус',name:'status',value:'',options:[
@@ -125,34 +129,43 @@ function exportQ(root,movements){
   if(!layer)return;
   initDatePickers(layer);initSegmentControls(layer);
   const node=layer.querySelector('[data-dds-excel-export]');
+  const submit=node?.querySelector('button[type="submit"]');
+  financeQSubmit(layer,node);
   let busy=false;
   node?.addEventListener('submit',async event=>{
     event.preventDefault();
     if(busy)return;
     busy=true;
-    const submit=node.querySelector('button[type="submit"]');
     if(submit)submit.disabled=true;
     try{
-      const rows=filteredRows(movements,node);
-      const fmt=String(new FormData(node).get('format')||'xlsx');
-      if(fmt==='csv')exportScopedCsv('finance',rows);
-      else await exportScopedWorkbook('finance',rows);
+      const formData=new FormData(node);
+      const fmt=String(formData.get('format')||'xlsx');
+      if(registry){
+        const from=String(formData.get('from')||''),to=String(formData.get('to')||''),kind=String(formData.get('kind')||''),wallet=String(formData.get('wallet')||''),status=String(formData.get('status')||'');
+        if(from&&to&&from>to)throw new Error('Дата «С» не может быть позже «По»');
+        const rows=registryRows.filter(row=>(!from||row.localDate>=from)&&(!to||row.localDate<=to)&&(!kind||row.direction===kind||(kind==='transfer'&&row.direction==='mixed'))&&(!wallet||row.wallets.includes(wallet))&&(!status||row.status===status));
+        if(fmt==='csv')exportFinanceRegistryCsv(rows);else await exportFinanceRegistryWorkbook(rows);
+      }else{
+        const rows=filteredRows(movements,node);
+        if(fmt==='csv')exportScopedCsv('finance',rows);else await exportScopedWorkbook('finance',rows);
+      }
       layer.v2Close?.();
     }catch(error){reportExcelError(error);}
     finally{busy=false;if(submit)submit.disabled=false;}
   });
 }
-export function openDDSExcel(root,movements,{onImported=()=>{}}={}){
+export function openDDSExcel(root,movements,{onImported=()=>{},anchor=null,exportMovements=movements,registryRows=null}={}){
   const actions=[
-    {key:'export',label:'Выгрузка',run:()=>exportQ(root,movements)},
+    {key:'export',label:'Выгрузка',run:()=>exportQ(root,exportMovements,registryRows)},
     {key:'import',label:'Загрузка',run:()=>chooseScopedImport(root,'finance',{
       onImported:async()=>{await refreshFinanceState();await onImported();},
     })},
     {key:'template',label:'Шаблон',run:()=>exportScopedWorkbook('finance',[],{template:true})},
   ];
-  const layer=mountModal(root,modal('<div class="modal-actions">'
-    +actions.map(item=>button(item.label,{variant:'secondary',data:'data-dds-excel-'+item.key})).join('')
-    +'</div>',{title:'Excel',variant:'x',surface:'app',xRole:'action'}));
+  const buttons=actions.map(item=>button(anchor?desktopExcelActionLabel(item.key,item.label):item.label,{variant:'secondary',data:'data-dds-excel-'+item.key})).join('');
+  const layer=anchor
+    ? mountModal(anchor,modal('<div class="people-action-menu">'+buttons+'</div>',{title:'Excel',variant:'x',surface:'app',xRole:'action',className:'people-action-popup'}))
+    : mountModal(root,modal('<div class="modal-actions">'+buttons+'</div>',{title:'Excel',variant:'x',surface:'app',xRole:'action'}));
   if(!layer)return;
   actions.forEach(item=>layer.querySelector('[data-dds-excel-'+item.key+']')?.addEventListener('click',()=>{
     layer.v2Close?.();

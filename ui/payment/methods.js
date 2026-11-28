@@ -17,6 +17,21 @@ const moneyInputText = (value) => {
 
 const moneyDisplay = (value) => `${moneyInputText(value) || '0'} ₽`;
 
+// A suggested amount in a row without a chosen source is not a payment.
+export function selectedPaymentRows(rows = []) {
+  return rows.filter(row => String(row?.source || ''));
+}
+export function paymentAllocationRemainder(total, rows = []) {
+  const cents = value => Math.max(0, Math.round(numberValue(value) * 100));
+  return Math.max(0, cents(total) - selectedPaymentRows(rows).reduce((sum, row) => sum + cents(row.amount), 0)) / 100;
+}
+export function nextPaymentAllocation(total, rows = []) {
+  const selected = selectedPaymentRows(rows);
+  const remainder = paymentAllocationRemainder(total, selected);
+  return { needed: !selected.length || (selected.every(row => numberValue(row.amount) > 0) && remainder > 0), suggested: remainder > 0 ? remainder : null };
+}
+
+
 function sourceKey(type, id) {
   return `${type}:${String(id || '')}`;
 }
@@ -74,6 +89,7 @@ function allocationRow(index, wallets, deposits, personalAccount, initial = {}) 
       value: amount,
       type: 'text',
       inputmode: 'decimal',
+      readonly: !selected,
       data: `data-payment-allocation-amount="${index}"`,
     })}
   </div>`;
@@ -151,11 +167,11 @@ export function paymentMethodsMarkup({
     ...(Math.max(0, numberValue(initialPersonalAccountAmount)) > 0.009 ? [{ personalAccount: true, amount: initialPersonalAccountAmount }] : []),
     ...(Array.isArray(initialAllocations) ? initialAllocations : []),
   ];
-  const rowCount = Math.max(2, Math.min(4, initial.length || 0));
+  const rowCount = Math.max(1, initial.length);
   return `<div class="form-grid" data-payment-allocation-owner>
     ${showTotal ? `<div data-payment-remaining>${totalReceipt('К оплате', total)}</div>` : ''}
-    <div class="form-grid">
-      ${Array.from({ length: rowCount }, (_, index) => allocationRow(index, wallets, deposits, personalAccount, initial[index] || {})).join('')}
+    <div class="form-grid" data-payment-allocation-rows>
+      ${Array.from({ length: rowCount }, (_, index) => allocationRow(index, wallets, deposits, personalAccount, initial[index] || { amount: total > 0 ? total : null })).join('')}
     </div>
     <div data-payment-tips-row hidden></div>
     ${showAction ? `<div class="modal-actions">${button('Сохранить', { data: 'data-payment-allocation-submit' })}</div>` : ''}
@@ -174,9 +190,15 @@ export function initPaymentMethodsAllocation(root, {
   const remainingNode = root.querySelector('[data-payment-remaining]');
   const tipsRow = root.querySelector('[data-payment-tips-row]');
   const submit = root.querySelector('[data-payment-allocation-submit]');
+  const rowsHost = root.querySelector('[data-payment-allocation-rows]');
   const rows = () => [...root.querySelectorAll('[data-payment-allocation-row]')].map((part) => ({
+    part,
     sourceInput: part.querySelector('input[data-payment-allocation-source]'),
     amountInput: part.querySelector('[data-payment-allocation-amount]'),
+  }));
+  let nextIndex = Math.max(-1, ...rows().map(({part}) => Number(part.dataset.paymentAllocationRow) || 0)) + 1;
+  const rowValues = (excluding = null) => rows().filter(row => row.part !== excluding).map(({sourceInput,amountInput}) => ({
+    source: String(sourceInput?.value || ''), amount: numberValue(amountInput?.value),
   }));
   const walletById = new Map((Array.isArray(wallets) ? wallets : []).map((item) => [String(item?.id || ''), item]));
   const depositById = new Map((Array.isArray(deposits) ? deposits : []).map((item) => [String(item?.depositId || item?.id || ''), item]));
@@ -190,17 +212,18 @@ export function initPaymentMethodsAllocation(root, {
     for (const { sourceInput, amountInput } of rows()) {
       const value = String(sourceInput?.value || '');
       const amount = Math.max(0, numberValue(amountInput?.value));
-      if (!value && amount <= 0) continue;
+      // The unselected trailing row is a suggestion, not a financial fact.
+      if (!value) continue;
       const separator = value.indexOf(':');
       const type = separator >= 0 ? value.slice(0, separator) : '';
       const id = separator >= 0 ? value.slice(separator + 1) : '';
       if (type === 'wallet') {
         const wallet = walletById.get(id);
-        walletAllocations.push({ walletId: id, walletName: String(wallet?.name || ''), amount });
+        walletAllocations.push({ walletId: wallet ? id : '', walletName: String(wallet?.name || ''), amount });
       } else if (type === 'deposit') {
         const deposit = depositById.get(id);
         depositAllocations.push({
-          depositId: id,
+          depositId: deposit ? id : '',
           name: String(deposit?.programName || deposit?.name || 'Депозит'),
           balance: Math.max(0, numberValue(deposit?.balance)),
           amount,
@@ -216,29 +239,67 @@ export function initPaymentMethodsAllocation(root, {
 
   function state() {
     const values = normalizedSources();
-    return paymentAllocationState(values.walletAllocations, total, values.depositAllocations, {
+    const current = paymentAllocationState(values.walletAllocations, total, values.depositAllocations, {
       amount: values.personalAccountAmount,
       availableAmount: personalAvailable,
     });
+    const depositTotals = new Map();
+    for (const item of values.depositAllocations) depositTotals.set(item.depositId, (depositTotals.get(item.depositId)||0)+Math.round(item.amount*100));
+    if ([...depositTotals].some(([id,amount]) => !depositById.has(id)||amount>Math.round(Math.max(0,numberValue(depositById.get(id)?.balance))*100))) current.valid=false;
+    return current;
   }
 
-  function sourceMaximum(value) {
+  function sourceMaximum(value, excluding = null) {
+    let maximum = null;
     if (value.startsWith('deposit:')) {
       const deposit = depositById.get(value.slice('deposit:'.length));
-      return Math.max(0, numberValue(deposit?.balance));
+      maximum = Math.max(0, numberValue(deposit?.balance));
+    } else if (value === sourceKey('personal-account', personalKey)) {
+      maximum = personalAvailable;
     }
-    if (value === sourceKey('personal-account', personalKey)) return personalAvailable;
-    return null;
+    if (maximum == null) return null;
+    // A source limit is shared by all its rows, not renewed per row.
+    const allocated = selectedPaymentRows(rowValues(excluding))
+      .filter(row => row.source === value).reduce((sum,row) => sum + Math.round(row.amount * 100),0);
+    return Math.max(0, Math.round(maximum * 100) - allocated) / 100;
   }
 
-  function clampSourceAmount(sourceInput, amountInput) {
-    const maximum = sourceMaximum(String(sourceInput?.value || ''));
+  function clampSourceAmount(row) {
+    const {part,sourceInput,amountInput} = row;
+    const maximum = sourceMaximum(String(sourceInput?.value || ''), part);
     if (maximum == null || !amountInput) return;
     if (numberValue(amountInput.value) > maximum) amountInput.value = moneyInputText(maximum);
   }
 
+  function appendEmptyRow(amount = null) {
+    if (!rowsHost) return null;
+    rowsHost.insertAdjacentHTML('beforeend', allocationRow(nextIndex++, wallets, deposits, personalAccount, { amount }));
+    const row = rows().at(-1);
+    if (row) bindRow(row);
+    return row || null;
+  }
+
+  function syncRows() {
+    const plan = nextPaymentAllocation(total, rowValues());
+    const all = rows();
+    const empty = all.filter(row => !String(row.sourceInput?.value || ''));
+    // Keep at most one trailing placeholder. Never recreate selected fields:
+    // typing, focus and manually entered amounts must survive an update.
+    let pending = plan.needed ? empty.at(-1) : null;
+    for (const row of empty) if (row !== pending) row.part.remove();
+    if (plan.needed && !pending) pending = appendEmptyRow(plan.suggested);
+    if (pending) {
+      if (rowsHost && rowsHost.lastElementChild !== pending.part) rowsHost.appendChild(pending.part);
+      if (pending.amountInput) {
+        pending.amountInput.readOnly = true;
+        pending.amountInput.value = plan.suggested == null ? '' : moneyInputText(plan.suggested);
+      }
+    }
+  }
+
   function sync() {
     const current = state();
+    syncRows();
     if (remainingNode) remainingNode.innerHTML = totalReceipt('К оплате', current.remaining);
     if (tipsRow) {
       tipsRow.hidden = current.tips <= 0.009;
@@ -249,13 +310,24 @@ export function initPaymentMethodsAllocation(root, {
     return current;
   }
 
-  rows().forEach(({ sourceInput, amountInput }) => {
+  function bindRow(row) {
+    const {part,sourceInput,amountInput} = row;
+    if (part.dataset.paymentAllocationReady === 'true') return;
+    part.dataset.paymentAllocationReady = 'true';
     sourceInput?.addEventListener('change', () => {
-      clampSourceAmount(sourceInput, amountInput);
+      const value = String(sourceInput.value || '');
+      if (amountInput) {
+        amountInput.readOnly = !value;
+        const remaining = paymentAllocationRemainder(total,rowValues(part));
+        const maximum = sourceMaximum(value,part);
+        // Initial wallet selection pulls the unpaid amount. A limited source
+        // pulls only the available balance; the next row receives the rest.
+        amountInput.value = value ? moneyInputText(maximum == null ? remaining : Math.min(remaining,maximum)) : '';
+      }
       sync();
     });
     amountInput?.addEventListener('input', () => {
-      clampSourceAmount(sourceInput, amountInput);
+      clampSourceAmount(row);
       sync();
     });
     amountInput?.addEventListener('blur', () => {
@@ -263,7 +335,9 @@ export function initPaymentMethodsAllocation(root, {
       amountInput.value = value > 0 ? moneyInputText(value) : '';
       sync();
     });
-  });
+  }
+
+  rows().forEach(bindRow);
 
   submit?.addEventListener('click', () => {
     const current = state();

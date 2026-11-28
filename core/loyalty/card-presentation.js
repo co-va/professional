@@ -26,8 +26,17 @@ export function loyaltyCardLabel(type = '') {
   return typeConfig(type).label;
 }
 
-export function loyaltyCardAppearance(type = '') {
-  const template = getCardAppearanceTemplate(loyaltyCardScope(type));
+export function loyaltyProgramCardScope(type = '', programId = '') {
+  const scope = loyaltyCardScope(type);
+  return programId && type !== 'personal-account' ? scope + ':' + encodeURIComponent(String(programId)) : scope;
+}
+
+function appearanceTemplate(type, programId) {
+  return getCardAppearanceTemplate(loyaltyProgramCardScope(type, programId)) || getCardAppearanceTemplate(loyaltyCardScope(type));
+}
+
+export function loyaltyCardAppearance(type = '', programId = '') {
+  const template = appearanceTemplate(type, programId);
   if (hasConfiguredEntityCardAppearance(template?.appearance)) {
     return type === 'personal-account' ? remapEntityCardAppearanceFields(template.appearance, {metaLeft:'amountLabel',metaRight:'currentAmount'}) : normalizeEntityCardAppearance(template.appearance);
   }
@@ -44,12 +53,12 @@ export function loyaltyCardAppearance(type = '') {
   });
 }
 
-export function loyaltyCardPhoto(type = '') {
-  return String(getCardAppearanceTemplate(loyaltyCardScope(type))?.photo || '');
+export function loyaltyCardPhoto(type = '', programId = '') {
+  return String(appearanceTemplate(type, programId)?.photo || '');
 }
 
-export function loyaltyCardPhotoPosition(type = '') {
-  return String(getCardAppearanceTemplate(loyaltyCardScope(type))?.photoPosition || '50% 50%');
+export function loyaltyCardPhotoPosition(type = '', programId = '') {
+  return String(appearanceTemplate(type, programId)?.photoPosition || '50% 50%');
 }
 
 export function loyaltyCardFields({
@@ -61,7 +70,7 @@ export function loyaltyCardFields({
   metaRight = '',
 } = {}) {
   return [
-    { value: 'uei', label: 'UEI', text: String(uei || '') },
+    { value: 'uei', label: 'Код', text: String(uei || '') },
     { value: 'title', label: 'Название', text: String(title || '') },
     { value: 'subtitle', label: 'Подпись', text: String(subtitle || '') },
     { value: 'status', label: 'Статус', text: String(status || '') },

@@ -41,3 +41,9 @@ export function initCheckList(root) {
     input.addEventListener('change', () => sync(input));
   });
 }
+
+// One grouping pre-section for the desktop sort menus. Native checkbox
+// behavior and the existing action menu's sorting buttons remain unchanged.
+export function sortGroupingSection(items) {
+  return '<div class="sort-grouping-section" role="group" aria-label="Группировка"><div class="sort-menu-section-label">Группировка</div><div class="sort-grouping-options">'+items.map(compactCheck).join('')+'</div></div><div class="sort-menu-section-label sort-menu-order-label">Сортировка</div>';
+}

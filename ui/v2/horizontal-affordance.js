@@ -1,3 +1,5 @@
+import { compactButton } from '../buttons/index.js';
+
 export const V2_HORIZONTAL_RAIL_SELECTOR = '[data-v2-horizontal-rail], [data-entity-card-rail], [data-mini-card-rail]';
 
 export function isV2HorizontalGestureTarget(target) {
@@ -45,7 +47,8 @@ function syncSection(section) {
   const rails = [...section.querySelectorAll(V2_HORIZONTAL_RAIL_SELECTOR)];
   rails.forEach(positionCurrentRailItem);
   const hasMore = rails.some(isHorizontallyScrollable);
-  section.classList.toggle('has-v2-horizontal-rail', hasMore);
+  if (section.classList.contains('has-v2-horizontal-rail') !== hasMore) section.classList.toggle('has-v2-horizontal-rail', hasMore);
+  rails.forEach(rail => rail.dispatchEvent(new Event('v2:rail-layout')));
 }
 
 export function syncV2HorizontalAffordances(root = document) {
@@ -54,20 +57,61 @@ export function syncV2HorizontalAffordances(root = document) {
 
 export function bindV2HorizontalAffordances(root) {
   if (!root?.querySelectorAll || typeof MutationObserver !== 'function') return () => {};
-  let queued = false;
+  // Never re-enter the header/rail MutationObserver chain within the same
+  // microtask checkpoint. Safari can otherwise starve painting and input.
+  let frame = 0;
   const sync = () => {
-    queued = false;
+    frame = 0;
     if (!root.isConnected) return;
     syncV2HorizontalAffordances(root);
   };
   const queue = () => {
-    if (queued) return;
-    queued = true;
-    queueMicrotask(sync);
+    if (frame) return;
+    frame = requestAnimationFrame(sync);
   };
 
   syncV2HorizontalAffordances(root);
   const observer = new MutationObserver(queue);
   observer.observe(root, { childList: true, subtree: true });
-  return () => observer.disconnect();
+  window.addEventListener('resize', queue);
+  return () => {
+    observer.disconnect();
+    window.removeEventListener('resize', queue);
+    if (frame) cancelAnimationFrame(frame);
+  };
+}
+
+/** Existing Desktop rail navigation, independent of card owner. */
+export function bindDesktopRailControls(rail, { prefix = 'rail', label = 'карта' } = {}) {
+  const section = rail?.closest('.v2-section');
+  const title = section?.querySelector('.v2-section__title');
+  if (!rail || !title || title.querySelector('.profile-workplace-rail-controls')) return;
+  title.insertAdjacentHTML('beforeend', '<span class="profile-workplace-rail-controls" data-v2-layer-gesture-ignore>' +
+    compactButton({ kind: 'previous', data: 'data-' + prefix + '-prev', aria: 'Назад: ' + label }) +
+    compactButton({ kind: 'next', data: 'data-' + prefix + '-next', aria: 'Вперёд: ' + label }) + '</span>');
+  section.classList.add('profile-workplace-rail-interactive');
+  const nav = title.querySelector('.profile-workplace-rail-controls');
+  const prev = nav.querySelector('[data-' + prefix + '-prev]');
+  const next = nav.querySelector('[data-' + prefix + '-next]');
+  const sync = () => {
+    const max = Math.max(0, rail.scrollWidth - rail.clientWidth);
+    const hidden = max <= 1;
+    const atStart = rail.scrollLeft <= 1;
+    const atEnd = rail.scrollLeft >= max - 1;
+    if (nav.hidden !== hidden) nav.hidden = hidden;
+    if (prev.disabled !== atStart) prev.disabled = atStart;
+    if (next.disabled !== atEnd) next.disabled = atEnd;
+  };
+  const step = direction => {
+    const max = Math.max(0, rail.scrollWidth - rail.clientWidth);
+    const first = rail.firstElementChild?.getBoundingClientRect().left || 0;
+    const positions = [...new Set([0, ...[...rail.children].map(card => Math.max(0, Math.min(max, card.getBoundingClientRect().left - first))), max])].sort((a,b) => a-b);
+    const target = direction > 0 ? positions.find(x => x > rail.scrollLeft + 1) : positions.slice().reverse().find(x => x < rail.scrollLeft - 1);
+    if (target != null) rail.scrollTo({ left: target, behavior: 'smooth' });
+  };
+  prev.addEventListener('click', () => step(-1));
+  next.addEventListener('click', () => step(1));
+  rail.addEventListener('scroll', sync, { passive: true });
+  rail.addEventListener('v2:rail-layout', sync);
+  requestAnimationFrame(sync);
 }

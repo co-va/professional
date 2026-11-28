@@ -1,7 +1,9 @@
+import { VIEW_ICON, GROUP_ICON } from '../../ui/buttons/index.js';
 import {
   button,
   compactButton,
   emptyState,
+  field,
   initViewNavigation,
   openSharedProfileSettingsMenu,
   openNotice,
@@ -13,6 +15,7 @@ import {
 import { loadOperationalState } from '../runtime/operational-state.js';
 import { loadAuxiliaryState } from '../runtime/auxiliary-state.js';
 import { openServiceGroupingQ } from './catalog-grouping.js';
+import { renderDesktopServiceCatalog } from './desktop-catalog.js';
 import { hasCurrentProceduresSnapshot } from './procedures/data.js';
 import { loadInventory } from '../inventory/service.js';
 import { serviceHeaderContext, notifyServiceContext } from './context.js';
@@ -77,6 +80,8 @@ export function renderService(root, navigateBack = () => {}) {
   let disposeCatalog = () => {};
   let renderVersion = 0;
   let disposed = false;
+  const makeDesktopState=()=>({query:'',sort:'manual',group:'',value:'',workplace:'',ranges:{},rangeMetric:'',selected:new Set(),groupCollapsed:new Set()});
+  const desktopStates={procedures:makeDesktopState(),products:makeDesktopState()};
 
   const renderCurrent = () => {
     if (disposed) return;
@@ -86,6 +91,7 @@ export function renderService(root, navigateBack = () => {}) {
     const view = views.some((item) => item.id === activeView) ? activeView : 'procedures';
 
     const desktop = isV2DesktopWorkspace(root.closest('[data-v2-app]'));
+    const desktopState=desktopStates[view];
     const actions = serviceSettingsActions(root, renderCurrent);
     const addAria = view === 'products' ? 'Добавить товар' : 'Добавить услугу';
     root.innerHTML = page([
@@ -106,25 +112,27 @@ export function renderService(root, navigateBack = () => {}) {
     // Use the same stationary Z header slot as Inventory; do not alter Shared
     // surface geometry or introduce a second header inside the Z body.
     const navMarkup = viewNavigation({ views, activeView: view, ariaLabel: 'Сервис' });
-    const toolbar = desktop ? `<div class="v2-desktop-tool-row" data-service-desktop-toolbar>
-      <div class="v2-desktop-tool-context">
-        ${navMarkup}
-        ${compactButton({ kind: 'group', data: 'data-service-tool="grouping" title="Группы"', aria: 'Группы' })}
+    const toolbar = desktop ? `<section data-people-desktop-toolbar data-service-desktop-toolbar><div class="people-desktop-tools">
+      <div class="v2-desktop-tool-context">${navMarkup}</div>
+      ${field({name:'serviceSearch',type:'search',placeholder:'Поиск',autocomplete:'off',value:desktopState.query,data:'data-service-search'})}
+      <div class="people-desktop-actions people-desktop-query-tools">
+        ${compactButton({kind:'filter',data:'data-service-filter title="Фильтр" aria-haspopup="dialog" aria-pressed="false"'})}
+        ${compactButton({kind:'sort',data:'data-service-sort title="Сортировка" aria-haspopup="dialog" aria-pressed="false"'})}
       </div>
-      <div class="v2-desktop-tool-actions">
-        ${actions.filter(action => action.id !== 'grouping').map(action => button(action.label, { variant: 'secondary', data: `data-service-tool="${action.id}"` })).join('')}
-        ${button('<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>', { variant: 'secondary', className: 'v2-desktop-tool-primary', data: 'data-service-add', aria: addAria })}
-      </div>
-    </div>` : navMarkup;
+      <div class="people-desktop-actions people-desktop-actions--right">
+        ${button(GROUP_ICON,{variant:'secondary',className:'people-desktop-icon',data:'data-service-tool="grouping" title="Группы"',aria:'Группы'})}
+        ${button(VIEW_ICON,{variant:'secondary',className:'people-desktop-icon',data:'data-service-tool="appearance" title="Вид"',aria:'Вид'})}
+        ${button('+',{variant:'secondary',className:'people-desktop-icon people-desktop-add',data:'data-service-add title="'+addAria+'"',aria:addAria})}
+      </div></div></section>` : navMarkup;
     const headerRows = setV2ZHeaderRows(root, [toolbar], {
       desktopTitle: desktop ? 'Сервис' : null,
       desktopAccessory: desktop ? '<output data-service-count aria-live="polite">—</output>' : '',
     });
     const counter = desktop ? root.closest('[data-v2-z],[data-v2-z-layer]')?.querySelector('[data-h-accessory]>[data-service-count]') : null;
-    const onCount = (count) => {
+    const onCount = (count,selected=0) => {
       if (!counter?.isConnected || version !== renderVersion) return;
-      counter.textContent = String(count);
-      counter.setAttribute('aria-label', 'Позиций в списке: ' + count);
+      counter.textContent = selected ? selected+' / '+count : String(count);
+      counter.setAttribute('aria-label', selected ? 'Выбрано '+selected+' из '+count : 'Позиций в списке: '+count);
     };
     const navigationRoot = headerRows[0] || root;
     if (!headerRows.length) {
@@ -148,7 +156,9 @@ export function renderService(root, navigateBack = () => {}) {
     });
 
     const catalog = root.querySelector('[data-service-catalog]');
-    if (catalog) {
+    if(catalog && desktop) {
+      disposeCatalog=renderDesktopServiceCatalog(catalog,{root,toolbar:navigationRoot,onChanged:renderCurrent,state:desktopState,kind:view,onCount,loadProceduresModule,loadProductsModule});
+    } else if (catalog) {
       const modulePromise = view === 'products' ? loadProductsModule() : loadProceduresModule();
       void modulePromise.then(async (module) => {
         if (view === 'products') await Promise.all([
@@ -219,7 +229,7 @@ export function renderService(root, navigateBack = () => {}) {
     disposeCatalog?.();
     const header = root?.closest?.('[data-v2-z],[data-v2-z-layer]')
       ?.querySelector?.(':scope > [data-v2-z-header] > [data-v2-z-header-content]');
-    if (header?.querySelector('[data-view-navigation]')) clearV2ZHeaderRows(root);
+    if (header?.querySelector('[data-view-navigation],[data-service-desktop-toolbar]')) clearV2ZHeaderRows(root);
   };
 }
 

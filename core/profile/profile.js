@@ -1,3 +1,4 @@
+import { VIEW_ICON } from '../../ui/buttons/index.js';
 import { button, compactButton, setV2ZHeaderRows, collectRepeatedField, entityVisualCard, escapeHtml, field, modal, mountModal, openEntityCardAppearanceQ, openSharedProfileDataEditor, openSharedProfileSettingsMenu, openSharedPasswordAction, page, repeatedField, searchableSelect, select, textareaField, v2HorizontalRail, v2Section, workspaceHeaderContext, workplaceAddButton } from '../../ui/ui.js';
 import { canUseCapability, getAccess, getLimit, loadAccess, requestLiveMode } from '../../core/access.js';
 import { changePassword, logout } from '../../core/auth.js';
@@ -9,6 +10,7 @@ import { getCardAppearanceTemplate, saveCardAppearanceTemplate } from '../../cor
 import { loadProfileState } from './runtime.js';
 import { loadOperationalState } from '../runtime/operational-state.js';
 import { isV2DesktopWorkspace } from '../../ui/v2/geometry.js';
+import { bindDesktopRailControls } from '../../ui/v2/horizontal-affordance.js';
 import { moveDesktopQTool } from '../../ui/v2/z-layout.js';
 
 const EXPERIENCES=['Без опыта','До 1 года','1–3 года','3–5 лет','5–10 лет','10–15 лет','15–20 лет','Более 20 лет'];
@@ -71,34 +73,7 @@ function workplaceRail(){
 }
 
 function bindDesktopWorkplaceRail(root){
-  const rail=root.querySelector('.v2-profile-workplaces');
-  const section=rail?.closest('.v2-section');
-  const title=section?.querySelector('.v2-section__title');
-  if(!rail||!title)return;
-  title.insertAdjacentHTML('beforeend','<span class="profile-workplace-rail-controls" data-v2-layer-gesture-ignore>'+
-    compactButton({kind:'previous',data:'data-profile-rail-prev',aria:'Предыдущее рабочее пространство'})+
-    compactButton({kind:'next',data:'data-profile-rail-next',aria:'Следующее рабочее пространство'})+'</span>');
-  section.classList.add('profile-workplace-rail-interactive');
-  const nav=title.querySelector('.profile-workplace-rail-controls');
-  const prev=nav.querySelector('[data-profile-rail-prev]');
-  const next=nav.querySelector('[data-profile-rail-next]');
-  const sync=()=>{
-    const max=Math.max(0,rail.scrollWidth-rail.clientWidth);
-    nav.hidden=max<=1;
-    prev.disabled=rail.scrollLeft<=1;
-    next.disabled=rail.scrollLeft>=max-1;
-  };
-  const step=direction=>{
-    const max=Math.max(0,rail.scrollWidth-rail.clientWidth);
-    const first=rail.firstElementChild?.getBoundingClientRect().left||0;
-    const positions=[...new Set([0,...[...rail.children].map(card=>Math.max(0,Math.min(max,card.getBoundingClientRect().left-first))),max])].sort((a,b)=>a-b);
-    const target=direction>0?positions.find(x=>x>rail.scrollLeft+1):positions.slice().reverse().find(x=>x<rail.scrollLeft-1);
-    if(target!=null)rail.scrollTo({left:target,behavior:'smooth'});
-  };
-  prev.addEventListener('click',()=>step(-1));
-  next.addEventListener('click',()=>step(1));
-  rail.addEventListener('scroll',sync,{passive:true});
-  requestAnimationFrame(sync);
+  bindDesktopRailControls(root.querySelector('.v2-profile-workplaces'), { prefix: 'profile-rail', label: 'рабочее пространство' });
 }
 
 function profileDataFields(p,emails){
@@ -313,7 +288,7 @@ function renderDesktopProfileTools(root,navigateBack,options,workplacesAllowed,t
     variant:'secondary',className:'v2-desktop-tool-primary',data:'data-profile-desktop-add',aria:'Добавить рабочее пространство',
   }):'';
   const markup='<div class="v2-desktop-tool-row" data-profile-desktop-toolbar><div class="v2-desktop-tool-actions">'+
-    actions.map(action=>button(action.label,{variant:'secondary',className:'v2-desktop-tool-accent',data:'data-profile-desktop-action="'+action.id+'"',aria:action.aria||action.label,disabled:Boolean(action.disabled)})).join('')+add+'</div></div>';
+    actions.map(action=>button(action.id==='appearance'?VIEW_ICON:action.label,{variant:'secondary',className:'v2-desktop-tool-accent'+(action.id==='appearance'?' v2-desktop-tool-icon':''),data:'data-profile-desktop-action="'+action.id+'"'+(action.id==='appearance'?' title="Вид"':''),aria:action.aria||action.label,disabled:Boolean(action.disabled)})).join('')+add+'</div></div>';
   const [row]=setV2ZHeaderRows(root,[markup],{desktopTitle:title});
   row?.querySelectorAll('[data-profile-desktop-action]').forEach(control=>{
     const action=actions.find(item=>item.id===control.dataset.profileDesktopAction);

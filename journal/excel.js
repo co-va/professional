@@ -1,3 +1,4 @@
+import { desktopExcelActionLabel } from '../ui/buttons/index.js';
 import {
   button, datePicker, initDatePickers, modal, mountModal, openNotice,
   segmentControl, initSegmentControls, select, twoColumnLayout,
@@ -164,7 +165,7 @@ function openJournalExport(root){
     finally{running=false;if(submit)submit.disabled=false;}
   });
 }
-export function openJournalExcel(root,{onImported=()=>{}}={}){
+export function openJournalExcel(root,{onImported=()=>{},anchor=null}={}){
   const actions=[
     {key:'export',name:'Выгрузка',run:()=>openJournalExport(root)},
     {key:'import',name:'Загрузка',run:()=>chooseScopedImport(root,'records',{
@@ -172,9 +173,9 @@ export function openJournalExcel(root,{onImported=()=>{}}={}){
     })},
     {key:'template',name:'Шаблон',run:()=>exportScopedWorkbook('records',[],{template:true})},
   ];
-  const layer=mountModal(root,modal('<div class="modal-actions">'
-    +actions.map(item=>button(item.name,{variant:'secondary',data:'data-journal-excel-'+item.key})).join('')
-    +'</div>',{title:'Excel',variant:'x',surface:'app',xRole:'action'}));
+  const layer=mountModal(anchor||root,modal('<div class="'+(anchor?'people-action-menu':'modal-actions')+'">'
+    +actions.map(item=>button(anchor?desktopExcelActionLabel(item.key,item.name):item.name,{variant:'secondary',data:'data-journal-excel-'+item.key})).join('')
+    +'</div>',{title:'Excel',variant:'x',surface:'app',xRole:'action',className:anchor?'people-action-popup':''}));
   if(!layer)return;
   actions.forEach(item=>layer.querySelector('[data-journal-excel-'+item.key+']')?.addEventListener('click',()=>{
     layer.v2Close?.();

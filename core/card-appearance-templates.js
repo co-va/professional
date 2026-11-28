@@ -9,6 +9,15 @@ SCOPES.add('loyalty-referral');
 SCOPES.add('loyalty-bonus');
 let templatesState = [];
 
+function validScope(scope) {
+  if (SCOPES.has(scope)) return true;
+  // Named program views share the existing server-owned template dataset.
+  // Deposit uses its canonical program record instead; Personal Account is not a program.
+  const [base, id, ...extra] = scope.split(':');
+  return !extra.length && Boolean(id) && base.startsWith('loyalty-')
+    && SCOPES.has(base) && base !== 'loyalty-deposit' && base !== 'loyalty-personal-account';
+}
+
 // Card templates are account-scoped. A second login must never inherit the
 // first account's visual template through the local timestamp merge.
 if (typeof window !== 'undefined') {
@@ -28,7 +37,7 @@ function objectValue(value = {}) {
 function normalizeTemplate(value = {}) {
   const source = objectValue(value);
   const scope = String(source.scope || '').trim();
-  if (!SCOPES.has(scope)) return null;
+  if (!validScope(scope)) return null;
   return {
     scope,
     appearance: clone(objectValue(source.appearance)),
@@ -81,7 +90,7 @@ export function saveCardAppearanceTemplate(scope = '', {
   photoPosition = '50% 50%',
 } = {}) {
   const key = String(scope || '').trim();
-  if (!SCOPES.has(key)) throw new Error('Неизвестный тип карты');
+  if (!validScope(key)) throw new Error('Неизвестный тип карты');
   const next = {
     scope: key,
     appearance: clone(objectValue(appearance)),

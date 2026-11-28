@@ -1,3 +1,4 @@
+import {inventoryDesktop,inventoryDesktopHeader,inventoryTable,inventoryRowButton,bindInventoryTableRows} from './desktop.js';
 import {
   actionBlock, button, compactButton, emptyState, escapeHtml, field,
   list, modal, mountModal, page, select, workspaceHeaderContext,
@@ -339,21 +340,31 @@ function openGroupEditor(current, onSaved) {
 
 export function renderConsumptionGroups(root) {
   let disposed = false;
+  const desktop=inventoryDesktop(root);
   root.innerHTML = page([
     workspaceHeaderContext({
       title:'Группы расхода',
-      c:{ label:'+',data:'data-consumption-group-add',aria:'Добавить группу расхода' },
+      c:desktop?null:{ label:'+',data:'data-consumption-group-add',aria:'Добавить группу расхода' },
     }),
-    '<div data-consumption-groups-list></div>',
+    '<div data-consumption-groups-list'+(desktop?' data-inventory-desktop-table':'')+'></div>',
   ]);
   const host = root.querySelector('[data-consumption-groups-list]');
+  const header=desktop?inventoryDesktopHeader(root,'Группы расхода','',[
+    {label:'+',className:'v2-desktop-tool-primary',data:'data-consumption-group-add',aria:'Добавить группу расхода'},
+  ]):null;
   const refresh = async () => {
     host.innerHTML = emptyState('Загрузка','Загружаем группы расхода.');
     try {
       const result = await request();
       if (disposed || !root.isConnected) return;
       const groups = Array.isArray(result.groups) ? result.groups : [];
-      host.innerHTML = groups.length ? list({ className:'ui-list--dense', items:groups.map(group => ({
+      host.innerHTML = groups.length ? desktop?inventoryTable(groups,[
+        {key:'name',label:'Наименование',render:group=>inventoryRowButton(group.name,'data-consumption-group-open',group.groupId)},
+        {key:'count',label:'Позиций',narrow:true,render:group=>String((group.itemIds||[]).length)},
+        {key:'unit',label:'Единица',narrow:true},
+        {key:'balance',label:'Остаток',narrow:true,render:group=>group.physicalBalance==null?'':escapeHtml(quantityText(group.physicalBalance))},
+        {key:'price',label:'Средняя стоимость',narrow:true,render:group=>group.averageUnitCost==null?'':escapeHtml(money(group.averageUnitCost)+'/'+group.unit)},
+      ],'Группы расхода'):list({ className:'ui-list--dense', items:groups.map(group => ({
         title:group.name,
         secondary:groupSubline(group),
         right:group.averageUnitCost == null ? '' : money(group.averageUnitCost) + '/' + group.unit,
@@ -361,11 +372,9 @@ export function renderConsumptionGroups(root) {
         data:'data-consumption-group-open="' + escapeHtml(group.groupId) + '"',
         aria:'Открыть ' + group.name,
       })) }) : emptyState('Групп пока нет','Создайте первую группу расхода кнопкой «+».');
-      host.querySelectorAll('[data-consumption-group-open]').forEach(node => {
-        node.addEventListener('click', () => {
-          const group = groups.find(row => String(row.groupId) === node.dataset.consumptionGroupOpen);
-          if (group) openGroupEditor(group, () => { if (!disposed) void refresh(); });
-        });
+      bindInventoryTableRows(host,'[data-consumption-group-open]',node=>{
+        const group=groups.find(row=>String(row.groupId)===node.dataset.consumptionGroupOpen);
+        if(group)openGroupEditor(group,()=>{if(!disposed)void refresh();});
       });
     } catch (error) {
       if (disposed || !root.isConnected) return;
@@ -373,7 +382,7 @@ export function renderConsumptionGroups(root) {
         error instanceof Error ? error.message : 'Проверьте соединение.');
     }
   };
-  root.querySelector('[data-consumption-group-add]')?.addEventListener('click',
+  (header?.querySelector('[data-consumption-group-add]')||root.querySelector('[data-consumption-group-add]'))?.addEventListener('click',
     () => openGroupEditor(null, () => { if (!disposed) void refresh(); }));
   void refresh();
   return () => { disposed = true; };

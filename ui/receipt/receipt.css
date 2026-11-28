@@ -14,3 +14,14 @@
 .read-only-sheet__row-actions .icon-button{flex:0 0 auto}
 .read-only-sheet__row.is-strong{font-weight:800}
 .read-only-sheet__action{padding-top:2px}
+
+/* Desktop financial X: existing H button height and confirmation alignment.
+   Do not change the shared receipt, Mobile or deletion confirmation geometry. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace .v2-layer--bottom .modal-actions.finance-receipt-actions{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:16px;margin-top:24px;padding:0}
+ .v2-app--workspace .v2-layer--bottom .finance-receipt-actions>.ui-button{box-sizing:border-box;width:auto;min-width:0;height:var(--h-tools,36px);min-height:var(--h-tools,36px);max-height:var(--h-tools,36px);margin:0;padding:0 12px;border-width:1px;border-radius:10px;font-size:13px;line-height:1;white-space:nowrap}
+ .v2-app--workspace .v2-layer--bottom .finance-receipt-actions>.ui-button:only-child{width:100%;max-width:160px}
+ .v2-app--workspace .v2-layer--bottom .modal-actions.finance-receipt-actions--dds:has(>.ui-button:nth-child(2)){display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;justify-items:stretch}
+ .v2-app--workspace .v2-layer--bottom .finance-receipt-actions--dds:has(>.ui-button:nth-child(2))>.ui-button{width:100%;max-width:160px;min-width:0}
+ .v2-app--workspace .v2-layer--bottom .finance-receipt-actions--dds:has(>.ui-button:nth-child(2))>.ui-button:nth-child(2){justify-self:end;background:var(--v2-base);border-color:var(--v2-base);color:var(--white)}
+}

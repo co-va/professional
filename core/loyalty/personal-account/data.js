@@ -61,7 +61,9 @@ export function getCachedPersonalAccount(personKey = '') {
 }
 
 export async function loadPersonalAccounts() {
-  const values = await payload(await apiRequest('/loyalty/personal-accounts'), 'Не удалось загрузить Личные счета');
+  const response = await apiRequest('/loyalty/personal-accounts');
+  if (response.status >= 500) throw new Error(`Сервер временно недоступен (HTTP ${response.status})`);
+  const values = await payload(response, 'Не удалось загрузить Личные счета');
   accounts = list(values).map(normalizeAccount).filter((item) => item.personKey);
   return getPersonalAccounts();
 }

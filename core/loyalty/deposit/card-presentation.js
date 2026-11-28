@@ -39,11 +39,26 @@ export function depositFundingProgress(deposit = {}) {
   return { fixed, nominal: fixed ? nominal : null, funded, due, paid: fixed && due <= 0.009 };
 }
 
+// Funding state is a presentation of the immutable assigned terms; it never
+// changes the deposit lifecycle, recorded payments or canonical amounts.
+export function depositFundingListStatus(deposit = {}, at = new Date()) {
+  const progress = depositFundingProgress(deposit);
+  if (deposit.status !== 'active' || !progress.fixed) return null;
+  if (progress.paid) return { label: 'Оплачено', amount: null };
+  const day = `${at.getFullYear()}-${String(at.getMonth() + 1).padStart(2, '0')}-${String(at.getDate()).padStart(2, '0')}`;
+  const terms = deposit.terms || {};
+  const start = ['dated', 'fixed'].includes(String(terms.termMode || '').toLowerCase())
+    ? String(terms.termStartDate || '').slice(0, 10) : '';
+  const future = /^\d{4}-\d{2}-\d{2}$/.test(start) && start > day;
+  return { label: future ? 'К оплате' : 'Задолженность', amount: progress.due };
+}
+
 export function depositCardScope() {
   return SCOPE;
 }
 
-export function depositCardAppearance() {
+export function depositCardAppearance(program = {}) {
+  if (hasConfiguredEntityCardAppearance(program.cardAppearance)) return remapEntityCardAppearanceFields(program.cardAppearance, {metaLeft:'benefit',metaRight:'nominal'});
   const template = getCardAppearanceTemplate(SCOPE);
   if (hasConfiguredEntityCardAppearance(template?.appearance)) return remapEntityCardAppearanceFields(template.appearance, {metaLeft:'benefit',metaRight:'nominal'});
   return normalizeEntityCardAppearance({
@@ -58,12 +73,12 @@ export function depositCardAppearance() {
   });
 }
 
-export function depositCardPhoto() {
-  return String(getCardAppearanceTemplate(SCOPE)?.photo || '');
+export function depositCardPhoto(program = {}) {
+  return String(program.photo ?? getCardAppearanceTemplate(SCOPE)?.photo ?? '');
 }
 
-export function depositCardPhotoPosition() {
-  return String(getCardAppearanceTemplate(SCOPE)?.photoPosition || '50% 50%');
+export function depositCardPhotoPosition(program = {}) {
+  return String(program.photoPosition || getCardAppearanceTemplate(SCOPE)?.photoPosition || '50% 50%');
 }
 
 // One status label for the Deposit program and its assigned Person card.
@@ -88,7 +103,7 @@ export function depositCardFields({
   toFund = null,
 } = {}) {
   return [
-    { value: 'uei', label: 'UEI программы', text: String(uei || '') },
+    { value: 'uei', label: 'Код программы', text: String(uei || '') },
     { value: 'title', label: 'Название программы', text: String(title || 'Депозит') },
     { value: 'subtitle', label: 'Срок действия', text: String(subtitle || 'Депозит') },
     { value: 'status', label: 'Статус', text: String(status || '') },

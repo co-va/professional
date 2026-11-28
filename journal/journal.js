@@ -1,3 +1,4 @@
+import { DATA_EXCHANGE_ICON } from '../ui/buttons/index.js';
 import { formatReportRubles as formatRubles, formatReportNumber as formatNumber } from '../ui/utils/values.js';
 import { recordDurationHours } from '../core/time/index.js';
 import { viewNavigation, initViewNavigation, ALL_WORKPLACES_ID, modal, mountModal, openDayWorkplaceControl, openSharedProfileSettingsMenu, workspaceHeaderContext, button } from '../ui/ui.js';
@@ -9,6 +10,8 @@ import { canUseCapability } from '../core/access.js';
 import { getAllWorkplacesMonthStats, getWorkplaceMonthStats, getWorkplaceMonthStatsMap, getWorkingDays, getWorkplaces } from '../core/workplace-time.js';
 import { getActiveDayWorkplaces, getAvailableDayWorkplaces } from '../core/day/index.js';
 import { getRecordPaymentState } from '../core/finance/index.js';
+import { readFinanceState } from '../core/finance/data.js';
+import { recordPaymentReport, recordPaymentPresentation } from '../core/finance/prepayment-model.js';
 import { hasZonedIntervalEnded } from '../core/time/index.js';
 import { applyTimetableWorkingDays, makeTimetableDayOff, openTimetableDayTimeEditor } from '../timetable/day-editor.js';
 import { getRecordsInRange, getRecordsForDay } from '../core/record/index.js';
@@ -372,10 +375,10 @@ export function renderJournal(root, options = {}) {
     const tipsTotal = paymentStates.reduce((sum, item) => sum + Math.max(0, Number(item.state?.tipsTotal) || 0), 0);
     const outstanding = paymentStates.filter((item) => Math.max(0, Number(item.state?.remaining) || 0) > 0.009);
     const dueTotal = outstanding
-      .filter((item) => !recordHasEnded(item.record))
+      .filter((item) => recordPaymentPresentation(item.record,item.state,workplaces.find(w=>String(w?.key||'')===String(item.record?.workplaceId||''))?.timeZone).phase!=='after')
       .reduce((sum, item) => sum + Math.max(0, Number(item.state?.remaining) || 0), 0);
     const debtTotal = outstanding
-      .filter((item) => recordHasEnded(item.record))
+      .filter((item) => recordPaymentPresentation(item.record,item.state,workplaces.find(w=>String(w?.key||'')===String(item.record?.workplaceId||''))?.timeZone).phase==='after')
       .reduce((sum, item) => sum + Math.max(0, Number(item.state?.remaining) || 0), 0);
     const periodLabel = isMonth
       ? selectedDate.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })
@@ -401,9 +404,12 @@ export function renderJournal(root, options = {}) {
       { label: 'Средний чек часа', value: formatRubles(averageHour) },
       isMonth ? { label: 'Средний чек за рабочий день', value: formatRubles(averageWorkingDay) } : null,
     ].filter(Boolean);
+    const finance=readFinanceState();
+    const paymentReport=recordPaymentReport(finance.operations,finance.ledger,records.map(r=>String(r.id)));
+    const paymentRows=paymentReport.prepayment>0?[{label:'Предоплата',value:formatRubles(paymentReport.prepayment)},...paymentReport.wallets.map(w=>({label:w.label,value:formatRubles(w.amount)}))]:[];
     const groups = [
       summaryRows,
-      statusRows,
+      [...statusRows,...paymentRows],
       [{ label: 'Tips', value: formatRubles(tipsTotal) }],
       [{ label: 'Сумма', value: formatRubles(total), strong: true }],
     ];
@@ -572,14 +578,14 @@ export function renderJournal(root, options = {}) {
     const secondaryNavigation = activeView === 'list'
       ? viewNavigation({ views: listModes, activeView: listMode, ariaLabel: 'Режим списка' })
       : '<div data-journal-period-navigation></div>';
-    const toolbar = wide ? `<div class="v2-journal-desktop-toolbar"><div data-journal-primary-navigation>${primaryNavigation}</div><div data-journal-secondary-navigation>${secondaryNavigation}</div><div class="v2-journal-desktop-actions">${activeView === 'day' ? button('Сегодня',{variant:'secondary',data:'data-journal-today'}) + button('Z-отчёт',{variant:'secondary',data:'data-journal-day-report'}) : ''}${activeView === 'list' ? button('Excel',{variant:'secondary',data:'data-journal-direct-excel'}) : ''}</div></div>` : '';
+    const toolbar = wide ? `<div class="v2-journal-desktop-toolbar"><div data-journal-primary-navigation>${primaryNavigation}</div><div data-journal-secondary-navigation>${secondaryNavigation}</div><div class="v2-journal-desktop-actions">${activeView === 'day' ? button('Сегодня',{variant:'secondary',data:'data-journal-today'}) + button('Z-отчёт',{variant:'secondary',data:'data-journal-day-report'}) : ''}${activeView === 'list' ? button(DATA_EXCHANGE_ICON,{variant:'secondary',className:'v2-journal-excel-icon',data:'data-journal-direct-excel title="Обмен данными" aria-haspopup="dialog"',aria:'Обмен данными'}) : ''}</div></div>` : '';
     const headerRows = setV2ZHeaderRows(root, wide ? [toolbar] : [primaryNavigation, secondaryNavigation]);
     const primaryNavigationRoot = wide ? headerRows[0]?.querySelector('[data-journal-primary-navigation]') : headerRows[0] || null;
     const secondaryNavigationRoot = wide ? headerRows[0]?.querySelector('[data-journal-secondary-navigation]') : headerRows[1] || null;
     if (wide) {
       headerRows[0]?.querySelector('[data-journal-today]')?.addEventListener('click', () => { selectedDate = new Date(); persistProfessionalContext(); renderView(); });
       headerRows[0]?.querySelector('[data-journal-day-report]')?.addEventListener('click', () => openJournalZReport());
-      headerRows[0]?.querySelector('[data-journal-direct-excel]')?.addEventListener('click', () => openJournalExcel(document.body,{onImported:()=>renderView()}));
+      headerRows[0]?.querySelector('[data-journal-direct-excel]')?.addEventListener('click', event => openJournalExcel(document.body,{anchor:event.currentTarget,onImported:()=>renderView()}));
     }
     const periodNavigationRoot = secondaryNavigationRoot?.querySelector('[data-journal-period-navigation]') || null;
     const viewClass = activeView === 'list' ? ' class="journal-list-viewport"' : '';

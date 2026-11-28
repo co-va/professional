@@ -1,3 +1,4 @@
+import {sortItems} from './sort.js';
 import {
   actionBlock,
   button,
@@ -41,6 +42,7 @@ import {
   workspaceHeaderContext,
   openEntityCardAppearanceQ,
 } from '../../ui/ui.js';
+import { DATA_EXCHANGE_ICON, VIEW_ICON } from '../../ui/buttons/index.js';
 import { applyUEI, detachUEI, getMembers, getOptions, getUEI } from '../uei.js';
 import { getTags } from '../../settings/tags/data.js';
 import { openTagEditor } from '../../settings/tags/tags.js';
@@ -81,22 +83,6 @@ function notifyContext() {
   window.dispatchEvent(new CustomEvent('va-tools:v2-context-changed'));
 }
 
-function sortItems(items, mode, visitIndex = null) {
-  const visits = mode.startsWith('last') ? (visitIndex || buildPersonVisitIndex()) : null;
-  return [...items].sort((a, b) => {
-    if (mode.startsWith('name')) {
-      const compared = name(a).localeCompare(name(b), 'ru');
-      return mode === 'nameDesc' ? -compared : compared;
-    }
-    if (mode.startsWith('uei')) {
-      const compared = String(personDisplay(a).uei || '').localeCompare(String(personDisplay(b).uei || ''), 'ru', { numeric: true });
-      return mode === 'ueiDesc' ? -compared : compared;
-    }
-    const av = Date.parse(visits?.get(String(a.key))?.lastVisit || '') || 0;
-    const bv = Date.parse(visits?.get(String(b.key))?.lastVisit || '') || 0;
-    return mode === 'lastDesc' ? bv - av : av - bv;
-  });
-}
 
 function sortOptions() {
   return [
@@ -533,7 +519,7 @@ function desktopPeopleTable(root, items, visitIndex) {
     { key:'debt', label:'Задолженность', sortable:false, render:row=>row.debt == null ? '—' : row.debt > 0.009 ? escapeHtml(money(row.debt)) : '' },
     { key: 'firstVisit', label: 'Первое посещение', sortable: false, header: () => '<span>Первое</span><span>посещение</span>', render: row => escapeHtml(row.firstVisit ? formatPersonVisitDate(row.firstVisit) : '') },
     { key: 'lastVisit', label: 'Последнее посещение', sortable:false, header: () => '<span>Последнее</span><span>посещение</span>', render: row => escapeHtml(row.lastVisit ? formatPersonVisitDate(row.lastVisit) : '') },
-    { key:'open',label:'',narrow:true,sortable:false,render:row=>`<button type="button" class="people-table-open" data-person="${escapeHtml(row.key)}" aria-label="Открыть клиента ${escapeHtml(row.name)}"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button>` },
+    { key:'edit',label:'',narrow:true,sortable:false,render:row=>button('✎',{variant:'secondary',className:'ui-compact-button people-table-edit',data:'data-people-row-edit="'+escapeHtml(row.key)+'" title="Редактировать"',aria:'Редактировать клиента '+row.name}) },
   ];
   const rows = items.map(person => {
     const display = personDisplay(person);
@@ -605,10 +591,37 @@ function refreshPeopleList(root) {
   const visitIndex = desktop ? (root.peopleVisitIndex ||= buildPersonVisitIndex({ finance:root.peopleFinanceReady === true })) : null;
   const items = visiblePeople(root, visitIndex);
   host.innerHTML = desktop ? desktopPeopleTable(root, items, visitIndex) : listMarkup(items, query);
-  if (desktop) bindDesktopPeopleTable(root, host, items);
-  host.querySelectorAll('[data-person]').forEach((node) => {
-    node.addEventListener('click', () => openPersonOverview(root, node.dataset.person, root.peopleOptions || {}));
-  });
+  if (desktop) {
+    bindDesktopPeopleTable(root, host, items);
+    host.querySelectorAll('[data-people-row-edit]').forEach(control=>{
+      const row=control.closest('tr');
+      if(!row)return;
+      const key=control.dataset.peopleRowEdit;
+      const open=()=>openPersonOverview(root,key,root.peopleOptions||{});
+      const edit=()=>openPersonEdit(root,key,{onSaved:()=>{
+        root.peopleVisitIndex=null;
+        refreshPeopleList(root);
+      }});
+      const nameCell=row.querySelector('[data-table-column="name"]');
+      if(nameCell){
+        nameCell.tabIndex=0;
+        nameCell.setAttribute('role','button');
+        nameCell.setAttribute('aria-label','Открыть клиента '+(items.find(person=>String(person.key)===key)?.name||''));
+        nameCell.addEventListener('keydown',event=>{
+          if(event.key==='Enter'||event.key===' '){event.preventDefault();open();}
+        });
+      }
+      row.addEventListener('click',event=>{
+        if(event.target.closest('[data-table-column="select"]'))return;
+        if(event.target.closest('[data-table-column="edit"]')){edit();return;}
+        open();
+      });
+    });
+  } else {
+    host.querySelectorAll('[data-person]').forEach(node=>node.addEventListener('click',()=>{
+      openPersonOverview(root,node.dataset.person,root.peopleOptions||{});
+    }));
+  }
 }
 
 function listContext() {
@@ -641,8 +654,8 @@ export function renderPeople(root, options = {}) {
         ${compactButton({kind:'sort',data:'data-people-desktop-sort title="Сортировка" aria-haspopup="dialog" aria-pressed="false"'})}
       </div>
       <div class="people-desktop-actions people-desktop-actions--right">
-        ${button('<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3v18m-4-4 4 4 4-4M17 21V3m-4 4 4-4 4 4"/></svg>',{variant:'secondary',className:'people-desktop-icon',data:'data-people-desktop-excel title="Обмен данными" aria-haspopup="dialog"',aria:'Обмен данными'})}
-        ${button('Вид',{variant:'secondary',data:'data-people-desktop-view'})}
+        ${button(DATA_EXCHANGE_ICON,{variant:'secondary',className:'people-desktop-icon',data:'data-people-desktop-excel title="Обмен данными" aria-haspopup="dialog"',aria:'Обмен данными'})}
+        ${button(VIEW_ICON,{variant:'secondary',className:'people-desktop-icon',data:'data-people-desktop-view title="Вид"',aria:'Вид'})}
         ${button('<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>',{variant:'secondary',className:'people-desktop-icon people-desktop-add',data:'data-people-desktop-add title="Добавить клиента" aria-haspopup="dialog"',aria:'Добавить клиента'})}
       </div>
     </div></section>` : `<div class="people-search ui-search-field">${search}</div>`], {

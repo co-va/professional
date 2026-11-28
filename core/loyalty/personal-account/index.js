@@ -1,7 +1,11 @@
+import { VIEW_ICON } from '../../../ui/buttons/index.js';
 import {
+  actionBlock,
   button,
+  compactButton,
+  dataTable,
+  setV2ZHeaderRows,
   datePicker,
-  details,
   emptyState,
   entityCardStack,
   escapeHtml,
@@ -12,6 +16,7 @@ import {
   miniCardRail,
   modal,
   mountModal,
+  openNotice,
   page,
   select,
   shortDateTime,
@@ -19,6 +24,11 @@ import {
   v2ListEntry,
   v2Section,
 } from '../../../ui/ui.js';
+import { isV2DesktopWorkspace } from '../../../ui/v2/geometry.js';
+import { compactCheck } from '../../../ui/selection/check-list.js';
+import { readOnlyReceipt } from '../../../ui/receipt/index.js';
+import { personDisplay } from '../../people/presentation.js';
+import { openLoyaltyAppearanceQ } from '../shared.js';
 import { getWallets } from '../../finance/index.js';
 import {
   availablePeople,
@@ -166,7 +176,7 @@ function movementEventMarkup(item = {}) {
   }
   rows.push({ label: 'Остаток', value: money(item?.balanceAfter) });
   rows.push({ label: 'Дата формирования', value: shortDateTime(item?.recordedAt || item?.createdAt || item?.occurredAt, '—') });
-  return details(rows);
+  return readOnlyReceipt({ groups: [rows] });
 }
 
 function openMovementEventS(root, item = {}) {
@@ -177,13 +187,15 @@ function openMovementEventS(root, item = {}) {
   }));
 }
 
-function debtList(account = {}) {
-  const items = Array.isArray(account?.debts) ? account.debts : [];
-  if (!items.length) return emptyState('Задолженностей нет', 'Неоплаченные остатки появятся здесь отдельно от денег Личного счёта.');
+function outstandingDebts(account = {}) {
+  return (Array.isArray(account?.debts) ? account.debts : []).filter(item => Number(item?.outstandingAmount || 0) > 0.009);
+}
+
+function debtList(items = []) {
   return v2ListEntries(items.map((item) => {
     const outstanding = Math.max(0, Number(item?.outstandingAmount || 0));
     return v2ListEntry({
-      title: outstanding > 0.009 ? 'Задолженность' : 'Погашено',
+      title: item?.sourceType === 'record' ? 'За услугу' : item?.sourceType === 'sale' ? 'За покупку' : item?.sourceType === 'order' ? 'За заказ' : 'За обслуживание',
       subtitle: shortDateTime(item?.occurredAt, '—'),
       rightTop: money(outstanding),
       rightBottom: outstanding > 0.009 ? 'Открыта' : 'Закрыта',
@@ -195,22 +207,25 @@ function debtList(account = {}) {
 }
 
 function accountInfo(person = {}, account = {}) {
-  return details([
+  return readOnlyReceipt({ groups: [[
     { label: 'Контакт', value: personLabel(person) },
     { label: 'Денежный остаток', value: money(account?.balance) },
-    { label: 'Задолженность', value: money(account?.debtTotal) },
-    { label: 'Можно оплатить со счёта', value: `${Math.max(0, Math.min(100, Number(account?.spendLimitPercent ?? 100) || 0))}%` },
-    { label: 'Виден конечному пользователю', value: account?.visibleToEndUser === false ? 'Нет' : 'Да' },
-  ]);
+    { label: 'Лимит оплаты', value: `${Math.max(0, Math.min(100, Number(account?.spendLimitPercent ?? 100) || 0))}%` },
+    { label: 'Показать', value: account?.visibleToEndUser === false ? 'Нет' : 'Да' },
+  ], [
+    { label: 'Долг за обслуживание', value: money(account?.debtTotal) },
+  ]] });
 }
 
-function openSettingsX(root, person, account, onSaved) {
+function openSettingsX(root, person, account, onSaved, { desktop = false } = {}) {
   const layer = mountModal(root, modal(`<form class="form-grid" data-personal-account-settings-form>
+    ${desktop ? '' : `<div data-personal-account-help-row>${personalAccountInfoButton()}</div>`}
     ${field({ label: 'Лимит оплаты, %', name: 'spendLimitPercent', type: 'number', min: '0', max: '100', step: '1', inputmode: 'decimal', value: account?.spendLimitPercent ?? 100, required: true })}
     ${button('Сохранить', { type: 'submit' })}
     <div class="form-error" data-personal-account-settings-error></div>
-  </form>`, { title: 'Настройки Личного счёта', variant: 'x', surface: 'app' }));
+  </form>`, { title: desktop ? 'Лимит оплаты' : 'Настройки Личного счёта', variant: 'x', surface: 'app' }));
   const form = layer?.querySelector?.('[data-personal-account-settings-form]');
+  if (!desktop) form?.querySelector('[data-personal-account-info]')?.addEventListener('click', () => openPersonalAccountInfo(layer));
   form?.addEventListener('submit', async (event) => {
     event.preventDefault();
     const errorNode = layer.querySelector('[data-personal-account-settings-error]');
@@ -234,15 +249,15 @@ function openSettingsX(root, person, account, onSaved) {
   return layer;
 }
 
-function openMoneyX(root, person, account, mode, onSaved) {
+function openMoneyX(root, person, account, mode, onSaved, { desktop = false } = {}) {
   const funding = mode === 'fund';
-  const title = funding ? 'Пополнить Личный счёт' : 'Вернуть деньги';
+  const title = funding ? 'Пополнить Личный счёт' : desktop ? 'Возврат' : 'Вернуть деньги';
   const layer = mountModal(root, modal(`<form class="form-grid" data-personal-account-money-form>
     ${field({ label: 'Сумма', name: 'amount', type: 'number', min: '0.01', step: '0.01', inputmode: 'decimal', value: '', required: true })}
     ${select({ label: funding ? 'Кошелёк приёма денег' : 'Кошелёк возврата', name: 'walletId', value: '', options: walletOptions() })}
     ${datePicker({ label: 'Дата операции', name: 'occurredAt', value: new Date().toISOString().slice(0, 10), showYear: true, modalVariant: 'q', modalSurface: 'app', allowClear: false })}
     ${field({ label: funding ? 'Комментарий' : 'Причина', name: funding ? 'note' : 'reason', value: '' })}
-    ${button(funding ? 'Пополнить' : 'Вернуть', { type: 'submit' })}
+    ${button(funding ? 'Пополнить' : desktop ? 'Возврат' : 'Вернуть', { type: 'submit' })}
     <div class="form-error" data-personal-account-money-error></div>
   </form>`, { title, variant: 'x', surface: 'app' }));
   if (!layer) return null;
@@ -324,19 +339,97 @@ function openDebtSettleX(root, debt, onSaved) {
   return layer;
 }
 
-function renderDetail(layer, root, person, account) {
+function bindAccountVisibility(control, person, onSaved = () => {}) {
+  control?.addEventListener('change', async () => {
+    const requested = Boolean(control.checked);
+    control.disabled = true;
+    let saved;
+    try {
+      // Partial settings update: do not overwrite the existing payment limit.
+      saved = await updatePersonalAccountSettings(personKey(person), { visibleToEndUser: requested });
+      if (!saved?.personKey) throw new Error('Сохранение видимости не подтверждено');
+      if (control.isConnected) control.checked = saved.visibleToEndUser !== false;
+    } catch (error) {
+      if (control.isConnected) control.checked = !requested;
+      openNotice({ title: 'Показать карту', message: error instanceof Error ? error.message : 'Не удалось сохранить видимость.' });
+      return;
+    } finally {
+      if (control.isConnected) control.disabled = false;
+    }
+    try { await onSaved(saved); }
+    catch { openNotice({ title: 'Настройки сохранены', message: 'Не удалось обновить данные. Откройте счёт заново.' }); }
+  });
+}
+
+function personalAccountInfoButton({ desktop = false } = {}) {
+  return compactButton({ kind: 'info', className: desktop ? 'desktop-q-action-slot desktop-q-leading-icon' : '', data: 'data-personal-account-info', aria: 'Как работает Личный счёт' });
+}
+
+function openPersonalAccountInfo(root) {
+  const sections = [
+    ['Личный счёт', 'Создаётся автоматически для каждого клиента. Это не депозитная программа: на счёте хранятся деньги, внесённые клиентом авансом.'],
+    ['Пополнение и оплата', 'Пополнение увеличивает остаток. При оплате услуги или покупки деньги списываются с этого остатка.'],
+    ['Лимит оплаты', 'Максимальная доля стоимости, которую можно оплатить со счёта при достаточном остатке. Например, при лимите 50% и стоимости 4 000 ₽ со счёта можно оплатить не более 2 000 ₽. Остальное оплачивается другим доступным способом. Это не скидка.'],
+    ['Долг за обслуживание', 'Если неоплаченная сумма оформлена как задолженность, она появляется отдельно от денежного остатка. Пополнение само по себе не погашает долг; лимит не создаёт долг автоматически.'],
+    ['Возврат и история', 'Можно вернуть внесённые, но не использованные деньги в пределах остатка. Движения счёта отображаются в истории.'],
+  ];
+  return mountModal(root, modal(`<div class="modal-title"><h2>Как работает Личный счёт</h2></div>${page(sections.map(([title, description]) =>
+    `<div><strong>${escapeHtml(title)}</strong><p>${escapeHtml(description)}</p></div>`
+  ))}`, { variant: 'technical', surface: 'app', title: 'Как работает Личный счёт' }));
+}
+
+function bindDesktopAccountTools(layer, person, account, refresh) {
+  const header = layer.querySelector('[data-v2-q-header-content]');
+  if (!header) return;
+  header.closest('.v2-layer--standard')?.classList.add('desktop-q-fixed-tools');
+  header.innerHTML = `<div class="desktop-q-heading"><h2 class="v2-q-title">${escapeHtml(personLabel(person))}</h2></div>
+    <div class="desktop-q-toolbar" data-personal-account-desktop-tools data-v2-layer-gesture-ignore>
+      ${personalAccountInfoButton({ desktop: true })}
+      ${compactButton({ kind: 'settings', className: 'desktop-q-action-slot desktop-q-leading-icon', data: 'data-personal-account-limit title="Лимит оплаты"', aria: 'Лимит оплаты' })}
+      ${button('Пополнить', { className: 'desktop-q-action-slot desktop-q-h-action', data: 'data-personal-account-fund' })}
+    </div>
+    <div class="desktop-q-toolbar" data-desktop-q-secondary-tools data-personal-account-secondary-tools data-v2-layer-gesture-ignore>
+      ${compactCheck({ label: 'Показать', checked: account?.visibleToEndUser !== false, data: 'data-personal-account-q-visible', aria: 'Показать карту клиенту' })}
+    </div>`;
+  header.querySelector('[data-personal-account-info]')?.addEventListener('click', () => openPersonalAccountInfo(layer));
+  bindAccountVisibility(header.querySelector('[data-personal-account-q-visible]'), person, refresh);
+  header.querySelector('[data-personal-account-fund]')?.addEventListener('click', () => openMoneyX(layer, person, account, 'fund', refresh, { desktop: true }));
+  header.querySelector('[data-personal-account-limit]')?.addEventListener('click', () => openSettingsX(layer, person, account, refresh, { desktop: true }));
+}
+
+function renderDetail(layer, root, person, account, onChanged = () => {}) {
   const host = layer.querySelector('[data-personal-account-q-host]') || layer;
+  const desktop = isV2DesktopWorkspace(layer.closest('[data-v2-app]'));
+  const header = layer.querySelector('[data-v2-q-header-content]');
+  if (!desktop && header?.querySelector('.desktop-q-toolbar')) {
+    header.innerHTML = `<h2 class="v2-q-title">${escapeHtml(personLabel(person))}</h2>`;
+    header.closest('.v2-layer--standard')?.classList.remove('desktop-q-fixed-tools');
+  }
+  const debts = outstandingDebts(account);
   host.innerHTML = page([
-    loyaltyHeader(personLabel(person), { settings: true, settingsData: 'data-personal-account-actions' }),
-    `<section class="v2-section">${accountInfo(person, account || {})}</section>`,
-    v2Section('Задолженности', debtList(account || {})),
+    loyaltyHeader(personLabel(person), { settings: !desktop, settingsData: 'data-personal-account-actions' }),
+    personalAccountVisualCard({
+      person, balance: account?.balance, debt: account?.debtTotal,
+      data: 'data-personal-account-summary', aria: 'Информация о личном счёте',
+    }),
+    debts.length ? v2Section('Задолженности', debtList(debts)) : '',
     v2Section('История', historyRail(account || {})),
+    desktop && Number(account?.balance || 0) > 0.009 ? actionBlock(button('Возврат', {
+      variant: 'danger', data: 'data-personal-account-withdraw data-ui-keyboard-action="auxiliary"',
+    })) : '',
   ]);
   const refresh = async (saved = null) => {
     const next = saved?.personKey ? saved : await loadPersonalAccount(personKey(person));
-    renderDetail(layer, root, person, next || {});
+    renderDetail(layer, root, person, next || {}, onChanged);
+    await onChanged();
   };
-  host.querySelector('[data-personal-account-actions]')?.addEventListener('click', () => {
+  host.querySelector('[data-personal-account-summary]')?.addEventListener('click', () => {
+    mountModal(layer, modal(accountInfo(person, account), { variant: 's', surface: 'app', title: 'Личный счёт' }));
+  });
+  if (desktop) {
+    bindDesktopAccountTools(layer, person, account, refresh);
+    host.querySelector('[data-personal-account-withdraw]')?.addEventListener('click', () => openMoneyX(layer, person, account, 'withdraw', refresh, { desktop: true }));
+  } else host.querySelector('[data-personal-account-actions]')?.addEventListener('click', () => {
     const actions = [
       { id: 'fund', label: 'Пополнить', onSelect: () => openMoneyX(root, person, account, 'fund', refresh) },
       { id: 'withdraw', label: 'Вернуть деньги', onSelect: () => openMoneyX(root, person, account, 'withdraw', refresh) },
@@ -372,7 +465,7 @@ function renderDetail(layer, root, person, account) {
   notifyLoyaltyContext();
 }
 
-export async function openPersonalAccountForPerson(root, person = {}, snapshot = null) {
+export async function openPersonalAccountForPerson(root, person = {}, snapshot = null, onChanged = () => {}) {
   const layer = mountModal(root, modal('<div data-personal-account-q-host></div>', {
     variant: 'q',
     surface: 'app',
@@ -381,7 +474,7 @@ export async function openPersonalAccountForPerson(root, person = {}, snapshot =
   }));
   if (!layer) return null;
   const account = snapshot || await loadPersonalAccount(personKey(person));
-  renderDetail(layer, root, person, account || {});
+  if (layer.isConnected) renderDetail(layer, root, person, account || {}, onChanged);
   return layer;
 }
 
@@ -419,9 +512,66 @@ export async function renderPersonalAccount(root) {
     return;
   }
 
+  if (!root.isConnected) return;
+  const desktop = isV2DesktopWorkspace(root.closest('[data-v2-app]'));
   const values = accounts
-    .filter((account) => Number(account?.balance || 0) > 0.009 || Number(account?.debtTotal || 0) > 0.009)
+    .filter(account => desktop
+      ? account.hasActivity === true || Boolean(account.movements?.length || account.debts?.length) || Number(account.balance || 0) > 0.009 || Number(account.debtTotal || 0) > 0.009
+      : Number(account?.balance || 0) > 0.009 || Number(account?.debtTotal || 0) > 0.009)
     .map((account) => ({ account, person: accountPerson(account, people) }));
+  if (desktop) {
+    const rows = values.map(({ account, person }) => {
+      const display = personDisplay(person);
+      return { id: personKey(person), code: display.uei, name: display.name, phone: display.phone, balance: money(account.balance), debt: money(account.debtTotal), visible: account.visibleToEndUser !== false };
+    }).sort((a,b) => String(a.name || '').localeCompare(String(b.name || ''), 'ru'));
+    const table = rows.length ? dataTable({
+      compact: true, caption: 'Личные счета',
+      columns: [
+        { key: 'code', label: 'Код', sortable: false },
+        { key: 'name', label: 'Клиент', sortable: false, render: row => '<button type="button" data-personal-account-person="' + escapeHtml(row.id) + '"><span class="people-table-person"><span class="people-table-person__name">' + escapeHtml(row.name) + '</span>' + (row.phone ? '<span class="people-table-person__phone">' + escapeHtml(row.phone) + '</span>' : '') + '</span></button>' },
+        { key: 'balance', label: 'Остаток', sortable: false },
+        { key: 'debt', label: 'Задолженность', sortable: false },
+        { key: 'visible', label: 'Показать', sortable: false, narrow: true, render: row => compactCheck({
+          checked: row.visible, data: `data-personal-account-row-visible="${escapeHtml(row.id)}"`, aria: `Показать карту клиенту ${row.name}`,
+        }) },
+      ], rows,
+    }) : emptyState('Личных счетов с движениями пока нет', 'Здесь появятся клиенты после операций по личному счёту.');
+    root.innerHTML = page([loyaltyHeader('Личный счёт'), `<div data-personal-account-list-host>${table}</div>`]);
+    const [toolbar] = setV2ZHeaderRows(root, ['<div class="v2-desktop-tool-row"><div class="v2-desktop-tool-actions">' + button(VIEW_ICON, { variant: 'secondary', className: 'v2-desktop-tool-icon', data: 'data-personal-account-view title="Вид"', aria: 'Вид' }) + '</div></div>'], { desktopTitle: 'Личный счёт' });
+    toolbar?.querySelector('[data-personal-account-view]')?.addEventListener('click', () => {
+      const first = values[0];
+      openLoyaltyAppearanceQ(root, { type: 'personal-account', fields: () => personalAccountCardFields({ person: first?.person || people[0] || {}, balance: first?.account?.balance || 0, debt: first?.account?.debtTotal || 0 }), onSaved: () => renderPersonalAccount(root) });
+    });
+    root.querySelectorAll('[data-personal-account-row-visible]').forEach(control => {
+      const item = values.find(({ person }) => personKey(person) === control.dataset.personalAccountRowVisible);
+      if (item) bindAccountVisibility(control, item.person, saved => { item.account = saved; });
+    });
+    let openingAccount = false;
+    root.querySelectorAll('[data-personal-account-person]').forEach(node => {
+      const row = node.closest('tr');
+      const open = async () => {
+        if (openingAccount) return;
+        const item = values.find(({ person }) => personKey(person) === node.dataset.personalAccountPerson);
+        if (!item) return;
+        openingAccount = true;
+        try {
+          const detail = await openPersonalAccountForPerson(root, item.person, item.account, () => renderPersonalAccount(root));
+          if (!detail) openNotice({ title: 'Личный счёт', message: 'Не удалось открыть Личный счёт.' });
+        } catch (error) {
+          openNotice({ title: 'Личный счёт', message: error instanceof Error ? error.message : 'Не удалось открыть Личный счёт.' });
+        } finally { openingAccount = false; }
+      };
+      if (row) {
+        row.dataset.personalAccountOpenRow = node.dataset.personalAccountPerson;
+        row.addEventListener('click', event => {
+          if (event.target.closest('[data-table-column="visible"]')) return;
+          void open();
+        });
+      } else node.addEventListener('click', open);
+    });
+    notifyLoyaltyContext();
+    return;
+  }
   const cards = values.length
     ? entityCardStack(values.map(({ account, person }) => personalAccountVisualCard({
         person,

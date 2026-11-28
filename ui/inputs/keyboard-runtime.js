@@ -53,7 +53,18 @@ function syncViewport() {
   const layoutHeight = Math.round(window.innerHeight || root.clientHeight || height);
   const focused = Boolean(activeEditable());
   const rotated = !stableHeight || !stableWidth || Math.abs(width - stableWidth) > 48;
-  if (rotated) {
+  // A non-touch Desktop browser has no native iOS keyboard to protect.
+  // Its visible window may shrink without an orientation/width change.
+  const desktopViewport = width >= 768
+    && window.matchMedia?.('(hover: hover) and (pointer: fine)')?.matches
+    && !(window.navigator?.maxTouchPoints > 0);
+  if (desktopViewport) {
+    stableWidth = width;
+    stableHeight = Math.min(height, layoutHeight);
+    keyboardSession = false;
+    keyboardInset = 0;
+    blurGraceUntil = 0;
+  } else if (rotated) {
     // A real orientation change starts a new coordinate space; an ordinary
     // keyboard event never changes its layout width by this amount.
     stableWidth = width;
@@ -67,7 +78,7 @@ function syncViewport() {
     stableHeight = Math.max(stableHeight, height, layoutHeight);
   }
 
-  if (focused) {
+  if (focused && !desktopViewport) {
     keyboardSession = true;
     blurGraceUntil = 0;
   }

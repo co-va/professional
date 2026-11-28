@@ -1,0 +1,37 @@
+import assert from 'node:assert/strict';
+import {supportsFinancePrepayment,manualWalletAllocation,netRecordPrepayment,recordPaymentReport,recordPaymentPresentation,recordPaymentTiming,recordPaymentButtonSummary} from '../../core/finance/prepayment-model.js';
+const catalog=[{articleId:'mechanism-services',values:[{valueId:'services-prepayment',routes:['SERVICE_PREPAYMENT']}]}];
+assert.equal(supportsFinancePrepayment(catalog),true);
+assert.equal(supportsFinancePrepayment([]),false);
+assert.deepEqual(manualWalletAllocation([{walletId:'cash',amount:50},{walletId:'card',amount:70}],120).map(a=>a.amount),[50,70]);
+assert.equal(manualWalletAllocation([{walletId:'cash',amount:50},{walletId:'cash',amount:70}],120),null);
+assert.equal(manualWalletAllocation([{walletId:'cash',amount:49},{walletId:'card',amount:70}],120),null);
+const op=(id,kind,data,record='r',originalOperationId='')=>({operationId:id,kind,status:'completed',source:{type:'record',id:record},data,originalOperationId});
+const ops=[op('advance','payment',{paymentTiming:'prepayment',serviceAmount:6000,cashServiceAmount:6000}),op('refund','refund',{serviceAmount:1000,cashServiceAmount:1000},'r','advance'),op('cash','payment',{serviceAmount:5000,cashServiceAmount:5000}),op('card','payment',{serviceAmount:20000,cashServiceAmount:20000}),op('other','payment',{paymentTiming:'prepayment',serviceAmount:10000},'other')];
+const ledger=[{operationId:'cash',walletId:'cash',walletName:'Наличные',direction:'IN',amount:5000,component:'service'},{operationId:'card',walletId:'card',walletName:'Карта',direction:'IN',amount:20000,component:'service'}];
+assert.equal(netRecordPrepayment(ops,['r']),5000);
+assert.deepEqual(recordPaymentReport(ops,ledger,['r']),{prepayment:5000,wallets:[{label:'Наличные',amount:5000},{label:'Карта',amount:20000}]});
+assert.deepEqual(recordPaymentReport(ops,[],['r']),{prepayment:5000,wallets:[]});
+assert.equal(netRecordPrepayment(ops,['missing']),0);
+console.log('PASS prepayment net, wallet split and report reconciliation');
+
+const record={date:'2026-12-03'},partial={remaining:7000,paidTotal:5000},tz='Europe/Moscow';
+// Preserve the already-approved Core #950 start-time contract.
+const visit={date:'2026-12-03',from:'09:00',to:'11:30'};
+assert.equal(recordPaymentTiming(visit,tz,'2026-12-02T20:59:59Z'),'prepayment');
+assert.equal(recordPaymentTiming(visit,tz,'2026-12-03T05:59:59Z'),'prepayment');
+assert.equal(recordPaymentTiming(visit,tz,'2026-12-03T06:00:00Z'),'settlement');
+assert.equal(recordPaymentTiming({date:'2026-12-03'},tz,'2026-12-03T06:00:00Z'),'');
+assert.deepEqual(recordPaymentPresentation(record,partial,tz,'2026-12-02T20:59:59Z',5000),{phase:'before',action:'Предоплата',status:'Предоплата',amount:5000,outstandingLabel:'К оплате'});
+assert.deepEqual(recordPaymentPresentation(record,partial,tz,'2026-12-02T21:00:00Z',5000),{phase:'on',action:'Оплата',status:'Оплата',amount:7000,outstandingLabel:'К оплате'});
+assert.deepEqual(recordPaymentPresentation(record,partial,tz,'2026-12-03T21:00:00Z',5000),{phase:'after',action:'Оплата',status:'Задолженность',amount:7000,outstandingLabel:'Задолженность'});
+assert.equal(recordPaymentPresentation(record,{fullyPaid:true,paidTotal:12000},tz,'2026-12-04T10:00:00Z').status,'Оплачено');
+assert.equal(recordPaymentPresentation(record,{remaining:12000},tz,'2026-12-02T20:00:00Z').amount,null);
+console.log('PASS single payment action, calendar dates and overdue status');
+
+assert.deepEqual(recordPaymentButtonSummary({remaining:12000,paidTotal:0}),{label:'К оплате',amount:12000});
+assert.deepEqual(recordPaymentButtonSummary(partial),{label:'К оплате',amount:7000});
+assert.deepEqual(recordPaymentButtonSummary({fullyPaid:true,remaining:0,paidTotal:12000}),{label:'Оплачено',amount:12000});
+assert.equal(recordPaymentPresentation(record,partial,tz,'2026-12-02T20:59:59Z',5000).action,'Предоплата');
+assert.equal(recordPaymentPresentation(record,partial,tz,'2026-12-03T21:00:00Z',5000).action,'Оплата');
+console.log('PASS record entry balance and independent payment form action');

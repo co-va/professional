@@ -19,6 +19,8 @@ jobs:
     timeout-minutes: 7
     steps:
       - uses: actions/checkout@v4
+      - name: Verify preview read recovery without real account data
+        run: node scripts/ci/preview-read-retry-smoke.mjs
       - name: Verify deployed host split and safe API access
         shell: bash
         run: |
@@ -71,4 +73,5 @@ jobs:
         run: |
           npm install --no-save --no-package-lock playwright@1.56.1
           npx playwright install chromium
+          node scripts/verify-dds-table-browser.mjs
           node scripts/verify-preview-browser.mjs https://professional-volokovykh.msk1.amvera.tech/

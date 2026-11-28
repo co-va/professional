@@ -12,6 +12,9 @@ import {
   paymentMethods,
   select,
   workspaceHeaderContext,
+  escapeHtml,
+  v2ListEntry,
+  v2ListEntries,
 } from '../../ui/ui.js';
 import {
   correctFinanceOperation,
@@ -19,6 +22,7 @@ import {
   getRefundsForPayment,
   hardDeleteFinanceOperation,
   recordPaymentIncome,
+  refreshFinanceState,
   recordRefundExpense,
   resolveRecordSettlement,
   saveSettlementSnapshot,
@@ -35,6 +39,7 @@ import { flushBusinessPersistence } from '../business-persistence.js';
 import { loadWalletCatalog } from '../runtime/auxiliary-state.js';
 import { getProfile } from '../profile/data.js';
 import { readOnlyReceipt } from '../../ui/receipt/index.js';
+import { supportsFinancePrepayment, recordPaymentTiming, recordPaymentPresentation } from '../finance/prepayment-model.js';
 
 const money = (value) => `${new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(Number(value || 0)).replaceAll('\u00a0', ' ')} ₽`;
 const paymentInFlightRecords = new Set();
@@ -280,6 +285,7 @@ async function openPaymentEntry(record, onCompleted = () => {}) {
   let state = null;
   let total = 0;
   let gratuityOnly = false;
+  let prepayment=false,newContract=false;
   let deposits = [];
   let verifiedPersonDeposits = [];
   let personalAccount = null;
@@ -288,11 +294,17 @@ async function openPaymentEntry(record, onCompleted = () => {}) {
     const key = String(personForRecord(current)?.key || personForRecord(current)?.id || '').trim();
     // A cold Journal/Record route may not have loaded Finance/Cash.
     // Resolve the actual wallet catalog before rendering any source picker.
+    const refreshed=await loadVerifiedPaymentSource(()=>refreshFinanceState(),'Финансы');
+    newContract=supportsFinancePrepayment(refreshed.articleCatalog);
+    if(!newContract)throw new Error('Обновление Core для предоплаты ещё недоступно.');
     [wallets, verifiedPersonDeposits] = await Promise.all([
       loadVerifiedPaymentSource(() => loadWalletCatalog(), 'Кошельки'),
       key ? loadVerifiedPaymentSource(() => listPersonDeposits(key,current?.date), 'Условия скидки') : Promise.resolve([]),
     ]);
     const verifiedRecord = getRecord(recordId) || current;
+    const timing=recordPaymentTiming(verifiedRecord,paymentWorkplaceTimeZone(verifiedRecord));
+    if(!timing)throw new Error('Не определены дата и время записи.');
+    prepayment=timing==='prepayment';
     settlement = settlementForRecord(verifiedRecord);
     state = paymentStateForRecord(verifiedRecord);
     if (state.fullyPaid && !canAcceptRecordTips(verifiedRecord, state)) {
@@ -301,7 +313,8 @@ async function openPaymentEntry(record, onCompleted = () => {}) {
     }
     total = Math.max(0, Number(settlement?.planTotal || 0) - Number(state?.paidTotal || 0));
     gratuityOnly = total <= 0.009 && Number(settlement?.serviceTotal || 0) > 0.009;
-    [deposits, personalAccount] = gratuityOnly
+    if(prepayment&&(total<=0.01||settlement.items?.some(i=>i.sourceType==='product')||Number(settlement.pricePercent||0)>0))throw new Error('Для этой записи предоплата пока недоступна.');
+    [deposits, personalAccount] = gratuityOnly||prepayment
       ? [[], null]
       : await Promise.all([
         depositsForRecord(verifiedRecord, null, verifiedPersonDeposits),
@@ -323,36 +336,51 @@ async function openPaymentEntry(record, onCompleted = () => {}) {
   const defaultDeposit = deposits.find((item) => String(item?.depositId || item?.id || '') === selectedDepositId)
     || (deposits.length === 1 ? deposits[0] : null);
   const defaultDepositAmount = Math.min(Math.max(0, total), Math.max(0, Number(defaultDeposit?.balance || 0)));
-  const initialDepositAllocations = defaultDeposit && defaultDepositAmount > 0.009
+  const initialDepositAllocations = !state.hasPayments && defaultDeposit && defaultDepositAmount > 0.009
     ? [{ depositId: String(defaultDeposit.depositId || defaultDeposit.id), amount: defaultDepositAmount }]
     : [];
+  const presentation=recordPaymentPresentation(getRecord(recordId)||current,state,paymentWorkplaceTimeZone(current));
   host.innerHTML = `
-    ${readOnlyReceipt({ totals: [{ label: 'К оплате', value: money(total), strong: true }] })}
+    ${readOnlyReceipt({ totals: [{ label: presentation.outstandingLabel, value: money(total), strong: true }] })}
     ${paymentMethods({ wallets, deposits, personalAccount, total, showAction: false, showTotal: false, initialDepositAllocations })}
-    ${actionBlock(button(gratuityOnly ? 'Завершить' : 'Оплатить', { data: 'data-record-payment-entry-submit', disabled: !gratuityOnly }))}`;
+    ${actionBlock(button(prepayment?'Предоплата':gratuityOnly ? 'Завершить' : 'Оплата', { data: 'data-record-payment-entry-submit', disabled: !gratuityOnly }))}
+    ${prepayment?'<div data-record-prepayment-limit hidden role="status"></div>':''}`;
 
   const submit = host.querySelector('[data-record-payment-entry-submit]');
+  const allocationHost = host.querySelector('[data-payment-methods]');
   let allocationState = null;
 
   const syncPrimary = () => {
-    if (!submit) return;
+    if (!submit || paymentInFlightRecords.has(recordId)) return;
     const hasMoney = Number(allocationState?.received || 0) > 0.009;
     const canCompleteWithoutMoney = gratuityOnly && !state.fullyPaid;
-    const label = canCompleteWithoutMoney && !hasMoney ? 'Завершить' : 'Оплатить';
+    const label = prepayment?'Предоплата':canCompleteWithoutMoney && !hasMoney ? 'Завершить' : 'Оплата';
     submit.textContent = label;
     submit.setAttribute('aria-label', label);
     submit.removeAttribute('aria-busy');
-    submit.disabled = hasMoney ? !allocationState?.valid : !canCompleteWithoutMoney;
+    submit.disabled = prepayment?!(allocationState?.valid&&allocationState.applied>0&&allocationState.remaining>0.009&&allocationState.tips<=0.009):hasMoney ? !allocationState?.valid : !canCompleteWithoutMoney;
+    const limit=host.querySelector('[data-record-prepayment-limit]');
+    if(limit){
+      const full=hasMoney&&allocationState?.remaining<=0.009;
+      limit.hidden=!full;
+      limit.textContent=full?'Пока доступна только частичная предоплата. Уменьшите сумму.':'';
+    }
   };
 
   submit?.addEventListener('click', async () => {
-    const hasMoney = Number(allocationState?.received || 0) > 0.009;
-    if (hasMoney && !allocationState?.valid) return;
+    if (paymentInFlightRecords.has(recordId)) return;
+    const selected = allocationState ? {
+      ...allocationState,
+      allocations: allocationState.allocations.map(item => ({ ...item })),
+      depositAllocations: allocationState.depositAllocations.map(item => ({ ...item })),
+    } : null;
+    const hasMoney = Number(selected?.received || 0) > 0.009;
+    if (hasMoney && !selected?.valid) return;
+    if(prepayment&&(!hasMoney||selected.remaining<=0.009||selected.tips>0.009))return;
     if (!hasMoney && (!gratuityOnly || state.fullyPaid)) return;
     const latest = getRecord(recordId) || current;
     const latestState = paymentStateForRecord(latest);
-    if ((latestState.fullyPaid && !canAcceptRecordTips(latest, latestState))
-      || paymentInFlightRecords.has(recordId)) {
+    if (latestState.fullyPaid && !canAcceptRecordTips(latest, latestState)) {
       layer.v2Close?.();
       onCompleted?.();
       return;
@@ -363,6 +391,7 @@ async function openPaymentEntry(record, onCompleted = () => {}) {
     submit.setAttribute('aria-busy', 'true');
     let completed = null;
     paymentInFlightRecords.add(recordId);
+    if (allocationHost) allocationHost.inert = true;
     try {
       // The payment X may stay open across a program expiry or a second-device
       // edit. Recheck before committing an irreversible financial operation.
@@ -371,6 +400,8 @@ async function openPaymentEntry(record, onCompleted = () => {}) {
       const checkedRecord = getRecord(recordId) || latest;
       const checkedSettlement = settlementForRecord(checkedRecord);
       const checkedPayment = paymentStateForRecord(checkedRecord);
+      const checkedTiming=recordPaymentTiming(checkedRecord,paymentWorkplaceTimeZone(checkedRecord));
+      if(!checkedTiming||checkedTiming!==(prepayment?'prepayment':'settlement'))throw new Error('Время записи изменилось. Закройте оплату и откройте её заново.');
       const changed = Math.abs(Number(checkedSettlement?.planTotal || 0) - Number(settlement?.planTotal || 0)) > 0.009
         || Math.abs(Number(checkedSettlement?.pricePercent || 0) - Number(settlement?.pricePercent || 0)) > 0.009
         || Math.abs(Number(checkedPayment?.paidTotal || 0) - Number(state?.paidTotal || 0)) > 0.009
@@ -382,36 +413,44 @@ async function openPaymentEntry(record, onCompleted = () => {}) {
         completed = await persistRecordCompletion(latest);
         if (!completed) throw new Error('Не удалось завершить запись');
       } else {
-        const occurredAt = recordServiceOccurredAt(latest);
+        const occurredAt = new Date();
         if (!occurredAt) throw new Error('У записи отсутствует дата факта обслуживания.');
-        // Finance occurredAt belongs to the service day. Server recordedAt/createdAt keeps the actual entry moment.
         completed = await recordPaymentIncome({
           source: { type: 'record', id: latest.id },
           workplace: workplaceName(latest.workplaceId),
           person: recordPerson(latest),
           settlement,
-          allocations: allocationState.allocations,
-          depositAllocations: allocationState.depositAllocations,
-          personalAccountAmount: allocationState.personalAccountAmount,
-          finalizeDebt: allocationState.remaining > 0.009,
+          allocations: selected.allocations,
+          depositAllocations: selected.depositAllocations,
+          personalAccountAmount: selected.personalAccountAmount,
+          finalizeDebt: !prepayment&&selected.remaining > 0.009,
           maxAmount: Math.max(0, Number(settlement?.planTotal || 0) - Number(latestState?.paidTotal || 0)),
-          serviceAmount: allocationState.applied,
-          tips: allocationState.tips,
+          serviceAmount: selected.applied,
+          tips: selected.tips,
+          paymentTiming:prepayment?'prepayment':'settlement',
           occurredAt,
         });
       }
     } catch (error) {
       openNotice({ message: String(error?.message || (hasMoney ? 'Не удалось провести оплату' : 'Не удалось завершить запись')) });
     } finally {
-      paymentInFlightRecords.delete(recordId);
+      if (!completed) {
+        paymentInFlightRecords.delete(recordId);
+        if (allocationHost) allocationHost.inert = false;
+      }
     }
 
     if (!completed) {
       if (submit.isConnected) syncPrimary();
       return;
     }
-    layer.v2Close?.();
-    onCompleted?.(completed);
+    try {
+      if(newContract)await refreshFinanceState().catch(()=>null);
+      layer.v2Close?.();
+      onCompleted?.(completed);
+    } finally {
+      paymentInFlightRecords.delete(recordId);
+    }
   });
 
   initPaymentMethods(host.querySelector('[data-payment-methods]'), {
@@ -490,6 +529,47 @@ async function openPaymentCorrection(record, payment, onSaved) {
     onChange: (next) => { allocationState = next; syncPrimary(); },
   });
   syncPrimary();
+  return layer;
+}
+
+
+// The quick payment X never displays past allocations. Correction alone
+// selects the actual payment document when there is more than one.
+function openPaymentCorrectionSelection(record, state, onSaved) {
+  const payments = (Array.isArray(state?.payments) ? state.payments : []).filter(payment => payment?.id);
+  if (!payments.length) return null;
+  if (payments.length === 1) return openPaymentCorrection(record, payments[0], onSaved);
+  const layer = mountPaymentQ(record, {
+    title: 'Корректировка оплаты',
+    className: 'record-payment-correction-q',
+    hostData: 'data-record-payment-correction-list',
+  });
+  const host = layer?.querySelector('[data-record-payment-correction-list]');
+  if (!host) return layer;
+  host.innerHTML = v2ListEntries(payments.map(payment => {
+    const parts = zonedDateTimeParts(payment.occurredAt || payment.paidAt, paymentWorkplaceTimeZone(record));
+    const date = parts.date ? parts.date.split('-').reverse().join('.') : '';
+    const sources = [
+      ...paymentAllocations(payment).map(item => item.walletName || item.walletId),
+      ...paymentDepositAllocations(payment).map(item => item.name || item.programName || 'Депозит'),
+      ...(Number(payment.personalAccountAmount || 0) > 0.009 ? ['Личный счёт'] : []),
+    ].filter(Boolean);
+    return v2ListEntry({
+      title: [date, parts.time].filter(Boolean).join(' · ') || 'Оплата',
+      subtitle: sources.join(' · '),
+      rightTop: money(payment.total),
+      leadingIcon: 'document',
+      initial: '',
+      data: 'data-record-payment-correction-id="' + escapeHtml(payment.id) + '"',
+      aria: 'Корректировка оплаты',
+    });
+  }));
+  host.querySelectorAll('[data-record-payment-correction-id]').forEach(control => control.addEventListener('click', () => {
+    const payment = payments.find(item => String(item.id) === control.dataset.recordPaymentCorrectionId);
+    if (!payment) return;
+    layer.v2Close?.();
+    void openPaymentCorrection(record, payment, onSaved);
+  }));
   return layer;
 }
 
@@ -598,7 +678,7 @@ function paymentActionsBody(state, extraActions = '') {
 function bindPaymentBodyActions(host, record, state, onSaved) {
   const payment = state?.latestPayment || null;
   if (!payment) return;
-  host.querySelector('[data-record-payment-correct]')?.addEventListener('click', () => openPaymentCorrection(record, payment, onSaved));
+  host.querySelector('[data-record-payment-correct]')?.addEventListener('click', () => openPaymentCorrectionSelection(record, paymentStateForRecord(getRecord(record.id) || record), onSaved));
   host.querySelector('[data-record-payment-refund]')?.addEventListener('click', () => openPaymentRefund(record, payment, onSaved));
   host.querySelector('[data-record-payment-delete]')?.addEventListener('click', () => openPaymentDeletion(payment, onSaved));
 }

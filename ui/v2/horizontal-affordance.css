@@ -27,3 +27,10 @@
 .profile-workplace-rail-controls[hidden]{display:none}
 .profile-workplace-rail-controls .ui-compact-button{color:inherit}
 .profile-workplace-rail-controls .ui-compact-button:disabled{opacity:.35;cursor:default}
+
+/* Program sections share the H action row and the existing Desktop rail controls. */
+.loyalty-program-section{min-width:0}
+.loyalty-program-section>.v2-section__title{display:flex;align-items:center;gap:8px;min-width:0}
+.loyalty-program-section>.v2-section__title>.v2-desktop-tool-actions{margin-left:auto}
+.loyalty-program-section>.v2-section__title>.profile-workplace-rail-controls{margin-left:0;flex:0 0 auto}
+.loyalty-program-section>.v2-section__content{min-width:0}

@@ -220,6 +220,7 @@
 .v2-app--workspace .v2-z .app-view-shell{min-height:100%;background:transparent}
 
 .v2-section{display:grid;gap:10px;margin-bottom:24px}
+[data-personal-account-q-host]>.ui-page>.v2-section{margin-bottom:0}
 .v2-section__title{margin:0;color:var(--v2-muted);font-size:14px;line-height:1.2;font-weight:650}
 .v2-section__content{min-width:0}
 .v2-rail{display:flex;gap:10px;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:none;padding:4px 0 12px}
@@ -399,6 +400,7 @@
   .v2-app--workspace>.v2-app__stage{grid-template-rows:auto minmax(0,1fr)}
   .v2-app--workspace>.v2-app__stage>.v2-front{grid-row:1/3}
   .v2-app--workspace>.v2-app__stage>.v2-fe-deck{grid-row:2}
+  .v2-app--workspace>.v2-app__stage:has(>[data-sidebar-calendar-initializing]:not([hidden]))>.v2-fe-deck{visibility:hidden}
   .v2-app--workspace .v2-desktop-calendar:not([hidden]){display:block;grid-column:1;grid-row:1;min-width:0;max-height:62dvh;overflow:auto;padding:0 12px 12px;color:var(--white)}
   .v2-app--workspace>.v2-layer-portal>.v2-layer-backdrop>.v2-layer--bottom{top:50%;left:50%;right:auto;bottom:auto;width:min(440px,90%);height:auto;max-height:85%;min-height:0;translate:-50% -50%;border-radius:14px;animation:none}
   .v2-app--workspace>.v2-layer-portal.is-anchored>.v2-layer-backdrop>.v2-layer--bottom{top:var(--v2-anchor-top,auto);left:var(--v2-anchor-left);right:auto;bottom:var(--v2-anchor-bottom,auto);width:var(--v2-anchor-width);height:auto;max-height:var(--v2-anchor-max-height);min-height:0;translate:none;padding:12px;animation:none;box-shadow:0 12px 32px rgba(0,0,0,.20)}
@@ -461,9 +463,34 @@
  .v2-app--workspace .v2-journal-desktop-toolbar .segment-control button.is-active{background:var(--text-secondary)}
  .v2-app--workspace .v2-journal-desktop-actions{display:flex;align-items:center;gap:8px;margin-left:auto}
  .v2-app--workspace .v2-journal-desktop-actions .ui-button{width:auto;height:32px;min-height:32px;border-radius:var(--radius-control);font-size:13px;padding:0 12px}
+ .v2-app--workspace .v2-journal-desktop-actions .v2-journal-excel-icon{display:grid;place-items:center;width:32px;min-width:32px;padding:0}
  .v2-app--workspace .v2-journal-desktop-toolbar [data-journal-period-navigation]{color:var(--white)}
  .v2-app--workspace .v2-journal-desktop-toolbar [data-journal-period-navigation] .ui-compact-button{color:var(--white);border-color:var(--text-secondary)}
  .v2-app--workspace .journal-list-viewport{height:auto;min-height:0;overflow:visible}
+
+ .v2-app--workspace [data-finance-article-table]{max-width:100%;min-width:0}
+ .v2-app--workspace [data-finance-article-table] .ui-data-table--compact td{white-space:normal;overflow-wrap:anywhere}
+ .v2-app--workspace [data-finance-article-table] .ui-data-table--compact tr{cursor:pointer}
+ /* DDS fills the approved working area. Fixed layout shares surplus across
+    explicit column bases, never by row content; minimum widths allow scroll. */
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-dds-history]{min-width:0;max-width:100%}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-dds-history] .ui-data-table--compact{width:100%;max-width:100%;overflow:auto;overscroll-behavior:none;scrollbar-gutter:stable;overflow-anchor:none}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-dds-history] .ui-data-table--compact table{table-layout:fixed;width:100%;min-width:752px}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-dds-history] .ui-data-table--compact table:has(th[data-table-column="article"]){min-width:882px}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-dds-history] .ui-data-table--compact :is(thead th,tbody tr:not([data-table-group-level])>td){box-sizing:border-box;padding-inline:6px;overflow-wrap:normal;word-break:normal}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-dds-history] .ui-data-table--compact :is(th,td)[data-table-column="select"]{width:32px;min-width:32px;max-width:32px;padding-inline:2px;text-align:center}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-dds-history] .ui-data-table--compact :is(th,td)[data-table-column="date"]{width:84px;min-width:84px;max-width:84px}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-dds-history] .ui-data-table--compact :is(th,td)[data-table-column="title"]{width:108px;min-width:108px;max-width:108px}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-dds-history] .ui-data-table--compact :is(th,td)[data-table-column="code"]{width:56px;min-width:56px;max-width:56px}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-dds-history] .ui-data-table--compact :is(th,td)[data-table-column="person"]{width:160px;min-width:160px;max-width:160px}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-dds-history] .ui-data-table--compact :is(th,td)[data-table-column="workplace"]{width:120px;min-width:120px;max-width:120px}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-dds-history] .ui-data-table--compact :is(th,td)[data-table-column="article"]{width:130px;min-width:130px;max-width:130px}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-dds-history] .ui-data-table--compact :is(th,td)[data-table-column="amount"]{width:96px;min-width:96px;max-width:96px;text-align:right;font-variant-numeric:tabular-nums}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-dds-history] .ui-data-table--compact :is(th,td)[data-table-column="bonus"]{width:96px;min-width:96px;max-width:96px;text-align:right;font-variant-numeric:tabular-nums}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-dds-history] .ui-data-table--compact th>div{line-height:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;overflow-wrap:normal;word-break:normal}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-dds-history] .ui-data-table--compact tbody tr:not([data-table-group-level])>td{height:var(--h-list-row);padding-block:4px;line-height:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;overflow-wrap:normal;word-break:normal}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-dds-history] .ui-data-table--compact td[data-table-column="title"]>button{display:block;width:100%;min-width:0}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-dds-history] .ui-data-table--compact tbody tr:not([data-table-group-level])>td :is(.people-table-person__name,.people-table-person__phone){display:block;max-width:100%;line-height:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;overflow-wrap:normal;word-break:normal}
  .v2-app--workspace .ui-data-table--compact tr.journal-list-record--active td{background:#EFFFBB}
  .v2-app--workspace .ui-data-table--compact tr.journal-list-record--paid td{background:#DDE8D7}
  .v2-app--workspace .ui-data-table--compact tr.journal-list-record--no-show td,.v2-app--workspace .ui-data-table--compact tr.journal-list-record--cancelled td{background:#F1DADA}
@@ -501,10 +528,10 @@
 @media (min-width:768px) and (min-height:600px){
  .v2-app--workspace>.v2-header{height:68px;min-height:68px;flex:0 0 68px;padding:0 32px 0 16px;grid-template-columns:48px calc(var(--v2-desktop-sidebar-width) - 96px) minmax(0,1fr) auto auto auto;gap:10px}
  .v2-app--workspace>.v2-header>.v2-header__title{display:none!important}
- .v2-app--workspace>.v2-header>.v2-desktop-toolbar-context{display:flex;grid-column:3;grid-row:1;align-items:center;gap:9px;color:#D1D4D6;font-size:13px;white-space:nowrap;min-width:0;overflow:hidden}
+ .v2-app--workspace>.v2-header>.v2-desktop-toolbar-context{display:flex;grid-column:3;grid-row:1;align-items:center;gap:9px;color:var(--desktop-h-secondary-ink);font-size:13px;white-space:nowrap;min-width:0;overflow:hidden}
  .v2-desktop-toolbar-context>span:last-child{color:var(--white);font-weight:650;overflow:hidden;text-overflow:ellipsis}
  .v2-desktop-toolbar-divider{color:var(--text-muted)}
- .v2-app--workspace>.v2-header>.v2-desktop-toolbar-user{display:flex;grid-column:6;grid-row:1;align-items:center;gap:10px;color:#D1D4D6;font-size:12px;min-width:0}
+ .v2-app--workspace>.v2-header>.v2-desktop-toolbar-user{display:flex;grid-column:6;grid-row:1;align-items:center;gap:10px;color:var(--desktop-h-secondary-ink);font-size:12px;min-width:0}
  .v2-desktop-toolbar-user>button{border:0;background:transparent;color:inherit;cursor:pointer;font:inherit}
  .v2-desktop-toolbar-user>button[data-desktop-profile]{padding:0;white-space:nowrap;max-width:180px;overflow:hidden;text-overflow:ellipsis}
  .v2-desktop-toolbar-user>button:not([data-desktop-profile]){box-sizing:border-box;display:grid;place-items:center;flex:0 0 36px;width:36px;height:36px;padding:0;border-radius:10px;color:var(--white)}
@@ -546,23 +573,24 @@
    border-radius:14px;background:var(--white);border-color:var(--border);
  }
  .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact th{
-   height:var(--h-list-row);box-sizing:border-box;padding:4px 12px;background:#E0D6D6;color:#41484F;
-   font-size:12px;font-weight:750;line-height:1.2;letter-spacing:0;text-transform:uppercase;white-space:normal;
+   height:var(--h-list-row);box-sizing:border-box;padding:4px 12px;
+   white-space:normal;
    border-bottom:1px solid #E0D6D6;
  }
- .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact td{
-   height:var(--h-list-row);box-sizing:border-box;padding:4px 12px;font-size:13px;color:var(--text);border-bottom:1px solid #E0D6D6;
+ .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact tbody tr:not([data-table-group-level])>td{
+   box-sizing:border-box;padding:4px 12px;font-size:13px;color:var(--text);border-bottom:1px solid #E0D6D6;
  }
  .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact td>button{font-weight:650}
  .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact tbody tr{cursor:default}
  .v2-app--workspace>.v2-header>.v2-desktop-toolbar-context,
  .v2-app--workspace>.v2-header>.v2-desktop-toolbar-user,
  .v2-app--workspace>.v2-header .v2-desktop-toolbar-divider,
- .v2-app--workspace>.v2-header .v2-desktop-toolbar-user>button:not([data-desktop-profile]){color:#E0D6D6}
- .v2-app--workspace>.v2-header:has(.v2-desktop-toolbar-context){border-bottom:1px solid rgba(255,255,255,.14)}
+ .v2-app--workspace>.v2-header .v2-desktop-toolbar-user>button:not([data-desktop-profile]){color:var(--desktop-h-secondary-ink)}
+ .v2-app--workspace>.v2-header:has(.v2-desktop-toolbar-context){position:relative;border-bottom:1px solid transparent}
+ .v2-app--workspace>.v2-header:has(.v2-desktop-toolbar-context)::after{content:"";position:absolute;inset-inline-start:var(--v2-desktop-sidebar-width);inset-inline-end:0;bottom:-1px;height:1px;background:rgba(255,255,255,.14);pointer-events:none}
 }
 @media (min-width:768px) and (max-width:1024px) and (min-height:600px){
- .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact td{padding:4px 8px}
+ .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact tbody tr:not([data-table-group-level])>td{padding:4px 8px}
 }
 
 /* Contacts: approved pearl controls; equal compact date columns.
@@ -571,9 +599,9 @@
  .people-desktop-tools>.field{flex:1 1 180px;max-width:300px;width:auto;min-width:140px}
  .people-desktop-actions--right{margin-left:auto}
  .people-desktop-actions .ui-button{background:var(--white);color:#41484F;border-color:var(--white)}
- .people-desktop-query-tools .ui-compact-button{color:var(--white);background:transparent;border:1px solid var(--white);border-radius:6px}
- .people-desktop-query-tools .ui-compact-button[aria-pressed="true"]{background:transparent;color:#E0D6D6;border-color:#E0D6D6}
- .people-desktop-query-tools .ui-compact-button:focus-visible{outline-color:var(--white)}
+ .people-desktop-query-tools .ui-compact-button{color:#E0D6D6;background:transparent;border:1px solid #E0D6D6;border-radius:6px}
+ .people-desktop-query-tools .ui-compact-button[aria-pressed="true"]{background:color-mix(in srgb,#E0D6D6 12%,transparent);color:#E0D6D6;border-color:#E0D6D6}
+ .people-desktop-query-tools .ui-compact-button:focus-visible{outline-color:#E0D6D6}
  .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact :is(th,td):is([data-table-column="firstVisit"],[data-table-column="lastVisit"]){
    box-sizing:border-box;width:110px;min-width:110px;max-width:110px;text-align:center;padding:4px 6px;
  }
@@ -601,30 +629,41 @@
  .people-action-popup>[data-add-choice-error]:empty{display:none}
 }
 
-/* Contacts Desktop: the table is the only vertical scroll owner. Keep the
-   actual table header in the same table so columns never drift. */
+/* Desktop lists: the table is the only vertical scroll owner. Keep its
+   actual header in the same table so columns never drift. */
 @media (min-width:768px) and (min-height:600px){
- .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z:has([data-people-desktop-toolbar])>[data-v2-z-body]{
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z:has([data-people-list-host],[data-wallet-history-host],[data-finance-article-table],[data-inventory-desktop-table])>[data-v2-z-body]{
    display:flex;flex-direction:column;overflow:hidden!important;
    padding-bottom:0;scrollbar-gutter:auto;
  }
- .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) :is([data-v2-workspace-surface],.ui-page,section:has(>[data-people-list-host]),[data-people-list-host]){
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z:has([data-people-list-host],[data-wallet-history-host],[data-finance-article-table],[data-inventory-desktop-table]) :is([data-v2-workspace-surface],.ui-page,[data-dds-history],section:has(>[data-people-list-host],>[data-wallet-history-host],>[data-finance-article-table]),[data-people-list-host],[data-wallet-history-host],[data-finance-article-table],[data-inventory-desktop-table]){
    display:flex;flex-direction:column;flex:1 1 auto;min-height:0;min-width:0;
  }
- .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) [data-people-list-host]>.ui-data-table--compact{
-   flex:0 1 auto;min-height:0;overflow:auto;overscroll-behavior:none;
+ /* The bounded frame belongs to the table viewport, never to the moving rows.
+    Keep the H bottom inset outside the complete rounded frame. */
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z:has([data-people-list-host],[data-wallet-history-host],[data-finance-article-table],[data-inventory-desktop-table])>[data-v2-z-body]{
+   min-height:0;box-sizing:border-box;
  }
- .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) [data-people-list-host]>.ui-data-table--compact table{
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z :is([data-people-list-host],[data-wallet-history-host],[data-finance-article-table],[data-inventory-desktop-table]){
+   overflow:hidden;
+ }
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z section:has(>[data-wallet-history-host])>.v2-desktop-tool-row{flex:0 0 auto}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z :is([data-people-list-host],[data-wallet-history-host],[data-finance-article-table],[data-inventory-desktop-table])>.ui-data-table--compact{
+   box-sizing:border-box;flex:0 1 auto;min-height:0;min-width:0;max-height:100%;max-width:100%;
+   border:1px solid var(--border);border-radius:14px;background:var(--white);
+   overflow:auto;overscroll-behavior:none;
+ }
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z :is([data-people-list-host],[data-wallet-history-host],[data-finance-article-table],[data-inventory-desktop-table])>.ui-data-table--compact table{
    border-collapse:separate;border-spacing:0;
  }
- .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) [data-people-list-host]>.ui-data-table--compact thead th{
-   position:sticky;top:0;z-index:2;background:#E0D6D6;
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z :is([data-people-list-host],[data-wallet-history-host],[data-finance-article-table],[data-inventory-desktop-table])>.ui-data-table--compact thead th{
+   position:sticky;top:0;z-index:2;background:var(--desktop-table-header-bg);
  }
 }
 
 /* One contact cell, two unchanged visit columns, compact rounded Contacts X. */
 @media (min-width:768px) and (min-height:600px){
- .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .people-table-person{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;width:100%;min-width:0;line-height:1.15}
+ .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar],[data-personal-account-list-host]) .people-table-person{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;width:100%;min-width:0;line-height:1.15}
  .people-table-person__name{font-size:13px;font-weight:650;overflow-wrap:anywhere}
   .people-table-person__phone{font-size:12px;font-weight:400;color:var(--text-secondary);white-space:nowrap;font-variant-numeric:tabular-nums}
  .people-sort-popup :is(.people-action-menu,.desktop-q-action-menu)>.ui-button[aria-pressed="true"]{font-weight:750;background:var(--surface-soft);border-radius:8px}
@@ -647,9 +686,11 @@
 /* Desktop Clients: preserve the approved 110px date columns, make Code visible,
    and reserve independent metric columns. Horizontal overflow stays in the table. */
 @media (min-width:768px) and (min-height:600px){
- .v2-app--workspace [data-people-list-host]>.ui-data-table--compact [data-table-column="code"]{width:72px;min-width:72px;text-align:left;font-variant-numeric:tabular-nums}
- .v2-app--workspace [data-people-list-host]>.ui-data-table--compact td[data-table-column="code"]{font-size:14px;font-weight:750;color:#111}
- .v2-app--workspace [data-people-list-host]>.ui-data-table--compact [data-table-column="name"]{min-width:155px}
+ .v2-app--workspace :is([data-people-list-host],[data-personal-account-list-host])>.ui-data-table--compact [data-table-column="code"]{width:72px;min-width:72px;text-align:left;font-variant-numeric:tabular-nums}
+ .v2-app--workspace :is([data-people-list-host],[data-personal-account-list-host])>.ui-data-table--compact td[data-table-column="code"]{font-size:14px;font-weight:750;color:#111}
+ .v2-app--workspace :is([data-people-list-host],[data-personal-account-list-host])>.ui-data-table--compact [data-table-column="name"]{min-width:155px}
+  .v2-app--workspace [data-personal-account-list-host]>.ui-data-table--compact [data-table-column="code"]{max-width:72px}
+  .v2-app--workspace [data-personal-account-list-host]>.ui-data-table--compact td[data-table-column="name"]>button{display:block;width:100%;min-width:0}
  .v2-app--workspace [data-people-list-host]>.ui-data-table--compact [data-table-column="visitCount"]{width:96px;min-width:96px;text-align:center;font-variant-numeric:tabular-nums}
  .v2-app--workspace [data-people-list-host]>.ui-data-table--compact :is([data-table-column="paidTotal"],[data-table-column="debt"]){width:112px;min-width:112px;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
  .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact th:is([data-table-column="visitCount"],[data-table-column="paidTotal"],[data-table-column="debt"]){padding:4px 6px}
@@ -677,24 +718,25 @@
    separate native controls. No row-wide click target. */
 @media (min-width:768px) and (min-height:600px){
  .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact :is(th,td)[data-table-column="select"]{padding:0 4px;text-align:center}
- .v2-app--workspace [data-people-list-host] .ui-compact-check{position:relative;display:inline-grid;place-items:center;width:36px;height:40px;min-height:40px;touch-action:manipulation}
- .v2-app--workspace [data-people-list-host] .ui-compact-check .ui-check-input{inset:0;width:100%;height:100%;margin:0;pointer-events:auto;cursor:pointer}
- .v2-app--workspace [data-people-list-host] .ui-compact-check .ui-compact-check__mark{pointer-events:none}
+ .v2-app--workspace [data-people-list-host] .ui-compact-check{display:inline-grid;place-items:center;width:36px;height:40px;min-height:40px;touch-action:manipulation}
  .v2-app--workspace [data-people-list-host] .ui-check-input:indeterminate+.ui-compact-check__mark::after{content:'−';font-weight:750;color:var(--text)}
- .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact :is(th,td)[data-table-column="open"]{width:36px;min-width:36px;padding:0 2px;text-align:center}
- .v2-app--workspace [data-people-list-host] .ui-data-table--compact td>.people-table-open{display:grid;place-items:center;width:32px;height:40px;margin:auto;color:#41484F;touch-action:manipulation;cursor:pointer}
- .v2-app--workspace [data-people-list-host] .people-table-open:hover{background:var(--surface-soft);border-radius:8px}
+ .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact :is(th,td)[data-table-column="edit"]{width:36px;min-width:36px;padding:0 2px;text-align:center}
+ .v2-app--workspace [data-people-list-host] .ui-data-table--compact td>.people-table-edit{display:grid;place-items:center;box-sizing:border-box;width:var(--ui-compact-size);height:var(--ui-compact-size);min-height:var(--ui-compact-size);padding:0;margin:auto;border:0;background:transparent;color:var(--text);font-size:20px;font-weight:400;line-height:1;touch-action:manipulation;cursor:pointer}
+
+ .v2-app--workspace [data-people-list-host] .ui-data-table--compact tbody td:not([data-table-column="select"]){cursor:pointer;touch-action:manipulation}
+ .v2-app--workspace [data-people-list-host] .ui-data-table--compact tbody td[data-table-column="name"]:focus-visible{outline:2px solid var(--v2-base);outline-offset:-2px}
 }
 
 /* Desktop Contacts / View: content-specific constructor and selector styles only. */
 @media (min-width:768px) and (min-height:600px){
- .people-card-appearance-q [data-entity-card-appearance-constructor]{width:100%;max-width:360px;margin-inline:auto}
- .people-card-appearance-q .ui-select__control{box-sizing:border-box;height:48px;min-height:48px;max-height:48px;border-radius:8px;font-size:16px;padding:0 28px;text-align:center;justify-content:center}
- .people-card-appearance-q .ui-select__selection{justify-content:center}
- .people-card-appearance-q .ui-select__text{display:flex;align-items:center;justify-content:center;gap:8px;text-align:center;max-width:100%}
- .people-card-appearance-q .ui-select__value{display:block;flex:0 1 auto;max-height:none;white-space:nowrap;text-overflow:ellipsis;font-size:16px;line-height:1.2;text-align:center}
- .people-card-appearance-q .ui-select__meta{flex:0 0 auto;font-size:14px;line-height:1.2;white-space:nowrap}
- .people-card-appearance-q .ui-select__meta[hidden]{display:none}
+ .desktop-appearance-q [data-entity-card-appearance-constructor]{width:100%;max-width:360px;margin-inline:auto}
+ .desktop-appearance-q .entity-card-editor{--entity-card-control-height:var(--v2-desktop-q-button-height,36px)}
+ .desktop-appearance-q .ui-select__control{box-sizing:border-box;height:var(--v2-desktop-q-button-height);min-height:var(--v2-desktop-q-button-height);max-height:var(--v2-desktop-q-button-height);border:1px solid var(--border);border-radius:8px;font-size:14px;padding:0 24px 0 8px;text-align:center;justify-content:center}
+ .desktop-appearance-q .ui-select__selection{justify-content:center}
+ .desktop-appearance-q .ui-select__text{display:flex;flex-wrap:nowrap;align-items:center;justify-content:center;gap:8px;text-align:center;max-width:100%;min-width:0}
+ .desktop-appearance-q .ui-select__value{display:block;flex:0 1 auto;max-height:none;white-space:nowrap;text-overflow:ellipsis;font-size:14px;line-height:1.2;text-align:center}
+ .desktop-appearance-q .ui-select__meta{flex:0 0 auto;font-size:13px;line-height:1.2;white-space:nowrap}
+ .desktop-appearance-q .ui-select__meta[hidden]{display:none}
  .people-card-field-selector .ui-selector__option{justify-content:center;text-align:center;min-height:42px;font-size:16px}
  .people-card-field-selector .ui-selector__option-main{display:flex;flex-wrap:nowrap;align-items:center;justify-content:center;gap:8px;text-align:center}
  .people-card-field-selector .ui-selector__option-label{min-width:0}
@@ -719,7 +761,7 @@
    Keep mobile Z and all Q geometry intact. */
 [data-h-title-row]{display:none}
 @media (min-width:768px) and (min-height:600px){
-.v2-app--workspace{--h-inset:36px;--h-top:36px;--h-bottom:48px;--h-title:36px;--h-gap:24px;--h-tools:36px;--h-list-tool-row:42px;--h-list-row:44px;--h-content-gap:24px}
+.v2-app--workspace{--h-inset:36px;--h-top:36px;--h-bottom:48px;--h-title:36px;--h-gap:24px;--h-tools:36px;--h-list-tool-row:42px;--h-list-row:44px;--desktop-table-disclosure-row:30px;--h-content-gap:24px}
 .v2-app--workspace [data-v2-z-header]>[data-v2-z-dismiss]{display:none!important;visibility:hidden!important;pointer-events:none!important}
 .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z{padding:var(--h-top) var(--h-inset) var(--h-bottom)}
 .v2-app--workspace[data-v2-desktop-surface] .v2-front>.v2-z>[data-v2-z-header]{display:grid!important;grid-template-columns:minmax(0,1fr)!important;grid-template-rows:var(--h-title) minmax(var(--h-tools),auto);align-items:center;gap:var(--h-gap);width:100%;max-width:none;align-self:stretch;min-height:0!important;margin:0!important;padding:0 0 var(--h-content-gap)!important;background:var(--v2-base)!important}
@@ -727,7 +769,9 @@
 .v2-app--workspace [data-h-title-row]>[data-h-title]{grid-column:1;justify-self:start;display:block;width:100%;min-width:0;margin:0!important;padding:0!important;text-align:left!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--white);font-size:30px;line-height:1.2;font-weight:720;letter-spacing:-.035em}
 .v2-app--workspace [data-h-title-row]>[data-h-accessory]{grid-column:2;justify-self:end}
 .v2-app--workspace [data-h-accessory]:empty{display:none}
-.v2-app--workspace [data-h-accessory]>:is([data-people-count],[data-service-count]){color:var(--white);font-size:30px;line-height:1.2;font-weight:720;letter-spacing:-.035em;font-variant-numeric:tabular-nums;white-space:nowrap}
+.v2-app--workspace :is([data-h-accessory]>:is([data-people-count],[data-service-count],[data-cash-total],[data-wallet-count]),.v2-section__accessory>[data-deposit-count]){color:var(--white);font-size:30px;line-height:1.2;font-weight:720;letter-spacing:-.035em;font-variant-numeric:tabular-nums;white-space:nowrap}
+ .v2-app--workspace .v2-section__heading{display:flex;align-items:center;justify-content:space-between;gap:16px;min-width:0}
+ .v2-app--workspace .v2-section__accessory{flex:0 0 auto}
 .v2-app--workspace [data-h-back]{grid-column:3;justify-self:end;display:none;background:transparent;border:0;padding:0;color:var(--white);font:inherit;font-size:14px;line-height:1.2;min-height:36px;cursor:pointer}
 .v2-app--workspace .v2-front>.v2-z--layer[data-v2-dismissible="true"]>[data-v2-z-header] [data-h-back]{display:block}
 .v2-app--workspace[data-v2-desktop-surface] .v2-front>.v2-z>[data-v2-z-header]>[data-v2-z-header-content]{grid-column:1!important;grid-row:2;min-height:var(--h-tools);justify-content:center;align-self:stretch;margin:0!important;padding:0!important}
@@ -756,7 +800,7 @@
  .v2-app--workspace :is(.people-documents-popup,.desktop-table-popup) .ui-data-table--compact{border-radius:10px;overflow:hidden}
  .v2-app--workspace :is(.people-documents-popup,.desktop-table-popup) .ui-data-table--compact table{width:100%;table-layout:fixed;border-collapse:collapse}
  /* Q uses the exact existing documents popup header, not the H-list header. */
- .v2-app--workspace :is(.people-documents-popup,.desktop-table-popup,.service-consumables-q) .ui-data-table--compact th{background:#E0D6D6;color:#41484F;font-size:12px;font-weight:750;box-sizing:border-box;padding:8px 10px;vertical-align:middle;text-align:left}
+ .v2-app--workspace :is(.people-documents-popup,.desktop-table-popup,.service-consumables-q) .ui-data-table--compact th{box-sizing:border-box;padding:8px 10px;vertical-align:middle;text-align:left}
  .v2-app--workspace :is(.people-documents-popup,.desktop-table-popup) .ui-data-table--compact td{box-sizing:border-box;padding:8px 10px;vertical-align:middle;text-align:left}
  .v2-app--workspace :is(.people-documents-popup,.desktop-table-popup) .ui-data-table--compact td{height:44px;font-size:13px;color:#41484F}
  .v2-app--workspace :is(.people-documents-popup,.desktop-table-popup) .ui-data-table--compact :is(th,td)[data-table-column="icon"]{width:38px;text-align:center;padding:4px}
@@ -772,23 +816,28 @@
 /* All deletion confirmations: safe action first, destructive action second.
    Keep the Mobile sheet geometry; Desktop confirmations are centered on a
    dimmed H backdrop, not anchored popups. Technical viewers and Q unchanged. */
-[data-v2-delete-confirmation] .modal-actions>.v2-confirmation-safe{background:var(--text);border-color:var(--text);color:var(--white)}
+[data-v2-delete-confirmation] .modal-actions>.v2-confirmation-safe{background:var(--v2-base);border-color:var(--v2-base);color:var(--white)}
+.desktop-export-confirmation .modal-actions>[data-wallet-export-cancel]{background:var(--white);border-color:var(--v2-base);color:var(--v2-base)}
+.desktop-export-confirmation .modal-actions>[data-wallet-export-confirm]{background:var(--v2-base);border-color:var(--v2-base);color:var(--white)}
+.desktop-export-confirmation .modal-actions>.ui-button:disabled{opacity:.55}
 [data-v2-delete-confirmation] .modal-actions>.v2-confirmation-destructive{background:var(--ui-delete-background);border-color:var(--ui-delete-foreground);color:var(--ui-delete-foreground)}
 [data-v2-delete-confirmation] .modal-actions>.v2-confirmation-destructive:disabled{background:var(--ui-delete-background);border-color:var(--ui-delete-foreground);color:var(--ui-delete-foreground);opacity:.55}
 @media (min-width:768px) and (min-height:600px){
- .v2-app--workspace>.v2-layer-portal>.v2-layer-backdrop[data-v2-delete-confirmation]>.v2-layer--bottom{border-radius:14px;padding:28px 32px;width:min(440px,calc(100% - 32px));box-shadow:0 12px 32px rgba(0,0,0,.24);animation:v2-desktop-confirm-in .16s ease-out both;color:#41484F}
- .v2-app--workspace [data-v2-delete-confirmation] .modal-title{margin-bottom:24px}
- .v2-app--workspace [data-v2-delete-confirmation] .modal-title h2{color:#41484F}
- .v2-app--workspace [data-v2-delete-confirmation] .modal-title p{margin-top:8px;font-size:15px;line-height:1.5;color:#41484F}
- .v2-app--workspace [data-v2-delete-confirmation] .modal-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;justify-items:stretch;align-items:center;margin-top:24px}
- .v2-app--workspace [data-v2-delete-confirmation] .modal-actions>:is(.v2-confirmation-safe,.v2-confirmation-destructive){box-sizing:border-box;width:100%;min-width:0;max-width:160px;height:var(--h-tools,36px);min-height:var(--h-tools,36px);max-height:var(--h-tools,36px);margin:0;padding:0 10px;border-width:1px;border-radius:10px;font-size:13px;line-height:1}
+ .v2-app--workspace>.v2-layer-portal>.v2-layer-backdrop:is([data-v2-delete-confirmation],:has(>.desktop-export-confirmation))>.v2-layer--bottom{border-radius:14px;padding:28px 32px;width:min(440px,calc(100% - 32px));box-shadow:0 12px 32px rgba(0,0,0,.24);animation:v2-desktop-confirm-in .16s ease-out both;color:#41484F}
+ .v2-app--workspace :is([data-v2-delete-confirmation],:has(>.desktop-export-confirmation)) .modal-title{margin-bottom:24px}
+ .v2-app--workspace :is([data-v2-delete-confirmation],:has(>.desktop-export-confirmation)) .modal-title h2{color:#41484F}
+ .v2-app--workspace :is([data-v2-delete-confirmation],:has(>.desktop-export-confirmation)) .modal-title p{margin-top:8px;font-size:15px;line-height:1.5;color:#41484F}
+ .v2-app--workspace :is([data-v2-delete-confirmation],:has(>.desktop-export-confirmation)) .modal-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;justify-items:stretch;align-items:center;margin-top:24px}
+ .v2-app--workspace :is([data-v2-delete-confirmation],:has(>.desktop-export-confirmation)) .modal-actions>:is(.v2-confirmation-safe,.v2-confirmation-destructive,[data-wallet-export-confirm],[data-wallet-export-cancel]){box-sizing:border-box;width:100%;min-width:0;max-width:160px;height:var(--h-tools,36px);min-height:var(--h-tools,36px);max-height:var(--h-tools,36px);margin:0;padding:0 10px;border-width:1px;border-radius:10px;font-size:13px;line-height:1}
  .v2-app--workspace [data-v2-delete-confirmation] .modal-actions>.v2-confirmation-destructive{grid-column:1;grid-row:1;justify-self:start}
  .v2-app--workspace [data-v2-delete-confirmation] .modal-actions>.v2-confirmation-safe{grid-column:2;grid-row:1;justify-self:end}
+ .v2-app--workspace .desktop-export-confirmation [data-wallet-export-cancel]{grid-column:1;grid-row:1;justify-self:start}
+ .v2-app--workspace .desktop-export-confirmation [data-wallet-export-confirm]{grid-column:2;grid-row:1;justify-self:end}
  /* Document confirmation: owner explicitly requests the destructive action on the right. */
  .v2-app--workspace [data-v2-delete-confirmation] .document-delete-confirmation .modal-actions>.v2-confirmation-destructive{grid-column:2;justify-self:end}
  .v2-app--workspace [data-v2-delete-confirmation] .document-delete-confirmation .modal-actions>.v2-confirmation-safe{grid-column:1;justify-self:start}
- .v2-app--workspace [data-v2-delete-confirmation] .v2-layer__gesture-zone{display:none}
- .v2-app--workspace>.v2-layer-portal>.v2-layer-backdrop[data-v2-delete-confirmation]>.v2-layer--bottom.is-dismissing{animation:none;opacity:0;transform:translateY(0);transition:opacity .15s ease}
+ .v2-app--workspace :is([data-v2-delete-confirmation],:has(>.desktop-export-confirmation)) .v2-layer__gesture-zone{display:none}
+ .v2-app--workspace>.v2-layer-portal>.v2-layer-backdrop:is([data-v2-delete-confirmation],:has(>.desktop-export-confirmation))>.v2-layer--bottom.is-dismissing{animation:none;opacity:0;transform:translateY(0);transition:opacity .15s ease}
 }
 @keyframes v2-desktop-confirm-in{from{opacity:0}to{opacity:1}}
 @media (prefers-reduced-motion:reduce){[data-v2-delete-confirmation]>.v2-layer{animation:none!important;transition:none!important}}
@@ -816,9 +865,9 @@
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-desktop-tool-context>.ui-compact-button:focus-visible{outline-color:var(--white)}
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-desktop-tool-actions{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:8px;margin-left:auto;min-width:0}
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-desktop-tool-actions>.ui-button{box-sizing:border-box;width:auto;height:var(--h-tools);min-height:var(--h-tools);max-height:var(--h-tools);padding:0 12px;margin:0;border:1px solid var(--white);border-radius:10px;background:var(--white);color:#41484F;font-size:13px;line-height:1;white-space:nowrap}
- .v2-app--workspace[data-v2-desktop-surface="list"] .v2-desktop-tool-actions>:is(.v2-desktop-tool-primary,.v2-desktop-tool-accent),
- .v2-app--workspace .desktop-q-toolbar>.desktop-q-action-slot.v2-desktop-tool-primary{background:#E0D6D6;border-color:#E0D6D6;color:#41484F}
- .v2-app--workspace[data-v2-desktop-surface="list"] .v2-desktop-tool-actions>.v2-desktop-tool-primary{display:grid;place-items:center;width:var(--h-tools);min-width:var(--h-tools);padding:0}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-desktop-tool-actions>:is(.v2-desktop-tool-primary,.v2-desktop-tool-accent){background:#E0D6D6;border-color:#E0D6D6;color:#41484F}
+ .v2-app--workspace .desktop-q-toolbar>.desktop-q-action-slot.v2-desktop-tool-primary{background:var(--v2-base);border-color:var(--v2-base);color:var(--white)}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-desktop-tool-actions>:is(.v2-desktop-tool-primary,.v2-desktop-tool-icon){display:grid;place-items:center;width:var(--h-tools);min-width:var(--h-tools);padding:0}
  .v2-app--workspace[data-v2-desktop-surface="list"] :is(.v2-desktop-tool-context,.v2-desktop-tool-actions)>.segment-control{box-sizing:border-box;width:auto;min-width:0;height:var(--h-tools);min-height:var(--h-tools);margin:0}
  .v2-app--workspace[data-v2-desktop-surface="list"] :is(.v2-desktop-tool-context,.v2-desktop-tool-actions)>.segment-control>button{flex:1 0 auto}
  .v2-app--workspace[data-v2-desktop-surface="list"] :is(.v2-desktop-tool-context,.v2-desktop-tool-actions) :is(.ui-button,.segment-control>button):focus-visible{outline:2px solid var(--white);outline-offset:-3px}
@@ -843,16 +892,16 @@
 
 @media (min-width:768px) and (min-height:600px){
  .v2-app--workspace [data-people-list-host] .ui-compact-check{display:grid;margin:auto}
- .v2-app--workspace [data-people-list-host] .people-table-person__name{white-space:nowrap;overflow-wrap:normal}
+ .v2-app--workspace :is([data-people-list-host],[data-personal-account-list-host]) .people-table-person__name{white-space:nowrap;overflow-wrap:normal}
 }
 
 /* Service Desktop: one visible catalogue panel, same stationary 44px header
    and independently scrolling body as the accepted Clients list. */
 @media (min-width:768px) and (min-height:600px){
- .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z:has([data-service-desktop-group-list])>[data-v2-z-body]{display:flex;flex-direction:column;overflow:hidden!important;padding-bottom:0;scrollbar-gutter:auto}
- .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z:has([data-service-desktop-group-list]) :is([data-v2-workspace-surface],.ui-page,[data-service-catalog]){display:flex;flex-direction:column;flex:1 1 auto;min-height:0;min-width:0}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z:has([data-service-table-kind="combined"])>[data-v2-z-body]{display:flex;flex-direction:column;overflow:hidden!important;min-height:0;scrollbar-gutter:auto}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z:has([data-service-table-kind="combined"]) :is([data-v2-workspace-surface],.ui-page,[data-service-catalog]){display:flex;flex-direction:column;flex:1 1 auto;min-height:0;min-width:0}
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-desktop-group-list]{display:flex;flex-direction:column;flex:0 1 auto;min-height:0;min-width:0;border:1px solid var(--border);border-radius:var(--radius-control);overflow:hidden;background:var(--white)}
- .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .service-desktop-group-header{box-sizing:border-box;display:flex;align-items:center;justify-content:space-between;gap:16px;flex:0 0 var(--h-list-row);height:var(--h-list-row);min-height:var(--h-list-row);max-height:var(--h-list-row);padding:0 12px 0 16px;background:#E0D6D6;color:#41484F;border-bottom:1px solid var(--border);font-size:12px;font-weight:750;font-style:italic;line-height:1.2;text-transform:uppercase}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .service-desktop-group-header{box-sizing:border-box;display:flex;align-items:center;justify-content:space-between;gap:16px;flex:0 0 var(--h-list-row);height:var(--h-list-row);min-height:var(--h-list-row);max-height:var(--h-list-row);padding:0 12px 0 16px;border-bottom:1px solid var(--border)}
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .service-desktop-group-select{display:flex;min-width:0;max-width:100%;flex:0 1 auto;gap:0}
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .service-desktop-group-select .ui-select__control{width:auto;height:36px;min-height:36px;max-height:36px;padding:0 24px 0 0;background:transparent;border:0;border-radius:0;color:#41484F;font-size:inherit;font-weight:inherit;font-style:inherit;text-transform:inherit}
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .service-desktop-group-select :is(.ui-select__selection,.ui-select__text){min-width:0;justify-content:flex-start;text-align:left}
@@ -860,7 +909,7 @@
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .service-desktop-group-select .ui-select__chevron{right:4px;color:#41484F}
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .service-desktop-price-title{flex:0 0 auto;text-align:right;white-space:nowrap}
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .service-desktop-group-title{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
- .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .service-desktop-group-header .service-desktop-group-select .ui-select__value{font-style:italic;text-transform:inherit}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .service-desktop-group-header .service-desktop-group-select .ui-select__value{font-style:inherit;text-transform:inherit}
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-desktop-group-list] :is([data-procedure],[data-product])>.list-entry__content{grid-template-columns:36px minmax(0,1fr) auto}
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-desktop-group-list] :is([data-procedure],[data-product]) .list-entry__right{grid-column:3;justify-self:end}
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z .service-desktop-group-body[data-service-group-catalog]{display:block;flex:0 1 auto;min-height:0;overflow:auto;overscroll-behavior:none}
@@ -885,7 +934,7 @@
  .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-q-fixed-tools .desktop-q-toolbar>.desktop-q-action-slot:is(.ui-button),.v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-q-fixed-tools .desktop-q-toolbar>.desktop-q-action-slot>.ui-button{box-sizing:border-box;width:var(--v2-desktop-q-button-width);min-width:var(--v2-desktop-q-button-width);max-width:var(--v2-desktop-q-button-width);height:var(--v2-desktop-q-button-height);min-height:var(--v2-desktop-q-button-height);max-height:var(--v2-desktop-q-button-height);padding:0 4px;margin:0;border-width:1px;border-radius:10px;font-size:12px;line-height:1.15;white-space:normal;overflow-wrap:normal;overflow:hidden;text-overflow:clip}
  .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-q-fixed-tools .desktop-q-toolbar>.desktop-q-action-slot.modal-actions{position:static;height:var(--v2-desktop-q-button-height);min-height:var(--v2-desktop-q-button-height);max-height:var(--v2-desktop-q-button-height);display:grid;gap:0}
  .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-q-fixed-tools .desktop-q-toolbar>.desktop-q-action-slot.ui-compact-button{flex:0 0 var(--ui-compact-size);width:var(--ui-compact-size);min-width:var(--ui-compact-size);max-width:var(--ui-compact-size)}
- .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-q-fixed-tools .desktop-q-toolbar>.desktop-q-action-slot.ui-compact-button.v2-desktop-tool-primary{flex:0 0 var(--h-tools);width:var(--h-tools);min-width:var(--h-tools);max-width:var(--h-tools);height:var(--h-tools);min-height:var(--h-tools);max-height:var(--h-tools);border:1px solid #E0D6D6;border-radius:10px;font-size:24px}
+ .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard.desktop-q-fixed-tools .desktop-q-toolbar>.desktop-q-action-slot.ui-compact-button.v2-desktop-tool-primary{flex:0 0 var(--h-tools);width:var(--h-tools);min-width:var(--h-tools);max-width:var(--h-tools);height:var(--h-tools);min-height:var(--h-tools);max-height:var(--h-tools);border:1px solid var(--v2-base);border-radius:10px;font-size:24px}
 
 }
 
@@ -973,15 +1022,15 @@
  .v2-app--workspace .desktop-service-groups-q [data-desktop-group-content] .ui-list__secondary{font-size:12px;line-height:14px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
  .v2-app--workspace .desktop-service-groups-q [data-desktop-group-content] .ui-list__item>.list-entry__reorder-handle{height:var(--ui-compact-size);width:var(--ui-compact-size);flex-basis:var(--ui-compact-size)}
  .v2-app--workspace .desktop-service-groups-q [data-desktop-group-content] .ui-list__right-secondary{font-size:13px;line-height:16px;font-variant-numeric:tabular-nums;white-space:nowrap}
- .v2-app--workspace .desktop-service-groups-q [data-service-group-value-list] .desktop-group-empty-row .ui-list__title{color:var(--text-secondary);font-weight:400}
+ .v2-app--workspace .desktop-service-group-editor-x [data-group-values-list] .desktop-group-empty-row .ui-list__title{color:var(--text-secondary);font-weight:400}
 }
 
 /* Service group directory keeps original LS2. Only value rows use the dense
    workplace-style list, including a single empty row in the same frame. */
 @media (min-width:768px) and (min-height:600px){
- .v2-app--workspace .desktop-service-groups-q .desktop-group-values{display:grid;gap:6px;min-width:0}
- .v2-app--workspace .desktop-service-groups-q [data-service-group-value-list]>.ui-list--dense.list-entries{box-sizing:border-box;border-radius:var(--radius-control,14px);min-height:0;height:auto;gap:0;padding:0;margin:0}
- .v2-app--workspace .desktop-service-groups-q [data-service-group-value-list] .ui-list__item.desktop-group-empty-row{height:44px;min-height:44px;max-height:44px;padding:4px 12px;flex:0 0 44px}
+ .v2-app--workspace .desktop-service-group-editor-x .desktop-group-values{display:grid;gap:6px;min-width:0}
+ .v2-app--workspace .desktop-service-group-editor-x [data-group-values-list]>.ui-list--dense.list-entries{box-sizing:border-box;border-radius:var(--radius-control,14px);min-height:0;height:auto;gap:0;padding:0;margin:0}
+ .v2-app--workspace .desktop-service-group-editor-x [data-group-values-list] .ui-list__item.desktop-group-empty-row{height:44px;min-height:44px;max-height:44px;padding:4px 12px;flex:0 0 44px}
 }
 
 /* Shared Service Z2: the existing visual card and workplace mini-cards
@@ -1067,7 +1116,7 @@
    keep their original size, but their hit areas align with text buttons. */
 @media (min-width:768px) and (min-height:600px){
  .v2-app--workspace [data-v2-q-header-content]>:is(.desktop-q-toolbar,.people-overview-toolbar){box-sizing:border-box;height:var(--v2-desktop-q-tool-height);min-height:var(--v2-desktop-q-tool-height);max-height:var(--v2-desktop-q-tool-height);align-items:center}
- .v2-app--workspace [data-v2-q-header-content] :is(.desktop-q-toolbar,.people-overview-toolbar) :is(.ui-button,.ui-select__control,.ui-compact-button){box-sizing:border-box;height:var(--v2-desktop-q-button-height);min-height:var(--v2-desktop-q-button-height);max-height:var(--v2-desktop-q-button-height)}
+ .v2-app--workspace [data-v2-q-header-content] :is(.desktop-q-toolbar,.people-overview-toolbar) :is(.ui-button,.ui-select__control,.ui-compact-button:not(.desktop-q-leading-icon)){box-sizing:border-box;height:var(--v2-desktop-q-button-height);min-height:var(--v2-desktop-q-button-height);max-height:var(--v2-desktop-q-button-height)}
  .v2-app--workspace [data-v2-q-header-content] :is(.desktop-q-toolbar,.people-overview-toolbar) .ui-select{margin:0;min-width:0}
  .v2-app--workspace>.v2-layer-portal.is-q>.v2-layer-backdrop[data-v2-q="true"]>.v2-layer--standard>[data-v2-q-header]>[data-v2-q-header-content]>[data-desktop-q-secondary-tools] :is(.ui-button,.ui-select__control,.ui-compact-button){box-sizing:border-box;height:var(--v2-desktop-q-button-height);min-height:var(--v2-desktop-q-button-height);max-height:var(--v2-desktop-q-button-height)}
  .v2-app--workspace [data-v2-q-header-content]>.people-history-search{margin:0}
@@ -1075,8 +1124,18 @@
 
 /* Service booking options use the shared Q tool rows, not the form. */
 @media (min-width:768px) and (min-height:600px){
- .v2-app--workspace .desktop-q-toolbar>.desktop-q-online-booking{order:-1;flex:0 1 auto;min-width:0;height:var(--v2-desktop-q-button-height);max-height:var(--v2-desktop-q-button-height);gap:5px}
+ .v2-app--workspace :is(.desktop-q-toolbar>.desktop-q-online-booking,.desktop-q-toolbar[data-desktop-q-secondary-tools]>.ui-compact-check){order:-1;flex:0 1 auto;min-width:0;height:var(--v2-desktop-q-button-height);max-height:var(--v2-desktop-q-button-height);gap:5px}
  .v2-app--workspace .desktop-q-toolbar>.desktop-q-online-booking .ui-compact-check__label{min-width:0;font-size:12px;line-height:1.15;font-weight:700;white-space:normal;overflow-wrap:normal}
+ .v2-app--workspace .desktop-q-toolbar>.desktop-q-leading-icon:is(.ui-compact-button--settings,.ui-compact-button--info){order:-1;background:transparent;border:0;color:var(--v2-base)}
+ /* Match the visible gear contour (~20px), not its 23px SVG viewport. Keep the approved gear untouched. */
+ .v2-app--workspace .desktop-q-toolbar>.desktop-q-leading-icon.ui-compact-button--info{position:relative;display:block;align-self:center;appearance:none;-webkit-appearance:none}
+ .v2-app--workspace .desktop-q-toolbar>.desktop-q-leading-icon.ui-compact-button--info>.small-action-button__info{box-sizing:border-box;display:grid;place-items:center;position:absolute;inset:0;width:20px;height:20px;border:1.5px solid currentColor;border-radius:5px;padding:0;margin:auto;font-size:0;line-height:1}
+ .v2-app--workspace .desktop-q-toolbar>.desktop-q-leading-icon.ui-compact-button--info>.small-action-button__info::before,.v2-app--workspace .desktop-q-toolbar>.desktop-q-leading-icon.ui-compact-button--info>.small-action-button__info::after{content:"";position:absolute;left:50%;transform:translateX(-50%);background:currentColor;border-radius:1px}
+ .v2-app--workspace .desktop-q-toolbar>.desktop-q-leading-icon.ui-compact-button--info>.small-action-button__info::before{top:3.5px;width:2px;height:2px}
+ .v2-app--workspace .desktop-q-toolbar>.desktop-q-leading-icon.ui-compact-button--info>.small-action-button__info::after{top:7.5px;width:1.7px;height:6px}
+ .v2-app--workspace .desktop-q-toolbar>.desktop-q-h-action.ui-button{background:var(--v2-base);border-color:var(--v2-base);color:var(--white)}
+ .v2-app--workspace [data-personal-account-desktop-tools]+[data-personal-account-secondary-tools]{justify-content:flex-start}
+ .v2-app--workspace .desktop-q-toolbar[data-desktop-q-secondary-tools]::before{display:none}
 }
 
 /* One Desktop veil for Q/X/S and technical layers; preserve Mobile geometry. */
@@ -1095,3 +1154,177 @@
  body:has(.v2-app--workspace)>.v2-layer-backdrop--technical>.v2-layer--technical .document-page h1{padding-right:40px}
  body:has(.v2-app--workspace)>.v2-layer-backdrop--technical>.v2-layer--technical:has(.document-viewer__pdf)>.v2-layer__close{top:calc(env(safe-area-inset-top) + 12px)}
 }
+
+/* Canonical Desktop table/group header (Clients, Service and every shared table). */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace{--desktop-table-header-bg:#E0D6D6;--desktop-table-header-ink:#41484F;--desktop-table-system-bg:#927D7D;--desktop-table-system-ink:#FFFFFF;--desktop-table-group-bg:#CDBABA;--desktop-table-group-ink:#41484F;--desktop-table-value-bg:#EFE5E5;--desktop-table-value-ink:#41484F;--desktop-h-secondary-ink:#E0D6D6}
+ .v2-app--workspace :is(.ui-data-table th,.service-desktop-group-header){background:var(--desktop-table-header-bg);color:var(--desktop-table-header-ink);font-size:12px;font-weight:750;font-style:normal;line-height:1.2;letter-spacing:0;text-transform:uppercase}
+ .v2-app--workspace .ui-data-table th button{font-style:inherit;font-weight:inherit;text-transform:inherit}
+ .v2-app--workspace :is(.loyalty-deposit-program-z,[data-personal-account-list-host]) .ui-data-table--compact :is(th,td){box-sizing:border-box;height:var(--h-list-row);padding-block:4px}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.loyalty-deposit-program-z .v2-section__title{color:var(--desktop-h-secondary-ink)}
+ .v2-app--workspace .loyalty-deposit-program-z [data-deposit-open-row]>td:not([data-table-column="visible"]){cursor:pointer}
+ .v2-app--workspace .loyalty-deposit-program-z .deposit-list-status{display:grid;gap:2px;line-height:1.15;justify-items:start}
+ .v2-app--workspace .loyalty-deposit-program-z .deposit-list-status__amount{white-space:nowrap;font-variant-numeric:tabular-nums}
+ .v2-app--workspace :is(.loyalty-deposit-program-z,[data-personal-account-list-host]) [data-table-column="visible"]{text-align:center}
+ .v2-app--workspace :is(.loyalty-deposit-program-z,[data-personal-account-list-host]) [data-table-column="visible"] .ui-compact-check{display:grid;margin:auto}
+ .v2-app--workspace [data-personal-account-open-row]>td:not([data-table-column="visible"]){cursor:pointer}
+ .v2-app--workspace[data-v2-desktop-surface="list"] [data-deposit-program-toolbar] .v2-desktop-tool-actions>.ui-button--danger{background:var(--ui-delete-background);color:var(--ui-delete-foreground);border-color:var(--ui-delete-foreground)}
+ .v2-app--workspace .deposit-program-code-x [data-deposit-code-form]{display:grid;gap:24px}
+ .v2-app--workspace .deposit-program-code-x [data-deposit-code-error]:empty{display:none}
+}
+
+[data-personal-account-help-row]{display:flex;justify-content:flex-start}
+
+/* Q add controls share the existing compact glyph and H surface, never the H toolbar beige. */
+.v2-app--workspace [data-v2-q-body] .ui-compact-button--add.v2-desktop-tool-primary{background:var(--v2-base);color:var(--white);border:1px solid var(--v2-base);border-radius:10px;width:var(--h-tools);min-width:var(--h-tools);max-width:var(--h-tools);height:var(--h-tools);min-height:var(--h-tools);max-height:var(--h-tools);flex-basis:var(--h-tools);font-size:24px;margin-left:auto}
+.v2-app--workspace [data-v2-q-body] .ui-compact-button--add.v2-desktop-tool-primary[hidden]{display:none!important}
+
+@media (min-width:768px) and (min-height:600px){
+/* Approved common table hierarchy. Do not recolor the canonical column header. */
+.v2-app--workspace [data-table-group-level="system"]{--table-level-bg:var(--desktop-table-system-bg);--table-level-ink:var(--desktop-table-system-ink)}
+.v2-app--workspace [data-table-group-level="group"]{--table-level-bg:var(--desktop-table-group-bg);--table-level-ink:var(--desktop-table-group-ink)}
+.v2-app--workspace [data-table-group-level="value"]{--table-level-bg:var(--desktop-table-value-bg);--table-level-ink:var(--desktop-table-value-ink)}
+.v2-app--workspace [data-table-group-level]:is(tr)>td{background:var(--table-level-bg);color:var(--table-level-ink);font-weight:750}
+.v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-table-kind="combined"]{--service-columns:36px 28px minmax(155px,1fr) minmax(85px,.65fr) minmax(80px,.45fr) minmax(130px,.85fr) minmax(100px,.65fr) minmax(105px,.75fr) 28px;display:block;overflow:auto;flex:0 1 auto;min-height:0;max-height:100%;overscroll-behavior:none}
+.v2-app--workspace [data-service-table-kind="combined"] .service-desktop-table-track{min-width:886px}
+.v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-table-kind] .service-desktop-group-header,.v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-table-kind] [data-service-position]>.list-entry__content{display:grid;grid-template-columns:var(--service-columns);gap:10px;padding-inline:12px;align-items:center}
+.v2-app--workspace [data-service-table-kind="combined"] .service-desktop-group-header{position:sticky;top:0;z-index:10}
+.v2-app--workspace [data-service-table-kind]  .service-desktop-group-header>span{min-width:0;white-space:normal;overflow-wrap:normal;text-align:right}.v2-app--workspace [data-service-table-kind] .service-desktop-group-header>span:nth-child(3){text-align:left}
+.v2-app--workspace [data-service-table-kind] [data-service-position] .list-entry__main{grid-column:3}.v2-app--workspace [data-service-table-kind] [data-service-position] .list-entry__right{grid-column:4}
+.v2-app--workspace [data-service-table-kind] .service-desktop-value{text-align:right;font-size:13px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-table-kind] .service-desktop-group-body[data-service-group-catalog]{display:block;overflow:visible}
+.v2-app--workspace [data-service-desktop-section]{display:block;min-width:0}.v2-app--workspace [data-service-desktop-section][hidden]{display:none!important}
+.v2-app--workspace [data-service-table-kind] .service-table-check{grid-column:2;justify-self:center;align-self:center;min-width:0;margin:0;padding:0}
+.v2-app--workspace [data-service-table-kind] [data-service-position] [data-reorder-handle]{grid-column:1}
+.v2-app--workspace [data-service-table-kind] [data-service-position],.v2-app--workspace [data-service-table-kind] [data-service-position] .list-entry__content{cursor:pointer}
+.v2-app--workspace [data-service-table-kind] .inventory-editor-panel__body{padding:0!important}.v2-app--workspace [data-service-table-kind] .inventory-editor-panel{margin:0;border:0;border-radius:0;box-shadow:none}.v2-app--workspace [data-service-table-kind] .service-desktop-branch{gap:0}
+.v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-table-kind] [data-table-group-level]:is(.inventory-editor-panel)>details>summary.inventory-editor-summary{background:var(--table-level-bg);color:var(--table-level-ink);border-bottom:1px solid var(--border)}
+.v2-app--workspace [data-service-table-kind] [data-table-group-level="value"]>details>summary.inventory-editor-summary{padding-left:36px}
+.v2-app--workspace [data-service-table-host]{min-width:0}
+.v2-app--workspace [data-dds-history] .ui-data-table--compact tbody tr[data-table-group-level]>td{background:var(--table-level-bg);color:var(--table-level-ink);font-weight:750;text-align:left;padding-inline:12px;white-space:normal}
+}
+
+/* Compact range editor: one standard selector above two straight inputs. */
+.people-filter-popup .service-filter-range{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;min-width:0}
+.people-filter-popup .service-filter-range .field{min-width:0;gap:0}.people-filter-popup .service-filter-range .field>span:empty{display:none}
+.people-filter-popup .service-filter-range input{box-sizing:border-box;width:100%;min-width:0;height:var(--ui-compact-size,28px);min-height:var(--ui-compact-size,28px);max-height:var(--ui-compact-size,28px);border-radius:0;font-size:13px;padding:0 6px}
+.people-filter-popup [data-service-range-fields]{gap:8px}
+
+@media (min-width:768px) and (min-height:600px){
+/* Drag first, selection second, editable action last. System headings are not draggable. */
+.v2-app--workspace [data-service-table-kind] [data-service-position] .service-table-edit{grid-column:9;justify-self:center;align-self:center;box-sizing:border-box;width:var(--ui-compact-size);height:var(--ui-compact-size);min-height:var(--ui-compact-size);padding:0;border:0;background:transparent;color:var(--text);font-size:20px;font-weight:400;line-height:1}
+.v2-app--workspace [data-service-table-kind] [data-service-collapse-key]{position:relative}
+
+.v2-app--workspace .ui-data-table--compact tr[data-table-group-level] .dds-table-disclosure>summary{display:flex;align-items:center;padding-inline:12px 40px;color:inherit;background:transparent;white-space:normal;font:inherit}
+.v2-app--workspace [data-dds-history] .ui-data-table--compact tr[data-table-group-level] .dds-table-disclosure>summary{padding-left:12px;gap:8px;list-style:none;cursor:pointer}
+.v2-app--workspace [data-dds-history] .ui-data-table--compact tr[data-table-group-level="value"] .dds-table-disclosure>summary{padding-left:32px}
+.v2-app--workspace [data-dds-history] .dds-table-disclosure>summary::-webkit-details-marker{display:none}
+.v2-app--workspace [data-dds-history] .dds-table-disclosure>summary::marker{content:""}
+.v2-app--workspace [data-dds-history] .dds-group-marker{flex:0 0 12px;text-align:center;line-height:1}
+.v2-app--workspace .desktop-service-groups-q :is([data-article-count],[data-service-group-count]){display:block;width:100%;text-align:right;font-weight:650;font-variant-numeric:tabular-nums}
+.v2-app--workspace [data-dds-history] .ui-data-table--compact tbody tr[hidden]{display:none!important}
+}
+
+/* Desktop Service: one explicit grid row; section selection is independent
+   from the native disclosure and from the other section. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-table-kind] [data-service-position]>.list-entry__content{grid-template-rows:minmax(0,1fr);grid-auto-rows:0;align-items:center}
+ .v2-app--workspace [data-service-table-kind] [data-service-position]>.list-entry__content>*{grid-row:1;min-width:0}
+ .v2-app--workspace [data-service-table-kind] [data-service-position] [data-service-column="duration"]{grid-column:5}
+ .v2-app--workspace [data-service-table-kind] [data-service-column="usage"]{grid-column:6}
+ .v2-app--workspace [data-service-table-kind] [data-service-column="minutes"]{grid-column:7}
+ .v2-app--workspace [data-service-table-kind] [data-service-column="revenue"]{grid-column:8}
+ .v2-app--workspace [data-service-table-kind] .service-desktop-group-header>[data-service-column]{display:grid;align-content:center;line-height:1.2}
+ .v2-app--workspace [data-service-table-kind] .service-desktop-group-header>[data-service-column="name"]{grid-column:3;text-align:left}
+ .v2-app--workspace [data-service-table-kind] [data-service-column="price"]{grid-column:4}
+ .v2-app--workspace [data-service-table-kind] .service-desktop-group-header>[data-service-column="duration"]{grid-column:5}
+ .v2-app--workspace [data-service-table-kind] [data-service-column]:is([data-service-column="duration"],[data-service-column="usage"],[data-service-column="minutes"]){text-align:center}
+ .v2-app--workspace [data-service-table-kind] [data-service-position] .service-desktop-price{width:100%;max-width:none;justify-self:stretch}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-table-kind] :is(.service-desktop-group-header,[data-service-position]>.list-entry__content){box-sizing:border-box;width:100%;justify-content:normal;padding-inline:12px}
+ .v2-app--workspace [data-service-table-kind] .service-desktop-group-header>span:last-child:not([data-service-column]){grid-column:9}
+ .v2-app--workspace [data-service-table-kind] [data-service-position] .list-entry__reorder-handle{height:var(--ui-compact-size);margin:0;justify-self:center}
+ .v2-app--workspace [data-service-table-kind] [data-service-desktop-section]{position:relative}
+}
+
+/* Service disclosure rows divide the catalogue without taking a full data row. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-table-kind] [data-service-collapse-key]>details>summary.inventory-editor-summary{box-sizing:border-box;height:var(--desktop-table-disclosure-row);min-height:var(--desktop-table-disclosure-row);max-height:var(--desktop-table-disclosure-row);padding-block:4px;line-height:21px}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-table-kind] [data-service-collapse-key]>.inventory-editor-heading__controls{top:0;height:var(--desktop-table-disclosure-row);min-height:0;align-items:center}
+}
+
+/* Products have no duration columns: compact the actual grid, not just its cells. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-front>.v2-z [data-service-table-kind][data-service-table-mode="products"]{--service-columns:36px 28px minmax(155px,1fr) minmax(85px,.65fr) minmax(130px,.85fr) minmax(105px,.75fr) 28px}
+ .v2-app--workspace [data-service-table-kind][data-service-table-mode="products"] .service-desktop-table-track{min-width:704px}
+ .v2-app--workspace [data-service-table-kind][data-service-table-mode="products"] [data-service-column="usage"]{grid-column:5}
+ .v2-app--workspace [data-service-table-kind][data-service-table-mode="products"] [data-service-column="revenue"]{grid-column:6}
+ .v2-app--workspace [data-service-table-kind][data-service-table-mode="products"] [data-service-position] .service-table-edit{grid-column:7}
+ .v2-app--workspace [data-service-table-kind][data-service-table-mode="products"] .service-desktop-group-header>span:last-child:not([data-service-column]){grid-column:7}
+}
+
+/* Q group directory uses the existing compact data table and shared reorder handle. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace [data-group-directory] tbody.list-entries{display:table-row-group}
+ .v2-app--workspace [data-group-directory] :is(thead th,tbody tr:not([data-table-group-level])>td){padding-inline:8px}
+ .v2-app--workspace [data-group-directory] :is(th,td)[data-table-column="drag"]{width:36px;padding:0;text-align:center}
+ .v2-app--workspace [data-group-directory] :is(th,td)[data-table-column="values"]{width:104px;padding-inline:12px;text-align:center;font-variant-numeric:tabular-nums}
+ .v2-app--workspace [data-group-directory] :is(th,td)[data-table-column="delete"]{width:40px;padding:0 6px;text-align:center}
+ .v2-app--workspace [data-group-directory] [data-desktop-group-row-delete]{margin:0 auto;touch-action:manipulation}
+ .v2-app--workspace [data-group-directory] .list-entry__reorder-handle{width:36px;height:var(--ui-compact-size);margin:0 auto}
+ .v2-app--workspace [data-group-directory] tbody tr{cursor:pointer;touch-action:manipulation}
+ .v2-app--workspace [data-group-directory] .desktop-group-table-name{display:block;width:100%;min-width:0;white-space:normal;overflow-wrap:anywhere;line-height:1.2;font-weight:650}
+ .v2-app--workspace [data-group-directory] .ui-data-table--compact .desktop-group-table-name{box-sizing:border-box;padding:0 0 0 var(--group-indent,0px);border:0;background:transparent;text-align:left;color:inherit;white-space:normal;overflow-wrap:normal;word-break:normal}
+ .v2-app--workspace [data-group-directory] .ui-data-table--compact th[data-table-column="name"]{white-space:nowrap;overflow-wrap:normal}
+ .v2-app--workspace [data-group-directory] .ui-data-table--compact tbody tr:not([data-table-group-level]){cursor:pointer}
+ .v2-app--workspace [data-group-directory] tr.is-reordering{position:relative;z-index:4;transform:translateY(var(--list-entry-drag-y,0px));pointer-events:none;background:var(--white)}
+ .v2-app--workspace [data-group-directory] tr.is-reorder-target-before>td{box-shadow:inset 0 2px var(--text)}
+ .v2-app--workspace [data-group-directory] tr.is-reorder-target-after>td{box-shadow:inset 0 -2px var(--text)}
+}
+
+/* Q group directory: one header and two independent section reorder scopes. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace [data-group-directory] .desktop-group-directory-empty{color:var(--text-secondary);cursor:default}
+}
+
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace .desktop-service-group-editor-x [data-group-values-list] .ui-list__item{box-sizing:border-box;min-height:44px;padding:4px 12px}
+ .v2-app--workspace .desktop-service-group-editor-x [data-group-values-list] .list-entry__reorder-handle{height:var(--ui-compact-size);width:var(--ui-compact-size);flex-basis:var(--ui-compact-size)}
+ .v2-app--workspace .desktop-service-group-editor-x [data-desktop-group-delete][hidden]{display:none!important}
+ .v2-app--workspace [data-group-directory] tbody[hidden]{display:none!important}
+ .v2-app--workspace .ui-data-table--compact tr[data-table-group-level="system"]>td>.desktop-group-section-toggle{display:flex;align-items:center;gap:8px;width:100%;height:calc(var(--desktop-table-disclosure-row) - 1px);min-height:calc(var(--desktop-table-disclosure-row) - 1px);padding:0 12px;border:0;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer;touch-action:manipulation}
+}
+
+/* Desktop group editor: use the existing H surface token for primary Save. */
+.v2-app--workspace .desktop-service-group-editor-x [data-desktop-group-save]:not(:disabled){background:var(--v2-base);border-color:var(--v2-base);color:var(--white)}
+
+/* Match the approved Desktop action dimensions, including when both buttons exist. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace .desktop-service-group-editor-x .desktop-group-editor-actions{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+ .v2-app--workspace .desktop-service-group-editor-x .desktop-group-editor-actions>.ui-button{box-sizing:border-box;width:160px;min-width:0;max-width:100%;height:var(--h-tools,36px);min-height:var(--h-tools,36px);max-height:var(--h-tools,36px);margin:0;padding:0 12px;border-width:1px;border-radius:10px;font-size:13px;line-height:1}
+ .v2-app--workspace .desktop-service-group-editor-x .desktop-group-editor-actions>[data-desktop-group-save]{margin-inline-start:auto}
+ .v2-app--workspace .desktop-service-group-editor-x [data-desktop-group-value] .ui-list__main{cursor:pointer;touch-action:manipulation}
+ .v2-app--workspace .desktop-service-group-editor-x [data-desktop-value-row-delete]{flex:0 0 var(--ui-compact-size);margin:0;color:#ff1111;touch-action:manipulation}
+}
+
+/* Shared Desktop table geometry: data/header and hierarchy are distinct row types.
+   Domain modules provide columns, content, and grouping level only. */
+@media (min-width:768px) and (min-height:600px){
+ .v2-app--workspace .ui-data-table--compact{border-radius:var(--radius-control,14px);border-color:var(--border);background:var(--white)}
+ .v2-app--workspace .ui-data-table--compact :is(thead tr,tbody tr:not([data-table-group-level])){height:var(--h-list-row)}
+ .v2-app--workspace .ui-data-table--compact :is(thead th,tbody tr:not([data-table-group-level])>td){box-sizing:border-box;height:var(--h-list-row);padding-block:4px;vertical-align:middle}
+ .v2-app--workspace .ui-data-table--compact tbody tr[data-table-group-level]{height:var(--desktop-table-disclosure-row);min-height:var(--desktop-table-disclosure-row)}
+ .v2-app--workspace .ui-data-table--compact tbody tr[data-table-group-level]>td{box-sizing:border-box;height:var(--desktop-table-disclosure-row);min-height:var(--desktop-table-disclosure-row);padding-block:0;vertical-align:middle;background:var(--table-level-bg);color:var(--table-level-ink);font-weight:750;font-style:normal;line-height:1.2}
+ .v2-app--workspace .ui-data-table--compact tbody tr[data-table-group-level]>td:has(>.dds-table-disclosure,>.desktop-group-section-toggle){padding:0}
+ .v2-app--workspace .ui-data-table--compact tbody tr[data-table-group-level]>td>.dds-table-disclosure>summary{box-sizing:border-box;height:calc(var(--desktop-table-disclosure-row) - 1px);min-height:calc(var(--desktop-table-disclosure-row) - 1px);max-height:calc(var(--desktop-table-disclosure-row) - 1px);padding-block:0;cursor:pointer;touch-action:manipulation;line-height:1.2}
+ .v2-app--workspace .ui-data-table--compact tbody tr[data-table-group-level="system"]>td{font-size:12px;text-transform:uppercase;white-space:normal}
+ .v2-app--workspace .ui-data-table--compact tbody tr[data-table-group-level="system"]>td :is(summary,button){text-transform:inherit}
+ .v2-app--workspace .ui-data-table--compact tbody tr[hidden],.v2-app--workspace .ui-data-table--compact tbody[hidden]{display:none!important}
+}
+
+/* Grouping is a separate, reusable pre-section of the existing sorting X. */
+.people-sort-popup .sort-grouping-section{display:grid;gap:8px;padding:8px 12px 12px;border-bottom:1px solid var(--border);margin-bottom:8px}
+.people-sort-popup .sort-menu-section-label{font-size:12px;font-weight:650;line-height:1.25;color:var(--text-secondary)}
+.people-sort-popup .sort-grouping-options{display:grid;gap:8px}
+.people-sort-popup .sort-grouping-options>.ui-compact-check{display:flex;gap:10px;width:100%;min-height:var(--ui-compact-size,28px)}
+.people-sort-popup .sort-grouping-options .ui-compact-check__label{font-weight:550;line-height:1.25;color:var(--text)}
+.people-sort-popup .sort-menu-order-label{padding:0 12px 6px}
