@@ -17,6 +17,7 @@ import {
   v2ZLayer,
   workplaceCountText,
 } from '../../../ui/ui.js';
+import { CONSUMABLES_ICON } from '../../../ui/buttons/index.js';
 import { getWorkplaces } from '../../profile/workplaces/data.js';
 import { renderServiceOverviewLayout, notifyServiceContext } from '../context.js';
 import { procedureCardAppearance, procedureCardFields, procedureCardPhoto } from '../card-presentation.js';
@@ -193,13 +194,16 @@ function renderProcedureOverview(layer, baseRoot, id, { onChanged = () => {}, st
   }
   layer.dataset.serviceOverview = 'procedure:' + id;
   const { showAdd } = serviceWorkplaceControls();
-  const consumablesAction = button('Расходник', { variant: 'secondary', className: 'v2-desktop-tool-accent', data: 'data-procedure-open-consumables' });
+  const consumablesAction = button(CONSUMABLES_ICON, {
+    variant: 'secondary', className: 'v2-desktop-tool-icon',
+    data: 'data-procedure-open-consumables title="Расходники"', aria: 'Расходники',
+  });
   renderServiceOverviewLayout(layer, {
     title: procedure.name || 'Услуга',
     card: procedureOverviewCard(procedure, statistics),
     workplaceCards: procedureWorkplaceCards(procedure, statistics),
     actions: (showAdd ? serviceWorkplaceAddButton() : '') + consumablesAction,
-    mobileActions: consumablesAction,
+    mobileActions: button('Расходник', { variant: 'secondary', className: 'v2-desktop-tool-accent', data: 'data-procedure-open-consumables' }),
     mobileAdd: showAdd ? { label: '+', data: 'data-service-workplace-add', aria: 'Добавить рабочее пространство' } : null,
   });
   bindServiceWorkplaceAssignments(layer, {
