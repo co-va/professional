@@ -718,9 +718,7 @@
    separate native controls. No row-wide click target. */
 @media (min-width:768px) and (min-height:600px){
  .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact :is(th,td)[data-table-column="select"]{padding:0 4px;text-align:center}
- .v2-app--workspace [data-people-list-host] .ui-compact-check{position:relative;display:inline-grid;place-items:center;width:36px;height:40px;min-height:40px;touch-action:manipulation}
- .v2-app--workspace [data-people-list-host] .ui-compact-check .ui-check-input{inset:0;width:100%;height:100%;margin:0;pointer-events:auto;cursor:pointer}
- .v2-app--workspace [data-people-list-host] .ui-compact-check .ui-compact-check__mark{pointer-events:none}
+ .v2-app--workspace [data-people-list-host] .ui-compact-check{display:inline-grid;place-items:center;width:36px;height:40px;min-height:40px;touch-action:manipulation}
  .v2-app--workspace [data-people-list-host] .ui-check-input:indeterminate+.ui-compact-check__mark::after{content:'−';font-weight:750;color:var(--text)}
  .v2-app--workspace .v2-front>.v2-z:has([data-people-desktop-toolbar]) .ui-data-table--compact :is(th,td)[data-table-column="edit"]{width:36px;min-width:36px;padding:0 2px;text-align:center}
  .v2-app--workspace [data-people-list-host] .ui-data-table--compact td>.people-table-edit{display:grid;place-items:center;box-sizing:border-box;width:var(--ui-compact-size);height:var(--ui-compact-size);min-height:var(--ui-compact-size);padding:0;margin:auto;border:0;background:transparent;color:var(--text);font-size:20px;font-weight:400;line-height:1;touch-action:manipulation;cursor:pointer}
