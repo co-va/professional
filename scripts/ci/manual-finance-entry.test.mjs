@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {manualArticleChoices,manualArticleSelection,manualRawArticle,manualDetailTotal,validManualLine} from '../core/finance/dds/manual-entry-model.js';
+import {manualArticleChoices,manualArticleSelection,manualRawArticle,manualDetailTotal,validManualLine} from '../../core/finance/dds/manual-entry-model.js';
 const raw=[{articleId:'s',systemKey:'SERVICE_REVENUE',direction:'IN',economicType:'SERVICE_REVENUE'},{articleId:'t',systemKey:'TIPS',direction:'IN',economicType:'TIPS'},{articleId:'r',systemKey:'REFUND',direction:'OUT',economicType:'REFUND'},{articleId:'c',direction:'OUT',economicType:'OTHER'},{articleId:'cv',direction:'OUT',economicType:'OTHER'},{articleId:'d',systemKey:'DEPOSIT_RECEIVED',direction:'IN',economicType:'DEPOSIT_RECEIVED'}];
 const catalog=[{articleId:'mechanism-services',name:'Оказание услуг',values:[{valueId:'payment',name:'Оплата услуг',routes:['SERVICE_REVENUE']},{valueId:'tips',name:'Чаевые',routes:['TIPS']},{valueId:'refund',name:'Возврат',routes:['REFUND']}]},{articleId:'c',name:'Закупки',values:[{valueId:'cv',name:'Продукты',routes:[]}]},{articleId:'mechanism-deposit',name:'Депозит',values:[{valueId:'funding',name:'Пополнение',routes:['DEPOSIT_RECEIVED']}]}];
 const income=manualArticleChoices(raw,catalog,'IN');

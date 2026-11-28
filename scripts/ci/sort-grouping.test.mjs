@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict';
-import {sortGroupingSection} from '../ui/selection/check-list.js';
-import {buildDDSGroups,flattenDDSGroups} from '../core/finance/dds/view-order.js';
+import {sortGroupingSection} from '../../ui/selection/check-list.js';
+import {buildDDSGroups,flattenDDSGroups} from '../../core/finance/dds/view-order.js';
 import {readFileSync} from 'node:fs';
 const markup=sortGroupingSection([{label:'По статьям',checked:true,data:'data-dds-group-articles'},{label:'По значениям',data:'data-dds-group-values'}]);
 assert.match(markup,/sort-grouping-section/);
 assert.equal((markup.match(/type="checkbox"/g)||[]).length,2);
 assert.match(markup,/sort-menu-order-label/);
-const wallet=readFileSync(new URL('../core/finance/cash/wallet-history.js',import.meta.url),'utf8');
+const wallet=readFileSync(new URL('../../core/finance/cash/wallet-history.js',import.meta.url),'utf8');
 assert.match(wallet,/const grouping=dds\?sortGroupingSection/);
 assert.match(wallet,/const groupArticles=dds&&state.groupArticles,groupValues=dds&&state.groupValues/);
 const catalog=[{articleId:'s',name:'Услуги',values:[{valueId:'a',name:'Оплата'},{valueId:'b',name:'Чаевые'}]},{articleId:'p',name:'Товары',values:[{valueId:'c',name:'Продажа'}]}];

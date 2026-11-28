@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {paymentAllocationState,selectedPaymentRows,paymentAllocationRemainder,nextPaymentAllocation,paymentMethodsMarkup,initPaymentMethodsAllocation} from '../ui/payment/methods.js';
+import {paymentAllocationState,selectedPaymentRows,paymentAllocationRemainder,nextPaymentAllocation,paymentMethodsMarkup,initPaymentMethodsAllocation} from '../../ui/payment/methods.js';
 const total=12000, cash={source:'wallet:cash',amount:5000}, card={source:'wallet:card',amount:7000};
 assert.deepEqual(nextPaymentAllocation(total,[]),{needed:true,suggested:12000});
 assert.deepEqual(nextPaymentAllocation(total,[{source:'',amount:12000}]),{needed:true,suggested:12000});

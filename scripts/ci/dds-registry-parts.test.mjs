@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { ddsRegistryParts } from '../core/finance/dds/registry-parts.js';
+import { ddsRegistryParts } from '../../core/finance/dds/registry-parts.js';
 const catalog=[{articleId:'s',systemKey:'SERVICE_REVENUE',name:'Услуги'},{articleId:'t',systemKey:'TIPS',name:'Чаевые'},{articleId:'p',systemKey:'PRODUCT_REVENUE',name:'Продажа товаров'},{articleId:'dg',systemKey:'DEPOSIT_BENEFIT_GRANTED',name:'Предоставление выгоды по депозиту'},{articleId:'ds',systemKey:'DEPOSIT_SPEND',name:'Списание с депозита'},{articleId:'dr',systemKey:'DEPOSIT_PAYMENT_REFUND',name:'Возврат на депозит'},{articleId:'db',systemKey:'DEPOSIT_BENEFIT_REVERSED',name:'Аннулирование выгоды по депозиту'},{articleId:'tr',systemKey:'TRANSFER',name:'Перевод между кошельками'}];
 const entry=(articleId,economicType,amount,direction='IN')=>({articleId,economicType,amount,direction,walletName:'Наличные'});
 const fact={kind:'payment',allocations:[{name:'Депозит'}],principal:-10000,bonus:2000,conditionalGranted:2000,conditionalReversed:0,conditionalWrittenOff:null,sources:['Депозит'],personal:0};

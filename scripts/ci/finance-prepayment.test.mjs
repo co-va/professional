@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {supportsFinancePrepayment,manualWalletAllocation,netRecordPrepayment,recordPaymentReport,recordPaymentPresentation,supportsRecordPaymentCalendar,recordPaymentButtonSummary} from '../core/finance/prepayment-model.js';
+import {supportsFinancePrepayment,manualWalletAllocation,netRecordPrepayment,recordPaymentReport,recordPaymentPresentation,recordPaymentTiming,recordPaymentButtonSummary} from '../../core/finance/prepayment-model.js';
 const catalog=[{articleId:'mechanism-services',values:[{valueId:'services-prepayment',routes:['SERVICE_PREPAYMENT']}]}];
 assert.equal(supportsFinancePrepayment(catalog),true);
 assert.equal(supportsFinancePrepayment([]),false);
@@ -16,8 +16,12 @@ assert.equal(netRecordPrepayment(ops,['missing']),0);
 console.log('PASS prepayment net, wallet split and report reconciliation');
 
 const record={date:'2026-12-03'},partial={remaining:7000,paidTotal:5000},tz='Europe/Moscow';
-assert.equal(supportsRecordPaymentCalendar({articleCatalog:catalog}),false);
-assert.equal(supportsRecordPaymentCalendar({articleCatalog:catalog,recordPaymentDateMode:'workplace-calendar-day'}),true);
+// Preserve the already-approved Core #950 start-time contract.
+const visit={date:'2026-12-03',from:'09:00',to:'11:30'};
+assert.equal(recordPaymentTiming(visit,tz,'2026-12-02T20:59:59Z'),'prepayment');
+assert.equal(recordPaymentTiming(visit,tz,'2026-12-03T05:59:59Z'),'prepayment');
+assert.equal(recordPaymentTiming(visit,tz,'2026-12-03T06:00:00Z'),'settlement');
+assert.equal(recordPaymentTiming({date:'2026-12-03'},tz,'2026-12-03T06:00:00Z'),'');
 assert.deepEqual(recordPaymentPresentation(record,partial,tz,'2026-12-02T20:59:59Z',5000),{phase:'before',action:'Предоплата',status:'Предоплата',amount:5000,outstandingLabel:'К оплате'});
 assert.deepEqual(recordPaymentPresentation(record,partial,tz,'2026-12-02T21:00:00Z',5000),{phase:'on',action:'Оплата',status:'Оплата',amount:7000,outstandingLabel:'К оплате'});
 assert.deepEqual(recordPaymentPresentation(record,partial,tz,'2026-12-03T21:00:00Z',5000),{phase:'after',action:'Оплата',status:'Задолженность',amount:7000,outstandingLabel:'Задолженность'});

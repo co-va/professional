@@ -1,8 +1,8 @@
-import {DDS_SORTS,WALLET_SORTS,normalizeWalletSort,normalizeDDSView,sortDDSRows,buildDDSGroups,flattenDDSGroups} from '../core/finance/dds/view-order.js';
+import {DDS_SORTS,WALLET_SORTS,normalizeWalletSort,normalizeDDSView,sortDDSRows,buildDDSGroups,flattenDDSGroups} from '../../core/finance/dds/view-order.js';
 import assert from 'node:assert/strict';
-import {sortArticleDirectory,mergeArticleSectionOrder,orderDDSArticleRows} from '../core/finance/dds/article-order.js';
-import { ddsRegistryParts } from '../core/finance/dds/registry-parts.js';
-import { registeredRoute, availableArticleDirectory, mechanismValueParents } from '../core/finance/dds/article-view.js';
+import {sortArticleDirectory,mergeArticleSectionOrder,orderDDSArticleRows} from '../../core/finance/dds/article-order.js';
+import { ddsRegistryParts } from '../../core/finance/dds/registry-parts.js';
+import { registeredRoute, availableArticleDirectory, mechanismValueParents } from '../../core/finance/dds/article-view.js';
 const canonical=[
 {articleId:'deposit',name:'Депозит',values:[{valueId:'fund',name:'Пополнение',routes:['DEPOSIT_RECEIVED']},{valueId:'pay',name:'Оплата',routes:['DEPOSIT_SPEND']},{valueId:'refund',name:'Возврат',routes:['DEPOSIT_RETURN','DEPOSIT_PAYMENT_REFUND']}],routes:[]},
 {articleId:'services',name:'Оказание услуг',values:[{valueId:'service',name:'Оплата услуг',routes:['SERVICE_REVENUE']},{valueId:'tip',name:'Чаевые',routes:['TIPS']}],routes:[]},
