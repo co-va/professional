@@ -158,8 +158,8 @@ export function bindServiceWorkplaceAssignments(root, {
           variant: 'secondary', data: 'data-service-workplace-cancel-price',
           aria: 'Отменить индивидуальную цену',
         }) : ''}
-        ${!isNew ? button(isProcedure ? 'Убрать из услуги' : 'Убрать из пространства', {
-          variant: 'danger', data: 'data-service-workplace-remove',
+        ${!isNew ? button(desktopTool ? 'Снять' : isProcedure ? 'Убрать из услуги' : 'Убрать из пространства', {
+          variant: 'danger', data: 'data-service-workplace-remove', aria: isProcedure ? 'Убрать из услуги' : 'Убрать из пространства',
         }) : ''}
       </div>
     ${overview ? '' : '</div>'}`;
