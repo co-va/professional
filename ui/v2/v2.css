@@ -868,6 +868,7 @@
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-desktop-tool-actions>:is(.v2-desktop-tool-primary,.v2-desktop-tool-accent){background:#E0D6D6;border-color:#E0D6D6;color:#41484F}
  .v2-app--workspace .desktop-q-toolbar>.desktop-q-action-slot.v2-desktop-tool-primary{background:var(--v2-base);border-color:var(--v2-base);color:var(--white)}
  .v2-app--workspace[data-v2-desktop-surface="list"] .v2-desktop-tool-actions>:is(.v2-desktop-tool-primary,.v2-desktop-tool-icon){display:grid;place-items:center;width:var(--h-tools);min-width:var(--h-tools);padding:0}
+ .v2-app--workspace[data-v2-desktop-surface="list"] .v2-desktop-tool-actions>.v2-desktop-tool-icon--unfilled{background:transparent;border-color:transparent;color:var(--white)}
  .v2-app--workspace[data-v2-desktop-surface="list"] :is(.v2-desktop-tool-context,.v2-desktop-tool-actions)>.segment-control{box-sizing:border-box;width:auto;min-width:0;height:var(--h-tools);min-height:var(--h-tools);margin:0}
  .v2-app--workspace[data-v2-desktop-surface="list"] :is(.v2-desktop-tool-context,.v2-desktop-tool-actions)>.segment-control>button{flex:1 0 auto}
  .v2-app--workspace[data-v2-desktop-surface="list"] :is(.v2-desktop-tool-context,.v2-desktop-tool-actions) :is(.ui-button,.segment-control>button):focus-visible{outline:2px solid var(--white);outline-offset:-3px}
