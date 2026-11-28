@@ -1005,7 +1005,7 @@ function bindProgramVisibility(control, save, title) {
 function bindDesktopProgramTools(layer, program, settings) {
   const toolsMarkup = `<div class="v2-desktop-tool-row" data-deposit-program-toolbar>
     <div class="v2-desktop-tool-actions">
-      ${button('Код · ' + escapeHtml(programUei(program) || '----'), { variant: 'secondary', data: 'data-deposit-program-action="code"', aria: 'Изменить код программы' })}
+      ${button(escapeHtml(programUei(program) || 'Код'), { variant: 'secondary', data: 'data-deposit-program-action="code"', aria: 'Изменить код программы' })}
       ${button('Создать копию', { variant: 'secondary', data: 'data-deposit-program-action="copy"' })}
       ${button(TRASH_ICON, { variant: 'danger', className: 'v2-desktop-tool-icon', data: 'data-deposit-program-action="delete" title="Удалить программу"', aria: 'Удалить программу' })}
       ${button('+', { variant: 'secondary', className: 'v2-desktop-tool-primary', data: 'data-deposit-program-action="fund" title="Оформить карту"', aria: 'Оформить карту' })}
