@@ -3,6 +3,7 @@ import { collectCost, validateCostDefinition, costField, durationPicker, field, 
 import { getProcedures, commitProcedure } from './data.js';
 import { procedureEditorSignature } from '../editor-signature.js';
 import { moveDesktopQTool, pinDesktopQDanger } from '../../../ui/v2/z-layout.js';
+import { isV2DesktopWorkspace } from '../../../ui/v2/geometry.js';
 import { procedureGroupBookingFields, bindProcedureGroupBooking, adaptDesktopGroupBooking } from './group-booking-ui.js';
 import { serviceGroupFields, readServiceGroupFields, bindServiceGroupFields } from '../catalog-grouping.js';
 
@@ -95,7 +96,10 @@ export function bindProcedureEditor(root, {
 
   moveDesktopQTool(primary);
   const deleteButton = root.querySelector('[data-procedure-editor-delete]');
-  if (deleteButton) pinDesktopQDanger(deleteButton);
+  if (deleteButton) {
+    if (isV2DesktopWorkspace(root.closest('[data-v2-app]'))) deleteButton.textContent = 'Удалить';
+    pinDesktopQDanger(deleteButton);
+  }
 
   // The relocated capacity remains associated with the same form.
   const groupTools = form.querySelector('.desktop-inline-group-booking');
