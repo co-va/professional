@@ -209,17 +209,16 @@ function applyDDSHierarchy(host,groups,collapsed){
   const td=doc.createElement('td');td.colSpan=width;
   const details=doc.createElement('details');details.className='dds-table-disclosure';details.open=!collapsed.has(id);
   const summary=doc.createElement('summary');summary.className='inventory-editor-summary';
-  const marker=doc.createElement('span');marker.className='dds-group-marker';marker.setAttribute('aria-hidden','true');
-  const label=doc.createElement('span');label.textContent=group.label;
-  summary.append(marker,label);details.append(summary);td.append(details);tr.append(td);fragment.append(tr);
-  const node={tr,details,marker,ancestors,leaves:[]};disclosures.push(node);
+  summary.textContent=group.label;
+  details.append(summary);td.append(details);tr.append(td);fragment.append(tr);
+  const node={tr,details,ancestors,leaves:[]};disclosures.push(node);
   if(group.children?.length)group.children.forEach(child=>append(child,[...ancestors,node]));
   else for(const row of group.rows){const member=byId.get(row.id);if(member){node.leaves.push(member);fragment.append(member);}}
   details.addEventListener('toggle',()=>{if(details.open)collapsed.delete(id);else collapsed.add(id);sync();});
  };
  const sync=()=>{for(const node of disclosures){
   const hidden=node.ancestors.some(parent=>!parent.details.open);
-  node.tr.hidden=hidden;node.marker.textContent=node.details.open?'▾':'▸';
+  node.tr.hidden=hidden;
   for(const row of node.leaves)row.hidden=hidden||!node.details.open;
  }};
  groups.forEach(group=>append(group));body.append(fragment);sync();
